@@ -17,10 +17,10 @@ namespace quda
   public:
     // Stores gamma matrix column index for non-zero complex value.
     // This is shared by g5gm, gmg5.
-    int gm_i[nSpin*nSpin][nSpin] {};
+    int gm_i[nSpin*nSpin][nSpin] = {};
 
     // Stores gamma matrix non-zero complex value for the corresponding g5gm_i
-    complex<real> g5gm_z[nSpin*nSpin][nSpin];
+    complex<real> g5gm_z[nSpin*nSpin][nSpin] = {};
     
     // use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
     //the possible minus sign will be taken care of in the main function
