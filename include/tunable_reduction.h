@@ -332,8 +332,7 @@ namespace quda
 
         if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
             && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
-            && param.block.z < n_batch_block_max
-            && shared_bytes <= this->maxSharedBytesPerBlock()) {
+            && param.block.z < n_batch_block_max && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.z++;
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
           param.shared_bytes = shared_bytes;
