@@ -245,7 +245,7 @@ namespace quda {
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const override
     {
-      if ((type == COMPUTE_VUV || type == COMPUTE_VLV) && arg.shared_atomic)
+      if (arg.shared_atomic && (type == COMPUTE_VUV || type == COMPUTE_VLV))
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
