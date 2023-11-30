@@ -135,7 +135,6 @@ namespace quda
       }
 
       Link U, Q;
-      //ThreadLocalCache<Link> Stap;
       ThreadLocalCache<Link,0,computeStapleRectangleOps> Stap;
       ThreadLocalCache<Link,0,decltype(Stap)> Rect; // offset by Stap type to ensure non-overlapping allocations
 
