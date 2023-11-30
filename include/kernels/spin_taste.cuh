@@ -75,21 +75,6 @@ namespace quda {
     return sign;
   }
 
-  template <typename Arg> inline __device__ __host__ void applySign(int idx, int parity, const Arg &arg) {
-    using real = typename mapper<typename Arg::Float>::type;
-    using Vector = ColorSpinor<real, Arg::nColor, 1>;
-
-    int x[4];
-
-    getCoords(x, idx, arg.X, parity);
-
-    real sign = getSign(x[0], x[1], x[2], x[3], arg);
-
-    Vector out = arg.in(idx, parity);
-
-    arg.out(idx, parity) = sign * out;
-  }
-
   template <typename Arg> struct SpinTastePhase
   {
     const Arg &arg;
@@ -98,7 +83,18 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity)
     {
-      applySign(x_cb, parity, arg);
+      using real = typename mapper<typename Arg::Float>::type;
+      using Vector = ColorSpinor<real, Arg::nColor, 1>;
+
+      int x[4];
+
+      getCoords(x, x_cb, arg.X, parity);
+
+      real sign = getSign(x[0], x[1], x[2], x[3], arg);
+
+      Vector out = arg.in(x_cb, parity);
+
+      arg.out(x_cb, parity) = sign * out;	    
     }
   };
 
