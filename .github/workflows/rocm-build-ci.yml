@@ -4,10 +4,13 @@ on: pull_request
 jobs:
   rocm-build:
     runs-on: [self-hosted, amd]
+    strategy:
+      matrix:
+        rocm: [ 5.5.0, 5.6.1, 5.7.2 ]
     steps:
       - uses: actions/checkout@v3
       - run: |
-          export ROCM_PATH=/opt/rocm-5.5.0
+          export ROCM_PATH=/opt/rocm-${{ matrix.rocm }}
           export PATH=${ROCM_PATH}/bin:${ROCM_PATH}/llvm/bin:${PATH}
           SRCROOT=`pwd`
           BUILDROOT=`mktemp -d build-XXXXXXXX`
