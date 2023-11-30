@@ -75,8 +75,7 @@ namespace quda {
     return sign;
   }
 
-  template <typename Arg>
-  __device__ __host__ void applySign(int idx, int parity, const Arg &arg) {
+  template <typename Arg> inline __device__ __host__ void applySign(int idx, int parity, const Arg &arg) {
     using real = typename mapper<typename Arg::Float>::type;
     using Vector = ColorSpinor<real, Arg::nColor, 1>;
 
