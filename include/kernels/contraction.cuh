@@ -377,12 +377,6 @@ namespace quda
 	  }
 	}
       }
-
-      // Debug
-      //for (int G_idx = 0; G_idx < arg.nSpin*arg.nSpin; G_idx++) {
-      //result_all_channels[G_idx].x += (G_idx+t) + idx;
-      //result_all_channels[G_idx].y += (G_idx+t) + idx;
-      //}
       
       return operator()(result_all_channels, result);
     }
@@ -437,16 +431,6 @@ namespace quda
 
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
       complex<real> prop_prod = innerProduct(x, y, 0, 0);	
-
-      #if 0 // JNS
-      printf("%1d %3d = %2d %2d %2d %2d : %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e ^ %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e = %10.3e %10.3e\n",
-	     parity, idx_cb,
-	     sink[3]+offsets[3],sink[2]+offsets[2],sink[1]+offsets[1],sink[0]+offsets[0],
-	     x.data[0].real(),x.data[0].imag(),x.data[1].real(),x.data[1].imag(),x.data[2].real(),x.data[2].imag(),
-	     y.data[0].real(),y.data[0].imag(),y.data[1].real(),y.data[1].imag(),y.data[2].real(),y.data[2].imag(),
-	     prop_prod.real(), prop_prod.imag()
-	     );
-      #endif
 
       // Fourier phase
       double dXi_dot_Pi, ph_real, ph_imag, tmp_real, tmp_imag;

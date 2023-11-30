@@ -9,7 +9,6 @@
 namespace quda {
 
   // Summed contraction type kernels.
-  //----------------------------------------------------------------------------
   template <typename Float, int nColor> class ContractionSummed : TunableMultiReduction
   {
   protected:
@@ -146,10 +145,7 @@ namespace quda {
     errorQuda("Contraction code has not been built");
   }
 #endif
-  //----------------------------------------------------------------------------
   
-  // FIXME: Delete before merging
-  //----------------------------------------------------------------------------
   template <typename Float, int nColor> class Contraction : TunableKernel2D
   {
     complex<Float> *result;
@@ -245,5 +241,4 @@ public:
     errorQuda("Contraction code has not been built");
   }
 #endif
-  //----------------------------------------------------------------------------
 } // namespace quda

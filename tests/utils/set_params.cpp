@@ -190,9 +190,6 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
-  // Gauge smear param
-  //setGaugeSmearParam(*inv_param.smear_param);
-
   // General parameter setup
   inv_param.inv_type = inv_type;
   inv_param.solution_type = solution_type;

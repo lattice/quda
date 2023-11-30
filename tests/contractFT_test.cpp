@@ -47,11 +47,9 @@ void display_test_info()
 int main(int argc, char **argv)
 {
   // Start Google Test Suite
-  //-----------------------------------------------------------------------------
   ::testing::InitGoogleTest(&argc, argv);
 
   // QUDA initialise
-  //-----------------------------------------------------------------------------
   // command line options
   auto app = make_app();
   try {
@@ -75,8 +73,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim}; // local dims
   setDims(X);
-  //cudaDeviceSetLimit(cudaLimitPrintfFifoSize,64*1024*1024); // DEBUG-JNS
-  //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
 
@@ -88,7 +84,6 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for contractFTQuda failed!");
   }
-  //-----------------------------------------------------------------------------
 
   // finalize the QUDA library
   endQuda();
@@ -100,8 +95,6 @@ int main(int argc, char **argv)
 }
 
 // Functions used for Google testing
-//-----------------------------------------------------------------------------
-
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
@@ -245,23 +238,6 @@ int test(int contractionType, QudaPrecision test_prec)
   // Perform GPU contraction.
   contractFTQuda(spinorX, spinorY, &d_result, cType, (void*)(&cs_param), src_colors, X, source_position, n_mom, mom, fft_type);
 
-  #if 0
-  const char* ftype[4]{"?","O","E","EO"};
-  printfQuda("contractions:");
-  for(int k=0; k<n_mom; ++k) {
-    printfQuda("\np = %2d %2d %2d %2d;  sym = %2s %2s %2s %2s",
-	       mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3],
-	       ftype[fft_type[4*k+0]],ftype[fft_type[4*k+1]],ftype[fft_type[4*k+2]],ftype[fft_type[4*k+3]]);
-    printfQuda("\n[");
-    for(int c=0; c<red_size*nSpin*nSpin*2; c+= 2) {
-      int indx = k*red_size*nSpin*nSpin*2 + c;
-      if( c > 0 && (c % 8) == 0 ) printfQuda("\n");
-      printfQuda(" (%10.3e+%10.3ej),",((double*)d_result)[indx],((double*)d_result)[indx+1]);
-    }
-    printfQuda("]\n");
-  }
-  printfQuda("\n");
-  #endif
   // Compare contraction from the host and device. Return the number of detected faults.
   int faults = 0;
   if (test_prec == QUDA_DOUBLE_PRECISION) {

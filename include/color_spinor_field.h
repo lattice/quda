@@ -779,16 +779,6 @@ namespace quda
     ColorSpinorField create_alias(const ColorSpinorParam &param = ColorSpinorParam());
 
     /**
-       @brief Create a field that aliases this field's storage.  The
-       alias field can use a different precision than this field,
-       though it cannot be greater.  This functionality is useful for
-       the case where we have multiple temporaries in different
-       precisions, but do not need them simultaneously.  Use this functionality with caution.
-       @param[in] param Parameters for the alias field
-    */
-    ColorSpinorField *CreateAlias(const ColorSpinorParam &param);
-
-    /**
        @brief Create a coarse color-spinor field, using this field to set the meta data
        @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
        @param[in] spinlockSize Geometric block size that defines the coarse spin dimension

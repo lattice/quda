@@ -48,11 +48,9 @@ void display_test_info()
 int main(int argc, char **argv)
 {
   // Start Google Test Suite
-  //-----------------------------------------------------------------------------
   ::testing::InitGoogleTest(&argc, argv);
 
   // QUDA initialise
-  //-----------------------------------------------------------------------------
   // command line options
   auto app = make_app();
   try {
@@ -76,7 +74,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
 
@@ -88,7 +85,6 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA contraction failed!");
   }
-  //-----------------------------------------------------------------------------
 
   // finalize the QUDA library
   endQuda();
@@ -100,7 +96,6 @@ int main(int argc, char **argv)
 }
 
 // Functions used for Google testing
-//-----------------------------------------------------------------------------
 
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
@@ -146,7 +141,7 @@ int test(int contractionType, QudaPrecision test_prec)
   // QUDA will allocate GPU memory, transfer the data,
   // perform the requested contraction, and return the
   // result in the array 'result'
-  // We then compare the GPU result with a CPU refernce code.
+  // We then compare the GPU result with a CPU reference code.
   
   // Perform GPU contraction.
   contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);

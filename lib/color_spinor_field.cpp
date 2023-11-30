@@ -840,17 +840,6 @@ namespace quda
     return ColorSpinorField(param);
   }
 
-  ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
-  {
-    if (param_.Precision() > precision)
-      errorQuda("Cannot create an alias to source with lower precision than the alias");
-    ColorSpinorParam param(param_);
-    param.create = QUDA_REFERENCE_FIELD_CREATE;
-    param.v = data();
-
-    return new ColorSpinorField(param);
-  }
-
   ColorSpinorField *ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
                                                    QudaMemoryType new_mem_type)

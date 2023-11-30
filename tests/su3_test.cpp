@@ -22,9 +22,6 @@
 double gauge_smear_rho = 0.1;
 double gauge_smear_epsilon = 0.1;
 double gauge_smear_alpha = 0.6;
-//int gauge_smear_steps = 50;
-//QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-//int measurement_interval = 5;
 bool su_project = true;
 
 void display_test_info()
