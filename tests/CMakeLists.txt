@@ -9,6 +9,15 @@ target_compile_options(
   $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
+
+# ignore any unkown pragmas if not using OpenMP
+if(NOT ${QUDA_OPENMP})
+  target_compile_options(quda_test PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
+    $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+    >)
+endif()
+
 if(BUILD_SHARED_LIBS)
   install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
@@ -265,6 +274,7 @@ if(QUDA_MPI OR QUDA_QMP)
   if(DEFINED ENV{QUDA_TEST_GRID_SIZE})
     get_test_ranks($ENV{QUDA_TEST_GRID_SIZE} QUDA_TEST_NUM_PROCS)
   endif()
+  message(STATUS "ctest will run on ${QUDA_TEST_NUM_PROCS} processes")
   set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE};${MPIEXEC_NUMPROC_FLAG};${QUDA_TEST_NUM_PROCS};${MPIEXEC_PREFLAGS}
     CACHE STRING "CTest Launcher command for QUDA's tests")
 endif()
@@ -374,6 +384,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Dslash
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_splitgrid_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
 
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -830,6 +852,17 @@ endif()
       set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPC
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
@@ -931,6 +964,20 @@ foreach(prec IN LISTS TEST_PRECS)
       --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
       --enable-testing true
       --gtest_output=xml:invert_test_wilson_${prec}.xml)
+
+      if(DEFINED ENV{QUDA_ENABLE_TUNING})
+        if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+          add_test(NAME invert_test_splitgrid_wilson_${prec}
+            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+            --dslash-type wilson --ngcrkrylov 8
+            --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+            --nsrc ${QUDA_TEST_NUM_PROCS}
+            --enable-testing true
+            --gtest_output=xml:invert_test_splitgrid_wilson_${prec}.xml)
+
+          set_tests_properties(invert_test_splitgrid_wilson_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+        endif()
+      endif()
   endif()
   
   if(QUDA_DIRAC_TWISTED_MASS)
@@ -1275,7 +1322,7 @@ foreach(prec IN LISTS TEST_PRECS)
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 4 6 8 10 --prec ${prec}
+                     --dim 4 6 8 10 --dilution-block-size 4 6 4 5 --prec ${prec}
                      --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 

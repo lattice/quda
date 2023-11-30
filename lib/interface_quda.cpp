@@ -763,6 +763,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   case QUDA_ASQTAD_FAT_LINKS: cudaGauge = gaugeFatPrecise; break;
   case QUDA_ASQTAD_LONG_LINKS: cudaGauge = gaugeLongPrecise; break;
   case QUDA_SMEARED_LINKS:
+    gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
     gauge_param.create = QUDA_NULL_FIELD_CREATE;
     gauge_param.reconstruct = param->reconstruct;
     gauge_param.setPrecision(param->cuda_prec, true);
@@ -3218,11 +3219,10 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // the split topology.
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading gauge field...\n");
     if (!is_staggered) {
-      loadGaugeQuda(collected_gauge->data(), gauge_param);
+      loadGaugeQuda(collected_gauge->raw_pointer(), gauge_param);
     } else {
-      // freeGaugeQuda();
-      loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->data(),
-                           collected_milc_longlink_field->data());
+      loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->raw_pointer(),
+                           collected_milc_longlink_field->raw_pointer());
     }
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
 
@@ -3745,7 +3745,7 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
       const double tol = unitarizedLink.Precision() == QUDA_DOUBLE_PRECISION ? 1e-15 : 2e-6;
       if (unitarizedLink.StaggeredPhaseApplied()) unitarizedLink.removeStaggeredPhase();
       projectSU3(unitarizedLink, tol, num_failures_d);
-      if (unitarizedLink.StaggeredPhaseApplied() && param->staggered_phase_applied)
+      if (!unitarizedLink.StaggeredPhaseApplied() && param->staggered_phase_applied)
         unitarizedLink.applyStaggeredPhase();
       if (*num_failures_h > 0) errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
     }

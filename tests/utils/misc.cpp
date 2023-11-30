@@ -371,6 +371,7 @@ std::string get_dilution_type_str(QudaDilutionType type)
   case QUDA_DILUTION_COLOR: s = std::string("color"); break;
   case QUDA_DILUTION_SPIN_COLOR: s = std::string("spin_color"); break;
   case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
+  case QUDA_DILUTION_BLOCK: s = std::string("block"); break;
   default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
   }
   return s;
