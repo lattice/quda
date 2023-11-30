@@ -63,15 +63,45 @@ struct HisqStencilTestWrapper {
   static inline void *fatlink_eps = nullptr;
   static inline void *longlink_eps = nullptr;
 
+  static inline void *qdp_sitelink[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
 
-  void init_test() {
-    cpu_prec = prec;
-    host_gauge_data_type_size = cpu_prec;
+  void set_naik(bool has_naik) {
+    if (has_naik) {
+      eps_naik = -0.03; // semi-arbitrary
+      n_naiks = 2;
+    } else {
+      eps_naik = 0.0;
+      n_naiks = 1;
+    }
+  }
 
+  void init_ctest(QudaPrecision prec_, QudaReconstructType link_recon_, bool has_naik) {
+    prec = prec_;
+    link_recon = link_recon_;
+
+    set_naik(has_naik);
+
+    gauge_param = newQudaGaugeParam();
+    setStaggeredGaugeParam(gauge_param);
+
+    gauge_param.cuda_prec = prec;
+
+    static bool first_time = true;
+    if (first_time) {
+      // force the Naik build up front, it doesn't effect the non-naik fields
+      set_naik(true);
+      init_host();
+      set_naik(has_naik);
+      first_time = false;
+    }
+    init();
+  }
+
+  void init_test() {
     gauge_param = newQudaGaugeParam();
     setStaggeredGaugeParam(gauge_param);
 
@@ -80,6 +110,7 @@ struct HisqStencilTestWrapper {
       init_host();
       first_time = false;
     }
+    init();
   }
 
   void init_host() {
@@ -140,14 +171,10 @@ struct HisqStencilTestWrapper {
     // Input links //
     /////////////////
 
-    void *qdp_sitelink[4] = {nullptr, nullptr, nullptr, nullptr};
     for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
-
-    milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
     // Note: this could be replaced with loading a gauge field
     createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, 0); // 0 -> no phases
-    reorderQDPtoMILC(milc_sitelink, qdp_sitelink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
     ///////////////////////
     // Perform CPU Build //
@@ -168,23 +195,9 @@ struct HisqStencilTestWrapper {
     computeHISQLinksCPU(fat_reflink, long_reflink, fat_reflink_eps, long_reflink_eps, qdp_sitelink, &gauge_param,
                         act_paths, eps_naik);
 
-    ///////////////////////////////////////////////////////
-    // Allocate host storage for fields built on the GPU //
-    ///////////////////////////////////////////////////////
-
-    // Paths for step 1:
-    vlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size); // V links
-    wlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size); // W links
-
-    // Paths for step 2:
-    fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);  // final fat ("X") links
-    longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size); // final long links
-
-    // Place to accumulate Naiks
-    if (n_naiks > 1) {
-      fatlink_eps = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);  // epsilon fat links
-      longlink_eps = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size); // epsilon long naiks
-    }
+    /////////////////////////////////////////////////////////////////////
+    // Allocate CPU-precision host storage for fields built on the GPU //
+    /////////////////////////////////////////////////////////////////////
 
     // QDP order fields
     for (int i = 0; i < 4; i++) {
@@ -196,24 +209,60 @@ struct HisqStencilTestWrapper {
       }
     }
 
-    /////////////////////////////////////////////////////////
-    // Free allocations that are only needed for CPU setup //
-    /////////////////////////////////////////////////////////
-
-    for (int i = 0; i < 4; i++)
-      host_free(qdp_sitelink[i]);
-
 #ifdef MULTI_GPU
     exchange_llfat_cleanup();
 #endif
   }
 
+  void init() {
+
+    // reset the reconstruct in gauge param
+    gauge_param.reconstruct = link_recon;
+
+    /////////////////////////////////////////////////////////////////
+    // Create a CPU copy of the initial field in the GPU precision //
+    /////////////////////////////////////////////////////////////////
+
+    milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);
+    reorderQDPtoMILC(milc_sitelink, qdp_sitelink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
+
+    ///////////////////////////////////////////////////////
+    // Allocate host storage for fields built on the GPU //
+    ///////////////////////////////////////////////////////
+
+    // Paths for step 1:
+    vlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
+    wlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
+
+    // Paths for step 2:
+    fatlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // final fat ("X") links
+    longlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // final long links
+
+    // Place to accumulate Naiks
+    if (n_naiks > 1) {
+      fatlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // epsilon fat links
+      longlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // epsilon long naiks
+    }
+  }
+
   static void end() {
+    if (milc_sitelink) host_free(milc_sitelink);
+
+    // Clean up GPU compute links
+    if (vlink) host_free(vlink);
+    if (wlink) host_free(wlink);
+    if (fatlink) host_free(fatlink);
+    if (longlink) host_free(longlink);
+
+    if (n_naiks > 1) {
+      if (fatlink_eps) host_free(fatlink_eps);
+      if (longlink_eps) host_free(longlink_eps);
+    }
+
     freeGaugeQuda();
   }
 
   static void destroy() {
-    if (milc_sitelink) host_free(milc_sitelink);
 
     for (int i = 0; i < 4; i++) {
       host_free(fat_reflink[i]);
@@ -224,18 +273,8 @@ struct HisqStencilTestWrapper {
       }
     }
 
-    // Clean up GPU compute links
-    host_free(vlink);
-    host_free(wlink);
-    host_free(fatlink);
-    host_free(longlink);
-
-    if (n_naiks > 1) {
-      host_free(fatlink_eps);
-      host_free(longlink_eps);
-    }
-
     for (int i = 0; i < 4; i++) {
+      host_free(qdp_sitelink[i]);
       host_free(qdp_fatlink[i]);
       host_free(qdp_longlink[i]);
       if (n_naiks > 1) {
@@ -259,6 +298,10 @@ struct HisqStencilTestWrapper {
     comm_barrier();
     host_timer.start();
 
+    // manually override precision of input fields
+    auto cpu_param_backup = gauge_param.cpu_prec;
+    gauge_param.cpu_prec = gauge_param.cuda_prec;
+
     for (int i = 0; i < niter; i++) {
       // If we create cudaGaugeField objs, we can do this 100% on the GPU, no copying!
 
@@ -270,11 +313,11 @@ struct HisqStencilTestWrapper {
         computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[2].data(), &gauge_param);
 
         // Rescale+copy Naiks into Naik field
-        cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
-        cpu_axy(prec, eps_naik, longlink, longlink_eps, V * 4 * gauge_site_size);
+        cpu_axy(gauge_param.cuda_prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
+        cpu_axy(gauge_param.cuda_prec, eps_naik, longlink, longlink_eps, V * 4 * gauge_site_size);
       } else {
-        memset(fatlink, 0, V * 4 * gauge_site_size * host_gauge_data_type_size);
-        memset(longlink, 0, V * 4 * gauge_site_size * host_gauge_data_type_size);
+        memset(fatlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
+        memset(longlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
       }
 
       // Create X and long links, 2nd path table set
@@ -282,10 +325,12 @@ struct HisqStencilTestWrapper {
 
       if (n_naiks > 1) {
         // Add into Naik field
-        cpu_xpy(prec, fatlink, fatlink_eps, V * 4 * gauge_site_size);
-        cpu_xpy(prec, longlink, longlink_eps, V * 4 * gauge_site_size);
+        cpu_xpy(gauge_param.cuda_prec, fatlink, fatlink_eps, V * 4 * gauge_site_size);
+        cpu_xpy(gauge_param.cuda_prec, longlink, longlink_eps, V * 4 * gauge_site_size);
       }
     }
+
+    gauge_param.cpu_prec = cpu_param_backup;
 
     host_timer.stop();
 
@@ -341,12 +386,12 @@ struct HisqStencilTestWrapper {
     // Layout change for fatlink, fatlink_eps, longlink, longlink_eps //
     ////////////////////////////////////////////////////////////////////
 
-    reorderMILCtoQDP(qdp_fatlink, fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-    reorderMILCtoQDP(qdp_longlink, longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+    reorderMILCtoQDP(qdp_fatlink, fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cuda_prec);
+    reorderMILCtoQDP(qdp_longlink, longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cuda_prec);
 
     if (n_naiks > 1) {
-      reorderMILCtoQDP(qdp_fatlink_eps, fatlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-      reorderMILCtoQDP(qdp_longlink_eps, longlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+      reorderMILCtoQDP(qdp_fatlink_eps, fatlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cuda_prec);
+      reorderMILCtoQDP(qdp_longlink_eps, longlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cuda_prec);
     }
 
     //////////////////////////////

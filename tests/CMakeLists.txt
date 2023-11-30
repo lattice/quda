@@ -230,6 +230,11 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_stencil_ctest hisq_stencil_ctest.cpp)
+  target_link_libraries(hisq_stencil_ctest ${TEST_LIBS})
+  quda_checkbuildtest(hisq_stencil_ctest QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_stencil_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
@@ -1289,7 +1294,14 @@ foreach(prec IN LISTS TEST_PRECS)
       --gtest_output=xml:eigensolve_test_mobius_eofa_asym_${prec}.xml)
   endif()
 endforeach(prec)
-  
+
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME hisq_stencil
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_stencil_test.xml)
+endif()
+
 foreach(prec IN LISTS TEST_PRECS)
 
   add_test(NAME gauge_path_${prec}

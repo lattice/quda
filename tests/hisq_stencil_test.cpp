@@ -59,10 +59,10 @@ TEST_F(HisqStencilTest, verify)
   double max_dev = 10. * getTolerance(prec);
 
   // fat link
-  EXPECT_LE(res[0], max_dev);
+  EXPECT_LE(res[0], max_dev) << "Reference CPU and QUDA implementations of fat link do not agree";
 
   // long link
-  EXPECT_LE(res[1], max_dev);
+  EXPECT_LE(res[1], max_dev) << "Reference CPU and QUDA implementations of long link do not agree";
 }
 
 int main(int argc, char **argv)
@@ -87,6 +87,9 @@ int main(int argc, char **argv)
 
   if (prec == QUDA_HALF_PRECISION || prec == QUDA_QUARTER_PRECISION)
     errorQuda("Precision %d is unsupported in some link fattening routines\n", prec);
+
+  if (link_recon != QUDA_RECONSTRUCT_NO)
+    errorQuda("Reconstruct %d is unsupported in some link fattening routines\n", link_recon);
 
   if (gauge_order != QUDA_MILC_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", gauge_order);
 
