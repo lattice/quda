@@ -24,8 +24,9 @@ namespace quda {
 
     unsigned int sharedBytesPerThread() const
     {
-      // use SharedMemoryCache if using Symanzik improvement for two Link fields
-      return 4*sizeof(int) + (wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0);
+      // use ThreadLocalCache if using Symanzik improvement for two Link fields
+      return (wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0)
+        + 4 * sizeof(int); // for thread_array
     }
 
   public:

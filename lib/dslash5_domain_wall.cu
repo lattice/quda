@@ -68,7 +68,9 @@ namespace quda
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const
     {
-      if (mobius_m5::shared()) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         // spin components in shared depend on inversion algorithm
 	bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
         int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
@@ -81,7 +83,9 @@ namespace quda
     // overloaded to return max dynamic shared memory if doing shared-memory inverse
     unsigned int maxSharedBytesPerBlock() const
     {
-      if (mobius_m5::shared()) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         return maxDynamicSharedBytesPerBlock();
       } else {
         return TunableKernel3D::maxSharedBytesPerBlock();
@@ -104,7 +108,9 @@ namespace quda
       xpay(a == 0.0 ? false : true),
       type(type)
     {
-      if (mobius_m5::shared()) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
       }
 
