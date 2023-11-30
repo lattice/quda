@@ -1,6 +1,6 @@
 #pragma once
 
-#include <helpers.h>
+#include <kernel_ops.h>
 #include <shared_memory_helper.h>
 #include <array.h>
 
