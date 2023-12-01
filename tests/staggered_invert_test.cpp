@@ -26,7 +26,8 @@ QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
 bool use_split_grid = false;
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+// if --enable-testing true is passed, we run the tests defined in here
+#include <staggered_invert_test_gtest.hpp>
 
 void display_test_info()
 {
@@ -219,8 +220,30 @@ void init()
   //-----------------------------------------------------------------------------------
 }
 
-std::vector<double> solve()
+std::vector<std::array<double, 2>> solve(test_t param)
 {
+  inv_param.inv_type = ::testing::get<0>(param);
+  inv_param.solution_type = ::testing::get<1>(param);
+  inv_param.solve_type = ::testing::get<2>(param);
+  inv_param.cuda_prec_sloppy = ::testing::get<3>(param);
+  multishift = ::testing::get<4>(param);
+  inv_param.solution_accumulator_pipeline = ::testing::get<5>(param);
+
+  // schwarz parameters
+  auto schwarz_param = ::testing::get<6>(param);
+  inv_param.schwarz_type           = ::testing::get<0>(schwarz_param);
+  inv_param.inv_type_precondition  = ::testing::get<1>(schwarz_param);
+  inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
+
+  inv_param.residual_type = ::testing::get<7>(param);
+
+  // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
+  if (enable_testing) inv_param.ca_lambda_max = -1.0;
+
+  logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
+          get_solution_str(inv_param.solution_type), get_solve_str(inv_param.solve_type),
+          get_solver_str(inv_param.inv_type), get_prec_str(inv_param.cuda_prec_sloppy));
+
   // params related to split grid.
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
@@ -265,7 +288,7 @@ std::vector<double> solve()
   // QUDA invert test
   //----------------------------------------------------------------------------
 
-  std::vector<double> res(Nsrc);
+  std::vector<std::array<double, 2>> res(Nsrc);
 
   if (multishift == 1) {
     if (!use_split_grid) {
@@ -351,7 +374,13 @@ std::vector<double> solve()
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
         auto resid = verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], cpuFatQDP, cpuLongQDP, inv_param, i);
-        if (i == 0) res[k] = resid;
+
+        // take the HQ residual from the lightest mass
+        if (i == 0) {
+          res[k] = resid;
+        } else {
+          if (resid[0] > res[k][0]) res[k][0] = resid[0];
+        }
       }
     }
   } else {
@@ -377,6 +406,7 @@ void cleanup()
 
 int main(int argc, char **argv)
 {
+  ::testing::InitGoogleTest(&argc, argv);
   setQudaStaggeredDefaultInvTestParams();
   setQudaDefaultMgTestParams();
   // Parse command line options
@@ -385,7 +415,7 @@ int main(int argc, char **argv)
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
   add_comms_option_group(app);
-
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -419,17 +449,36 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
+  // need force a well-behaved operator + reasonable convergence
+  if (enable_testing) {
+    compute_fatlong = true;
+    mass = 0.32; // yes, it's a magic number
+    tol = 1e-6;
+    tol_hq = 1e-6;
+    //niter = 500; // the staggered spectrum is rough
+  }
+
   init();
 
-  solve();
+  int result = 0;
+  if (enable_testing) { // tests are defined in staggered_invert_test_gtest.hpp
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    if (dslash_type == QUDA_LAPLACE_DSLASH)
+      errorQuda("Staggered ctest doesn't support the Laplace operator (yet)");
+    result = RUN_ALL_TESTS();
+  } else {
+    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
+                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                  inv_param.residual_type});
+  }
 
   cleanup();
 
   // Finalize the QUDA library
+  freeGaugeQuda();
   endQuda();
-
-  // Finalize the communications layer
   finalizeComms();
 
-  return 0;
+  return result;
 }

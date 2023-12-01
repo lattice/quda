@@ -109,7 +109,7 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
                                                 void *spinorCheck, QudaGaugeParam &gauge_param,
                                                 QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
-double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
+std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
                                 quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                 QudaInvertParam &inv_param, int shift);
 

@@ -743,7 +743,7 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   return l2r;
 }
 
-double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
+std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
                                 quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                 QudaInvertParam &inv_param, int shift)
 {
@@ -798,5 +798,5 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     }
   }
 
-  return l2r;
+  return {l2r, inv_param.tol_hq};
 }
