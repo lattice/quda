@@ -76,7 +76,7 @@ namespace quda {
     ColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
     double b2 = blas::norm2(b); // norm sq of source
-    double r2;               // norm sq of residual
+    double r2;                  // norm sq of residual
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -134,7 +134,7 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
-	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         b2 = r2;
@@ -147,12 +147,9 @@ namespace quda {
     if (param.precision_sloppy == x.Precision()) {
       r_sloppy = &r;
 
-      if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
-      {
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO){
         r_0 = &b;
-      }
-      else
-      {
+      } else {
         ColorSpinorParam csParam(r);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         r_0 = new ColorSpinorField(csParam); // remember to delete this pointer.
@@ -168,13 +165,10 @@ namespace quda {
       *r_0 = r;
     }
 
-    if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator)
-    {
+    if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
       x_sloppy = &x;
       blas::zero(*x_sloppy);
-    }
-    else
-    {
+    } else {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
@@ -222,20 +216,19 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
-		 blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
-		 blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+                 blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
+                 blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
 
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) &&
-	    k < param.maxiter) {
+    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
       matSloppy(v, p);
 
       Complex r0v;
       if (param.pipeline) {
-	r0v = blas::cDotProduct(r0, v);
-	if (k>0) rho = blas::cDotProduct(r0, r);
+        r0v = blas::cDotProduct(r0, v);
+        if (k>0) rho = blas::cDotProduct(r0, r);
       } else {
-	r0v = blas::cDotProduct(r0, v);
+        r0v = blas::cDotProduct(r0, v);
       }
       if (abs(rho) == 0.0) alpha = 0.0;
       else alpha = rho / r0v;
@@ -247,38 +240,37 @@ namespace quda {
 
       int updateR = 0;
       if (param.pipeline) {
-	// omega = (t, r) / (t, t)
-	omega_t2 = blas::cDotProductNormA(t, rSloppy);
-	Complex tr = Complex(omega_t2.x, omega_t2.y);
-	double t2 = omega_t2.z;
-	omega = tr / t2;
-	double s2 = blas::norm2(rSloppy);
-	Complex r0t = blas::cDotProduct(r0, t);
-	beta = -r0t / r0v;
-	r2 = s2 - real(omega * conj(tr)) ;
-
-	// now we can work out if we need to do a reliable update
+        // omega = (t, r) / (t, t)
+        omega_t2 = blas::cDotProductNormA(t, rSloppy);
+        Complex tr = Complex(omega_t2.x, omega_t2.y);
+        double t2 = omega_t2.z;
+        omega = tr / t2;
+        double s2 = blas::norm2(rSloppy);
+        Complex r0t = blas::cDotProduct(r0, t);
+        beta = -r0t / r0v;
+        r2 = s2 - real(omega * conj(tr)) ;
+        // now we can work out if we need to do a reliable update
         updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
       } else {
-	// omega = (t, r) / (t, t)
-	omega_t2 = blas::cDotProductNormA(t, rSloppy);
-	omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
+        // omega = (t, r) / (t, t)
+        omega_t2 = blas::cDotProductNormA(t, rSloppy);
+        omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
       }
 
       if (param.pipeline && !updateR) {
-	//x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
-	blas::caxpbypzYmbw(alpha, p, omega, rSloppy, xSloppy, t);
-	blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
-	//tripleBiCGstabUpdate(alpha, p, omega, rSloppy, xSloppy, t, -beta*omega, v, beta, p
+        //x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
+        blas::caxpbypzYmbw(alpha, p, omega, rSloppy, xSloppy, t);
+        blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
+        //tripleBiCGstabUpdate(alpha, p, omega, rSloppy, xSloppy, t, -beta*omega, v, beta, p
       } else {
-	//x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-	rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, rSloppy, xSloppy, t, r0);
-	rho0 = rho;
-	rho = Complex(rho_r2.x, rho_r2.y);
-	r2 = rho_r2.z;
+        //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
+        rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, rSloppy, xSloppy, t, r0);
+        rho0 = rho;
+        rho = Complex(rho_r2.x, rho_r2.y);
+        r2 = rho_r2.z;
       }
 
-      if (use_heavy_quark_res && k%heavy_quark_check==0) {
+      if (use_heavy_quark_res && k % heavy_quark_check==0) {
         if (&x != &xSloppy) {
            blas::copy(tmp,y);
            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
@@ -291,9 +283,9 @@ namespace quda {
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
 
       if (updateR) {
-	if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
+        if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
 
-	blas::xpy(x, y); // swap these around?
+        blas::xpy(x, y); // swap these around?
 
         mat(r, y);
         r2 = blas::xmyNorm(b, r);
@@ -307,31 +299,30 @@ namespace quda {
           r2 = blas::xmyNorm(b, r);
         }
 
-	if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);
-	blas::zero(xSloppy);
+        if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);
+        blas::zero(xSloppy);
 
-	rNorm = sqrt(r2);
-	maxrr = rNorm;
-	maxrx = rNorm;
-	//r0Norm = rNorm;
-	rUpdate++;
+        rNorm = sqrt(r2);
+        maxrr = rNorm;
+        maxrx = rNorm;
+        //r0Norm = rNorm;
+        rUpdate++;
       }
 
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
-		   blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
-		   blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+        printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
+          blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
+          blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
 
       // update p
-      if (!param.pipeline || updateR) {// need to update if not pipeline or did a reliable update
-	if (abs(rho*alpha) == 0.0) beta = 0.0;
-	else beta = (rho/rho0) * (alpha/omega);
-	blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
+      if (!param.pipeline || updateR) { // need to update if not pipeline or did a reliable update
+        if (abs(rho*alpha) == 0.0) beta = 0.0;
+        else beta = (rho/rho0) * (alpha/omega);
+        blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
       }
-
     }
 
     if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
@@ -342,7 +333,7 @@ namespace quda {
 
     param.iter += k;
 
-    if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
 
@@ -361,9 +352,7 @@ namespace quda {
     if (param.precision_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
-    }
-    else if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
-    {
+    } else if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
       delete r_0;
     }
 
