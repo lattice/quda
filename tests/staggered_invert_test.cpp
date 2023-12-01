@@ -26,6 +26,9 @@ QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
 bool use_split_grid = false;
 
+// print instructions on how to run the old tests
+bool print_legacy_info = false;
+
 // if --enable-testing true is passed, we run the tests defined in here
 #include <staggered_invert_test_gtest.hpp>
 
@@ -109,6 +112,18 @@ void display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
+}
+
+void display_legacy_info()
+{
+  printfQuda("Instructions for running legacy tests:\n");
+  printfQuda("--test 0 -> --solve-type direct    --solution-type mat    --inv-type bicgstab\n");
+  printfQuda("--test 1 -> --solve-type direct-pc --solution-type mat    --inv-type cg --matpc even-even\n");
+  printfQuda("--test 2 -> --solve-type direct-pc --solution-type mat    --inv-type cg --matpc odd-odd\n");
+  printfQuda("--test 3 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc even-even\n");
+  printfQuda("--test 4 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc odd-odd\n");
+  printfQuda("--test 5 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc even-even --multishift 8\n");
+  printfQuda("--test 6 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc odd-odd   --multishift 8\n");
 }
 
 GaugeField cpuFatQDP = {};
@@ -416,6 +431,7 @@ int main(int argc, char **argv)
   add_multigrid_option_group(app);
   add_comms_option_group(app);
   add_testing_option_group(app);
+  app->add_option("--legacy-test-info", print_legacy_info, "Print info on how to reproduce the old '--test #' behavior with flags, then exit");
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -423,14 +439,19 @@ int main(int argc, char **argv)
   }
   setVerbosity(verbosity);
 
-  if (inv_deflate && inv_multigrid)
-    errorQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
-
   // Set values for precisions via the command line.
   setQudaPrecisions();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
+
+  if (print_legacy_info) {
+    display_legacy_info();
+    errorQuda("Exiting...");
+  }
+
+  if (inv_deflate && inv_multigrid)
+    errorQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
 
   initRand();
 
