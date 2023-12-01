@@ -449,13 +449,29 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
-  // need force a well-behaved operator + reasonable convergence
   if (enable_testing) {
-    compute_fatlong = true;
-    mass = 0.32; // yes, it's a magic number
-    tol = 1e-6;
-    tol_hq = 1e-6;
-    //niter = 500; // the staggered spectrum is rough
+    // We need to force a well-behaved operator + reasonable convergence, otherwise
+    // the staggered tests will fail. These checks are designed to be consistent
+    // with what's in [src]/tests/CMakeFiles.txt, which have been "sanity checked"
+    if (!compute_fatlong) {
+      warningQuda("compute_fatlong = %d , expected value %d , overriding", compute_fatlong, true);
+      compute_fatlong = true;
+    }
+
+    double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-5 : 1e-6;
+    if (tol != expected_tol) {
+      warningQuda("tol = %e , expected value %e , overriding", tol, expected_tol);
+      tol = expected_tol;
+    }
+    if (tol_hq != expected_tol) {
+      warningQuda("tol_hq = %e , expected value %e , overriding", tol_hq, expected_tol);
+      tol_hq = 1e-5;
+    }
+
+    if (niter != 1000) {
+      warningQuda("niter = %d , expected value %d , overriding", niter, 1000);
+      compute_fatlong = 1000;
+    }
   }
 
   init();

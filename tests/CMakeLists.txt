@@ -953,7 +953,7 @@ elseif(single_prec)
   set(TEST_PRECS single)
 endif()
 
-# Inversions
+# Wilson-type Inversions
 foreach(prec IN LISTS TEST_PRECS)
 
   if(${prec} STREQUAL "double")
@@ -1125,6 +1125,49 @@ foreach(prec IN LISTS TEST_PRECS)
       --matpc even-even-asym
       --enable-testing true
       --gtest_output=xml:invert_test_mobius_eofa_asym_${prec}.xml)
+  endif()
+endforeach(prec)
+
+# Staggered-type Inversions
+foreach(prec IN LISTS TEST_PRECS)
+
+  # These require looser tolerances to keep iterations to solution in check
+  if(${prec} STREQUAL "double")
+    set(tol 1e-6)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-5)
+  endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    # --compute-fat-long true is necessary to get well-behaved fields
+
+    add_test(NAME invert_test_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_staggered_${prec}.xml)
+
+#      if(DEFINED ENV{QUDA_ENABLE_TUNING})
+#        if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+#          add_test(NAME invert_test_splitgrid_wilson_${prec}
+#            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+#            --dslash-type wilson --ngcrkrylov 8
+#            --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+#            --nsrc ${QUDA_TEST_NUM_PROCS}
+#            --enable-testing true
+#            --gtest_output=xml:invert_test_splitgrid_wilson_${prec}.xml)
+#
+#          set_tests_properties(invert_test_splitgrid_wilson_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+#        endif()
+#      endif()
+
+    add_test(NAME invert_test_asqtad_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+      --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_asqtad_${prec}.xml)
   endif()
 endforeach(prec)
 

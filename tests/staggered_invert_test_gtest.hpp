@@ -77,7 +77,6 @@ bool support_solution_accumulator_pipeline(QudaInverterType type)
 bool skip_test(test_t param)
 {
   auto inverter_type = ::testing::get<0>(param);
-  auto solution_type = ::testing::get<1>(param);
   auto prec_sloppy = ::testing::get<3>(param);
   auto multishift = ::testing::get<4>(param);
   auto solution_accumulator_pipeline = ::testing::get<5>(param);
@@ -114,25 +113,40 @@ TEST_P(StaggeredInvertTest, verify)
   if (res_t & QUDA_L2_RELATIVE_RESIDUAL) inv_param.tol = tol;
   if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) inv_param.tol_hq = tol_hq;
 
-  inv_param.reliable_delta = reliable_delta;
+  auto inverter_type = ::testing::get<0>(param);
+  auto solution_type = ::testing::get<1>(param);
+  auto solve_type = ::testing::get<2>(param);
 
-  auto tol = inv_param.tol;
   // FIXME eventually we should build in refinement to the *NR solvers to remove the need for this
-  if (is_normal_residual(::testing::get<0>(GetParam()))) tol *= 50;
-  // Slight loss of precision possible when reconstructing full solution
-  if (is_full_solution(::testing::get<1>(GetParam())) && is_preconditioned_solve(::testing::get<2>(GetParam())))
-    tol *= 10;
+  // The mass squared is a proxy for the condition number
+  if (is_normal_residual(inverter_type)) tol /= (0.25 * mass * mass);
 
-  // Slight loss of precision seems to be possible in single precision
-  // with the asqtad operator, though it looks like it's because of the
-  // fat/long links going through a few precision conversions here and there
-  if (dslash_type == QUDA_ASQTAD_DSLASH && prec <= QUDA_SINGLE_PRECISION)
+  // To solve the direct operator to a given tolerance, grind the preconditioned
+  // operator to 0.5 * mass * tol... to keep the target tolerance in inv_param
+  // in check, we shift the requirement to the verified tolerance instead.
+  if (is_full_solution(solution_type) && is_preconditioned_solve(solve_type)) {
+    if (solve_type == QUDA_DIRECT_PC_SOLVE)
+      tol /= (0.5 * mass); // to solve the full operator to eps, solve the preconditioned to mass * eps
+    else if (solve_type == QUDA_NORMOP_PC_SOLVE)
+      tol /= (0.25 * mass * mass); // same as above, but squared as a proxy for the condition number
+  }
+
+  // The power iterations method of determining the Chebyshev window
+  // breaks down due to the nature of the spectrum of the direct operator
+  auto ca_basis_tmp = inv_param.ca_basis;
+  if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER)
+    inv_param.ca_basis = QUDA_POWER_BASIS;
+
+  // Slight loss of precision seems to be possible with the asqtad operator
+  if (dslash_type == QUDA_ASQTAD_DSLASH)
     tol *= 1.1;
 
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
     if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }
   }
+
+  inv_param.ca_basis = ca_basis_tmp;
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
@@ -167,14 +181,9 @@ auto staggered_pc_solvers
 
 auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER);
 
-// The spectrum of the staggered operator means MR has a miserable time converging,
-// it's not MR's fault. Other solvers have troubles too, which I need to think through.
-//auto direct_solvers
-//  = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
-//           QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
-
 auto direct_solvers
-  = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_BICGSTABL_INVERTER);
+  = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
+           QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
 
 auto sloppy_precisions
   = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION);
@@ -214,6 +223,16 @@ INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, StaggeredInvertTest,
                                  solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
+// Heavy-Quark preconditioned solves
+INSTANTIATE_TEST_SUITE_P(HeavyQuarkEvenOdd, StaggeredInvertTest,
+                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION),
+                                 Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(1),
+                                 solution_accumulator_pipelines, no_schwarz,
+                                 Values(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL, QUDA_HEAVY_QUARK_RESIDUAL)),
+                         gettestname);
+
+// These are left in but commented out for future reference
+
 // Schwarz-preconditioned normal solves
 //INSTANTIATE_TEST_SUITE_P(SchwarzNormal, StaggeredInvertTest,
 //                         Combine(Values(QUDA_PCG_INVERTER), Values(QUDA_MATPCDAG_MATPC_SOLUTION),
@@ -233,10 +252,3 @@ INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, StaggeredInvertTest,
 //                                 no_heavy_quark),
 //                         gettestname);
 
-// Heavy-Quark preconditioned solves
-INSTANTIATE_TEST_SUITE_P(HeavyQuarkEvenOdd, StaggeredInvertTest,
-                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION),
-                                 Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(1),
-                                 solution_accumulator_pipelines, no_schwarz,
-                                 Values(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL, QUDA_HEAVY_QUARK_RESIDUAL)),
-                         gettestname);
