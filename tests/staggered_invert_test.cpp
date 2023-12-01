@@ -247,7 +247,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // params related to split grid.
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
+  use_split_grid = num_sub_partition > 1;
 
   // Setup the multigrid preconditioner
   void *mg_preconditioner = nullptr;

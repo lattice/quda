@@ -95,7 +95,7 @@ bool skip_test(test_t param)
   //if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ)
   //  if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
 
-  // split-grid doesn't support split-grid at present
+  // split-grid doesn't support multigrid at present
   if (use_split_grid && multishift > 1) return true;
 
   return false;

@@ -117,7 +117,7 @@ bool skip_test(test_t param)
     return true;
 #endif
   }
-  // split-grid doesn't support split-grid at present
+  // split-grid doesn't support multishift at present
   if (use_split_grid && multishift > 1) return true;
 
   return false;
