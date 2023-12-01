@@ -315,7 +315,7 @@ quda::file_array<char[256]> prop_source_infile;
 quda::file_array<char[256]> prop_source_outfile;
 quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
-quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
+quda::source_array<std::array<int, 4>> prop_source_position = {{0, 0, 0, 0}};
 
 int prop_source_smear_steps = 0;
 int prop_sink_smear_steps = 0;
