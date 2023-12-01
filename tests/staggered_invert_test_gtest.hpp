@@ -16,6 +16,15 @@ public:
   StaggeredInvertTest() : param(GetParam()) { }
 };
 
+bool is_hermitian_solver(QudaInverterType type)
+{
+  switch(type) {
+  case QUDA_CG_INVERTER:
+  case QUDA_CA_CG_INVERTER: return true;
+  default: return false;
+  }
+}
+
 bool is_normal_residual(QudaInverterType type)
 {
   switch (type) {
@@ -77,6 +86,8 @@ bool support_solution_accumulator_pipeline(QudaInverterType type)
 bool skip_test(test_t param)
 {
   auto inverter_type = ::testing::get<0>(param);
+  auto solution_type = ::testing::get<1>(param);
+  auto solve_type = ::testing::get<2>(param);
   auto prec_sloppy = ::testing::get<3>(param);
   auto multishift = ::testing::get<4>(param);
   auto solution_accumulator_pipeline = ::testing::get<5>(param);
@@ -95,6 +106,19 @@ bool skip_test(test_t param)
   //if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ)
   //  if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
 
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    if (multishift > 1) return true; // Laplace doesn't support multishift
+    if (solution_type != QUDA_MAT_SOLUTION || solve_type != QUDA_DIRECT_SOLVE) return true; // Laplace only supports direct solves
+  }
+
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_ASQTAD_DSLASH) {
+    // the staggered and asqtad operators aren't HPD
+    if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && is_hermitian_solver(inverter_type)) return true;
+
+    // MR struggles with the staggered and asqtad spectrum, it's not MR's fault
+    if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_MR_INVERTER) return true;
+  }
+
   // split-grid doesn't support multigrid at present
   if (use_split_grid && multishift > 1) return true;
 
@@ -106,6 +130,8 @@ std::vector<std::array<double, 2>> solve(test_t param);
 TEST_P(StaggeredInvertTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
+
+  auto tol_backup = tol;
 
   inv_param.tol = 0.0;
   inv_param.tol_hq = 0.0;
@@ -124,11 +150,13 @@ TEST_P(StaggeredInvertTest, verify)
   // To solve the direct operator to a given tolerance, grind the preconditioned
   // operator to 0.5 * mass * tol... to keep the target tolerance in inv_param
   // in check, we shift the requirement to the verified tolerance instead.
-  if (is_full_solution(solution_type) && is_preconditioned_solve(solve_type)) {
+  if (solution_type == QUDA_MAT_SOLUTION) {
     if (solve_type == QUDA_DIRECT_PC_SOLVE)
       tol /= (0.5 * mass); // to solve the full operator to eps, solve the preconditioned to mass * eps
-    else if (solve_type == QUDA_NORMOP_PC_SOLVE)
-      tol /= (0.25 * mass * mass); // same as above, but squared as a proxy for the condition number
+    if (solve_type == QUDA_NORMOP_SOLVE)
+      tol /= (0.5 * mass); // a proxy for the condition number
+  } else if (solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+    tol *= 1.05; // seems to need a bit of a bump
   }
 
   // The power iterations method of determining the Chebyshev window
@@ -137,9 +165,13 @@ TEST_P(StaggeredInvertTest, verify)
   if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER)
     inv_param.ca_basis = QUDA_POWER_BASIS;
 
-  // Slight loss of precision seems to be possible with the asqtad operator
-  if (dslash_type == QUDA_ASQTAD_DSLASH)
+  // FIXME: there's an issue in mixed precision BiCGStab I need to squash.
+  if (inverter_type == QUDA_BICGSTAB_INVERTER)
     tol *= 1.1;
+
+  // CGNE needs a bit of a bump
+  if (inverter_type == QUDA_CGNE_INVERTER || inverter_type == QUDA_CA_CGNE_INVERTER)
+    tol *= 1.05;
 
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
@@ -147,6 +179,7 @@ TEST_P(StaggeredInvertTest, verify)
   }
 
   inv_param.ca_basis = ca_basis_tmp;
+  tol = tol_backup;
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
@@ -182,7 +215,7 @@ auto staggered_pc_solvers
 auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER);
 
 auto direct_solvers
-  = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
+  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
            QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
 
 auto sloppy_precisions

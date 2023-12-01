@@ -456,8 +456,15 @@ int main(int argc, char **argv)
   initRand();
 
   // Only these fermions are supported in this file
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
-    errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  if (is_laplace_enabled) {
+    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  } else {
+    if (dslash_type == QUDA_LAPLACE_DSLASH)
+      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  }
 
   // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
@@ -501,8 +508,6 @@ int main(int argc, char **argv)
   if (enable_testing) { // tests are defined in staggered_invert_test_gtest.hpp
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    if (dslash_type == QUDA_LAPLACE_DSLASH)
-      errorQuda("Staggered ctest doesn't support the Laplace operator (yet)");
     result = RUN_ALL_TESTS();
   } else {
     solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,

@@ -79,8 +79,15 @@ int main(int argc, char **argv)
   setQudaPrecisions();
 
   // Only these fermions are supported in this file
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
-    errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  if (is_laplace_enabled) {
+    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  } else {
+    if (dslash_type == QUDA_LAPLACE_DSLASH)
+      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  }
 
   display_test_info();
 

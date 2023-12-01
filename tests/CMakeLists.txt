@@ -928,6 +928,19 @@ endif()
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
+
+    if(QUDA_LAPLACE)
+      set(DIRAC_NAME laplace)
+      add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+               COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                       --dslash-type ${DIRAC_NAME}
+                       --test Mat
+                       --dim 2 4 6 8
+                       --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+      if(polenv)
+        set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      endif()
+    endif()
   endif()
 
   if(QUDA_COVDEV)
@@ -1168,6 +1181,15 @@ foreach(prec IN LISTS TEST_PRECS)
       --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
       --enable-testing true
       --gtest_output=xml:invert_test_asqtad_${prec}.xml)
+
+    if (QUDA_LAPLACE)
+      add_test(NAME invert_test_laplace_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type laplace --ngcrkrylov 8 --compute-fat-long true
+        --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+        --enable-testing true
+        --gtest_output=xml:invert_test_laplace_${prec}.xml)
+    endif()
   endif()
 endforeach(prec)
 
