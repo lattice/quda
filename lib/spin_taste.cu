@@ -13,6 +13,8 @@ namespace quda {
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
+    template <QudaSpinTasteGamma gamma> using Arg = SpinTasteArg<Float, nColor, gamma>;
+
     SpinTastePhase_(ColorSpinorField &out, const ColorSpinorField &in, QudaSpinTasteGamma gamma) :
       TunableKernel2D(in, in.SiteSubset()),
       in(in),
@@ -25,41 +27,40 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      template <QudaSpinTasteGamma gamma> using Arg = SpinTasteArg<Float, nColor, gamma>;
-
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
       if (gamma == QUDA_SPIN_TASTE_G1) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G1>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_G1>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GX) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GX>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GX>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GY) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GY>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GY>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GZ) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GZ>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GZ>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GT) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GT>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GT>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_G5) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_G5>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GYGZ) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GYGZ>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GYGZ>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GZGX) {
-        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GZGX>(out, in));	
+        launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GZGX>(out, in));	
       } else if (gamma == QUDA_SPIN_TASTE_GXGY) {
-        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GXGY>(out, in));	
+        launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GXGY>(out, in));	
       } else if (gamma == QUDA_SPIN_TASTE_GXGT) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GXGT>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GXGT>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GYGT) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GYGT>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GYGT>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GZGT) {
-        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GZGT>(out, in));	      
+        launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_GZGT>(out, in));	      
       } else if (gamma == QUDA_SPIN_TASTE_G5GX) {
-        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GX>(out, in));	      
+        launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_G5GX>(out, in));	      
       } else if (gamma == QUDA_SPIN_TASTE_G5GY) {
-        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GY>(out, in));	      
+        launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_G5GY>(out, in));	      
       } else if (gamma == QUDA_SPIN_TASTE_G5GZ) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GZ>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_G5GZ>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_G5GT) {
-	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GT>(out, in));
+	launch<SpinTastePhase>(tp, stream, Arg<QUDA_SPIN_TASTE_G5GT>(out, in));
       } else {
         errorQuda("Undefined gamma type");
       }
