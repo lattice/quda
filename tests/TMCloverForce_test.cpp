@@ -60,15 +60,6 @@ void init(int argc, char **argv)
     setInvertParam(inv_param);
   }
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-  //inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  //inv_param.cuda_prec_refinement_sloppy = QUDA_DOUBLE_PRECISION;
-  //inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION;
-  //inv_param.cuda_prec_eigensolver = QUDA_HALF_PRECISION;
-  // inv_param.clover_location = QUDA_CUDA_FIELD_LOCATION;
-  //inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  //inv_param.clover_cuda_prec_refinement_sloppy = QUDA_DOUBLE_PRECISION;
-  //inv_param.clover_cuda_prec_precondition = QUDA_HALF_PRECISION;
-  //inv_param.clover_cuda_prec_eigensolver = QUDA_HALF_PRECISION;
 
   if (inv_deflate) {
     setEigParam(eig_param);
@@ -123,8 +114,6 @@ void init(int argc, char **argv)
 // If compute_force is false then a path is computed
 void TMCloverForce_test()
 {
-  // int max_length = 6;
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
 
   setGaugeParam(gauge_param);
@@ -133,34 +122,6 @@ void TMCloverForce_test()
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
-
-  // double loop_coeff_d[sizeof(loop_coeff_f) / sizeof(float)];
-  // for (unsigned int i = 0; i < sizeof(loop_coeff_f) / sizeof(float); i++) { loop_coeff_d[i] = loop_coeff_f[i]; }
-
-  // void *loop_coeff;
-  // if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-  //   loop_coeff = (void *)&loop_coeff_f[0];
-  // } else {
-  //   loop_coeff = loop_coeff_d;
-  // }
-  // double eb3 = 0.3;
-  // int num_paths = sizeof(path_dir_x) / sizeof(path_dir_x[0]);
-
-  // int **input_path_buf[4];
-  // for (int dir = 0; dir < 4; dir++) {
-  //   input_path_buf[dir] = (int **)safe_malloc(num_paths * sizeof(int *));
-  //   for (int i = 0; i < num_paths; i++) {
-  //     input_path_buf[dir][i] = (int *)safe_malloc(length[i] * sizeof(int));
-  //     if (dir == 0)
-  //       memcpy(input_path_buf[dir][i], path_dir_x[i], length[i] * sizeof(int));
-  //     else if (dir == 1)
-  //       memcpy(input_path_buf[dir][i], path_dir_y[i], length[i] * sizeof(int));
-  //     else if (dir == 2)
-  //       memcpy(input_path_buf[dir][i], path_dir_z[i], length[i] * sizeof(int));
-  //     else if (dir == 3)
-  //       memcpy(input_path_buf[dir][i], path_dir_t[i], length[i] * sizeof(int));
-  //   }
-  // }
 
   quda::GaugeFieldParam param(gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
@@ -192,13 +153,10 @@ void TMCloverForce_test()
 
   void *mom = nullptr;
   void *mom_array[QUDA_MAX_DIM];
-  // void *sitelink = nullptr;
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    // sitelink = U_milc.Gauge_p();
     mom = Mom_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    // sitelink = U_qdp.Gauge_p();
     for (int d = 0; d < 4; d++) mom_array[d] = Mom_qdp.data(d);
     mom = reinterpret_cast<void *>(mom_array);
   } else {
@@ -254,10 +212,9 @@ void TMCloverForce_test()
   }
 
   double coeff[1] = {4. * inv_param.kappa * inv_param.kappa};
-  if (getTuning() == QUDA_TUNE_YES) {
+  if (getTuning() == QUDA_TUNE_YES)
     computeTMCloverForceQuda(mom, in[0].data(), NULL, coeff, 1,  &gauge_param, &inv_param, false);
-    
-  }
+
   printf("Device function computed\n");
   quda::host_timer_t host_timer;
   double time_sec = 0.0;
@@ -300,14 +257,6 @@ void TMCloverForce_test()
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
   // if (compute_force) {
   printfQuda("Force calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3, perf);
-  // } else {
-  //   printfQuda("Gauge path calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3,
-  //              perf);
-  // }
-  // for (int dir = 0; dir < 4; dir++) {
-  //   for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
-  //   host_free(input_path_buf[dir]);
-  // }
 }
 
 TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }
@@ -316,19 +265,6 @@ TEST(action, verify)
 {
   ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
 }
-
-// TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree"; }
-
-// TEST(loop_traces, verify)
-// {
-//   ASSERT_LE(loop_deviation, getTolerance(cuda_prec)) << "CPU and QUDA loop trace implementations do not agree";
-// }
-
-// TEST(plaquette, verify)
-// {
-//   ASSERT_LE(plaq_deviation, getTolerance(cuda_prec))
-//     << "Plaquette from QUDA loop trace and QUDA dedicated plaquette function do not agree";
-// }
 
 static void display_test_info()
 {

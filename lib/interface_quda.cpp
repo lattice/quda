@@ -4568,7 +4568,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   std::vector<double> force_coeff(nvector);
 
-  profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   // loop over different quark fields
   for(int i=0; i<nvector; i++){
     ColorSpinorField &x = *(quarkX[i]);
@@ -4603,7 +4603,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   // Make sure extendedGaugeResident has the correct R
   // TODO: In most situation, deallocation is unnecessery
   if (extendedGaugeResident) delete extendedGaugeResident;
-  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeForce);
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   // In double precision the clover derivative is faster with no reconstruct
@@ -4634,7 +4634,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   if (u != &gaugeEx) delete u;
   updateMomentum(cudaMom, -1.0, cudaForce, "clover");
 
-  profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // copy the outer product field back to the host
   if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
@@ -4735,7 +4735,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   // Make sure extendedGaugeResident has the correct R
   // TODO: In most situation, deallocation is unnecessery
   if (extendedGaugeResident) delete extendedGaugeResident;
-  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeForce);
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileTMCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   // create oprod and trace field
