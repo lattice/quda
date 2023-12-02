@@ -66,6 +66,7 @@ namespace quda {
 #if defined(GPU_CLOVER_DIRAC) && (QUDA_PRECISION & 8)
   void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
     assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
 
@@ -81,6 +82,7 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", force.Precision());
     }
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
   void cloverDerivative(GaugeField &, GaugeField &, GaugeField &, double, QudaParity)

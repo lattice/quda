@@ -276,8 +276,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    blas::flops = 0;
-
     blas::copy(r_sloppy, r);
 
     int total_iter = 0;
@@ -386,11 +384,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
-    if (K) gflops += K->flops()*1e-9;
-
     if (k >= param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     logQuda(QUDA_VERBOSE, "GCR: number of restarts = %d\n", restart);
@@ -410,15 +403,7 @@ namespace quda {
       if (0) blas::copy(b, K ? r_sloppy : p[k_break]);
     }
 
-    param.gflops += gflops;
     param.iter += total_iter;
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
-    matMdagM.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);

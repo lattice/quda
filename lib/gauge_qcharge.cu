@@ -62,12 +62,16 @@ namespace quda
 
   void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

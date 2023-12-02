@@ -60,15 +60,15 @@ void init(int argc, char **argv)
     setInvertParam(inv_param);
   }
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_refinement_sloppy = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION;
-  inv_param.cuda_prec_eigensolver = QUDA_HALF_PRECISION;
+  //inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  //inv_param.cuda_prec_refinement_sloppy = QUDA_DOUBLE_PRECISION;
+  //inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION;
+  //inv_param.cuda_prec_eigensolver = QUDA_HALF_PRECISION;
   // inv_param.clover_location = QUDA_CUDA_FIELD_LOCATION;
-  inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  inv_param.clover_cuda_prec_refinement_sloppy = QUDA_DOUBLE_PRECISION;
-  inv_param.clover_cuda_prec_precondition = QUDA_HALF_PRECISION;
-  inv_param.clover_cuda_prec_eigensolver = QUDA_HALF_PRECISION;
+  //inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  //inv_param.clover_cuda_prec_refinement_sloppy = QUDA_DOUBLE_PRECISION;
+  //inv_param.clover_cuda_prec_precondition = QUDA_HALF_PRECISION;
+  //inv_param.clover_cuda_prec_eigensolver = QUDA_HALF_PRECISION;
 
   if (inv_deflate) {
     setEigParam(eig_param);
@@ -179,26 +179,28 @@ void TMCloverForce_test()
   // param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
-  quda::cpuGaugeField Mom_milc(param);
-  quda::cpuGaugeField Mom_ref_milc(param);
+  quda::GaugeField Mom_milc(param);
+  quda::GaugeField Mom_ref_milc(param);
 
   param.order = QUDA_QDP_GAUGE_ORDER;
-  quda::cpuGaugeField Mom_qdp(param);
+  quda::GaugeField Mom_qdp(param);
 
   // initialize some data in cpuMom
-  createMomCPU(Mom_ref_milc.Gauge_p(), gauge_param.cpu_prec, 0.0);
+  createMomCPU(Mom_ref_milc.data(), gauge_param.cpu_prec, 0.0);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc.copy(Mom_ref_milc);
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp.copy(Mom_ref_milc);
 
   void *mom = nullptr;
+  void *mom_array[QUDA_MAX_DIM];
   // void *sitelink = nullptr;
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
     // sitelink = U_milc.Gauge_p();
-    mom = Mom_milc.Gauge_p();
+    mom = Mom_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     // sitelink = U_qdp.Gauge_p();
-    mom = Mom_qdp.Gauge_p();
+    for (int d = 0; d < 4; d++) mom_array[d] = Mom_qdp.data(d);
+    mom = reinterpret_cast<void *>(mom_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -236,7 +238,7 @@ void TMCloverForce_test()
     for (int n = 0; n < Nsrc; n++) {
       out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
       spinorNoise(out_multishift[n * multishift + i], rng, QUDA_NOISE_GAUSS);
-      in[n][i] = out_multishift[n * multishift + i].V();
+      in[n][i] = out_multishift[n * multishift + i].data();
       ////////////my init
       // double *vin = (double *)in[0][0];
       // for (int x = 0; x < 2 * 4 * 4 * 2 * 24; x++) {
@@ -275,16 +277,16 @@ void TMCloverForce_test()
   // The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops = 153004;
 
-  void *refmom = Mom_ref_milc.Gauge_p();
+  void *refmom = Mom_ref_milc.data();
   // int *check_out = compute_force ? &force_check : &path_check;
   int *check_out = true ? &force_check : &path_check;
   if (verify_results) {
     
     TMCloverForce_reference(refmom, in[0].data(), coeff, 1, gauge, clover, clover_inv, &gauge_param, &inv_param);
     *check_out
-      = compare_floats(Mom_milc.Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
+      = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     // if (compute_force)
-    strong_check_mom(Mom_milc.Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
+    strong_check_mom(Mom_milc.data(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
   logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");

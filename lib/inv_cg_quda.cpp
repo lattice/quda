@@ -369,7 +369,6 @@ namespace quda {
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      blas::flops = 0;
     }
 
     int k = 0;
@@ -544,9 +543,6 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-      param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
-      param.gflops = gflops;
       param.iter += k;
 
       if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -563,15 +559,7 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, 0.0);
 
-    if (!param.is_preconditioner) {
-      // reset the flops counters
-      blas::flops = 0;
-      mat.flops();
-      matSloppy.flops();
-      matPrecon.flops();
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    }
+    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     if (param.is_preconditioner) commGlobalReductionPop();
   }
@@ -692,7 +680,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     int k = 0;
 
@@ -988,9 +975,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -1005,12 +989,6 @@ namespace quda {
     }
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
@@ -1163,7 +1141,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     int k = 0;
 
@@ -1311,9 +1288,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -1331,11 +1305,6 @@ namespace quda {
 
       PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i], 0.0);
     }
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
@@ -1533,7 +1502,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profile.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas::flops = 0;
 
   int k = 0;
 
@@ -1879,9 +1847,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-  param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-  double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-  param.gflops = gflops;
   param.iter += k;
 
   if (k == param.maxiter)
@@ -1900,11 +1865,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
-
-  // reset the flops counters
-  blas::flops = 0;
-  mat.flops();
-  matSloppy.flops();
 
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);

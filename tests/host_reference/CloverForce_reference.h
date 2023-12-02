@@ -251,11 +251,11 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
 {
 
   gFloat **gaugeFull = (gFloat **)gauge.data();
-  sFloat *spinorField = (sFloat *)inB.V();
+  sFloat *spinorField = (sFloat *)inB.data();
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
 
-  sFloat *A = (sFloat *)inA.V();
+  sFloat *A = (sFloat *)inA.data();
 
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
@@ -892,6 +892,9 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
   // auto oprod_ex = quda::createExtendedTensorGauge(oprod_qdp.data(), param, R);
   // printf("HERE before oprod_ex created\n");
 
+  void *u_array[QUDA_MAX_DIM];
+  for (int d = 0; d < 4; d++) u_array[d] = qdp_ex->data(d);
+
   for (int i = 0; i < Vh; i++) {
     for (int yIndex = 0; yIndex < 2; yIndex++) {
       for (int mu = 0; mu < 4; mu++) {
@@ -899,15 +902,17 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
           if (nu == mu)
             continue;
           else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
-            computeForce_reference<double>(h_mom, (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu, nu);
+            computeForce_reference<double>(h_mom, u_array, lat, oprod, i, yIndex, parity, mu, nu);
           else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
-            computeForce_reference<float>(h_mom, (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu, nu);
+            computeForce_reference<float>(h_mom, u_array, lat, oprod, i, yIndex, parity, mu, nu);
           else
             errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
         }
       }
     }
   }
+
+  delete qdp_ex;
 }
 
 template <typename sFloat, typename gFloat>
@@ -916,8 +921,8 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
 {
   int nColor = 3;
   gFloat *oprod = (gFloat *)oprod_;
-  sFloat *x = (sFloat *)inx.V();
-  sFloat *p = (sFloat *)inp.V();
+  sFloat *x = (sFloat *)inx.data();
+  sFloat *p = (sFloat *)inp.data();
 
   gFloat oprod_f[gauge_site_size];
   gFloat oprod_imx2[gauge_site_size];

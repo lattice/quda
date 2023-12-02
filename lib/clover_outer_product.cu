@@ -136,6 +136,7 @@ namespace quda {
   void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
                           std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkNative(*x[0], *p[0], force, U);
     checkPrecision(*x[0], *p[0], force, U);
 
@@ -162,6 +163,7 @@ namespace quda {
         instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
       }
     }
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else // GPU_CLOVER_DIRAC not defined
   void computeCloverForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,

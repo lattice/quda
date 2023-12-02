@@ -52,9 +52,9 @@ namespace quda {
 
     QudaMatPCType matpcType;
     QudaDagType dagger;
-    cudaGaugeField *gauge;
-    cudaGaugeField *fatGauge;  // used by staggered only
-    cudaGaugeField *longGauge; // used by staggered only
+    GaugeField *gauge;
+    GaugeField *fatGauge;  // used by staggered only
+    GaugeField *longGauge; // used by staggered only
     int laplace3D;
     CloverField *clover;
     GaugeField *xInvKD; // used for the Kahler-Dirac operator only
@@ -168,13 +168,12 @@ namespace quda {
     friend class DiracG5M;
 
   protected:
-    cudaGaugeField *gauge;
+    GaugeField *gauge;
     double kappa;
     double mass;
     int laplace3D;
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
-    mutable unsigned long long flops;
     QudaDiracType type;
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
@@ -405,16 +404,6 @@ namespace quda {
     virtual bool AllowTruncation() const { return false; }
 
     /**
-       @brief  returns and then zeroes flopcount
-    */
-    unsigned long long Flops() const
-    {
-      unsigned long long rtn = flops;
-      flops = 0;
-      return rtn;
-    }
-
-    /**
        @brief returns preconditioning type
     */
     QudaMatPCType getMatPCType() const { return matpcType; }
@@ -450,7 +439,7 @@ namespace quda {
 
         @return Error for non-staggered operators
     */
-    virtual cudaGaugeField *getStaggeredShortLinkField() const
+    virtual GaugeField *getStaggeredShortLinkField() const
     {
       errorQuda("Invalid dirac type %d", getDiracType());
       return nullptr;
@@ -461,7 +450,7 @@ namespace quda {
 
         @return Error for non-improved staggered operators
     */
-    virtual cudaGaugeField *getStaggeredLongLinkField() const
+    virtual GaugeField *getStaggeredLongLinkField() const
     {
       errorQuda("Invalid dirac type %d", getDiracType());
       return nullptr;
@@ -476,10 +465,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
-    {
-      gauge = gauge_in;
-    }
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *) { gauge = gauge_in; }
 
     /**
      * @brief Create the coarse operator (virtual parent)
@@ -623,7 +609,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *clover_in)
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -979,7 +965,7 @@ namespace quda {
   class DiracMobiusPC : public DiracMobius {
 
   protected:
-    mutable cudaGaugeField *extended_gauge;
+    mutable GaugeField *extended_gauge;
 
   private:
   public:
@@ -1227,7 +1213,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *clover_in)
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -1365,7 +1351,7 @@ public:
 
        @return Gauge field
    */
-    virtual cudaGaugeField *getStaggeredShortLinkField() const { return gauge; }
+    virtual GaugeField *getStaggeredShortLinkField() const { return gauge; }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1500,7 +1486,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
                               CloverField *clover_in);
 
     /**
@@ -1541,8 +1527,8 @@ public:
   class DiracImprovedStaggered : public Dirac {
 
   protected:
-    cudaGaugeField *fatGauge;
-    cudaGaugeField *longGauge;
+    GaugeField *fatGauge;
+    GaugeField *longGauge;
 
   public:
     DiracImprovedStaggered(const DiracParam &param);
@@ -1569,14 +1555,14 @@ public:
 
         @return fat link field
     */
-    virtual cudaGaugeField *getStaggeredShortLinkField() const { return fatGauge; }
+    virtual GaugeField *getStaggeredShortLinkField() const { return fatGauge; }
 
     /**
         @brief return the long link field for staggered operators for MG setup
 
         @return long link field
     */
-    virtual cudaGaugeField *getStaggeredLongLinkField() const { return longGauge; }
+    virtual GaugeField *getStaggeredLongLinkField() const { return longGauge; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1587,7 +1573,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, CloverField *)
+    virtual void updateFields(GaugeField *, GaugeField *fat_gauge_in, GaugeField *long_gauge_in, CloverField *)
     {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
       fatGauge = fat_gauge_in;
@@ -1736,7 +1722,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
                               CloverField *clover_in);
 
     /**
@@ -1791,19 +1777,19 @@ public:
     const bool dslash_use_mma;   /** Whether to use tensor cores or not */
     const bool need_aos_gauge_copy; // Whether or not we need an AoS copy of the gauge fields
 
-    mutable std::shared_ptr<cpuGaugeField> Y_h;    /** CPU copy of the coarse link field */
-    mutable std::shared_ptr<cpuGaugeField> X_h;    /** CPU copy of the coarse clover term */
-    mutable std::shared_ptr<cpuGaugeField> Xinv_h; /** CPU copy of the inverse coarse clover term */
-    mutable std::shared_ptr<cpuGaugeField> Yhat_h; /** CPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<GaugeField> Y_h;    /** CPU copy of the coarse link field */
+    mutable std::shared_ptr<GaugeField> X_h;    /** CPU copy of the coarse clover term */
+    mutable std::shared_ptr<GaugeField> Xinv_h; /** CPU copy of the inverse coarse clover term */
+    mutable std::shared_ptr<GaugeField> Yhat_h; /** CPU copy of the preconditioned coarse link field */
 
-    mutable std::shared_ptr<cudaGaugeField> Y_d;        /** GPU copy of the coarse link field */
-    mutable std::shared_ptr<cudaGaugeField> X_d;        /** GPU copy of the coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Y_aos_d;    /** AoS GPU copy of the coarse link field */
-    mutable std::shared_ptr<cudaGaugeField> X_aos_d;    /** AoS GPU copy of the coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Xinv_d;     /** GPU copy of inverse coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Yhat_d;     /** GPU copy of the preconditioned coarse link field */
-    mutable std::shared_ptr<cudaGaugeField> Xinv_aos_d; /** AoS GPU copy of inverse coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Yhat_aos_d; /** AoS GPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<GaugeField> Y_d;        /** GPU copy of the coarse link field */
+    mutable std::shared_ptr<GaugeField> X_d;        /** GPU copy of the coarse clover term */
+    mutable std::shared_ptr<GaugeField> Y_aos_d;    /** AoS GPU copy of the coarse link field */
+    mutable std::shared_ptr<GaugeField> X_aos_d;    /** AoS GPU copy of the coarse clover term */
+    mutable std::shared_ptr<GaugeField> Xinv_d;     /** GPU copy of inverse coarse clover term */
+    mutable std::shared_ptr<GaugeField> Yhat_d;     /** GPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<GaugeField> Xinv_aos_d; /** AoS GPU copy of inverse coarse clover term */
+    mutable std::shared_ptr<GaugeField> Yhat_aos_d; /** AoS GPU copy of the preconditioned coarse link field */
 
     /**
        @brief Initialize the coarse gauge fields.  Location is
@@ -1862,10 +1848,10 @@ public:
        @param[in] Xinv_d GPU coarse inverse clover field
        @param[in] Yhat_d GPU coarse preconditioned link field
      */
-    DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h,
-                std::shared_ptr<cpuGaugeField> Xinv_h, std::shared_ptr<cpuGaugeField> Yhat_h,
-                std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
-                std::shared_ptr<cudaGaugeField> Xinv_d = nullptr, std::shared_ptr<cudaGaugeField> Yhat_d = nullptr);
+    DiracCoarse(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                std::shared_ptr<GaugeField> Xinv_h, std::shared_ptr<GaugeField> Yhat_h,
+                std::shared_ptr<GaugeField> Y_d = nullptr, std::shared_ptr<GaugeField> X_d = nullptr,
+                std::shared_ptr<GaugeField> Xinv_d = nullptr, std::shared_ptr<GaugeField> Yhat_d = nullptr);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
@@ -1955,7 +1941,7 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
 
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *)
     {
       Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
       warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
@@ -2027,10 +2013,10 @@ public:
        @param[in] Xinv_d GPU coarse inverse clover field
        @param[in] Yhat_d GPU coarse preconditioned link field
      */
-    DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h,
-                  std::shared_ptr<cpuGaugeField> Xinv_h, std::shared_ptr<cpuGaugeField> Yhat_h,
-                  std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
-                  std::shared_ptr<cudaGaugeField> Xinv_d = nullptr, std::shared_ptr<cudaGaugeField> Yhat_d = nullptr);
+    DiracCoarsePC(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                  std::shared_ptr<GaugeField> Xinv_h, std::shared_ptr<GaugeField> Yhat_h,
+                  std::shared_ptr<GaugeField> Y_d = nullptr, std::shared_ptr<GaugeField> X_d = nullptr,
+                  std::shared_ptr<GaugeField> Xinv_d = nullptr, std::shared_ptr<GaugeField> Yhat_d = nullptr);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
@@ -2242,8 +2228,6 @@ public:
        @param[out] out The vector of input fields
      */
     virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const = 0;
-
-    unsigned long long flops() const { return dirac->Flops(); }
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 

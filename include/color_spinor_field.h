@@ -121,18 +121,13 @@ namespace quda
     }
   };
 
-  class ColorSpinorParam : public LatticeFieldParam
-  {
-
-  public:
+  struct ColorSpinorParam : public LatticeFieldParam {
     int nColor = 0; // Number of colors of the field
     int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
-
     QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
-
     QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER; // Float, Float2, Float4 etc.
     QudaGammaBasis gammaBasis = QUDA_INVALID_GAMMA_BASIS;
     QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
@@ -179,7 +174,6 @@ namespace quda
     ColorSpinorParam() = default;
 
     // used to create cpu params
-
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const lat_dim_t &X, const bool pc_solution,
                      QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
       LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
@@ -188,20 +182,12 @@ namespace quda
              || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
               1 :
               4),
-      nVec(1),
       twistFlavor(inv_param.twist_flavor),
-      siteOrder(QUDA_INVALID_SITE_ORDER),
-      fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
       pc_type(inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
-      v(V),
-      is_composite(false),
-      composite_dim(0),
-      is_component(false),
-      component_id(0)
+      v(V)
     {
-
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
       for (int d = 0; d < nDim; d++) x[d] = X[d];
 
@@ -343,8 +329,7 @@ namespace quda
 
     size_t length = 0; // length including pads, but not norm zone
 
-    void *v = nullptr;      // the field elements
-    void *v_h = nullptr;    // the field elements
+    quda_ptr v = {};        // the field elements
     size_t norm_offset = 0; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
@@ -442,6 +427,12 @@ namespace quda
     ColorSpinorField &operator=(ColorSpinorField &&field);
 
     /**
+       @brief Returns if the object is empty (not initialized)
+       @return true if the object has not been allocated, otherwise false
+    */
+    bool empty() const { return !init; }
+
+    /**
        @brief Copy the source field contents into this
        @param[in] src Source from which we are copying
      */
@@ -477,37 +468,19 @@ namespace quda
     /**
        @brief Return pointer to the field allocation
     */
-    void *V()
+    template <typename T = void *> auto data() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return v;
-    }
-
-    /**
-       @brief Return pointer to the field allocation
-    */
-    const void *V() const
-    {
-      if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return v;
+      return reinterpret_cast<T>(v.data());
     }
 
     /**
        @brief Return pointer to the norm base pointer in the field allocation
     */
-    void *Norm()
+    void *Norm() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return static_cast<char *>(v) + norm_offset;
-    }
-
-    /**
-       @brief Return pointer to the norm base pointer in the field allocation
-    */
-    const void *Norm() const
-    {
-      if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return static_cast<char *>(v) + norm_offset;
+      return static_cast<char *>(v.data()) + norm_offset;
     }
 
     size_t NormOffset() const { return norm_offset; }
@@ -938,7 +911,7 @@ namespace quda
     static void test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
 
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
-    friend class ColorSpinorParam;
+    friend struct ColorSpinorParam;
   };
 
   /**
@@ -1022,28 +995,30 @@ namespace quda
 
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
-     @param src The colorspinorfield
-     @param randstates Random state
-     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+     @param[out] src The colorspinorfield
+     @param[in,out] randstates Random state
+     @param[in] type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
   void spinorNoise(ColorSpinorField &src, RNG &randstates, QudaNoiseType type);
 
   /**
      @brief Generate a random noise spinor.  This variant just
      requires a seed and will create and destroy the random number state.
-     @param src The colorspinorfield
-     @param seed Seed
-     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+     @param[out] src The colorspinorfield
+     @param[in] seed Seed
+     @param[in] type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
   void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type);
 
   /**
      @brief Generate a set of diluted color spinors from a single source.
-     @param v Diluted vector set
-     @param src The input source
-     @param type The type of dilution to apply (QUDA_DILUTION_SPIN_COLOR, etc.)
+     @param[out] v Diluted vector set
+     @param[in] src The input source
+     @param[in] type The type of dilution to apply (QUDA_DILUTION_SPIN_COLOR, etc.)
+     @param[in] local_block The local block size to use when using QUDA_DILUTION_BLOCK dilution
   */
-  void spinorDilute(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, QudaDilutionType type);
+  void spinorDilute(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, QudaDilutionType type,
+                    const lat_dim_t &local_block = {});
 
   /**
      @brief Helper function for determining if the preconditioning

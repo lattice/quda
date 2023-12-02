@@ -38,7 +38,7 @@ namespace quda
       bool mixed = param.precision != param.precision_sloppy;
 
       if (!mixed) csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      csParam.v = r.V();
+      csParam.v = r.data();
       r_sloppy = ColorSpinorField(csParam);
 
       init = true;
@@ -62,10 +62,7 @@ namespace quda
 
     create(x, b); // allocate fields
 
-    if (!param.is_preconditioner) {
-      blas::flops = 0;
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    }
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     double b2 = blas::norm2(b); // Save norm of b
     double r2 = 0.0;            // if zero source then we will exit immediately doing no work
@@ -160,17 +157,7 @@ namespace quda
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-
-      // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops()) * 1e-9;
-
-      param.gflops += gflops;
       param.iter += iter;
-      blas::flops = 0;
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
   }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <utility>
 #include <register_traits.h>
 #include <blas_helper.cuh>
 #include <reduce_helper.h>

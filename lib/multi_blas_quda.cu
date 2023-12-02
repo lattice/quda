@@ -81,9 +81,6 @@ namespace quda {
 #endif
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
       TuneKey tuneKey() const override { return TuneKey(vol, typeid(f).name(), aux); }

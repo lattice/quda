@@ -25,7 +25,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     ApplyStaggered(out, in, *gauge, 0., in, parity, dagger, commDim, profile);
-    flops += 570ll*in.Volume();
   }
 
   void DiracStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -43,10 +42,8 @@ namespace quda {
       } else {
         ApplyStaggered(out, in, *gauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
       }
-      flops += 570ll * in.Volume();
     } else {
       ApplyStaggered(out, in, *gauge, k, x, parity, dagger, commDim, profile);
-      flops += 582ll * in.Volume();
     }
   }
 
@@ -66,10 +63,8 @@ namespace quda {
       } else {
         ApplyStaggered(out, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
       }
-      flops += 570ll * in.Volume();
     } else {
       ApplyStaggered(out, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      flops += 582ll * in.Volume();
     }
   }
 
@@ -142,7 +137,6 @@ namespace quda {
     } else {
       ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     }
-    flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.Volume() / ( is_time_slice ? in.X(3) : 1 ) );
   }  
   
 

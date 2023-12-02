@@ -88,7 +88,7 @@ namespace quda {
         if (NXZ == NYW) {
           is_norm = true;
           for (int i = 0; i < NXZ; i++) {
-            if (x[i].V() != y[i].V() || x[i].V() != z[i].V() || x[i].V() != w[i].V()) {
+            if (x[i].data() != y[i].data() || x[i].data() != z[i].data() || x[i].data() != w[i].data()) {
               is_norm = false;
               break;
             }
@@ -97,9 +97,6 @@ namespace quda {
         if (is_norm) strcat(aux, ",norm");
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
       TuneKey tuneKey() const override { return TuneKey(vol, typeid(r).name(), aux); }

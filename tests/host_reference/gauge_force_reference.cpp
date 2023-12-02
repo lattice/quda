@@ -8,6 +8,7 @@
 #include "host_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
+#include "timer.h"
 
 extern int Z[4];
 extern int V;
@@ -67,7 +68,15 @@ struct fcomplex {
 struct dcomplex {
   double real;
   double imag;
+
+  void operator+=(const dcomplex &other)
+  {
+    real += other.real;
+    imag += other.imag;
+  }
 };
+
+#pragma omp declare reduction(dcomplex_sum:dcomplex : omp_out += omp_in)
 
 struct fsu3_matrix {
   using real_t = float;
@@ -302,9 +311,7 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
 template <typename su3_matrix>
 static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, int len, int dx[4], const lattice_t &lat)
 {
-  su3_matrix prev_matrix, curr_matrix;
-
-  memset(&curr_matrix, 0, sizeof(curr_matrix));
+  su3_matrix prev_matrix, curr_matrix = {};
 
   curr_matrix.e[0][0].real = 1;
   curr_matrix.e[1][1].real = 1;
@@ -346,16 +353,14 @@ template <typename su3_matrix, typename Float>
 static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff,
                                  int dir, const lattice_t &lat)
 {
-  su3_matrix curr_matrix, tmat;
-  int dx[4];
-
+#pragma omp parallel for
   for (size_t i = 0; i < lat.volume; i++) {
-    memset(dx, 0, sizeof(dx));
-
+    int dx[4] = {};
     dx[dir] = 1;
 
-    curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
+    su3_matrix curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
 
+    su3_matrix tmat;
     su3_adjoint(&curr_matrix, &tmat);
     scalar_mult_add_su3_matrix(staple + i, &tmat, loop_coeff, staple + i);
   } // i
@@ -364,16 +369,14 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int 
 template <typename su3_matrix>
 static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, double loop_coeff, const lattice_t &lat)
 {
-  su3_matrix tmat;
-  dcomplex accum;
-  memset(&accum, 0, sizeof(accum));
-  int dx[4];
+  dcomplex accum = {};
 
+#pragma omp parallel for reduction(dcomplex_sum : accum)
   for (size_t i = 0; i < lat.volume; i++) {
-    memset(dx, 0, sizeof(dx));
-    tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
+    int dx[4] = {};
+    su3_matrix tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
     auto tr = trace_su3(&tmat);
-    CSUM(accum, tr);
+    accum += dcomplex {tr.real, tr.imag};
   }
 
   CSCALE(accum, loop_coeff);
@@ -385,6 +388,7 @@ template <typename su3_matrix, typename anti_hermitmat, typename Float>
 static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
                        const lattice_t &lat)
 {
+#pragma omp parallel for
   for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat1;
     su3_matrix tmat2;
@@ -406,6 +410,7 @@ template <typename su3_matrix, typename Float>
 static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
                          const lattice_t &lat)
 {
+#pragma omp parallel for
   for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat;
 
@@ -422,11 +427,11 @@ static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *sitelink, void *const *sitelink_ex,
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
                                const lattice_t &lat, bool compute_force)
 {
-  size_t size = V * 2 * lat.n_color * lat.n_color * prec;
+  size_t size = size_t(V) * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
   memset(staple, 0, size);
 
@@ -458,9 +463,11 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
   host_free(staple);
 }
 
-void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
+void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int ***path_dir, int *length,
                            void *loop_coeff, int num_paths, bool compute_force)
 {
+  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+
   // created extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -472,17 +479,20 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   lattice_t lat(*qdp_ex);
 
+  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
-                              loop_coeff, num_paths, lat, compute_force);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex, u.Precision(), path_dir[dir], length, loop_coeff,
+                              num_paths, lat, compute_force);
   }
 
   delete qdp_ex;
 }
 
-void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector<quda::Complex> &loop_traces,
-                                double factor, int **input_path, int *length, double *path_coeff, int num_paths)
+void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
+                                int **input_path, int *length, double *path_coeff, int num_paths)
 {
+  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+
   // create extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -493,12 +503,12 @@ void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector
 
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   lattice_t lat(*qdp_ex);
-  void **sitelink_ex = (void **)qdp_ex->Gauge_p();
+  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
 
   std::vector<double> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
-    if (prec == QUDA_DOUBLE_PRECISION) {
+    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       dcomplex tr = compute_loop_trace((dsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;

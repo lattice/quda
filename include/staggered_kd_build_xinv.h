@@ -14,7 +14,7 @@ namespace quda
      @param mass [in] Mass of the original staggered operator w/out factor of 2 convention
      @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
   */
-  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass,
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const GaugeField &gauge, const double mass,
                                         const bool dagger_approximation);
 
   /**
@@ -34,7 +34,7 @@ namespace quda
      @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
      @return constructed Xinv
   */
-  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass,
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, const double mass,
                                                                           const bool dagger_approximation);
 
 } // namespace quda

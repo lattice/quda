@@ -61,6 +61,7 @@ namespace quda {
   void computeCloverSigmaOprod(GaugeField& oprod, std::vector<ColorSpinorField*> &x,
 			       std::vector<ColorSpinorField*> &p, std::vector<std::vector<double> > &coeff)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (x.size() > MAX_NVECTOR) {
       // divide and conquer
       std::vector<ColorSpinorField*> x0(x.begin(), x.begin()+x.size()/2);
@@ -83,6 +84,7 @@ namespace quda {
     }
 
     instantiate<CloverSigmaOprod>(oprod, x, p, coeff);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else // GPU_CLOVER_DIRAC not defined
   void computeCloverSigmaOprod(GaugeField &, std::vector<ColorSpinorField*> &,

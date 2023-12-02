@@ -1054,6 +1054,7 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
   }
 
   for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
         for (int n = 0; n < 3; n++) {
@@ -1269,14 +1270,21 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
 
   for (int d = 0; d < 4; d++) {
     for (int eo = 0; eo < 2; eo++) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         int ga_idx = (eo * Vh + i);
         for (int j = 0; j < 18; j++) {
           double diff = fabs(newG[d][ga_idx * 18 + j] - oldG[d][ga_idx * 18 + j]); /// fabs(oldG[d][ga_idx*18+j]);
 
           for (int f = 0; f < fail_check; f++)
-            if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[d][f]++;
-          if (diff > epsilon || std::isnan(diff)) iter[d][j]++;
+            if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
+#pragma omp atomic
+              fail[d][f]++;
+            }
+          if (diff > epsilon || std::isnan(diff)) {
+#pragma omp atomic
+            iter[d][j]++;
+          }
         }
       }
     }
@@ -1302,7 +1310,7 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
     checkGauge((float **)oldG, (float **)newG, epsilon);
 }
 
-void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
+void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     constructUnitaryGaugeField((double **)link);
@@ -1311,6 +1319,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
   }
 
   if (phase == SITELINK_PHASE_MILC) {
+#pragma omp parallel for
     for (int i = 0; i < V; i++) {
       for (int dir = XUP; dir <= TUP; dir++) {
         int idx = i;
@@ -1443,6 +1452,12 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
   return;
 }
 
+void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase)
+{
+  void *link[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+  createSiteLinkCPU(link, precision, phase);
+}
+
 template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
 {
   const int fail_check = 16;
@@ -1453,14 +1468,21 @@ template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
   for (int i = 0; i < 18; i++) iter[i] = 0;
 
   for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
     for (int i = 0; i < len; i++) {
       for (int j = 0; j < 18; j++) {
         int is = i * 18 + j;
         double diff = fabs(linkA[dir][is] - linkB[dir][is]);
         for (int f = 0; f < fail_check; f++)
-          if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
+          if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
+#pragma omp atomic
+            fail[f]++;
+          }
         // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-        if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
+        if (diff > 1e-3 || std::isnan(diff)) {
+#pragma omp atomic
+          iter[j]++;
+        }
       }
     }
   }
@@ -1488,6 +1510,21 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
     ret = compareLink((double **)linkA, (double **)linkB, len);
   } else {
     ret = compareLink((float **)linkA, (float **)linkB, len);
+  }
+
+  return ret;
+}
+
+static int compare_link(const GaugeField &linkA, const GaugeField &linkB)
+{
+  int ret;
+
+  void *a[] = {linkA.data(0), linkA.data(1), linkA.data(2), linkA.data(3)};
+  void *b[] = {linkB.data(0), linkB.data(1), linkB.data(2), linkB.data(3)};
+  if (checkPrecision(linkA, linkB) == QUDA_DOUBLE_PRECISION) {
+    ret = compareLink((double **)a, (double **)b, linkA.Volume());
+  } else {
+    ret = compareLink((float **)a, (float **)b, linkA.Volume());
   }
 
   return ret;
@@ -1524,8 +1561,30 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
     printfQuda("\n");
   }
 
-  int ret = compare_link(linkA, linkB, len, prec);
-  return ret;
+  return compare_link(linkA, linkB, len, prec);
+}
+
+int strong_check_link(const GaugeField &linkA, const std::string &msgA, const GaugeField &linkB, const std::string &msgB)
+{
+  if (verbosity >= QUDA_VERBOSE) {
+    printfQuda("%s\n", msgA.c_str());
+    printLinkElement(linkA.data(0), 0, prec);
+    printfQuda("\n");
+    printLinkElement(linkA.data(0), 1, prec);
+    printfQuda("...\n");
+    printLinkElement(linkA.data(3), linkA.Volume() - 1, prec);
+    printfQuda("\n");
+
+    printfQuda("\n%s\n", msgB.c_str());
+    printLinkElement(linkB.data(0), 0, prec);
+    printfQuda("\n");
+    printLinkElement(linkB.data(0), 1, prec);
+    printfQuda("...\n");
+    printLinkElement(linkB.data(3), linkB.Volume() - 1, prec);
+    printfQuda("\n");
+  }
+
+  return compare_link(linkA, linkB);
 }
 
 void createMomCPU(void *mom, QudaPrecision precision, double max_val)
@@ -1581,14 +1640,21 @@ template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
   int iter[mom_site_size];
   for (auto i = 0lu; i < mom_site_size; i++) iter[i] = 0;
 
+#pragma omp parallel for
   for (int i = 0; i < len; i++) {
     for (auto j = 0lu; j < mom_site_size - 1; j++) {
       int is = i * mom_site_size + j;
       double diff = fabs(momA[is] - momB[is]);
       for (int f = 0; f < fail_check; f++)
-        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
+        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
+#pragma omp atomic
+          fail[f]++;
+        }
       // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-      if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
+      if (diff > 1e-3 || std::isnan(diff)) {
+#pragma omp atomic
+        iter[j]++;
+      }
     }
   }
 

@@ -124,16 +124,17 @@ void gauge_force_test(bool compute_force = true)
   }
 
   quda::GaugeFieldParam param(gauge_param);
+  param.location = QUDA_CPU_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION;
-  quda::cpuGaugeField U_qdp(param);
+  quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU((void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
-  quda::cpuGaugeField U_milc(param);
+  quda::GaugeField U_milc(param);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc.copy(U_qdp);
   if (compute_force) {
     param.reconstruct = QUDA_RECONSTRUCT_10;
@@ -142,27 +143,31 @@ void gauge_force_test(bool compute_force = true)
     param.reconstruct = QUDA_RECONSTRUCT_NO;
   }
   param.create = QUDA_ZERO_FIELD_CREATE;
-  quda::cpuGaugeField Mom_milc(param);
-  quda::cpuGaugeField Mom_ref_milc(param);
+  quda::GaugeField Mom_milc(param);
+  quda::GaugeField Mom_ref_milc(param);
 
   param.order = QUDA_QDP_GAUGE_ORDER;
-  quda::cpuGaugeField Mom_qdp(param);
+  quda::GaugeField Mom_qdp(param);
 
   // initialize some data in cpuMom
   if (compute_force) {
-    createMomCPU(Mom_ref_milc.Gauge_p(), gauge_param.cpu_prec);
+    createMomCPU(Mom_ref_milc.data(), gauge_param.cpu_prec);
     if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc.copy(Mom_ref_milc);
     if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp.copy(Mom_ref_milc);
   }
   void *mom = nullptr;
   void *sitelink = nullptr;
+  void *sitelink_array[QUDA_MAX_DIM];
+  void *mom_array[QUDA_MAX_DIM];
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    sitelink = U_milc.Gauge_p();
-    mom = Mom_milc.Gauge_p();
+    sitelink = U_milc.data();
+    mom = Mom_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    sitelink = U_qdp.Gauge_p();
-    mom = Mom_qdp.Gauge_p();
+    for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
+    for (int d = 0; d < 4; d++) mom_array[d] = Mom_qdp.data(d);
+    mom = reinterpret_cast<void *>(mom_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -196,14 +201,17 @@ void gauge_force_test(bool compute_force = true)
   // The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops = 153004;
 
-  void *refmom = Mom_ref_milc.Gauge_p();
+  void *refmom = Mom_ref_milc.data();
   int *check_out = compute_force ? &force_check : &path_check;
   if (verify_results) {
-    gauge_force_reference(refmom, eb3, (void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
-                          loop_coeff, num_paths, compute_force);
+    quda::host_timer_t verify_timer;
+    verify_timer.start();
+    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length, loop_coeff, num_paths, compute_force);
     *check_out
-      = compare_floats(Mom_milc.Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
-    if (compute_force) strong_check_mom(Mom_milc.Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
+      = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
+    if (compute_force) strong_check_mom(Mom_milc.data(), refmom, 4 * V, gauge_param.cpu_prec);
+    verify_timer.stop();
+    printfQuda("Verification time = %.2f ms\n", verify_timer.last());
   }
 
   if (compute_force) {
@@ -255,21 +263,23 @@ void gauge_loop_test()
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION;
-  quda::cpuGaugeField U_qdp(param);
+  quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU((void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
-  quda::cpuGaugeField U_milc(param);
+  quda::GaugeField U_milc(param);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc.copy(U_qdp);
 
   void *sitelink = nullptr;
+  void *sitelink_array[QUDA_MAX_DIM];
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    sitelink = U_milc.Gauge_p();
+    sitelink = U_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    sitelink = U_qdp.Gauge_p();
+    for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -311,8 +321,11 @@ void gauge_loop_test()
   std::vector<quda::Complex> traces_ref(num_paths);
 
   if (verify_results) {
-    gauge_loop_trace_reference((void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p,
-                               trace_loop_length_p, trace_loop_coeff_p, num_paths);
+    quda::host_timer_t verify_timer;
+    verify_timer.start();
+
+    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p,
+                               num_paths);
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
@@ -342,6 +355,9 @@ void gauge_loop_test()
             "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
             plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1],
             obsParam.plaquette[2], plaq_deviation);
+
+    verify_timer.stop();
+    printfQuda("Verification time = %.2f ms\n", verify_timer.last());
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
