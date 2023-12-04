@@ -1872,12 +1872,14 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
-void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam inv_param)
+void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param)
 {
   profileCovDev.TPSTART(QUDA_PROFILE_TOTAL);
   profileCovDev.TPSTART(QUDA_PROFILE_INIT);
 
   const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  QudaInvertParam &inv_param = *param;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -1958,12 +1960,14 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam inv_pa
   profileCovDev.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam inv_param)
+void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam *param)
 {
   profileCovDev.TPSTART(QUDA_PROFILE_TOTAL);
   profileCovDev.TPSTART(QUDA_PROFILE_INIT);
 
   const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  QudaInvertParam &inv_param = *param;  
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -2248,10 +2252,12 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
   profileCovDev.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam inv_param)
+void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
 {
   profileCovDev.TPSTART(QUDA_PROFILE_TOTAL);
   profileCovDev.TPSTART(QUDA_PROFILE_INIT);
+
+  QudaInvertParam &inv_param = *param;
 
   const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
 

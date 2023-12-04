@@ -1294,7 +1294,7 @@ extern "C" {
    * @param dir    Direction of application
    * @param param  Metadata for host and device storage
    */
-  void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam param);
+  void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param);
 
   /**
    * Apply the covariant derivative.
@@ -1304,7 +1304,7 @@ extern "C" {
    * @param sym    Apply forward=2, backward=2 or symmetric=3 shift
    * @param param  Metadata for host and device storage
    */
-  void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam param);
+  void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param);
 
   /**
    * Apply the spin-taste operator.
@@ -1314,7 +1314,7 @@ extern "C" {
    * @param taste  Taste gamma structure
    * @param param  Metadata for host and device storage
    */
-  void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam inv_param);
+  void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam *param);
 
   /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
