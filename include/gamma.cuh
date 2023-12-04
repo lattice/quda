@@ -290,5 +290,144 @@ namespace quda {
     //Returns the type of Gamma matrix
     inline constexpr int Dir() const { return dir;  }
   };
+  
+  // list of specialized structures used in the contraction kernels: 
+  static constexpr int nspin = 4;
+
+  constexpr array<array<int, nspin>, nspin*nspin> get_dr_gm_i() {      
+      return {{   
+        // VECTORS
+        // G_idx = 1: \gamma_1
+        {3, 2, 1, 0},	 
+
+        // G_idx = 2: \gamma_2
+        {3, 2, 1, 0},
+
+        // G_idx = 3: \gamma_3
+        {2, 3, 0, 1},
+
+        // G_idx = 4: \gamma_4
+        {2, 3, 0, 1},
+
+        // PSEUDO-VECTORS
+        // G_idx = 6: \gamma_5\gamma_1
+        {3, 2, 1, 0},
+
+        // G_idx = 7: \gamma_5\gamma_2
+        {3, 2, 1, 0},
+
+        // G_idx = 8: \gamma_5\gamma_3
+        {2, 3, 0, 1},
+
+        // G_idx = 9: \gamma_5\gamma_4
+        {2, 3, 0, 1}, 
+
+        // SCALAR
+        // G_idx = 0: I
+        {0, 1, 2, 3},
+
+        // PSEUDO-SCALAR
+        // G_idx = 5: \gamma_5
+        {0, 1, 2, 3},
+
+        // TENSORS
+        // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+        {0, 1, 2, 3},
+
+        // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
+        {1, 0, 3, 2},
+
+        // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+        {1, 0, 3, 2},
+
+        // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+        {1, 0, 3, 2},
+
+        // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
+        {1, 0, 3, 2},
+
+        // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
+        {0, 1, 2, 3}
+      }};
+  }
+
+  template<typename T>
+  constexpr array<array<complex<T>, nspin>, nspin*nspin> get_dr_g5gm_z() {  
+
+      constexpr complex<T> i   = complex<T>(0., 1.);
+      constexpr complex<T> one = complex<T>(1., 0.);      
+
+      return {{
+        // VECTORS
+        // G_idx = 1: \gamma_1
+        {i, i, i, i},
+
+        // G_idx = 2: \gamma_2
+        {-one, one, -one, one},
+
+        // G_idx = 3: \gamma_3
+        {i, -i, i, -i},
+
+        // G_idx = 4: \gamma_4
+        {one, one, -one, -one},        
+
+        // PSEUDO-VECTORS
+        // G_idx = 6: \gamma_5\gamma_1
+        {i, i, -i, -i},        
+
+        // G_idx = 7: \gamma_5\gamma_2
+        {-one, one, one, -one},        
+
+        // G_idx = 8: \gamma_5\gamma_3
+        {i, -i, -i, i},        
+
+        // G_idx = 9: \gamma_5\gamma_4
+        {one, one, one, one},      
+
+        // SCALAR
+        // G_idx = 0: I
+        {one, one, -one, -one},        
+
+        // PSEUDO-SCALAR
+        // G_idx = 5: \gamma_5
+        {one, one, one, one},
+
+        // TENSORS
+        // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+        {one, -one, -one, one},        
+
+        // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
+        {-i, i, i, -i},                
+
+        // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+        {-one, -one, -one, -one},                
+
+        // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+        {one, one, -one, -one},                
+
+        // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
+        {-i, i, -i, i},                
+
+        // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
+        {-one, one, -one, one}
+      }};
+  }
+
+  template <typename real, int nSpin> struct DRGamma { };
+
+  template <> struct DRGamma<double, 4> {
+    static constexpr int nSpin = 4;
+    //
+    const array<array<int, nSpin>, nSpin*nSpin> gm_i               = get_dr_gm_i();
+    const array<array<complex<double>, nSpin>, nSpin*nSpin> g5gm_z = get_dr_g5gm_z<double>(); 
+  };
+
+  template <> struct DRGamma<float, 4> {
+    static constexpr int nSpin = 4;
+    //
+    const array<array<int, nSpin>, nSpin*nSpin> gm_i               = get_dr_gm_i();
+    const array<array<complex<float>, nSpin>, nSpin*nSpin> g5gm_z  = get_dr_g5gm_z<float>();     
+  };  
+  
 
 } // namespace quda
