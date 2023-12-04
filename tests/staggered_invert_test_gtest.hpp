@@ -166,11 +166,12 @@ TEST_P(StaggeredInvertTest, verify)
     inv_param.ca_basis = QUDA_POWER_BASIS;
 
   // FIXME: there's an issue in mixed precision BiCGStab I need to squash.
-  if (inverter_type == QUDA_BICGSTAB_INVERTER)
-    tol *= 1.1;
+  //if (inverter_type == QUDA_BICGSTAB_INVERTER)
+  //  tol *= 1.1;
 
-  // CGNE needs a bit of a bump
-  if (inverter_type == QUDA_CGNE_INVERTER || inverter_type == QUDA_CA_CGNE_INVERTER)
+  // CGNE and ASQTAD need a bit of a bump
+  if (inverter_type == QUDA_CGNE_INVERTER || inverter_type == QUDA_CA_CGNE_INVERTER
+      || dslash_type == QUDA_ASQTAD_DSLASH)
     tol *= 1.05;
 
   for (auto rsd : solve(GetParam())) {

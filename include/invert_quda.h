@@ -1048,8 +1048,15 @@ namespace quda {
 
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+
+    ColorSpinorField y; // Full precision solution accumulator
+    ColorSpinorField r; // Full precision residual vector
+    ColorSpinorField p; // Sloppy precision search direction
+    ColorSpinorField v; // Sloppy precision A * p
+    ColorSpinorField t; // Sloppy precision vector used for minres step
+    ColorSpinorField r0; // Bi-orthogonalization vector
+    ColorSpinorField r_sloppy; // Slopy precision residual vector
+    ColorSpinorField x_sloppy; // Sloppy solution accumulator vector
     bool init = false;
 
   public:

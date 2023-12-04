@@ -21,15 +21,6 @@ namespace quda {
 
   BiCGstab::~BiCGstab() {
     profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if(init) {
-      delete yp;
-      delete rp;
-      delete pp;
-      delete vp;
-      delete tmpp;
-      delete tp;
-    }
     destroyDeflationSpace();
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -55,25 +46,15 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = new ColorSpinorField(csParam);
-      rp = new ColorSpinorField(csParam);
+      y = ColorSpinorField(csParam);
+      r = ColorSpinorField(csParam);
       csParam.setPrecision(param.precision_sloppy);
-      pp = new ColorSpinorField(csParam);
-      vp = new ColorSpinorField(csParam);
-      tmpp = new ColorSpinorField(csParam);
-      tp = new ColorSpinorField(csParam);
+      p = ColorSpinorField(csParam);
+      v = ColorSpinorField(csParam);
+      t = ColorSpinorField(csParam);
 
       init = true;
     }
-
-    ColorSpinorField &y = *yp;
-    ColorSpinorField &r = *rp;
-    ColorSpinorField &p = *pp;
-    ColorSpinorField &v = *vp;
-    ColorSpinorField &tmp = *tmpp;
-    ColorSpinorField &t = *tp;
-
-    ColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
     double b2 = blas::norm2(b); // norm sq of source
     double r2;                  // norm sq of residual
@@ -145,40 +126,35 @@ namespace quda {
 
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
-      r_sloppy = &r;
+      r_sloppy = r.create_alias();
 
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO){
-        r_0 = &b;
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+        r0 = b.create_alias();
       } else {
         ColorSpinorParam csParam(r);
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        r_0 = new ColorSpinorField(csParam); // remember to delete this pointer.
-        *r_0 = r;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        r0 = ColorSpinorField(csParam);
+        blas::copy(r0, r);
       }
     } else {
       ColorSpinorParam csParam(x);
       csParam.setPrecision(param.precision_sloppy);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      r_sloppy = new ColorSpinorField(csParam);
-      *r_sloppy = r;
-      r_0 = new ColorSpinorField(csParam);
-      *r_0 = r;
+      r_sloppy = ColorSpinorField(csParam);
+      blas::copy(r_sloppy, r);
+      r0 = ColorSpinorField(csParam);
+      blas::copy(r0, r);
     }
 
     if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
-      x_sloppy = &x;
-      blas::zero(*x_sloppy);
+      x_sloppy = x.create_alias();
+      blas::zero(x_sloppy);
     } else {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = new ColorSpinorField(csParam);
+      x_sloppy = ColorSpinorField(csParam);
     }
-
-    // Syntatic sugar
-    ColorSpinorField &rSloppy = *r_sloppy;
-    ColorSpinorField &xSloppy = *x_sloppy;
-    ColorSpinorField &r0 = *r_0;
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
@@ -212,21 +188,27 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
-    blas::copy(p, rSloppy);
+    blas::copy(p, r_sloppy);
+
+    bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
-                 blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
-                 blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n",
+                 blas::norm2(x), blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p),
+                 blas::norm2(r0), blas::norm2(t));
 
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
+    // track if we just performed an exact recalculation of y, r, r2
+    bool just_updated = false;
+
+    while ( !converged && k < param.maxiter) {
+      just_updated = false;
 
       matSloppy(v, p);
 
       Complex r0v;
       if (param.pipeline) {
         r0v = blas::cDotProduct(r0, v);
-        if (k>0) rho = blas::cDotProduct(r0, r);
+        if (k > 0) rho = blas::cDotProduct(r0, r);
       } else {
         r0v = blas::cDotProduct(r0, v);
       }
@@ -234,18 +216,18 @@ namespace quda {
       else alpha = rho / r0v;
 
       // r -= alpha*v
-      blas::caxpy(-alpha, v, rSloppy);
+      blas::caxpy(-alpha, v, r_sloppy);
 
-      matSloppy(t, rSloppy);
+      matSloppy(t, r_sloppy);
 
       int updateR = 0;
       if (param.pipeline) {
         // omega = (t, r) / (t, t)
-        omega_t2 = blas::cDotProductNormA(t, rSloppy);
+        omega_t2 = blas::cDotProductNormA(t, r_sloppy);
         Complex tr = Complex(omega_t2.x, omega_t2.y);
         double t2 = omega_t2.z;
         omega = tr / t2;
-        double s2 = blas::norm2(rSloppy);
+        double s2 = blas::norm2(r_sloppy);
         Complex r0t = blas::cDotProduct(r0, t);
         beta = -r0t / r0v;
         r2 = s2 - real(omega * conj(tr)) ;
@@ -253,29 +235,28 @@ namespace quda {
         updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
       } else {
         // omega = (t, r) / (t, t)
-        omega_t2 = blas::cDotProductNormA(t, rSloppy);
+        omega_t2 = blas::cDotProductNormA(t, r_sloppy);
         omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
       }
 
       if (param.pipeline && !updateR) {
         //x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
-        blas::caxpbypzYmbw(alpha, p, omega, rSloppy, xSloppy, t);
-        blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
-        //tripleBiCGstabUpdate(alpha, p, omega, rSloppy, xSloppy, t, -beta*omega, v, beta, p
+        blas::caxpbypzYmbw(alpha, p, omega, r_sloppy, x_sloppy, t);
+        blas::cxpaypbz(r_sloppy, -beta*omega, v, beta, p);
+        //tripleBiCGstabUpdate(alpha, p, omega, r_sloppy, x_sloppy, t, -beta*omega, v, beta, p
       } else {
         //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-        rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, rSloppy, xSloppy, t, r0);
+        rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, r_sloppy, x_sloppy, t, r0);
         rho0 = rho;
         rho = Complex(rho_r2.x, rho_r2.y);
         r2 = rho_r2.z;
       }
 
       if (use_heavy_quark_res && k % heavy_quark_check==0) {
-        if (&x != &xSloppy) {
-           blas::copy(tmp,y);
-           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+        if (&x != &x_sloppy) {
+           heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x_sloppy, r_sloppy).z);
         } else {
-           blas::copy(r, rSloppy);
+           blas::copy(r, r_sloppy);
            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
         }
       }
@@ -283,9 +264,9 @@ namespace quda {
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
 
       if (updateR) {
-        if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
+        if (x.Precision() != x_sloppy.Precision()) blas::copy(x, x_sloppy);
 
-        blas::xpy(x, y); // swap these around?
+        blas::xpy(x, y);
 
         mat(r, y);
         r2 = blas::xmyNorm(b, r);
@@ -299,34 +280,74 @@ namespace quda {
           r2 = blas::xmyNorm(b, r);
         }
 
-        if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);
-        blas::zero(xSloppy);
+        if (x.Precision() != r_sloppy.Precision()) blas::copy(r_sloppy, r);
+        blas::zero(x_sloppy);
 
         rNorm = sqrt(r2);
         maxrr = rNorm;
         maxrx = rNorm;
         //r0Norm = rNorm;
         rUpdate++;
+
+        just_updated = true;
       }
 
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
-          blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
-          blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+        printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n",
+          blas::norm2(x), blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p),
+          blas::norm2(r0), blas::norm2(t));
+
+      converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+
+      if (converged) {
+        // make sure we've truly converged
+        if (!just_updated) {
+          if (x.Precision() != x_sloppy.Precision()) blas::copy(x, x_sloppy);
+          blas::xpy(x, y);
+          mat(r, y);
+          r2 = blas::xmyNorm(b, r);
+
+          if (param.deflate && sqrt(r2) < param.tol_restart) {
+            // Deflate and accumulate to solution vector
+            eig_solve->deflate(y, r, evecs, evals, true);
+            // Compute r_defl = RHS - A * LHS
+            mat(r, y);
+            r2 = blas::xmyNorm(b, r);
+          }
+
+          if (x.Precision() != r_sloppy.Precision()) blas::copy(r_sloppy, r);
+          blas::zero(x_sloppy);
+
+          rNorm = sqrt(r2);
+          maxrr = rNorm;
+          maxrx = rNorm;
+          //r0Norm = rNorm;
+          rUpdate++;
+
+          just_updated = true;
+        }
+
+        // explicitly compute the HQ residual if need be
+        heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(y, r).z) : 0.0;
+
+        // Update convergence check
+        converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+      }
 
       // update p
-      if (!param.pipeline || updateR) { // need to update if not pipeline or did a reliable update
+      if ((!param.pipeline || updateR) && !converged) { // need to update if not pipeline or did a reliable update
         if (abs(rho*alpha) == 0.0) beta = 0.0;
         else beta = (rho/rho0) * (alpha/omega);
-        blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
+        blas::cxpaypbz(r_sloppy, -beta*omega, v, beta, p);
       }
     }
 
-    if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
-    blas::xpy(y, x);
+    // We have a guarantee that we just converged via the true residual
+    // y has already been updated
+    blas::copy(x, y);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -338,9 +359,8 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
 
     if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
-      // Calculate the true residual
-      mat(r, x);
-      param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
+      // r2 was freshly computed
+      param.true_res = sqrt(r2 / b2);
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
 
       PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
@@ -348,17 +368,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    profile.TPSTART(QUDA_PROFILE_FREE);
-    if (param.precision_sloppy != x.Precision()) {
-      delete r_0;
-      delete r_sloppy;
-    } else if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-      delete r_0;
-    }
-
-    if (&x != &xSloppy) delete x_sloppy;
-
-    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
 } // namespace quda
