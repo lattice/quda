@@ -333,7 +333,7 @@ namespace quda
     size_t norm_offset = 0; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
-    array_2d<void *, 2, QUDA_MAX_DIM> ghost = {};          // pointers to the ghost regions - NULL by default
+    mutable array_2d<void *, 2, QUDA_MAX_DIM> ghost = {};          // pointers to the ghost regions - NULL by default
     mutable lat_dim_t ghostFace = {};                      // the size of each face
     mutable lat_dim_t ghostFaceCB = {};                    // the size of each checkboarded face
     mutable array<void *, 2 *QUDA_MAX_DIM> ghost_buf = {}; // wrapper that points to current ghost zone
@@ -510,7 +510,7 @@ namespace quda
        @param[in] nFace Depth of each halo
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
-    void createComms(int nFace, bool spin_project = true);
+    void createComms(int nFace, bool spin_project = true) const;
 
     /**
        @brief Packs the ColorSpinorField's ghost zone
@@ -530,7 +530,7 @@ namespace quda
       */
     void packGhost(const int nFace, const QudaParity parity, const int dagger, const qudaStream_t &stream,
                    MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, bool spin_project,
-                   double a = 0, double b = 0, double c = 0, int shmem = 0);
+                   double a = 0, double b = 0, double c = 0, int shmem = 0) const;
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -550,7 +550,7 @@ namespace quda
     */
     void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
-              int shmem = 0);
+              int shmem = 0) const;
 
     /**
       @brief Initiate the gpu to cpu send of the ghost zone (halo)
@@ -559,7 +559,7 @@ namespace quda
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param stream The array of streams to use
       */
-    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream);
+    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream) const;
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -568,7 +568,7 @@ namespace quda
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param stream The array of streams to use
       */
-    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream);
+    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream) const;
 
     /**
        @brief Copies the ghost to the host from the device, prior to
@@ -577,7 +577,7 @@ namespace quda
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] stream The stream in which to do the copy
      */
-    void gather(int dir, const qudaStream_t &stream);
+    void gather(int dir, const qudaStream_t &stream) const;
 
     /**
        @brief Initiate halo communication receive
@@ -585,7 +585,7 @@ namespace quda
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] gdr Whether we are using GDR on the receive side
     */
-    void recvStart(int dir, const qudaStream_t &stream, bool gdr = false);
+    void recvStart(int dir, const qudaStream_t &stream, bool gdr = false) const;
 
     /**
        @brief Initiate halo communication sending
@@ -596,7 +596,7 @@ namespace quda
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false);
+    void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false) const;
 
     /**
        @brief Initiate halo communication
@@ -606,7 +606,7 @@ namespace quda
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsStart(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
+    void commsStart(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
 
     /**
        @brief Non-blocking query if the halo communication has completed
@@ -616,7 +616,7 @@ namespace quda
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
+    int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
 
     /**
        @brief Wait on halo communication to complete
@@ -626,7 +626,7 @@ namespace quda
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsWait(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
+    void commsWait(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
 
     /**
        @brief Unpacks the ghost from host to device after
@@ -636,7 +636,7 @@ namespace quda
        @param[in] stream The stream in which to do the copy.  If
        -1 is passed then the copy will be issied to the d^th stream
      */
-    void scatter(int d, const qudaStream_t &stream);
+    void scatter(int d, const qudaStream_t &stream) const;
 
     /**
        Do the exchange between neighbouring nodes of the data in
