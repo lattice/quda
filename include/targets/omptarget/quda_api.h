@@ -89,26 +89,6 @@ namespace quda {
     namespace omptarget {
       dim3 & launch_param_grid(void);
       dim3 & launch_param_block(void);
-
-      inline dim3 & launch_param_kernel_block(void)
-      {
-        static char block[sizeof(dim3)];
-        #pragma omp groupprivate(block)
-        return *reinterpret_cast<dim3*>(block);
-      }
-      inline dim3 & launch_param_kernel_grid(void)
-      {
-        static char grid[sizeof(dim3)];
-        #pragma omp groupprivate(grid)
-        return *reinterpret_cast<dim3*>(grid);
-      }
-      inline void launch_param_device_set(dim3 grid, dim3 block)
-      {
-        dim3 & gref = launch_param_kernel_grid();
-        dim3 & bref = launch_param_kernel_block();
-        gref = grid;
-        bref = block;
-      }
     }
   }
 }

@@ -104,19 +104,6 @@ namespace quda {
     }
 
   public:
-    /**
-       @brief Special kernel launcher used for raw CUDA kernels with no
-       assumption made about shape of parallelism.  Kernels launched
-       using this must take responsibility of bounds checking and
-       assignment of threads.
-     */
-    template <template <typename> class Functor, typename Arg>
-    void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
-    {
-      constexpr bool grid_stride = false;
-      const_cast<TunableKernel*>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
-    }
-
     TunableKernel(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {

@@ -115,18 +115,9 @@ namespace quda
                       0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        BlockKernel2D_impl<Functor, Arg>(arg);
-      }
-    }
+    QUDA_OMPTARGET_KERNEL_BEGIN(arg)
+      BlockKernel2D_impl<Functor, Arg>(arg);
+    QUDA_OMPTARGET_KERNEL_END
   }
 
   /**
@@ -149,18 +140,9 @@ namespace quda
                       0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg *argp)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        BlockKernel2D_impl<Functor, Arg>(*argp);
-      }
-    }
+    QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp)
+      BlockKernel2D_impl<Functor, Arg>(*argp);
+    QUDA_OMPTARGET_KERNEL_END
   }
 
 }

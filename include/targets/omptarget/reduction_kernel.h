@@ -3,6 +3,24 @@
 #include <target_device.h>
 #include <reduce_helper.h>
 
+#define OMP_KERNEL(kern) \
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true> \
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> kern(Arg arg) \
+  { \
+    QUDA_OMPTARGET_KERNEL_BEGIN(arg) \
+      kern##_impl<Functor, Arg, grid_stride>(arg); \
+    QUDA_OMPTARGET_KERNEL_END \
+  }
+
+#define OMP_KERNEL_PTR(kern) \
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true> \
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> kern(Arg *argp) \
+  { \
+    QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp) \
+      kern##_impl<Functor, Arg, grid_stride>(*argp); \
+    QUDA_OMPTARGET_KERNEL_END \
+  }
+
 namespace quda
 {
 
@@ -56,22 +74,7 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Reduction2D(Arg arg)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Reduction2D_impl<Functor, Arg, grid_stride>(arg);
-      }
-    }
-  }
+  OMP_KERNEL(Reduction2D)
 
   /**
      @brief Reduction2D is the entry point of the generic 2-d
@@ -85,22 +88,7 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D(Arg *argp)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Reduction2D_impl<Functor, Arg, grid_stride>(*argp);
-      }
-    }
-  }
+  OMP_KERNEL_PTR(Reduction2D)
 
   /**
      @brief MultiReduction_impl is the implementation of the generic
@@ -156,22 +144,7 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> MultiReduction(Arg arg)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        MultiReduction_impl<Functor, Arg, grid_stride>(arg);
-      }
-    }
-  }
+  OMP_KERNEL(MultiReduction)
 
   /**
      @brief MultiReduction is the entry point of the generic
@@ -185,21 +158,9 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction(Arg *argp)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        MultiReduction_impl<Functor, Arg, grid_stride>(*argp);
-      }
-    }
-  }
+  OMP_KERNEL_PTR(MultiReduction)
 
 } // namespace quda
+
+#undef OMP_KERNEL
+#undef OMP_KERNEL_PTR

@@ -12,9 +12,106 @@
 #define QUDA_MAX_SHARED_MEMORY_SIZE 40*1024
 #endif
 
+#ifndef QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD
+/* 0: racy
+   1: if && barrier
+   2: single
+   3: teams set && parallel
+ */
+#define QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD 0
+#endif
+
+#if QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==0
+
+  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
+    _Pragma("omp parallel num_threads(ld)") \
+    { target::omptarget::launch_param_device_set(grid, block);
+
+#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==1
+
+  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
+    _Pragma("omp parallel num_threads(ld)") \
+    { if(omp_get_thread_num()==0) \
+        target::omptarget::launch_param_device_set(grid, block); \
+      _Pragma("omp barrier")
+
+#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==2
+
+  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
+    _Pragma("omp parallel num_threads(ld)") \
+    { _Pragma("omp single") \
+      target::omptarget::launch_param_device_set(grid, block);
+
+#elif QUDA_OMPTARGET_PARALLEL_LAUNCH_METHOD==3
+
+  #define QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block) \
+    target::omptarget::launch_param_device_set(grid, block); \
+    _Pragma("omp parallel num_threads(ld)") \
+    {
+
+#else
+
+  #error "Allowed values for QUDA_OMPTARGET_LAUNCH_METHOD are 0, 1, 2, or 3."
+
+#endif
+
+#define QUDA_OMPTARGET_KERNEL_BEGIN(arg) \
+    const dim3 grid = target::omptarget::launch_param_grid(); \
+    const dim3 block = target::omptarget::launch_param_block(); \
+    const int gd = grid.x*grid.y*grid.z; \
+    const int ld = block.x*block.y*block.z; \
+    _Pragma("omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)") \
+    { QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block)
+
+#define QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp) \
+    const dim3 grid = target::omptarget::launch_param_grid(); \
+    const dim3 block = target::omptarget::launch_param_block(); \
+    const int gd = grid.x*grid.y*grid.z; \
+    const int ld = block.x*block.y*block.z; \
+    _Pragma("omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)") \
+    { QUDA_OMPTARGET_PARALLEL_LAUNCH(ld,grid,block)
+
+#define QUDA_OMPTARGET_KERNEL_END }} /* closes BEGIN/BEGIN_PTR */
+
 namespace quda {
 
   namespace target {
+
+    namespace omptarget {
+      inline dim3 & launch_param_kernel_block(void)
+      {
+#if 1
+        static char block[sizeof(dim3)];
+        #pragma omp groupprivate(block)
+        return *reinterpret_cast<dim3*>(block);
+#else
+        /* omp 6 */
+        static char block[sizeof(dim3)];
+        #pragma omp threadprivate(block)
+        return *reinterpret_cast<dim3*>(block);
+#endif
+      }
+      inline dim3 & launch_param_kernel_grid(void)
+      {
+#if 1
+        static char grid[sizeof(dim3)];
+        #pragma omp groupprivate(grid)
+        return *reinterpret_cast<dim3*>(grid);
+#else
+        /* omp 6 */
+        static char grid[sizeof(dim3)];
+        #pragma omp threadprivate(grid)
+        return *reinterpret_cast<dim3*>(grid);
+#endif
+      }
+      inline void launch_param_device_set(dim3 grid, dim3 block)
+      {
+        dim3 & gref = launch_param_kernel_grid();
+        dim3 & bref = launch_param_kernel_block();
+        gref = grid;
+        bref = block;
+      }
+    } // namespace omptarget
 
 #pragma omp begin declare variant match(device={kind(host)})
     template <template <bool, typename ...> class f, typename ...Args>

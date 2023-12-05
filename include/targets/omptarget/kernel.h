@@ -3,6 +3,24 @@
 #include <target_device.h>
 #include <kernel_helper.h>
 
+#define OMP_KERNEL(kern) \
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false> \
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> kern(Arg arg) \
+  { \
+    QUDA_OMPTARGET_KERNEL_BEGIN(arg) \
+      kern##_impl<Functor, Arg, grid_stride>(arg); \
+    QUDA_OMPTARGET_KERNEL_END \
+  }
+
+#define OMP_KERNEL_PTR(kern) \
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false> \
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> kern(Arg *argp) \
+  { \
+    QUDA_OMPTARGET_KERNEL_BEGIN_PTR(argp) \
+      kern##_impl<Functor, Arg, grid_stride>(*argp); \
+    QUDA_OMPTARGET_KERNEL_END \
+  }
+
 namespace quda
 {
 
@@ -47,22 +65,7 @@ namespace quda
      per thread.
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel1D(Arg arg)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Kernel1D_impl<Functor, Arg, grid_stride>(arg);
-      }
-    }
-  }
+  OMP_KERNEL(Kernel1D);
 
   /**
      @brief Kernel1D is the entry point of the generic 1-d kernel.
@@ -76,22 +79,7 @@ namespace quda
      per thread.
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D(Arg *argp)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Kernel1D_impl<Functor, Arg, grid_stride>(*argp);
-      }
-    }
-  }
+  OMP_KERNEL_PTR(Kernel1D);
 
   /**
      @brief Kernel2D_impl is the implementation of the generic 2-d
@@ -136,22 +124,7 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel2D(Arg arg)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Kernel2D_impl<Functor, Arg, grid_stride>(arg);
-      }
-    }
-  }
+  OMP_KERNEL(Kernel2D);
 
   /**
      @brief Kernel2D is the entry point of the generic 2-d kernel.
@@ -165,22 +138,7 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D(Arg *argp)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Kernel2D_impl<Functor, Arg, grid_stride>(*argp);
-      }
-    }
-  }
+  OMP_KERNEL_PTR(Kernel2D);
 
   /**
      @brief Kernel3D_impl is the implementation of the generic 3-d
@@ -227,22 +185,7 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(Arg arg)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Kernel3D_impl<Functor, Arg, grid_stride>(arg);
-      }
-    }
-  }
+  OMP_KERNEL(Kernel3D);
 
   /**
      @brief Kernel3D is the entry point of the generic 3-d kernel.
@@ -256,53 +199,9 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D(Arg *argp)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Kernel3D_impl<Functor, Arg, grid_stride>(*argp);
-      }
-    }
-  }
-
-  /**
-     @brief raw_kernel is used for CUDA-specific kernels where we want
-     to avoid using the generic framework.  For these kernels, we
-     delegate the parallelism and bounds checking for the kernel
-     functor.
-
-     @tparam Functor Kernel functor that defines the kernel
-     @tparam Arg Kernel argument struct that set any required meta
-     data for the kernel
-     @tparam dummy unused template parameter, present to allow us to
-     utilize the generic launching framework
-
-     @param[in] arg Kernel argument
-   */
-  template <template <typename> class Functor, typename Arg, bool dummy = false>
-  __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
-  {
-    const dim3 grid = target::omptarget::launch_param_grid();
-    const dim3 block = target::omptarget::launch_param_block();
-    const int gd = grid.x*grid.y*grid.z;
-    const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
-    {
-      target::omptarget::launch_param_device_set(grid, block);
-      #pragma omp parallel num_threads(ld)
-      {
-        Functor<Arg> f(&arg);
-        f();
-      }
-    }
-  }
+  OMP_KERNEL_PTR(Kernel3D);
 
 }
+
+#undef OMP_KERNEL
+#undef OMP_KERNEL_PTR
