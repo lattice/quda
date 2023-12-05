@@ -177,8 +177,6 @@ void TMCloverForce_test()
   // inv_param.kappa=1;// we can not set to zero
   // inv_param.mu=0;
   // std::vector<quda::ColorSpinorField> in(Nsrc);
-  int nvector = 3;
-  int detratio = 0;
   std::vector<quda::ColorSpinorField> out_nvector(nvector * Nsrc);
   std::vector<std::vector<void *>> in(Nsrc, std::vector<void *>(nvector));
   std::vector<quda::ColorSpinorField> out_nvector0(nvector * Nsrc);
@@ -286,6 +284,8 @@ static void display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
                dimPartitioned(3));
+  printfQuda("nvector: %d\n",nvector);
+  printfQuda("detratio: %d\n",detratio);
 }
 
 int main(int argc, char **argv)
@@ -300,6 +300,7 @@ int main(int argc, char **argv)
   CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
                                                             {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
+  add_clover_force_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
