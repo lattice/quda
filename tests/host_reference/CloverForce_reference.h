@@ -249,7 +249,6 @@ template <typename sFloat, typename gFloat>
 void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::ColorSpinorField &inA,
                              quda::ColorSpinorField &inB, int projSign, int parity, double force_coeff)
 {
-
   gFloat **gaugeFull = (gFloat **)gauge.data();
   sFloat *spinorField = (sFloat *)inB.data();
 
@@ -262,6 +261,7 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
   }
 
+#pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
     // loop over the forward directions
     for (int dir = 0; dir < 8; dir += 2) {
@@ -322,12 +322,14 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
   int N = nColor * nSpin / 2;
   int chiralBlock = N + 2 * (N - 1) * N / 2;
 
-  cFloat A_array[72];
   typedef Eigen::Matrix<std::complex<cFloat>, 3, 3> Matrix3c;
   typedef Eigen::Matrix<std::complex<cFloat>, 6, 6> CloverM;
   // if (dynamic_clover) {
   // }
+
+#pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
+    cFloat A_array[72];
     for (int chirality = 0; chirality < 2; chirality++) {
       // the cover filed for a given chirality is stored as
       // N real numbers: the diagonal part D
@@ -897,6 +899,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
   void *u_array[QUDA_MAX_DIM];
   for (int d = 0; d < 4; d++) u_array[d] = qdp_ex->data(d);
 
+#pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
     for (int yIndex = 0; yIndex < 2; yIndex++) {
       for (int mu = 0; mu < 4; mu++) {
@@ -926,10 +929,8 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
   sFloat *x = (sFloat *)inx.data();
   sFloat *p = (sFloat *)inp.data();
 
-  gFloat oprod_f[gauge_site_size];
-  gFloat oprod_imx2[gauge_site_size];
-
   for (int parity = 0; parity < 2; parity++) {
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       for (int mu = 1; mu < 4; mu++) {
         for (int nu = 0; nu < mu; nu++) {
@@ -949,6 +950,8 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
             }
           }
 
+          gFloat oprod_f[gauge_site_size];
+          gFloat oprod_imx2[gauge_site_size];
           outerProdSpinTrace(oprod_f, temp, &x[spinor_site_size * (i + Vh * parity)]);
           su3_imagx2(oprod_imx2, oprod_f);
 
