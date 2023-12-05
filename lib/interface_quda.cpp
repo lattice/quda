@@ -1891,16 +1891,16 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
   ColorSpinorParam cudaParam(cpuParam, inv_param, QUDA_CUDA_FIELD_LOCATION);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param.output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField out_h(cpuParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField in(cudaParam); // cudaColorSpinorField
-  in = *in_h;
+  in = in_h;
   ColorSpinorField out(cudaParam); // cudaColorSpinorField
   out = in;
   ColorSpinorField tmp(cudaParam); // cudaColorSpinorField
@@ -1908,14 +1908,10 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
 
   profileCovDev.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileCovDev.TPSTART(QUDA_PROFILE_H2D);
-  in = *in_h;
-  profileCovDev.TPSTOP(QUDA_PROFILE_H2D);
-
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
+    double cpu = blas::norm2(in_h);
     double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
@@ -1940,11 +1936,11 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileCovDev.TPSTART(QUDA_PROFILE_D2H);
-  *out_h = out;
+  out_h = out;
   profileCovDev.TPSTOP(QUDA_PROFILE_D2H);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
+    double cpu = blas::norm2(out_h);
     double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
@@ -1952,8 +1948,6 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
   profileCovDev.TPSTART(QUDA_PROFILE_FREE);
   delete myCovDev; // clean up
 
-  delete out_h;
-  delete in_h;
   profileCovDev.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -1979,30 +1973,26 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
   ColorSpinorParam cudaParam(cpuParam, inv_param, QUDA_CUDA_FIELD_LOCATION);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param.output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField out_h(cpuParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField in(cudaParam); // cudaColorSpinorField
-  in = *in_h;
+  in = in_h;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; // create new field and zero it
   ColorSpinorField out(cudaParam); // cudaColorSpinorField = 0
   ColorSpinorField tmp(cudaParam); // cudaColorSpinorField = 0
 
   profileCovDev.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileCovDev.TPSTART(QUDA_PROFILE_H2D);
-  in = *in_h;
-  profileCovDev.TPSTOP(QUDA_PROFILE_H2D);
-
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
+    double cpu = blas::norm2(in_h);
     double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
@@ -2232,11 +2222,11 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileCovDev.TPSTART(QUDA_PROFILE_D2H);
-  *out_h = out;
+  out_h = out;
   profileCovDev.TPSTOP(QUDA_PROFILE_D2H);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
+    double cpu = blas::norm2(out_h);
     double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
@@ -2244,8 +2234,6 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
   profileCovDev.TPSTART(QUDA_PROFILE_FREE);
   delete myCovDev; // clean up
 
-  delete out_h;
-  delete in_h;
   profileCovDev.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -2273,29 +2261,25 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
   ColorSpinorParam cudaParam(cpuParam, inv_param, QUDA_CUDA_FIELD_LOCATION);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param.output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField out_h(cpuParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField in(cudaParam); // cudaColorSpinorField
-  in = *in_h;
+  in = in_h;
   ColorSpinorField out(cudaParam); // cudaColorSpinorField
   out = in;
 
   profileCovDev.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileCovDev.TPSTART(QUDA_PROFILE_H2D);
-  in = *in_h;
-  profileCovDev.TPSTOP(QUDA_PROFILE_H2D);
-
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
+    double cpu = blas::norm2(in_h);
     double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
@@ -2309,11 +2293,11 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileCovDev.TPSTART(QUDA_PROFILE_D2H);
-  *out_h = out;
+  out_h = out;
   profileCovDev.TPSTOP(QUDA_PROFILE_D2H);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
+    double cpu = blas::norm2(out_h);
     double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
@@ -2321,8 +2305,6 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
   profileCovDev.TPSTART(QUDA_PROFILE_FREE);
   delete myCovDev; // clean up
 
-  delete out_h;
-  delete in_h;
   profileCovDev.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -5759,14 +5741,14 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
   //FIXME can we merge the two propagators if they are the same to save mem?
   // wrap CPU host side pointers
-  std::vector<ColorSpinorField*> h_prop1, h_prop2;
+  std::vector<ColorSpinorField> h_prop1, h_prop2;
   h_prop1.reserve(nSpin*src_nColor);
   h_prop2.reserve(nSpin*src_nColor);
   for(size_t i=0; i<nSpin*src_nColor; i++) {
     cs_param->v = prop_array_flavor_1[i];
-    h_prop1.push_back(ColorSpinorField::Create(*cs_param));
+    h_prop1.push_back(ColorSpinorField(*cs_param));
     cs_param->v = prop_array_flavor_2[i];
-    h_prop2.push_back(ColorSpinorField::Create(*cs_param));
+    h_prop2.push_back(ColorSpinorField(*cs_param));
   }
   
   // Create device spinor fields
@@ -5776,12 +5758,12 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not relevant for staggered
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   
-  std::vector<ColorSpinorField *> d_prop1, d_prop2;
+  std::vector<ColorSpinorField> d_prop1, d_prop2;
   d_prop1.reserve(nSpin*src_nColor);
   d_prop2.reserve(nSpin*src_nColor);
   for(size_t i=0; i<nSpin*src_nColor; i++) {
-    d_prop1.push_back(ColorSpinorField::Create(cudaParam));
-    d_prop2.push_back(ColorSpinorField::Create(cudaParam));
+    d_prop1.push_back(ColorSpinorField(cudaParam));
+    d_prop2.push_back(ColorSpinorField(cudaParam));
   }
 
   // temporal or spatial correlator?
@@ -5801,8 +5783,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   // Transfer data from host to device
   profileContractFT.TPSTART(QUDA_PROFILE_H2D);
   for(size_t i=0; i<nSpin*src_nColor; i++) {
-    *d_prop1[i] = *h_prop1[i];
-    *d_prop2[i] = *h_prop2[i];
+    d_prop1[i] = h_prop1[i];
+    d_prop2[i] = h_prop2[i];
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -5817,8 +5799,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 	  profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
 	  
 	  std::fill(result_global.begin(), result_global.end(), 0.0);
-	  contractSummedQuda(*d_prop1[s1 * src_nColor + c1],
-			     *d_prop2[b1 * src_nColor + c1],
+	  contractSummedQuda(d_prop1[s1 * src_nColor + c1],
+			     d_prop2[b1 * src_nColor + c1],
 			     result_global, cType,
 			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
 			     s1, b1);
@@ -5838,13 +5820,6 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   }
 
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
-  // Free memory
-  for(size_t i=0; i<nSpin*src_nColor; i++) {
-    delete h_prop1[i];
-    delete h_prop2[i];
-    delete d_prop1[i];
-    delete d_prop2[i];
-  }
   
   profileContractFT.TPSTOP(QUDA_PROFILE_FREE);
   profileContractFT.TPSTOP(QUDA_PROFILE_TOTAL);
