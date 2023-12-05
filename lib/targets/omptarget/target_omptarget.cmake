@@ -33,6 +33,9 @@ message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}
 option(QUDA_OMPTARGET_JIT "Build OpenMP target backend with JIT" OFF)
 mark_as_advanced(QUDA_OMPTARGET_JIT)
 
+option(QUDA_OMPTARGET_SIMD16 "Build OpenMP target backend with simd width 16" OFF)
+mark_as_advanced(QUDA_OMPTARGET_SIMD16)
+
 # ######################################################################################################################
 # define omptarget flags
 
@@ -47,15 +50,20 @@ if(QUDA_OMPTARGET_DEBUG)
     set(QUDA_OMPTARGET_FLAGS ${QUDA_OMPTARGET_FLAGS} -gline-tables-only)
 endif()
 
+if(QUDA_OMPTARGET_SIMD16)
+    set(QUDA_OMPTARGET_FLAGS ${QUDA_OMPTARGET_FLAGS} "SHELL:-mllvm -vpo-paropt-fixed-simd-width=16")
+endif()
+
 message(STATUS "Using OpenMP target flags: ${QUDA_OMPTARGET_FLAGS}")
 
 string(REPLACE " " "" QUDA_GPU_ARCH_STRIP "${QUDA_GPU_ARCH}")
 
 # QUDA_HASH for tunecache
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH_STRIP},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
 if(QUDA_OMPTARGET_JIT)
+    set(HASH cpu_arch=${CPU_ARCH},gpu_arch=JIT,cxx_version=${CMAKE_CXX_COMPILER_VERSION})
     set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:JIT")
 else()
+    set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH_STRIP},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
     set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:${QUDA_GPU_ARCH_STRIP}")
 endif()
 
