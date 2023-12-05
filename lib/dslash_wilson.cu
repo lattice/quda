@@ -5,6 +5,7 @@
 
 #include <dslash_policy.cuh>
 #include <kernels/dslash_wilson.cuh>
+#include <kernels/dslash_wilson_distance.cuh>
 
 /**
    This is the basic gauged Wilson operator
@@ -35,6 +36,26 @@ namespace quda
     }
   };
 
+  template <typename Arg> class WilsonDistance : public Dslash<wilsonDistance, Arg>
+  {
+    using Dslash = Dslash<wilsonDistance, Arg>;
+
+  public:
+    WilsonDistance(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    {
+      if(in.Ndim() == 5) {
+        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      }
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packShmem>(tp, stream);
+    }
+  };
+
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
 
     inline WilsonApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
@@ -48,6 +69,19 @@ namespace quda
     }
   };
 
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonDistanceApply {
+
+    inline WilsonDistanceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
+      WilsonDistance<decltype(arg)> wilson(arg, out, in);
+
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+    }
+  };
+
   // Apply the Wilson operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the a normalization for the Wilson operator.
@@ -55,7 +89,11 @@ namespace quda
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+    if (in.Alpha() != 0 && in.SourceTime() >= 0) {
+      instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+    } else {
+      instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+    }
   }
 #else
   void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
