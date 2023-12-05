@@ -4775,8 +4775,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
       // x.Even= X.Even.tmLQCD*kappa and p.Even=-Y.Even.tmLQCD*kappa
 
       // the gamma5 application in tmLQCD is done  inside deriv_Sb
-      gamma5(p.Even(), p.Even());
-      gamma5(p.Odd(), p.Odd());
+      gamma5(p, p);
     } else {
       errorQuda("computeTMCloverForceQuda: MATPC type not supported");
     }
@@ -4785,7 +4784,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-  if (!detratio) computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0 ); 
+  if (!detratio) computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0);
 
   std::vector< std::vector<double> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
