@@ -44,17 +44,14 @@ namespace quda {
     long long bytes() const { return clover.Bytes() + output.Bytes(); }
   };
 
-#ifdef GPU_CLOVER_DIRAC
   void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity)
   {
-    checkNative(output, clover);
-    instantiate<CloverSigmaTrace>(output, clover, coeff, parity);
+    if constexpr (clover::is_enabled()) {
+      checkNative(output, clover);
+      instantiate<CloverSigmaTrace>(output, clover, coeff, parity);
+    } else {
+      errorQuda("Clover has not been built");
+    }
   }
-#else
-  void computeCloverSigmaTrace(GaugeField&, const CloverField&, double, int)
-  {
-    errorQuda("Clover has not been built");
-  }
-#endif
 
 } // namespace quda

@@ -4534,10 +4534,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField*> quarkX, quarkP;
-  for (int i=0; i<nvector; i++) {
-    quarkX.push_back(ColorSpinorField::Create(qParam));
-    quarkP.push_back(ColorSpinorField::Create(qParam));
+  std::vector<ColorSpinorField> quarkX, quarkP;
+  for (int i = 0; i < nvector; i++) {
+    quarkX[i] = ColorSpinorField(qParam);
+    quarkP[i] = ColorSpinorField(qParam);
   }
 
   // for downloading x_e
@@ -4571,8 +4571,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   // loop over different quark fields
   for(int i=0; i<nvector; i++){
-    ColorSpinorField &x = *(quarkX[i]);
-    ColorSpinorField &p = *(quarkP[i]);
+    ColorSpinorField &x = quarkX[i];
+    ColorSpinorField &p = quarkP[i];
 
     if (!inv_param->use_resident_solution) {
       // Wrap the even-parity MILC quark field
@@ -4646,11 +4646,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   else if (!gauge_param->make_resident_mom)
     momResident = GaugeField();
 
-  for (int i=0; i<nvector; i++) {
-    delete quarkX[i];
-    delete quarkP[i];
-  }
-
 #if 0
   if (inv_param->use_resident_solution) solutionResident.clear();
 #endif
@@ -4709,11 +4704,11 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField*> quarkX, quarkP, quarkX0;
-  for (int i=0; i<nvector; i++){
-    quarkX.push_back(ColorSpinorField::Create(qParam));
-    quarkP.push_back(ColorSpinorField::Create(qParam));
-    if (detratio) quarkX0.push_back(ColorSpinorField::Create(qParam));
+  std::vector<ColorSpinorField> quarkX(nvector), quarkP(nvector), quarkX0(nvector);
+  for (int i = 0; i < nvector; i++) {
+    quarkX[i] = ColorSpinorField(qParam);
+    quarkP[i] = ColorSpinorField(qParam);
+    if (detratio) quarkX0[i] = ColorSpinorField(qParam);
   }
 
   qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -4743,11 +4738,11 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   GaugeField oprod(gParamMom);
 
   std::vector<double> force_coeff(nvector);
-  for(int i=0; i<nvector; i++){
+  for (int i = 0; i < nvector; i++) {
     force_coeff[i] = 1.0 * coeff[i];
 
-    ColorSpinorField &x = *(quarkX[i]);
-    ColorSpinorField &p = *(quarkP[i]);
+    ColorSpinorField &x = quarkX[i];
+    ColorSpinorField &p = quarkP[i];
 
     const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
     ColorSpinorParam cpuParam(h_x[i], *inv_param, gauge.X(), true, inv_param->input_location);
@@ -4771,7 +4766,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
       if (detratio){
         ColorSpinorParam cpuParam0(h_x0[i], *inv_param, gauge.X(), true, inv_param->input_location);
         ColorSpinorField cpuQuarkX0(cpuParam0);
-        ColorSpinorField &x0 = *(quarkX0[i]);
+        ColorSpinorField &x0 = quarkX0[i];
         x0.Odd()=cpuQuarkX0;
         blas::axpbyz(1, p.Odd(), 1, x0.Odd(), p.Odd());
       }
@@ -4819,11 +4814,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
     std::exchange(momResident, gpuMom);
   else if (!gauge_param->make_resident_mom)
     momResident = GaugeField();
-
-  for (int i = 0; i < nvector; i++){
-    delete quarkX[i];
-    delete quarkP[i];
-  }
 
   delete oprodEx;
   delete dirac;

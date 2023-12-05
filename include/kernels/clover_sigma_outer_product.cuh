@@ -25,13 +25,13 @@ namespace quda
     const F inB[nvector];
     real coeff[nvector][2];
 
-    CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA,
-                        const std::vector<ColorSpinorField*> &inB,
+    CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
+                        cvector_ref<const ColorSpinorField> &inB,
                         const std::vector<std::vector<double>> &coeff_) :
       kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
       oprod(oprod),
-      inA{*inA[0]},
-      inB{*inB[0]}
+      inA{inA[0]},
+      inB{inB[0]}
     {
       for (int i = 0; i < nvector; i++) {
         coeff[i][0] = coeff_[i][0];

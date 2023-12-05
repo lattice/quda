@@ -90,7 +90,7 @@ namespace quda {
     }
   }; // CloverForce
 
-  void exchangeGhost(ColorSpinorField &a, int parity, int dag) {
+  void exchangeGhost(const ColorSpinorField &a, int parity, int dag) {
     // this sets the communications pattern for the packing kernel
     int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1),
                                 commDimPartitioned(2), commDimPartitioned(3) };
@@ -132,45 +132,41 @@ namespace quda {
     comm_barrier();
   }
 
-#ifdef GPU_CLOVER_DIRAC
-  void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
-                          std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
+  void computeCloverForce(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff)
   {
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    checkNative(*x[0], *p[0], force, U);
-    checkPrecision(*x[0], *p[0], force, U);
+    if constexpr (clover::is_enabled()) {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      checkNative(x[0], p[0], force, U);
+      checkPrecision(x[0], p[0], force, U);
 
-    int dag = 1;
+      int dag = 1;
 
-    for (unsigned int i=0; i<x.size(); i++) {
-      // x[i]->Even().allocateGhostBuffer(1);
-      // x[i]->Odd().allocateGhostBuffer(1);
-      // p[i]->Even().allocateGhostBuffer(1);
-      // p[i]->Odd().allocateGhostBuffer(1);
+      for (unsigned int i=0; i<x.size(); i++) {
+        // x[i]->Even().allocateGhostBuffer(1);
+        // x[i]->Odd().allocateGhostBuffer(1);
+        // p[i]->Even().allocateGhostBuffer(1);
+        // p[i]->Odd().allocateGhostBuffer(1);
 
-      for (int parity=0; parity<2; parity++) {
-	ColorSpinorField& inA = (parity&1) ? x[i]->Odd() : x[i]->Even();
-	ColorSpinorField& inB = (parity&1) ? p[i]->Even(): p[i]->Odd();
-	ColorSpinorField& inC = (parity&1) ? p[i]->Odd() : p[i]->Even();
-	ColorSpinorField& inD = (parity&1) ? x[i]->Even(): x[i]->Odd();
+        for (int parity=0; parity<2; parity++) {
+          const ColorSpinorField &inA = (parity&1) ? x[i].Odd() : x[i].Even();
+          const ColorSpinorField &inB = (parity&1) ? p[i].Even(): p[i].Odd();
+          const ColorSpinorField &inC = (parity&1) ? p[i].Odd() : p[i].Even();
+          const ColorSpinorField &inD = (parity&1) ? x[i].Even(): x[i].Odd();
 
-        static constexpr int nFace = 1;
-        inB.exchangeGhost((QudaParity)(1-parity), nFace, dag);
-        exchangeGhost(inB, parity, dag);
-        inD.exchangeGhost((QudaParity)(1-parity), nFace, 1-dag);
-        exchangeGhost(inD, parity, 1-dag);
+          static constexpr int nFace = 1;
+          inB.exchangeGhost((QudaParity)(1-parity), nFace, dag);
+          exchangeGhost(inB, parity, dag);
+          inD.exchangeGhost((QudaParity)(1-parity), nFace, 1-dag);
+          exchangeGhost(inD, parity, 1-dag);
 
-        instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
+          instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
+        }
       }
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Clover Dirac operator has not been built!");
     }
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else // GPU_CLOVER_DIRAC not defined
-  void computeCloverForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,
-                          std::vector<ColorSpinorField *> &, std::vector<double> &)
-  {
-    errorQuda("Clover Dirac operator has not been built!");
-  }
-#endif
 
 } // namespace quda
