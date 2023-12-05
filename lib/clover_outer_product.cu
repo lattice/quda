@@ -45,11 +45,8 @@ namespace quda {
       for (int i=3; i>=0; i--) {
         if (!commDimPartitioned(i)) continue;
         strcpy(aux, aux2);
-        strcat(aux, ",exterior");
-        if (dir==0) strcat(aux, ",dir=0");
-        else if (dir==1) strcat(aux, ",dir=1");
-        else if (dir==2) strcat(aux, ",dir=2");
-        else if (dir==3) strcat(aux, ",dir=3");
+        strcat(aux, ",exterior,dir=");
+        strcat(aux, dir == 0 ? "0" : dir == 1 ? "1" : dir == 2 ? "2" : "3");
         kernel = EXTERIOR;
         dir = i;
         apply(device::get_default_stream());
@@ -90,10 +87,12 @@ namespace quda {
     }
   }; // CloverForce
 
-  void exchangeGhost(const ColorSpinorField &a, int parity, int dag) {
+  void exchangeGhost(const ColorSpinorField &a, int parity, int dag)
+  {
     // this sets the communications pattern for the packing kernel
     int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1),
                                 commDimPartitioned(2), commDimPartitioned(3) };
+
     setPackComms(comms);
 
     // first transfer src1
@@ -149,10 +148,7 @@ namespace quda {
           const ColorSpinorField &inC = (parity&1) ? p[i].Odd() : p[i].Even();
           const ColorSpinorField &inD = (parity&1) ? x[i].Even(): x[i].Odd();
 
-          static constexpr int nFace = 1;
-          inB.exchangeGhost((QudaParity)(1-parity), nFace, dag);
           exchangeGhost(inB, parity, dag);
-          inD.exchangeGhost((QudaParity)(1-parity), nFace, 1-dag);
           exchangeGhost(inD, parity, 1-dag);
 
           instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);

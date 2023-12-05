@@ -46,6 +46,25 @@ namespace quda {
     {
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];
       for (int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
+
+      // need to reset the ghost pointers since default ghost_offset
+      // (Ghost() method) not set (this is temporary work around)
+      void *ghost[8] = {};
+      for (int dim = 0; dim < 4; dim++) {
+        for (int dir = 0; dir < 2; dir++) {
+          ghost[2 * dim + dir] = (char *)inB.Ghost2() + inB.GhostOffset(dim, dir);
+        }
+      }
+      this->inB.resetGhost(ghost);
+      inD.bufferIndex = (1 - inD.bufferIndex);
+
+      for (int dim = 0; dim < 4; dim++) {
+        for (int dir = 0; dir < 2; dir++) {
+          ghost[2 * dim + dir] = (char *)inD.Ghost2() + inD.GhostOffset(dim, dir);
+        }
+      }
+      this->inD.resetGhost(ghost);
+      inD.bufferIndex = (1 - inD.bufferIndex);
     }
   };
 
