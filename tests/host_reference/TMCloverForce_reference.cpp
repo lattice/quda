@@ -245,9 +245,9 @@ void TMCloverForce_reference(void *h_mom, void **h_x,  void **h_x0, double *coef
         if (i == j)
           continue;
         else if (j == 0)
-          ghostFace[i] *= qParam.x[j] * 2;
+          ghostFace[i] *= qParam.x[j] * 2 + 2 * R[i];
         else
-          ghostFace[i] *= qParam.x[j];
+          ghostFace[i] *= qParam.x[j] + 2 * R[i];
       }
     }
     ghost_size += 2 * R[i] * ghostFace[i];
