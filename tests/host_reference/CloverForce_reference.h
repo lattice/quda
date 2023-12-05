@@ -293,22 +293,24 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
   }
 }
 
-void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, quda::ColorSpinorField &x,
-                           quda::ColorSpinorField &p, double force_coeff)
+void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, std::vector<quda::ColorSpinorField> &x,
+                           std::vector<quda::ColorSpinorField> &p, std::vector<double> force_coeff)
 {
   int dag = 1;
-  for (int parity = 0; parity < 2; parity++) {
-    quda::ColorSpinorField &inA = (parity & 1) ? x.Odd() : x.Even();
-    quda::ColorSpinorField &inB = (parity & 1) ? p.Even() : p.Odd();
-    quda::ColorSpinorField &inC = (parity & 1) ? p.Odd() : p.Even();
-    quda::ColorSpinorField &inD = (parity & 1) ? x.Even() : x.Odd();
+  for (auto i = 0u; i<x.size(); i++) {
+    for (int parity = 0; parity < 2; parity++) {
+      quda::ColorSpinorField &inA = (parity & 1) ? x[i].Odd() : x[i].Even();
+      quda::ColorSpinorField &inB = (parity & 1) ? p[i].Even(): p[i].Odd();
+      quda::ColorSpinorField &inC = (parity & 1) ? p[i].Odd() : p[i].Even();
+      quda::ColorSpinorField &inD = (parity & 1) ? x[i].Even(): x[i].Odd();
 
-    static constexpr int nFace = 1;
-    // every time that exchange ghost is called fwdGhostFaceBuffer becomes the Ghost of the last spinor called
-    inB.exchangeGhost((QudaParity)(1 - parity), nFace, dag);
-    CloverForce_kernel_host<double, double>(gauge, h_mom, inA, inB, 1, parity, force_coeff);
-    inD.exchangeGhost((QudaParity)(1 - parity), nFace, 1 - dag);
-    CloverForce_kernel_host<double, double>(gauge, h_mom, inC, inD, -1, parity, force_coeff);
+      static constexpr int nFace = 1;
+      // every time that exchange ghost is called fwdGhostFaceBuffer becomes the Ghost of the last spinor called
+      inB.exchangeGhost((QudaParity)(1 - parity), nFace, dag);
+      CloverForce_kernel_host<double, double>(gauge, h_mom, inA, inB, 1, parity, force_coeff[i]);
+      inD.exchangeGhost((QudaParity)(1 - parity), nFace, 1 - dag);
+      CloverForce_kernel_host<double, double>(gauge, h_mom, inC, inD, -1, parity, force_coeff[i]);
+    }
   }
 }
 template <typename cFloat>
@@ -917,7 +919,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
 
 template <typename sFloat, typename gFloat>
 void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda::ColorSpinorField &inx,
-                                std::vector<std::vector<double>> &coeff)
+                                std::vector<double> &coeff)
 {
   int nColor = 3;
   gFloat *oprod = (gFloat *)oprod_;
@@ -956,8 +958,8 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
             for (int cj = 0; cj < nColor; cj++) { // col
               int color = ci * nColor + cj;
               int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
-              oprod[id + 0] += coeff[0][parity] * oprod_imx2[color * 2 + 0] / 2.0;
-              oprod[id + 1] += coeff[0][parity] * oprod_imx2[color * 2 + 1] / 2.0;
+              oprod[id + 0] += coeff[parity] * oprod_imx2[color * 2 + 0] / 2.0;
+              oprod[id + 1] += coeff[parity] * oprod_imx2[color * 2 + 1] / 2.0;
             }
           }
         }
@@ -966,13 +968,15 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
   }
 }
 
-void computeCloverSigmaOprod_reference(void *oprod, quda::ColorSpinorField &p, quda::ColorSpinorField &x,
+void computeCloverSigmaOprod_reference(void *oprod, std::vector<quda::ColorSpinorField> &p, std::vector<quda::ColorSpinorField> &x,
                                        std::vector<std::vector<double>> &ferm_epsilon, QudaGaugeParam &gauge_param)
 {
-  if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
-    CloverSigmaOprod_reference<double, double>(oprod, p, x, ferm_epsilon);
-  else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
-    CloverSigmaOprod_reference<float, float>(oprod, p, x, ferm_epsilon);
-  else
-    errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
+  for (auto i=0u; i < x.size(); i++){
+    if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
+      CloverSigmaOprod_reference<double, double>(oprod, p[i], x[i], ferm_epsilon[i]);
+    else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
+      CloverSigmaOprod_reference<float, float>(oprod, p[i], x[i], ferm_epsilon[i]);
+    else
+      errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
+  }
 }

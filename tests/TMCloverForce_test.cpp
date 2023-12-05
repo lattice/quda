@@ -104,6 +104,11 @@ void init(int argc, char **argv)
       inv_param.return_clover = compute_clover;
       inv_param.compute_clover_inverse = true;
       inv_param.return_clover_inverse = true;
+      inv_param.num_offset=1;
+      inv_param.true_res_offset[0]=0; // not use but printed. So we initialize it to a meaningless value
+      inv_param.iter_res_offset[0]=0; // same as above
+      inv_param.action[0]=0;
+      inv_param.action[1]=0;
     // Load the clover terms to the device
     loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
   } else {
@@ -172,9 +177,9 @@ void TMCloverForce_test()
   // inv_param.kappa=1;// we can not set to zero
   // inv_param.mu=0;
   // std::vector<quda::ColorSpinorField> in(Nsrc);
-  multishift = 1;
-  std::vector<quda::ColorSpinorField> out_multishift(multishift * Nsrc);
-  std::vector<std::vector<void *>> in(Nsrc, std::vector<void *>(multishift));
+  int nvector = 3;
+  std::vector<quda::ColorSpinorField> out_nvector(nvector * Nsrc);
+  std::vector<std::vector<void *>> in(Nsrc, std::vector<void *>(nvector));
 
   quda::ColorSpinorField check;
   quda::ColorSpinorParam cs_param;
@@ -183,8 +188,8 @@ void TMCloverForce_test()
 
   quda::RNG rng(check, 1234);
 
-  inv_param.num_offset = multishift;
-  for (int i = 0; i < multishift; i++) {
+  inv_param.num_offset = nvector;
+  for (int i = 0; i < nvector; i++) {
     // Set masses and offsets
     // masses[i] = 0.06 + i * i * 0.01;
     // inv_param.offset[i] = 4 * masses[i] * masses[i];
@@ -194,9 +199,9 @@ void TMCloverForce_test()
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
     // Allocate memory and set pointers
     for (int n = 0; n < Nsrc; n++) {
-      out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
-      spinorNoise(out_multishift[n * multishift + i], rng, QUDA_NOISE_GAUSS);
-      in[n][i] = out_multishift[n * multishift + i].data();
+      out_nvector[n * nvector + i] = quda::ColorSpinorField(cs_param);
+      spinorNoise(out_nvector[n * nvector + i], rng, QUDA_NOISE_GAUSS);
+      in[n][i] = out_nvector[n * nvector + i].data();
       ////////////my init
       // double *vin = (double *)in[0][0];
       // for (int x = 0; x < 2 * 4 * 4 * 2 * 24; x++) {
@@ -211,9 +216,13 @@ void TMCloverForce_test()
     }
   }
 
-  double coeff[1] = {4. * inv_param.kappa * inv_param.kappa};
+  double *coeff=(double*) malloc(sizeof(double)*nvector);
+  for(int i=0;i<nvector;i++){
+    coeff[i]=4. * inv_param.kappa * inv_param.kappa;
+    coeff[i] += coeff[i]* (i+1)/10.0;
+  }
   if (getTuning() == QUDA_TUNE_YES)
-    computeTMCloverForceQuda(mom, in[0].data(), NULL, coeff, 1,  &gauge_param, &inv_param, false);
+    computeTMCloverForceQuda(mom, in[0].data(), NULL, coeff, nvector,  &gauge_param, &inv_param, false);
 
   printf("Device function computed\n");
   quda::host_timer_t host_timer;
@@ -224,7 +233,7 @@ void TMCloverForce_test()
   for (int i = 0; i < niter; i++) {
     Mom_.copy(Mom_ref_milc); // restore initial momentum for correctness
     host_timer.start();
-    computeTMCloverForceQuda(mom, in[0].data(),NULL, coeff, 1,  &gauge_param, &inv_param, false);
+    computeTMCloverForceQuda(mom, in[0].data(),NULL, coeff, nvector,  &gauge_param, &inv_param, false);
 
     host_timer.stop();
     time_sec += host_timer.last();
@@ -239,7 +248,7 @@ void TMCloverForce_test()
   int *check_out = true ? &force_check : &path_check;
   if (verify_results) {
     
-    TMCloverForce_reference(refmom, in[0].data(), coeff, 1, gauge, clover, clover_inv, &gauge_param, &inv_param);
+    TMCloverForce_reference(refmom, in[0].data(), coeff, nvector, gauge, clover, clover_inv, &gauge_param, &inv_param, false);
     *check_out
       = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     // if (compute_force)
@@ -257,6 +266,7 @@ void TMCloverForce_test()
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
   // if (compute_force) {
   printfQuda("Force calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3, perf);
+  free(coeff);
 }
 
 TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }
