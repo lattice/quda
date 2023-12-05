@@ -103,8 +103,7 @@ namespace quda
     Topology *topo = new Topology;
 
 #ifdef BUILD_OPENQCD_INTERFACE
-    int *data = static_cast<int *>(map_data);
-    topo->cstar = data[0];
+    topo->cstar = (map_data == nullptr) ? 0 : static_cast<int *>(map_data)[0];
 #else
     topo->cstar = 0;
 #endif

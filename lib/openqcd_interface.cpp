@@ -537,7 +537,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout)
   qudaState.initialized = true;
 }
 
-void openQCD_qudaFinalize() {
+void openQCD_qudaFinalize(void) {
   qudaState.initialized = false;
   endQuda();
 }

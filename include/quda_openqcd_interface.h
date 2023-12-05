@@ -113,11 +113,11 @@ typedef struct {
                         data[5+lex(ix,iy,iz,it)] returns rank number in
                         openQCD, where lex stands for lexicographical
                         indexing (in QUDA order (xyzt)) */
-  bc_parms_t bc_parms;
-  dirac_parms_t dirac_parms;
-  flds_parms_t flds_parms;
-  void* (*h_gauge)(void);
-  void* (*h_sw)(void);
+  bc_parms_t bc_parms;       /** @see bc_parms() */
+  dirac_parms_t dirac_parms; /** @see dirac_parms() */
+  flds_parms_t flds_parms;   /** @see flds_parms() */
+  void* (*h_gauge)(void);    /** function to return a pointer to the gauge fields */
+  void* (*h_sw)(void);       /** function to return a pointer to the clover fields */
 } openQCD_QudaLayout_t;
 
 

@@ -116,7 +116,7 @@ namespace quda {
       using G = OpenQCDOrder<FloatOut, length>;
       CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, Out, In);
 #else
-      errorQuda("OPENQCD interface has not been built\n");
+      errorQuda("OPENQCD interface has not been built");
 #endif
 
     } else {
