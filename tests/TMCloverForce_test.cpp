@@ -178,8 +178,11 @@ void TMCloverForce_test()
   // inv_param.mu=0;
   // std::vector<quda::ColorSpinorField> in(Nsrc);
   int nvector = 3;
+  int detratio = 0;
   std::vector<quda::ColorSpinorField> out_nvector(nvector * Nsrc);
   std::vector<std::vector<void *>> in(Nsrc, std::vector<void *>(nvector));
+  std::vector<quda::ColorSpinorField> out_nvector0(nvector * Nsrc);
+  std::vector<std::vector<void *>> in0(Nsrc, std::vector<void *>(nvector));
 
   quda::ColorSpinorField check;
   quda::ColorSpinorParam cs_param;
@@ -202,17 +205,11 @@ void TMCloverForce_test()
       out_nvector[n * nvector + i] = quda::ColorSpinorField(cs_param);
       spinorNoise(out_nvector[n * nvector + i], rng, QUDA_NOISE_GAUSS);
       in[n][i] = out_nvector[n * nvector + i].data();
-      ////////////my init
-      // double *vin = (double *)in[0][0];
-      // for (int x = 0; x < 2 * 4 * 4 * 2 * 24; x++) {
-      //   (*vin) = 0;
-      //   vin++;
-      // }
-      // vin = (double *)in[0][0];
-      // if (getRankVerbosity()) {
-      //   (*vin) = 1;
-      // } 
-      ////////////////////////
+
+      out_nvector0[n * nvector + i] = quda::ColorSpinorField(cs_param);
+      spinorNoise(out_nvector0[n * nvector + i], rng, QUDA_NOISE_GAUSS);
+      in0[n][i] = out_nvector0[n * nvector + i].data();
+
     }
   }
 
@@ -222,7 +219,7 @@ void TMCloverForce_test()
     coeff[i] += coeff[i]* (i+1)/10.0;
   }
   if (getTuning() == QUDA_TUNE_YES)
-    computeTMCloverForceQuda(mom, in[0].data(), NULL, coeff, nvector,  &gauge_param, &inv_param, false);
+    computeTMCloverForceQuda(mom, in[0].data(), in0[0].data(), coeff, nvector,  &gauge_param, &inv_param, detratio);
 
   printf("Device function computed\n");
   quda::host_timer_t host_timer;
@@ -233,7 +230,7 @@ void TMCloverForce_test()
   for (int i = 0; i < niter; i++) {
     Mom_.copy(Mom_ref_milc); // restore initial momentum for correctness
     host_timer.start();
-    computeTMCloverForceQuda(mom, in[0].data(),NULL, coeff, nvector,  &gauge_param, &inv_param, false);
+    computeTMCloverForceQuda(mom, in[0].data(), in0[0].data(), coeff, nvector,  &gauge_param, &inv_param, detratio);
 
     host_timer.stop();
     time_sec += host_timer.last();
@@ -248,7 +245,7 @@ void TMCloverForce_test()
   int *check_out = true ? &force_check : &path_check;
   if (verify_results) {
     
-    TMCloverForce_reference(refmom, in[0].data(), coeff, nvector, gauge, clover, clover_inv, &gauge_param, &inv_param, false);
+    TMCloverForce_reference(refmom, in[0].data(), in0[0].data(), coeff, nvector, gauge, clover, clover_inv, &gauge_param, &inv_param, detratio);
     *check_out
       = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     // if (compute_force)

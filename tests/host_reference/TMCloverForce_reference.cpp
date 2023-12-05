@@ -30,6 +30,13 @@ void Gamma5_host(double *out, double *in, const int V)
     }
   }
 }
+void axpbyz_host(double a, double *x, double b,   double *y, double *z, const int V)
+{
+  for (int i = 0; i < V*24; i++) {
+        z[i] = a*x[i]+b*y[i];
+  }
+}
+
 void Gamma5_host_UKQCD(double *out, double *in, const int V)
 {
 
@@ -55,7 +62,7 @@ template <typename Float> void set_to_zero(void *oprod_)
   for (size_t i = 0; i < V * 6 * gauge_site_size; i++) oprod[i] = 0;
 }
 
-void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector, std::array<void *, 4> gauge,
+void TMCloverForce_reference(void *h_mom, void **h_x,  void **h_x0, double *coeff, int nvector, std::array<void *, 4> gauge,
                              std::vector<char> clover, std::vector<char> clover_inv, QudaGaugeParam *gauge_param,
                              QudaInvertParam *inv_param, int detratio)
 {
@@ -125,17 +132,32 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         tmc_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
                   inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+      } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+        clover_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa, myMatPCType,
+                    QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+      } else {
+        errorQuda("TMCloverForce_reference: dslash_type not supported\n");
+      }
+
+      if (detratio){
+        qParam.v = h_x0[i];
+        quda::ColorSpinorField load_half(qParam);
+        x0[i].Odd()=load_half;
+        axpbyz_host(1, p[i].Odd().data<double*>(), 1, x0[i].Odd().data<double*>(), p[i].Odd().data<double*>(), p[i].Odd().VolumeCB());
+      }
+
+      if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         tmc_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(), inv_param->kappa,
                   inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO, inv_param->cpu_prec,
                   *gauge_param);
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-        clover_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa, myMatPCType,
-                    QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
         clover_dslash(p[i].Even().data(), gauge.data(), clover_inv.data(), p[i].Odd().data(), parity, QUDA_DAG_NO,
                       inv_param->cpu_prec, *gauge_param);
       } else {
         errorQuda("TMCloverForce_reference: dslash_type not supported\n");
       }
+
+
     }
     else {
       errorQuda("TMCloverForce_reference: MATPC type not supported\n");
@@ -185,7 +207,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
     0.0;
 
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-  computeCloverSigmaTrace_reference(oprod, clover.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2, twist_flavor);
+  if (!detratio)  computeCloverSigmaTrace_reference(oprod, clover.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2, twist_flavor);
 
   std::vector<std::vector<double>> ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
