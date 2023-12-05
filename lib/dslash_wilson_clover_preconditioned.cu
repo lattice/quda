@@ -237,7 +237,7 @@ namespace quda
       const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
       TimeProfile &profile)
   {
-    if (in.Alpha() != 0 && in.SourceTime() > 0) {
+    if (in.Alpha() != 0 && in.SourceTime() >= 0) {
       instantiate<WilsonCloverPreconditionedDistanceApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
     } else {
       instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);

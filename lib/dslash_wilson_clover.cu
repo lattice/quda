@@ -172,7 +172,7 @@ namespace quda
   void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
       double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if (in.Alpha() != 0 && in.SourceTime() > 0) {
+    if (in.Alpha() != 0 && in.SourceTime() >= 0) {
       instantiate<WilsonCloverDistanceApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
     } else {
       instantiate<WilsonCloverApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
