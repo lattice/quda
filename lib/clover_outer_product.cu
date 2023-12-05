@@ -142,13 +142,8 @@ namespace quda {
 
       int dag = 1;
 
-      for (unsigned int i=0; i<x.size(); i++) {
-        // x[i]->Even().allocateGhostBuffer(1);
-        // x[i]->Odd().allocateGhostBuffer(1);
-        // p[i]->Even().allocateGhostBuffer(1);
-        // p[i]->Odd().allocateGhostBuffer(1);
-
-        for (int parity=0; parity<2; parity++) {
+      for (auto i = 0u; i<x.size(); i++) {
+        for (int parity = 0; parity < 2; parity++) {
           const ColorSpinorField &inA = (parity&1) ? x[i].Odd() : x[i].Even();
           const ColorSpinorField &inB = (parity&1) ? p[i].Even(): p[i].Odd();
           const ColorSpinorField &inC = (parity&1) ? p[i].Odd() : p[i].Even();

@@ -33,7 +33,7 @@ namespace quda {
 
     CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
                    const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity, const double coeff) :
-      kernel_param(dim3(dim == -1 ? inA.VolumeCB() : inB.GhostFaceCB()[dim])),
+      kernel_param(dim3(dim == -1 ? inA.VolumeCB() : inB.GhostFaceCB()[dim])), // inB since it has a ghost allocated
       force(force),
       inA(inA),
       inB(inB),
