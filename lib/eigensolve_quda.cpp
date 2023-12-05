@@ -44,9 +44,11 @@ namespace quda
     converged = false;
     restart_iter = 0;
     max_restarts = eig_param->max_restarts;
+    max_ortho_attempts = eig_param->max_ortho_attempts;
     check_interval = eig_param->check_interval;
     batched_rotate = eig_param->batched_rotate;
     block_size = eig_param->block_size;
+    ortho_block_size = eig_param->ortho_block_size;
     iter = 0;
     iter_converged = 0;
     iter_locked = 0;
@@ -64,6 +66,7 @@ namespace quda
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
+    if (ortho_block_size < 0) errorQuda("block_size=%d must be positive or zero", ortho_block_size);
 
     residua.resize(n_kr, 0.0);
 
@@ -104,16 +107,16 @@ namespace quda
 
     switch (eig_param->eig_type) {
     case QUDA_EIG_IR_ARNOLDI:
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
+      logQuda(QUDA_VERBOSE, "Creating IR Arnoldi eigensolver\n");
       eig_solver = new IRAM(mat, eig_param, profile);
       break;
     case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
+      logQuda(QUDA_VERBOSE, "Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param, profile);
       break;
     case QUDA_EIG_BLK_TR_LANCZOS:
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Block TR Lanczos eigensolver\n");
+      logQuda(QUDA_VERBOSE, "Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param, profile);
       break;
     default: errorQuda("Invalid eig solver type");
@@ -157,27 +160,30 @@ namespace quda
     }
 
     bool orthed = false;
-    int k = 0, kmax = 5;
-    while (!orthed && k < kmax) {
-      orthonormalizeMGS(kSpace, block_size);
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        if (block_size > 1)
-          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
-        else
-          printfQuda("Orthonormalising initial guess\n");
+    int k = 0;
+    while (!orthed && k < max_ortho_attempts) {
+      orthonormalizeHMGS(kSpace, ortho_block_size, block_size);
+      if (block_size > 1) {
+        logQuda(QUDA_SUMMARIZE, "Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d\n", k);
+      } else {
+        logQuda(QUDA_SUMMARIZE, "Orthonormalising initial guess\n");
       }
       orthed = orthoCheck(kSpace, block_size);
       k++;
     }
-    if (!orthed) errorQuda("Failed to orthonormalise initial guesses");
+    if (!orthed) errorQuda("Failed to orthonormalise initial guesses with %d orthonormalisation attempts (max = %d)", k+1, max_ortho_attempts);
   }
 
   void EigenSolver::checkChebyOpMax(std::vector<ColorSpinorField> &kSpace)
   {
-    if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
-      // Use part of the kSpace as temps
-      eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
+    if (eig_param->use_poly_acc) {
+      if (eig_param->a_max <= 0.0) {
+        // Use part of the kSpace as temps
+        eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
+        logQuda(QUDA_SUMMARIZE, "Chebyshev maximum estimate: %e.\n", eig_param->a_max);
+      }
+      if (eig_param->a_min >= eig_param->a_max)
+        errorQuda("Invalid a_min = %e a_max = %e combination", eig_param->a_min, eig_param->a_max);
     }
   }
 
@@ -190,25 +196,21 @@ namespace quda
 
   void EigenSolver::printEigensolverSetup()
   {
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("********************************\n");
-      printfQuda("**** START QUDA EIGENSOLVER ****\n");
-      printfQuda("********************************\n");
-    }
+    logQuda(QUDA_SUMMARIZE, "********************************\n");
+    logQuda(QUDA_SUMMARIZE, "**** START QUDA EIGENSOLVER ****\n");
+    logQuda(QUDA_SUMMARIZE, "********************************\n");
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("spectrum %s\n", spectrum);
-      printfQuda("tol %.4e\n", tol);
-      printfQuda("n_conv %d\n", n_conv);
-      printfQuda("n_ev %d\n", n_ev);
-      printfQuda("n_kr %d\n", n_kr);
-      if (block_size > 1) printfQuda("block size %d\n", block_size);
-      if (batched_rotate > 0) printfQuda("batched rotation size %d\n", batched_rotate);
-      if (eig_param->use_poly_acc) {
-        printfQuda("polyDeg %d\n", eig_param->poly_deg);
-        printfQuda("a-min %f\n", eig_param->a_min);
-        printfQuda("a-max %f\n", eig_param->a_max);
-      }
+    logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum);
+    logQuda(QUDA_VERBOSE, "tol %.4e\n", tol);
+    logQuda(QUDA_VERBOSE, "n_conv %d\n", n_conv);
+    logQuda(QUDA_VERBOSE, "n_ev %d\n", n_ev);
+    logQuda(QUDA_VERBOSE, "n_kr %d\n", n_kr);
+    if (block_size > 1) logQuda(QUDA_VERBOSE, "block size %d\n", block_size);
+    if (batched_rotate > 0) logQuda(QUDA_VERBOSE, "batched rotation size %d\n", batched_rotate);
+    if (eig_param->use_poly_acc) {
+      logQuda(QUDA_VERBOSE, "polyDeg %d\n", eig_param->poly_deg);
+      logQuda(QUDA_VERBOSE, "a-min %f\n", eig_param->a_min);
+      logQuda(QUDA_VERBOSE, "a-max %f\n", eig_param->a_max);
     }
   }
 
@@ -228,10 +230,10 @@ namespace quda
   void EigenSolver::queryPrec(const QudaPrecision prec)
   {
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION: printfQuda("Running eigensolver in double precision\n"); break;
-    case QUDA_SINGLE_PRECISION: printfQuda("Running eigensolver in single precision\n"); break;
-    case QUDA_HALF_PRECISION: printfQuda("Running eigensolver in half precision\n"); break;
-    case QUDA_QUARTER_PRECISION: printfQuda("Running eigensolver in quarter precision\n"); break;
+    case QUDA_DOUBLE_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in double precision\n"); break;
+    case QUDA_SINGLE_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in single precision\n"); break;
+    case QUDA_HALF_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in half precision\n"); break;
+    case QUDA_QUARTER_PRECISION: logQuda(QUDA_VERBOSE, "Running eigensolver in quarter precision\n"); break;
     default: errorQuda("Invalid precision %d", prec);
     }
   }
@@ -248,22 +250,18 @@ namespace quda
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
+      logQuda(QUDA_SUMMARIZE, "saving eigenvectors\n");
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       for (auto &k : kSpace) k.setSuggestedParity(mat_parity);
 
       // save the vectors
-      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
+      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE, eig_param->partfile);
       io.save(kSpace, save_prec, n_eig);
     }
 
-    mat.flops();
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("********************************\n");
-      printfQuda("***** END QUDA EIGENSOLVER *****\n");
-      printfQuda("********************************\n");
-    }
+    logQuda(QUDA_SUMMARIZE, "********************************\n");
+    logQuda(QUDA_SUMMARIZE, "***** END QUDA EIGENSOLVER *****\n");
+    logQuda(QUDA_SUMMARIZE, "********************************\n");
   }
 
   void EigenSolver::chebyOp(cvector_ref<ColorSpinorField> &out,
@@ -368,15 +366,13 @@ namespace quda
         auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
-            if (getVerbosity() >= QUDA_SUMMARIZE)
-              printfQuda("Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
+            logQuda(QUDA_SUMMARIZE, "Norm <%d|%d>^2 = ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
           if (abs(Unit - cnorm) > 5.0 * epsilon) {
-            if (getVerbosity() >= QUDA_SUMMARIZE)
-              printfQuda("1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(),
-                         abs(Unit - cnorm));
+            logQuda(QUDA_SUMMARIZE, "1 - Norm <%d|%d>^2 = 1 - ||(%e,%e)|| = %e\n", i, j, cnorm.real(), cnorm.imag(),
+                    abs(Unit - cnorm));
             orthed = false;
           }
         }
@@ -386,12 +382,19 @@ namespace quda
     return orthed;
   }
 
-  void EigenSolver::orthonormalizeMGS(std::vector<ColorSpinorField> &vecs, int size)
+  void EigenSolver::orthonormalizeHMGS(std::vector<ColorSpinorField> &vecs, int h_block_size, int size)
   {
     for (int i = 0; i < size; i++) {
-      for (int j = 0; j < i; j++) {
-        Complex cnorm = blas::cDotProduct(vecs[j], vecs[i]); // <j|i> with i normalised.
-        blas::caxpy(-cnorm, vecs[j], vecs[i]);               // i = i - proj_{j}(i) = i - <j|i> * j
+      auto array_size = h_block_size;
+      for (int j = 0; j < i; j += array_size) {
+        if (i < h_block_size || h_block_size == 0) array_size = i;
+        if (i - j < h_block_size) array_size = i - j;
+        logQuda(QUDA_DEBUG_VERBOSE, "Current block size = %d\n", array_size);
+
+        std::vector<Complex> s(array_size);
+        blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
+        for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
+        blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // i = i - proj_{j}(i) = i - <j|i> * j
       }
       double norm = sqrt(blas::norm2(vecs[i]));
       blas::ax(1.0 / norm, vecs[i]); // i/<i|i>
@@ -399,18 +402,24 @@ namespace quda
   }
 
   // Orthogonalise r[0:] against V_[0:j]
-  void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int j)
+  void EigenSolver::blockOrthogonalizeHMGS(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int h_block_size, int i)
   {
-    auto vecs_size = j;
-    auto array_size = vecs_size * rvecs.size();
-    std::vector<Complex> s(array_size);
+    auto block_array_size = h_block_size;
+    for (int j = 0; j < i; j += block_array_size) {
+      if (i < h_block_size || h_block_size == 0) block_array_size = i;
+      if (i - j < h_block_size) block_array_size = (i - j);
+      auto array_size = block_array_size * rvecs.size();
+      logQuda(QUDA_DEBUG_VERBOSE, "Current block array size = %d\n", block_array_size);
 
-    // Block dot products stored in s.
-    blas::cDotProduct(s, {vecs.begin(), vecs.begin() + vecs_size}, {rvecs.begin(), rvecs.end()});
+      std::vector<Complex> s(array_size);
 
-    // Block orthogonalise
-    for (auto i = 0u; i < array_size; i++) s[i] *= -1.0;
-    blas::caxpy(s, {vecs.begin(), vecs.begin() + vecs_size}, {rvecs.begin(), rvecs.end()});
+      // Block dot products stored in s.
+      blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
+
+      // Block orthogonalise
+      for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
+      blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
+    }
   }
 
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField> &kSpace, MatrixXi &mat, int size)
@@ -495,7 +504,7 @@ namespace quda
 
   void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
   {
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
+    logQuda(QUDA_SUMMARIZE, "Computing SVD of M\n");
 
     int n_conv = eig_param->n_conv;
     if (evecs.size() < (unsigned int)(2 * n_conv))
@@ -527,9 +536,8 @@ namespace quda
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
       blas::ax(1.0 / sigma_tmp[i], evecs[n_conv + i]);
 
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
-                   sigma_tmp[i] - sqrt(abs(lambda.real())));
+      logQuda(QUDA_SUMMARIZE, "Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
+              sigma_tmp[i] - sqrt(abs(lambda.real())));
 
       evals[i] = sigma_tmp[i];
       //--------------------------------------------------------------------------
@@ -552,7 +560,7 @@ namespace quda
       errorQuda("Incorrect deflation space sized %d passed to deflateSVD, expected %d", (int)(evecs.size()),
                 2 * eig_param->n_conv);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
+    logQuda(QUDA_VERBOSE, "Deflating %d left and right singular vectors\n", n_defl);
 
     // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
@@ -596,8 +604,9 @@ namespace quda
       // eig_param->invert_param->true_res_offset[i] = residua[i];
 
       // If size = n_conv, this routine is called post sort
-      if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
-        printfQuda("Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), abs(evals[i]), residua[i]);
+      if (size == n_conv)
+        logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", i, evals[i].real(),
+                evals[i].imag(), abs(evals[i]), residua[i]);
     }
   }
 
@@ -613,7 +622,7 @@ namespace quda
     }
 
     int n_defl = n_ev_deflate;
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
+    logQuda(QUDA_VERBOSE, "Deflating %d vectors\n", n_defl);
 
     // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
@@ -777,7 +786,7 @@ namespace quda
     // If we have memory available, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= keep) {
       if ((int)kSpace.size() < offset + keep) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
+        logQuda(QUDA_VERBOSE, "Resizing kSpace to %d vectors\n", n_kr + keep);
         resize(kSpace, offset + keep, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
       }
 
@@ -804,7 +813,7 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+        logQuda(QUDA_VERBOSE, "Resizing kSpace to %d vectors\n", offset + batch_size);
         resize(kSpace, offset + batch_size, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
       }
 

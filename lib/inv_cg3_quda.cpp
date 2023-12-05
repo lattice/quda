@@ -268,8 +268,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    blas::flops = 0;
-
     // compute initial residual depending on whether we have an initial guess or not
     double r2;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -474,13 +472,9 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
-    if (k == param.maxiter)
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residuals
     if (!mixed_precision && param.compute_true_res) {
@@ -490,11 +484,6 @@ namespace quda {
     }
 
     PrintSummary("CG3", k, r2, b2, stop, param.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   }

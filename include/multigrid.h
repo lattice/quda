@@ -157,11 +157,17 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether to save in partfile format (true) or singlefile (false) */
+    bool mg_vec_partfile;
+
     /** Whether or not this is a staggered solve or not */
     QudaTransferType transfer_type;
 
-    /** Whether to use tensor cores (if available) */
-    bool use_mma;
+    /** Whether to use tensor cores (if available) for setup */
+    bool setup_use_mma;
+
+    /** Whether to use tensor cores (if available) for dslash */
+    bool dslash_use_mma;
 
     /**
        This is top level instantiation done when we start creating the multigrid operator.
@@ -190,8 +196,10 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
+      mg_vec_partfile(param.mg_vec_partfile[level]),
       transfer_type(param.transfer_type[level]),
-      use_mma(param.use_mma == QUDA_BOOLEAN_TRUE)
+      setup_use_mma(param.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
+      dslash_use_mma(param.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -226,8 +234,10 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
+      mg_vec_partfile(param.mg_global.mg_vec_partfile[level]),
       transfer_type(param.mg_global.transfer_type[level]),
-      use_mma(param.use_mma)
+      setup_use_mma(param.mg_global.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
+      dslash_use_mma(param.mg_global.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -370,7 +380,12 @@ namespace quda {
     /**
        @return MG can solve non-Hermitian systems
      */
-    bool hermitian() { return false; };
+    bool hermitian() const final { return false; };
+
+    /**
+       @return Is an MG inverter
+      */
+    virtual QudaInverterType getInverterType() const final { return QUDA_MG_INVERTER; }
 
     /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
@@ -382,9 +397,9 @@ namespace quda {
        @brief This method only resets the KD operators with the updated fine links and rebuilds
               the KD inverse
      */
-    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
-                          cudaGaugeField *long_gauge_sloppy_in, double mass);
+    void resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
+                          GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
+                          GaugeField *long_gauge_sloppy_in, double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -472,11 +487,6 @@ namespace quda {
     void buildFreeVectors(std::vector<ColorSpinorField*> &B);
 
     /**
-       @brief Return the total flops done on this and all coarser levels.
-     */
-    double flops() const;
-
-    /**
       @brief Return if we're on a fine grid right now
     */
     bool is_fine_grid() const
@@ -494,7 +504,9 @@ namespace quda {
   /**
      @brief Apply the coarse dslash stencil.  This single driver
      accounts for all variations with and without the clover field,
-     with and without dslash, and both single and full parity fields
+     with and without dslash, and both single and full parity fields.
+     This function is where the number of colors are queried and the
+     appropriate template is called.
      @param[out] out The result vector
      @param[in] inA The first input vector
      @param[in] inB The second input vector
@@ -508,10 +520,58 @@ namespace quda {
      @param[in] commDim Which dimensions are partitioned?
      @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
    */
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
-		   bool dslash=true, bool clover=true, bool dagger=false, const int *commDim=0,
-                   QudaPrecision halo_precision=QUDA_INVALID_PRECISION);
+  void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   int parity = QUDA_INVALID_PARITY, bool dslash = true, bool clover = true, bool dagger = false,
+                   const int *commDim = 0, QudaPrecision halo_precision = QUDA_INVALID_PRECISION, bool use_mma = false);
+
+  /**
+     @brief Apply the coarse dslash stencil.  This single driver
+     accounts for all variations with and without the clover field,
+     with and without dslash, and both single and full parity fields
+     This template function requires that the dagger and number of
+     colors templates have been instantiated.
+     @param[out] out The result vector
+     @param[in] inA The first input vector
+     @param[in] inB The second input vector
+     @param[in] Y Coarse link field
+     @param[in] X Coarse clover field
+     @param[in] kappa Scaling parameter
+     @param[in] parity Parity of the field (if single parity)
+     @param[in] dslash Are we applying dslash?
+     @param[in] clover Are we applying clover?
+     @param[in] dagger Apply dagger operator?
+     @param[in] commDim Which dimensions are partitioned?
+     @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
+   */
+  template <bool dagger, int coarseColor>
+  void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
+
+  /**
+     @brief Apply the coarse dslash stencil with MMA.  This single driver
+     accounts for all variations with and without the clover field,
+     with and without dslash, and both single and full parity fields
+     This template function requires that the dagger and number of
+     colors templates have been instantiated.
+     @param[out] out The result vector
+     @param[in] inA The first input vector
+     @param[in] inB The second input vector
+     @param[in] Y Coarse link field
+     @param[in] X Coarse clover field
+     @param[in] kappa Scaling parameter
+     @param[in] parity Parity of the field (if single parity)
+     @param[in] dslash Are we applying dslash?
+     @param[in] clover Are we applying clover?
+     @param[in] dagger Apply dagger operator?
+     @param[in] commDim Which dimensions are partitioned?
+     @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
+   */
+  template <bool dagger, int coarseColor, int nVec>
+  void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                      cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                      int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
@@ -529,7 +589,29 @@ namespace quda {
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const CloverField *clover,
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
+                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+
+  /**
+     @brief Coarse operator construction from a fine-grid operator
+     (Wilson / Clover).  This template function requires the fine and
+     coarse colors templates to be instantiated.
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param T[in] Transfer operator that defines the coarse space
+     @param gauge[in] Gauge field from fine grid
+     @param clover[in] Clover field on fine grid (optional)
+     @param kappa[in] Kappa parameter
+     @param mass[in] Mass parameter
+     @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
+     @param mu_factor[in] Multiplicative factor for the mu parameter
+     @param matpc[in] The type of even-odd preconditioned fine-grid
+     operator we are constructing the coarse grid operator from.  If
+     matpc==QUDA_MATPC_INVALID then we assume the operator is not
+     even-odd preconditioned and we coarsen the full operator.
+   */
+  template <int fineColor, int coarseColor>
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
                 double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
@@ -542,12 +624,18 @@ namespace quda {
      @param XinvKD[in] Inverse Kahler-Dirac block
      @param mass[in] Mass parameter
      @param allow_truncation[in] Whether or not we can drop the long links for small aggregation dimensions
+     @param dirac[in] fine Dirac operator type
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         QudaDiracType dirac, QudaMatPCType matpc);
+
+  template <int fineColor, int coarseColor>
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
@@ -576,6 +664,36 @@ namespace quda {
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma = false);
 
   /**
+     @brief Coarse operator construction from an intermediate-grid
+     operator (Coarse).  This template function requires the fine and
+     coarse colors templates to be instantiated, as well whether we
+     are using mma or not.
+
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param T[in] Transfer operator that defines the new coarse space
+     @param gauge[in] Link field from fine grid
+     @param clover[in] Clover field on fine grid
+     @param cloverInv[in] Clover inverse field on fine grid
+     @param kappa[in] Kappa parameter
+     @param mass[in] Mass parameter
+     @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
+     @param mu_factor[in] Multiplicative factor for the mu parameter
+     @param matpc[in] The type of even-odd preconditioned fine-grid
+     operator we are constructing the coarse grid operator from.  If
+     matpc==QUDA_MATPC_INVALID then we assume the operator is not
+     even-odd preconditioned and we coarsen the full operator.
+     @param need_bidirectional[in] Whether or not we need to force a bi-directional
+     build, even if the given level isn't preconditioned---if any previous level is
+     preconditioned, we've violated that symmetry.
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
+   */
+  template <int fineColor, int coarseColor, bool mma>
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
+                      double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+
+  /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
      @param Yhat[out] Preconditioned coarse link field
      @param Xinv[out] Coarse clover inverse field
@@ -583,6 +701,19 @@ namespace quda {
      @param X[in] Coarse clover field
      @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
+
+  /**
+     @brief Calculate preconditioned coarse links and coarse clover
+     inverse field.  Requires the number of colors to have been
+     instantiated.
+     @param Yhat[out] Preconditioned coarse link field
+     @param Xinv[out] Coarse clover inverse field
+     @param Y[in] Coarse link field
+     @param X[in] Coarse clover field
+     @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
+   */
+  template <int Nc>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
 
   /**

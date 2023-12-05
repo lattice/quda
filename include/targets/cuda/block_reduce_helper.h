@@ -69,6 +69,14 @@ namespace quda
     using type = float;
   };
 
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<float>>>> {
+    using type = float;
+  };
+
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<double>>>> {
+    using type = double;
+  };
+
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
 
@@ -94,7 +102,12 @@ namespace quda
       using warp_reduce_t = cub::WarpReduce<T, param_t::width, __COMPUTE_CAPABILITY__>;
       typename warp_reduce_t::TempStorage dummy_storage;
       warp_reduce_t warp_reduce(dummy_storage);
-      T value = reducer_t::do_sum ? warp_reduce.Sum(value_) : warp_reduce.Reduce(value_, r);
+      T value = {};
+      if constexpr (reducer_t::do_sum) {
+        value = warp_reduce.Sum(value_);
+      } else {
+        value = warp_reduce.Reduce(value_, r);
+      }
 
       if (all) {
         using warp_scan_t = cub::WarpScan<T, param_t::width, __COMPUTE_CAPABILITY__>;

@@ -92,10 +92,8 @@ namespace quda
     beta = sqrt(blas::norm2(r[0]));
     while (beta < 0.717 * beta_pre && orth_iter < orth_iter_max) {
 
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        printfQuda("beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n", beta, 0.717 * beta_pre, j,
-                   orth_iter);
-      }
+      logQuda(QUDA_DEBUG_VERBOSE, "beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n", beta,
+              0.717 * beta_pre, j, orth_iter);
 
       beta_pre = beta;
 
@@ -416,7 +414,7 @@ namespace quda
         for (int j = 0; j < n_kr; j++) Qmat[i][j] = Q(i, j);
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QR iterations = %d\n", iter);
+      logQuda(QUDA_VERBOSE, "QR iterations = %d\n", iter);
       profile.TPSTOP(QUDA_PROFILE_EIGENEV);
     }
   }
@@ -428,10 +426,10 @@ namespace quda
 
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_SUMMARIZE) queryPrec(kSpace[0].Precision());
+    queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
-      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      logQuda(QUDA_VERBOSE, "Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(kSpace, evals);
       return;
     }
@@ -489,8 +487,7 @@ namespace quda
         double rtemp = std::max(epsilon23, abs(evals[idx]));
         if (residua[idx] < tol * rtemp) {
           iter_converged++;
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-            printf("residuum[%d] = %e, condition = %e\n", i, residua[idx], tol * abs(evals[idx]));
+          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, residua[idx], tol * abs(evals[idx]));
         } else {
           // Unlikely to find new converged eigenvalues
           break;
@@ -504,8 +501,7 @@ namespace quda
       num_keep = iter_keep;
       num_shifts = n_kr - num_keep;
 
-      if (getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
+      logQuda(QUDA_VERBOSE, "%04d converged eigenvalues at iter %d\n", num_converged, restart_iter);
 
       if (num_converged >= n_conv) {
 
@@ -561,11 +557,10 @@ namespace quda
                     n_conv, n_ev, n_kr, max_restarts);
       }
     } else {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("IRAM computed the requested %d vectors with a %d search space and %d Krylov space in %d "
-                   "restart steps and %d OP*x operations.\n",
-                   n_conv, n_ev, n_kr, restart_iter, iter);
-      }
+      logQuda(QUDA_SUMMARIZE,
+              "IRAM computed the requested %d vectors with a %d search space and %d Krylov space in %d "
+              "restart steps and %d OP*x operations.\n",
+              n_conv, n_ev, n_kr, restart_iter, iter);
     }
 
     // Local clean-up

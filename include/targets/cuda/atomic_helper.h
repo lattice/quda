@@ -70,6 +70,14 @@ namespace quda
     for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
   }
 
+  __device__ __host__ inline void atomic_fetch_add(int4 *addr, int4 val)
+  {
+    atomic_fetch_add(reinterpret_cast<int *>(addr) + 0, val.x);
+    atomic_fetch_add(reinterpret_cast<int *>(addr) + 1, val.y);
+    atomic_fetch_add(reinterpret_cast<int *>(addr) + 2, val.z);
+    atomic_fetch_add(reinterpret_cast<int *>(addr) + 3, val.w);
+  }
+
   template <bool is_device> struct atomic_fetch_abs_max_impl {
     template <typename T> inline void operator()(T *addr, T val)
     {
@@ -107,5 +115,9 @@ namespace quda
   {
     target::dispatch<atomic_fetch_abs_max_impl>(addr, val);
   }
+
+  struct fetch_add_atomic_t {
+    template <class T> __device__ __host__ inline void operator()(T *out, T in) { atomic_fetch_add(out, in); }
+  };
 
 } // namespace quda

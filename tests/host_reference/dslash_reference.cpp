@@ -11,19 +11,19 @@
 #include <command_line_params.h>
 
 // Overload for workflows without multishift
-double verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
-                       QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
+std::array<double, 2> verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
+                                      QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
 {
   void **spinorOutMulti = nullptr;
   return verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover,
                          clover_inv);
 }
 
-double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                       QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                       void *clover_inv)
+std::array<double, 2> verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
+                                      QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge,
+                                      void *clover, void *clover_inv)
 {
-  double res = std::numeric_limits<double>::max();
+  std::array<double, 2> res = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     res = verifyDomainWallTypeInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge,
@@ -38,9 +38,9 @@ double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, v
   return res;
 }
 
-double verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
-                                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *,
-                                     void *)
+std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
+                                                    QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
+                                                    void **gauge, void *, void *)
 {
   if (multishift > 1) errorQuda("Multishift not supported");
 
@@ -165,12 +165,13 @@ double verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, v
   printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n",
              inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
-  return l2r;
+  return {l2r, inv_param.tol_hq};
+  ;
 }
 
-double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                                 QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                                 void *clover_inv)
+std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn,
+                                                void *spinorCheck, QudaGaugeParam &gauge_param,
+                                                QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
 {
   int vol
     = (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ? V : Vh);
@@ -411,7 +412,7 @@ double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *s
       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
   }
 
-  return l2r_max;
+  return {l2r_max, inv_param.tol_hq};
 }
 
 double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param,
@@ -743,10 +744,17 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
 }
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
-                                void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
-                                QudaInvertParam &inv_param, int shift)
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fatlink,
+                                quda::GaugeField &longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
+                                int shift)
 {
+  void *qdp_fatlink[] = {fatlink.data(0), fatlink.data(1), fatlink.data(2), fatlink.data(3)};
+  void *qdp_longlink[] = {longlink.data(0), longlink.data(1), longlink.data(2), longlink.data(3)};
+  void *ghost_fatlink[]
+    = {fatlink.Ghost()[0].data(), fatlink.Ghost()[1].data(), fatlink.Ghost()[2].data(), fatlink.Ghost()[3].data()};
+  void *ghost_longlink[]
+    = {longlink.Ghost()[0].data(), longlink.Ghost()[1].data(), longlink.Ghost()[2].data(), longlink.Ghost()[3].data()};
+
   switch (test_type) {
   case 0: // full parity solution, full parity system
   case 1: // full parity solution, solving EVEN EVEN prec system
@@ -762,10 +770,10 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
                     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
-      ax(0.5 / kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
+      xpay(out.data(), kappa, ref.data(), ref.Length(), gauge_param.cpu_prec);
+      ax(0.5 / kappa, ref.data(), ref.Length(), gauge_param.cpu_prec);
     } else {
-      axpy(2 * mass, out.V(), ref.V(), ref.Length(), gauge_param.cpu_prec);
+      axpy(2 * mass, out.data(), ref.data(), ref.Length(), gauge_param.cpu_prec);
     }
     break;
 
@@ -787,9 +795,9 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     len = Vh;
   }
 
-  mxpy(in.V(), ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(in.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  mxpy(in.data(), ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
   double l2r = sqrt(nrm2 / src2);
 

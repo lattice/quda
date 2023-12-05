@@ -24,7 +24,7 @@ namespace quda {
       Out(Out),
       In(In)
     {
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
       apply(device::get_default_stream());
     }
 

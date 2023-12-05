@@ -20,6 +20,7 @@ QudaMultigridParam mg_param;
 QudaInvertParam mg_inv_param;
 QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
+bool use_split_grid = false;
 
 // if --enable-testing true is passed, we run the tests defined in here
 #include <invert_test_gtest.hpp>
@@ -177,7 +178,7 @@ void init(int argc, char **argv)
   }
 }
 
-std::vector<double> solve(test_t param)
+std::vector<std::array<double, 2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
   inv_param.solution_type = ::testing::get<1>(param);
@@ -194,6 +195,8 @@ std::vector<double> solve(test_t param)
   inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
   inv_param.clover_cuda_prec_precondition = ::testing::get<2>(schwarz_param);
 
+  inv_param.residual_type = ::testing::get<7>(param);
+
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
 
@@ -204,7 +207,7 @@ std::vector<double> solve(test_t param)
   // params corresponds to split grid
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
+  use_split_grid = num_sub_partition > 1;
 
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
@@ -212,6 +215,8 @@ std::vector<double> solve(test_t param)
     if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
+
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.secs, mg_param.gflops / mg_param.secs);
   }
 
   // Vector construct START
@@ -229,26 +234,36 @@ std::vector<double> solve(test_t param)
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
-  // Quark masses
-  std::vector<double> masses(multishift);
+  // Shifts
+  std::vector<double> shifts(multishift);
 
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
   if (multishift > 1) {
     if (use_split_grid) { errorQuda("Split grid does not work with multishift yet."); }
     inv_param.num_offset = multishift;
+
+    // Consistency check for shifts, tols, tols_hq size if we're setting custom values
+    if (multishift_masses.size() != 0)
+      errorQuda("Multishift masses are not supported for Wilson-type fermions");
+    if (multishift_shifts.size() != 0 && multishift_shifts.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift shift count %d does not agree with number of shifts passed in %lu\n", multishift, multishift_shifts.size());
+    if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
+    if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
+
+    // Copy offsets and tolerances into inv_param; copy data pointers
     for (int i = 0; i < multishift; i++) {
-      // Set masses and offsets
-      masses[i] = 0.06 + i * i * 0.01;
-      inv_param.offset[i] = 4 * masses[i] * masses[i];
-      // Set tolerances for the heavy quarks, these can be set independently
-      // (functions of i) if desired
-      inv_param.tol_offset[i] = inv_param.tol;
-      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+      shifts[i] = (multishift_shifts.size() == 0 ? (i * i * 0.01) : multishift_shifts[i]);
+      inv_param.offset[i] = shifts[i];
+      inv_param.tol_offset[i] = (multishift_tols.size() == 0 ? inv_param.tol : multishift_tols[i]);
+      inv_param.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? inv_param.tol_hq : multishift_tols_hq[i]);
+
       // Allocate memory and set pointers
       for (int n = 0; n < Nsrc; n++) {
         out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
-        _hp_multi_x[n][i] = out_multishift[n * multishift + i].V();
+        _hp_multi_x[n][i] = out_multishift[n * multishift + i].data();
       }
     }
   }
@@ -273,9 +288,9 @@ std::vector<double> solve(test_t param)
       if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
       if (multishift > 1) {
-        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].V(), &inv_param);
+        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].data(), &inv_param);
       } else {
-        invertQuda(out[i].V(), in[i].V(), &inv_param);
+        invertQuda(out[i].data(), in[i].data(), &inv_param);
       }
 
       time[i] = inv_param.secs;
@@ -292,8 +307,8 @@ std::vector<double> solve(test_t param)
     std::vector<void *> _hp_x(Nsrc);
     std::vector<void *> _hp_b(Nsrc);
     for (int i = 0; i < Nsrc; i++) {
-      _hp_x[i] = out[i].V();
-      _hp_b[i] = in[i].V();
+      _hp_x[i] = out[i].data();
+      _hp_b[i] = in[i].data();
     }
     // Run split grid
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
@@ -322,11 +337,11 @@ std::vector<double> solve(test_t param)
   // Compute performance statistics
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
 
-  std::vector<double> res(Nsrc);
+  std::vector<std::array<double, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
-      res[i] = verifyInversion(out[i].V(), _hp_multi_x[i].data(), in[i].V(), check.V(), gauge_param, inv_param,
+      res[i] = verifyInversion(out[i].data(), _hp_multi_x[i].data(), in[i].data(), check.data(), gauge_param, inv_param,
                                gauge.data(), clover.data(), clover_inv.data());
     }
   }
@@ -409,7 +424,8 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
   } else {
     solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition} } );
+                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                  inv_param.residual_type});
   }
 
   // finalize the QUDA library

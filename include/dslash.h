@@ -52,20 +52,19 @@ namespace quda
     */
     inline void fillAuxBase(const std::string &app_base)
     {
+      strcpy(aux_base, TunableKernel3D::aux);
       char comm[5];
       comm[0] = (arg.commDim[0] ? '1' : '0');
       comm[1] = (arg.commDim[1] ? '1' : '0');
       comm[2] = (arg.commDim[2] ? '1' : '0');
       comm[3] = (arg.commDim[3] ? '1' : '0');
       comm[4] = '\0';
-      strcpy(aux_base, ",commDim=");
+      strcat(aux_base, ",commDim=");
       strcat(aux_base, comm);
-
       strcat(aux_base, app_base.c_str());
 
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
-      strcat(aux_base, arg.nParity == 2 ? ",parity=2" : ",parity=1");
     }
 
     /**
@@ -76,8 +75,8 @@ namespace quda
     inline void fillAux(KernelType kernel_type, const char *kernel_str)
     {
       strcpy(aux[kernel_type], kernel_str);
-      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
+      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
     }
 
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
@@ -336,20 +335,20 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString());
+      // strcpy(aux, in.AuxString().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
-      fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
-      fillAux(UBER_KERNEL, "policy_kernel=uber");
-      fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
-      fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x");
-      fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y");
-      fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z");
-      fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t");
+      fillAux(INTERIOR_KERNEL, "policy_kernel=interior,");
+      fillAux(UBER_KERNEL, "policy_kernel=uber,");
+      fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all,");
+      fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x,");
+      fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y,");
+      fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z,");
+      fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t,");
 #else
-      fillAux(INTERIOR_KERNEL, "policy_kernel=single-GPU");
+      fillAux(INTERIOR_KERNEL, "policy_kernel=single,");
 #endif // MULTI_GPU
-      fillAux(KERNEL_POLICY, "policy");
+      fillAux(KERNEL_POLICY, "policy,");
 
 #ifdef NVSHMEM_COMMS
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
@@ -434,7 +433,7 @@ namespace quda
       auto aux_ = (arg.pack_blocks > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) ?
         aux_pack :
         ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
     /**

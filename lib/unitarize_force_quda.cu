@@ -56,6 +56,7 @@ namespace quda {
     void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
 			int* fails)
     {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkReconstruct(u, oldForce, newForce);
       checkPrecision(u, oldForce, newForce);
 
@@ -63,6 +64,7 @@ namespace quda {
         errorQuda("Only native order supported");
 
       instantiate<ForceUnitarize, ReconstructNone>(newForce, oldForce, u, fails);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 #else
     void unitarizeForce(GaugeField &, const GaugeField &, const GaugeField &, int*)
@@ -99,7 +101,6 @@ namespace quda {
       if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
       int num_failures = 0;
       constexpr int nColor = 3;
-      Matrix<complex<double>, nColor> old_force, new_force, v;
       if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
         if (u.Precision() == QUDA_DOUBLE_PRECISION) {
           UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(

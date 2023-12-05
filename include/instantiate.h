@@ -309,21 +309,12 @@ namespace quda
   template <template <typename, int, int> class Apply, typename store_t, typename F, typename... Args>
   constexpr void instantiateSpinor(F &field, Args &&...args)
   {
+    if (!is_enabled_spin(field.Nspin())) errorQuda("nSpin=%d support has not been built", field.Nspin());
+
     if (field.Nspin() == 4) {
-      if constexpr (is_enabled_spin(4))
-        instantiateSpinor<Apply, store_t, 4>(field, args...);
-      else
-        errorQuda("nSpin=%d support has not been built", field.Nspin());
-    } else if (field.Nspin() == 2) {
-      if constexpr (is_enabled_spin(2))
-        instantiateSpinor<Apply, store_t, 2>(field, args...);
-      else
-        errorQuda("nSpin=%d support has not been built", field.Nspin());
+      if constexpr (is_enabled_spin(4)) instantiateSpinor<Apply, store_t, 4>(field, args...);
     } else if (field.Nspin() == 1) {
-      if constexpr (is_enabled_spin(1))
-        instantiateSpinor<Apply, store_t, 1>(field, args...);
-      else
-        errorQuda("nSpin=%d support has not been built", field.Nspin());
+      if constexpr (is_enabled_spin(1)) instantiateSpinor<Apply, store_t, 1>(field, args...);
     } else {
       errorQuda("Unsupported number of spins %d\n", field.Nspin());
     }
@@ -338,26 +329,17 @@ namespace quda
   template <template <typename, int, int> class Apply, typename F, typename... Args>
   constexpr void instantiateSpinor(F &field, Args &&...args)
   {
+    if (!is_enabled(field.Precision()))
+      errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, field.Precision());
+
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
-        instantiateSpinor<Apply, double>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION)) instantiateSpinor<Apply, double>(field, args...);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
-        instantiateSpinor<Apply, float>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) instantiateSpinor<Apply, float>(field, args...);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled(QUDA_HALF_PRECISION))
-        instantiateSpinor<Apply, short>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) instantiateSpinor<Apply, short>(field, args...);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-    if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
-        instantiateSpinor<Apply, int8_t>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiateSpinor<Apply, int8_t>(field, args...);
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
     }
@@ -377,24 +359,17 @@ namespace quda
   template <template <typename> class Apply, typename F, typename... Args>
   constexpr void instantiatePrecision(F &field, Args &&... args)
   {
+    if (!is_enabled(field.Precision()) && field.Precision() != QUDA_DOUBLE_PRECISION)
+      errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, field.Precision());
+
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      // always instantiate double precision
-      Apply<double>(field, args...);
+      Apply<double>(field, args...); // always instantiate double precision
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
-        Apply<float>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) Apply<float>(field, args...);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled(QUDA_HALF_PRECISION))
-        Apply<short>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) Apply<short>(field, args...);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
-        Apply<int8_t>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) Apply<int8_t>(field, args...);
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
     }
@@ -419,26 +394,99 @@ namespace quda
   template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
   constexpr void instantiatePrecision2(F &field, Args &&... args)
   {
+    if (!is_enabled(field.Precision()) && field.Precision() != QUDA_DOUBLE_PRECISION)
+      errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, field.Precision());
+
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      // always instantiate double precision
-      Apply<double, T>(field, args...);
+      Apply<double, T>(field, args...); // always instantiate double precision
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
-        Apply<float, T>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) Apply<float, T>(field, args...);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled(QUDA_HALF_PRECISION))
-        Apply<short, T>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) Apply<short, T>(field, args...);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
-        Apply<int8_t, T>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) Apply<int8_t, T>(field, args...);
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate combinations of reconstruct
+     and phase for pure-gauge routines using staggered phases
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, int nColor,
+            typename G, typename... Args>
+  constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
+  {
+    if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+        // actual phase type doesn't matter because the phase is baked into the links
+        Apply<store_t, nColor, QUDA_RECONSTRUCT_NO, QUDA_STAGGERED_PHASE_NO>(U, args...);
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_NO);
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_13) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+        if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO)
+          Apply<store_t, nColor, QUDA_RECONSTRUCT_13, QUDA_STAGGERED_PHASE_NO>(U, args...);
+        else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC)
+          Apply<store_t, nColor, QUDA_RECONSTRUCT_13, QUDA_STAGGERED_PHASE_MILC>(U, args...);
+        else
+          errorQuda("Unsupported staggered phase type %d\n", U.StaggeredPhase());
+      } else {
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_13);
+      }
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+        errorQuda("QUDA_RECONSTRUCT=%d has not been implemented for HISQ gauge routines yet.", QUDA_RECONSTRUCT_12);
+      } else {
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d\n", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_12);
+      }
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the colors for various combinations
+     of reconstructs and phases for pure-gauge routines using staggered phases
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, typename G,
+            typename... Args>
+  constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
+  {
+    if (U.Ncolor() == 3) {
+      instantiateGaugeStaggered<Apply, store_t, 3>(U, args...);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate various combinations
+     of reconstructs and phases for pure-gauge routines that need to be mindful of
+     staggered phases (HISQ force, fat/long)
+     @param[in] U Gauge field
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename G, typename... Args>
+  constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
+  {
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
+        instantiateGaugeStaggered<Apply, double>(U, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+        instantiateGaugeStaggered<Apply, float>(U, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
     }
   }
 

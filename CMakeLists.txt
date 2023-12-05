@@ -157,6 +157,8 @@ option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
+option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
+
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
@@ -194,9 +196,16 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
-option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
+set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
+set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
+set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
+
+set_property(CACHE QUDA_ORDER_FP PROPERTY STRINGS 4 8)
+set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
+set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
+option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
 # QUDA uses tiling routines to compute certain BLAS routines. The maximum allowable
 # tile size is governed by this number. The larger the number, the faster the routines
@@ -237,9 +246,11 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
+option(QUDA_MULTIGRID "build multigrid solvers" OFF)
+option(QUDA_MULTIGRID_DSLASH_PROMOTE "Whether to promote the internal precision when computing the coarse dslash" OFF)
+
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
-option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
 option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
@@ -253,7 +264,9 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_FLOAT8)
+mark_as_advanced(QUDA_ORDER_FP)
+mark_as_advanced(QUDA_ORDER_SP_MG)
+mark_as_advanced(QUDA_ORDER_FP_MG)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 
@@ -263,9 +276,8 @@ mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
+mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
-mark_as_advanced(QUDA_CTEST_LAUNCH)
-mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
@@ -300,6 +312,10 @@ if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()
 
+if(QUDA_SMEAR_GAUSS_TWOLINK AND NOT QUDA_DIRAC_STAGGERED)
+  message(SEND_ERROR "Specifying QUDA_SMEAR_GAUSS_TWOLINK requires QUDA_DIRAC_STAGGERED.")
+endif()
+
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
 # CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
 
@@ -321,7 +337,7 @@ set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
   "-O3 ${CXX_OPT}"
@@ -343,7 +359,7 @@ set(CMAKE_C_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
   "-O3"
@@ -401,15 +417,13 @@ if(QUDA_DOWNLOAD_EIGEN)
       CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
   mark_as_advanced(QUDA_EIGEN_VERSION)
   CPMAddPackage(
-    NAME
-    Eigen
-    VERSION
-    ${QUDA_EIGEN_VERSION}
-    URL
-    https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
-    DOWNLOAD_ONLY
-    YES)
+    NAME Eigen
+    VERSION ${QUDA_EIGEN_VERSION}
+    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
+    DOWNLOAD_ONLY YES
+    SYSTEM YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
+  install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)
@@ -433,26 +447,28 @@ endif()
 if(QUDA_MPI OR QUDA_QMP)
   # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line
   # check for MPICXX and MPICC environment variables
-  if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
-    set(MPI_CXX_COMPILER $ENV{MPICXX})
-    set(mpimessage True)
-    message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
-  endif()
-  if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
-    message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
-    set(MPI_C_COMPILER $ENV{MPICC})
-    set(mpimessage True)
-  endif()
-  # I think we don't use that at all but
-  if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
-    message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
-    set(MPI_Fortran_COMPILER $ENV{MPIFORT})
-    set(mpimessage True)
-  endif()
-  if(mpimessage)
-    message(
-      "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
-      )
+  if( NOT QUDA_SPACK_BUILD )
+    if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
+      set(MPI_CXX_COMPILER $ENV{MPICXX})
+      set(mpimessage True)
+      message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
+    endif()
+    if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
+      message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
+      set(MPI_C_COMPILER $ENV{MPICC})
+      set(mpimessage True)
+    endif()
+    # I think we don't use that at all but
+    if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
+      message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
+      set(MPI_Fortran_COMPILER $ENV{MPIFORT})
+      set(mpimessage True)
+    endif()
+    if(mpimessage)
+      message(
+        "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
+        )
+    endif()
   endif()
   find_package(MPI REQUIRED)
 endif()

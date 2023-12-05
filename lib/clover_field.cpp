@@ -15,9 +15,7 @@ namespace quda {
   CloverFieldParam::CloverFieldParam(const CloverField &a) :
     LatticeFieldParam(a),
     reconstruct(clover::reconstruct()),
-    inverse(a.V(true)),
-    clover(nullptr),
-    cloverInv(nullptr),
+    inverse(a.Inverse()),
     csw(a.Csw()),
     coeff(a.Coeff()),
     twist_flavor(a.TwistFlavor()),
@@ -36,21 +34,16 @@ namespace quda {
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param),
     reconstruct(param.reconstruct),
-    bytes(0),
     nColor(3),
     nSpin(4),
-    clover(nullptr),
-    cloverInv(nullptr),
-    diagonal(0.0),
-    max {0, 0},
+    inverse(param.inverse),
     csw(param.csw),
     coeff(param.coeff),
     twist_flavor(param.twist_flavor),
     mu2(param.mu2),
     rho(param.rho),
     order(param.order),
-    create(param.create),
-    trlog {0, 0}
+    create(param.create)
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", siteSubset);
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
@@ -79,53 +72,26 @@ namespace quda {
 
     if (bytes) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          clover = pool_device_malloc(bytes);
-        } else {
-          clover = safe_malloc(bytes);
-        }
-
+        clover = quda_ptr(mem_type, bytes);
       } else {
-        clover = param.clover;
+        clover = quda_ptr(param.clover, mem_type);
       }
 
       total_bytes += bytes;
 
-      if (param.inverse) {
+      if (inverse) {
         if (create != QUDA_REFERENCE_FIELD_CREATE) {
-          if (location == QUDA_CUDA_FIELD_LOCATION) {
-            cloverInv = pool_device_malloc(bytes);
-          } else {
-            cloverInv = safe_malloc(bytes);
-          }
+          cloverInv = quda_ptr(mem_type, bytes);
         } else {
-          cloverInv = param.cloverInv;
+          cloverInv = quda_ptr(param.cloverInv, mem_type);
         }
 
         total_bytes += bytes;
       }
 
       if (create == QUDA_ZERO_FIELD_CREATE) {
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          qudaMemset(clover, '\0', bytes);
-          if (param.inverse) qudaMemset(cloverInv, '\0', bytes);
-        } else {
-          memset(clover, '\0', bytes);
-          if (param.inverse) memset(cloverInv, '\0', bytes);
-        }
-      }
-    }
-  }
-
-  CloverField::~CloverField()
-  {
-    if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        if (clover) pool_device_free(clover);
-        if (cloverInv) pool_device_free(cloverInv);
-      } else {
-        if (clover) host_free(clover);
-        if (cloverInv) host_free(cloverInv);
+        qudaMemset(clover, '\0', bytes);
+        if (inverse) qudaMemset(cloverInv, '\0', bytes);
       }
     }
   }
@@ -141,38 +107,31 @@ namespace quda {
 
   void CloverField::backup(bool which) const
   {
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy(backup_h + which * bytes, V(which), bytes, qudaMemcpyDeviceToHost);
-    } else {
-      memcpy(backup_h + which * bytes, V(which), bytes);
-    }
+    qudaMemcpy(backup_h[which], which ? cloverInv : clover, bytes, qudaMemcpyDefault);
   }
 
   void CloverField::backup() const
   {
-    if (backup_h) errorQuda("Already allocated host backup");
-    backup_h = static_cast<char *>(safe_malloc(2 * bytes));
+    if (backup_h.size()) errorQuda("Already allocated host backup");
+    backup_h.resize(2);
+    for (auto &b : backup_h) b = quda_ptr(QUDA_MEMORY_HOST, bytes);
 
-    if (V(false)) backup(false);
-    if (V(true)) backup(true);
+    backup(false);
+    if (inverse) backup(true);
   }
 
   void CloverField::restore(bool which) const
   {
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy((void *)V(which), backup_h + which * bytes, bytes, qudaMemcpyHostToDevice);
-    } else {
-      memcpy((void *)V(which), backup_h + which * bytes, bytes);
-    }
+    qudaMemcpy(which ? cloverInv : clover, backup_h[which], bytes, qudaMemcpyDefault);
   }
 
   void CloverField::restore() const
   {
-    if (V(false)) restore(false);
-    if (V(true)) restore(true);
+    if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
+    restore(false);
+    if (inverse) restore(true);
 
-    host_free(backup_h);
-    backup_h = nullptr;
+    backup_h.resize(0);
   }
 
   CloverField *CloverField::Create(const CloverFieldParam &param) { return new CloverField(param); }
@@ -184,9 +143,15 @@ namespace quda {
 
   void CloverField::copy(const CloverField &src, bool is_inverse)
   {
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_H2D);
+    }
+
     // special case where we wish to make a copy of the inverse field when dynamic_inverse is enabled
     static bool dynamic_inverse_copy = false;
-    if (is_inverse && clover::dynamic_inverse() && V(true) && !src.V(true) && !dynamic_inverse_copy) {
+    if (is_inverse && clover::dynamic_inverse() && inverse && !src.inverse && !dynamic_inverse_copy) {
       dynamic_inverse_copy = true;
       // create a copy of the clover field that we will invert in place and use as the source
       CloverFieldParam param(src);
@@ -201,11 +166,11 @@ namespace quda {
     }
 
     checkField(src);
-    if (!V(is_inverse)) errorQuda("Destination field's is_inverse=%d component does not exist", is_inverse);
-    if (!src.V(is_inverse) && !dynamic_inverse_copy)
+    if (is_inverse && !inverse) errorQuda("Destination field's is_inverse=%d component does not exist", is_inverse);
+    if (is_inverse && !src.Inverse() && !dynamic_inverse_copy)
       errorQuda("Source field's is_inverse=%d component does not exist", is_inverse);
 
-    auto src_v = dynamic_inverse_copy ? src.V(false) : src.V(is_inverse);
+    auto src_v = dynamic_inverse_copy ? src.data(false) : src.data(is_inverse);
 
     // if we copying to a reconstruction field, we must find the overall scale factor to allow us to reconstruct
     if (Reconstruct()) {
@@ -227,7 +192,7 @@ namespace quda {
         void *packClover = pool_pinned_malloc(bytes);
 
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, packClover, src_v);
-        qudaMemcpy(V(is_inverse), packClover, bytes, qudaMemcpyHostToDevice);
+        qudaMemcpy(data(is_inverse), packClover, bytes, qudaMemcpyHostToDevice);
 
         pool_pinned_free(packClover);
       } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -252,13 +217,17 @@ namespace quda {
         void *packClover = pool_device_malloc(bytes);
 
         copyGenericClover(*this, src, is_inverse, QUDA_CUDA_FIELD_LOCATION, packClover, src_v);
-        qudaMemcpy(V(is_inverse), packClover, bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpy(data(is_inverse), packClover, bytes, qudaMemcpyDeviceToHost);
 
         pool_device_free(packClover);
       }
     }
 
-    qudaDeviceSynchronize();
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTOP(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTOP(QUDA_PROFILE_H2D);
+    }
   }
 
   void CloverField::copy(const CloverField &src)
@@ -270,26 +239,22 @@ namespace quda {
   void CloverField::copy_to_buffer(void *buffer) const
   {
     size_t buffer_offset = 0;
-    if (V(false)) { // direct
-      qudaMemcpy(buffer, clover, bytes, qudaMemcpyDefault);
-      buffer_offset += bytes;
-    }
+    qudaMemcpy(buffer, clover.data(), bytes, qudaMemcpyDefault);
+    buffer_offset += bytes;
 
-    if (V(true)) { // inverse
-      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, qudaMemcpyDefault);
+    if (inverse) { // inverse
+      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv.data(), bytes, qudaMemcpyDefault);
     }
   }
 
   void CloverField::copy_from_buffer(void *buffer)
   {
     size_t buffer_offset = 0;
-    if (V(false)) { // direct
-      qudaMemcpy(clover, static_cast<char *>(buffer), bytes, qudaMemcpyDefault);
-      buffer_offset += bytes;
-    }
+    qudaMemcpy(clover.data(), static_cast<char *>(buffer), bytes, qudaMemcpyDefault);
+    buffer_offset += bytes;
 
-    if (V(true)) { // inverse
-      qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, qudaMemcpyDefault);
+    if (inverse) { // inverse
+      qudaMemcpy(cloverInv.data(), static_cast<char *>(buffer) + buffer_offset, bytes, qudaMemcpyDefault);
     }
   }
 
@@ -303,12 +268,12 @@ namespace quda {
                              QudaParity parity) const
   {
     if (location == QUDA_CUDA_FIELD_LOCATION && is_prefetch_enabled()) {
-      auto clover_parity = clover;
-      auto cloverInv_parity = cloverInv;
       auto bytes_parity = parity == QUDA_INVALID_PARITY ? bytes : bytes / 2;
+      auto clover_parity = clover.data();
+      auto cloverInv_parity = inverse ? cloverInv.data() : nullptr;
       if (parity == QUDA_ODD_PARITY) {
-        clover_parity = clover ? static_cast<char *>(clover_parity) + bytes_parity : nullptr;
-        cloverInv_parity = cloverInv ? static_cast<char *>(cloverInv_parity) + bytes_parity : nullptr;
+        clover_parity = static_cast<char *>(clover_parity) + bytes_parity;
+        cloverInv_parity = inverse ? static_cast<char *>(cloverInv_parity) + bytes_parity : nullptr;
       }
 
       switch (type) {
@@ -350,8 +315,8 @@ namespace quda {
     return output;  // for multiple << operators.
   }
 
-  ColorSpinorParam colorSpinorParam(const CloverField &a, bool inverse) {
-
+  ColorSpinorParam colorSpinorParam(const CloverField &a, bool inverse)
+  {
     if (a.Precision() == QUDA_HALF_PRECISION)
       errorQuda("Casting a CloverField into ColorSpinorField not possible in half precision");
 
@@ -363,29 +328,26 @@ namespace quda {
     spinor_param.setPrecision(a.Precision());
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = a.Precision() == QUDA_DOUBLE_PRECISION ?
-      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.fieldOrder = colorspinor::getNative(a.Precision(), a.Nspin());
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
-    spinor_param.v = (void*)a.V(inverse);
+    spinor_param.v = a.data(inverse);
     spinor_param.location = a.Location();
     return spinor_param;
   }
 
   // Return the L2 norm squared of the clover field
-  double norm2(const CloverField &a, bool inverse) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
-    double nrm2 = blas::norm2(*b);
-    delete b;
-    return nrm2;
+  double norm2(const CloverField &a, bool inverse)
+  {
+    ColorSpinorField b(colorSpinorParam(a, inverse));
+    return blas::norm2(b);
   }
 
   // Return the L1 norm of the clover field
-  double norm1(const CloverField &a, bool inverse) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
-    double nrm1 = blas::norm1(*b);
-    delete b;
-    return nrm1;
+  double norm1(const CloverField &a, bool inverse)
+  {
+    ColorSpinorField b(colorSpinorParam(a, inverse));
+    return blas::norm1(b);
   }
 
 } // namespace quda

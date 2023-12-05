@@ -20,12 +20,7 @@
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
 #ifdef INTERFACE_NVTX
-
-#if QUDA_NVTX_VERSION == 3
 #include "nvtx3/nvToolsExt.h"
-#else
-#include "nvToolsExt.h"
-#endif
 
 static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
 static const int num_colors = sizeof(colors)/sizeof(uint32_t);
@@ -98,12 +93,15 @@ void qudaSetMPICommHandle(void *mycomm) { setMPICommHandleQuda(mycomm); }
 
 void qudaInit(QudaInitArgs_t input)
 {
+  // Calling qudamilc_called with QUDA_SUMMARIZE hand-baked in is intentional:
+  // if the default verbosity is QUDA_VERBOSE or greater, the printfQuda
+  // inside qudamilc_called will barf because qudaSetLayout hasn't been called yet.
   if (initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
-  qudamilc_called<true>(__func__);
+  qudamilc_called<true>(__func__, QUDA_SUMMARIZE);
   qudaSetLayout(input.layout);
   initialized = true;
-  qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__, QUDA_SUMMARIZE);
 }
 
 void qudaFinalize()
@@ -232,6 +230,40 @@ static  void invalidateGaugeQuda() {
   qudamilc_called<false>(__func__);
 }
 
+static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType &reconstruct_sloppy)
+{
+  static bool recon_queried = false;
+  static QudaReconstructType reconstruct_in = QUDA_RECONSTRUCT_INVALID;
+  static QudaReconstructType reconstruct_sloppy_in = QUDA_RECONSTRUCT_INVALID;
+  if (!recon_queried) {
+    char *reconstruct_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+    if (!reconstruct_env || strcmp(reconstruct_env, "18") == 0) {
+      reconstruct_in = QUDA_RECONSTRUCT_NO;
+    } else if (strcmp(reconstruct_env, "13") == 0) {
+      reconstruct_in = QUDA_RECONSTRUCT_13;
+    } else if (strcmp(reconstruct_env, "9") == 0) {
+      reconstruct_in = QUDA_RECONSTRUCT_9;
+    } else {
+      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT=%s not supported", reconstruct_env);
+    }
+    char *reconstruct_sloppy_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY");
+    if (!reconstruct_sloppy_env) { // if env is not set, default to using outer reconstruct type
+      reconstruct_sloppy_in = reconstruct_in;
+    } else if (strcmp(reconstruct_sloppy_env, "18") == 0) {
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_NO;
+    } else if (strcmp(reconstruct_sloppy_env, "13") == 0) {
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_13;
+    } else if (strcmp(reconstruct_sloppy_env, "9") == 0) {
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_9;
+    } else {
+      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY=%s not supported", reconstruct_sloppy_env);
+    }
+    recon_queried = true;
+  }
+  reconstruct = reconstruct_in;
+  reconstruct_sloppy = reconstruct_sloppy_in;
+}
+
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t, const double act_path_coeff[6], void *inlink, void *fatlink,
                     void *longlink)
 {
@@ -283,6 +315,9 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
 
   QudaGaugeParam gParam = newMILCGaugeParam(localDim, (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
 
+  // Use to specify the reconstruct for the HISQ force calculation
+  getReconstruct(gParam.reconstruct, gParam.reconstruct_sloppy);
+
   if (!invalidate_quda_mom) {
     gParam.use_resident_mom = true;
     gParam.make_resident_mom = true;
@@ -303,12 +338,12 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
   return;
 }
 
-void qudaAsqtadForce(int, const double[], const void *const[], const void *const[4], const void *const, void *const)
+void qudaAsqtadForce(int, const double[6], const void *const[4], const void *const[4], const void *const, void *const)
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
 
-void qudaComputeOprod(int, int, int, double **, double, void **, void *[])
+void qudaComputeOprod(int, int, int, double **, double, void **, void *[3])
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
@@ -909,37 +944,6 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
   }
 }
 
-static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType &reconstruct_sloppy)
-{
-  {
-    char *reconstruct_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-    if (!reconstruct_env || strcmp(reconstruct_env, "18") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_NO;
-    } else if (strcmp(reconstruct_env, "13") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_13;
-    } else if (strcmp(reconstruct_env, "9") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_9;
-    } else {
-      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT=%s not supported", reconstruct_env);
-    }
-  }
-
-  {
-    char *reconstruct_sloppy_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY");
-    if (!reconstruct_sloppy_env) { // if env is not set, default to using outer reconstruct type
-      reconstruct_sloppy = reconstruct;
-    } else if (strcmp(reconstruct_sloppy_env, "18") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    } else if (strcmp(reconstruct_sloppy_env, "13") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_13;
-    } else if (strcmp(reconstruct_sloppy_env, "9") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_9;
-    } else {
-      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY=%s not supported", reconstruct_sloppy_env);
-    }
-  }
-}
-
 static void setGaugeParams(QudaGaugeParam &fat_param, QudaGaugeParam &long_param, const void *const longlink,
                            const int dim[4], QudaPrecision cpu_prec, QudaPrecision cuda_prec,
                            QudaPrecision cuda_prec_sloppy, double tadpole, double naik_epsilon)
@@ -1439,7 +1443,8 @@ struct mgInputStruct {
   QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
   QudaTransferType
     optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
-  bool use_mma;              // accelerate setup using MMA routines
+  bool setup_use_mma[QUDA_MAX_MG_LEVEL];  // accelerate setup using MMA routines
+  bool dslash_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate dslash using MMA routines
   bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
   bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
@@ -1459,6 +1464,7 @@ struct mgInputStruct {
   int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];    // ignored on first and last level
   char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
   char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
+  bool mg_vec_partfile[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
   int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (values on first level are prescribed)
 
   /**
@@ -1491,6 +1497,7 @@ struct mgInputStruct {
   bool deflate_use_poly_acc;
   double deflate_a_min; // ignored if no polynomial acceleration
   int deflate_poly_deg; // ignored if no polynomial acceleration
+  bool deflate_vec_partfile;
 
   void setArrayDefaults()
   {
@@ -1506,7 +1513,11 @@ struct mgInputStruct {
       setup_ca_basis_size[i] = 4;
       mg_vec_infile[i][0] = 0;
       mg_vec_outfile[i][0] = 0;
+      mg_vec_partfile[i] = false;
       for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
+
+      setup_use_mma[i] = true;
+      dslash_use_mma[i] = true;
 
       coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
       coarse_solver[i] = QUDA_GCR_INVERTER;
@@ -1527,7 +1538,6 @@ struct mgInputStruct {
     verify_results(true),
     preconditioner_precision(QUDA_HALF_PRECISION),
     optimized_kd(QUDA_TRANSFER_OPTIMIZED_KD),
-    use_mma(true),
     allow_truncation(false),
     dagger_approximation(false),
     deflate_n_ev(66),
@@ -1536,7 +1546,8 @@ struct mgInputStruct {
     deflate_tol(1e-5),
     deflate_use_poly_acc(false),
     deflate_a_min(1e-2),
-    deflate_poly_deg(50)
+    deflate_poly_deg(50),
+    deflate_vec_partfile(false)
   {
     /* initialize internal arrays */
     setArrayDefaults();
@@ -1741,12 +1752,21 @@ struct mgInputStruct {
       } else {
         optimized_kd = getQudaTransferType(input_line[1].c_str());
       }
-
     } else if (strcmp(input_line[0].c_str(), "use_mma") == 0) {
       if (input_line.size() < 2) {
         error_code = 1;
       } else {
-        use_mma = input_line[1][0] == 't' ? true : false;
+        if (input_line[1][0] == 't') {
+          for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+            setup_use_mma[i] = true;
+            dslash_use_mma[i] = true;
+          }
+        } else {
+          for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+            setup_use_mma[i] = false;
+            dslash_use_mma[i] = false;
+          }
+        }
       }
     } else if (strcmp(input_line[0].c_str(), "allow_truncation") == 0) {
       if (input_line.size() < 2) {
@@ -1824,6 +1844,12 @@ struct mgInputStruct {
         strcpy(mg_vec_outfile[atoi(input_line[1].c_str())], input_line[2].c_str());
       }
 
+    } else if (strcmp(input_line[0].c_str(), "mg_vec_partfile") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        mg_vec_partfile[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
+      }
     } else /* Begin Solvers */
       if (strcmp(input_line[0].c_str(), "coarse_solve_type") == 0) {
       if (input_line.size() < 3) {
@@ -1931,6 +1957,12 @@ struct mgInputStruct {
         deflate_poly_deg = atoi(input_line[1].c_str());
       }
 
+    } else if (strcmp(input_line[0].c_str(), "deflate_vec_partfile") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_vec_partfile = input_line[1][0] == 't' ? true : false;
+      }
     } else {
       printf("Invalid option %s\n", input_line[0].c_str());
       return false;
@@ -1995,6 +2027,7 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE; // do not inflate coarse vectors
   mg_eig_param.save_prec = QUDA_SINGLE_PRECISION;      // cannot save in fixed point
+  mg_eig_param.partfile = QUDA_BOOLEAN_FALSE;          // ignored, multigrid parameters take precedence
 
   strcpy(mg_eig_param.QUDA_logfile, "" /*eig_QUDA_logfile*/);
 }
@@ -2096,8 +2129,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels; // set from file
 
-  mg_param.use_mma = input_struct.use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
   // whether or not we allow dropping a long link when an aggregation size is smaller than 3
   mg_param.allow_truncation = input_struct.allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -2114,6 +2145,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     } else {
       for (int j = 0; j < 4; j++) { mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j]; }
     }
+
+    mg_param.setup_use_mma[i] = input_struct.setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.dslash_use_mma[i] = input_struct.dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     if (i == mg_param.n_level - 1 && input_struct.nvec[i] > 0) {
@@ -2340,6 +2374,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     strcpy(mg_param.vec_outfile[i], input_struct.mg_vec_outfile[i]);
     if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
     if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    if (i != mg_param.n_level - 1)
+      mg_param.mg_vec_partfile[i] = input_struct.mg_vec_partfile[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    else
+      mg_param.mg_vec_partfile[i] = input_struct.deflate_vec_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
 
   mg_param.coarse_guess = QUDA_BOOLEAN_FALSE; // mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -2572,7 +2610,7 @@ void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 void qudaSaveGaugeField(void* gauge, void* inGauge)
 {
   qudamilc_called<true>(__func__);
-  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
+  auto cudaGauge = reinterpret_cast<GaugeField *>(inGauge);
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
   saveGaugeFieldQuda(gauge, inGauge, &qudaGaugeParam);
   qudamilc_called<false>(__func__);
@@ -2724,6 +2762,13 @@ void qudaFreeGaugeField() {
   freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
+
+void qudaFreeTwoLink()
+{
+  qudamilc_called<true>(__func__);
+  freeGaugeSmearedQuda();
+  qudamilc_called<false>(__func__);
+} // qudaFreeTwoLink
 
 void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
                          void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,
@@ -2999,14 +3044,8 @@ void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int v
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
-  double timeinfo[3];
   computeGaugeFixingOVRQuda(gauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
-                            stopWtheta, &qudaGaugeParam, timeinfo);
-
-  printfQuda("Time H2D: %lf\n", timeinfo[0]);
-  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
-  printfQuda("Time D2H: %lf\n", timeinfo[2]);
-  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+                            stopWtheta, &qudaGaugeParam);
 
   qudamilc_called<false>(__func__, verbosity);
 }
@@ -3028,13 +3067,70 @@ void qudaGaugeFixingFFT( int precision,
   qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
 
-
-  double timeinfo[3];
-  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
-
-  printfQuda("Time H2D: %lf\n", timeinfo[0]);
-  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
-  printfQuda("Time D2H: %lf\n", timeinfo[2]);
-  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta,
+                            &qudaGaugeParam);
 }
+
+void qudaTwoLinkGaussianSmear( int external_precision, int quda_precision, void * h_gauge, void * source, QudaTwoLinkQuarkSmearArgs_t qsmear_args )
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  QudaPrecision cpu_prec = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = cuda_prec;
+
+  // inverter setup ---------------------
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  double mass = 0.0;
+  QudaParity parity = QUDA_EVEN_PARITY; // need to fix
+
+  // dummies
+  double target_residual = 1e-14;
+  double target_residual_hq = 1e-14;
+  int maxiter = 1;
+  double reliable_delta = 0.1;
+  QudaInverterType inverter = QUDA_CG_INVERTER;
+  
+  setInvertParams( cpu_prec, cuda_prec, cuda_prec_sloppy, mass, target_residual, target_residual_hq, maxiter, reliable_delta, parity, verbosity, inverter, &invertParam );
+  
+  invertParam.laplace3D = qsmear_args.laplaceDim;
+  //---------------------------- inverter setup
+
+  // gauge setup ---------------------------
+  QudaGaugeParam gaugeParam = newQudaGaugeParam();
+
+  int * dim = localDim;
+  
+  // dummies
+  double tadpole = 0;
+  double naik_epsilon = 0;
+  
+  setGaugeParams( gaugeParam, gaugeParam, nullptr, dim, cpu_prec, cuda_prec, cuda_prec_sloppy, tadpole, naik_epsilon );
+
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO; // need to fix
+  gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+  
+  gaugeParam.ga_pad = getLinkPadding( dim );
+  gaugeParam.mom_ga_pad = 0;
+  //--------------------------- gauge setup
+
+  // Load gauge field
+  if( qsmear_args.compute_2link == 0 ) gaugeParam.use_resident_gauge = 1;
+  loadGaugeQuda( const_cast<void *>(h_gauge), &gaugeParam );
+  
+  // quark smearing parameters
+  QudaQuarkSmearParam qsmearParam;
+  qsmearParam.inv_param = &invertParam;
+  qsmearParam.n_steps = qsmear_args.n_steps;
+  qsmearParam.width = qsmear_args.width;
+  qsmearParam.compute_2link = qsmear_args.compute_2link;
+  qsmearParam.delete_2link = qsmear_args.delete_2link;
+  qsmearParam.t0 = qsmear_args.t0;
+  
+  // run gaussian smearing
+  performTwoLinkGaussianSmearNStep( source, &qsmearParam );
+
+  qudamilc_called<false>(__func__, verbosity);  
+} //qudaTwoLinkGaussianSmear

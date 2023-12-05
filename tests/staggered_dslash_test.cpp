@@ -2,52 +2,62 @@
 
 using namespace quda;
 
-StaggeredDslashTestWrapper dslash_test_wrapper;
+int argc_copy;
+char **argv_copy;
 
-static int dslashTest()
+class StaggeredDslashTest : public ::testing::Test
 {
-  // return code for google test
-  int test_rc = 0;
-  dslash_test_wrapper.init_test();
+protected:
+  StaggeredDslashTestWrapper dslash_test_wrapper;
+
+  void display_test_info()
+  {
+    printfQuda("running the following test:\n");
+    printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
+    printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec),
+               get_recon_str(link_recon), get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
+    printfQuda("Grid partition info:     X  Y  Z  T\n");
+    printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+               dimPartitioned(3));
+  }
+
+public:
+  virtual void SetUp()
+  {
+    dslash_test_wrapper.init_test(argc_copy, argv_copy);
+    display_test_info();
+  }
+
+  virtual void TearDown() { dslash_test_wrapper.end(); }
+
+  static void SetUpTestCase() { initQuda(device_ordinal); }
+
+  // Per-test-case tear-down.
+  // Called after the last test in this test case.
+  // Can be omitted if not needed.
+  static void TearDownTestCase()
+  {
+    StaggeredDslashTestWrapper::destroy();
+    endQuda();
+  }
+};
+
+TEST_F(StaggeredDslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }
+
+TEST_F(StaggeredDslashTest, verify)
+{
+  if (!verify_results) GTEST_SKIP();
 
   dslash_test_wrapper.staggeredDslashRef();
-  int attempts = 1;
-  for (int i = 0; i < attempts; i++) {
-    dslash_test_wrapper.run_test(niter, /**print_metrics =*/true);
-    if (verify_results) {
-      test_rc = RUN_ALL_TESTS();
-      if (test_rc != 0) warningQuda("Tests failed");
-    }
-  }
-  dslash_test_wrapper.end();
+  dslash_test_wrapper.run_test(2);
 
-  return test_rc;
-}
-
-TEST(dslash, verify)
-{
   double deviation = dslash_test_wrapper.verify();
-  double tol = getTolerance(prec);
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-}
-
-void display_test_info()
-{
-  printfQuda("running the following test:\n");
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-             get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
+  double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
+  ASSERT_LE(deviation, tol) << "reference and QUDA implementations do not agree";
 }
 
 int main(int argc, char **argv)
 {
-  // hack for loading gauge fields
-  dslash_test_wrapper.argc_copy = argc;
-  dslash_test_wrapper.argv_copy = argv;
-
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
 
@@ -55,6 +65,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   add_comms_option_group(app);
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -63,9 +74,13 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  updateR();
-
-  initQuda(device_ordinal);
+  // The 'SetUp()' method of the Google Test class from which DslashTest
+  // in derived has no arguments, but QUDA's implementation requires the
+  // use of argc and argv to set up the test via the function 'init'.
+  // As a workaround, we declare argc_copy and argv_copy as global pointers
+  // so that they are visible inside the 'init' function.
+  argc_copy = argc;
+  argv_copy = argv;
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
@@ -83,7 +98,7 @@ int main(int argc, char **argv)
   // and don't ask to build the fat/long links... it doesn't make sense.
   if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda(
-      "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
+      "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".");
   }
 
   // Set n_naiks to 2 if eps_naik != 0.0
@@ -103,25 +118,18 @@ int main(int argc, char **argv)
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator.\n",
-                get_string(dtest_type_map, dtest_type).c_str());
+      errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
     }
   }
 
   // If we're building fat/long links, there are some
   // tests we have to skip.
   if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec < QUDA_SINGLE_PRECISION /* half */) { errorQuda("Half precision unsupported in fat/long compute"); }
+    if (prec < QUDA_SINGLE_PRECISION) { errorQuda("Fixed-point precision unsupported in fat/long compute"); }
   }
 
-  display_test_info();
-
-  // return result of RUN_ALL_TESTS
-  int test_rc = dslashTest();
-
-  endQuda();
+  int test_rc = RUN_ALL_TESTS();
 
   finalizeComms();
-
   return test_rc;
 }

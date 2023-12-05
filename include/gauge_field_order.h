@@ -173,8 +173,12 @@ namespace quda {
       using store_type = storeFloat;
       complex<storeFloat> *v;
       const unsigned int idx;
+
+    private:
       const Float scale;
       const Float scale_inv;
+
+    public:
       static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
       /**
@@ -198,7 +202,9 @@ namespace quda {
       __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat> &a)
       {
         complex<Float> in = a;
-        v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : a.v[a.idx];
+        v[idx] = fixed ?
+          complex<storeFloat>(f2i_round<storeFloat>(scale * in.real()), f2i_round<storeFloat>(scale * in.imag())) :
+          a.v[a.idx];
       }
 
       /**
@@ -209,8 +215,9 @@ namespace quda {
       __device__ __host__ inline void operator=(const fieldorder_wrapper<theirFloat, theirStoreFloat> &a)
       {
         complex<theirFloat> in = a;
-        v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) :
-                         complex<storeFloat>(in.real(), in.imag());
+        v[idx] = fixed ?
+          complex<storeFloat>(f2i_round<storeFloat>(scale * in.real()), f2i_round<storeFloat>(scale * in.imag())) :
+          complex<storeFloat>(in.real(), in.imag());
       }
 
       /**
@@ -222,7 +229,8 @@ namespace quda {
         if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] = complex<storeFloat>(a.x, a.y);
         } else {
-          v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x), f2i_round<storeFloat>(scale * a.y)) :
+                           complex<storeFloat>(a.x, a.y);
         }
       }
 
@@ -242,6 +250,16 @@ namespace quda {
       __device__ __host__ inline auto data() const { return &v[idx]; }
 
       /**
+       * @brief returns the scale of this wrapper object
+       */
+      __device__ __host__ inline auto get_scale() const { return scale; }
+
+      /**
+       * @brief returns the scale_inv of this wrapper object
+       */
+      __device__ __host__ inline auto get_scale_inv() const { return scale_inv; }
+
+      /**
          @brief negation operator
          @return negation of this complex number
       */
@@ -259,7 +277,8 @@ namespace quda {
         if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] += complex<storeFloat>(a.x, a.y);
         } else {
-          v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          v[idx] += fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x), f2i_round<storeFloat>(scale * a.y)) :
+                            complex<storeFloat>(a.x, a.y);
         }
       }
 
@@ -272,7 +291,8 @@ namespace quda {
         if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] -= complex<storeFloat>(a.x, a.y);
         } else {
-          v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          v[idx] -= fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x), f2i_round<storeFloat>(scale * a.y)) :
+                            complex<storeFloat>(a.x, a.y);
         }
       }
       };
@@ -355,10 +375,9 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-	for (int d=0; d<U.Geometry(); d++)
-	  u[d] = gauge_ ? static_cast<complex<storeFloat>**>(gauge_)[d] :
-	    static_cast<complex<storeFloat>**>(const_cast<void*>(U.Gauge_p()))[d];
-	resetScale(U.Scale());
+        for (int d = 0; d < U.Geometry(); d++)
+          u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max)
@@ -382,8 +401,8 @@ namespace quda {
         vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
-          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
+          vec2 {f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
+          vec2 {static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
@@ -417,27 +436,30 @@ namespace quda {
     template <typename Float, int nColor, bool native_ghost, typename storeFloat>
     struct GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
-      complex<storeFloat> *ghost[8];
-      unsigned int ghostOffset[8];
-      Float scale;
-      Float scale_inv;
+      complex<storeFloat> *ghost[8] = {};
+      unsigned int ghostOffset[8] = {};
+      Float scale = static_cast<Float>(1.0);
+      Float scale_inv = static_cast<Float>(1.0);
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr) :
-        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
       {
         for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
-	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat> *>(ghost_[d]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+                              static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d].data())) :
+                              nullptr;
+          ghostOffset[d] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
 
-	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
-	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-	}
+          ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+                     static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4].data())) :
+                     nullptr;
+          ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
+        }
 
-	resetScale(U.Scale());
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max)
@@ -466,8 +488,7 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
       Accessor(const GaugeField &U, void *gauge_ = nullptr, void ** = nullptr) :
-        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) :
-                   static_cast<complex<storeFloat> *>(const_cast<void *>(U.Gauge_p()))),
+        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) : U.data<complex<storeFloat> *>()),
         volumeCB(U.VolumeCB()),
         geometry(U.Geometry()),
         scale(static_cast<Float>(1.0)),
@@ -501,8 +522,8 @@ namespace quda {
         vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
-          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
+          vec2 {f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
+          vec2 {static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
@@ -539,27 +560,30 @@ namespace quda {
     template <typename Float, int nColor, bool native_ghost, typename storeFloat>
     struct GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
-      complex<storeFloat> *ghost[8];
-      unsigned int ghostOffset[8];
-      Float scale;
-      Float scale_inv;
+      complex<storeFloat> *ghost[8] = {};
+      unsigned int ghostOffset[8] = {};
+      Float scale = static_cast<Float>(1.0);
+      Float scale_inv = static_cast<Float>(1.0);
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr) :
-        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
       {
         for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
-	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat> *>(ghost_[d]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+                              static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d].data())) :
+                              nullptr;
+          ghostOffset[d] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
 
-	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
-	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-	}
+          ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+                     static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4].data())) :
+                     nullptr;
+          ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
+        }
 
-	resetScale(U.Scale());
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max)
@@ -604,8 +628,7 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
       Accessor(const GaugeField &U, void *gauge_ = nullptr, void ** = nullptr) :
-        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) :
-                   static_cast<complex<storeFloat> *>(const_cast<void *>(U.Gauge_p()))),
+        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) : U.data<complex<storeFloat> *>()),
         offset_cb((U.Bytes() >> 1) / sizeof(complex<storeFloat>)),
         volumeCB(U.VolumeCB()),
         stride(U.Stride()),
@@ -638,8 +661,8 @@ namespace quda {
         vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
-          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
+          vec2 {f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
+          vec2 {static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
@@ -671,26 +694,26 @@ namespace quda {
     template <typename Float, int nColor, bool native_ghost, typename storeFloat>
     struct GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
-      complex<storeFloat> *ghost[8];
-      const int volumeCB;
-      unsigned int ghostVolumeCB[8];
-      Float scale;
-      Float scale_inv;
+      complex<storeFloat> *ghost[8] = {};
+      const unsigned int volumeCB;
+      unsigned int ghostVolumeCB[8] = {};
+      Float scale = static_cast<Float>(1.0);
+      Float scale_inv = static_cast<Float>(1.0);
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
       GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_ = 0) :
         volumeCB(U.VolumeCB()),
-        scale(static_cast<Float>(1.0)),
-        scale_inv(static_cast<Float>(1.0)),
         accessor(U, gauge_, ghost_)
       {
         if constexpr (!native_ghost) assert(ghost_ != nullptr);
         for (int d = 0; d < 4; d++) {
           ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
-	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
-	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
-	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
+          ghostVolumeCB[d] = U.Nface() * U.SurfaceCB(d);
+          ghost[d + 4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY ?
+            static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
+            nullptr;
+          ghostVolumeCB[d + 4] = U.Nface() * U.SurfaceCB(d);
         }
         resetScale(U.Scale());
       }
@@ -735,7 +758,7 @@ namespace quda {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
 
       /** An internal reference to the actual field we are accessing */
-      const int volumeCB;
+      const unsigned int volumeCB;
       const int nDim;
       const int_fastdiv geometry;
       const QudaFieldLocation location;
@@ -854,13 +877,13 @@ namespace quda {
 	__device__ __host__ inline int Ncolor() const { return nColor; }
 
 	/** Returns the field volume */
-	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
+        __device__ __host__ inline auto Volume() const { return 2 * volumeCB; }
 
-	/** Returns the field volume */
-	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+        /** Returns the field volume */
+        __device__ __host__ inline auto VolumeCB() const { return volumeCB; }
 
-	/** Returns the field geometric dimension */
-	__device__ __host__ inline int Ndim() const { return nDim; }
+        /** Returns the field geometric dimension */
+        __device__ __host__ inline int Ndim() const { return nDim; }
 
 	/** Returns the field geometry */
 	__device__ __host__ inline int Geometry() const { return geometry; }
@@ -1172,7 +1195,10 @@ namespace quda {
         const real scale;
         const real scale_inv;
 
-        Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
+        Reconstruct(const GaugeField &u) :
+          reconstruct_12(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+        {
+        }
 
         __device__ __host__ inline void Pack(real out[12], const complex in[9]) const { reconstruct_12.Pack(out, in); }
 
@@ -1393,7 +1419,10 @@ namespace quda {
         const real scale;
         const real scale_inv;
 
-        Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()), scale_inv(1.0 / scale) {}
+        Reconstruct(const GaugeField &u) :
+          reconstruct_8(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+        {
+        }
 
         __device__ __host__ inline real getPhase(const complex in[9]) const
         {
@@ -1475,7 +1504,7 @@ namespace quda {
       {
         switch (phase) {
         case QUDA_STAGGERED_PHASE_MILC:
-        case QUDA_STAGGERED_PHASE_CPS:
+        case QUDA_STAGGERED_PHASE_CHROMA:
         case QUDA_STAGGERED_PHASE_TIFR: return true;
         default: return false;
         }
@@ -1504,7 +1533,7 @@ namespace quda {
         int coords[QUDA_MAX_DIM];
         int_fastdiv X[QUDA_MAX_DIM];
         int R[QUDA_MAX_DIM];
-        const int volumeCB;
+        const unsigned int volumeCB;
         int faceVolumeCB[4];
         const int stride;
         const int geometry;
@@ -1513,7 +1542,7 @@ namespace quda {
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
-          gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+          gauge(gauge_ ? gauge_ : u.data<Float *>()),
           offset(u.Bytes() / (2 * sizeof(Float) * N)),
           ghostExchange(u.GhostExchange()),
           volumeCB(u.VolumeCB()),
@@ -1741,7 +1770,7 @@ namespace quda {
 
       /**
          @brief The LegacyOrder defines the ghost zone storage and ordering for
-         all cpuGaugeFields, which use the same ghost zone storage.
+         all non-native fields, which use the same ghost zone storage.
       */
       template <typename Float, int length_> struct LegacyOrder {
         static constexpr int length = length_;
@@ -1749,9 +1778,9 @@ namespace quda {
         using store_t = Float;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        Float *ghost[QUDA_MAX_DIM];
-        int faceVolumeCB[QUDA_MAX_DIM];
-        const int volumeCB;
+        Float *ghost[QUDA_MAX_DIM] = {};
+        int faceVolumeCB[QUDA_MAX_DIM] = {};
+        const unsigned int volumeCB;
         const int stride;
         const int geometry;
         const int hasPhase;
@@ -1766,7 +1795,9 @@ namespace quda {
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
           for (int i = 0; i < 4; i++) {
-            ghost[i] = (ghost_) ? ghost_[i] : (Float *)(u.Ghost()[i]);
+            ghost[i] = (ghost_)                            ? ghost_[i] :
+              u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ? (Float *)(u.Ghost()[i].data()) :
+                                                             nullptr;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
         }
@@ -1823,10 +1854,12 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
-      const int volumeCB;
-    QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
-      : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
-	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
+      const unsigned int volumeCB;
+      QDPOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
+      {
+        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+      }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
@@ -1867,10 +1900,12 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
-      const int volumeCB;
-    QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
-      : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
-	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
+      const unsigned int volumeCB;
+      QDPJITOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
+      {
+        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+      }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
@@ -1915,16 +1950,21 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
-    const int volumeCB;
+    const unsigned int volumeCB;
     const int geometry;
-  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) :
-    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-      volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
+    MILCOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+      LegacyOrder<Float, length>(u, ghost_),
+      gauge(gauge_ ? gauge_ : u.data<Float *>()),
+      volumeCB(u.VolumeCB()),
+      geometry(u.Geometry())
+    {
+      ;
+    }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-  {
-    auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-    block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
+    {
+      auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
@@ -1971,13 +2011,13 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
-    const int volumeCB;
+    const unsigned int volumeCB;
     const int geometry;
     const size_t offset;
     const size_t size;
     MILCSiteOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
       LegacyOrder<Float, length>(u, ghost_),
-      gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+      gauge(gauge_ ? gauge_ : u.data<Float *>()),
       volumeCB(u.VolumeCB()),
       geometry(u.Geometry()),
       offset(u.SiteOffset()),
@@ -2030,14 +2070,14 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
-    const int volumeCB;
+    const unsigned int volumeCB;
     const real anisotropy;
     const real anisotropy_inv;
     static constexpr int Nc = 3;
     const int geometry;
     CPSOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
       LegacyOrder<Float, length>(u, ghost_),
-      gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+      gauge(gauge_ ? gauge_ : u.data<Float *>()),
       volumeCB(u.VolumeCB()),
       anisotropy(u.Anisotropy()),
       anisotropy_inv(1.0 / anisotropy),
@@ -2099,13 +2139,11 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
-      const int volumeCB;
-      int exVolumeCB; // extended checkerboard volume
+      const unsigned int volumeCB;
+      unsigned int exVolumeCB; // extended checkerboard volume
       static constexpr int Nc = 3;
       BQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
-        LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
-        volumeCB(u.VolumeCB())
+        LegacyOrder<Float, length>(u, ghost_), gauge(gauge_ ? gauge_ : u.data<Float *>()), volumeCB(u.VolumeCB())
       {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
@@ -2163,13 +2201,13 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
-      const int volumeCB;
+      const unsigned int volumeCB;
       static constexpr int Nc = 3;
       const real scale;
       const real scale_inv;
       TIFROrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
         scale(u.Scale()),
         scale_inv(1.0 / scale)
@@ -2227,7 +2265,7 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
-      const int volumeCB;
+      const unsigned int volumeCB;
       int exVolumeCB;
       static constexpr int Nc = 3;
       const real scale;
@@ -2236,7 +2274,7 @@ namespace quda {
       const int exDim[4];
       TIFRPaddedOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
         exVolumeCB(1),
         scale(u.Scale()),
@@ -2378,12 +2416,6 @@ namespace quda {
     typedef gauge::FloatNOrder<float, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
-#ifdef FLOAT8
-#define FLOATN 8
-#else
-#define FLOATN 4
-#endif
-
   // half precision
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -2403,11 +2435,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, QUDA_ORDER_FP, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, QUDA_ORDER_FP, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -2429,14 +2461,12 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, QUDA_ORDER_FP, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, QUDA_ORDER_FP, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
-
-#undef FLOATN
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
             QudaGhostExchange ghostExchange, bool use_inphase>

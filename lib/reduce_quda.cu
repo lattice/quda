@@ -20,7 +20,7 @@ namespace quda {
       ColorSpinorField &x, &y, &z, &w, &v;
       host_reduce_t &result;
 
-      bool advanceSharedBytes(TuneParam &param) const
+      bool advanceSharedBytes(TuneParam &param) const override
       {
         TuneParam next(param);
         advanceBlockDim(next); // to get next blockDim
@@ -58,18 +58,15 @@ namespace quda {
 
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y.AuxString());
+          strcat(aux, y.AuxString().c_str());
         }
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(r).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(vol, typeid(r).name(), aux); }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value || decltype(r)::site_unroll;
         if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
@@ -115,7 +112,7 @@ namespace quda {
         }
       }
 
-      void preTune()
+      void preTune() override
       {
         if (r.write.X) x.backup();
         if (r.write.Y) y.backup();
@@ -124,7 +121,7 @@ namespace quda {
         if (r.write.V) v.backup();
       }
 
-      void postTune()
+      void postTune() override
       {
         if (r.write.X) x.restore();
         if (r.write.Y) y.restore();
@@ -133,9 +130,9 @@ namespace quda {
         if (r.write.V) v.restore();
       }
 
-      long long flops() const { return r.flops() * x.Length(); }
+      long long flops() const override { return r.flops() * x.Length(); }
 
-      long long bytes() const
+      long long bytes() const override
       {
         return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() +
           (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
@@ -156,9 +153,11 @@ namespace quda {
       return instantiateReduce<Max, false>(0.0, 0.0, 0.0, x, x, x, x, x);
     }
 
-    double max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
+    array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      return instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
+      auto deviation = instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
+      // ensure that if the absolute deviation is zero, so is the relative deviation
+      return {deviation.diff, deviation.diff > 0.0 ? deviation.diff / deviation.ref : 0.0};
     }
 
     double norm1(const ColorSpinorField &x)

@@ -7,9 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    unsigned long long flops;
-    unsigned long long bytes;
-
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename coeff_t>
     class Blas : public TunableGridStrideKernel2D
@@ -21,9 +18,9 @@ namespace quda {
       const coeff_t &a, &b, &c;
       ColorSpinorField &x, &y, &z, &w, &v;
 
-      bool tuneSharedBytes() const { return false; }
+      bool tuneSharedBytes() const override { return false; }
       // for these streaming kernels, there is no need to tune the grid size, just use max
-      unsigned int minGridSize() const { return maxGridSize(); }
+      unsigned int minGridSize() const override { return maxGridSize(); }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>
@@ -52,18 +49,15 @@ namespace quda {
 
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y.AuxString());
+          strcat(aux, y.AuxString().c_str());
         }
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(f).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(vol, typeid(f).name(), aux); }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
         if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
@@ -109,7 +103,7 @@ namespace quda {
         }
       }
 
-      void preTune()
+      void preTune() override
       {
         if (f.write.X) x.backup();
         if (f.write.Y) y.backup();
@@ -118,7 +112,7 @@ namespace quda {
         if (f.write.V) v.backup();
       }
 
-      void postTune()
+      void postTune() override
       {
         if (f.write.X) x.restore();
         if (f.write.Y) y.restore();
@@ -127,13 +121,13 @@ namespace quda {
         if (f.write.V) v.restore();
       }
 
-      bool advanceTuneParam(TuneParam &param) const
+      bool advanceTuneParam(TuneParam &param) const override
       {
         return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
       }
 
-      long long flops() const { return f.flops() * x.Length(); }
-      long long bytes() const
+      long long flops() const override { return f.flops() * x.Length(); }
+      long long bytes() const override
       {
         return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +
           (f.read.Z + f.write.Z) * z.Bytes() + (f.read.W + f.write.W) * w.Bytes() + (f.read.V + f.write.V) * v.Bytes();

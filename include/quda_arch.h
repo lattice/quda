@@ -4,8 +4,9 @@
 #if defined(QUDA_TARGET_CUDA)
 #include <cuda.h>
 #include <cuda_runtime.h>
-#if __COMPUTE_CAPABILITY__ >= 700
-#define QUDA_MMA_AVAILABLE 1
+
+#if (__COMPUTE_CAPABILITY__ >= 700) && defined(QUDA_ENABLE_MMA)
+#define QUDA_MMA_AVAILABLE
 #endif
 
 #elif defined(QUDA_TARGET_HIP)
@@ -13,5 +14,8 @@
 
 #elif defined(QUDA_TARGET_SYCL)
 #include <targets/sycl/quda_sycl.h>
+#endif
 
+#ifdef QUDA_OPENMP
+#include <omp.h>
 #endif
