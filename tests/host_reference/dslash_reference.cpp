@@ -752,7 +752,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
 
-    // exact reason for this tbd, this isn't needed in the dslash test...
+    // correct for the massRescale function inside invertQuda
     if (dslash_type == QUDA_LAPLACE_DSLASH)
       ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
   } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {

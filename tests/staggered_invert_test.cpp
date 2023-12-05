@@ -172,7 +172,6 @@ void init()
   }
 
   setDims(gauge_param.X);
-  // Hack: use the domain wall dimensions so we may use the 5th dim for multi indexing
   dw_setDims(gauge_param.X, 1);
 
   // Staggered Gauge construct START
@@ -185,9 +184,9 @@ void init()
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
   GaugeFieldParam cpuParam(gauge_param);
-  cpuParam.create = QUDA_NULL_FIELD_CREATE;
-  cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
+  cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuParam.create = QUDA_NULL_FIELD_CREATE;
   GaugeField cpuIn = GaugeField(cpuParam);
   cpuFatQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
@@ -221,6 +220,8 @@ void init()
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
+
+  freeGaugeQuda();
 
   loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
 
