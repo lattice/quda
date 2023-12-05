@@ -113,9 +113,9 @@ typedef struct {
                         data[5+lex(ix,iy,iz,it)] returns rank number in
                         openQCD, where lex stands for lexicographical
                         indexing (in QUDA order (xyzt)) */
-  bc_parms_t bc_parms;       /** @see bc_parms() */
-  dirac_parms_t dirac_parms; /** @see dirac_parms() */
-  flds_parms_t flds_parms;   /** @see flds_parms() */
+  bc_parms_t (*bc_parms)(void); /** @see bc_parms() */
+  flds_parms_t (*flds_parms)(void); /** @see flds_parms() */
+  dirac_parms_t (*dirac_parms)(void); /** @see dirac_parms() */
   void* (*h_gauge)(void);    /** function to return a pointer to the gauge fields */
   void* (*h_sw)(void);       /** function to return a pointer to the clover fields */
 } openQCD_QudaLayout_t;
@@ -126,7 +126,6 @@ typedef struct {
  */
 typedef struct {
   QudaVerbosity verbosity;      /** How verbose QUDA should be (QUDA_SILENT, QUDA_VERBOSE or QUDA_SUMMARIZE) */
-  openQCD_QudaLayout_t layout;  /** Layout for QUDA to use */
   FILE *logfile;                /** log file handler */
   void *gauge;                  /** base pointer to the gauge fields */
   int volume;                   /** VOLUME */
@@ -158,9 +157,10 @@ typedef struct {
  * Initialize the QUDA context.
  *
  * @param[in]  init    Meta data for the QUDA context
- * @param[in]  layout  The layout struct
+ * @param[in]  layout  Layout struct
+ * @param      infile  Input file
  */
-void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout);
+void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, char *infile);
 
 
 /**
@@ -176,6 +176,31 @@ void openQCD_qudaFinalize(void);
  * @param[out]  h_out Spinor output field
  */
 void openQCD_back_and_forth(void *h_in, void *h_out);
+
+
+/**
+ * @brief      Wrapper around openqcd::ipt
+ *
+ * @param[in]  x     Euclidean corrdinate in txyz convention
+ *
+ * @return     ipt[x]
+ *
+ * @see        openqcd::ipt()
+ */
+int openQCD_qudaIndexIpt(const int *x);
+
+
+/**
+ * @brief      Wrapper around openqcd::iup
+ *
+ * @param[in]  x     Euclidean corrdinate in txyz convention
+ * @param[in]  mu    Direction
+ *
+ * @return     iup[x][mu]
+ *
+ * @see        openqcd::iup()
+ */
+int openQCD_qudaIndexIup(const int *x, const int mu);
 
 
 /**

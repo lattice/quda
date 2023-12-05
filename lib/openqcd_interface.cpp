@@ -15,6 +15,7 @@
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
+#include <index_helper.cuh>
 #include <mpi.h>
 
 
@@ -416,9 +417,10 @@ static int rankFromCoords(const int *coords, void *fdata)
 /**
  * Set set the local dimensions and machine topology for QUDA to use
  *
- * @param layout Struct defining local dimensions and machine topology
+ * @param      layout  Struct defining local dimensions and machine topology
+ * @param      infile  Input file
  */
-void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
+void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
 {
   int my_rank;
   char prefix[20];
@@ -446,6 +448,14 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   sprintf(prefix, "QUDA (rank=%d): ", my_rank);
 
+  if (my_rank == 0 && infile != nullptr) {
+    KeyValueStore kv;
+    kv.set_map(&enum_map);
+    kv.load(infile);
+    qudaState.init.verbosity = kv.get<QudaVerbosity>("QUDA", "verbosity", qudaState.init.verbosity);
+  }
+
+  MPI_Bcast((void*) &qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, MPI_COMM_WORLD);
   setVerbosityQuda(qudaState.init.verbosity, prefix, qudaState.init.logfile);
   initQuda(device);
 }
@@ -525,14 +535,14 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
 }
 
 
-void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout)
+void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, char *infile)
 {
   if (qudaState.initialized) return;
   qudaState.init = init;
   qudaState.layout = layout;
 
   qudaopenqcd_called<true>(__func__);
-  openQCD_qudaSetLayout(qudaState.layout);
+  openQCD_qudaSetLayout(qudaState.layout, infile);
   qudaopenqcd_called<false>(__func__);
   qudaState.initialized = true;
 }
@@ -695,6 +705,23 @@ void openQCD_back_and_forth(void *h_in, void *h_out)
 
   /* transfer the GPU field back to CPU */
   out_h = out;
+}
+
+
+int openQCD_qudaIndexIpt(const int *x)
+{
+  int L_openqcd[4];
+  openqcd::rotate_coords(qudaState.layout.L, L_openqcd);
+  return openqcd::ipt(x, L_openqcd);
+}
+
+
+int openQCD_qudaIndexIup(const int *x, const int mu)
+{
+  int L_openqcd[4], nproc_openqcd[4];
+  openqcd::rotate_coords(qudaState.layout.L, L_openqcd);
+  openqcd::rotate_coords(qudaState.layout.nproc, nproc_openqcd);
+  return openqcd::iup(x, mu, L_openqcd, nproc_openqcd);
 }
 
 
@@ -886,7 +913,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   param->dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
   param->gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   param->dslash_type = QUDA_WILSON_DSLASH;
-  param->kappa = 1.0/(2.0*(qudaState.layout.dirac_parms.m0+4.0));
+  param->kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
   param->mu = 0.0;
   param->dagger = QUDA_DAG_NO;
   param->solution_type = QUDA_MAT_SOLUTION;
@@ -896,18 +923,18 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   param->inv_type_precondition = QUDA_INVALID_INVERTER; /* disables any preconditioning   */
   param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  if (qudaState.layout.dirac_parms.su3csw != 0.0) {
+  if (qudaState.layout.dirac_parms().su3csw != 0.0) {
     param->clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
     param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
 
-    param->clover_csw = qudaState.layout.dirac_parms.su3csw;
+    param->clover_csw = qudaState.layout.dirac_parms().su3csw;
     param->clover_coeff = 0.0;
 
     /* Set to Wilson Dirac operator with Clover term */
     param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 
-    if (qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
+    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
       param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
       param->compute_clover = true;
     } else {
@@ -1164,8 +1191,8 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     POP_RANGE;
   }
 
-  if (qudaState.layout.dirac_parms.su3csw != 0.0) {
-    if (qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
+  if (qudaState.layout.dirac_parms().su3csw != 0.0) {
+    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
       /**
        * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
        * the GPU and finally calls @createCloverQuda to calculate the clover
