@@ -355,8 +355,6 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // QUDA invert test
   //----------------------------------------------------------------------------
 
-  std::vector<std::array<double, 2>> res(Nsrc);
-
   if (!use_split_grid) {
 
     for (int n = 0; n < Nsrc; n++) {
@@ -374,24 +372,6 @@ std::vector<std::array<double, 2>> solve(test_t param)
       iter[n] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                   inv_param.gflops / inv_param.secs);
-
-      if (verify_results) {
-        if (multishift > 1) {
-          for (int i = 0; i < multishift; i++) {
-            printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-            auto resid = verifyStaggeredInversion(tmp, ref, in[n], out_multishift[n * multishift + i], masses[i], cpuFatQDP, cpuLongQDP, inv_param, i);
-
-            // take the HQ residual from the lightest mass
-            if (i == 0) {
-              res[n] = resid;
-            } else {
-                if (resid[0] > res[n][0]) res[n][0] = resid[0];
-            }
-          }
-        } else {
-          res[n] = verifyStaggeredInversion(tmp, ref, in[n], out[n], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
-        }
-      }
     }
   } else {
     inv_param.num_src = Nsrc;
@@ -414,11 +394,6 @@ std::vector<std::array<double, 2>> solve(test_t param)
     quda::comm_allreduce_max(inv_param.secs);
     printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
                 inv_param.secs, inv_param.gflops / inv_param.secs);
-
-    for (int n = 0; n < Nsrc; n++) {
-      if (verify_results)
-        res[n] = verifyStaggeredInversion(tmp, ref, in[n], out[n], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
-    }
   }
 
   // Free the multigrid solver
@@ -426,6 +401,21 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
   // Compute timings
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
+
+  std::vector<std::array<double, 2>> res(Nsrc);
+  // Perform host side verification of inversion if requested
+  if (verify_results) {
+    for (int n = 0; n < Nsrc; n++) {
+      if (multishift > 1) {
+        printfQuda("\nSource %d:\n", n);
+        // Create an appropriate subset of the full out_multishift vector
+        std::vector<quda::ColorSpinorField> out_subset = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
+        res[n] = verifyStaggeredInversion(tmp, ref, in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
+      } else {
+        res[n] = verifyStaggeredInversion(tmp, ref, in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param);
+      }
+    }
+  }
 
   return res;
 }

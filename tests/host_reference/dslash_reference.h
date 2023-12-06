@@ -110,8 +110,12 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
                                                 QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                QudaInvertParam &inv_param, int shift);
+                                quda::ColorSpinorField &out, quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                QudaInvertParam &inv_param);
+
+std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
+                                std::vector<quda::ColorSpinorField> &out_vector, quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                QudaInvertParam &inv_param);
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
