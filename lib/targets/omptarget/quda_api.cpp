@@ -68,9 +68,21 @@ namespace quda
       ompMemset(void *p, unsigned char b, std::size_t s)
       {
         constexpr int max_threads = device::max_block_size();
-        unsigned char *c = reinterpret_cast<unsigned char *>(p);
-      #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c)
-        for(std::size_t i=0;i<s;++i) c[i] = b;
+        constexpr size_t nb = sizeof(float);
+        if(s%nb==0){
+          float *c = reinterpret_cast<float *>(p);
+          float f;
+          unsigned char bs[nb];
+          for(std::size_t i=0; i<nb; ++i) bs[i] = b;
+          memcpy(&f, bs, nb);
+          const std::size_t sb = s/nb;
+          #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c)
+          for(std::size_t i=0;i<sb;++i) c[i] = f;
+        }else{
+          unsigned char *c = reinterpret_cast<unsigned char *>(p);
+          #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c)
+          for(std::size_t i=0;i<s;++i) c[i] = b;
+        }
         return 0;
       }
 
@@ -84,11 +96,25 @@ namespace quda
       ompMemset2D(void *p, size_t pitch, unsigned char b, size_t w, size_t h)
       {
         constexpr int max_threads = device::max_block_size();
-        unsigned char *c = reinterpret_cast<unsigned char *>(p);
-      #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c) collapse(2)
-        for(std::size_t i=0;i<h;++i)
-          for(std::size_t j=0;j<w;++j)
-            c[j+i*pitch] = b;
+        constexpr size_t nb = sizeof(float);
+        if(w%nb==0 && pitch%nb==0){
+          float *c = reinterpret_cast<float *>(p);
+          float f;
+          unsigned char bs[nb];
+          for(std::size_t i=0; i<nb; ++i) bs[i] = b;
+          memcpy(&f, bs, nb);
+          const std::size_t wb = w/nb, pitchb = pitch/nb;
+          #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c) collapse(2)
+          for(std::size_t i=0;i<h;++i)
+            for(std::size_t j=0;j<wb;++j)
+              c[j+i*pitchb] = b;
+        }else{
+          unsigned char *c = reinterpret_cast<unsigned char *>(p);
+          #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c) collapse(2)
+          for(std::size_t i=0;i<h;++i)
+            for(std::size_t j=0;j<w;++j)
+              c[j+i*pitch] = b;
+        }
         return 0;
       }
 
