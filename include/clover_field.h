@@ -509,7 +509,7 @@ namespace quda {
   void computeCloverSigmaOprod(GaugeField& oprod,
 			       cvector_ref<const ColorSpinorField> &x,
 			       cvector_ref<const ColorSpinorField> &p,
-			       const std::vector< std::vector<double> > &coeff);
+			       const std::vector< array<double, 2> > &coeff);
   /**
      @brief Compute the matrix tensor field necessary for the force calculation from
      the clover trace action.  This computes a tensor field [mu,nu].

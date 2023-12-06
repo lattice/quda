@@ -4607,7 +4607,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt, 1);
 
   /* Now the U dA/dU terms */
-  std::vector< std::vector<double> > ferm_epsilon(nvector);
+  std::vector< array<double, 2> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) ferm_epsilon[i] = {2.0*ck*coeff[i]*dt, -kappa2 * 2.0*ck*coeff[i]*dt};
 
   computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
@@ -4764,7 +4764,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
   if (!detratio) computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0);
 
-  std::vector< std::vector<double> > ferm_epsilon(nvector);
+  std::vector< array<double, 2> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) ferm_epsilon[i] = { k_csw_ov_8 * coeff[i], k_csw_ov_8 * coeff[i]/(kappa*kappa) };
 
   // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD

@@ -16,12 +16,12 @@ namespace quda {
     GaugeField &oprod;
     cvector_ref<const ColorSpinorField> &inA;
     cvector_ref<const ColorSpinorField> &inB;
-    const std::vector<std::vector<double>> &coeff;
+    const std::vector<array<double, 2>> &coeff;
     unsigned int minThreads() const { return oprod.VolumeCB(); }
 
   public:
     CloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
-                     cvector_ref<const ColorSpinorField> &inB, const std::vector<std::vector<double>> &coeff) :
+                     cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff) :
       TunableKernel3D(oprod, 2, 6),
       oprod(oprod),
       inA(inA),
@@ -57,27 +57,19 @@ namespace quda {
   }; // CloverSigmaOprod
 
   void computeCloverSigmaOprod(GaugeField& oprod, cvector_ref<const ColorSpinorField> &x,
-			       cvector_ref<const ColorSpinorField> &p, const std::vector<std::vector<double> > &coeff)
+			       cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2> > &coeff)
   {
     if constexpr (clover::is_enabled()) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       if (x.size() > MAX_NVECTOR) {
         // divide and conquer
-        std::vector<std::vector<double> > coeff_1(coeff.size() / 2);
-        std::vector<std::vector<double> > coeff_2(coeff.size()- coeff.size() / 2);
-        for (auto i = 0u; i<coeff.size() / 2 ; i++)
-          coeff_1[i] =std::vector<double>{coeff[i][0],coeff[i][1]};
-        for (auto i=coeff.size() / 2; i<coeff.size() ;i++)
-          coeff_2[i-coeff.size() / 2] =std::vector<double>{coeff[i][0],coeff[i][1]};
-
         computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField>{x.begin(), x.begin() + x.size()/2},
                                 cvector_ref<const ColorSpinorField>{p.begin(), p.begin() + p.size() / 2},
-                                coeff_1);
+                                {coeff.begin(), coeff.begin() + coeff.size() / 2});
 
         computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField>{x.begin() + x.size() / 2, x.end()},
                                 cvector_ref<const ColorSpinorField>{p.begin() + p.size() / 2, p.end()},
-                                coeff_2);
-
+                                {coeff.begin() + coeff.size() / 2, coeff.end()});
         return;
       }
 

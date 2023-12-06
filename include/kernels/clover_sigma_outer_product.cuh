@@ -21,21 +21,20 @@ namespace quda
     using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
 
     Oprod oprod;
-    const F inA[nvector];
-    const F inB[nvector];
-    real coeff[nvector][2];
+    F inA[nvector];
+    F inB[nvector];
+    array_2d<real, nvector, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                         cvector_ref<const ColorSpinorField> &inB,
-                        const std::vector<std::vector<double>> &coeff_) :
+                        const std::vector<array<double, 2>> &coeff_) :
       kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
-      oprod(oprod),
-      inA{inA[0]},
-      inB{inB[0]}
+      oprod(oprod)
     {
       for (int i = 0; i < nvector; i++) {
-        coeff[i][0] = coeff_[i][0];
-        coeff[i][1] = coeff_[i][1];
+        this->inA[i] = inA[i];
+        this->inB[i] = inB[i];
+        coeff[i] = {coeff_[i][0], coeff_[i][1]};
       }
     }
   };
