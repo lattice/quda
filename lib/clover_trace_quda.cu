@@ -27,13 +27,10 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (clover.TwistFlavor() == QUDA_TWIST_SINGLET ||
-          clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
-        CloverTraceArg<Float, nColor, true> arg(output, clover, coeff, parity);
-        launch<CloverSigmaTr>(tp, stream, arg);
+      if (clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
+        launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, true>(output, clover, coeff, parity));
       } else {
-        CloverTraceArg<Float, nColor, false> arg(output, clover, coeff, parity);
-        launch<CloverSigmaTr>(tp, stream, arg);
+        launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, false>(output, clover, coeff, parity));
       }
     }
 

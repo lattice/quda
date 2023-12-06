@@ -110,9 +110,7 @@ namespace quda {
             for (int j=0; j<3; ++j) {
 #pragma unroll
               for (int k=0; k<3; ++k) {
-                auto ctmp = conj(A0(k + 3, j)) + A0(j + 3, k) - conj(A1(k + 3, j)) - A1(j + 3, k);
-                mat(j,k).x = -ctmp.imag();
-                mat(j,k).y =  ctmp.real();
+                mat(j, k) = i_(conj(A0(k + 3, j)) + A0(j + 3, k) - conj(A1(k + 3, j)) - A1(j + 3, k));
               }
             }
           } // mu == 3 // X T
@@ -123,8 +121,7 @@ namespace quda {
             for (int j=0; j<3; ++j) {
 #pragma unroll
               for (int k=0; k<3; ++k) {
-                auto ctmp = conj(A0(k + 3, j)) + A0(j + 3, k) + conj(A1(k + 3, j)) + A1(j + 3, k);
-                mat(j, k) = -i_(ctmp);
+                mat(j, k) = -i_(conj(A0(k + 3, j)) + A0(j + 3, k) + conj(A1(k + 3, j)) + A1(j + 3, k));
               }
             }
           } else if (mu == 3){ // Y T
