@@ -43,12 +43,12 @@ namespace quda {
       apply(device::get_default_stream());
 
       for (int i=3; i>=0; i--) {
+        dir = i;
         if (!commDimPartitioned(i)) continue;
         strcpy(aux, aux2);
         strcat(aux, ",exterior,dir=");
         strcat(aux, dir == 0 ? "0" : dir == 1 ? "1" : dir == 2 ? "2" : "3");
         kernel = EXTERIOR;
-        dir = i;
         apply(device::get_default_stream());
       }
     }
