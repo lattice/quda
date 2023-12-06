@@ -152,6 +152,7 @@ void TMCloverForce_test()
   quda::GaugeField Mom_qdp(param);
 
   // initialize some data in cpuMom
+  // we need to set the mom to zero because computeTMCloverForceQuda is overwriting the momentum
   createMomCPU(Mom_ref_milc.data(), gauge_param.cpu_prec, 0.0);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc.copy(Mom_ref_milc);
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp.copy(Mom_ref_milc);
@@ -219,7 +220,7 @@ void TMCloverForce_test()
   if (getTuning() == QUDA_TUNE_YES)
     computeTMCloverForceQuda(mom, in[0].data(), in0[0].data(), coeff, nvector,  &gauge_param, &inv_param, detratio);
 
-  printf("Device function computed\n");
+  printfQuda("Device function computed\n");
   quda::host_timer_t host_timer;
   double time_sec = 0.0;
   // Multiple execution to exclude warmup time in the first run
