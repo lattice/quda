@@ -173,7 +173,7 @@ namespace quda
       // Compute eigenvalues/singular values
 
       computeEvals(kSpace, evals);
-      if (compute_svd) computeSVD(kSpace, evals);
+      if (compute_svd) computeSVD(kSpace, evals, eig_param->use_dagger);
     }
 
     // Local clean-up

@@ -502,7 +502,7 @@ namespace quda
     }
   }
 
-  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
+  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, bool dagger)
   {
     logQuda(QUDA_SUMMARIZE, "Computing SVD of M\n");
 
@@ -527,8 +527,13 @@ namespace quda
       // Lambda already contains the square root of the eigenvalue of the norm op.
       Complex lambda = evals[i];
 
-      // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat.Expose()->M(evecs[n_conv + i], evecs[i]);
+      if (dagger) {
+        // Mdag*Lev_i = Mdag*Lsv_i = sigma_i Rsv_i
+        mat.Expose()->Mdag(evecs[n_conv + i], evecs[i]);
+      } else {
+        // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+        mat.Expose()->M(evecs[n_conv + i], evecs[i]);
+      }
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
       sigma_tmp[i] = sqrt(blas::norm2(evecs[n_conv + i]));
