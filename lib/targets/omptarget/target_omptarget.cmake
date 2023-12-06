@@ -25,8 +25,8 @@ set_property(CACHE QUDA_MAX_BLOCK_SIZE PROPERTY STRINGS 256 512 768 1024)
 target_compile_definitions(quda PUBLIC QUDA_MAX_BLOCK_SIZE=${QUDA_MAX_BLOCK_SIZE})
 message(STATUS "Using maximum team size: ${QUDA_MAX_BLOCK_SIZE}")
 
-set(QUDA_MAX_SHARED_MEMORY_SIZE 40960 CACHE STRING "OpenMP target maximum shared memory size (among threads in a team)")
-set_property(CACHE QUDA_MAX_SHARED_MEMORY_SIZE PROPERTY STRINGS 36864 40960 45056 49152 65536)
+set(QUDA_MAX_SHARED_MEMORY_SIZE 114688 CACHE STRING "OpenMP target maximum shared memory size (among threads in a team)")
+set_property(CACHE QUDA_MAX_SHARED_MEMORY_SIZE PROPERTY STRINGS 32768 49152 65536 81920 98304 114688 131072)
 target_compile_definitions(quda PUBLIC QUDA_MAX_SHARED_MEMORY_SIZE=${QUDA_MAX_SHARED_MEMORY_SIZE})
 message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}")
 
@@ -35,6 +35,8 @@ mark_as_advanced(QUDA_OMPTARGET_JIT)
 
 option(QUDA_OMPTARGET_SIMD16 "Build OpenMP target backend with simd width 16" OFF)
 mark_as_advanced(QUDA_OMPTARGET_SIMD16)
+
+string(REPLACE " " "" QUDA_GPU_ARCH_TAG "${QUDA_GPU_ARCH}")
 
 # ######################################################################################################################
 # define omptarget flags
@@ -52,19 +54,18 @@ endif()
 
 if(QUDA_OMPTARGET_SIMD16)
     set(QUDA_OMPTARGET_FLAGS ${QUDA_OMPTARGET_FLAGS} "SHELL:-mllvm -vpo-paropt-fixed-simd-width=16")
+    set(QUDA_GPU_ARCH_TAG "${QUDA_GPU_ARCH_TAG}-SIMD16")
 endif()
 
 message(STATUS "Using OpenMP target flags: ${QUDA_OMPTARGET_FLAGS}")
-
-string(REPLACE " " "" QUDA_GPU_ARCH_STRIP "${QUDA_GPU_ARCH}")
 
 # QUDA_HASH for tunecache
 if(QUDA_OMPTARGET_JIT)
     set(HASH cpu_arch=${CPU_ARCH},gpu_arch=JIT,cxx_version=${CMAKE_CXX_COMPILER_VERSION})
     set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:JIT")
 else()
-    set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH_STRIP},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
-    set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:${QUDA_GPU_ARCH_STRIP}")
+    set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH_TAG},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
+    set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget")
 endif()
 
 # ######################################################################################################################

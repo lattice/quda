@@ -8,7 +8,7 @@
 // until we have a way to query device properties correctly
 
 #ifndef QUDA_OMP_MAX_TEAMS
-#define QUDA_OMP_MAX_TEAMS 65536
+#define QUDA_OMP_MAX_TEAMS 2147483647
 #endif
 
 #ifndef QUDA_MAX_THREADS_PER_PROCESSOR
@@ -120,11 +120,11 @@ namespace quda
     {
       constexpr int len = 128;
       char *device_order_env = getenv("ZE_AFFINITY_MASK");
-      char *omptarget_devices = getenv("LIBOMPTARGET_DEVICES");
-      if(omptarget_devices && device_order_env)
-        snprintf(device_list_string, len, "%s%s", omptarget_devices, device_order_env);
-      else if(omptarget_devices)
-        snprintf(device_list_string, len, "%s", omptarget_devices);
+      char *oneapi_device_env = getenv("ONEAPI_DEVICE_SELECTOR");
+      if(oneapi_device_env && device_order_env)
+        snprintf(device_list_string, len, "%s%s", oneapi_device_env, device_order_env);
+      else if(oneapi_device_env)
+        snprintf(device_list_string, len, "%s", oneapi_device_env);
       else if(device_order_env)
         snprintf(device_list_string, len, "%s", device_order_env);
     }
