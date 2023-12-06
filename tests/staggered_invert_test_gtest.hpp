@@ -233,7 +233,7 @@ INSTANTIATE_TEST_SUITE_P(EvenOdd, StaggeredInvertTest,
 
 // full system normal solve
 INSTANTIATE_TEST_SUITE_P(NormalFull, StaggeredInvertTest,
-                         Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION), Values(QUDA_NORMOP_SOLVE),
+                         Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION, QUDA_MAT_SOLUTION), Values(QUDA_NORMOP_SOLVE),
                                  sloppy_precisions, Values(1), solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 

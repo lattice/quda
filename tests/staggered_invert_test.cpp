@@ -279,76 +279,29 @@ std::vector<std::array<double, 2>> solve(test_t param)
   //-----------------------------------------------------------------------------------
   std::vector<quda::ColorSpinorField> in(Nsrc);
   std::vector<quda::ColorSpinorField> out(Nsrc);
+  std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
+  quda::ColorSpinorField ref;
+  quda::ColorSpinorField tmp;
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  for (int k = 0; k < Nsrc; k++) {
-    in[k] = quda::ColorSpinorField(cs_param);
-    out[k] = quda::ColorSpinorField(cs_param);
-  }
-  ColorSpinorField ref(cs_param);
-  ColorSpinorField tmp(cs_param);
+  ref = quda::ColorSpinorField(cs_param);
+  tmp = quda::ColorSpinorField(cs_param);
+  std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void*>(multishift));
+
   // Staggered vector construct END
   //-----------------------------------------------------------------------------------
 
-  // Prepare rng
-  quda::RNG rng(ref, 1234);
+  // Setup multishift parameters (if needed)
+  //---------------------------------------------------------------------------
 
-  // Performance measuring
-  std::vector<double> time(Nsrc);
-  std::vector<double> gflops(Nsrc);
-  std::vector<int> iter(Nsrc);
+  // Masses
+  std::vector<double> masses(multishift);
 
-  // Populate `in` with random noise
-  for (int k = 0; k < Nsrc; k++) { quda::spinorNoise(in[k], rng, QUDA_NOISE_UNIFORM); }
-
-  // QUDA invert test
-  //----------------------------------------------------------------------------
-
-  std::vector<std::array<double, 2>> res(Nsrc);
-
-  if (multishift == 1) {
-    if (!use_split_grid) {
-      for (int k = 0; k < Nsrc; k++) {
-        if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-        invertQuda(out[k].data(), in[k].data(), &inv_param);
-        time[k] = inv_param.secs;
-        gflops[k] = inv_param.gflops / inv_param.secs;
-        iter[k] = inv_param.iter;
-        printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-                   inv_param.gflops / inv_param.secs);
-      }
-    } else {
-      std::vector<void *> _hp_x(Nsrc);
-      std::vector<void *> _hp_b(Nsrc);
-      for (int k = 0; k < Nsrc; k++) {
-        _hp_x[k] = out[k].data();
-        _hp_b[k] = in[k].data();
-      }
-      inv_param.num_src = Nsrc;
-      inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, cpuFatMILC.data(), cpuLongMILC.data(),
-                                  &gauge_param);
-      quda::comm_allreduce_int(inv_param.iter);
-      inv_param.iter /= comm_size() / num_sub_partition;
-      quda::comm_allreduce_sum(inv_param.gflops);
-      inv_param.gflops /= comm_size() / num_sub_partition;
-      quda::comm_allreduce_max(inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
-                 inv_param.secs, inv_param.gflops / inv_param.secs);
-    }
-
-    for (int k = 0; k < Nsrc; k++) {
-      if (verify_results)
-        res[k] = verifyStaggeredInversion(tmp, ref, in[k], out[k], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
-    }
-  } else if (multishift > 1) {
+  if (multishift > 1) {
     if (use_split_grid)
       errorQuda("Multishift currently doesn't support split grid.\n");
 
     inv_param.num_offset = multishift;
-
-    // Prepare vectors for masses
-    std::vector<double> masses(multishift);
 
     // Consistency check for masses, tols, tols_hq size if we're setting custom values
     if (multishift_shifts.size() != 0)
@@ -360,47 +313,112 @@ std::vector<std::array<double, 2>> solve(test_t param)
     if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
       errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
 
-    // Allocate storage of output arrays
-    std::vector<void*> outArray(multishift);
-    std::vector<ColorSpinorField> qudaOutArray(multishift, cs_param);
-
-    // Copy offsets and tolerances into inv_param; copy data pointers into outArray
+    // Copy offsets and tolerances into inv_param; allocate and copy data pointers
     for (int i = 0; i < multishift; i++) {
       masses[i] = (multishift_masses.size() == 0 ? (mass + i * i * 0.01) : multishift_masses[i]);
       inv_param.offset[i] = 4 * masses[i] * masses[i];
       inv_param.tol_offset[i] = (multishift_tols.size() == 0 ? inv_param.tol : multishift_tols[i]);
       inv_param.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? inv_param.tol_hq : multishift_tols_hq[i]);
 
-      outArray[i] = qudaOutArray[i].data();
+      // Allocate memory and set pointers
+      for (int n = 0; n < Nsrc; n++) {
+        out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
+        _hp_multi_x[n][i] = out_multishift[n * multishift + i].data();
+      }
 
       logQuda(QUDA_VERBOSE, "Multishift mass %d = %e ; tolerance %e ; hq tolerance %e\n", i, masses[i], inv_param.tol_offset[i], inv_param.tol_hq_offset[i]);
     }
+  }
 
-    for (int k = 0; k < Nsrc; k++) {
-      quda::spinorNoise(in[k], rng, QUDA_NOISE_UNIFORM);
-      invertMultiShiftQuda((void **)outArray.data(), in[k].data(), &inv_param);
+  // Setup multishift parameters END
+  //-----------------------------------------------------------------------------------
 
-      time[k] = inv_param.secs;
-      gflops[k] = inv_param.gflops / inv_param.secs;
-      iter[k] = inv_param.iter;
+  // Prepare rng, fill host spinors with random numbers
+  //-----------------------------------------------------------------------------------
+
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
+
+  quda::RNG rng(ref, 1234);
+
+  for (int n = 0; n < Nsrc; n++) {
+    // Populate the host spinor with random numbers.
+    in[n] = quda::ColorSpinorField(cs_param);
+    quda::spinorNoise(in[n], rng, QUDA_NOISE_UNIFORM);
+    out[n] = quda::ColorSpinorField(cs_param);
+  }
+
+  // Prepare rng, fill host spinors with random numbers END
+  //-----------------------------------------------------------------------------------
+
+  // QUDA invert test
+  //----------------------------------------------------------------------------
+
+  std::vector<std::array<double, 2>> res(Nsrc);
+
+  if (!use_split_grid) {
+
+    for (int n = 0; n < Nsrc; n++) {
+      // If deflating, preserve the deflation space between solves
+      if (inv_deflate) eig_param.preserve_deflation = n < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      // Perform QUDA inversions
+      if (multishift > 1) {
+        invertMultiShiftQuda(_hp_multi_x[n].data(), in[n].data(), &inv_param);
+      } else {
+        invertQuda(out[n].data(), in[n].data(), &inv_param);
+      }
+
+      time[n] = inv_param.secs;
+      gflops[n] = inv_param.gflops / inv_param.secs;
+      iter[n] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-                 inv_param.gflops / inv_param.secs);
+                  inv_param.gflops / inv_param.secs);
 
+      if (verify_results) {
+        if (multishift > 1) {
+          for (int i = 0; i < multishift; i++) {
+            printfQuda("%dth solution: mass=%f, ", i, masses[i]);
+            auto resid = verifyStaggeredInversion(tmp, ref, in[n], out_multishift[n * multishift + i], masses[i], cpuFatQDP, cpuLongQDP, inv_param, i);
 
-      for (int i = 0; i < multishift; i++) {
-        printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        auto resid = verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], cpuFatQDP, cpuLongQDP, inv_param, i);
-
-        // take the HQ residual from the lightest mass
-        if (i == 0) {
-          res[k] = resid;
+            // take the HQ residual from the lightest mass
+            if (i == 0) {
+              res[n] = resid;
+            } else {
+                if (resid[0] > res[n][0]) res[n][0] = resid[0];
+            }
+          }
         } else {
-          if (resid[0] > res[k][0]) res[k][0] = resid[0];
+          res[n] = verifyStaggeredInversion(tmp, ref, in[n], out[n], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
         }
       }
     }
   } else {
-    errorQuda("Invalid number of shifts %d", multishift);
+    inv_param.num_src = Nsrc;
+    inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
+    // Host arrays for solutions, sources, and check
+    std::vector<void *> _hp_x(Nsrc);
+    std::vector<void *> _hp_b(Nsrc);
+    for (int n = 0; n < Nsrc; n++) {
+      _hp_x[n] = out[n].data();
+      _hp_b[n] = in[n].data();
+    }
+    // Run split grid
+    invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, cpuFatMILC.data(), cpuLongMILC.data(),
+                                &gauge_param);
+
+    quda::comm_allreduce_int(inv_param.iter);
+    inv_param.iter /= comm_size() / num_sub_partition;
+    quda::comm_allreduce_sum(inv_param.gflops);
+    inv_param.gflops /= comm_size() / num_sub_partition;
+    quda::comm_allreduce_max(inv_param.secs);
+    printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
+                inv_param.secs, inv_param.gflops / inv_param.secs);
+
+    for (int n = 0; n < Nsrc; n++) {
+      if (verify_results)
+        res[n] = verifyStaggeredInversion(tmp, ref, in[n], out[n], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
+    }
   }
 
   // Free the multigrid solver
