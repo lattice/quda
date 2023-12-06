@@ -530,9 +530,8 @@ namespace quda {
      @param gauge The input gauge field
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
-     @param parity The field parity we are working on
    */
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field

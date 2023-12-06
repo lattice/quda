@@ -2,88 +2,64 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <kernels/clover_deriv.cuh>
+#include <instantiate.h>
 
 namespace quda {
 
-  template <typename Float, QudaReconstructType recon>
-  class DerivativeClover : TunableKernel3D {
+  template <typename Float, int nColor, QudaReconstructType recon> class DerivativeClover : TunableKernel3D {
     GaugeField &force;
     GaugeField &gauge;
     GaugeField &oprod;
     double coeff;
-    int parity;
     unsigned int minThreads() const { return gauge.LocalVolumeCB(); }
 
   public:
-    DerivativeClover(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, int parity) :
+    DerivativeClover(GaugeField &gauge, GaugeField &force, GaugeField &oprod, double coeff) :
       TunableKernel3D(gauge, 2, 4),
       force(force),
       gauge(gauge),
       oprod(oprod),
-      coeff(coeff),
-      parity(parity)
+      coeff(coeff)
     {
       apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverDerivative>(tp, stream, CloverDerivArg<Float, recon>(force, gauge, oprod, coeff, parity));
+      launch<CloverDerivative>(tp, stream, CloverDerivArg<Float, nColor, recon>(force, gauge, oprod, coeff));
     }
 
     // The force field is updated so we must preserve its initial state
     void preTune() { force.backup(); }
     void postTune() { force.restore(); }
 
-    long long flops() const { return 16 * 198 * 3 * 4 * gauge.LocalVolume(); }
-    long long bytes() const
+    long long flops() const
     {
-      return ((8 * gauge.Reconstruct() + 4 * oprod.Reconstruct()) * 3 + 2 * force.Reconstruct()) * 4 * gauge.LocalVolume() * gauge.Precision();
+      auto gemm_flops = 8 * nColor * nColor * nColor - 2 * nColor * nColor;
+      return 32 * gemm_flops * 12 * gauge.LocalVolume();
+    }
+    long long bytes() const override
+    {
+      return (16 * gauge.Reconstruct() + 8 * oprod.Reconstruct() + 2 * force.Reconstruct()) * 12 * gauge.Precision() * gauge.LocalVolume();
     }
   };
 
-  template<typename Float>
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, int parity)
-  {
-    if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
-    if (force.Order() != oprod.Order()) errorQuda("Force and Oprod orders must match");
-    if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
-
-    if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      if (gauge.isNative()) {
-	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  DerivativeClover<Float, QUDA_RECONSTRUCT_NO> deriv(force, gauge, oprod, coeff, parity);
-	} else {
-	  errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
-	}
-      } else {
-	errorQuda("Gauge order %d not supported", gauge.Order());
-      }
-    } else {
-      errorQuda("Force order %d not supported", force.Order());
-    } // force / oprod order
-  }
-
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)
+  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff)
   {
     if constexpr (clover::is_enabled()) {
-      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      checkPrecision(force, gauge, oprod);
       assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
       assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
+      if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
+      if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
 
-      for (int d = 0; d < 4; d++) {
-        if (oprod.X()[d] != gauge.X()[d])
-          errorQuda("Incompatible extended dimensions d=%d gauge=%d oprod=%d", d, gauge.X()[d], oprod.X()[d]);
-      }
+      GaugeField *oprodEx = createExtendedGauge(oprod, gauge.R(), getProfile());
 
-      if (force.Precision() == QUDA_DOUBLE_PRECISION) {
-        cloverDerivative<double>(force, gauge, oprod, coeff, (parity == QUDA_EVEN_PARITY) ? 0 : 1);
-      } else if (force.Precision() == QUDA_SINGLE_PRECISION) {
-        cloverDerivative<float>(force, gauge, oprod, coeff, (parity == QUDA_EVEN_PARITY) ? 0 : 1);
-      } else {
-        errorQuda("Precision %d not supported", force.Precision());
-      }
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      instantiate<DerivativeClover, ReconstructNo12>(gauge, force, *oprodEx, coeff);
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+      delete oprodEx;
     } else {
       errorQuda("Clover has not been built");
     }

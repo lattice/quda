@@ -7,7 +7,8 @@
 namespace quda
 {
 
-  template <typename Float, QudaReconstructType recon> struct CloverDerivArg : kernel_param<> {
+  template <typename Float, int nColor_, QudaReconstructType recon> struct CloverDerivArg : kernel_param<> {
+    static constexpr int nColor = nColor_;
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Gauge = typename gauge_mapper<Float, recon>::type;
@@ -16,16 +17,14 @@ namespace quda
     int E[4];
     int border[4];
     real coeff;
-    int parity;
 
     Force force;
     Gauge gauge;
     Oprod oprod;
 
-    CloverDerivArg(const GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff, int parity) :
+    CloverDerivArg(const GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff) :
       kernel_param(dim3(force.VolumeCB(), 2, 4)),
       coeff(coeff),
-      parity(parity),
       force(force),
       gauge(gauge),
       oprod(oprod)
@@ -38,167 +37,158 @@ namespace quda
     }
   };
 
-  template <typename Link, typename Arg>
-  __device__ __host__ void computeForce(Link &force_total, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
+  template <typename Link, typename Force, typename Arg>
+  __device__ __host__ void computeForce(Force &force_total, const Arg &arg, int xIndex, int parity, int mu, int nu)
   {
-    const int otherparity = (1 - arg.parity);
+    const int otherparity = (1 - parity);
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
 
-    if (yIndex == 0) { // do "this" force
+    int x[4];
+    getCoordsExtended(x, xIndex, arg.X, parity, arg.border);
 
-      int x[4];
-      getCoordsExtended(x, xIndex, arg.X, arg.parity, arg.border);
+    // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
+    {
+      thread_array<int, 4> d = { };
 
-      // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
-      {
-        thread_array<int, 4> d = { };
+      // load U(x)_(+mu)
+      Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
 
-        // load U(x)_(+mu)
-        Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
+      // load U(x+mu)_(+nu)
+      d[mu]++;
+      Link U2 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      d[mu]--;
 
-        // load U(x+mu)_(+nu)
-        d[mu]++;
-        Link U2 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
-        d[mu]--;
+      // load U(x+nu)_(+mu)
+      d[nu]++;
+      Link U3 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]--;
 
-        // load U(x+nu)_(+mu)
-        d[nu]++;
-        Link U3 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
-        d[nu]--;
+      // load U(x)_(+nu)
+      Link U4 = arg.gauge(nu, linkIndexShift(x, d, arg.E), parity);
 
-        // load U(x)_(+nu)
-        Link U4 = arg.gauge(nu, linkIndexShift(x, d, arg.E), arg.parity);
+      // load Oprod
+      Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), parity);
+      Link force = U1 * U2 * conj(U3) * conj(U4) * Oprod1;
 
-        // load Oprod
-        Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
-        Link force = U1 * U2 * conj(U3) * conj(U4) * Oprod1;
+      d[mu]++;
+      d[nu]++;
+      Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), parity);
+      force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
 
-        d[mu]++;
-        d[nu]++;
-        Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
-        force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
-
-        if (nu < mu) force_total -= force;
-        else force_total += force;
-      }
-
-      {
-        thread_array<int, 4> d = { };
-
-        // load U(x-nu)(+nu)
-        d[nu]--;
-        Link U1 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
-        d[nu]++;
-
-        // load U(x-nu)(+mu)
-        d[nu]--;
-        Link U2 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
-        d[nu]++;
-
-        // load U(x+mu-nu)(nu)
-        d[mu]++;
-        d[nu]--;
-        Link U3 = arg.gauge(nu, linkIndexShift(x, d, arg.E), arg.parity);
-        d[mu]--;
-        d[nu]++;
-
-        // load U(x)_(+mu)
-        Link U4 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
-
-        d[mu]++;
-        d[nu]--;
-        Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
-        Link force = conj(U1) * U2 * Oprod1 * U3 * conj(U4);
-
-        d[mu]--;
-        d[nu]++;
-        Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
-        force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
-
-        if (nu < mu) force_total += force;
-        else force_total -= force;
-      }
-
-    } else { // else do other force
-
-      int y[4] = { };
-      getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
-
-      {
-        thread_array<int, 4> d = { };
-
-        // load U(x)_(+mu)
-        Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
-
-        // load U(x+mu)_(+nu)
-        d[mu]++;
-        Link U2 = arg.gauge(nu, linkIndexShift(y, d, arg.E), arg.parity);
-        d[mu]--;
-
-        // load U(x+nu)_(+mu)
-        d[nu]++;
-        Link U3 = arg.gauge(mu, linkIndexShift(y, d, arg.E), arg.parity);
-        d[nu]--;
-
-        // load U(x)_(+nu)
-        Link U4 = arg.gauge(nu, linkIndexShift(y, d, arg.E), otherparity);
-
-        // load opposite parity Oprod
-        d[nu]++;
-        Link Oprod3 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        Link force = U1 * U2 * conj(U3) * Oprod3 * conj(U4);
-
-        // load Oprod(x+mu)
-        d[nu]--;
-        d[mu]++;
-        Link Oprod4 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
-
-        if (nu < mu) force_total -= force;
-        else force_total += force;
-      }
-
-      // Lower leaf
-      // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
-      {
-        thread_array<int, 4> d = { };
-
-        // load U(x-nu)(+nu)
-        d[nu]--;
-        Link U1 = arg.gauge(nu, linkIndexShift(y, d, arg.E), arg.parity);
-        d[nu]++;
-
-        // load U(x-nu)(+mu)
-        d[nu]--;
-        Link U2 = arg.gauge(mu, linkIndexShift(y, d, arg.E), arg.parity);
-        d[nu]++;
-
-        // load U(x+mu-nu)(nu)
-        d[mu]++;
-        d[nu]--;
-        Link U3 = arg.gauge(nu, linkIndexShift(y, d, arg.E), otherparity);
-        d[mu]--;
-        d[nu]++;
-
-        // load U(x)_(+mu)
-        Link U4 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
-
-        // load Oprod(x+mu)
-        d[mu]++;
-        Link Oprod1 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        Link force = conj(U1) * U2 * U3 * Oprod1 * conj(U4);
-
-        d[mu]--;
-        d[nu]--;
-        Link Oprod2 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
-
-        if (nu < mu) force_total += force;
-        else force_total -= force;
-      }
+      if (nu < mu) force_total -= force;
+      else force_total += force;
     }
 
-  } // namespace quda
+    {
+      thread_array<int, 4> d = { };
+
+      // load U(x-nu)(+nu)
+      d[nu]--;
+      Link U1 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]++;
+
+      // load U(x-nu)(+mu)
+      d[nu]--;
+      Link U2 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]++;
+
+      // load U(x+mu-nu)(nu)
+      d[mu]++;
+      d[nu]--;
+      Link U3 = arg.gauge(nu, linkIndexShift(x, d, arg.E), parity);
+      d[mu]--;
+      d[nu]++;
+
+      // load U(x)_(+mu)
+      Link U4 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
+
+      d[mu]++;
+      d[nu]--;
+      Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), parity);
+      Link force = conj(U1) * U2 * Oprod1 * U3 * conj(U4);
+
+      d[mu]--;
+      d[nu]++;
+      Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), parity);
+      force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
+
+      if (nu < mu) force_total += force;
+      else force_total -= force;
+    }
+
+    {
+      thread_array<int, 4> d = { };
+
+      // load U(x)_(+mu)
+      Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
+
+      // load U(x+mu)_(+nu)
+      d[mu]++;
+      Link U2 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      d[mu]--;
+
+      // load U(x+nu)_(+mu)
+      d[nu]++;
+      Link U3 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]--;
+
+      // load U(x)_(+nu)
+      Link U4 = arg.gauge(nu, linkIndexShift(x, d, arg.E), parity);
+
+      // load opposite parity Oprod
+      d[nu]++;
+      Link Oprod3 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
+      Link force = U1 * U2 * conj(U3) * Oprod3 * conj(U4);
+
+      // load Oprod(x+mu)
+      d[nu]--;
+      d[mu]++;
+      Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
+      force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
+
+      if (nu < mu) force_total -= force;
+      else force_total += force;
+    }
+
+    // Lower leaf
+    // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
+    {
+      thread_array<int, 4> d = { };
+
+      // load U(x-nu)(+nu)
+      d[nu]--;
+      Link U1 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]++;
+
+      // load U(x-nu)(+mu)
+      d[nu]--;
+      Link U2 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]++;
+
+      // load U(x+mu-nu)(nu)
+      d[mu]++;
+      d[nu]--;
+      Link U3 = arg.gauge(nu, linkIndexShift(x, d, arg.E), parity);
+      d[mu]--;
+      d[nu]++;
+
+      // load U(x)_(+mu)
+      Link U4 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
+
+      // load Oprod(x+mu)
+      d[mu]++;
+      Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
+      Link force = conj(U1) * U2 * U3 * Oprod1 * conj(U4);
+
+      d[mu]--;
+      d[nu]--;
+      Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
+      force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
+
+      if (nu < mu) force_total += force;
+      else force_total -= force;
+    }
+  }
 
   template <typename Arg> struct CloverDerivative
   {
@@ -210,20 +200,19 @@ namespace quda
     {
       using real = typename Arg::real;
       using Complex = complex<real>;
-      using Link = Matrix<Complex, 3>;
+      using Link = Matrix<Complex, Arg::nColor>;
 
       Link force;
 
-#pragma unroll
       for (int nu = 0; nu < 4; nu++) {
         if (nu == mu) continue;
-        computeForce(force, arg, x_cb, parity, mu, nu);
+        computeForce<Link>(force, arg, x_cb, parity, mu, nu);
       }
 
       // Write to array
-      Link F = arg.force(mu, x_cb, parity == 0 ? arg.parity : 1 - arg.parity);
-      F += arg.coeff * force;
-      arg.force(mu, x_cb, parity == 0 ? arg.parity : 1 - arg.parity) = F;
+      Link F = arg.force(mu, x_cb, parity);
+      F += arg.coeff * static_cast<Link>(force);
+      arg.force(mu, x_cb, parity) = F;
     }
   };
 

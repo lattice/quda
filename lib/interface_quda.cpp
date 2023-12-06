@@ -4578,9 +4578,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
       // Wrap the even-parity MILC quark field
       qParam.v = h_x[i];
       ColorSpinorField cpuQuarkX(qParam); // create host quark field
-
       x.Even() = cpuQuarkX;
-
       gamma5(x.Even(), x.Even());
     } else {
       x.Even() = solutionResident[i];
@@ -4606,40 +4604,22 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
-  // In double precision the clover derivative is faster with no reconstruct
-  GaugeField *u = &gaugeEx;
-  if (gaugeEx.Reconstruct() == QUDA_RECONSTRUCT_12 && gaugeEx.Precision() == QUDA_DOUBLE_PRECISION) {
-    GaugeFieldParam param(gaugeEx);
-    param.reconstruct = QUDA_RECONSTRUCT_NO;
-    u = new GaugeField(param);
-    u -> copy(gaugeEx);
-  }
   computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt, 1);
 
   /* Now the U dA/dU terms */
   std::vector< std::vector<double> > ferm_epsilon(nvector);
-  for (int shift = 0; shift < nvector; shift++) {
-    ferm_epsilon[shift].reserve(2);
-    ferm_epsilon[shift][0] = 2.0*ck*coeff[shift]*dt;
-    ferm_epsilon[shift][1] = -kappa2 * 2.0*ck*coeff[shift]*dt;
-  }
+  for (int i = 0; i < nvector; i++) ferm_epsilon[i] = {2.0*ck*coeff[i]*dt, -kappa2 * 2.0*ck*coeff[i]*dt};
 
   computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
 
-  GaugeField *oprodEx = createExtendedGauge(oprod, R, profileCloverForce);
+  cloverDerivative(cudaForce, gaugeEx, oprod, 1.0);
 
-  cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_ODD_PARITY);
-  cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_EVEN_PARITY);
-
-  if (u != &gaugeEx) delete u;
   updateMomentum(cudaMom, -1.0, cudaForce, "clover");
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // copy the outer product field back to the host
   if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
-
-  delete oprodEx;
 
   if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
     std::exchange(momResident, cudaMom);
@@ -4669,7 +4649,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   if (!cloverPrecise) errorQuda("No resident clover field");
 
   GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
-
   GaugeField cpuMom(gParamMom);
 
   //create the device momentum field
@@ -4738,6 +4717,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   GaugeField oprod(gParamMom);
 
   std::vector<double> force_coeff(nvector);
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   for (int i = 0; i < nvector; i++) {
     force_coeff[i] = 1.0 * coeff[i];
 
@@ -4749,8 +4729,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
     ColorSpinorField cpuQuarkX(cpuParam);
  
     x.Odd() = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
-
-    profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       dirac->Dagger(QUDA_DAG_YES);
@@ -4787,21 +4765,14 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   if (!detratio) computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0);
 
   std::vector< std::vector<double> > ferm_epsilon(nvector);
-  for (int i = 0; i < nvector; i++) {
-    ferm_epsilon[i].reserve(2);
-    ferm_epsilon[i][0] =  k_csw_ov_8 * coeff[i];
-    ferm_epsilon[i][1] =  k_csw_ov_8 * coeff[i]/(kappa*kappa);
-  }
+  for (int i = 0; i < nvector; i++) ferm_epsilon[i] = { k_csw_ov_8 * coeff[i], k_csw_ov_8 * coeff[i]/(kappa*kappa) };
 
   // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
   computeCloverSigmaOprod(oprod, quarkP,  quarkX, ferm_epsilon);
 
-  GaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
-
   // oprod = (A12) of hep-lat/0112051 
   // compute the insertion of oprod in Fig.27 of hep-lat/0112051 
-  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
-  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
+  cloverDerivative(cudaForce, gaugeEx, oprod, 1.0);
 
   updateMomentum(gpuMom, -1.0, cudaForce, "tmclover");
 
@@ -4814,7 +4785,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   else if (!gauge_param->make_resident_mom)
     momResident = GaugeField();
 
-  delete oprodEx;
   delete dirac;
 }
 
