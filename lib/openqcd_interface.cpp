@@ -866,18 +866,6 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 }
 
 
-void openQCD_qudaDdagD(void *src, void *dst, openQCD_QudaDiracParam_t p)
-{
-  QudaInvertParam param = newOpenQCDDiracParam(p);
-
-  /* both fields reside on the CPU */
-  param.input_location = QUDA_CPU_FIELD_LOCATION;
-  param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  MatDagMatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
-}
-
-
 void openQCD_qudaDw2(void *param, double mu, void *src, void *dst)
 {
   QudaInvertParam* inv_param = static_cast<QudaInvertParam*>(param);
@@ -949,9 +937,8 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     kv.load(infile);
 
     param->verbosity = kv.get<QudaVerbosity>(section, "verbosity", param->verbosity);
-    setVerbosity(param->verbosity);
 
-    if (param->verbosity >= QUDA_VERBOSE) {
+    if (param->verbosity >= QUDA_DEBUG_VERBOSE) {
       kv.dump();
     }
 
@@ -1295,9 +1282,8 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
     kv.load(infile);
 
     verbosity = kv.get<QudaVerbosity>(section, "verbosity", verbosity);
-    setVerbosity(verbosity);
 
-    if (verbosity >= QUDA_VERBOSE) {
+    if (verbosity >= QUDA_DEBUG_VERBOSE) {
       kv.dump();
     }
 
@@ -1350,13 +1336,17 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
   /* transfer of the struct to all the processes */
   MPI_Bcast((void*) param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
 
-  void *inv_param = openQCD_qudaSolverSetup(infile, inv_section);
-  param->invert_param = static_cast<QudaInvertParam*>(inv_param);
+  if (inv_section != nullptr) {
+    void *inv_param = openQCD_qudaSolverSetup(infile, inv_section);
+    param->invert_param = static_cast<QudaInvertParam*>(inv_param);
+  } else {
+    param->invert_param = new QudaInvertParam(newQudaInvertParam());
+  }
 
-  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+  if (inv_section != nullptr && verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaEigParam(param);
   }
-  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+  if (inv_section != nullptr && verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaEigParam(param);
   }
 
@@ -1376,6 +1366,7 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
   logQuda(QUDA_SUMMARIZE, "openQCD_qudaEigensolve()\n");
   logQuda(QUDA_SUMMARIZE, "  gflops      = %.2e\n", eig_param->gflops);
   logQuda(QUDA_SUMMARIZE, "  secs        = %.2e\n", eig_param->secs);
+  logQuda(QUDA_SUMMARIZE, "  iter        = %d\n", eig_param->invert_param->iter);
 }
 
 

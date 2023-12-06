@@ -251,7 +251,6 @@ void openQCD_qudaSpinorFree(void** quda_field);
  * @param[in]  p     Dirac parameter struct
  */
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
-void openQCD_qudaDdagD(void *src, void *dst, openQCD_QudaDiracParam_t p);
 void openQCD_qudaDw2(void *param, double mu, void *src, void *dst);
 
 
@@ -305,8 +304,44 @@ double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, 
 void openQCD_qudaSolverDestroy(void *param);
 
 
+/**
+ * Setup the eigen-solver interface to quda.  This function parses the file
+ * given by [infile] as an openQCD ini file.  The solver section given by the
+ * [inv_section] parameter must have a key-value pair like solver = QUDA and may
+ * contain every member of the struct [QudaInvertParam].  See
+ * [openQCD_qudaSolverSetup] for more details about the solver. The eigen-solver
+ * section given by the [section] parameter may contain every member of the
+ * struct [QudaEigParam].
+ *
+ * @param[in]  infile       Ini-file containing sections about the eigen-solver
+ * @param[in]  section      The section name of the eigen-solver
+ * @param[in]  inv_section  The section name of the solver
+ *
+ * @return     Pointer to the eigen-solver context
+ */
 void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_section);
+
+
+/**
+ * @brief        Solve Ax=b for an Clover Wilson operator with a multigrid
+ *               solver. All fields are fields passed and returned are host
+ *               (CPU) field in openQCD order.  This function requires an
+ *               existing solver context created with openQCD_qudaSolverSetup().
+ *
+ * @param[inout] param    Pointer returned by openQCD_qudaEigensolverSetup()
+ * @param[inout] h_evecs  Allocated array of void-pointers to param->n_conf
+ *                        fields
+ * @param[out]   h_evals  Allocated array of param->n_conf complex_dbles
+ */
 void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals);
+
+
+/**
+ * @brief      Destroys an existing eigen-solver context and frees all involed
+ *             structs.
+ *
+ * @param      param  Pointer to the context to destroy
+ */
 void openQCD_qudaEigensolverDestroy(void *param);
 
 
