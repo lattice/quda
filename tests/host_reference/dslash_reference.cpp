@@ -771,7 +771,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda
   }
 
   int len = 0;
-  if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
     len = V;
   } else {
     len = Vh;

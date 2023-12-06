@@ -155,8 +155,6 @@ TEST_P(StaggeredInvertTest, verify)
       tol /= (0.5 * mass); // to solve the full operator to eps, solve the preconditioned to mass * eps
     if (solve_type == QUDA_NORMOP_SOLVE)
       tol /= (0.5 * mass); // a proxy for the condition number
-  } else if (solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    tol *= 1.05; // seems to need a bit of a bump
   }
 
   // The power iterations method of determining the Chebyshev window
@@ -165,14 +163,9 @@ TEST_P(StaggeredInvertTest, verify)
   if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER)
     inv_param.ca_basis = QUDA_POWER_BASIS;
 
-  // FIXME: there's an issue in mixed precision BiCGStab I need to squash.
-  //if (inverter_type == QUDA_BICGSTAB_INVERTER)
-  //  tol *= 1.1;
-
-  // CGNE and ASQTAD need a bit of a bump
-  if (inverter_type == QUDA_CGNE_INVERTER || inverter_type == QUDA_CA_CGNE_INVERTER
-      || dslash_type == QUDA_ASQTAD_DSLASH)
-    tol *= 1.05;
+  // Single precision needs a tiny bump
+  if (prec == QUDA_SINGLE_PRECISION)
+    tol *= 1.01;
 
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
