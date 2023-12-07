@@ -23,7 +23,7 @@ protected:
         || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0)
       return true;
 
-    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1))
+    if (is_laplace(dslash_type) && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1))
       return true;
 
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
@@ -123,12 +123,12 @@ int main(int argc, char **argv)
 
   // Only these fermions are supported in this file
   if (is_laplace_enabled) {
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+    if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (dslash_type == QUDA_LAPLACE_DSLASH)
+    if (is_laplace(dslash_type))
       errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+    if (!is_staggered(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
       eps_naik = 0.0; // to avoid potential headaches
   }
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH && dtest_type != dslash_test_type::Mat)
+  if (is_laplace(dslash_type) && dtest_type != dslash_test_type::Mat)
     errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
 
   int test_rc = RUN_ALL_TESTS();

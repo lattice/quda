@@ -11,17 +11,6 @@ public:
   EigensolveTest() : param(GetParam()) { }
 };
 
-bool is_chiral(QudaDslashType type)
-{
-  switch (type) {
-  case QUDA_DOMAIN_WALL_DSLASH:
-  case QUDA_DOMAIN_WALL_4D_DSLASH:
-  case QUDA_MOBIUS_DWF_DSLASH:
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
-  default: return false;
-  }
-}
-
 bool skip_test(test_t param)
 {
   // dwf-style solves must use a normal solver

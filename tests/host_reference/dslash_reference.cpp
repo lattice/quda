@@ -806,7 +806,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda
       stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
 
       // correct for the massRescale function inside invertQuda
-      if (dslash_type == QUDA_LAPLACE_DSLASH)
+      if (is_laplace(dslash_type))
         ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
       QudaParity parity = QUDA_INVALID_PARITY;

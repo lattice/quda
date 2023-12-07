@@ -117,11 +117,20 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 
 // Helper functions
 //------------------------------------------------------
-inline bool isPCSolution(QudaSolutionType solution_type)
-{
-  return (solution_type == QUDA_MATPC_SOLUTION || solution_type == QUDA_MATPC_DAG_SOLUTION
-          || solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-}
+bool is_pc_solution(QudaSolutionType solution_type);
+bool is_full_solution(QudaSolutionType type);
+
+bool is_preconditioned_solve(QudaSolveType type);
+bool is_normal_solve(QudaInverterType inv_type, QudaSolveType solve_type);
+
+bool is_hermitian_solver(QudaInverterType type);
+bool support_solution_accumulator_pipeline(QudaInverterType type);
+bool is_normal_residual(QudaInverterType type);
+
+bool is_staggered(QudaDslashType type);
+bool is_chiral(QudaDslashType type);
+bool is_laplace(QudaDslashType type);
+
 //------------------------------------------------------
 
 // Reports basic statistics of flops and solver iterations

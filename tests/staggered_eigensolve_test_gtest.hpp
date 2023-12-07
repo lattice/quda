@@ -37,7 +37,7 @@ bool skip_test(test_t test_param)
     // matpc
 
     // this is only legal for the staggered and asqtad op
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+    if (!is_staggered(dslash_type))
       return true;
 
     // we can only compute the real part for Lanczos, and real or magnitude for Arnoldi
@@ -55,7 +55,7 @@ bool skip_test(test_t test_param)
     // matdag_mat
     
     // this is only legal for the staggered and asqtad op
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+    if (!is_staggered(dslash_type))
       return true;
 
     switch (eig_type) {

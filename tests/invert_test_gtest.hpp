@@ -16,79 +16,11 @@ public:
   InvertTest() : param(GetParam()) { }
 };
 
-bool is_normal_residual(QudaInverterType type)
-{
-  switch (type) {
-  case QUDA_CGNR_INVERTER:
-  case QUDA_CA_CGNR_INVERTER: return true;
-  default: return false;
-  }
-}
-
-bool is_preconditioned_solve(QudaSolveType type)
-{
-  switch (type) {
-  case QUDA_DIRECT_PC_SOLVE:
-  case QUDA_NORMOP_PC_SOLVE: return true;
-  default: return false;
-  }
-}
-
-bool is_full_solution(QudaSolutionType type)
-{
-  switch (type) {
-  case QUDA_MAT_SOLUTION:
-  case QUDA_MATDAG_MAT_SOLUTION: return true;
-  default: return false;
-  }
-}
-
-bool is_normal_solve(test_t param)
-{
-  auto inv_type = ::testing::get<0>(param);
-  auto solve_type = ::testing::get<2>(param);
-
-  switch (solve_type) {
-  case QUDA_NORMOP_SOLVE:
-  case QUDA_NORMOP_PC_SOLVE: return true;
-  default:
-    switch (inv_type) {
-    case QUDA_CGNR_INVERTER:
-    case QUDA_CGNE_INVERTER:
-    case QUDA_CA_CGNR_INVERTER:
-    case QUDA_CA_CGNE_INVERTER: return true;
-    default: return false;
-    }
-  }
-}
-
-bool is_chiral(QudaDslashType type)
-{
-  switch (type) {
-  case QUDA_DOMAIN_WALL_DSLASH:
-  case QUDA_DOMAIN_WALL_4D_DSLASH:
-  case QUDA_MOBIUS_DWF_DSLASH:
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
-  default: return false;
-  }
-}
-
-bool support_solution_accumulator_pipeline(QudaInverterType type)
-{
-  switch (type) {
-  case QUDA_CG_INVERTER:
-  case QUDA_CA_CG_INVERTER:
-  case QUDA_CGNR_INVERTER:
-  case QUDA_CGNE_INVERTER:
-  case QUDA_PCG_INVERTER: return true;
-  default: return false;
-  }
-}
-
 bool skip_test(test_t param)
 {
   auto inverter_type = ::testing::get<0>(param);
   auto solution_type = ::testing::get<1>(param);
+  auto solve_type = ::testing::get<2>(param);
   auto prec_sloppy = ::testing::get<3>(param);
   auto multishift = ::testing::get<4>(param);
   auto solution_accumulator_pipeline = ::testing::get<5>(param);
@@ -102,7 +34,7 @@ bool skip_test(test_t param)
   if (prec_sloppy < prec_precondition) return true; // sloppy precision >= preconditioner precision
 
   // dwf-style solves must use a normal solver
-  if (is_chiral(dslash_type) && !is_normal_solve(param)) return true;
+  if (is_chiral(dslash_type) && !is_normal_solve(inverter_type, solve_type)) return true;
   // FIXME this needs to be added to dslash_reference.cpp
   if (is_chiral(dslash_type) && multishift > 1) return true;
   // FIXME this needs to be added to dslash_reference.cpp

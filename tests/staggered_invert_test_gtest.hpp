@@ -16,73 +16,6 @@ public:
   StaggeredInvertTest() : param(GetParam()) { }
 };
 
-bool is_hermitian_solver(QudaInverterType type)
-{
-  switch(type) {
-  case QUDA_CG_INVERTER:
-  case QUDA_CA_CG_INVERTER: return true;
-  default: return false;
-  }
-}
-
-bool is_normal_residual(QudaInverterType type)
-{
-  switch (type) {
-  case QUDA_CGNR_INVERTER:
-  case QUDA_CA_CGNR_INVERTER: return true;
-  default: return false;
-  }
-}
-
-bool is_preconditioned_solve(QudaSolveType type)
-{
-  switch (type) {
-  case QUDA_DIRECT_PC_SOLVE:
-  case QUDA_NORMOP_PC_SOLVE: return true;
-  default: return false;
-  }
-}
-
-bool is_full_solution(QudaSolutionType type)
-{
-  switch (type) {
-  case QUDA_MAT_SOLUTION:
-  case QUDA_MATDAG_MAT_SOLUTION: return true;
-  default: return false;
-  }
-}
-
-bool is_normal_solve(test_t param)
-{
-  auto inv_type = ::testing::get<0>(param);
-  auto solve_type = ::testing::get<2>(param);
-
-  switch (solve_type) {
-  case QUDA_NORMOP_SOLVE:
-  case QUDA_NORMOP_PC_SOLVE: return true;
-  default:
-    switch (inv_type) {
-    case QUDA_CGNR_INVERTER:
-    case QUDA_CGNE_INVERTER:
-    case QUDA_CA_CGNR_INVERTER:
-    case QUDA_CA_CGNE_INVERTER: return true;
-    default: return false;
-    }
-  }
-}
-
-bool support_solution_accumulator_pipeline(QudaInverterType type)
-{
-  switch (type) {
-  case QUDA_CG_INVERTER:
-  case QUDA_CA_CG_INVERTER:
-  case QUDA_CGNR_INVERTER:
-  case QUDA_CGNE_INVERTER:
-  case QUDA_PCG_INVERTER: return true;
-  default: return false;
-  }
-}
-
 bool skip_test(test_t param)
 {
   auto inverter_type = ::testing::get<0>(param);
@@ -106,12 +39,12 @@ bool skip_test(test_t param)
   //if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ)
   //  if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+  if (is_laplace(dslash_type)) {
     if (multishift > 1) return true; // Laplace doesn't support multishift
     if (solution_type != QUDA_MAT_SOLUTION || solve_type != QUDA_DIRECT_SOLVE) return true; // Laplace only supports direct solves
   }
 
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (is_staggered(dslash_type)) {
     // the staggered and asqtad operators aren't HPD
     if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && is_hermitian_solver(inverter_type)) return true;
 
@@ -131,8 +64,6 @@ TEST_P(StaggeredInvertTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  auto tol_backup = tol;
-
   inv_param.tol = 0.0;
   inv_param.tol_hq = 0.0;
   auto res_t = ::testing::get<7>(GetParam());
@@ -143,18 +74,21 @@ TEST_P(StaggeredInvertTest, verify)
   auto solution_type = ::testing::get<1>(param);
   auto solve_type = ::testing::get<2>(param);
 
+  // Make a local copy of "tol" for modification in place
+  auto verify_tol = tol;
+
   // FIXME eventually we should build in refinement to the *NR solvers to remove the need for this
   // The mass squared is a proxy for the condition number
-  if (is_normal_residual(inverter_type)) tol /= (0.25 * mass * mass);
+  if (is_normal_residual(inverter_type)) verify_tol /= (0.25 * mass * mass);
 
   // To solve the direct operator to a given tolerance, grind the preconditioned
   // operator to 0.5 * mass * tol... to keep the target tolerance in inv_param
   // in check, we shift the requirement to the verified tolerance instead.
   if (solution_type == QUDA_MAT_SOLUTION) {
     if (solve_type == QUDA_DIRECT_PC_SOLVE)
-      tol /= (0.5 * mass); // to solve the full operator to eps, solve the preconditioned to mass * eps
+      verify_tol /= (0.5 * mass); // to solve the full operator to eps, solve the preconditioned to mass * eps
     if (solve_type == QUDA_NORMOP_SOLVE)
-      tol /= (0.5 * mass); // a proxy for the condition number
+      verify_tol /= (0.5 * mass); // a proxy for the condition number
   }
 
   // The power iterations method of determining the Chebyshev window
@@ -163,17 +97,16 @@ TEST_P(StaggeredInvertTest, verify)
   if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER)
     inv_param.ca_basis = QUDA_POWER_BASIS;
 
-  // Single precision needs a tiny bump
+  // Single precision needs a tiny bump due to small host/device precision deviations
   if (prec == QUDA_SINGLE_PRECISION)
-    tol *= 1.01;
+    verify_tol *= 1.01;
 
   for (auto rsd : solve(GetParam())) {
-    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
+    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], verify_tol); }
     if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }
   }
 
   inv_param.ca_basis = ca_basis_tmp;
-  tol = tol_backup;
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)

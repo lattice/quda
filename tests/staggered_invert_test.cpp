@@ -466,18 +466,18 @@ int main(int argc, char **argv)
 
   // Only these fermions are supported in this file
   if (is_laplace_enabled) {
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+    if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (dslash_type == QUDA_LAPLACE_DSLASH)
+    if (is_laplace(dslash_type))
       errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH)
+    if (!is_staggered(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
   // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
-    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH) {
+    if (!is_staggered(dslash_type)) {
       errorQuda("dslash_type %s not supported for multigrid preconditioner\n", get_dslash_str(dslash_type));
     }
   }

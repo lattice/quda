@@ -245,7 +245,7 @@ struct StaggeredDslashTestWrapper {
     cpuLong = GaugeField(cpuLongParam);
 
     // Override link reconstruct as appropriate for staggered or asqtad
-    if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_ASQTAD_DSLASH) {
+    if (is_staggered(dslash_type)) {
       if (link_recon == QUDA_RECONSTRUCT_12) link_recon = QUDA_RECONSTRUCT_13;
       if (link_recon == QUDA_RECONSTRUCT_8) link_recon = QUDA_RECONSTRUCT_9;
     }
@@ -342,12 +342,12 @@ struct StaggeredDslashTestWrapper {
 
         host_timer.start();
 
-        if (dslash_type == QUDA_LAPLACE_DSLASH) {
+        if (is_laplace(dslash_type)) {
           switch (dtest_type) {
           case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinor); break;
           default: errorQuda("Test type %d not defined on Laplace operator", static_cast<int>(dtest_type));
           }
-        } else {
+        } else if (is_staggered(dslash_type)) {
           switch (dtest_type) {
           case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorOut, cudaSpinor, parity); break;
           case dslash_test_type::MatPC: dirac->M(cudaSpinorOut, cudaSpinor); break;
@@ -355,6 +355,8 @@ struct StaggeredDslashTestWrapper {
           case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinor); break;
           default: errorQuda("Test type %d not defined on staggered dslash", static_cast<int>(dtest_type));
           }
+        } else {
+          errorQuda("Invalid dslash type %d", dslash_type);
         }
 
         host_timer.stop();
