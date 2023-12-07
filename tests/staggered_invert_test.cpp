@@ -490,24 +490,20 @@ int main(int argc, char **argv)
     // We need to force a well-behaved operator + reasonable convergence, otherwise
     // the staggered tests will fail. These checks are designed to be consistent
     // with what's in [src]/tests/CMakeFiles.txt, which have been "sanity checked"
-    if (!compute_fatlong) {
-      warningQuda("compute_fatlong = %d , expected value %d , overriding", compute_fatlong, true);
-      compute_fatlong = true;
-    }
+    bool changes = false;
+    if (!compute_fatlong) { compute_fatlong = true; changes = true; }
 
     double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-5 : 1e-6;
-    if (tol != expected_tol) {
-      warningQuda("tol = %e , expected value %e , overriding", tol, expected_tol);
-      tol = expected_tol;
-    }
-    if (tol_hq != expected_tol) {
-      warningQuda("tol_hq = %e , expected value %e , overriding", tol_hq, expected_tol);
-      tol_hq = 1e-5;
-    }
+    if (tol != expected_tol) { tol = expected_tol; changes = true; }
+    if (tol_hq != expected_tol) { tol_hq = expected_tol; changes = true; }
+    if (niter != 1000) { niter = 1000; changes = true; }
 
-    if (niter != 1000) {
-      warningQuda("niter = %d , expected value %d , overriding", niter, 1000);
-      compute_fatlong = 1000;
+    if (changes) {
+      printfQuda("For gtest, various defaults are changed:\n");
+      printfQuda("  --compute-fat-long true\n");
+      printfQuda("  --tol (1e-6 for double, 1e-5 for single)\n");
+      printfQuda("  --tol-hq (1e-6 for double, 1e-5 for single)\n");
+      printfQuda("  --niter 1000\n");
     }
   }
 

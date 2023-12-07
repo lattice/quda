@@ -20,7 +20,7 @@ QudaInvertParam eig_inv_param;
 QudaEigParam eig_param;
 
 // if "--enable-testing true" is passed, we run the tests defined in here
-//#include <staggered_eigensolve_test_gtest.hpp>
+#include <staggered_eigensolve_test_gtest.hpp>
 
 void display_test_info(QudaEigParam &param)
 {
@@ -150,15 +150,14 @@ void init()
   //-----------------------------------------------------------------------------------
 }
 
-//std::vector<double> eigensolve(test_t test_param)
-std::vector<double> eigensolve(QudaEigType eig_type, QudaBoolean use_norm_op, QudaBoolean use_pc, QudaBoolean compute_svd, QudaEigSpectrumType spectrum)
+std::vector<double> eigensolve(test_t test_param)
 {
   // Collect testing parameters from gtest
-  eig_param.eig_type = eig_type; //::testing::get<0>(test_param);
-  eig_param.use_norm_op = use_norm_op; //::testing::get<1>(test_param);
-  eig_param.use_pc = use_pc; //::testing::get<2>(test_param);
-  eig_param.compute_svd = compute_svd; //::testing::get<3>(test_param);
-  eig_param.spectrum = spectrum; //::testing::get<4>(test_param);
+  eig_param.eig_type = ::testing::get<0>(test_param);
+  eig_param.use_norm_op = ::testing::get<1>(test_param);
+  eig_param.use_pc = ::testing::get<2>(test_param);
+  eig_param.compute_svd = ::testing::get<3>(test_param);
+  eig_param.spectrum = ::testing::get<4>(test_param);
 
   if (eig_param.use_pc)
     eig_inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -175,7 +174,6 @@ std::vector<double> eigensolve(QudaEigType eig_type, QudaBoolean use_norm_op, Qu
   if (enable_testing) {
     eig_use_poly_acc = false;
     eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
-    eig_block_size != 4 ? eig_param.block_size = eig_block_size : eig_param.block_size = 4;
     eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
   }
 
@@ -185,7 +183,8 @@ std::vector<double> eigensolve(QudaEigType eig_type, QudaBoolean use_norm_op, Qu
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
 
-  display_test_info(eig_param);
+  if (!enable_testing || (enable_testing && getVerbosity() >= QUDA_VERBOSE))
+    display_test_info(eig_param);
 
   // Vector construct START
   //----------------------------------------------------------------------------
@@ -239,12 +238,13 @@ void cleanup()
 
 int main(int argc, char **argv)
 {
+  ::testing::InitGoogleTest(&argc, argv);
   // Set defaults
   setQudaStaggeredDefaultInvTestParams();
 
   auto app = make_app();
   add_eigen_option_group(app);
-  //add_testing_option_group(app);
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -284,18 +284,39 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
+  if (enable_testing) {
+    // We need to force a well-behaved operator + reasonable convergence, otherwise
+    // the staggered tests will fail. These checks are designed to be consistent
+    // with what's in [src]/tests/CMakeFiles.txt, which have been "sanity checked"
+    bool changes = false;
+    if (!compute_fatlong) { compute_fatlong = true; changes = true; }
+
+    double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-4 : 1e-5;
+    if (eig_tol != expected_tol) { eig_tol = expected_tol; changes = true; }
+    if (niter != 1000) { niter = 1000; changes = true; }
+    if (eig_n_kr != 256) { eig_n_kr = 256; changes = true; }
+    if (eig_block_size != 8) { eig_block_size = 8; }
+
+    if (changes) {
+      printfQuda("For gtest, various defaults are changed:\n");
+      printfQuda("  --compute-fat-long true\n");
+      printfQuda("  --eig-tol (1e-5 for double, 1e-4 for single)\n");
+      printfQuda("  --niter 1000\n");
+      printfQuda("  --eig-n-kr 256\n");
+    }
+  }
+
   init();
 
   int result = 0;
-  //if (enable_testing) { // tests are defined in invert_test_gtest.hpp
-    //::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-    //if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    //result = RUN_ALL_TESTS();
-  //} else {
-    //eigensolve(
-    //  test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
-    eigensolve(eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum);
-  //}
+  if (enable_testing) { // tests are defined in invert_test_gtest.hpp
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    result = RUN_ALL_TESTS();
+  } else {
+    eigensolve(
+      test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
+  }
 
   cleanup();
 
