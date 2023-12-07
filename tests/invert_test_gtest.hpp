@@ -69,10 +69,7 @@ TEST_P(InvertTest, verify)
   if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) inv_param.tol_hq = tol_hq;
 
   auto tol = inv_param.tol;
-  if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-    inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-    inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-    inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  if (is_chiral(inv_param.dslash_type)) {
     tol *= std::sqrt(static_cast<double>(inv_param.Ls));
   }
   // FIXME eventually we should build in refinement to the *NR solvers to remove the need for this
