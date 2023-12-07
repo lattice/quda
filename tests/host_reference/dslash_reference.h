@@ -117,6 +117,12 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda
                                 std::vector<quda::ColorSpinorField> &out_vector, quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                 QudaInvertParam &inv_param);
 
+double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Complex lambda, int i,
+                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link);
+
+double verifyStaggeredTypeSingularVector(quda::ColorSpinorField& spinor_left, quda::ColorSpinorField &spinor_right, double _Complex sigma, int i,
+                                         QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link);
+
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
 //

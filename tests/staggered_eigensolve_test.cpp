@@ -223,6 +223,18 @@ std::vector<double> eigensolve(test_t test_param)
   // ...
 
   std::vector<double> residua(eig_n_conv, 0.0);
+  // Perform host side verification of eigenvector if requested.
+  if (verify_results) {
+    for (int i = 0; i < eig_n_conv; i++) {
+      if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
+        double _Complex sigma = evals[i];
+        residua[i] = verifyStaggeredTypeSingularVector(evecs[i], evecs[i + eig_n_conv], sigma, i, eig_param, cpuFatQDP, cpuLongQDP);
+      } else {
+        double _Complex lambda = evals[i];
+        residua[i] = verifyStaggeredTypeEigenvector(evecs[i], lambda, i, eig_param, cpuFatQDP, cpuLongQDP);
+      }
+    }
+  }
   return residua;
   // QUDA eigensolver test COMPLETE
   //----------------------------------------------------------------------------

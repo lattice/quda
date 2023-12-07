@@ -839,3 +839,82 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda
 
   return {l2r_max, hqr_max};
 }
+
+double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Complex lambda, int i,
+                                   QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
+{
+  QudaInvertParam& inv_param = *(eig_param.invert_param);
+  int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
+  bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
+  bool normop = (eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? true : false);
+  double mass = inv_param.mass;
+
+  // Reverse engineer a "solution_type" to help determine which host dslash needs to be applied
+  QudaSolutionType sol_type = QUDA_INVALID_SOLUTION;
+  if (normop) {
+    if (use_pc) errorQuda("The normal preconditioned staggered op is not supported");
+    else sol_type = QUDA_MATDAG_MAT_SOLUTION;
+  } else {
+    if (use_pc) sol_type = QUDA_MATPC_SOLUTION;
+    else sol_type = QUDA_MAT_SOLUTION;
+  }
+
+  // Create temporary spinors
+  quda::ColorSpinorParam csParam(spinor);
+  quda::ColorSpinorField ref(csParam);
+  quda::ColorSpinorField tmp(csParam);
+
+  if (sol_type == QUDA_MAT_SOLUTION) {
+    stag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
+  } else if (sol_type == QUDA_MATPC_SOLUTION) {
+    QudaParity parity = QUDA_INVALID_PARITY;
+    switch (inv_param.matpc_type) {
+      case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
+      case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
+      default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
+    }
+    stag_matpc(ref, fat_link, long_link, spinor, mass, 0, tmp, parity, dslash_type);
+  } else if (sol_type == QUDA_MATDAG_MAT_SOLUTION) {
+    stag_mat(tmp, fat_link, long_link, spinor, mass, dagger, dslash_type);
+    stag_mat(ref, fat_link, long_link, tmp, mass, 1 - dagger, dslash_type);
+  }
+
+  // Compute M * x - \lambda * x
+  caxpy(-lambda, spinor.data(), ref.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  double l2r = sqrt(nrm2 / src2);
+
+  printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+
+  return l2r;
+}
+
+double verifyStaggeredTypeSingularVector(quda::ColorSpinorField& spinor_left, quda::ColorSpinorField &spinor_right, double _Complex sigma, int i,
+                                         QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
+{
+  QudaInvertParam& inv_param = *(eig_param.invert_param);
+  int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
+  bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
+  double mass = inv_param.mass;
+
+  if (use_pc)
+    errorQuda("The SVD of the preconditioned staggered op is not supported");
+
+  // Create temporary spinors
+  quda::ColorSpinorParam csParam(spinor_left);
+  quda::ColorSpinorField ref(csParam);
+
+  // Only `mat` is used here
+  stag_mat(ref, fat_link, long_link, spinor_left, mass, dagger, dslash_type);
+
+  // Compute M * x_left - \sigma * x_right
+  caxpy(-sigma, spinor_right.data(), ref.data(), spinor_right.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(spinor_left.data(), spinor_left.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  double l2r = sqrt(nrm2 / src2);
+
+  printfQuda("Singular vector pair %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+
+  return l2r;
+}
