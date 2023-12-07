@@ -1193,7 +1193,7 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 endforeach(prec)
 
-# Eigensolves
+# Wilson-type eigensolves
 foreach(prec IN LISTS TEST_PRECS)
 
   if(${prec} STREQUAL "double")
@@ -1359,6 +1359,48 @@ foreach(prec IN LISTS TEST_PRECS)
       --gtest_output=xml:eigensolve_test_mobius_eofa_asym_${prec}.xml)
   endif()
 endforeach(prec)
+
+# Staggered-type eigensolves
+foreach(prec IN LISTS TEST_PRECS)
+
+  # These require looser tolerances to keep iterations to solution in check
+  if(${prec} STREQUAL "double")
+    set(tol 1e-6)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-5)
+  endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    # --compute-fat-long true is necessary to get well-behaved fields
+
+    add_test(NAME eigensolve_test_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --compute-fat-long true
+      --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --enable-testing true
+      --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+
+    add_test(NAME eigensolve_test_asqtad_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type asqtad --compute-fat-long true
+      --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+      --dim 6 6 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --enable-testing true
+      --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+
+    if (QUDA_LAPLACE)
+      add_test(NAME eigensolve_test_laplace_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type laplace --compute-fat-long true
+        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+        --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+        --enable-testing true
+        --gtest_output=xml:staggered_eigensolve_test_laplace_${prec}.xml)
+    endif()
+  endif()
+endforeach(prec)
+
 
 if(QUDA_DIRAC_STAGGERED)
   add_test(NAME hisq_stencil
