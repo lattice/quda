@@ -194,15 +194,13 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
 void constructHostGaugeField(quda::GaugeField &gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
   if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
-    constructHostGaugeField(gauge.raw_pointer(), gauge_param, argc, argv);
+    constructHostGaugeField(static_cast<void **>(gauge.raw_pointer()), gauge_param, argc, argv);
   } else {
     GaugeFieldParam param(gauge);
     param.order = QUDA_QDP_GAUGE_ORDER;
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField u(param);
-
-    constructHostGaugeField(u.raw_pointer(), gauge_param, argc, argv);
-
+    constructHostGaugeField(static_cast<void **>(u.raw_pointer()), gauge_param, argc, argv);
     gauge = u;
   }
 }
@@ -1470,7 +1468,7 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
 
 void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase)
 {
-  if (u.Order() == QUDA_QDP_GAUGE_ORDER) createSiteLinkCPU(link.raw_pointer(), precision, phase);
+  if (u.Order() == QUDA_QDP_GAUGE_ORDER) createSiteLinkCPU(static_cast<void **>(u.raw_pointer()), precision, phase);
   else errorQuda("Unsupported gauge order %d", u.Order());
 }
 
@@ -1531,14 +1529,14 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
   return ret;
 }
 
-static int compare_link(const GaugeField &linkA, const GaugeField &linkB)
+static int compare_link(const GaugeField &a, const GaugeField &b)
 {
-  if (checkOrder(linkA, linkB) != QUDA_QDP_ORDER) errorQuda("Unsupported gauge order %d", linkA.Order());
+  if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
   int ret;
-  if (checkPrecision(linkA, linkB) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(static_cast<double **>(a.raw_pointer()), static_cast<double **>(b.raw_pointer()), linkA.Volume());
+  if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
+    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()), a.Volume());
   } else {
-    ret = compareLink(static_cast<float **>(a.raw_pointer()), static_cast<float **>(b.raw_pointer()), linkA.Volume());
+    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()), a.Volume());
   }
 
   return ret;
@@ -1580,7 +1578,7 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
 
 int strong_check_link(const GaugeField &linkA, const std::string &msgA, const GaugeField &linkB, const std::string &msgB)
 {
-  if (checkOrder(linkA, linkB) != QUDA_QDP_ORDER) errorQuda("Unsupported gauge order %d", linkA.Order());
+  if (linkA.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", linkA.Order());
   if (verbosity >= QUDA_VERBOSE) {
     printfQuda("%s\n", msgA.c_str());
     printLinkElement(linkA.data(0), 0, prec);

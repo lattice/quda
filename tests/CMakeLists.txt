@@ -1302,13 +1302,27 @@ foreach(prec IN LISTS TEST_PRECS)
                    --dim 2 4 6 8 --prec ${prec}
                    --gtest_output=xml:gauge_path_test_${prec}.xml)
 
-  add_test(NAME TMCloverForce_test_${prec}
+
+  if(QUDA_DIRAC_CLOVER)
+    add_test(NAME clover_force_test_${prec}
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:TMCloverForce_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
-                   --dslash-type twisted-clover --compute-clover 1 
-                   --matpc even-even-asym            
-                   --gtest_output=xml:TMCloverForce_test_${prec}.xml)
-        
+                   --dslash-type clover --compute-clover true
+                   --matpc even-even-asym
+                   --enable-testing true
+                   --gtest_output=xml:clover_force_test_${prec}.xml)
+   endif()
+
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    add_test(NAME tmc_clover_force_test_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:TMCloverForce_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --dslash-type twisted-clover --compute-clover true
+                   --matpc even-even-asym
+                   --enable-testing true
+                   --gtest_output=xml:tmc_clover_force_test_${prec}.xml)
+   endif()
+
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}

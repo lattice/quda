@@ -4494,7 +4494,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
                             QudaInvertParam *inv_param)
 {
   using namespace quda;
-  auto profile = pushProfile(profileCloverForce);
+  auto profile = pushProfile(profileCloverForce, inv_param->secs, inv_param->gflops);
 
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
@@ -4608,7 +4608,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
 {
   using namespace quda;
-  auto profile = pushProfile(profileTMCloverForce);
+  auto profile = pushProfile(profileTMCloverForce, inv_param->secs, inv_param->gflops);
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaGaugeParam(gauge_param);
