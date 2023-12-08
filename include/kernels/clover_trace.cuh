@@ -39,8 +39,8 @@ namespace quda {
   {
     using namespace linalg; // for Cholesky
     using real = typename Arg::real;
-    constexpr int N = Arg::nColor * Arg::nSpin / 2;
-    using Mat = HMatrix<real, N>;
+    constexpr int N = Arg::nColor;
+    using Mat = HMatrix<real, N * Arg::nSpin / 2>;
     Mat A[2];
 
     // load the clover term into memory
@@ -56,7 +56,7 @@ namespace quda {
         }
 
         // compute the Cholesky decomposition
-        Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A[ch]);
+        Cholesky<HMatrix, clover::cholesky_t<real>, N * Arg::nSpin / 2> cholesky(A[ch]);
         A[ch] = cholesky.template invert<Mat>(); // return full inverse
       }
 
@@ -80,16 +80,16 @@ namespace quda {
         if (nu == 0) {
           if (mu == 1) {
 #pragma unroll
-            for (int j=0; j<3; ++j) {
-              mat(j, j).imag(A0(j + 3, j + 3).real() + A1(j + 3, j + 3).real() - A0(j, j).real() - A1(j, j).real());
+            for (int j=0; j<N; ++j) {
+              mat(j, j).imag(A0(j + N, j + N).real() + A1(j + N, j + N).real() - A0(j, j).real() - A1(j, j).real());
             }
 
             // triangular part
 #pragma unroll
-            for (int j=1; j<3; ++j) {
+            for (int j=1; j<N; ++j) {
 #pragma unroll
               for (int k=0; k<j; ++k) {
-                auto ctmp = A0(j + 3, k + 3) + A1(j + 3, k + 3) - A0(j, k) - A1(j, k);
+                auto ctmp = A0(j + N, k + N) + A1(j + N, k + N) - A0(j, k) - A1(j, k);
                 mat(j, k) = i_(ctmp);
                 mat(k, j) =  i_(conj(ctmp));
               }
@@ -98,19 +98,19 @@ namespace quda {
           } else if (mu == 2) {
 
 #pragma unroll
-            for (int j=0; j<3; ++j) {
+            for (int j=0; j<N; ++j) {
 #pragma unroll
-              for (int k=0; k<3; ++k) {
-                mat(j,k) = conj(A0(k + 3, j)) - A0(j + 3, k) + conj(A1(k + 3, j)) - A1(j + 3, k);
+              for (int k=0; k<N; ++k) {
+                mat(j,k) = conj(A0(k + N, j)) - A0(j + N, k) + conj(A1(k + N, j)) - A1(j + N, k);
               }
             } // X Z
 
           } else if (mu == 3) {
 #pragma unroll
-            for (int j=0; j<3; ++j) {
+            for (int j=0; j<N; ++j) {
 #pragma unroll
-              for (int k=0; k<3; ++k) {
-                mat(j, k) = i_(conj(A0(k + 3, j)) + A0(j + 3, k) - conj(A1(k + 3, j)) - A1(j + 3, k));
+              for (int k=0; k<N; ++k) {
+                mat(j, k) = i_(conj(A0(k + N, j)) + A0(j + N, k) - conj(A1(k + N, j)) - A1(j + N, k));
               }
             }
           } // mu == 3 // X T
@@ -118,33 +118,33 @@ namespace quda {
         } else if (nu == 1) {
           if (mu == 2) { // Y Z
 #pragma unroll
-            for (int j=0; j<3; ++j) {
+            for (int j=0; j<N; ++j) {
 #pragma unroll
-              for (int k=0; k<3; ++k) {
-                mat(j, k) = -i_(conj(A0(k + 3, j)) + A0(j + 3, k) + conj(A1(k + 3, j)) + A1(j + 3, k));
+              for (int k=0; k<N; ++k) {
+                mat(j, k) = -i_(conj(A0(k + N, j)) + A0(j + N, k) + conj(A1(k + N, j)) + A1(j + N, k));
               }
             }
           } else if (mu == 3){ // Y T
 #pragma unroll
-            for (int j=0; j<3; ++j) {
+            for (int j=0; j<N; ++j) {
 #pragma unroll
-              for (int k=0; k<3; ++k) {
-                mat(j, k) = conj(A0(k + 3, j)) - A0(j + 3, k) - conj(A1(k + 3, j)) + A1(j + 3, k);
+              for (int k=0; k<N; ++k) {
+                mat(j, k) = conj(A0(k + N, j)) - A0(j + N, k) - conj(A1(k + N, j)) + A1(j + N, k);
               }
             }
           } // mu == 3
         } // nu == 1
         else if (nu == 2){
-          if (mu == 3) {
+          if (mu == N) {
 #pragma unroll
-            for (int j=0; j<3; ++j) {
-              mat(j, j).imag(A0(j, j).real() - A0(j + 3, j + 3).real() - A1(j, j).real() + A1(j + 3, j + 3).real());
+            for (int j=0; j<N; ++j) {
+              mat(j, j).imag(A0(j, j).real() - A0(j + N, j + N).real() - A1(j, j).real() + A1(j + N, j + N).real());
             }
 #pragma unroll
-            for (int j=1; j<3; ++j) {
+            for (int j=1; j<N; ++j) {
 #pragma unroll
               for (int k=0; k<j; ++k) {
-                auto ctmp = A0(j, k) - A0(j + 3, k + 3) - A1(j, k) + A1(j + 3, k + 3);
+                auto ctmp = A0(j, k) - A0(j + N, k + N) - A1(j, k) + A1(j + N, k + N);
                 mat(j, k) = i_(ctmp);
                 mat(k, j) = i_(conj(ctmp));
               }

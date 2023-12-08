@@ -10,24 +10,27 @@ namespace quda {
   class CloverSigmaTrace : TunableKernel1D {
     GaugeField &output;
     const CloverField &clover;
+    const bool twisted;
     Float coeff;
     const int parity;
     unsigned int minThreads() const { return clover.VolumeCB(); }
 
   public:
-    CloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity) :
+    CloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity) :
       TunableKernel1D(output),
       output(output),
       clover(clover),
+      twisted(clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       coeff(static_cast<Float>(coeff)),
       parity(parity)
     {
+      if (twisted) strcat(aux, ",twisted");
       apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
+      if (twisted) {
         launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, true>(output, clover, coeff, parity));
       } else {
         launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, false>(output, clover, coeff, parity));
