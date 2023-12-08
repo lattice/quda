@@ -13,7 +13,7 @@ namespace quda {
     const bool twisted;
     Float coeff;
     const int parity;
-    unsigned int minThreads() const { return clover.VolumeCB(); }
+    unsigned int minThreads() const override { return clover.VolumeCB(); }
 
   public:
     CloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity) :
@@ -28,7 +28,8 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream) override
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (twisted) {
         launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, true>(output, clover, coeff, parity));
@@ -37,11 +38,11 @@ namespace quda {
       }
     }
 
-    void preTune() { output.backup(); }
-    void postTune() { output.restore(); }
+    void preTune() override { output.backup(); }
+    void postTune() override { output.restore(); }
 
-    long long flops() const { return 0; } // Fix this
-    long long bytes() const { return clover.Bytes() + output.Bytes(); }
+    long long flops() const override { return 0; } // Fix this
+    long long bytes() const override { return clover.Bytes() + output.Bytes(); }
   };
 
   void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity)

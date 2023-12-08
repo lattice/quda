@@ -17,7 +17,7 @@ namespace quda {
     cvector_ref<const ColorSpinorField> &inA;
     cvector_ref<const ColorSpinorField> &inB;
     const std::vector<array<double, 2>> &coeff;
-    unsigned int minThreads() const { return oprod.VolumeCB(); }
+    unsigned int minThreads() const override { return oprod.VolumeCB(); }
 
   public:
     CloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
@@ -34,7 +34,7 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       switch (inA.size()) {
@@ -43,14 +43,14 @@ namespace quda {
       }
     } // apply
 
-    void preTune() { oprod.backup(); }
-    void postTune() { oprod.restore(); }
+    void preTune() override { oprod.backup(); }
+    void postTune() override { oprod.restore(); }
 
-    long long flops() const
+    long long flops() const override
     {
       return ((144 + 18) * inA.size() + 18) * 6 * oprod.Volume(); // spin trace + multiply-add
     }
-    long long bytes() const
+    long long bytes() const override
     {
       return (inA[0].Bytes() + inB[0].Bytes()) * inA.size() * 6 + 2 * oprod.Bytes();
     }

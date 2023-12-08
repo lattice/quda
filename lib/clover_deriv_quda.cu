@@ -11,7 +11,7 @@ namespace quda {
     GaugeField &gauge;
     GaugeField &oprod;
     double coeff;
-    unsigned int minThreads() const { return gauge.LocalVolumeCB(); }
+    unsigned int minThreads() const override { return gauge.LocalVolumeCB(); }
 
   public:
     DerivativeClover(GaugeField &gauge, GaugeField &force, GaugeField &oprod, double coeff) :
@@ -24,16 +24,16 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream) override {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<CloverDerivative>(tp, stream, CloverDerivArg<Float, nColor, recon>(force, gauge, oprod, coeff));
     }
 
     // The force field is updated so we must preserve its initial state
-    void preTune() { force.backup(); }
-    void postTune() { force.restore(); }
+    void preTune() override { force.backup(); }
+    void postTune() override { force.restore(); }
 
-    long long flops() const
+    long long flops() const override
     {
       auto gemm_flops = 8 * nColor * nColor * nColor - 2 * nColor * nColor;
       return 32 * gemm_flops * 12 * gauge.LocalVolume();

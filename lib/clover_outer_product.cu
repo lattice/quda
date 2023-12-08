@@ -20,7 +20,7 @@ namespace quda {
     const real coeff;
     OprodKernelType kernel;
     int dir;
-    unsigned int minThreads() const { return kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
+    unsigned int minThreads() const override { return kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
 
   public:
     CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
@@ -70,13 +70,13 @@ namespace quda {
       }
     }
 
-    void preTune() { force.backup(); }
-    void postTune() { force.restore(); }
+    void preTune() override { force.backup(); }
+    void postTune() override { force.restore(); }
 
     // spin trace + multiply-add (ignore spin-project)
-    long long flops() const { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
+    long long flops() const override { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
 
-    long long bytes() const
+    long long bytes() const override
     {
       if (kernel == INTERIOR) {
 	return inA.Bytes() + inC.Bytes() + 4*(inB.Bytes() + inD.Bytes()) + force.Bytes() + U.Bytes() / 2;

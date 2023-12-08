@@ -73,7 +73,7 @@ void destroy()
 
 using test_t = ::testing::tuple<bool, int>;
 
-std::array<double, 2> clover_force_test(test_t param)
+std::tuple<int, double> clover_force_test(test_t param)
 {
   bool detratio = ::testing::get<0>(param);
   int nvector = ::testing::get<1>(param);
@@ -161,8 +161,8 @@ public:
 TEST_P(CloverForceTest, verify)
 {
   auto deviation = clover_force_test(GetParam());
-  ASSERT_EQ(deviation[0], 1) << "CPU and QUDA force implementations do not agree";
-  ASSERT_LE(deviation[1], getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
+  ASSERT_EQ(std::get<0>(deviation), 1) << "CPU and QUDA force implementations do not agree";
+  ASSERT_LE(std::get<1>(deviation), getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
 }
 
 static void display_test_info()
