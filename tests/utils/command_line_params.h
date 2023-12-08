@@ -430,5 +430,4 @@ extern std::array<int, 4> grid_partition;
 
 extern bool enable_testing;
 
-extern int nvector;
 extern bool detratio;

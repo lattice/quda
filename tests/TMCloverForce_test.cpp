@@ -78,10 +78,10 @@ std::tuple<int, double> clover_force_test(test_t param)
   bool detratio = ::testing::get<0>(param);
   int nvector = ::testing::get<1>(param);
 
-  std::vector<quda::ColorSpinorField> out_nvector(nvector * Nsrc);
-  std::vector<std::vector<void *>> in(Nsrc, std::vector<void *>(nvector));
-  std::vector<quda::ColorSpinorField> out_nvector0(nvector * Nsrc);
-  std::vector<std::vector<void *>> in0(Nsrc, std::vector<void *>(nvector));
+  std::vector<quda::ColorSpinorField> out_nvector(nvector);
+  std::vector<void *> in(nvector);
+  std::vector<quda::ColorSpinorField> out_nvector0(nvector);
+  std::vector<void *> in0(nvector);
 
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
@@ -91,15 +91,13 @@ std::tuple<int, double> clover_force_test(test_t param)
   inv_param.num_offset = nvector;
   for (int i = 0; i < nvector; i++) {
     // Allocate memory and set pointers
-    for (int n = 0; n < Nsrc; n++) {
-      out_nvector[n * nvector + i] = quda::ColorSpinorField(cs_param);
-      spinorNoise(out_nvector[n * nvector + i], rng, QUDA_NOISE_GAUSS);
-      in[n][i] = out_nvector[n * nvector + i].data();
+    out_nvector[i] = quda::ColorSpinorField(cs_param);
+    spinorNoise(out_nvector[i], rng, QUDA_NOISE_GAUSS);
+    in[i] = out_nvector[i].data();
 
-      out_nvector0[n * nvector + i] = quda::ColorSpinorField(cs_param);
-      spinorNoise(out_nvector0[n * nvector + i], rng, QUDA_NOISE_GAUSS);
-      in0[n][i] = out_nvector0[n * nvector + i].data();
-    }
+    out_nvector0[i] = quda::ColorSpinorField(cs_param);
+    spinorNoise(out_nvector0[i], rng, QUDA_NOISE_GAUSS);
+    in0[i] = out_nvector0[i].data();
   }
 
   std::vector<double> coeff(nvector);
@@ -108,16 +106,16 @@ std::tuple<int, double> clover_force_test(test_t param)
     coeff[i] += coeff[i] * (i + 1) / 10.0;
   }
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  gauge_param.overwrite_mom = 1;
   if (getTuning() == QUDA_TUNE_YES)
-    computeTMCloverForceQuda(mom.data(), in[0].data(), in0[0].data(), coeff.data(), nvector, &gauge_param, &inv_param,
+    computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
                              detratio);
 
   // Multiple execution to exclude warmup time in the first run
   double time_sec = 0.0;
   double gflops = 0.0;
   for (int i = 0; i < niter; i++) {
-    mom = mom_ref; // restore initial momentum for correctness
-    computeTMCloverForceQuda(mom.data(), in[0].data(), in0[0].data(), coeff.data(), nvector, &gauge_param, &inv_param,
+    computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
                              detratio);
     time_sec += inv_param.secs;
     gflops += inv_param.gflops;
@@ -127,7 +125,8 @@ std::tuple<int, double> clover_force_test(test_t param)
   std::array<void *, 4> u = {gauge.data(0), gauge.data(1), gauge.data(2), gauge.data(3)};
   if (verify_results) {
     gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-    TMCloverForce_reference(mom_ref.data(), in[0].data(), in0[0].data(), coeff.data(), nvector, u, clover, clover_inv,
+    mom_ref.zero();
+    TMCloverForce_reference(mom_ref.data(), in.data(), in0.data(), coeff.data(), nvector, u, clover, clover_inv,
                             &gauge_param, &inv_param, detratio);
     *check_out
       = compare_floats(mom.data(), mom_ref.data(), 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
@@ -218,7 +217,7 @@ int main(int argc, char **argv)
 
     test_rc = RUN_ALL_TESTS();
   } else {
-    clover_force_test({detratio, nvector});
+    clover_force_test({detratio, Nsrc});
   }
 
   destroy();

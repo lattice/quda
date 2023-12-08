@@ -302,8 +302,8 @@ bool   smear_delete_two_link  = true;
 
 bool enable_testing = false;
 
-int nvector = 1;
 bool detratio = false;
+
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
@@ -1122,7 +1122,5 @@ void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
-  opgroup->add_option("--nvector", nvector, "Test multiple quark fields. Default is 1");
   opgroup->add_option("--detratio", detratio, "Test a ratio of determinants. Default is false");
-  
 }

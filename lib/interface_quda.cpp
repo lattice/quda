@@ -3838,7 +3838,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   gParamMom.create = qudaGaugeParam->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
   gParamMom.field = &cpuMom;
   gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
-  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParamMom.setPrecision(qudaGaugeParam->cuda_prec, true);
 
   GaugeField cudaMom = qudaGaugeParam->use_resident_mom ? momResident.create_alias() : GaugeField(gParamMom);
@@ -4498,6 +4497,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
+  if (!cloverPrecise) errorQuda("No resident clover field");
 
   GaugeFieldParam fParam(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   // create the host momentum field
@@ -4506,13 +4506,15 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   // create the device momentum field
   fParam.location = QUDA_CUDA_FIELD_LOCATION;
-  fParam.create = QUDA_COPY_FIELD_CREATE;
+  fParam.create = gauge_param->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
   fParam.field = &cpuMom;
+  fParam.reconstruct = QUDA_RECONSTRUCT_10;
   fParam.setPrecision(gauge_param->cuda_prec, true);
 
   if (gauge_param->use_resident_mom && !momResident.Length()) errorQuda("No resident momentum field to use");
   GaugeField cudaMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(fParam);
-  
+  if (gauge_param->use_resident_mom && gauge_param->overwrite_mom) cudaMom.zero();
+
   // create the device force field
   fParam.link_type = QUDA_GENERAL_LINKS;
   fParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -4610,27 +4612,29 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   using namespace quda;
   auto profile = pushProfile(profileTMCloverForce, inv_param->secs, inv_param->gflops);
 
+  checkGaugeParam(gauge_param);
+  if (!gaugePrecise) errorQuda("No resident gauge field");
+  if (!cloverPrecise) errorQuda("No resident clover field");
+
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaGaugeParam(gauge_param);
 
   double kappa = inv_param->kappa;
   double k_csw_ov_8 = kappa * inv_param->clover_csw / 8.0;
 
-  checkGaugeParam(gauge_param);
-  if (!gaugePrecise) errorQuda("No resident gauge field");
-  if (!cloverPrecise) errorQuda("No resident clover field");
-
   GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
-  GaugeField cpuMom(gParamMom);
+  GaugeField cpuMom = !gauge_param->use_resident_mom ? GaugeField(gParamMom) : GaugeField();
 
   //create the device momentum field
   gParamMom.location = QUDA_CUDA_FIELD_LOCATION;
-  gParamMom.create =  QUDA_COPY_FIELD_CREATE;
+  gParamMom.create = gauge_param->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
   gParamMom.field = &cpuMom;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
   gParamMom.setPrecision(gauge_param->cuda_prec, true);
 
   if (gauge_param->use_resident_mom && !momResident.Length()) errorQuda("No resident momentum field to use");
   GaugeField gpuMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(gParamMom);
+  if (gauge_param->use_resident_mom && gauge_param->overwrite_mom) gpuMom.zero();
 
   // create the device force field
   gParamMom.link_type = QUDA_GENERAL_LINKS;
