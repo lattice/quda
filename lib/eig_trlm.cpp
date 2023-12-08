@@ -28,7 +28,8 @@ namespace quda
     beta.resize(n_kr, 0.0);
 
     // Thick restart specific checks
-    if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
+    if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than or equal to n_ev+6=%d\n", n_kr, n_ev + 6);
+    if (n_kr < n_conv + 12) errorQuda("n_kr=%d must be greater than or equal to n_conv+12=%d\n", n_kr, n_conv + 12);
 
     if (!(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
