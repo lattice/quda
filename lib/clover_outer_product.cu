@@ -135,7 +135,6 @@ namespace quda {
                           cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff)
   {
     if constexpr (clover::is_enabled()) {
-      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkNative(x[0], p[0], force, U);
       checkPrecision(x[0], p[0], force, U);
 
@@ -148,13 +147,16 @@ namespace quda {
           const ColorSpinorField &inC = (parity&1) ? p[i].Odd() : p[i].Even();
           const ColorSpinorField &inD = (parity&1) ? x[i].Even(): x[i].Odd();
 
+          getProfile().TPSTART(QUDA_PROFILE_COMMS);
           exchangeGhost(inB, parity, dag);
           exchangeGhost(inD, parity, 1-dag);
+          getProfile().TPSTOP(QUDA_PROFILE_COMMS);
 
+          getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
           instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
+          getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
         }
       }
-      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
       errorQuda("Clover Dirac operator has not been built!");
     }
