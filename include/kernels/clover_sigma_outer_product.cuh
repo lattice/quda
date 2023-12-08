@@ -34,7 +34,7 @@ namespace quda
       for (int i = 0; i < nvector; i++) {
         this->inA[i] = inA[i];
         this->inB[i] = inB[i];
-        coeff[i] = {static_cast<Float>(coeff_[i][0]), static_cast<Float>(coeff_[i][1])};
+        coeff[i] = {static_cast<real>(coeff_[i][0]), static_cast<real>(coeff_[i][1])};
       }
     }
   };
