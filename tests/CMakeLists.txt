@@ -246,10 +246,12 @@ target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-add_executable(TMCloverForce_test TMCloverForce_test.cpp)
-target_link_libraries(TMCloverForce_test ${TEST_LIBS})
-quda_checkbuildtest(TMCloverForce_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS TMCloverForce_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+  add_executable(clover_force_test clover_force_test.cpp)
+  target_link_libraries(clover_force_test ${TEST_LIBS})
+  quda_checkbuildtest(clover_force_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS clover_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 add_executable(gauge_alg_test gauge_alg_test.cpp)
 target_link_libraries(gauge_alg_test ${TEST_LIBS})
@@ -1305,7 +1307,7 @@ foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_DIRAC_CLOVER)
     add_test(NAME clover_force_test_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:TMCloverForce_test> ${MPIEXEC_POSTFLAGS}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --dslash-type clover --compute-clover true
                    --matpc even-even-asym
@@ -1315,7 +1317,7 @@ foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_DIRAC_TWISTED_CLOVER)
     add_test(NAME tmc_clover_force_test_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:TMCloverForce_test> ${MPIEXEC_POSTFLAGS}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --dslash-type twisted-clover --compute-clover true
                    --matpc even-even-asym
