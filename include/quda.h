@@ -1314,7 +1314,7 @@ extern "C" {
    * @param taste  Taste gamma structure
    * @param param  Metadata for host and device storage
    */
-  void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam *param);
+  void spinTasteQuda(void *h_out, void *h_in, int spin, int taste, QudaInvertParam *param);
 
   /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
