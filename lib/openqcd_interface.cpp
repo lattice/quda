@@ -71,7 +71,7 @@ template <bool start> void inline qudaopenqcd_called(const char *func, QudaVerbo
     POP_RANGE;
   }
 
-  #ifdef QUDA_OPENQCD_VERBOSE
+#ifdef QUDA_OPENQCD_VERBOSE
   if (verb >= QUDA_VERBOSE) {
     if (start) {
       printfQuda("QUDA_OPENQCD_INTERFACE: %s (called) \n", func);
@@ -953,7 +953,8 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     }
 
     if (kv.get<std::string>(section, "solver") != "QUDA") {
-      errorQuda("Solver section %s is not a quda-solver section\n", section);
+      errorQuda("Solver section \"%s\" in file %s is not a valid quda-solver section (solver = %s)\n",
+        section, infile, kv.get<std::string>(section, "solver").c_str());
     }
 
     /* both fields reside on the CPU */

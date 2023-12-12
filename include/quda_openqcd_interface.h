@@ -315,7 +315,9 @@ void openQCD_qudaSolverDestroy(void *param);
  *
  * @param[in]  infile       Ini-file containing sections about the eigen-solver
  * @param[in]  section      The section name of the eigen-solver
- * @param[in]  inv_section  The section name of the solver
+ * @param[in]  inv_section  The section name of the solver. If NULL, the section
+ *                          is not read in and the gauge and clover fields are
+ *                          not transfered/updated.
  *
  * @return     Pointer to the eigen-solver context
  */
