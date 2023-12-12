@@ -50,7 +50,7 @@ namespace quda {
       A[ch] *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
 
       if constexpr (Arg::dynamic_clover) {
-        if (Arg::twist) { // Compute (T^2 + mu2 - epsilon2) first, then invert
+        if constexpr (Arg::twist) { // Compute (T^2 + mu2 - epsilon2) first, then invert
           A[ch] = A[ch].square();
           A[ch] += arg.mu2_minus_epsilon2;
         }
