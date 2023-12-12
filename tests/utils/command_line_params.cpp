@@ -1122,5 +1122,5 @@ void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
-  opgroup->add_option("--detratio", detratio, "Test a ratio of determinants. Default is false");
+  opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
 }
