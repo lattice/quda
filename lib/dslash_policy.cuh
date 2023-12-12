@@ -647,7 +647,6 @@ namespace quda
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir]) {
               if (commsComplete(in, dslash, i, dir, true, true, false)) {
-                ;
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
