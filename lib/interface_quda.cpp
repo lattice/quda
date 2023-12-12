@@ -3034,7 +3034,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
   // the original one
   if (!gauge_param_)
     errorQuda("Input gauge_param is null");
-
   QudaGaugeParam gauge_param = *gauge_param_;
 
   if (num_sub_partition == 1) { // In this case we don't split the grid.
@@ -3078,10 +3077,10 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     GaugeFieldParam *gf_param = nullptr;
     GaugeField *in = nullptr;
     // Staggered gauge fields/params
-    GaugeFieldParam *milc_fatlink_param = nullptr;
-    GaugeFieldParam *milc_longlink_param = nullptr;
-    GaugeField *milc_fatlink_field = nullptr;
-    GaugeField *milc_longlink_field = nullptr;
+    GaugeFieldParam milc_fatlink_param;
+    GaugeFieldParam milc_longlink_param;
+    quda::GaugeField milc_fatlink_field;
+    quda::GaugeField milc_longlink_field;
 
     // set up the gauge field params.
     if (!is_staggered) { // not staggered
@@ -3089,16 +3088,14 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       if (gf_param->order <= 4) gf_param->ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       in = GaugeField::Create(*gf_param);
     } else { // staggered
-      milc_fatlink_param = new GaugeFieldParam(gauge_param, milc_fatlinks);
-      if (milc_fatlink_param->order <= 4) milc_fatlink_param->ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      milc_fatlink_param->order = QUDA_MILC_GAUGE_ORDER;
-      milc_fatlink_field = GaugeField::Create(*milc_fatlink_param);
+      milc_fatlink_param = GaugeFieldParam(gauge_param, milc_fatlinks);
+      milc_fatlink_param.order = QUDA_MILC_GAUGE_ORDER;
+      milc_fatlink_field = GaugeField(milc_fatlink_param);
 
       if (is_asqtad) {
-        milc_longlink_param = new GaugeFieldParam(gauge_param, milc_longlinks);
-        if (milc_longlink_param->order <= 4) milc_longlink_param->ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-        milc_longlink_param->order = QUDA_MILC_GAUGE_ORDER;
-        milc_longlink_field = GaugeField::Create(*milc_longlink_param);
+        milc_longlink_param = GaugeFieldParam(gauge_param, milc_longlinks);
+        milc_longlink_param.order = QUDA_MILC_GAUGE_ORDER;
+        milc_longlink_field = GaugeField(milc_longlink_param);
       }
     }
 
@@ -3133,10 +3130,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         gf_param->x[d] *= split_key[d];
         gf_param->pad *= split_key[d];
       } else {
-        milc_fatlink_param->x[d] *= split_key[d];
-        //milc_fatlink_param->pad *= split_key[d];
-        if (is_asqtad) milc_longlink_param->x[d] *= split_key[d];
-        //milc_longlink_param->pad *= split_key[d];
+        milc_fatlink_param.x[d] *= split_key[d];
+        if (is_asqtad) milc_longlink_param.x[d] *= split_key[d];
       }
       gauge_param.X[d] *= split_key[d];
       if (!is_staggered) gauge_param.ga_pad *= split_key[d];
@@ -3183,8 +3178,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     }
 
     quda::GaugeField *collected_gauge = nullptr;
-    quda::GaugeField *collected_milc_fatlink_field = nullptr;
-    quda::GaugeField *collected_milc_longlink_field = nullptr;
+    quda::GaugeField collected_milc_fatlink_field;
+    quda::GaugeField collected_milc_longlink_field;
 
     if (!is_staggered) {
       gf_param->create = QUDA_NULL_FIELD_CREATE;
@@ -3195,16 +3190,16 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     } else {
       std::vector<quda::GaugeField *> v_g(1);
 
-      milc_fatlink_param->create = QUDA_NULL_FIELD_CREATE;
-      collected_milc_fatlink_field = new quda::GaugeField(*milc_fatlink_param);
-      v_g[0] = milc_fatlink_field;
-      quda::split_field(*collected_milc_fatlink_field, v_g, split_key);
+      milc_fatlink_param.create = QUDA_NULL_FIELD_CREATE;
+      collected_milc_fatlink_field = GaugeField(milc_fatlink_param);
+      v_g[0] = &milc_fatlink_field;
+      quda::split_field(collected_milc_fatlink_field, v_g, split_key);
 
       if (is_asqtad) {
-        milc_longlink_param->create = QUDA_NULL_FIELD_CREATE;
-        collected_milc_longlink_field = new quda::GaugeField(*milc_longlink_param);
-        v_g[0] = milc_longlink_field;
-        quda::split_field(*collected_milc_longlink_field, v_g, split_key);
+        milc_longlink_param.create = QUDA_NULL_FIELD_CREATE;
+        collected_milc_longlink_field = GaugeField(milc_longlink_param);
+        v_g[0] = &milc_longlink_field;
+        quda::split_field(collected_milc_longlink_field, v_g, split_key);
       }
     }
 
@@ -3240,8 +3235,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (!is_staggered) {
       loadGaugeQuda(collected_gauge->raw_pointer(), &gauge_param);
     } else {
-      loadFatLongGaugeQuda(param, &gauge_param, collected_milc_fatlink_field->raw_pointer(),
-                           collected_milc_longlink_field->raw_pointer());
+      loadFatLongGaugeQuda(param, &gauge_param, collected_milc_fatlink_field.raw_pointer(),
+        (is_asqtad) ? collected_milc_longlink_field.raw_pointer() : nullptr);
     }
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
 
@@ -3286,14 +3281,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (!is_staggered) {
       delete in;
       delete collected_gauge;
-    } else {
-      delete milc_fatlink_field;
-      delete collected_milc_fatlink_field;
-
-      if (is_asqtad) {
-        delete milc_longlink_field;
-        delete collected_milc_longlink_field;
-      }
     }
 
     if (input_clover) { delete input_clover; }

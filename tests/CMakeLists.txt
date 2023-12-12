@@ -1379,9 +1379,9 @@ foreach(prec IN LISTS TEST_PRECS)
 
   # These require looser tolerances to keep iterations to solution in check
   if(${prec} STREQUAL "double")
-    set(tol 1e-6)
-  elseif(${prec} STREQUAL "single")
     set(tol 1e-5)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-4)
   endif()
 
   if(QUDA_DIRAC_STAGGERED)

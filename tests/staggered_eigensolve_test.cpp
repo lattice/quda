@@ -174,7 +174,7 @@ std::vector<double> eigensolve(test_t test_param)
   if (enable_testing) {
     eig_use_poly_acc = false;
     eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
-    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
+    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 0;
   }
 
   logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
     if (eig_tol != expected_tol) { eig_tol = expected_tol; changes = true; }
     if (niter != 1000) { niter = 1000; changes = true; }
     if (eig_n_kr != 256) { eig_n_kr = 256; changes = true; }
-    if (eig_block_size != 8) { eig_block_size = 8; }
+    if (eig_block_size != 4) { eig_block_size = 4; }
 
     if (changes) {
       printfQuda("For gtest, various defaults are changed:\n");

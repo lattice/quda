@@ -102,6 +102,13 @@ bool skip_test(test_t test_param)
     }
   }
 
+  // There seems to be some stubborn issue with this combination on 2xGPUs that I can't quite
+  // comprehend, and am a bit tired to debugging.
+  //if (prec == QUDA_SINGLE_PRECISION && dslash_type == QUDA_ASQTAD_DSLASH &&
+  //    eig_type == QUDA_EIG_BLK_TR_LANCZOS && spectrum == QUDA_SPECTRUM_SR_EIG &&
+  //    combo_solve_type == QUDA_DIRECT_PC_SOLVE)
+  //    return true;
+
   return false;
 }
 
