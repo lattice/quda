@@ -7,6 +7,7 @@
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
+#include <comm_quda.h>
 
 namespace quda
 {
@@ -37,6 +38,8 @@ namespace quda
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     const real alpha;
     const int source_time;
+    const int comm_dim_3;
+    const int comm_coord_3;
 
     WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
@@ -48,7 +51,9 @@ namespace quda
       U(U),
       a(a),
       alpha(in.Alpha()),
-      source_time(in.SourceTime())
+      source_time(in.SourceTime()),
+      comm_dim_3(comm_dim(3)),
+      comm_coord_3(comm_coord(3))
     {
     }
   };
@@ -75,6 +80,13 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
+    // values for distance preconditioning
+    const int nt = arg.comm_dim_3 * arg.dim[3];
+    const int time_delta = arg.comm_coord_3 * arg.dim[3] + coord[3] - arg.source_time + nt;
+    const real denom = cosh(arg.alpha * ((time_delta) % nt - nt / 2));
+    const real ratio_plus = cosh(arg.alpha * ((time_delta + 1) % nt - nt / 2)) / denom;
+    const real ratio_minus = cosh(arg.alpha * ((time_delta - 1) % nt - nt / 2)) / denom;
+
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
@@ -94,9 +106,7 @@ namespace quda
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
           if (d == 3) {
-            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
-            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time + 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
-            out += ratio * (U * in).reconstruct(d, proj_dir);
+            out += ratio_plus * (U * in).reconstruct(d, proj_dir);
           } else {
             out += (U * in).reconstruct(d, proj_dir);
           }
@@ -106,9 +116,7 @@ namespace quda
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           if (d == 3) {
-            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
-            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time + 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
-            out += ratio * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out += ratio_plus * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           } else {
             out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
@@ -132,9 +140,7 @@ namespace quda
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
           if (d == 3) {
-            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
-            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time - 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
-            out += ratio * (conj(U) * in).reconstruct(d, proj_dir);
+            out += ratio_minus * (conj(U) * in).reconstruct(d, proj_dir);
           } else {
             out += (conj(U) * in).reconstruct(d, proj_dir);
           }
@@ -144,9 +150,7 @@ namespace quda
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           if (d == 3) {
-            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
-            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time - 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
-            out += ratio * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out += ratio_minus * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           } else {
             out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
