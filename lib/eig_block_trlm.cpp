@@ -83,7 +83,7 @@ namespace quda
     checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
-    double mat_norm = 0.0;
+    //double mat_norm = 0.0;
     double epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
@@ -106,15 +106,15 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated.
-      for (int i = num_locked; i < n_kr; i++)
-        if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+      //for (int i = num_locked; i < n_kr; i++)
+      //  if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
-        if (residua[i + num_locked] < epsilon * mat_norm) {
+        if (residua[i + num_locked] < epsilon * fabs(alpha[i + num_locked]) /*mat_norm*/) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  epsilon * mat_norm);
+                  epsilon * fabs(alpha[i + num_locked]) /*mat_norm*/);
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -125,9 +125,9 @@ namespace quda
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
-        if (residua[i + num_locked] < tol * mat_norm) {
+        if (residua[i + num_locked] < tol * fabs(alpha[i + num_locked]) /*mat_norm*/) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  tol * mat_norm);
+                  tol * fabs(alpha[i + num_locked]) /*mat_norm*/);
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs

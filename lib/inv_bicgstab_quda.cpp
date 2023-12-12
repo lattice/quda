@@ -44,7 +44,7 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b); // norm sq of source
-    double r2;                  // norm sq of residual
+    double r2 = 0.0;            // norm sq of residual
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
