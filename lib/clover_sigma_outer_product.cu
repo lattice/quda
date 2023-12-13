@@ -59,7 +59,7 @@ namespace quda {
   void computeCloverSigmaOprod(GaugeField& oprod, cvector_ref<const ColorSpinorField> &x,
 			       cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2> > &coeff)
   {
-    if constexpr (clover::is_enabled()) {
+    if constexpr (is_enabled_clover()) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       if (x.size() > MAX_NVECTOR) {
         // divide and conquer

@@ -47,7 +47,7 @@ namespace quda {
 
   void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity)
   {
-    if constexpr (clover::is_enabled()) {
+    if constexpr (is_enabled_clover()) {
       checkNative(output, clover);
       instantiate<CloverSigmaTrace>(output, clover, coeff, parity);
     } else {

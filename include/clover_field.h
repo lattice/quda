@@ -7,14 +7,11 @@
 
 namespace quda {
 
-  namespace clover
-  {
-
     /**
        @brief Helper function that returns whether we have enabled
        clover fermions.
      */
-    constexpr bool is_enabled()
+    constexpr bool is_enabled_clover()
     {
 #ifdef GPU_CLOVER_DIRAC
       return true;
@@ -22,6 +19,9 @@ namespace quda {
       return false;
 #endif
     }
+
+  namespace clover
+  {
 
     /**
        @brief Helper function that returns whether we have enabled

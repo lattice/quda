@@ -134,7 +134,7 @@ namespace quda {
   void computeCloverForce(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
                           cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff)
   {
-    if constexpr (clover::is_enabled()) {
+    if constexpr (is_enabled_clover()) {
       checkNative(x[0], p[0], force, U);
       checkPrecision(x[0], p[0], force, U);
 

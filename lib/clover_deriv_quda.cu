@@ -46,7 +46,7 @@ namespace quda {
 
   void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff)
   {
-    if constexpr (clover::is_enabled()) {
+    if constexpr (is_enabled_clover()) {
       checkPrecision(force, gauge, oprod);
       assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
       assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
