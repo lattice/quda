@@ -134,17 +134,17 @@ void popOutputPrefix()
 
 char *getPrintBuffer() { return buffer_; }
 
-char* getOmpThreadStr() {
-  static char omp_thread_string[128];
+const char *getOmpThreadStr()
+{
+  static std::string omp_thread_string;
   static bool init = false;
   if (!init) {
-    strcpy(omp_thread_string,"omp_threads=");
-    char *omp_threads = getenv("OMP_NUM_THREADS");
-    strcat(omp_thread_string, omp_threads ? omp_threads : "1");
-    strcat(omp_thread_string, ",");
+#ifdef QUDA_OPENMP
+    omp_thread_string = std::string("omp_threads=" + std::to_string(omp_get_max_threads()) + ",");
+#endif
     init = true;
   }
-  return omp_thread_string;
+  return omp_thread_string.c_str();
 }
 
 void errorQuda_(const char *func, const char *file, int line, ...)

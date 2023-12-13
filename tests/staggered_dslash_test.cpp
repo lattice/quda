@@ -22,8 +22,6 @@ protected:
   }
 
 public:
-  StaggeredDslashTest() = default;
-
   virtual void SetUp()
   {
     dslash_test_wrapper.init_test(argc_copy, argv_copy);
@@ -37,7 +35,11 @@ public:
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
-  static void TearDownTestCase() { endQuda(); }
+  static void TearDownTestCase()
+  {
+    StaggeredDslashTestWrapper::destroy();
+    endQuda();
+  }
 };
 
 TEST_F(StaggeredDslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <quda_arch.h>
+#include <cmath>
 
 // tuple containing parameters for Schwarz solver
 using schwarz_t = ::testing::tuple<QudaSchwarzType, QudaInverterType, QudaPrecision>;
@@ -117,6 +118,8 @@ bool skip_test(test_t param)
     return true;
 #endif
   }
+  // split-grid doesn't support split-grid at present
+  if (use_split_grid && multishift > 1) return true;
 
   return false;
 }
@@ -134,6 +137,12 @@ TEST_P(InvertTest, verify)
   if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) inv_param.tol_hq = tol_hq;
 
   auto tol = inv_param.tol;
+  if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+    inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+    inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
+    inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    tol *= std::sqrt(static_cast<double>(inv_param.Ls));
+  }
   // FIXME eventually we should build in refinement to the *NR solvers to remove the need for this
   if (is_normal_residual(::testing::get<0>(GetParam()))) tol *= 50;
   // Slight loss of precision possible when reconstructing full solution

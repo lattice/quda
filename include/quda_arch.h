@@ -17,5 +17,8 @@
 
 #elif defined(QUDA_TARGET_OMPTARGET)
 #include <omp.h>
+#endif
 
+#ifdef QUDA_OPENMP
+#include <omp.h>
 #endif

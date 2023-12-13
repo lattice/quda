@@ -473,6 +473,7 @@ endif()
 
 if(QUDA_OPENMP)
   target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
+  target_compile_definitions(quda PUBLIC QUDA_OPENMP)
 endif()
 
 # set which precisions to enable
