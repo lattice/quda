@@ -1254,7 +1254,7 @@ namespace quda {
   }
 
   // helper for creating extended gauge fields
-  GaugeField *createExtendedGauge(GaugeField &in, const lat_dim_t &R, TimeProfile &profile, bool redundant_comms,
+  GaugeField *createExtendedGauge(const GaugeField &in, const lat_dim_t &R, TimeProfile &profile, bool redundant_comms,
                                   QudaReconstructType recon)
   {
     GaugeFieldParam gParamEx(in);

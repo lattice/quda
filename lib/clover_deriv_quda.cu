@@ -8,13 +8,13 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon> class DerivativeClover : TunableKernel3D {
     GaugeField &force;
-    GaugeField &gauge;
-    GaugeField &oprod;
+    const GaugeField &gauge;
+    const GaugeField &oprod;
     double coeff;
     unsigned int minThreads() const override { return gauge.LocalVolumeCB(); }
 
   public:
-    DerivativeClover(GaugeField &gauge, GaugeField &force, GaugeField &oprod, double coeff) :
+    DerivativeClover(const GaugeField &gauge, GaugeField &force, const GaugeField &oprod, double coeff) :
       TunableKernel3D(gauge, 2, 4),
       force(force),
       gauge(gauge),
@@ -44,7 +44,7 @@ namespace quda {
     }
   };
 
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff)
+  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff)
   {
     if constexpr (is_enabled_clover()) {
       checkPrecision(force, gauge, oprod);

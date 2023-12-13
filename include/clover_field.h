@@ -477,6 +477,29 @@ namespace quda {
   void cloverInvert(CloverField &clover, bool computeTraceLog);
 
   /**
+     @brief Driver for the clover force computation.  Eventually the
+     construction of the x and p fields will be delegated to this
+     function, but for now, we pre-compute these and pass them in.
+     @param mom[in,out] Momentum field to be updates
+     @param gaugeEx[in] Extended gauge field
+     @param gauge[in] Gauge field
+     @param clover[in] Clover field
+     @param x[in] Vector of quark solution fields
+     @param p[in] Vector of quark solution fields
+     @param coeff[in] Vector of coefficients for the quark field outer
+     products
+     @param epsilon[in] Vector of scalar coefficient pairs (one per
+     parity) for the clover sigma outer product
+     @param sigma_coeff[in] Coefficient for the tr log clover force
+     @param detratio[in] Whether to compute determinant ratio
+     @param parity[in] Which parity do we need compute the tr log clover force
+  */
+  void clover_force(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge, const CloverField &clover,
+                    cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
+                    const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                    double sigma_coeff, bool detratio, int parity);
+
+  /**
      @brief Compute the force contribution from the solver solution fields
 
      Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
@@ -531,7 +554,7 @@ namespace quda {
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
    */
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff);
+  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field

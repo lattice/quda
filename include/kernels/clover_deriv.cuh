@@ -22,7 +22,7 @@ namespace quda
     Gauge gauge;
     Oprod oprod;
 
-    CloverDerivArg(const GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff) :
+    CloverDerivArg(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff) :
       kernel_param(dim3(force.VolumeCB(), 2, 4)),
       coeff(coeff),
       force(force),
