@@ -466,7 +466,9 @@ namespace quda
     int Nspin() const { return nSpin; }
     int Nvec() const { return nVec; }
     double Alpha() const { return alpha; }
+    void setAlpha(const double alpha) { this->alpha = alpha; }
     int SourceTime() const {return source_time; }
+    void setSourceTime(const int source_time) { this->source_time = source_time; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int *X() const { return x.data; }

@@ -239,6 +239,8 @@ namespace quda
   {
     if (in.Alpha() != 0 && in.SourceTime() >= 0) {
       instantiate<WilsonCloverPreconditionedDistanceApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
+      out.setAlpha(in.Alpha());
+      out.setSourceTime(in.SourceTime());
     } else {
       instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
     }

@@ -174,6 +174,8 @@ namespace quda
   {
     if (in.Alpha() != 0 && in.SourceTime() >= 0) {
       instantiate<WilsonCloverDistanceApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
+      out.setAlpha(in.Alpha());
+      out.setSourceTime(in.SourceTime());
     } else {
       instantiate<WilsonCloverApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
     }

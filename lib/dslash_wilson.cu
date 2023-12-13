@@ -91,6 +91,8 @@ namespace quda
   {
     if (in.Alpha() != 0 && in.SourceTime() >= 0) {
       instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+      out.setAlpha(in.Alpha());
+      out.setSourceTime(in.SourceTime());
     } else {
       instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
     }
