@@ -4573,7 +4573,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
-  clover_force(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, p, force_coeff, ferm_epsilon, 2.0*ck*multiplicity*dt, false, 1);
+  computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, p, force_coeff, ferm_epsilon, 2.0*ck*multiplicity*dt, false, 1);
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -4691,7 +4691,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileTMCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
-  clover_force(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, p, force_coeff, ferm_epsilon, k_csw_ov_8 * 32.0, detratio, 0);
+  computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, p, force_coeff, ferm_epsilon, k_csw_ov_8 * 32.0, detratio, 0);
 
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 

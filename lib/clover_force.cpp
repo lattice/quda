@@ -5,10 +5,10 @@
 
 namespace quda {
 
-  void clover_force(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge, const CloverField &clover,
-                    cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
-                    const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
-                    double sigma_coeff, bool detratio, int parity)
+  void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge, const CloverField &clover,
+                          cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
+                          const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                          double sigma_coeff, bool detratio, int parity)
   {
     // create oprod and trace field
     GaugeFieldParam param(mom);

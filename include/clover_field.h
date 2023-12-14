@@ -494,10 +494,10 @@ namespace quda {
      @param detratio[in] Whether to compute determinant ratio
      @param parity[in] Which parity do we need compute the tr log clover force
   */
-  void clover_force(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge, const CloverField &clover,
-                    cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
-                    const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
-                    double sigma_coeff, bool detratio, int parity);
+  void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge, const CloverField &clover,
+                          cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
+                          const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                          double sigma_coeff, bool detratio, int parity);
 
   /**
      @brief Compute the force contribution from the solver solution fields
