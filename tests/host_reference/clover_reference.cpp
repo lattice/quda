@@ -21,6 +21,7 @@ template <typename sFloat, typename cFloat> void cloverReference(sFloat *out, cF
   int N = nColor * nSpin / 2;
   int chiralBlock = N + 2 * (N - 1) * N / 2;
 
+#pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
     std::complex<sFloat> *In = reinterpret_cast<std::complex<sFloat> *>(&in[i * nSpin * nColor * 2]);
     std::complex<sFloat> *Out = reinterpret_cast<std::complex<sFloat> *>(&out[i * nSpin * nColor * 2]);
@@ -86,7 +87,6 @@ void clover_dslash(void *out, void **gauge, void *clover, void *in, int parity, 
 void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void *in, double kappa,
                   QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   double kappa2 = -kappa * kappa;
   void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
@@ -143,7 +143,6 @@ void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void 
 void clover_mat(void *out, void **gauge, void *clover, void *in, double kappa, int dagger, QudaPrecision precision,
                 QudaGaugeParam &gauge_param)
 {
-
   void *tmp = safe_malloc(V * spinor_site_size * precision);
 
   void *inEven = in;
@@ -171,6 +170,7 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
 {
   switch (precision) {
   case QUDA_DOUBLE_PRECISION:
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++)
       for (int s = 0; s < 4; s++) {
         double a5 = ((s / 2) ? -1.0 : +1.0) * a;
@@ -183,6 +183,7 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
       }
     break;
   case QUDA_SINGLE_PRECISION:
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++)
       for (int s = 0; s < 4; s++) {
         float a5 = ((s / 2) ? -1.0 : +1.0) * a;
@@ -312,7 +313,6 @@ void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, dou
   void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
   void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
-
   if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     wil_dslash(tmp1, gauge, in, parity, dagger, precision, param);
     twistCloverGamma5(out, tmp1, clover, cInv, dagger, kappa, mu, flavor, parity, QUDA_TWIST_GAMMA5_INVERSE, precision);
@@ -335,7 +335,6 @@ void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, dou
 void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
              int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   void *tmp = safe_malloc(V * spinor_site_size * precision);
 
   void *inEven = in;
@@ -364,7 +363,6 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
                QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                QudaGaugeParam &gauge_param)
 {
-
   double kappa2 = -kappa * kappa;
 
   void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
@@ -628,7 +626,6 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv,
 void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, int dagger,
                               QudaPrecision precision, QudaGaugeParam &gauge_param, QudaMatPCType matpc_type)
 {
-
   // out = CloverMat in
   clover_mat(out, gauge, clover, in, kappa, dagger, precision, gauge_param);
 
@@ -682,7 +679,6 @@ void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover
                                  QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                                  QudaGaugeParam &gauge_param)
 {
-
   clover_matpc(out, gauge, clover, cInv, in, kappa, matpc_type, dagger, precision, gauge_param);
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD) {

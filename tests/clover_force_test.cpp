@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "TMCloverForce_reference.h"
+#include "clover_force_reference.h"
 #include "misc.h"
 #include <color_spinor_field.h> // convenient quark field container
 #include <command_line_params.h>
