@@ -1310,6 +1310,7 @@ foreach(prec IN LISTS TEST_PRECS)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --dslash-type clover --compute-clover true
+                   --solution-type mat-pc-dag-mat-pc
                    --matpc even-even-asym
                    --enable-testing true
                    --gtest_output=xml:clover_force_test_${prec}.xml)
@@ -1320,6 +1321,7 @@ foreach(prec IN LISTS TEST_PRECS)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --dslash-type twisted-clover --compute-clover true
+                   --solution-type mat-pc-dag-mat-pc
                    --matpc even-even-asym
                    --enable-testing true
                    --gtest_output=xml:tmc_clover_force_test_${prec}.xml)

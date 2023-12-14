@@ -4515,6 +4515,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   GaugeField cudaMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(fParam);
   if (gauge_param->use_resident_mom && gauge_param->overwrite_mom) cudaMom.zero();
 
+  if (inv_param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION)
+    errorQuda("Force computation only supports solution to MatPCDagMatPC");
   ColorSpinorParam qParam(nullptr, *inv_param, fParam.x, false, QUDA_CUDA_FIELD_LOCATION);
   qParam.setPrecision(fParam.Precision(), fParam.Precision(), true);
   qParam.create = QUDA_NULL_FIELD_CREATE;
@@ -4616,6 +4618,8 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   GaugeField gpuMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(gParamMom);
   if (gauge_param->use_resident_mom && gauge_param->overwrite_mom) gpuMom.zero();
 
+  if (inv_param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION)
+    errorQuda("Force computation only supports solution to MatPCDagMatPC");
   ColorSpinorParam qParam(nullptr, *inv_param, gParamMom.x, false, QUDA_CUDA_FIELD_LOCATION);
   qParam.setPrecision(gauge_param->cuda_prec, gauge_param->cuda_prec, true);
   qParam.create = QUDA_NULL_FIELD_CREATE;
