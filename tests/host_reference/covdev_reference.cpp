@@ -161,7 +161,9 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
   auto fwd_nbr_spinor = reinterpret_cast<sFloat **>(in.fwdGhostFaceBuffer);
   auto back_nbr_spinor = reinterpret_cast<sFloat **>(in.backGhostFaceBuffer);
 
-  for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
+  const int my_spinor_site_size = in.Nspin() == 1 ? stag_spinor_site_size : spinor_site_size;
+
+  for (auto i = 0lu; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
   gFloat *ghostLinkEven[4], *ghostLinkOdd[4];
@@ -175,18 +177,18 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
   }
 
   for (int sid = 0; sid < Vh; sid++) {
-    int offset = spinor_site_size * sid;
+    int offset = my_spinor_site_size * sid;
 
     gFloat *lnk = gaugeLink_mg4dir(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
     const sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, static_cast<const sFloat *>(in.data()),
-                                                 fwd_nbr_spinor, back_nbr_spinor, 1, 1);
+                                                 fwd_nbr_spinor, back_nbr_spinor, 1, 1, my_spinor_site_size);
 
-    sFloat gaugedSpinor[spinor_site_size];
+    sFloat gaugedSpinor[my_spinor_site_size];
 
     if (daggerBit) {
-      for (int s = 0; s < 4; s++) su3Tmul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
+      for (int s = 0; s < in.Nspin(); s++) su3Tmul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
     } else {
-      for (int s = 0; s < 4; s++) su3Mul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
+      for (int s = 0; s < in.Nspin(); s++) su3Mul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
     }
     sum(&res[offset], &res[offset], gaugedSpinor, spinor_site_size);
   } // 4-d volume
