@@ -4643,9 +4643,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
     }
   }
 
-  qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  qParam.x[0] /= 2;
-  ColorSpinorField tmp(qParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, true);
@@ -4658,13 +4655,13 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
 
     if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       dirac->Dagger(QUDA_DAG_YES);
-      gamma5(tmp, x[i].Odd());
-      dirac->Dslash(x[i].Even(), tmp, QUDA_EVEN_PARITY);
+      gamma5(p[i].Even(), x[i].Odd());
+      dirac->Dslash(x[i].Even(), p[i].Even(), QUDA_EVEN_PARITY);
       gamma5(x[i].Even(), x[i].Even());
-
+      
       // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
       dirac->Dagger(QUDA_DAG_YES);
-      dirac->M(p[i].Odd(), tmp); // this is the odd part of Y
+      dirac->M(p[i].Odd(), p[i].Even()); // this is the odd part of Y
       dirac->Dagger(QUDA_DAG_NO);
 
       if (detratio) blas::xpy(x0[i].Odd(), p[i].Odd());
