@@ -1258,23 +1258,22 @@ namespace quda {
                                   QudaReconstructType recon)
   {
     GaugeFieldParam gParamEx(in);
-    // gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
     gParamEx.pad = 0;
     gParamEx.nFace = 1;
-    gParamEx.tadpole = in.Tadpole();
-    gParamEx.anisotropy = in.Anisotropy();
     for (int d = 0; d < 4; d++) {
       gParamEx.x[d] += 2 * R[d];
       gParamEx.r[d] = R[d];
     }
-    if (recon != QUDA_RECONSTRUCT_INVALID) gParamEx.reconstruct = recon;
-    gParamEx.setPrecision(gParamEx.Precision(), true);
+    if (recon != QUDA_RECONSTRUCT_INVALID && recon != in.Reconstruct()) {
+      gParamEx.reconstruct = recon;
+      gParamEx.setPrecision(gParamEx.Precision());
+    }
 
     auto *out = new GaugeField(gParamEx);
 
     // copy input field into the extended device gauge field
-    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION); // wrong location if both fields cpu
+    copyExtendedGauge(*out, in, in.Location());
 
     // now fill up the halos
     out->exchangeExtendedGhost(R, profile, redundant_comms);
