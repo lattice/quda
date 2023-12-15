@@ -48,10 +48,11 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     struct CacheDims {
-      static constexpr dim3 dims(dim3 block) {
-	block.x += 1;
-	block.z = 1;
-	return block;
+      static constexpr dim3 dims(dim3 block)
+      {
+        block.x += 1;
+        block.z = 1;
+        return block;
       }
     };
 

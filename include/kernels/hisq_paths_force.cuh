@@ -387,7 +387,9 @@ namespace quda {
             2 multiplies, 1 add, 1 rescale
       */
       template <typename LinkCache>
-      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, LinkCache &Uab_cache) {
+      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu,
+                                                   LinkCache &Uab_cache)
+      {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -707,7 +709,8 @@ namespace quda {
             4 multiplies, 2 adds, 2 rescales
       */
       template <typename LinkCache>
-      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache) {
+      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      {
         auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -801,7 +804,6 @@ namespace quda {
           force_sig = mm_add(mycoeff_seven * Oz, Od * Uda, force_sig);
           Matrix_cache.save(force_sig, 2);
         }
-
       }
 
       /**
@@ -820,7 +822,8 @@ namespace quda {
             2 multiplies, 2 adds, 2 rescales
       */
       template <typename LinkCache>
-      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache) {
+      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_positive)>(y, arg.nu, arg);
         int parity_h = 1 - parity_a;
@@ -873,7 +876,8 @@ namespace quda {
             1 multiply, 1 add, 1 rescale
       */
       template <typename LinkCache>
-      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache) {
+      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -959,8 +963,8 @@ namespace quda {
         int parity_a = parity;
 
         // calculate p5_sig
-	constexpr int cacheLen = sig_positive ? 3 : 2;
-        ThreadLocalCache<Link,cacheLen> Matrix_cache;
+        constexpr int cacheLen = sig_positive ? 3 : 2;
+        ThreadLocalCache<Link, cacheLen> Matrix_cache;
 
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);

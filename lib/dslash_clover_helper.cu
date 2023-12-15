@@ -77,9 +77,9 @@ namespace quda {
     unsigned int sharedBytesPerThread() const
     {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-	return 0;
+        return 0;
       } else {
-	return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
+        return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
       }
     }
 

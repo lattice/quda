@@ -72,8 +72,10 @@ namespace quda
           && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
               || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         // spin components in shared depend on inversion algorithm
-	bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
-        int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
+        bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+          || type == Dslash5Type::M5_INV_ZMOBIUS;
+        int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() :
+                                                           in.Nspin();
         return 2 * nSpin * nColor * sizeof(typename mapper<Float>::type);
       } else {
         return 0;

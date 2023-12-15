@@ -47,7 +47,8 @@ namespace quda {
       return (p.count * mat_mul_flops + p.num_paths * (2 * Nc + 2)) * u.Volume();
     }
 
-    long long bytes() const override {
+    long long bytes() const override
+    {
       // links * one LatticeColorMatrix worth of data
       return p.count * u.Bytes() / 4;
     }
