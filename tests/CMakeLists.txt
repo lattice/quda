@@ -1311,7 +1311,7 @@ foreach(prec IN LISTS TEST_PRECS)
                    --dim 2 4 6 8 --prec ${prec}
                    --dslash-type clover --compute-clover true
                    --solution-type mat-pc-dag-mat-pc
-                   --matpc even-even-asym
+                   --matpc odd-odd-asym --dagger
                    --enable-testing true
                    --gtest_output=xml:clover_force_test_${prec}.xml)
    endif()
@@ -1322,7 +1322,7 @@ foreach(prec IN LISTS TEST_PRECS)
                    --dim 2 4 6 8 --prec ${prec}
                    --dslash-type twisted-clover --compute-clover true
                    --solution-type mat-pc-dag-mat-pc
-                   --matpc even-even-asym
+                   --matpc odd-odd-asym --dagger
                    --enable-testing true
                    --gtest_output=xml:tmc_clover_force_test_${prec}.xml)
    endif()

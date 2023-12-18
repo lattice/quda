@@ -485,7 +485,7 @@ namespace quda {
      @param gauge[in] Gauge field
      @param clover[in] Clover field
      @param x[in] Vector of quark solution fields
-     @param p[in] Vector of quark solution fields
+     @param x0[in] Vector of auxilary quark fields for determinant ratio
      @param coeff[in] Vector of coefficients for the quark field outer
      products
      @param epsilon[in] Vector of scalar coefficient pairs (one per
@@ -494,10 +494,10 @@ namespace quda {
      @param detratio[in] Whether to compute determinant ratio
      @param parity[in] Which parity do we need compute the tr log clover force
   */
-  void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge, const CloverField &clover,
-                          cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
+  void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
+                          const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
                           const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
-                          double sigma_coeff, bool detratio, int parity);
+                          double sigma_coeff, bool detratio, QudaInvertParam &param);
 
   /**
      @brief Compute the force contribution from the solver solution fields

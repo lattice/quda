@@ -4501,7 +4501,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   GaugeFieldParam fParam(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   // create the host momentum field
-  fParam.location = QUDA_CPU_FIELD_LOCATION;
   GaugeField cpuMom = !gauge_param->use_resident_mom ? GaugeField(fParam) : GaugeField();
 
   // create the device momentum field
@@ -4522,70 +4521,42 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField> x(nvector), p(nvector);
+  std::vector<ColorSpinorField> x(nvector), x0(nvector);
+  std::vector<double> force_coeff(nvector);
+  std::vector<array<double, 2>> ferm_epsilon(nvector);
+
+  QudaParity parity = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+
   for (int i = 0; i < nvector; i++) {
-    p[i] = ColorSpinorField(qParam);
     x[i] = ColorSpinorField(qParam);
 
     if (!inv_param->use_resident_solution) {
       ColorSpinorParam cpuParam(h_x[i], *inv_param, fParam.x, true, inv_param->input_location);
       ColorSpinorField cpuQuarkX(cpuParam);
-      x[i].Even() = cpuQuarkX;
-      gamma5(x[i].Even(), x[i].Even());
+      x[i][parity] = cpuQuarkX;
     } else {
-      x[i].Even() = solutionResident[i];
+      x[i][parity] = solutionResident[i];
     }
-  }
 
-  DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, true);
-  Dirac *dirac = Dirac::create(diracParam);
+    force_coeff[i] = 2.0 * dt * coeff[i] * kappa2;
+    ferm_epsilon[i] = {2.0 * ck * coeff[i] * dt, -kappa2 * 2.0 * ck * coeff[i] * dt};
+  }
 
   if (inv_param->use_resident_solution && solutionResident.size() < (unsigned int)nvector)
     errorQuda("solutionResident.size() %lu does not match number of shifts %d", solutionResident.size(), nvector);
 
-  std::vector<double> force_coeff(nvector);
-
-  profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  // loop over different quark fields
-  for (int i = 0; i < nvector; i++) {
-    force_coeff[i] = 2.0 * dt * coeff[i] * kappa2;
-
-    dirac->Dslash(x[i].Odd(), x[i].Even(), QUDA_ODD_PARITY);
-    dirac->M(p[i].Even(), x[i].Even());
-    dirac->Dagger(QUDA_DAG_YES);
-    dirac->Dslash(p[i].Odd(), p[i].Even(), QUDA_ODD_PARITY);
-    dirac->Dagger(QUDA_DAG_NO);
-
-    gamma5(x[i], x[i]);
-    gamma5(p[i], p[i]);
-  }
-
-  delete dirac;
-
-  /* Now the U dA/dU terms */
-  std::vector< array<double, 2> > ferm_epsilon(nvector);
-  for (int i = 0; i < nvector; i++) ferm_epsilon[i] = {2.0*ck*coeff[i]*dt, -kappa2 * 2.0*ck*coeff[i]*dt};
-
   // Make sure extendedGaugeResident has the correct R
-  // TODO: In most situation, deallocation is unnecessery
   if (extendedGaugeResident) delete extendedGaugeResident;
   extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
-  computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, p, force_coeff, ferm_epsilon, 2.0*ck*multiplicity*dt, false, 1);
-
-  profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
+                     2.0 * ck * multiplicity * dt, false, *inv_param);
 
   // copy the outer product field back to the host
   if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
-
   if (gauge_param->make_resident_mom && gauge_param->use_resident_mom) std::exchange(momResident, cudaMom);
   else if (!gauge_param->make_resident_mom) momResident = GaugeField();
-
-#if 0
-  if (inv_param->use_resident_solution) solutionResident.clear();
-#endif
 }
 
 void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector, 
@@ -4597,9 +4568,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
   if (!cloverPrecise) errorQuda("No resident clover field");
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaGaugeParam(gauge_param);
 
   double kappa = inv_param->kappa;
   double k_csw_ov_8 = kappa * inv_param->clover_csw / 8.0;
@@ -4625,75 +4593,38 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField> x(nvector), p(nvector), x0(nvector);
-  for (int i = 0; i < nvector; i++) {
-    p[i] = ColorSpinorField(qParam);
+  std::vector<ColorSpinorField> x(nvector), x0(nvector);
+  std::vector<double> force_coeff(nvector);
+  std::vector<array<double, 2>> ferm_epsilon(nvector);
 
+  QudaParity parity = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+
+  for (int i = 0; i < nvector; i++) {
     x[i] = ColorSpinorField(qParam);
     ColorSpinorParam cpuParam(h_x[i], *inv_param, gParamMom.x, true, inv_param->input_location);
     ColorSpinorField cpuQuarkX(cpuParam);
-    x[i].Odd() = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
+    x[i][parity] = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
 
     if (detratio) {
       x0[i] = ColorSpinorField(qParam);
-
       ColorSpinorParam cpuParam0(h_x0[i], *inv_param, gParamMom.x, true, inv_param->input_location);
       ColorSpinorField cpuQuarkX0(cpuParam0);
-      x0[i].Odd() = cpuQuarkX0;
+      x0[i][parity] = cpuQuarkX0;
     }
-  }
 
-
-  DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, true);
-  Dirac *dirac = Dirac::create(diracParam);
-
-  std::vector<double> force_coeff(nvector);
-  profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  for (int i = 0; i < nvector; i++) {
     force_coeff[i] = 1.0 * coeff[i];
-
-    if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      dirac->Dagger(QUDA_DAG_YES);
-      gamma5(p[i].Even(), x[i].Odd());
-      dirac->Dslash(x[i].Even(), p[i].Even(), QUDA_EVEN_PARITY);
-      gamma5(x[i].Even(), x[i].Even());
-      
-      // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
-      dirac->Dagger(QUDA_DAG_YES);
-      dirac->M(p[i].Odd(), p[i].Even()); // this is the odd part of Y
-      dirac->Dagger(QUDA_DAG_NO);
-
-      if (detratio) blas::xpy(x0[i].Odd(), p[i].Odd());
-
-      dirac->Dslash(p[i].Even(), p[i].Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
-      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
-      // x.Even= X.Even.tmLQCD*kappa and p.Even=-Y.Even.tmLQCD*kappa
-
-      // the gamma5 application in tmLQCD is done inside deriv_Sb
-      gamma5(p[i], p[i]);
-    } else {
-      errorQuda("MatPC type %d not supported", inv_param->matpc_type);
-    }
+    ferm_epsilon[i] = {k_csw_ov_8 * coeff[i], k_csw_ov_8 * coeff[i] / (kappa * kappa)};
   }
-
-  delete dirac;
-
-  std::vector< array<double, 2> > ferm_epsilon(nvector);
-  for (int i = 0; i < nvector; i++) ferm_epsilon[i] = { k_csw_ov_8 * coeff[i], k_csw_ov_8 * coeff[i]/(kappa*kappa) };
 
   // Make sure extendedGaugeResident has the correct R
-  // TODO: In most situation, deallocation is unnecessery
   if (extendedGaugeResident) delete extendedGaugeResident;
   extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileTMCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
-  computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, p, force_coeff, ferm_epsilon, k_csw_ov_8 * 32.0, detratio, 0);
-
-  profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
+                     k_csw_ov_8 * 32.0, detratio, *inv_param);
 
   if (gauge_param->return_result_mom) cpuMom.copy(gpuMom);
-
   if (gauge_param->make_resident_mom && gauge_param->use_resident_mom) std::exchange(momResident, gpuMom);
   else if (!gauge_param->make_resident_mom) momResident = GaugeField();
 }

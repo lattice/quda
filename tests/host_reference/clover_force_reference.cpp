@@ -930,6 +930,10 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
                              std::array<void *, 4> &gauge, std::vector<char> &clover, std::vector<char> &clover_inv,
                              QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
 {
+  if (inv_param->matpc_type != QUDA_MATPC_ODD_ODD_ASYMMETRIC)
+    errorQuda("Preconditioned operator type %d not supported by test code", inv_param->matpc_type);
+  if (inv_param->dagger != QUDA_DAG_YES) errorQuda("Test code presently requires dagger option");
+
   quda::ColorSpinorParam qParam;
   inv_param->solution_type = QUDA_MATDAG_MAT_SOLUTION; // set to full solution for field creation
   constructWilsonTestSpinorParam(&qParam, inv_param, gauge_param);
