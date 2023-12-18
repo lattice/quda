@@ -725,6 +725,9 @@ namespace quda
     ColorSpinorField &Even();
     ColorSpinorField &Odd();
 
+    const ColorSpinorField& operator[](QudaParity parity) const { return parity == QUDA_EVEN_PARITY ? Even() : Odd(); }
+    ColorSpinorField& operator[](QudaParity parity) { return parity == QUDA_EVEN_PARITY ? Even() : Odd(); }
+
     CompositeColorSpinorField &Components() { return components; };
 
     /**
