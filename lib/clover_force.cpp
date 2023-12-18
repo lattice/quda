@@ -12,7 +12,7 @@ namespace quda {
                           const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
                           double sigma_coeff, bool detratio, QudaInvertParam &inv_param)
   {
-    if (!inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC & !inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
+    if (inv_param.matpc_type != QUDA_MATPC_EVEN_EVEN_ASYMMETRIC && inv_param.matpc_type != QUDA_MATPC_ODD_ODD_ASYMMETRIC)
       errorQuda("MatPC type %d not supported", inv_param.matpc_type);
 
     QudaParity parity = inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;

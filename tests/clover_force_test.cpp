@@ -88,6 +88,7 @@ std::tuple<int, double> clover_force_test(test_t param)
 
   quda::RNG rng(mom, 1234);
 
+  inv_param.dagger = static_cast<QudaDagType>(dagger);
   inv_param.num_offset = nvector;
   for (int i = 0; i < nvector; i++) {
     // Allocate memory and set pointers
@@ -107,6 +108,7 @@ std::tuple<int, double> clover_force_test(test_t param)
   }
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gauge_param.overwrite_mom = 1;
+
   if (getTuning() == QUDA_TUNE_YES)
     computeTMCloverForceQuda(mom.data(), in.data(), in0.data(), coeff.data(), nvector, &gauge_param, &inv_param,
                              detratio);
