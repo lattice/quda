@@ -201,6 +201,15 @@ namespace quda
     /**
        make_set is a helper function that creates a vector of
        reference wrapped objects from the input reference argument.
+       This is the specialized overload that handles a vector_ref of
+       objects.  Used to convert a non-const set to a const set.
+       @param[in] v Vector argument we wish to wrap
+     */
+    template <typename U> vector make_set(vector_ref<U> &v) { return vector{v.begin(), v.end()}; }
+
+    /**
+       make_set is a helper function that creates a vector of
+       reference wrapped objects from the input reference argument.
        This is the specialized overload that handles an
        initializer_list of a pair of iterators.
        @param[in] v initializer_list
