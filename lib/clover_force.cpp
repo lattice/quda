@@ -48,7 +48,7 @@ namespace quda
       dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
       if (not_dagger) dirac->Dagger(QUDA_DAG_NO);
       // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
-      // x.Even= X.Even.tmLQCD*kappa and p.Even=-Y.Even.tmLQCD*kappa
+      // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
 
       // the gamma5 application in tmLQCD is done inside deriv_Sb
       gamma5(p[i], p[i]);
