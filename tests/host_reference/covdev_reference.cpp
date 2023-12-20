@@ -163,7 +163,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
 
   const int my_spinor_site_size = in.Nspin() == 1 ? stag_spinor_site_size : spinor_site_size;
 
-  for (auto i = 0lu; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
+  for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
   gFloat *ghostLinkEven[4], *ghostLinkOdd[4];

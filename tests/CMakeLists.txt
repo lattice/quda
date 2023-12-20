@@ -212,10 +212,6 @@ if(QUDA_CONTRACT)
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   
-  #add_executable(correlator_test correlator_test.cpp)
-  #target_link_libraries(correlator_test ${TEST_LIBS})
-  #quda_checkbuildtest(correlator_test QUDA_BUILD_ALL_TESTS)
-  #install(TARGETS correlator_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_SMEAR_GAUSS_TWOLINK)
