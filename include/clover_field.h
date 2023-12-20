@@ -7,18 +7,18 @@
 
 namespace quda {
 
-    /**
-       @brief Helper function that returns whether we have enabled
-       clover fermions.
-     */
-    constexpr bool is_enabled_clover()
-    {
+  /**
+     @brief Helper function that returns whether we have enabled
+     clover fermions.
+   */
+  constexpr bool is_enabled_clover()
+  {
 #ifdef GPU_CLOVER_DIRAC
-      return true;
+    return true;
 #else
-      return false;
+    return false;
 #endif
-    }
+  }
 
   namespace clover
   {
@@ -516,9 +516,8 @@ namespace quda {
      @param p Intermediate vectors (both parities)
      @param coeff Multiplicative coefficient (e.g., dt * residue)
    */
-  void computeCloverForce(GaugeField& force, const GaugeField& U,
-			  cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &p,
-			  const std::vector<double> &coeff);
+  void computeCloverForce(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
@@ -529,10 +528,8 @@ namespace quda {
      @param p[in] Intermediate vectors (both parities)
      @coeff coeff[in] Multiplicative coefficient (e.g., dt * residiue), one for each parity
   */
-  void computeCloverSigmaOprod(GaugeField& oprod,
-			       cvector_ref<const ColorSpinorField> &x,
-			       cvector_ref<const ColorSpinorField> &p,
-			       const std::vector< array<double, 2> > &coeff);
+  void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff);
   /**
      @brief Compute the matrix tensor field necessary for the force calculation from
      the clover trace action.  This computes a tensor field [mu,nu].

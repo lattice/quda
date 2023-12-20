@@ -5,7 +5,8 @@
 #include "blas_quda.h"
 #include "dirac_quda.h"
 
-namespace quda {
+namespace quda
+{
 
   void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
                           const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
@@ -70,12 +71,13 @@ namespace quda {
     // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
     if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
 
-    // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
+    // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
+    // sw_spinor_eo(OO,..)  in tmLQCD
     computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
                             epsilon);
 
-    // oprod = (A12) of hep-lat/0112051 
-    // compute the insertion of oprod in Fig.27 of hep-lat/0112051 
+    // oprod = (A12) of hep-lat/0112051
+    // compute the insertion of oprod in Fig.27 of hep-lat/0112051
     cloverDerivative(force, gaugeEx, oprod, 1.0);
 
     updateMomentum(mom, -1.0, force, "clover");
@@ -83,4 +85,4 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
-}
+} // namespace quda

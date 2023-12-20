@@ -26,10 +26,8 @@ namespace quda
     array_2d<real, nvector, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
-                        cvector_ref<const ColorSpinorField> &inB,
-                        const std::vector<array<double, 2>> &coeff_) :
-      kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
-      oprod(oprod)
+                        cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), oprod(oprod)
     {
       for (int i = 0; i < nvector; i++) {
         this->inA[i] = inA[i];

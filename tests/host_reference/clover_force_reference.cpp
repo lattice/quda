@@ -801,9 +801,11 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
           if (nu == mu)
             continue;
           else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
-            computeForce_reference<double>(h_mom, (void**)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex, parity, mu, nu);
+            computeForce_reference<double>(h_mom, (void **)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex,
+                                           parity, mu, nu);
           else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
-            computeForce_reference<float>(h_mom, (void**)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex, parity, mu, nu);
+            computeForce_reference<float>(h_mom, (void **)qdp_ex->raw_pointer(), lat, oprod_ex->data(), i, yIndex,
+                                          parity, mu, nu);
           else
             errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
         }

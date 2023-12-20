@@ -8,8 +8,7 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, bool twist_>
-  struct CloverTraceArg : kernel_param<> {
+  template <typename Float, int nColor_, bool twist_> struct CloverTraceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr bool twist = twist_;
     static constexpr int nColor = nColor_;
@@ -24,18 +23,19 @@ namespace quda {
     real mu2_minus_epsilon2;
     const int parity;
 
-    CloverTraceArg(GaugeField& output, const CloverField& clover, double coeff, int parity) :
+    CloverTraceArg(GaugeField &output, const CloverField &clover, double coeff, int parity) :
       kernel_param(dim3(output.VolumeCB(), 1, 1)),
       output(output),
       clover(clover, false),
       clover_inv(clover, dynamic_clover ? false : true),
       coeff(coeff),
       mu2_minus_epsilon2(clover.Mu2() - clover.Epsilon2()),
-      parity(parity) {}
+      parity(parity)
+    {
+    }
   };
 
-  template <typename Arg>
-  __device__ __host__ inline void cloverSigmaTraceCompute(const Arg &arg, const int x)
+  template <typename Arg> __device__ __host__ inline void cloverSigmaTraceCompute(const Arg &arg, const int x)
   {
     using namespace linalg; // for Cholesky
     using real = typename Arg::real;
@@ -70,9 +70,9 @@ namespace quda {
     const Mat &A1 = A[1];
 
 #pragma unroll
-    for (int mu=0; mu<4; mu++) {
+    for (int mu = 0; mu < 4; mu++) {
 #pragma unroll
-      for (int nu=0; nu<4; nu++) {
+      for (int nu = 0; nu < 4; nu++) {
         if (nu >= mu) continue;
         Matrix<complex<real>, Arg::nColor> mat = {};
 
@@ -80,36 +80,36 @@ namespace quda {
         if (nu == 0) {
           if (mu == 1) {
 #pragma unroll
-            for (int j=0; j<N; ++j) {
+            for (int j = 0; j < N; ++j) {
               mat(j, j).imag(A0(j + N, j + N).real() + A1(j + N, j + N).real() - A0(j, j).real() - A1(j, j).real());
             }
 
             // triangular part
 #pragma unroll
-            for (int j=1; j<N; ++j) {
+            for (int j = 1; j < N; ++j) {
 #pragma unroll
               for (int k=0; k<j; ++k) {
                 auto ctmp = A0(j + N, k + N) + A1(j + N, k + N) - A0(j, k) - A1(j, k);
                 mat(j, k) = i_(ctmp);
-                mat(k, j) =  i_(conj(ctmp));
+                mat(k, j) = i_(conj(ctmp));
               }
             } // X Y
 
           } else if (mu == 2) {
 
 #pragma unroll
-            for (int j=0; j<N; ++j) {
+            for (int j = 0; j < N; ++j) {
 #pragma unroll
-              for (int k=0; k<N; ++k) {
-                mat(j,k) = conj(A0(k + N, j)) - A0(j + N, k) + conj(A1(k + N, j)) - A1(j + N, k);
+              for (int k = 0; k < N; ++k) {
+                mat(j, k) = conj(A0(k + N, j)) - A0(j + N, k) + conj(A1(k + N, j)) - A1(j + N, k);
               }
             } // X Z
 
           } else if (mu == 3) {
 #pragma unroll
-            for (int j=0; j<N; ++j) {
+            for (int j = 0; j < N; ++j) {
 #pragma unroll
-              for (int k=0; k<N; ++k) {
+              for (int k = 0; k < N; ++k) {
                 mat(j, k) = i_(conj(A0(k + N, j)) + A0(j + N, k) - conj(A1(k + N, j)) - A1(j + N, k));
               }
             }
@@ -118,17 +118,17 @@ namespace quda {
         } else if (nu == 1) {
           if (mu == 2) { // Y Z
 #pragma unroll
-            for (int j=0; j<N; ++j) {
+            for (int j = 0; j < N; ++j) {
 #pragma unroll
-              for (int k=0; k<N; ++k) {
+              for (int k = 0; k < N; ++k) {
                 mat(j, k) = -i_(conj(A0(k + N, j)) + A0(j + N, k) + conj(A1(k + N, j)) + A1(j + N, k));
               }
             }
           } else if (mu == 3){ // Y T
 #pragma unroll
-            for (int j=0; j<N; ++j) {
+            for (int j = 0; j < N; ++j) {
 #pragma unroll
-              for (int k=0; k<N; ++k) {
+              for (int k = 0; k < N; ++k) {
                 mat(j, k) = conj(A0(k + N, j)) - A0(j + N, k) - conj(A1(k + N, j)) + A1(j + N, k);
               }
             }
@@ -137,11 +137,11 @@ namespace quda {
         else if (nu == 2){
           if (mu == N) {
 #pragma unroll
-            for (int j=0; j<N; ++j) {
+            for (int j = 0; j < N; ++j) {
               mat(j, j).imag(A0(j, j).real() - A0(j + N, j + N).real() - A1(j, j).real() + A1(j + N, j + N).real());
             }
 #pragma unroll
-            for (int j=1; j<N; ++j) {
+            for (int j = 1; j < N; ++j) {
 #pragma unroll
               for (int k=0; k<j; ++k) {
                 auto ctmp = A0(j, k) - A0(j + N, k + N) - A1(j, k) + A1(j + N, k + N);
@@ -154,7 +154,7 @@ namespace quda {
 
         arg.output((mu - 1) * mu / 2 + nu, x, arg.parity) = arg.coeff * mat;
       } // nu
-    } // mu
+    }   // mu
   }
 
   template <typename Arg> struct CloverSigmaTr
@@ -163,10 +163,7 @@ namespace quda {
     constexpr CloverSigmaTr(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
-    {
-      cloverSigmaTraceCompute<Arg>(arg, x_cb);
-    }
+    __device__ __host__ inline void operator()(int x_cb) { cloverSigmaTraceCompute<Arg>(arg, x_cb); }
   };
 
 }

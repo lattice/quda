@@ -6,7 +6,8 @@
 
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class DerivativeClover : TunableKernel3D {
+  template <typename Float, int nColor, QudaReconstructType recon> class DerivativeClover : TunableKernel3D
+  {
     GaugeField &force;
     const GaugeField &gauge;
     const GaugeField &oprod;
@@ -15,16 +16,13 @@ namespace quda {
 
   public:
     DerivativeClover(const GaugeField &gauge, GaugeField &force, const GaugeField &oprod, double coeff) :
-      TunableKernel3D(gauge, 2, 4),
-      force(force),
-      gauge(gauge),
-      oprod(oprod),
-      coeff(coeff)
+      TunableKernel3D(gauge, 2, 4), force(force), gauge(gauge), oprod(oprod), coeff(coeff)
     {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream) override {
+    void apply(const qudaStream_t &stream) override
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<CloverDerivative>(tp, stream, CloverDerivArg<Float, nColor, recon>(force, gauge, oprod, coeff));
     }
@@ -40,7 +38,8 @@ namespace quda {
     }
     long long bytes() const override
     {
-      return (16 * gauge.Reconstruct() + 8 * oprod.Reconstruct() + 2 * force.Reconstruct()) * 12 * gauge.Precision() * gauge.LocalVolume();
+      return (16 * gauge.Reconstruct() + 8 * oprod.Reconstruct() + 2 * force.Reconstruct()) * 12 * gauge.Precision()
+        * gauge.LocalVolume();
     }
   };
 

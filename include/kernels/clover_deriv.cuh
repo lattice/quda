@@ -23,11 +23,7 @@ namespace quda
     Oprod oprod;
 
     CloverDerivArg(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff) :
-      kernel_param(dim3(force.VolumeCB(), 2, 4)),
-      coeff(coeff),
-      force(force),
-      gauge(gauge),
-      oprod(oprod)
+      kernel_param(dim3(force.VolumeCB(), 2, 4)), coeff(coeff), force(force), gauge(gauge), oprod(oprod)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = force.X()[dir];
@@ -48,7 +44,7 @@ namespace quda
 
     // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
     {
-      thread_array<int, 4> d = { };
+      thread_array<int, 4> d = {};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -75,12 +71,14 @@ namespace quda
       Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), parity);
       force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
 
-      if (nu < mu) force_total -= force;
-      else force_total += force;
+      if (nu < mu)
+        force_total -= force;
+      else
+        force_total += force;
     }
 
     {
-      thread_array<int, 4> d = { };
+      thread_array<int, 4> d = {};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -112,12 +110,14 @@ namespace quda
       Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), parity);
       force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
 
-      if (nu < mu) force_total += force;
-      else force_total -= force;
+      if (nu < mu)
+        force_total += force;
+      else
+        force_total -= force;
     }
 
     {
-      thread_array<int, 4> d = { };
+      thread_array<int, 4> d = {};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -146,14 +146,16 @@ namespace quda
       Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
       force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
 
-      if (nu < mu) force_total -= force;
-      else force_total += force;
+      if (nu < mu)
+        force_total -= force;
+      else
+        force_total += force;
     }
 
     // Lower leaf
     // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
     {
-      thread_array<int, 4> d = { };
+      thread_array<int, 4> d = {};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -185,8 +187,10 @@ namespace quda
       Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
       force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
 
-      if (nu < mu) force_total += force;
-      else force_total -= force;
+      if (nu < mu)
+        force_total += force;
+      else
+        force_total -= force;
     }
   }
 

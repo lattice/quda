@@ -333,7 +333,7 @@ namespace quda
     size_t norm_offset = 0; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
-    mutable array_2d<void *, 2, QUDA_MAX_DIM> ghost = {};          // pointers to the ghost regions - NULL by default
+    mutable array_2d<void *, 2, QUDA_MAX_DIM> ghost = {};  // pointers to the ghost regions - NULL by default
     mutable lat_dim_t ghostFace = {};                      // the size of each face
     mutable lat_dim_t ghostFaceCB = {};                    // the size of each checkboarded face
     mutable array<void *, 2 *QUDA_MAX_DIM> ghost_buf = {}; // wrapper that points to current ghost zone
@@ -725,8 +725,8 @@ namespace quda
     ColorSpinorField &Even();
     ColorSpinorField &Odd();
 
-    const ColorSpinorField& operator[](QudaParity parity) const { return parity == QUDA_EVEN_PARITY ? Even() : Odd(); }
-    ColorSpinorField& operator[](QudaParity parity) { return parity == QUDA_EVEN_PARITY ? Even() : Odd(); }
+    const ColorSpinorField &operator[](QudaParity parity) const { return parity == QUDA_EVEN_PARITY ? Even() : Odd(); }
+    ColorSpinorField &operator[](QudaParity parity) { return parity == QUDA_EVEN_PARITY ? Even() : Odd(); }
 
     CompositeColorSpinorField &Components() { return components; };
 

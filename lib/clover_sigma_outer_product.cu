@@ -22,11 +22,7 @@ namespace quda {
   public:
     CloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                      cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff) :
-      TunableKernel3D(oprod, 2, 6),
-      oprod(oprod),
-      inA(inA),
-      inB(inB),
-      coeff(coeff)
+      TunableKernel3D(oprod, 2, 6), oprod(oprod), inA(inA), inB(inB), coeff(coeff)
     {
       char tmp[16];
       sprintf(tmp, ",nvector=%lu", inA.size());
@@ -50,25 +46,22 @@ namespace quda {
     {
       return ((144 + 18) * inA.size() + 18) * 6 * oprod.Volume(); // spin trace + multiply-add
     }
-    long long bytes() const override
-    {
-      return (inA[0].Bytes() + inB[0].Bytes()) * inA.size() * 6 + 2 * oprod.Bytes();
-    }
+    long long bytes() const override { return (inA[0].Bytes() + inB[0].Bytes()) * inA.size() * 6 + 2 * oprod.Bytes(); }
   }; // CloverSigmaOprod
 
-  void computeCloverSigmaOprod(GaugeField& oprod, cvector_ref<const ColorSpinorField> &x,
-			       cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2> > &coeff)
+  void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff)
   {
     if constexpr (is_enabled_clover()) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       if (x.size() > MAX_NVECTOR) {
         // divide and conquer
-        computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField>{x.begin(), x.begin() + x.size()/2},
-                                cvector_ref<const ColorSpinorField>{p.begin(), p.begin() + p.size() / 2},
+        computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin(), x.begin() + x.size() / 2},
+                                cvector_ref<const ColorSpinorField> {p.begin(), p.begin() + p.size() / 2},
                                 {coeff.begin(), coeff.begin() + coeff.size() / 2});
 
-        computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField>{x.begin() + x.size() / 2, x.end()},
-                                cvector_ref<const ColorSpinorField>{p.begin() + p.size() / 2, p.end()},
+        computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin() + x.size() / 2, x.end()},
+                                cvector_ref<const ColorSpinorField> {p.begin() + p.size() / 2, p.end()},
                                 {coeff.begin() + coeff.size() / 2, coeff.end()});
         return;
       }

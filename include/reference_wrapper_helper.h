@@ -196,7 +196,7 @@ namespace quda
        objects.  Used to convert a non-const set to a const set.
        @param[in] v Vector argument we wish to wrap
      */
-    template <typename U> vector make_set(const vector_ref<U> &v) { return vector{v.begin(), v.end()}; }
+    template <typename U> vector make_set(const vector_ref<U> &v) { return vector {v.begin(), v.end()}; }
 
     /**
        make_set is a helper function that creates a vector of
@@ -205,7 +205,7 @@ namespace quda
        objects.  Used to convert a non-const set to a const set.
        @param[in] v Vector argument we wish to wrap
      */
-    template <typename U> vector make_set(vector_ref<U> &v) { return vector{v.begin(), v.end()}; }
+    template <typename U> vector make_set(vector_ref<U> &v) { return vector {v.begin(), v.end()}; }
 
     /**
        make_set is a helper function that creates a vector of

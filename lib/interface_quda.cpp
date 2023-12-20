@@ -158,7 +158,7 @@ static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 //!<Profiler for computeCloverForceQuda
 static TimeProfile profileCloverForce("computeCloverForceQuda");
 
-//!<Profiles for computeTMCloverForceQuda
+//!< Profiles for computeTMCloverForceQuda
 static TimeProfile profileTMCloverForce("computeTMCloverForceQuda");
 
 //!<Profiler for computeStaggeredForceQuda
@@ -4555,11 +4555,13 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   // copy the outer product field back to the host
   if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
-  if (gauge_param->make_resident_mom && gauge_param->use_resident_mom) std::exchange(momResident, cudaMom);
-  else if (!gauge_param->make_resident_mom) momResident = GaugeField();
+  if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
+    std::exchange(momResident, cudaMom);
+  else if (!gauge_param->make_resident_mom)
+    momResident = GaugeField();
 }
 
-void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector, 
+void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
 {
   using namespace quda;
@@ -4575,7 +4577,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   GaugeField cpuMom = !gauge_param->use_resident_mom ? GaugeField(gParamMom) : GaugeField();
 
-  //create the device momentum field
+  // create the device momentum field
   gParamMom.location = QUDA_CUDA_FIELD_LOCATION;
   gParamMom.create = gauge_param->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
   gParamMom.field = &cpuMom;
@@ -4625,8 +4627,10 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
                      k_csw_ov_8 * 32.0, detratio, *inv_param);
 
   if (gauge_param->return_result_mom) cpuMom.copy(gpuMom);
-  if (gauge_param->make_resident_mom && gauge_param->use_resident_mom) std::exchange(momResident, gpuMom);
-  else if (!gauge_param->make_resident_mom) momResident = GaugeField();
+  if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
+    std::exchange(momResident, gpuMom);
+  else if (!gauge_param->make_resident_mom)
+    momResident = GaugeField();
 }
 
 void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, int exact, QudaGaugeParam *param)

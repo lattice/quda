@@ -1468,8 +1468,10 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
 
 void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase)
 {
-  if (u.Order() == QUDA_QDP_GAUGE_ORDER) createSiteLinkCPU(static_cast<void **>(u.raw_pointer()), precision, phase);
-  else errorQuda("Unsupported gauge order %d", u.Order());
+  if (u.Order() == QUDA_QDP_GAUGE_ORDER)
+    createSiteLinkCPU(static_cast<void **>(u.raw_pointer()), precision, phase);
+  else
+    errorQuda("Unsupported gauge order %d", u.Order());
 }
 
 template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
@@ -1534,9 +1536,11 @@ static int compare_link(const GaugeField &a, const GaugeField &b)
   if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
   int ret;
   if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()), a.Volume());
+    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()),
+                      a.Volume());
   } else {
-    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()), a.Volume());
+    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()),
+                      a.Volume());
   }
 
   return ret;

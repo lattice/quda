@@ -102,7 +102,7 @@ std::tuple<int, double> clover_force_test(test_t param)
   }
 
   std::vector<double> coeff(nvector);
-  for(int i=0;i<nvector;i++){
+  for (int i = 0; i < nvector; i++) {
     coeff[i] = 4. * inv_param.kappa * inv_param.kappa;
     coeff[i] += coeff[i] * (i + 1) / 10.0;
   }
@@ -163,7 +163,8 @@ TEST_P(CloverForceTest, verify)
 {
   auto deviation = clover_force_test(GetParam());
   ASSERT_EQ(std::get<0>(deviation), 1) << "CPU and QUDA force implementations do not agree";
-  ASSERT_LE(std::get<1>(deviation), getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
+  ASSERT_LE(std::get<1>(deviation), getTolerance(cuda_prec))
+    << "CPU and QUDA momentum action implementations do not agree";
 }
 
 static void display_test_info()
@@ -178,7 +179,7 @@ static void display_test_info()
              get_gauge_order_str(QUDA_MILC_GAUGE_ORDER), niter);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-               dimPartitioned(3));
+             dimPartitioned(3));
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)

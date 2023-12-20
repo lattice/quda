@@ -45,7 +45,7 @@ namespace quda {
     long long bytes() const override { return clover.Bytes() + output.Bytes(); }
   };
 
-  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity)
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity)
   {
     if constexpr (is_enabled_clover()) {
       checkNative(output, clover);

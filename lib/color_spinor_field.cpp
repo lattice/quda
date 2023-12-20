@@ -1057,7 +1057,8 @@ namespace quda
     packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
   }
 
-  void ColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream) const
+  void ColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
+                                   const qudaStream_t &stream) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     void *gpu_buf
@@ -1398,7 +1399,8 @@ namespace quda
           for (int dim = 0; dim < nDimComms; dim++) {
             for (int dir = 0; dir < 2; dir++) {
               if (!comms_complete[dim * 2 + dir]) {
-                comms_complete[2 * dim + dir] = commsQuery(2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
+                comms_complete[2 * dim + dir]
+                  = commsQuery(2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
                 if (comms_complete[2 * dim + dir]) {
                   comms_done++;
                   if (comm_peer2peer_enabled(1 - dir, dim))

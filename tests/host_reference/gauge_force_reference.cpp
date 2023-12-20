@@ -4,7 +4,6 @@
 #include <string.h>
 #include <type_traits>
 
-
 #include "host_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
