@@ -13,6 +13,7 @@ namespace quda {
     const GaugeField &in;
     const Float alpha;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
+    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
