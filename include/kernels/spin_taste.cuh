@@ -28,9 +28,9 @@ namespace quda {
       checkPrecision(out_, in_); // check all precisions match
       checkLocation(out_, in_);  // check all locations match
       if (!in_.isNative())
-        errorQuda("Unsupported field order colorspinor= \n", in_.FieldOrder());
+        errorQuda("Unsupported field order colorspinor= %d \n", in_.FieldOrder());
       if (!out_.isNative())
-        errorQuda("Unsupported field order colorspinor= \n", out_.FieldOrder());
+        errorQuda("Unsupported field order colorspinor= %d \n", out_.FieldOrder());
       #pragma unroll
       for (int i=0; i<4; i++) { X[i] = in_.X()[i]; }
     }

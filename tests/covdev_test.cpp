@@ -20,6 +20,10 @@
 #include <assert.h>
 #include <gtest/gtest.h>
 
+#include <test.h>
+
+using test_t = ::testing::tuple<QudaSiteSubset, int>;//single parity or full spinor, or test type
+
 using namespace quda;
 
 QudaGaugeParam gauge_param;
@@ -188,6 +192,18 @@ void display_test_info()
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 }
+
+struct covdev_test : quda_test {
+  void display_info() const override
+  {
+    quda_test::display_info();
+    printfQuda("prec    S_dimension T_dimension Ls_dimension\n");
+    printfQuda("%6s   %3d/%3d/%3d     %3d         %2d\n", get_prec_str(prec), xdim, ydim, zdim, tdim, Lsdim);
+  }
+
+  covdev_test(int argc, char **argv) : quda_test("Covariant Derivative Test", argc, argv) { }
+};
+
 
 int main(int argc, char **argv)
 {

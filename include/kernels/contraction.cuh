@@ -57,8 +57,6 @@ namespace quda
     static constexpr bool spin_project = nSpin_ == 1 ? false : true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
-    const DRGamma<real, nSpin> Gamma;//empty for nSpin != 4
-
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     
     F x;
@@ -81,8 +79,7 @@ namespace quda
       x(x),
       y(y),
       s1(s1),
-      b1(b1),
-      Gamma()
+      b1(b1)
       // Launch xyz threads per t, t times.
     {
       for(int i=0; i<4; i++) {
@@ -117,6 +114,9 @@ namespace quda
 
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
+
+      constexpr array<array<int, nSpin>, nSpin*nSpin>           gm_i   = get_dr_gm_i();
+      constexpr array<array<complex<real>, nSpin>, nSpin*nSpin> g5gm_z = get_dr_g5gm_z<real>();     
 
       reduce_t result_all_channels = zero<reduce_t>();
       int s1 = arg.s1;
@@ -166,15 +166,15 @@ namespace quda
 	for (int s2 = 0; s2 < nSpin; s2++) {
 
 	  // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
-	  int b2 = arg.Gamma.gm_i[G_idx][s2];	  
+	  int b2 = gm_i[G_idx][s2];	  
 	  // get non-zero column index for current s1
-	  int b1_tmp = arg.Gamma.gm_i[G_idx][s1];
+	  int b1_tmp = gm_i[G_idx][s1];
 	  
 	  // only contributes if we're at the correct b1 from the outer loop FIXME
 	  if (b1_tmp == b1) {
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
-	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
+	    propagator_product = g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * g5gm_z[G_idx][b1];
 	    result_all_channels[G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
 	    result_all_channels[G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }

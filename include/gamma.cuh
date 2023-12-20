@@ -354,80 +354,64 @@ namespace quda {
   template<typename T>
   constexpr array<array<complex<T>, nspin>, nspin*nspin> get_dr_g5gm_z() {  
 
-      constexpr complex<T> i   = complex<T>(0., 1.);
-      constexpr complex<T> one = complex<T>(1., 0.);      
+      constexpr complex<T> p_i = complex<T>( 0., +1.);
+      constexpr complex<T> m_i = complex<T>( 0., -1.);
+      constexpr complex<T> p_1 = complex<T>(+1.,  0.);
+      constexpr complex<T> m_1 = complex<T>(-1.,  0.);      
 
       return {{
         // VECTORS
         // G_idx = 1: \gamma_1
-        {i, i, i, i},
+        {p_i, p_i, p_i, p_i},
 
         // G_idx = 2: \gamma_2
-        {-one, one, -one, one},
+        {m_1, p_1, m_1, p_1},
 
         // G_idx = 3: \gamma_3
-        {i, -i, i, -i},
+        {p_i, m_i, p_i, m_i},
 
         // G_idx = 4: \gamma_4
-        {one, one, -one, -one},        
+        {p_1, p_1, m_1, m_1},        
 
         // PSEUDO-VECTORS
         // G_idx = 6: \gamma_5\gamma_1
-        {i, i, -i, -i},        
+        {p_i, p_i, m_i, m_i},        
 
         // G_idx = 7: \gamma_5\gamma_2
-        {-one, one, one, -one},        
+        {m_1, p_1, p_1, m_1},        
 
         // G_idx = 8: \gamma_5\gamma_3
-        {i, -i, -i, i},        
+        {p_i, m_i, m_i, p_i},        
 
         // G_idx = 9: \gamma_5\gamma_4
-        {one, one, one, one},      
+        {p_1, p_1, p_1, p_1},      
 
         // SCALAR
         // G_idx = 0: I
-        {one, one, -one, -one},        
+        {p_1, p_1, m_1, m_1},        
 
         // PSEUDO-SCALAR
         // G_idx = 5: \gamma_5
-        {one, one, one, one},
+        {p_1, p_1, p_1, p_1},
 
         // TENSORS
         // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
-        {one, -one, -one, one},        
+        {p_1, m_1, m_1, p_1},        
 
         // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
-        {-i, i, i, -i},                
+        {m_i, p_i, p_i, m_i},                
 
         // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
-        {-one, -one, -one, -one},                
+        {m_1, m_1, m_1, m_1},                
 
         // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
-        {one, one, -one, -one},                
+        {p_1, p_1, m_1, m_1},                
 
         // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
-        {-i, i, -i, i},                
+        {m_i, p_i, m_i, p_i},                
 
         // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
-        {-one, one, -one, one}
+        {m_1, p_1, m_1, p_1}
       }};
   }
-
-  template <typename real, int nSpin> struct DRGamma { };
-
-  template <> struct DRGamma<double, 4> {
-    static constexpr int nSpin = 4;
-    //
-    const array<array<int, nSpin>, nSpin*nSpin> gm_i               = get_dr_gm_i();
-    const array<array<complex<double>, nSpin>, nSpin*nSpin> g5gm_z = get_dr_g5gm_z<double>(); 
-  };
-
-  template <> struct DRGamma<float, 4> {
-    static constexpr int nSpin = 4;
-    //
-    const array<array<int, nSpin>, nSpin*nSpin> gm_i               = get_dr_gm_i();
-    const array<array<complex<float>, nSpin>, nSpin*nSpin> g5gm_z  = get_dr_g5gm_z<float>();     
-  };  
-  
-
 } // namespace quda
