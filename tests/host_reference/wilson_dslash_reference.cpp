@@ -12,61 +12,9 @@
 
 #include <dslash_reference.h>
 #include <string.h>
+#include "gamma_reference.h"
 
 using namespace quda;
-
-// clang-format off
-static const double projector[8][4][4][2] = {
-  {
-    {{1,0}, {0,0}, {0,0}, {0,-1}},
-    {{0,0}, {1,0}, {0,-1}, {0,0}},
-    {{0,0}, {0,1}, {1,0}, {0,0}},
-    {{0,1}, {0,0}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {0,0}, {0,1}},
-    {{0,0}, {1,0}, {0,1}, {0,0}},
-    {{0,0}, {0,-1}, {1,0}, {0,0}},
-    {{0,-1}, {0,0}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {0,0}, {1,0}},
-    {{0,0}, {1,0}, {-1,0}, {0,0}},
-    {{0,0}, {-1,0}, {1,0}, {0,0}},
-    {{1,0}, {0,0}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {0,0}, {-1,0}},
-    {{0,0}, {1,0}, {1,0}, {0,0}},
-    {{0,0}, {1,0}, {1,0}, {0,0}},
-    {{-1,0}, {0,0}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {0,-1}, {0,0}},
-    {{0,0}, {1,0}, {0,0}, {0,1}},
-    {{0,1}, {0,0}, {1,0}, {0,0}},
-    {{0,0}, {0,-1}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {0,1}, {0,0}},
-    {{0,0}, {1,0}, {0,0}, {0,-1}},
-    {{0,-1}, {0,0}, {1,0}, {0,0}},
-    {{0,0}, {0,1}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {-1,0}, {0,0}},
-    {{0,0}, {1,0}, {0,0}, {-1,0}},
-    {{-1,0}, {0,0}, {1,0}, {0,0}},
-    {{0,0}, {-1,0}, {0,0}, {1,0}}
-  },
-  {
-    {{1,0}, {0,0}, {1,0}, {0,0}},
-    {{0,0}, {1,0}, {0,0}, {1,0}},
-    {{1,0}, {0,0}, {1,0}, {0,0}},
-    {{0,0}, {1,0}, {0,0}, {1,0}}
-  }
-};
-// clang-format on
 
 // todo pass projector
 template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
@@ -111,6 +59,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
   }
 
+#pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, 1);
@@ -150,6 +99,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
     ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
   }
 
+#pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
 
     for (int dir = 0; dir < 8; dir++) {
@@ -247,7 +197,6 @@ template <typename sFloat>
 void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, const sFloat mu,
                  const QudaTwistFlavorType flavor, const int V, QudaTwistGamma5Type twist)
 {
-
   sFloat a = 0.0, b = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
     a = 2.0 * kappa * mu * flavor;         // mu already includes the flavor
@@ -262,6 +211,7 @@ void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, 
 
   if (dagger) a *= -1.0;
 
+#pragma omp parallel for
   for (int i = 0; i < V; i++) {
     sFloat tmp[24];
     for (int s = 0; s < 4; s++)
@@ -289,7 +239,6 @@ void twist_gamma5(void *out, void *in, int daggerBit, double kappa, double mu, Q
 void tm_dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double mu, QudaTwistFlavorType flavor,
                int oddBit, QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   if (daggerBit && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD))
     twist_gamma5(spinorField, spinorField, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
 
@@ -306,7 +255,6 @@ void tm_dslash(void *res, void **gaugeFull, void *spinorField, double kappa, dou
 void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
              QudaGaugeParam &gauge_param)
 {
-
   void *inEven = in;
   void *inOdd = (char *)in + Vh * spinor_site_size * precision;
   void *outEven = out;
@@ -322,7 +270,6 @@ void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, Qu
 void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor, int dagger_bit,
             QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   void *inEven = in;
   void *inOdd = (char *)in + Vh * spinor_site_size * precision;
   void *outEven = out;
@@ -345,7 +292,6 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwis
 void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa, QudaMatPCType matpc_type, int daggerBit,
                QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   // FIXME: remove once reference clover is finished
@@ -369,7 +315,6 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa, QudaMatP
 void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
               QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
@@ -425,7 +370,6 @@ template <typename sFloat>
 void ndegTwistGamma5(sFloat *out1, sFloat *out2, sFloat *in1, sFloat *in2, const int dagger, const sFloat kappa,
                      const sFloat mu, const sFloat epsilon, const int V, QudaTwistGamma5Type twist)
 {
-
   sFloat a = 0.0, b = 0.0, d = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
     a = 2.0 * kappa * mu;
@@ -442,6 +386,7 @@ void ndegTwistGamma5(sFloat *out1, sFloat *out2, sFloat *in1, sFloat *in2, const
 
   if (dagger) a *= -1.0;
 
+#pragma omp parallel for
   for (int i = 0; i < V; i++) {
     sFloat tmp1[24];
     sFloat tmp2[24];
