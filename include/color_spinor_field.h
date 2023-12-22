@@ -126,9 +126,6 @@ namespace quda
     int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
 
-    double alpha = 0;
-    int source_time = -1;
-
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
     QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
     QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER; // Float, Float2, Float4 etc.
@@ -185,8 +182,6 @@ namespace quda
              || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
               1 :
               4),
-      alpha(inv_param.alpha),
-      source_time(inv_param.source_time),
       twistFlavor(inv_param.twist_flavor),
       gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
@@ -246,8 +241,6 @@ namespace quda
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),
       nVec(cpuParam.nVec),
-      alpha(cpuParam.alpha),
-      source_time(cpuParam.source_time),
       twistFlavor(cpuParam.twistFlavor),
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER),
@@ -270,8 +263,6 @@ namespace quda
     {
       printfQuda("nColor = %d\n", nColor);
       printfQuda("nSpin = %d\n", nSpin);
-      printfQuda("alpha = %f\n", alpha);
-      printfQuda("source_time = %d\n", source_time);
       printfQuda("twistFlavor = %d\n", twistFlavor);
       printfQuda("nDim = %d\n", nDim);
       for (int d = 0; d < nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
@@ -325,9 +316,6 @@ namespace quda
     int nColor = 0;
     int nSpin = 0;
     int nVec = 0;
-
-    double alpha = 0;
-    int source_time = -1;
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID;
 
@@ -465,10 +453,6 @@ namespace quda
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     int Nvec() const { return nVec; }
-    double Alpha() const { return alpha; }
-    void setAlpha(const double alpha) { this->alpha = alpha; }
-    int SourceTime() const {return source_time; }
-    void setSourceTime(const int source_time) { this->source_time = source_time; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int *X() const { return x.data; }

@@ -37,7 +37,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_alpha, distance_source, x, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    }
   }
 
   // Public method to apply the clover term only
@@ -50,7 +54,11 @@ namespace quda {
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_alpha, distance_source, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    }
   }
 
   void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -135,7 +143,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, 0.0, distance_alpha, distance_source, in, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
+    }
   }
 
   // xpay version of the above
@@ -146,7 +158,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, k, distance_alpha, distance_source, x, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    }
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator

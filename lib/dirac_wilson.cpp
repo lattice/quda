@@ -5,12 +5,12 @@
 
 namespace quda {
 
-  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param), distance_alpha(param.distance_alpha), distance_source(param.distance_source) { }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
+  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), distance_alpha(dirac.distance_alpha), distance_source(dirac.distance_source) { }
 
   // hack (for DW and TM operators)
-  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { }
+  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param), distance_alpha(0.0), distance_source(-1) { }
 
   DiracWilson::~DiracWilson() { }
 
@@ -19,6 +19,8 @@ namespace quda {
     if (&dirac != this) {
       Dirac::operator=(dirac);
     }
+    distance_alpha = dirac.distance_alpha;
+    distance_source = dirac.distance_source;
     return *this;
   }
 
@@ -27,7 +29,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_alpha, distance_source, in, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
+    }
   }
 
   void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -36,14 +42,22 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, k, distance_alpha, distance_source, x, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
+    }
   }
 
   void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
 
-    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    if (distance_alpha != 0 && distance_source >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, -kappa, distance_alpha, distance_source, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    }
   }
 
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

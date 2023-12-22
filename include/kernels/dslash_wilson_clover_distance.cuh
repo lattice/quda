@@ -21,8 +21,8 @@ namespace quda
     const real b; /** chiral twist factor (twisted-clover only) */
 
     WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+                    double a, double b, double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for

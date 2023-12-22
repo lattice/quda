@@ -20,8 +20,8 @@ namespace quda
     const real a; /** xpay scale factor */
 
     WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+                    double a, double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger, comm_override),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a)
     {
@@ -31,10 +31,10 @@ namespace quda
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct wilsonCloverPreconditionedDistance : dslash_default {
+  struct wilsonCloverDistancePreconditioned : dslash_default {
 
     const Arg &arg;
-    constexpr wilsonCloverPreconditionedDistance(const Arg &arg) : arg(arg) {}
+    constexpr wilsonCloverDistancePreconditioned(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

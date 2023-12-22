@@ -36,13 +36,13 @@ namespace quda
     const F x;    /** input vector when doing xpay */
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
-    const real alpha;
-    const int source_time;
+    const real distance_alpha;
+    const int distance_source;
     const int comm_dim_3;
     const int comm_coord_3;
 
-    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double distance_alpha,
+              int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
@@ -50,8 +50,8 @@ namespace quda
       x(x),
       U(U),
       a(a),
-      alpha(in.Alpha()),
-      source_time(in.SourceTime()),
+      distance_alpha(distance_alpha),
+      distance_source(distance_source),
       comm_dim_3(comm_dim(3)),
       comm_coord_3(comm_coord(3))
     {
@@ -82,10 +82,10 @@ namespace quda
 
     // values for distance preconditioning
     const int nt = arg.comm_dim_3 * arg.dim[3];
-    const int time_delta = arg.comm_coord_3 * arg.dim[3] + coord[3] - arg.source_time + nt;
-    const real denom = cosh(arg.alpha * ((time_delta) % nt - nt / 2));
-    const real ratio_plus = cosh(arg.alpha * ((time_delta + 1) % nt - nt / 2)) / denom;
-    const real ratio_minus = cosh(arg.alpha * ((time_delta - 1) % nt - nt / 2)) / denom;
+    const int time_delta = arg.comm_coord_3 * arg.dim[3] + coord[3] - arg.distance_source + nt;
+    const real denom = cosh(arg.distance_alpha * ((time_delta) % nt - nt / 2));
+    const real ratio_plus = cosh(arg.distance_alpha * ((time_delta + 1) % nt - nt / 2)) / denom;
+    const real ratio_minus = cosh(arg.distance_alpha * ((time_delta - 1) % nt - nt / 2)) / denom;
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well

@@ -69,19 +69,6 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonDistanceApply {
-
-    inline WilsonDistanceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
-    {
-      constexpr int nDim = 4;
-      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
-      WilsonDistance<decltype(arg)> wilson(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
-    }
-  };
-
   // Apply the Wilson operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the a normalization for the Wilson operator.
@@ -89,17 +76,42 @@ namespace quda
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if (in.Alpha() != 0 && in.SourceTime() >= 0) {
-      instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
-      out.setAlpha(in.Alpha());
-      out.setSourceTime(in.SourceTime());
-    } else {
-      instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
-    }
+    instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
-                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, const ColorSpinorField &,
+                   int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Wilson dslash has not been built");
+  }
+#endif // GPU_WILSON_DIRAC
+
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonDistanceApply {
+
+    inline WilsonDistanceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                               double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger,
+                               const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, distance_alpha, distance_source, x, parity, dagger,
+                                                        comm_override);
+      WilsonDistance<decltype(arg)> wilson(arg, out, in);
+
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+    }
+  };
+
+#ifdef GPU_WILSON_DIRAC
+  void ApplyWilsonDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                           double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger,
+                           const int *comm_override, TimeProfile &profile)
+  {
+    instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger,
+                                                        comm_override, profile);
+  }
+#else
+  void ApplyWilsonDistance(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double, int,
+                           const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Wilson dslash has not been built");
   }
