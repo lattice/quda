@@ -32,6 +32,31 @@ namespace quda
     }
   };
 
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool twist_ = false>
+  struct WilsonCloverDistanceArg : WilsonDistanceArg<Float, nColor, nDim, reconstruct_> {
+    using WilsonDistanceArg<Float, nColor, nDim, reconstruct_>::nSpin;
+    static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
+    static constexpr bool twist = twist_;
+
+    typedef typename clover_mapper<Float, length, true>::type C;
+    typedef typename mapper<Float>::type real;
+
+    const C A;    /** the clover field */
+    const real a; /** xpay scale factor */
+    const real b; /** chiral twist factor (twisted-clover only) */
+
+    WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                    double a, double b, double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger, comm_override),
+      A(A, false),
+      a(a),
+      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
+    {
+      checkPrecision(U, A);
+      checkLocation(U, A);
+    }
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct wilsonClover : dslash_default {
 

@@ -30,6 +30,29 @@ namespace quda
     }
   };
 
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
+  struct WilsonCloverDistanceArg : WilsonDistanceArg<Float, nColor, nDim, reconstruct_> {
+    using WilsonDistanceArg<Float, nColor, nDim, reconstruct_>::nSpin;
+    static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
+    static constexpr bool dynamic_clover = clover::dynamic_inverse();
+
+    typedef typename clover_mapper<Float, length>::type C;
+    typedef typename mapper<Float>::type real;
+
+    const C A;    /** the clover field */
+    const real a; /** xpay scale factor */
+
+    WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                    double a, double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger, comm_override),
+      A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
+      a(a)
+    {
+      checkPrecision(U, A);
+      checkLocation(U, A);
+    }
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct wilsonCloverPreconditioned : dslash_default {
 

@@ -5,7 +5,6 @@
 
 #include <dslash_policy.cuh>
 #include <kernels/dslash_wilson.cuh>
-#include <kernels/dslash_wilson_distance.cuh>
 
 /**
    This is the basic gauged Wilson operator
@@ -22,26 +21,6 @@ namespace quda
 
   public:
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
-    {
-      if(in.Ndim() == 5) {
-        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
-      }
-    }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
-      Dslash::template instantiate<packShmem>(tp, stream);
-    }
-  };
-
-  template <typename Arg> class WilsonDistance : public Dslash<wilsonDistance, Arg>
-  {
-    using Dslash = Dslash<wilsonDistance, Arg>;
-
-  public:
-    WilsonDistance(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       if(in.Ndim() == 5) {
         TunableKernel3D::resizeVector(in.X(4), arg.nParity);
@@ -95,7 +74,7 @@ namespace quda
       constexpr int nDim = 4;
       WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, distance_alpha, distance_source, x, parity, dagger,
                                                         comm_override);
-      WilsonDistance<decltype(arg)> wilson(arg, out, in);
+      Wilson<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
