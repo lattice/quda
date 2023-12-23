@@ -43,8 +43,8 @@ namespace quda
     const real a; /** xpay scale factor */
 
     WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger, comm_override),
+                    double a, double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, alpha, t0, x, parity, dagger, comm_override),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a)
     {

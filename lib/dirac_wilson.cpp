@@ -5,12 +5,12 @@
 
 namespace quda {
 
-  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param), distance_alpha(param.distance_alpha), distance_source(param.distance_source) { }
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param), distance_pc_alpha(0.0), distance_pc_t0(-1) { }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), distance_alpha(dirac.distance_alpha), distance_source(dirac.distance_source) { }
+  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), distance_pc_alpha(dirac.distance_pc_alpha), distance_pc_t0(dirac.distance_pc_t0) { }
 
   // hack (for DW and TM operators)
-  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param), distance_alpha(0.0), distance_source(-1) { }
+  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param), distance_pc_alpha(0.0), distance_pc_t0(-1) { }
 
   DiracWilson::~DiracWilson() { }
 
@@ -19,8 +19,8 @@ namespace quda {
     if (&dirac != this) {
       Dirac::operator=(dirac);
     }
-    distance_alpha = dirac.distance_alpha;
-    distance_source = dirac.distance_source;
+    distance_pc_alpha = dirac.distance_pc_alpha;
+    distance_pc_t0 = dirac.distance_pc_t0;
     return *this;
   }
 
@@ -29,8 +29,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_alpha != 0 && distance_source >= 0) {
-      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_alpha, distance_source, in, parity, dagger, commDim, profile);
+    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha, distance_pc_t0, in, parity, dagger, commDim, profile);
     } else {
       ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
     }
@@ -42,8 +42,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_alpha != 0 && distance_source >= 0) {
-      ApplyWilsonDistance(out, in, *gauge, k, distance_alpha, distance_source, x, parity, dagger, commDim, profile);
+    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha, distance_pc_t0, x, parity, dagger, commDim, profile);
     } else {
       ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
     }
@@ -53,8 +53,8 @@ namespace quda {
   {
     checkFullSpinor(out, in);
 
-    if (distance_alpha != 0 && distance_source >= 0) {
-      ApplyWilsonDistance(out, in, *gauge, -kappa, distance_alpha, distance_source, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, -kappa, distance_pc_alpha, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     } else {
       ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     }

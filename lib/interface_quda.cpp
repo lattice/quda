@@ -1523,11 +1523,6 @@ namespace quda {
     diracParam.mu = inv_param->mu;
     diracParam.tm_rho = inv_param->tm_rho;
 
-    if (inv_param->dslash_type == QUDA_WILSON_DSLASH || inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-      diracParam.distance_alpha = inv_param->distance_alpha;
-      diracParam.distance_source = inv_param->distance_source;
-    }
-
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
     if (diracParam.gauge->Precision() != inv_param->cuda_prec)
@@ -2740,6 +2735,21 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(b, *param, false);
 
+  const double alpha = param->distance_pc_alpha;
+  const int t0 = param->distance_pc_t0;
+  bool distance_pc = (alpha != 0) && (t0 >= 0);
+  distance_pc &= (param->dslash_type == QUDA_WILSON_DSLASH) || (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH);
+  distance_pc &= (param->inv_type != QUDA_MG_INVERTER);
+
+  // Don't apply distance preconditioning in functions other than invertQuda.
+  if (distance_pc) {
+    dirac.setDistancePrecondition(alpha, t0);
+    diracSloppy.setDistancePrecondition(alpha, t0);
+    diracPre.setDistancePrecondition(alpha, t0);
+    diracEig.setDistancePrecondition(alpha, t0);
+    spinorDistanceReweight(b, -alpha, t0);
+  }
+
   dirac.prepare(in, out, x, b, param->solution_type);
 
   logQuda(QUDA_VERBOSE, "Prepared source = %g\n", blas::norm2(*in));
@@ -2922,6 +2932,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     basis[0] = *out; // set first entry to new solution
   }
   dirac.reconstruct(x, b, param->solution_type);
+
+  if (distance_pc) {
+    spinorDistanceReweight(x, alpha, t0);
+  }
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution

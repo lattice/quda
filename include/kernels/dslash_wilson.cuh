@@ -7,6 +7,7 @@
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
+#include <kernels/spinor_reweight.cuh>
 
 namespace quda
 {
@@ -60,16 +61,16 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    const real distance_alpha;
-    const int distance_source;
+    const real alpha;
+    const int t0;
     const int comm_dim_3;
     const int comm_coord_3;
 
-    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double distance_alpha,
-              int distance_source, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha,
+              int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor_, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-      distance_alpha(distance_alpha),
-      distance_source(distance_source),
+      alpha(alpha),
+      t0(t0),
       comm_dim_3(comm_dim(3)),
       comm_coord_3(comm_coord(3))
     {
@@ -177,11 +178,13 @@ namespace quda
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
     // values for distance preconditioning
+    const real alpha = arg.alpha;
+    const int t0 = arg.t0;
+    const int t = arg.comm_coord_3 * arg.dim[3] + coord[3];
     const int nt = arg.comm_dim_3 * arg.dim[3];
-    const int dt = arg.comm_coord_3 * arg.dim[3] + coord[3] - arg.distance_source + nt;
-    const real denom = cosh(arg.distance_alpha * ((dt) % nt - nt / 2));
-    const real ratio_plus = cosh(arg.distance_alpha * ((dt + 1) % nt - nt / 2)) / denom;
-    const real ratio_minus = cosh(arg.distance_alpha * ((dt - 1) % nt - nt / 2)) / denom;
+    const real denom = genDistanceWeight<false>(alpha, t0, t, nt);
+    const real ratio_fwd = genDistanceWeight<false>(alpha, t0, t + 1, nt) / denom;
+    const real ratio_bwd = genDistanceWeight<false>(alpha, t0, t - 1, nt) / denom;
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -202,7 +205,7 @@ namespace quda
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
           if (d == 3) {
-            out += ratio_plus * (U * in).reconstruct(d, proj_dir);
+            out += ratio_fwd * (U * in).reconstruct(d, proj_dir);
           } else {
             out += (U * in).reconstruct(d, proj_dir);
           }
@@ -212,7 +215,7 @@ namespace quda
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           if (d == 3) {
-            out += ratio_plus * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out += ratio_fwd * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           } else {
             out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
@@ -236,7 +239,7 @@ namespace quda
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
           if (d == 3) {
-            out += ratio_minus * (conj(U) * in).reconstruct(d, proj_dir);
+            out += ratio_bwd * (conj(U) * in).reconstruct(d, proj_dir);
           } else {
             out += (conj(U) * in).reconstruct(d, proj_dir);
           }
@@ -246,7 +249,7 @@ namespace quda
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           if (d == 3) {
-            out += ratio_minus * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out += ratio_bwd * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           } else {
             out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }

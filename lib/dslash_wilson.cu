@@ -68,11 +68,11 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonDistanceApply {
 
     inline WilsonDistanceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                               double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger,
+                               double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger,
                                const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, distance_alpha, distance_source, x, parity, dagger,
+      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, alpha, t0, x, parity, dagger,
                                                         comm_override);
       Wilson<decltype(arg)> wilson(arg, out, in);
 
@@ -82,10 +82,10 @@ namespace quda
 
 #ifdef GPU_WILSON_DIRAC
   void ApplyWilsonDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                           double distance_alpha, int distance_source, const ColorSpinorField &x, int parity, bool dagger,
+                           double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger,
                            const int *comm_override, TimeProfile &profile)
   {
-    instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, distance_alpha, distance_source, x, parity, dagger,
+    instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, alpha, t0, x, parity, dagger,
                                                         comm_override, profile);
   }
 #else

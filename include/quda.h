@@ -448,8 +448,8 @@ extern "C" {
     QudaBoolean use_mobius_fused_kernel;
 
     /** Parameters for distance preconditioning */
-    double distance_alpha;
-    int distance_source;
+    double distance_pc_alpha;
+    int distance_pc_t0;
 
   } QudaInvertParam;
 

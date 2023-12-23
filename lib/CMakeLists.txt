@@ -54,7 +54,7 @@ set (QUDA_OBJS
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
-  spinor_noise.cu spinor_dilute.cu
+  spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu

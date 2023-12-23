@@ -728,11 +728,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(distance_alpha, 0);
-  P(distance_source, -1);
+  P(distance_pc_alpha, 0);
+  P(distance_pc_t0, -1);
 #else
-  P(distance_alpha, INVALID_DOUBLE);
-  P(distance_source, INVALID_INT);
+  P(distance_pc_alpha, INVALID_DOUBLE);
+  P(distance_pc_t0, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
