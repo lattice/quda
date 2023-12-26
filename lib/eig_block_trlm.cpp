@@ -121,9 +121,9 @@ namespace quda
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
-        if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked]) /*mat_norm*/) {
+        if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  epsilon * check_norm(alpha[i + num_locked]) /*mat_norm*/);
+                  epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -134,9 +134,9 @@ namespace quda
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
-        if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked]) /*mat_norm*/) {
+        if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  tol * check_norm(alpha[i + num_locked]) /*mat_norm*/);
+                  tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
