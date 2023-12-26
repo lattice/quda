@@ -109,17 +109,65 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
                                                 void *spinorCheck, QudaGaugeParam &gauge_param,
                                                 QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
+/**
+  * @brief Verify a staggered inversion on the host. This version is a thin wrapper around a version that takes
+  *        an array of outputs as is necessary for handling both single- and multi-shift solves.
+  *
+  * @param tmp A temporary spinor intermediate calculations
+  * @param ref A temporary reference field that is used to store the host verification solution
+  * @param in The initial rhs
+  * @param out The solution to A out = in
+  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
+  * @param long_link The long links; null for naive staggered and Laplace
+  * @param inv_param Invert params, used to query the solve type, etc
+  * @return The residual and HQ residual (if requested)
+  */
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
                                 quda::ColorSpinorField &out, quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                 QudaInvertParam &inv_param);
 
+/**
+  * @brief Verify a single- or multi-shift staggered inversion on the host
+  *
+  * @param tmp A temporary spinor intermediate calculations
+  * @param ref A temporary reference field that is used to store the host verification solution
+  * @param in The initial rhs
+  * @param out The solutions to (A + shift) out = in for multiple shifts; shift == 0 for a single shift solve
+  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
+  * @param long_link The long links; null for naive staggered and Laplace
+  * @param inv_param Invert params, used to query the solve type, etc, also includes the shifts
+  * @return The residual and HQ residual (if requested)
+  */
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
                                 std::vector<quda::ColorSpinorField> &out_vector, quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                 QudaInvertParam &inv_param);
 
+/**
+  * @brief Verify a staggered-type eigenvector
+  *
+  * @param spinor The host eigenvector to be verified
+  * @param lambda The host eigenvalue to be verified
+  * @param i The number of the eigenvalue, only used when printing outputs
+  * @param eig_param Eigensolve params, used to query the operator type, etc
+  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
+  * @param long_link The long links; null for naive staggered and Laplace
+  * @return The residual norm
+  */
 double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Complex lambda, int i,
                                       QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link);
 
+/**
+  * @brief Verify a staggered-type singular vector
+  *
+  * @param spinor The host left singular vector to be verified
+  * @param spinor_right The host right singular vector to be verified
+  * @param lambda The host singular value to be verified
+  * @param i The number of the singular value, only used when printing outputs
+  * @param eig_param Eigensolve params, used to query the operator type, etc
+  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
+  * @param long_link The long links; null for naive staggered and Laplace
+  * @return The residual norm
+  */
 double verifyStaggeredTypeSingularVector(quda::ColorSpinorField& spinor_left, quda::ColorSpinorField &spinor_right, double _Complex sigma, int i,
                                          QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link);
 
