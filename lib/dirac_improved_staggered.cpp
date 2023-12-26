@@ -79,8 +79,7 @@ namespace quda {
 
     // Apply -D + 4 m^2
     // improved, no clover, xpay
-    //ApplyLocalStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, true, false, true);
-    errorQuda("DiracImprovedStaggered::MLocal has not been implemented yet");
+    ApplyLocalStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, true, false, true);
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -102,13 +101,9 @@ namespace quda {
 
     auto tmp = getFieldTmp(in);
 
-    // Apply D
-    //ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, QUDA_INVALID_PARITY, true, false, false);
-
-    // Apply -D + 4 m^2
-    //ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, QUDA_INVALID_PARITY, true, true, true);
-
-    errorQuda("DiracImprovedStaggered::MdagMLocal has not been implemented yet");
+    // Apply D, -D + 4 m^2
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, QUDA_INVALID_PARITY, true, false, false);
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, QUDA_INVALID_PARITY, true, true, true);
   }
 
   void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -248,13 +243,9 @@ namespace quda {
       errorQuda("Invalid matpcType(%d) in function\n", matpcType);
     }
 
-    // Apply D_oe [D_eo]
-    //ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, false, false);
-
-    // apply -D_eo [-D_oe] + 4 m^2
-    //ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, true, true);
-
-    errorQuda("DiracImprovedStaggeredPC::MLocal has not been implemented yet");
+    // Apply D_oe [D_eo], -D_eo [-D_oe] + 4 m^2
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, false, false);
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, true, true);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const

@@ -93,7 +93,7 @@ set (QUDA_OBJS
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
-  dslash_staggered.cu dslash_improved_staggered.cu
+  dslash_staggered.cu dslash_improved_staggered.cu dslash_staggered_local.cu
   dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
   dslash_wilson_clover_preconditioned.cu 
   dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
