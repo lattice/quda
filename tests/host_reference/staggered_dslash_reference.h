@@ -69,9 +69,8 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
   * @param in Host input spinor
   * @param mass Mass for the dslash operator
   * @param dagger_bit 0 for the regular operator, 1 for the dagger operator --- irrelevant for the HPD preconditioned operator
-  * @param tmp Temporary spinor field
   * @param parity Parity of preconditioned dslash
   * @param dslash_type Dslash type
   */
 void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in,
-                double mass, int dagger_bit, ColorSpinorField &tmp, QudaParity parity, QudaDslashType dslash_type);
+                double mass, int dagger_bit, QudaParity parity, QudaDslashType dslash_type);

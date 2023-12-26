@@ -280,12 +280,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
   std::vector<quda::ColorSpinorField> in(Nsrc);
   std::vector<quda::ColorSpinorField> out(Nsrc);
   std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
-  quda::ColorSpinorField ref;
-  quda::ColorSpinorField tmp;
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  ref = quda::ColorSpinorField(cs_param);
-  tmp = quda::ColorSpinorField(cs_param);
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void*>(multishift));
 
   // Staggered vector construct END
@@ -340,7 +336,10 @@ std::vector<std::array<double, 2>> solve(test_t param)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  quda::RNG rng(ref, 1234);
+  // Create a temporary spinor just to seed the rng
+  quda::ColorSpinorField tmp(cs_param);
+  quda::RNG rng(tmp, 1234);
+  tmp = quda::ColorSpinorField();
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
@@ -410,9 +409,9 @@ std::vector<std::array<double, 2>> solve(test_t param)
         printfQuda("\nSource %d:\n", n);
         // Create an appropriate subset of the full out_multishift vector
         std::vector<quda::ColorSpinorField> out_subset = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
-        res[n] = verifyStaggeredInversion(tmp, ref, in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
+        res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
       } else {
-        res[n] = verifyStaggeredInversion(tmp, ref, in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param);
+        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param);
       }
     }
   }

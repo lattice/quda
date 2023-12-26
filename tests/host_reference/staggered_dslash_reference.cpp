@@ -193,7 +193,7 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
 }
 
 void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, double mass, int,
-                ColorSpinorField &tmp, QudaParity parity, QudaDslashType dslash_type)
+                QudaParity parity, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precison are not the same"); }
@@ -206,6 +206,10 @@ void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFi
   } else {
     errorQuda("full parity not supported in function");
   }
+
+  // Create temporary spinors
+  quda::ColorSpinorParam csParam(in);
+  quda::ColorSpinorField tmp(csParam);
 
   // dagger bit does not matter
   stag_dslash(tmp, fat_link, long_link, in, otherparity, 0, dslash_type);
