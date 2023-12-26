@@ -98,6 +98,7 @@ void setQudaDefaultMgTestParams();
 //------------------------------------------------------
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
+void constructHostGaugeField(quda::GaugeField &gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);
@@ -210,7 +211,7 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
  */
 double mom_action(void *mom, QudaPrecision prec, int len);
 
-void createMomCPU(void *mom, QudaPrecision precision);
+void createMomCPU(void *mom, QudaPrecision precision, double max_val = 1.0);
 
 /**
    @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations

@@ -301,7 +301,7 @@ namespace quda {
   template <> struct dim_collapse<true> {
     template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
     {
-      SharedMemoryCache<T> cache(target::block_dim());
+      SharedMemoryCache<T> cache;
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
 

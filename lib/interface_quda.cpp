@@ -158,6 +158,9 @@ static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 //!<Profiler for computeCloverForceQuda
 static TimeProfile profileCloverForce("computeCloverForceQuda");
 
+//!< Profiles for computeTMCloverForceQuda
+static TimeProfile profileTMCloverForce("computeTMCloverForceQuda");
+
 //!<Profiler for computeStaggeredForceQuda
 static TimeProfile profileStaggeredForce("computeStaggeredForceQuda");
 
@@ -1381,6 +1384,7 @@ void endQuda(void)
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
     profileCloverForce.Print();
+    profileTMCloverForce.Print();
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
@@ -3837,7 +3841,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   gParamMom.create = qudaGaugeParam->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
   gParamMom.field = &cpuMom;
   gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
-  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParamMom.setPrecision(qudaGaugeParam->cuda_prec, true);
 
   GaugeField cudaMom = qudaGaugeParam->use_resident_mom ? momResident.create_alias() : GaugeField(gParamMom);
@@ -4493,158 +4496,144 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
                             QudaInvertParam *inv_param)
 {
   using namespace quda;
-  auto profile = pushProfile(profileCloverForce);
+  auto profile = pushProfile(profileCloverForce, inv_param->secs, inv_param->gflops);
 
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
+  if (!cloverPrecise) errorQuda("No resident clover field");
 
   GaugeFieldParam fParam(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   // create the host momentum field
-  fParam.location = QUDA_CPU_FIELD_LOCATION;
-  fParam.reconstruct = QUDA_RECONSTRUCT_10;
-  fParam.order = gauge_param->gauge_order;
-  GaugeField cpuMom(fParam);
+  GaugeField cpuMom = !gauge_param->use_resident_mom ? GaugeField(fParam) : GaugeField();
 
   // create the device momentum field
   fParam.location = QUDA_CUDA_FIELD_LOCATION;
-  fParam.create = QUDA_ZERO_FIELD_CREATE;
-  fParam.setPrecision(fParam.Precision(), true);
-  GaugeField cudaMom(fParam);
+  fParam.create = gauge_param->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
+  fParam.field = &cpuMom;
+  fParam.reconstruct = QUDA_RECONSTRUCT_10;
+  fParam.setPrecision(gauge_param->cuda_prec, true);
 
-  // create the device force field
-  fParam.link_type = QUDA_GENERAL_LINKS;
-  fParam.create = QUDA_ZERO_FIELD_CREATE;
-  fParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  fParam.setPrecision(fParam.Precision(), true);
-  GaugeField cudaForce(fParam);
+  if (gauge_param->use_resident_mom && !momResident.Length()) errorQuda("No resident momentum field to use");
+  GaugeField cudaMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(fParam);
+  if (gauge_param->use_resident_mom && gauge_param->overwrite_mom) cudaMom.zero();
 
-  ColorSpinorParam qParam;
-  qParam.location = QUDA_CUDA_FIELD_LOCATION;
-  qParam.nColor = 3;
-  qParam.nSpin = 4;
-  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  qParam.nDim = 4;
+  if (inv_param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION)
+    errorQuda("Force computation only supports solution to MatPCDagMatPC");
+  ColorSpinorParam qParam(nullptr, *inv_param, fParam.x, false, QUDA_CUDA_FIELD_LOCATION);
   qParam.setPrecision(fParam.Precision(), fParam.Precision(), true);
-  qParam.pad = 0;
-  for(int dir=0; dir<4; ++dir) qParam.x[dir] = fParam.x[dir];
-
-  // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField*> quarkX, quarkP;
-  for (int i=0; i<nvector; i++) {
-    quarkX.push_back(ColorSpinorField::Create(qParam));
-    quarkP.push_back(ColorSpinorField::Create(qParam));
-  }
-
-  qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  qParam.x[0] /= 2;
-  ColorSpinorField tmp(qParam);
-
-  // create the host quark field
-  qParam.location = QUDA_CPU_FIELD_LOCATION;
-  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // need expose this to interface
-
-  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
-  DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, pc_solve);
-  Dirac *dirac = Dirac::create(diracParam);
-
-  if (inv_param->use_resident_solution) {
-    if (solutionResident.size() < (unsigned int)nvector)
-      errorQuda("solutionResident.size() %lu does not match number of shifts %d",
-		solutionResident.size(), nvector);
-  }
-
-  GaugeField &gaugeEx = *extendedGaugeResident;
-
-  // create oprod and trace fields
-  fParam.geometry = QUDA_TENSOR_GEOMETRY;
-  GaugeField oprod(fParam);
-
+  std::vector<ColorSpinorField> x(nvector), x0(nvector);
   std::vector<double> force_coeff(nvector);
-  // loop over different quark fields
-  for(int i=0; i<nvector; i++){
-    ColorSpinorField &x = *(quarkX[i]);
-    ColorSpinorField &p = *(quarkP[i]);
+  std::vector<array<double, 2>> ferm_epsilon(nvector);
+
+  QudaParity parity = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+
+  for (int i = 0; i < nvector; i++) {
+    x[i] = ColorSpinorField(qParam);
 
     if (!inv_param->use_resident_solution) {
-      // for downloading x_e
-      qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      qParam.x[0] /= 2;
-
-      // Wrap the even-parity MILC quark field
-      qParam.v = h_x[i];
-      ColorSpinorField cpuQuarkX(qParam); // create host quark field
-
-      x.Even() = cpuQuarkX;
-
-      gamma5(x.Even(), x.Even());
+      ColorSpinorParam cpuParam(h_x[i], *inv_param, fParam.x, true, inv_param->input_location);
+      ColorSpinorField cpuQuarkX(cpuParam);
+      x[i][parity] = cpuQuarkX;
     } else {
-      x.Even() = solutionResident[i];
+      x[i][parity] = solutionResident[i];
     }
 
-    dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
-    dirac->M(p.Even(), x.Even());
-    dirac->Dagger(QUDA_DAG_YES);
-    dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY);
-    dirac->Dagger(QUDA_DAG_NO);
-
-    gamma5(x, x);
-    gamma5(p, p);
-
-    force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
+    force_coeff[i] = 2.0 * dt * coeff[i] * kappa2;
+    ferm_epsilon[i] = {2.0 * ck * coeff[i] * dt, -kappa2 * 2.0 * ck * coeff[i] * dt};
   }
 
-  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+  if (inv_param->use_resident_solution && solutionResident.size() < (unsigned int)nvector)
+    errorQuda("solutionResident.size() %lu does not match number of shifts %d", solutionResident.size(), nvector);
 
-  // In double precision the clover derivative is faster with no reconstruct
-  GaugeField *u = &gaugeEx;
-  if (gaugeEx.Reconstruct() == QUDA_RECONSTRUCT_12 && gaugeEx.Precision() == QUDA_DOUBLE_PRECISION) {
-    GaugeFieldParam param(gaugeEx);
-    param.reconstruct = QUDA_RECONSTRUCT_NO;
-    u = new GaugeField(param);
-    u -> copy(gaugeEx);
-  }
+  // Make sure extendedGaugeResident has the correct R
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileCloverForce);
+  GaugeField &gaugeEx = *extendedGaugeResident;
 
-  computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt);
-
-  /* Now the U dA/dU terms */
-  std::vector< std::vector<double> > ferm_epsilon(nvector);
-  for (int shift = 0; shift < nvector; shift++) {
-    ferm_epsilon[shift].reserve(2);
-    ferm_epsilon[shift][0] = 2.0*ck*coeff[shift]*dt;
-    ferm_epsilon[shift][1] = -kappa2 * 2.0*ck*coeff[shift]*dt;
-  }
-
-  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
-
-  GaugeField *oprodEx = createExtendedGauge(oprod, R, profileCloverForce);
-
-  cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_ODD_PARITY);
-  cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_EVEN_PARITY);
-
-  if (u != &gaugeEx) delete u;
-
-  updateMomentum(cudaMom, -1.0, cudaForce, "clover");
+  computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
+                     2.0 * ck * multiplicity * dt, false, *inv_param);
 
   // copy the outer product field back to the host
-  cpuMom.copy(cudaMom);
+  if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
+  if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
+    std::exchange(momResident, cudaMom);
+  else if (!gauge_param->make_resident_mom)
+    momResident = GaugeField();
+}
 
-  for (int i=0; i<nvector; i++) {
-    delete quarkX[i];
-    delete quarkP[i];
+void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
+                              QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
+{
+  using namespace quda;
+  auto profile = pushProfile(profileTMCloverForce, inv_param->secs, inv_param->gflops);
+
+  checkGaugeParam(gauge_param);
+  if (!gaugePrecise) errorQuda("No resident gauge field");
+  if (!cloverPrecise) errorQuda("No resident clover field");
+
+  double kappa = inv_param->kappa;
+  double k_csw_ov_8 = kappa * inv_param->clover_csw / 8.0;
+
+  GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
+  GaugeField cpuMom = !gauge_param->use_resident_mom ? GaugeField(gParamMom) : GaugeField();
+
+  // create the device momentum field
+  gParamMom.location = QUDA_CUDA_FIELD_LOCATION;
+  gParamMom.create = gauge_param->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
+  gParamMom.field = &cpuMom;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.setPrecision(gauge_param->cuda_prec, true);
+
+  if (gauge_param->use_resident_mom && !momResident.Length()) errorQuda("No resident momentum field to use");
+  GaugeField gpuMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(gParamMom);
+  if (gauge_param->use_resident_mom && gauge_param->overwrite_mom) gpuMom.zero();
+
+  if (inv_param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION)
+    errorQuda("Force computation only supports solution to MatPCDagMatPC");
+  ColorSpinorParam qParam(nullptr, *inv_param, gParamMom.x, false, QUDA_CUDA_FIELD_LOCATION);
+  qParam.setPrecision(gauge_param->cuda_prec, gauge_param->cuda_prec, true);
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+  std::vector<ColorSpinorField> x(nvector), x0(nvector);
+  std::vector<double> force_coeff(nvector);
+  std::vector<array<double, 2>> ferm_epsilon(nvector);
+
+  QudaParity parity = inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+
+  for (int i = 0; i < nvector; i++) {
+    x[i] = ColorSpinorField(qParam);
+    ColorSpinorParam cpuParam(h_x[i], *inv_param, gParamMom.x, true, inv_param->input_location);
+    ColorSpinorField cpuQuarkX(cpuParam);
+    x[i][parity] = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
+
+    if (detratio) {
+      x0[i] = ColorSpinorField(qParam);
+      ColorSpinorParam cpuParam0(h_x0[i], *inv_param, gParamMom.x, true, inv_param->input_location);
+      ColorSpinorField cpuQuarkX0(cpuParam0);
+      x0[i][parity] = cpuQuarkX0;
+    }
+
+    force_coeff[i] = 1.0 * coeff[i];
+    ferm_epsilon[i] = {k_csw_ov_8 * coeff[i], k_csw_ov_8 * coeff[i] / (kappa * kappa)};
   }
 
-#if 0
-  if (inv_param->use_resident_solution) solutionResident.clear();
-#endif
-  delete dirac;
+  // Make sure extendedGaugeResident has the correct R
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileTMCloverForce);
+  GaugeField &gaugeEx = *extendedGaugeResident;
+
+  computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
+                     k_csw_ov_8 * 32.0, detratio, *inv_param);
+
+  if (gauge_param->return_result_mom) cpuMom.copy(gpuMom);
+  if (gauge_param->make_resident_mom && gauge_param->use_resident_mom)
+    std::exchange(momResident, gpuMom);
+  else if (!gauge_param->make_resident_mom)
+    momResident = GaugeField();
 }
 
 void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, int exact, QudaGaugeParam *param)
