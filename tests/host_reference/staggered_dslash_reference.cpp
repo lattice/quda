@@ -131,6 +131,10 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
 
+  // assert we have single-parity spinors
+  if (out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || in.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_dslash, out %d in %d", out.SiteSubset(), in.SiteSubset());
+
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
@@ -216,6 +220,10 @@ void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFi
 {
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precison are not the same"); }
+
+  // assert we have single-parity spinors
+  if (out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || in.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_matpc, out %d in %d", out.SiteSubset(), in.SiteSubset());
 
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (parity == QUDA_EVEN_PARITY) {
