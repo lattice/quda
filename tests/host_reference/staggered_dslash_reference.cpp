@@ -192,6 +192,25 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
   }
 }
 
+void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
+{
+  // assert sPrecision and gPrecision must be the same
+  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
+
+  // assert we have full-parity spinors
+  if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_matdagmat, out %d in %d", out.SiteSubset(), in.SiteSubset());
+
+  // Create temporary spinors
+  quda::ColorSpinorParam csParam(in);
+  quda::ColorSpinorField tmp(csParam);
+
+  // Apply mat in sequence
+  stag_mat(tmp, fat_link, long_link, in, mass, daggerBit, dslash_type);
+  stag_mat(out, fat_link, long_link, tmp, mass, 1 - daggerBit, dslash_type);
+}
+
 void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, double mass, int,
                 QudaParity parity, QudaDslashType dslash_type)
 {

@@ -61,6 +61,20 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
               double mass, int daggerBit, QudaDslashType dslash_type);
 
 /**
+  * @brief Apply the full parity staggered-type matdag_mat
+  *
+  * @param out Host output rhs
+  * @param fat_link Fat links for an asqtad dslash, or the gauge links for a staggered or Laplace dslash
+  * @param long_link Long links for an asqtad dslash, or an empty GaugeField for staggered or Laplace dslash
+  * @param in Host input spinor
+  * @param mass Mass for the dslash operator
+  * @param daggerBit 0 for the regular operator, 1 for the dagger operator
+  * @param dslash_type Dslash type
+  */
+void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in,
+              double mass, int daggerBit, QudaDslashType dslash_type);
+
+/**
   * @brief Apply the even-even or odd-odd preconditioned staggered dslash
   *
   * @param out Host output rhs

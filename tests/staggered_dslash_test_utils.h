@@ -53,7 +53,6 @@ struct StaggeredDslashTestWrapper {
   static inline ColorSpinorField spinor;
   static inline ColorSpinorField spinorOut;
   static inline ColorSpinorField spinorRef;
-  static inline ColorSpinorField tmpCpu;
 
   ColorSpinorField cudaSpinor;
   ColorSpinorField cudaSpinorOut;
@@ -92,8 +91,7 @@ struct StaggeredDslashTestWrapper {
       stag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
       break;
     case dslash_test_type::MatDagMat:
-      stag_mat(tmpCpu, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
-      stag_mat(spinorRef, cpuFat, cpuLong, tmpCpu, mass, 1 - dagger, dslash_type);
+      stag_matdag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
     }
@@ -201,7 +199,6 @@ struct StaggeredDslashTestWrapper {
     spinor = ColorSpinorField(csParam);
     spinorOut = ColorSpinorField(csParam);
     spinorRef = ColorSpinorField(csParam);
-    tmpCpu = ColorSpinorField(csParam);
 
     spinor.Source(QUDA_RANDOM_SOURCE);
 
@@ -307,7 +304,6 @@ struct StaggeredDslashTestWrapper {
     spinor = {};
     spinorOut = {};
     spinorRef = {};
-    tmpCpu = {};
 
     if (test_split_grid) {
       vp_spinor.clear();

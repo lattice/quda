@@ -747,8 +747,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda:
                                 quda::GaugeField &long_link, QudaInvertParam &inv_param) {
   std::vector<quda::ColorSpinorField> out_vector(1);
   out_vector[0] = out;
-  return verifyStaggeredInversion(in, out_vector, fat_link,
-                                  long_link, inv_param);
+  return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param);
 }
 
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::vector<quda::ColorSpinorField> &out_vector,
@@ -761,7 +760,6 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
   // Create temporary spinors
   quda::ColorSpinorParam csParam(in);
   quda::ColorSpinorField ref(csParam);
-  quda::ColorSpinorField tmp(csParam);
 
   if (multishift > 1) {
     if (dslash_type == QUDA_LAPLACE_DSLASH)
@@ -821,8 +819,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
       }
       stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
     } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-      stag_mat(tmp, fat_link, long_link, out, mass, dagger, dslash_type);
-      stag_mat(ref, fat_link, long_link, tmp, mass, 1 - dagger, dslash_type);
+      stag_matdag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
     } else {
       errorQuda("Invalid staggered solution type %d", inv_param.solution_type);
     }
@@ -866,7 +863,6 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Co
   // Create temporary spinors
   quda::ColorSpinorParam csParam(spinor);
   quda::ColorSpinorField ref(csParam);
-  quda::ColorSpinorField tmp(csParam);
 
   if (sol_type == QUDA_MAT_SOLUTION) {
     stag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
@@ -879,8 +875,7 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Co
     }
     stag_matpc(ref, fat_link, long_link, spinor, mass, 0, parity, dslash_type);
   } else if (sol_type == QUDA_MATDAG_MAT_SOLUTION) {
-    stag_mat(tmp, fat_link, long_link, spinor, mass, dagger, dslash_type);
-    stag_mat(ref, fat_link, long_link, tmp, mass, 1 - dagger, dslash_type);
+    stag_matdag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
   }
 
   // Compute M * x - \lambda * x
