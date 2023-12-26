@@ -68,6 +68,17 @@ namespace quda {
     }
   }
 
+  // Local staggered operator
+  void DiracStaggered::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkFullSpinor(in, out);
+
+    // Apply -D + 4 m^2
+    // unimproved, no clover, xpay
+    //ApplyLocalStaggered(out, in, *gauge, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, false, false, true);
+    errorQuda("DiracStaggered::MLocal has not been implemented yet");
+  }
+
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     auto tmp = getFieldTmp(in.Even());
@@ -79,6 +90,21 @@ namespace quda {
     // odd
     Dslash(tmp, in.Odd(), QUDA_EVEN_PARITY);
     DslashXpay(out.Odd(), tmp, QUDA_ODD_PARITY, in.Odd(), 4 * mass * mass);
+  }
+
+  void DiracStaggered::MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkFullSpinor(in, out);
+
+    auto tmp = getFieldTmp(in);
+
+    // Apply D
+    //ApplyLocalStaggered(tmp, in, *gauge, *gauge, 0.0, in, QUDA_INVALID_PARITY, false, false, false);
+
+    // Apply -D + 4 m^2
+    //ApplyLocalStaggered(out, tmp, *gauge, *gauge, 4. * mass * mass, in, QUDA_INVALID_PARITY, false, true, true);
+
+    errorQuda("DiracStaggered::MdagMLocal has not been implemented yet");
   }
 
   void DiracStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -193,6 +219,35 @@ namespace quda {
 
     Dslash(tmp, in, other_parity);
     DslashXpay(out, tmp, parity, in, 4 * mass * mass);
+  }
+
+  // Apply the local version of M, book-keeping terms that hop out then in
+  void DiracStaggeredPC::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkSpinorAlias(in, out);
+
+    auto tmp = getFieldTmp(in);
+
+    // Determine parity of first dslash (even -> D_oe; odd -> D_eo)
+    QudaParity parity = QUDA_INVALID_PARITY;
+    QudaParity other_parity = QUDA_INVALID_PARITY;
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      parity = QUDA_EVEN_PARITY;
+      other_parity = QUDA_ODD_PARITY;
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      parity = QUDA_ODD_PARITY;
+      other_parity = QUDA_EVEN_PARITY;
+    } else {
+      errorQuda("Invalid matpcType(%d) in function\n", matpcType);
+    }
+
+    // Apply D_oe [D_eo]; second "gauge" is a dummy value for the long links
+    //ApplyLocalStaggered(tmp, in, *gauge, *gauge, 0.0, in, other_parity, false, false, false);
+
+    // apply -D_eo [-D_oe] + 4 m^2
+    //ApplyLocalStaggered(out, tmp, *gauge, *gauge, 4. * mass * mass, in, parity, false, true, true);
+
+    errorQuda("DiracStaggeredPC::MLocal has not been implemented yet");
   }
 
   void DiracStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const

@@ -80,6 +80,24 @@ namespace quda
     }
   }
 
+  void DiracImprovedStaggeredKD::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const {
+
+    if (dagger == QUDA_DAG_YES)
+      errorQuda("The dagger operator has not been implemented for staggered KD Mlocal");
+
+    checkFullSpinor(in, out);
+
+    auto tmp = getFieldTmp(in);
+
+    // Apply -D + 4 m^2
+    // improved, no clover, xpay
+    //ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, true, false, true);
+    //ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
+
+    // flops += ...
+    errorQuda("DiracImprovedStaggeredKD::MLocal has not been implemented yet");
+  }
+
   void DiracImprovedStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     auto tmp = getFieldTmp(in);

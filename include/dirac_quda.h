@@ -148,6 +148,7 @@ namespace quda {
   // forward declarations
   class DiracMatrix; // What are the differences in these classes?
   class DiracM;
+  class DiracMLocal;
   class DiracMdagM;
   class DiracMdagMLocal;
   class DiracMMdag;
@@ -161,6 +162,7 @@ namespace quda {
 
     friend class DiracMatrix;
     friend class DiracM;
+    friend class DiracMLocal;
     friend class DiracMdagM;
     friend class DiracMdagMLocal;
     friend class DiracMMdag;
@@ -271,6 +273,22 @@ namespace quda {
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
     virtual void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+    {
+      for (auto i = 0u; i < in.size(); i++) M(out[i], in[i]);
+    }
+
+    /**
+       @brief Apply the local M operator: equivalent to applying zero Dirichlet
+              boundary condition to M on each rank. Depending on the number of
+              stencil steps of the fermion type, this may require additional effort
+              to include the terms that hop out of the boundary and then hop back.
+    */
+    virtual void MLocal(ColorSpinorField &, const ColorSpinorField &) const { errorQuda("Not implemented!\n"); }
+
+    /**
+       @brief Apply MLocal for the dirac op. E.g. the Schur Complement operator
+    */
+    virtual void MLocal(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) M(out[i], in[i]);
     }
@@ -1338,6 +1356,9 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
+
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
@@ -1404,6 +1425,8 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
+
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
@@ -1461,6 +1484,8 @@ public:
                             const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1541,6 +1566,9 @@ public:
                             const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
@@ -1641,6 +1669,8 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
+
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
@@ -1697,6 +1727,8 @@ public:
                             const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -2314,6 +2346,32 @@ public:
       dirac->M(out, in);
       for (auto i = 0u; i < in.size(); i++)
         if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+    }
+
+    int getStencilSteps() const
+    {
+      return dirac->getStencilSteps();
+    }
+  };
+
+  /* Gloms onto a DiracOp and provides an operator() which applies its MLocal */
+  class DiracMLocal : public DiracMatrix
+  {
+
+  public:
+    DiracMLocal(const Dirac &d) : DiracMatrix(d) { }
+    DiracMLocal(const Dirac *d) : DiracMatrix(d) { }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MLocal(out, in); }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+    {
+      dirac->MLocal(out, in);
     }
 
     int getStencilSteps() const
