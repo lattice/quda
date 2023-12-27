@@ -11,6 +11,30 @@ extern GaugeField *gaugePrecise;
 extern GaugeField *gaugeFatPrecise;
 extern GaugeField *gaugeLongPrecise;
 
+bool is_pc_dslash_test_type(dslash_test_type type) {
+  switch(type) {
+  case dslash_test_type::Dslash:
+  case dslash_test_type::MatPC:
+  case dslash_test_type::MatPCDagMatPC:
+  case dslash_test_type::M5:
+  case dslash_test_type::Dslash4pre:
+  case dslash_test_type::M5inv:
+  case dslash_test_type::MatPCLocal:
+  case dslash_test_type::MatPCDagMatPCLocal:
+    return true;
+    break;
+  case dslash_test_type::Mat:
+  case dslash_test_type::MatDagMat:
+  case dslash_test_type::MatLocal:
+  case dslash_test_type::MatDagMatLocal:
+    return false;
+    break;
+  default:
+    errorQuda("Invalid dslash test type %d", static_cast<int>(type));
+  }
+  return false;
+}
+
 void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, dslash_test_type test_type)
 {
   const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;

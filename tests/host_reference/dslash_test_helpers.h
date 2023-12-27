@@ -11,8 +11,19 @@ enum class dslash_test_type {
   M5,
   M5inv,
   Dslash4pre,
-  MatPCDagMatPCLocal
+  MatPCLocal,
+  MatLocal,
+  MatPCDagMatPCLocal,
+  MatDagMatLocal
 };
+
+/**
+ * Determine if the dslash is full parity or single parity based on
+ * the dslash_test_type
+ * @param type  Dslash test type
+ * @return True for a single parity operator, false for a full parity operator
+ */
+bool is_pc_dslash_test_type(dslash_test_type type);
 
 /**
  * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.

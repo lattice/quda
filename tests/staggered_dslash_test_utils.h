@@ -29,11 +29,9 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {
   {"MatPC", dslash_test_type::MatPC},
   {"Mat", dslash_test_type::Mat},
   {"MatDagMat", dslash_test_type::MatDagMat},
-  // left here for completeness but not supported in staggered dslash test
-  // {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
-  // {"M5", dslash_test_type::M5},
-  // {"M5inv", dslash_test_type::M5inv},
-  // {"Dslash4pre", dslash_test_type::Dslash4pre}
+  {"MatPCLocal", dslash_test_type::MatPCLocal},
+  {"MatLocal", dslash_test_type::MatLocal},
+  {"MatDagMatLocal", dslash_test_type::MatDagMatLocal}
 };
 
 struct DslashTime {
@@ -180,13 +178,29 @@ struct StaggeredDslashTestWrapper {
 
     csParam.setPrecision(inv_param.cpu_prec);
     csParam.pad = 0;
-    if (dtest_type != dslash_test_type::Mat && dtest_type != dslash_test_type::MatDagMat) {
+    if (is_pc_dslash_test_type(dtest_type)) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /= 2;
-      inv_param.solution_type = QUDA_MATPC_SOLUTION;
     } else {
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    }
+
+    switch (dtest_type) {
+    case dslash_test_type::Dslash:
+    case dslash_test_type::MatPC:
+    case dslash_test_type::MatPCLocal:
+      inv_param.solution_type = QUDA_MATPC_SOLUTION;
+      break;
+    case dslash_test_type::Mat:
+    case dslash_test_type::MatLocal:
       inv_param.solution_type = QUDA_MAT_SOLUTION;
+      break;
+    case dslash_test_type::MatDagMat:
+    case dslash_test_type::MatDagMatLocal:
+      inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
+      break;
+    default:
+      errorQuda("Test type %d not supported on staggered dslash", static_cast<int>(dtest_type));
     }
 
     csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -263,8 +277,9 @@ struct StaggeredDslashTestWrapper {
     cudaSpinorOut = ColorSpinorField(csParam);
     cudaSpinor = spinor;
 
-    bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
+    // note: for "Dslash" test type, you can use either pc or not pc
     // because both call the same "Dslash" directly.
+    bool pc = is_pc_dslash_test_type(dtest_type);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
     dirac = Dirac::create(diracParam);
@@ -349,6 +364,9 @@ struct StaggeredDslashTestWrapper {
           case dslash_test_type::MatPC: dirac->M(cudaSpinorOut, cudaSpinor); break;
           case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinor); break;
           case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinor); break;
+          case dslash_test_type::MatPCLocal: dirac->MLocal(cudaSpinorOut, cudaSpinor); break;
+          case dslash_test_type::MatLocal: dirac->MLocal(cudaSpinorOut, cudaSpinor); break;
+          case dslash_test_type::MatDagMatLocal: dirac->MdagMLocal(cudaSpinorOut, cudaSpinor); break;
           default: errorQuda("Test type %d not defined on staggered dslash", static_cast<int>(dtest_type));
           }
         } else {
