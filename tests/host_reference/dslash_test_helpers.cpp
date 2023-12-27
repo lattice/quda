@@ -11,7 +11,7 @@ extern GaugeField *gaugePrecise;
 extern GaugeField *gaugeFatPrecise;
 extern GaugeField *gaugeLongPrecise;
 
-bool is_pc_dslash_test_type(dslash_test_type type) {
+bool is_dslash_test_type_pc(dslash_test_type type) {
   switch(type) {
   case dslash_test_type::Dslash:
   case dslash_test_type::MatPC:
@@ -27,6 +27,30 @@ bool is_pc_dslash_test_type(dslash_test_type type) {
   case dslash_test_type::MatDagMat:
   case dslash_test_type::MatLocal:
   case dslash_test_type::MatDagMatLocal:
+    return false;
+    break;
+  default:
+    errorQuda("Invalid dslash test type %d", static_cast<int>(type));
+  }
+  return false;
+}
+
+bool is_dslash_test_type_local(dslash_test_type type) {
+  switch(type) {
+  case dslash_test_type::MatPCLocal:
+  case dslash_test_type::MatLocal:
+  case dslash_test_type::MatPCDagMatPCLocal:
+  case dslash_test_type::MatDagMatLocal:
+    return true;
+    break;
+  case dslash_test_type::Dslash:
+  case dslash_test_type::MatPC:
+  case dslash_test_type::Mat:
+  case dslash_test_type::MatPCDagMatPC:
+  case dslash_test_type::MatDagMat:
+  case dslash_test_type::M5:
+  case dslash_test_type::Dslash4pre:
+  case dslash_test_type::M5inv:
     return false;
     break;
   default:

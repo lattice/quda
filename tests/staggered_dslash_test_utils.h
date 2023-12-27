@@ -63,8 +63,12 @@ struct StaggeredDslashTestWrapper {
   static inline void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *milc_fatlink = nullptr;
   static inline void *milc_longlink = nullptr;
-  static inline GaugeField cpuFat;
-  static inline GaugeField cpuLong;
+
+  static inline GaugeField cpuFatQDP = {};
+  static inline GaugeField cpuLongQDP = {};
+
+  static inline GaugeField *cpuFatPaddedQDP = nullptr;
+  static inline GaugeField *cpuLongPaddedQDP = nullptr;
 
   QudaParity parity = QUDA_EVEN_PARITY;
 
@@ -80,16 +84,16 @@ struct StaggeredDslashTestWrapper {
     printfQuda("Calculating reference implementation...");
     switch (dtest_type) {
     case dslash_test_type::Dslash:
-      stag_dslash(spinorRef, cpuFat, cpuLong, spinor, parity, dagger, dslash_type);
+      stag_dslash(spinorRef, cpuFatQDP, cpuLongQDP, spinor, parity, dagger, dslash_type);
       break;
     case dslash_test_type::MatPC:
-      stag_matpc(spinorRef, cpuFat, cpuLong, spinor, mass, 0, parity, dslash_type);
+      stag_matpc(spinorRef, cpuFatQDP, cpuLongQDP, spinor, mass, 0, parity, dslash_type);
       break;
     case dslash_test_type::Mat:
-      stag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
+      stag_mat(spinorRef, cpuFatQDP, cpuLongQDP, spinor, mass, dagger, dslash_type);
       break;
     case dslash_test_type::MatDagMat:
-      stag_matdag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
+      stag_matdag_mat(spinorRef, cpuFatQDP, cpuLongQDP, spinor, mass, dagger, dslash_type);
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
     }
@@ -178,7 +182,7 @@ struct StaggeredDslashTestWrapper {
 
     csParam.setPrecision(inv_param.cpu_prec);
     csParam.pad = 0;
-    if (is_pc_dslash_test_type(dtest_type)) {
+    if (is_dslash_test_type_pc(dtest_type)) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /= 2;
     } else {
@@ -247,13 +251,27 @@ struct StaggeredDslashTestWrapper {
     GaugeFieldParam cpuFatParam(gauge_param, qdp_fatlink);
     cpuFatParam.order = QUDA_QDP_GAUGE_ORDER;
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuFat = GaugeField(cpuFatParam);
+    cpuFatQDP = GaugeField(cpuFatParam);
+
+    if (is_dslash_test_type_local(dtest_type)) {
+      int face_depth = 1;
+      const lat_dim_t R = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
+                            face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3) };
+      cpuFatPaddedQDP = quda::createExtendedGauge(cpuFatQDP, R);
+    }
 
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
     cpuLongParam.order = QUDA_QDP_GAUGE_ORDER;
     cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuLong = GaugeField(cpuLongParam);
+    cpuLongQDP = GaugeField(cpuLongParam);
+
+    if (is_dslash_test_type_local(dtest_type)) {
+      int face_depth = 3;
+      const lat_dim_t R = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
+                            face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3) };
+      cpuLongPaddedQDP = quda::createExtendedGauge(cpuLongQDP, R);
+    }
 
     // Override link reconstruct as appropriate for staggered or asqtad
     if (is_staggered(dslash_type)) {
@@ -261,10 +279,10 @@ struct StaggeredDslashTestWrapper {
       if (link_recon == QUDA_RECONSTRUCT_8) link_recon = QUDA_RECONSTRUCT_9;
     }
 
-    loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
-
     // reset the reconstruct in gauge param
     gauge_param.reconstruct = link_recon;
+
+    loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
     // create device-size spinors
     ColorSpinorParam csParam(spinor);
@@ -279,7 +297,7 @@ struct StaggeredDslashTestWrapper {
 
     // note: for "Dslash" test type, you can use either pc or not pc
     // because both call the same "Dslash" directly.
-    bool pc = is_pc_dslash_test_type(dtest_type);
+    bool pc = is_dslash_test_type_pc(dtest_type);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
     dirac = Dirac::create(diracParam);
@@ -293,8 +311,16 @@ struct StaggeredDslashTestWrapper {
       dirac = nullptr;
     }
     freeGaugeQuda();
-    cpuFat = {};
-    cpuLong = {};
+    cpuFatQDP = {};
+    cpuLongQDP = {};
+    if (cpuFatPaddedQDP) {
+      delete cpuFatPaddedQDP;
+      cpuFatPaddedQDP = nullptr;
+    }
+    if (cpuLongPaddedQDP) {
+      delete cpuLongPaddedQDP;
+      cpuLongPaddedQDP = nullptr;
+    }
     commDimPartitionedReset();
   }
 

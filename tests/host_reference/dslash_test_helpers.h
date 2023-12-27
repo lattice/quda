@@ -23,7 +23,14 @@ enum class dslash_test_type {
  * @param type  Dslash test type
  * @return True for a single parity operator, false for a full parity operator
  */
-bool is_pc_dslash_test_type(dslash_test_type type);
+bool is_dslash_test_type_pc(dslash_test_type type);
+
+/**
+ * Determine if the dslash is local or not based on the dslash_test_type
+ * @param type  Dslash test type
+ * @return True for an M*Local operator, false otherwise
+ */
+bool is_dslash_test_type_local(dslash_test_type type);
 
 /**
  * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.
