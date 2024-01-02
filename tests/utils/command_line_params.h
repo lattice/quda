@@ -260,6 +260,7 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -581,3 +582,5 @@ extern int prop_n_sources;
 extern QudaPrecision prop_save_prec;
 
 extern bool enable_testing;
+
+extern bool detratio;

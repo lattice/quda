@@ -315,7 +315,7 @@ quda::file_array<char[256]> prop_source_infile;
 quda::file_array<char[256]> prop_source_outfile;
 quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
-quda::source_array<std::array<int, 4>> prop_source_position = {{0, 0, 0, 0}};
+quda::source_array<std::array<int, 4>> prop_source_position = {{{0, 0, 0, 0}}};
 
 int prop_source_smear_steps = 0;
 int prop_sink_smear_steps = 0;
@@ -336,6 +336,8 @@ bool   smear_compute_two_link = true;
 bool   smear_delete_two_link  = true;
 
 bool enable_testing = false;
+
+bool detratio = false;
 
 namespace
 {
@@ -1265,4 +1267,10 @@ void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--smear-coeff", smear_coeff, "Set smearing coefficient (default 0.1)");
   opgroup->add_option("--smear-nsteps", smear_n_steps, "Number of smearing steps (default 50)");
   opgroup->add_option("--smear-t0", smear_t0, "Index of the time slice (default -1)");
+}
+
+void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
+  opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
 }

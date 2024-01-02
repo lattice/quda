@@ -42,6 +42,7 @@ namespace quda
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+      checkSharedBytes(tp);
       launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
       return launch_error;
     }
@@ -50,6 +51,7 @@ namespace quda
     std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+      checkSharedBytes(tp);
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
       launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
@@ -66,6 +68,7 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
     {
+      checkSharedBytes(tp);
       constexpr bool grid_stride = false;
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }

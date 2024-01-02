@@ -253,6 +253,13 @@ target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+  add_executable(clover_force_test clover_force_test.cpp)
+  target_link_libraries(clover_force_test ${TEST_LIBS})
+  quda_checkbuildtest(clover_force_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS clover_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 add_executable(gauge_alg_test gauge_alg_test.cpp)
 target_link_libraries(gauge_alg_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
@@ -1303,6 +1310,29 @@ foreach(prec IN LISTS TEST_PRECS)
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --gtest_output=xml:gauge_path_test_${prec}.xml)
+
+
+  if(QUDA_DIRAC_CLOVER)
+    add_test(NAME clover_force_test_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --dslash-type clover --compute-clover true
+                   --solution-type mat-pc-dag-mat-pc
+                   --matpc odd-odd-asym --dagger
+                   --enable-testing true
+                   --gtest_output=xml:clover_force_test_${prec}.xml)
+   endif()
+
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    add_test(NAME tmc_clover_force_test_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --dslash-type twisted-clover --compute-clover true
+                   --solution-type mat-pc-dag-mat-pc
+                   --matpc odd-odd-asym --dagger
+                   --enable-testing true
+                   --gtest_output=xml:tmc_clover_force_test_${prec}.xml)
+   endif()
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
