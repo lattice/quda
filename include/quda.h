@@ -1002,8 +1002,16 @@ extern "C" {
    * @brief update the radius for halos.
    * @details This should only be needed for automated testing when
    * different partitioning is applied within a single run.
+   * @param[in] halo_depth Default 2, set to 4 for asqtad because we need a deeper halo
    */
-  void updateR();
+  void updateR(void);
+
+  /**
+   * @brief update the radius for ASQTAD halos.
+   * @details This should only be needed for automated testing when
+   * different partitioning is applied within a single run.
+   */
+  void updateRAsqtad(void);
 
   /**
    * A new QudaGaugeParam should always be initialized immediately

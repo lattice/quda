@@ -504,6 +504,11 @@ void updateR()
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 }
 
+void updateRAsqtad()
+{
+  for (int d=0; d<4; d++) R[d] = 4 * (redundant_comms || commDimPartitioned(d));
+}
+
 void initQuda(int dev)
 {
   // initialize communications topology, if not already done explicitly via initCommsGridQuda()

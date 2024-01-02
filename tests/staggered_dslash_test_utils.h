@@ -95,6 +95,15 @@ struct StaggeredDslashTestWrapper {
     case dslash_test_type::MatDagMat:
       stag_matdag_mat(spinorRef, cpuFatQDP, cpuLongQDP, spinor, mass, dagger, dslash_type);
       break;
+    case dslash_test_type::MatPCLocal:
+      stag_matpc_local(spinorRef, *cpuFatPaddedQDP, *cpuLongPaddedQDP, spinor, mass, 0, parity, dslash_type);
+      break;
+    case dslash_test_type::MatLocal:
+      stag_mat_local(spinorRef, *cpuFatPaddedQDP, *cpuLongPaddedQDP, spinor, mass, dagger, dslash_type);
+      break;
+    case dslash_test_type::MatDagMatLocal:
+      stag_matdag_mat_local(spinorRef, *cpuFatPaddedQDP, *cpuLongPaddedQDP, spinor, mass, dagger, dslash_type);
+      break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
     }
   }
@@ -254,7 +263,8 @@ struct StaggeredDslashTestWrapper {
     cpuFatQDP = GaugeField(cpuFatParam);
 
     if (is_dslash_test_type_local(dtest_type)) {
-      int face_depth = 1;
+      // We round up to the nearest even number to avoid odd_bit woes
+      int face_depth = (dslash_type == QUDA_ASQTAD_DSLASH) ? 4 : 2;
       const lat_dim_t R = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
                             face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3) };
       cpuFatPaddedQDP = quda::createExtendedGauge(cpuFatQDP, R);
@@ -267,7 +277,8 @@ struct StaggeredDslashTestWrapper {
     cpuLongQDP = GaugeField(cpuLongParam);
 
     if (is_dslash_test_type_local(dtest_type)) {
-      int face_depth = 3;
+      // We round up to the nearest even number to avoid odd_bit woes
+      int face_depth = 4;
       const lat_dim_t R = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
                             face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3) };
       cpuLongPaddedQDP = quda::createExtendedGauge(cpuLongQDP, R);
@@ -311,8 +322,7 @@ struct StaggeredDslashTestWrapper {
       dirac = nullptr;
     }
     freeGaugeQuda();
-    cpuFatQDP = {};
-    cpuLongQDP = {};
+
     if (cpuFatPaddedQDP) {
       delete cpuFatPaddedQDP;
       cpuFatPaddedQDP = nullptr;
@@ -321,6 +331,10 @@ struct StaggeredDslashTestWrapper {
       delete cpuLongPaddedQDP;
       cpuLongPaddedQDP = nullptr;
     }
+
+    cpuFatQDP = {};
+    cpuLongQDP = {};
+    
     commDimPartitionedReset();
   }
 

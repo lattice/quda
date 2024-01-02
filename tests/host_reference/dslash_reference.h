@@ -285,7 +285,8 @@ inline int x4_mg(int i, int oddBit)
 
 template <typename Float>
 static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
-                                      Float **ghostGaugeEven, Float **ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
+                                      Float **ghostGaugeEven, Float **ghostGaugeOdd, int n_ghost_faces, int nbr_distance,
+                                      std::array<int, 4> comm_override = {1, 1, 1, 1})
 {
   Float **gaugeField;
   int j;
@@ -309,7 +310,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     switch (dir) {
     case 1: { //-X direction
       int new_x1 = (x1 - d + X1) % X1;
-      if (x1 - d < 0 && quda::comm_dim_partitioned(0)) {
+      if (x1 - d < 0 && quda::comm_dim_partitioned(0) && comm_override[0]) {
         ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
         int offset = (n_ghost_faces + x1 - d) * X4 * X3 * X2 / 2 + (x4 * X3 * X2 + x3 * X2 + x2) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
@@ -319,7 +320,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     }
     case 3: { //-Y direction
       int new_x2 = (x2 - d + X2) % X2;
-      if (x2 - d < 0 && quda::comm_dim_partitioned(1)) {
+      if (x2 - d < 0 && quda::comm_dim_partitioned(1) && comm_override[1]) {
         ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
         int offset = (n_ghost_faces + x2 - d) * X4 * X3 * X1 / 2 + (x4 * X3 * X1 + x3 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
@@ -329,7 +330,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     }
     case 5: { //-Z direction
       int new_x3 = (x3 - d + X3) % X3;
-      if (x3 - d < 0 && quda::comm_dim_partitioned(2)) {
+      if (x3 - d < 0 && quda::comm_dim_partitioned(2) && comm_override[2]) {
         ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
         int offset = (n_ghost_faces + x3 - d) * X4 * X2 * X1 / 2 + (x4 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
@@ -339,7 +340,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     }
     case 7: { //-T direction
       int new_x4 = (x4 - d + X4) % X4;
-      if (x4 - d < 0 && quda::comm_dim_partitioned(3)) {
+      if (x4 - d < 0 && quda::comm_dim_partitioned(3) && comm_override[3]) {
         ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
         int offset = (n_ghost_faces + x4 - d) * X1 * X2 * X3 / 2 + (x3 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
@@ -362,7 +363,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
 template <typename Float>
 static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, const Float *spinorField,
                                                  Float **fwd_nbr_spinor, Float **back_nbr_spinor, int neighbor_distance,
-                                                 int nFace, int site_size = 24)
+                                                 int nFace, int site_size = 24, std::array<int, 4> comm_override = {1, 1, 1, 1})
 {
   int j;
   int nb = neighbor_distance;
@@ -380,7 +381,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   case 0: //+X
   {
     int new_x1 = (x1 + nb) % X1;
-    if (x1 + nb >= X1 && quda::comm_dim_partitioned(0)) {
+    if (x1 + nb >= X1 && quda::comm_dim_partitioned(0) && comm_override[0]) {
       int offset = (x1 + nb - X1) * X4 * X3 * X2 / 2 + (x4 * X3 * X2 + x3 * X2 + x2) / 2;
       return fwd_nbr_spinor[0] + offset * site_size;
     }
@@ -390,7 +391,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   case 1: //-X
   {
     int new_x1 = (x1 - nb + X1) % X1;
-    if (x1 - nb < 0 && quda::comm_dim_partitioned(0)) {
+    if (x1 - nb < 0 && quda::comm_dim_partitioned(0) && comm_override[0]) {
       int offset = (x1 + nFace - nb) * X4 * X3 * X2 / 2 + (x4 * X3 * X2 + x3 * X2 + x2) / 2;
       return back_nbr_spinor[0] + offset * site_size;
     }
@@ -400,7 +401,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   case 2: //+Y
   {
     int new_x2 = (x2 + nb) % X2;
-    if (x2 + nb >= X2 && quda::comm_dim_partitioned(1)) {
+    if (x2 + nb >= X2 && quda::comm_dim_partitioned(1) && comm_override[1]) {
       int offset = (x2 + nb - X2) * X4 * X3 * X1 / 2 + (x4 * X3 * X1 + x3 * X1 + x1) / 2;
       return fwd_nbr_spinor[1] + offset * site_size;
     }
@@ -410,7 +411,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   case 3: // -Y
   {
     int new_x2 = (x2 - nb + X2) % X2;
-    if (x2 - nb < 0 && quda::comm_dim_partitioned(1)) {
+    if (x2 - nb < 0 && quda::comm_dim_partitioned(1) && comm_override[1]) {
       int offset = (x2 + nFace - nb) * X4 * X3 * X1 / 2 + (x4 * X3 * X1 + x3 * X1 + x1) / 2;
       return back_nbr_spinor[1] + offset * site_size;
     }
@@ -420,7 +421,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   case 4: //+Z
   {
     int new_x3 = (x3 + nb) % X3;
-    if (x3 + nb >= X3 && quda::comm_dim_partitioned(2)) {
+    if (x3 + nb >= X3 && quda::comm_dim_partitioned(2) && comm_override[2]) {
       int offset = (x3 + nb - X3) * X4 * X2 * X1 / 2 + (x4 * X2 * X1 + x2 * X1 + x1) / 2;
       return fwd_nbr_spinor[2] + offset * site_size;
     }
@@ -430,7 +431,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   case 5: //-Z
   {
     int new_x3 = (x3 - nb + X3) % X3;
-    if (x3 - nb < 0 && quda::comm_dim_partitioned(2)) {
+    if (x3 - nb < 0 && quda::comm_dim_partitioned(2) && comm_override[2]) {
       int offset = (x3 + nFace - nb) * X4 * X2 * X1 / 2 + (x4 * X2 * X1 + x2 * X1 + x1) / 2;
       return back_nbr_spinor[2] + offset * site_size;
     }
@@ -441,7 +442,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   {
     j = neighborIndex_mg(i, oddBit, +nb, 0, 0, 0);
     int x4 = x4_mg(i, oddBit);
-    if ((x4 + nb) >= Z[3] && quda::comm_dim_partitioned(3)) {
+    if ((x4 + nb) >= Z[3] && quda::comm_dim_partitioned(3) && comm_override[3]) {
       int offset = (x4 + nb - Z[3]) * Vsh_t;
       return &fwd_nbr_spinor[3][(offset + j) * site_size];
     }
@@ -451,7 +452,7 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   {
     j = neighborIndex_mg(i, oddBit, -nb, 0, 0, 0);
     int x4 = x4_mg(i, oddBit);
-    if ((x4 - nb) < 0 && quda::comm_dim_partitioned(3)) {
+    if ((x4 - nb) < 0 && quda::comm_dim_partitioned(3) && comm_override[3]) {
       int offset = (x4 - nb + nFace) * Vsh_t;
       return &back_nbr_spinor[3][(offset + j) * site_size];
     }
@@ -459,14 +460,13 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   }
   default:
     j = -1;
-    printf("ERROR: wrong dir\n");
-    exit(1);
+    errorQuda("Invalid direction %d", dir);
   }
 
   return &spinorField[j * site_size];
 }
 
-template <QudaPCType type> int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
+template <QudaPCType type> int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1, std::array<int, 4> comm_override = {1, 1, 1, 1})
 {
   int ret;
 
@@ -485,7 +485,7 @@ template <QudaPCType type> int neighborIndex_5d_mgpu(int i, int oddBit, int dxs,
   x2 = (x2 + dx2 + Z[1]) % Z[1];
   x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  if ((ghost_x4 >= 0 && ghost_x4) < Z[3] || !quda::comm_dim_partitioned(3)) {
+  if ((ghost_x4 >= 0 && ghost_x4) < Z[3] || !quda::comm_dim_partitioned(3) || !comm_override[3]) {
     ret = (xs * Z[3] * Z[2] * Z[1] * Z[0] + x4 * Z[2] * Z[1] * Z[0] + x3 * Z[1] * Z[0] + x2 * Z[0] + x1) >> 1;
   } else {
     ret = (xs * Z[2] * Z[1] * Z[0] + x3 * Z[1] * Z[0] + x2 * Z[0] + x1) >> 1;
@@ -502,7 +502,8 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
 
 template <QudaPCType type, typename Float>
 Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
-                              Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+                              Float **back_nbr_spinor, int neighbor_distance, int nFace,
+                              int site_size = 24, std::array<int, 4> comm_override = {1, 1, 1, 1})
 {
   int j;
   int nb = neighbor_distance;
@@ -522,7 +523,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 0: //+X
   {
     int new_x1 = (x1 + nb) % X1;
-    if (x1 + nb >= X1 && quda::comm_dim_partitioned(0)) {
+    if (x1 + nb >= X1 && quda::comm_dim_partitioned(0) && comm_override[0]) {
       int offset = ((x1 + nb - X1) * Ls * X4 * X3 * X2 + xs * X4 * X3 * X2 + x4 * X3 * X2 + x3 * X2 + x2) >> 1;
       return fwd_nbr_spinor[0] + offset * site_size;
     }
@@ -532,7 +533,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 1: //-X
   {
     int new_x1 = (x1 - nb + X1) % X1;
-    if (x1 - nb < 0 && quda::comm_dim_partitioned(0)) {
+    if (x1 - nb < 0 && quda::comm_dim_partitioned(0) && comm_override[0]) {
       int offset = ((x1 + nFace - nb) * Ls * X4 * X3 * X2 + xs * X4 * X3 * X2 + x4 * X3 * X2 + x3 * X2 + x2) >> 1;
       return back_nbr_spinor[0] + offset * site_size;
     }
@@ -542,7 +543,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 2: //+Y
   {
     int new_x2 = (x2 + nb) % X2;
-    if (x2 + nb >= X2 && quda::comm_dim_partitioned(1)) {
+    if (x2 + nb >= X2 && quda::comm_dim_partitioned(1) && comm_override[1]) {
       int offset = ((x2 + nb - X2) * Ls * X4 * X3 * X1 + xs * X4 * X3 * X1 + x4 * X3 * X1 + x3 * X1 + x1) >> 1;
       return fwd_nbr_spinor[1] + offset * site_size;
     }
@@ -552,7 +553,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 3: // -Y
   {
     int new_x2 = (x2 - nb + X2) % X2;
-    if (x2 - nb < 0 && quda::comm_dim_partitioned(1)) {
+    if (x2 - nb < 0 && quda::comm_dim_partitioned(1) && comm_override[1]) {
       int offset = ((x2 + nFace - nb) * Ls * X4 * X3 * X1 + xs * X4 * X3 * X1 + x4 * X3 * X1 + x3 * X1 + x1) >> 1;
       return back_nbr_spinor[1] + offset * site_size;
     }
@@ -562,7 +563,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 4: //+Z
   {
     int new_x3 = (x3 + nb) % X3;
-    if (x3 + nb >= X3 && quda::comm_dim_partitioned(2)) {
+    if (x3 + nb >= X3 && quda::comm_dim_partitioned(2) && comm_override[2]) {
       int offset = ((x3 + nb - X3) * Ls * X4 * X2 * X1 + xs * X4 * X2 * X1 + x4 * X2 * X1 + x2 * X1 + x1) >> 1;
       return fwd_nbr_spinor[2] + offset * site_size;
     }
@@ -572,7 +573,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 5: //-Z
   {
     int new_x3 = (x3 - nb + X3) % X3;
-    if (x3 - nb < 0 && quda::comm_dim_partitioned(2)) {
+    if (x3 - nb < 0 && quda::comm_dim_partitioned(2) && comm_override[2]) {
       int offset = ((x3 + nFace - nb) * Ls * X4 * X2 * X1 + xs * X4 * X2 * X1 + x4 * X2 * X1 + x2 * X1 + x1) >> 1;
       return back_nbr_spinor[2] + offset * site_size;
     }
@@ -582,30 +583,37 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 6: //+T
   {
     int x4 = x4_5d_mgpu<type>(i, oddBit);
-    if ((x4 + nb) >= Z[3] && quda::comm_dim_partitioned(3)) {
+    if ((x4 + nb) >= Z[3] && quda::comm_dim_partitioned(3) && comm_override[3]) {
       int offset = ((x4 + nb - Z[3]) * Ls * X3 * X2 * X1 + xs * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
       return fwd_nbr_spinor[3] + offset * site_size;
     }
-    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, +nb, 0, 0, 0);
+    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, +nb, 0, 0, 0, comm_override);
     break;
   }
   case 7: //-T
   {
     int x4 = x4_5d_mgpu<type>(i, oddBit);
-    if ((x4 - nb) < 0 && quda::comm_dim_partitioned(3)) {
+    if ((x4 - nb) < 0 && quda::comm_dim_partitioned(3) && comm_override[3]) {
       int offset = ((x4 - nb + nFace) * Ls * X3 * X2 * X1 + xs * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
       return back_nbr_spinor[3] + offset * site_size;
     }
-    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, -nb, 0, 0, 0);
+    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, -nb, 0, 0, 0, comm_override);
     break;
   }
   default:
     j = -1;
-    printf("ERROR: wrong dir\n");
-    exit(1);
+    errorQuda("Invalid direction %d", dir);
   }
 
   return &spinorField[j * site_size];
+}
+
+#else
+
+template <QudaPCType type, typename Float>
+Float *spinorNeighbor_5d_mgpu(int, int, int, Float*, Float **, Float **, int, int, int, std::array<int, 4>) {
+  errorQuda("spinorNeighbor_5d_mgpu not defined for single GPU builds");
+  return nullptr;
 }
 
 #endif // MULTI_GPU

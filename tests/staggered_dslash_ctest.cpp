@@ -56,7 +56,11 @@ public:
     for (int j = 0; j < 4; j++) {
       if (partition & (1 << j)) { commDimPartitionedSet(j); }
     }
-    updateR();
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH)
+      updateRAsqtad();
+    else
+      updateR();
 
     dslash_test_wrapper.init_ctest(prec, recon);
     display_test_info(prec, recon);

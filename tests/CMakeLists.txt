@@ -864,6 +864,46 @@ endif()
       set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
+    add_test(NAME dslash_${DIRAC_NAME}_matdag_mat_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatDagMat
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_matdat_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_matpc_local_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPCLocal
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_local_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_matpc_local_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_mat_local_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatLocal
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_local_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_matdag_mat_local_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatDagMatLocal
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matdag_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_matdat_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
     add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
@@ -909,6 +949,52 @@ endif()
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_matdag_mat_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
+                     --test MatDagMat
+                     --dim 6 8 10 12
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matdag_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_matdag_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    # Not working yet...
+    #add_test(NAME dslash_${DIRAC_NAME}_matpc_local_policy${pol2}
+    #         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+    #                 --dslash-type ${DIRAC_NAME}
+    #                 --all-partitions 1
+    #                 --test MatPCLocal
+    #                 --dim 6 8 10 12
+    #                 --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_local_test_pol${pol2}.xml)
+    #if(polenv)
+    #  set_tests_properties(dslash_${DIRAC_NAME}_matpc_local_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    #endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_mat_local_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
+                     --test MatLocal
+                     --dim 6 8 10 12
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_local_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_mat_local_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    # Not working yet...
+    #add_test(NAME dslash_${DIRAC_NAME}_matdag_mat_local_policy${pol2}
+    #         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+    #                 --dslash-type ${DIRAC_NAME}
+    #                 --all-partitions 1
+    #                 --test MatDagMatLocal
+    #                 --dim 6 8 10 12
+    #                 --gtest_output=xml:dslash_${DIRAC_NAME}_matdag_mat_local_test_pol${pol2}.xml)
+    #if(polenv)
+    #  set_tests_properties(dslash_${DIRAC_NAME}_matdag_mat_local_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    #endif()
 
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}

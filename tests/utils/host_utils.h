@@ -156,6 +156,28 @@ int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4]);
 void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const int shrinked_dim[4],
                                     const int shift[4], int parity);
 
+/**
+   @brief Given a local checkerboard index and parity, get the extended checkerboard index
+   @param[in] x_cb Local checkedboard index
+   @param[in] parity Local parity
+   @param[in] X Dimensions of local lattice
+   @param[in] E Dimensions of extended lattice
+   @param[in] R Depth of padding
+   @return Extended checkerboard index
+ */
+int get_padded_x_cb(const int x_cb, const int parity, const int X[4], const int E[4], const int R[4]);
+
+/**
+   @brief Given a local checkerboard index and parity, get the extended full lattice index
+   @param[in] x_cb Local checkedboard index
+   @param[in] parity Local parity
+   @param[in] X Dimensions of local lattice
+   @param[in] E Dimensions of extended lattice
+   @param[in] R Depth of padding
+   @return Extended full lattice index
+ */
+int get_padded_coord(const int x_cb, const int parity, const int X[4], const int E[4], const int R[4]);
+
 int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
 

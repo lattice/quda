@@ -557,6 +557,50 @@ void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const
   for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
 }
 
+int get_padded_x_cb(const int x_cb, const int parity, const int X[4], const int E[4], const int R[4]) {
+  int x[4];
+  int X0h = X[0] / 2;
+  int za = (x_cb / X0h);
+  int zb =  (za / X[1]);
+  x[1] = (za - zb * X[1]);
+  x[3] = (zb / X[2]);
+  x[2] = (zb - x[3] * X[2]);
+  int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
+  int x_idx = 2 * x_cb + x1odd;
+  x[0] = (x_idx  - za * X[0]);
+
+  int x_padded[4];
+  for (int d = 0; d < 4; d++)
+    x_padded[d] = x[d] + R[d];
+  int x_padded_cb = (((x_padded[3] * E[2] + x_padded[2]) * E[1] + x_padded[1]) * E[0] + x_padded[0]) >> 1;
+  return x_padded_cb;
+}
+
+int get_padded_coord(const int x_cb, const int parity, const int X[4], const int E[4], const int R[4]) {
+  int x[4];
+  int X0h = X[0] / 2;
+  int za = (x_cb / X0h);
+  int zb =  (za / X[1]);
+  x[1] = (za - zb * X[1]);
+  x[3] = (zb / X[2]);
+  x[2] = (zb - x[3] * X[2]);
+  int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
+  int x_idx = 2 * x_cb + x1odd;
+  x[0] = (x_idx  - za * X[0]);
+
+  int x_padded[4];
+  int V_padded = 1;
+  for (int d = 0; d < 4; d++) {
+    x_padded[d] = x[d] + R[d];
+    V_padded *= E[d];
+  }
+  int Vh_padded = V_padded / 2;
+
+  int x_padded_cb = (((x_padded[3] * E[2] + x_padded[2]) * E[1] + x_padded[1]) * E[0] + x_padded[0]) >> 1;
+  int parity_padded = (x_padded[0] + x_padded[1] + x_padded[2] + x_padded[3]) & 1;
+  return x_padded_cb + parity_padded * Vh_padded;
+}
+
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
 //
