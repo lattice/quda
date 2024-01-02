@@ -1751,9 +1751,19 @@ extern "C" {
                     const int *X);
 
   /**
-   * DMH: to do
+   * @param[in] x pointer to host data array
+   * @param[in] y pointer to host data array
+   * @param[out] result pointer to the spin*spin projections per lattice slice site 
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] src_colors color dilution parameter
+   * @param[in] X local lattice dimansions
+   * @param[in] source_position source position array
+   * @param[in] number of momentum modes
+   * @param[in] mom_modes momentum modes
+   * @param[in] fft_type Fourier phase factor type (cos, sin or exp{ikx})
    */
-  void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **result,
+  void contractFTQuda(void **x, void **y, void **result,
 		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
 		      const int *X, const int *const source_position,
 		      const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type);

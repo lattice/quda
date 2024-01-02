@@ -233,7 +233,7 @@ namespace quda
       Vector y = arg.y(idx_cb, parity);
 
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
-      complex<real> prop_prod = innerProduct(x, y, 0, 0);	
+      complex<real> prop_prod = innerProduct(x, y);	
 
       // Fourier phase
       double dXi_dot_Pi, ph_real, ph_imag, tmp_real, tmp_imag;
@@ -516,8 +516,7 @@ namespace quda
 
       Matrix<complex<real>, nSpin> A;
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
-      A(0, 0) = innerProduct(x, y, 0, 0);
-      //printf("%.7e %.7e\n",A(mu, nu).real(),A(mu, nu).imag());
+      A(0, 0) = innerProduct(x, y);
 
       arg.s.save(A, x_cb, parity);
     }
