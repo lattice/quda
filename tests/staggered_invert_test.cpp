@@ -459,7 +459,7 @@ int main(int argc, char **argv)
   }
 
   if (inv_deflate && inv_multigrid)
-    errorQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
+    errorQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve");
 
   initRand();
 
@@ -477,7 +477,7 @@ int main(int argc, char **argv)
   // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
     if (!is_staggered(dslash_type)) {
-      errorQuda("dslash_type %s not supported for multigrid preconditioner\n", get_dslash_str(dslash_type));
+      errorQuda("dslash_type %s not supported for multigrid preconditioner", get_dslash_str(dslash_type));
     }
   }
 
