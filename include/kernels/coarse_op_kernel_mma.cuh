@@ -11,7 +11,7 @@
 #include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
-#include <special_ops_target.h>
+#include <kernel_ops_target.h>
 
 namespace quda
 {
