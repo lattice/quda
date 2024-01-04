@@ -175,6 +175,7 @@ namespace quda
     {
       TunableKernel::initTuneParam(param);
       param.block.y = block_size_y;
+      setSharedBytes(param);
     }
 
     /**
@@ -185,6 +186,7 @@ namespace quda
     {
       TunableKernel::defaultTuneParam(param);
       param.block.y = block_size_y;
+      setSharedBytes(param);
     }
   };
 
@@ -341,11 +343,17 @@ namespace quda
       if (rtn) {
         return true;
       } else {
+
+        auto next = param;
+        next.block.z++;
+        auto shared_bytes = setSharedBytes(next);
+
         if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
             && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
-            && param.block.z < n_batch_block_max) {
+            && param.block.z < n_batch_block_max && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.z++;
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
+          param.shared_bytes = shared_bytes;
           return true;
         } else { // we have run off the end so let's reset
           param.block.z = 1;
@@ -364,6 +372,7 @@ namespace quda
       TunableReduction2D::initTuneParam(param);
       param.block = {param.block.x, param.block.y, 1};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
+      setSharedBytes(param);
     }
 
     /**
@@ -375,6 +384,7 @@ namespace quda
       TunableReduction2D::defaultTuneParam(param);
       param.block = {param.block.x, param.block.y, 1};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
+      setSharedBytes(param);
     }
   };
 

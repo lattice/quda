@@ -1,6 +1,6 @@
 #pragma once
 
-#include <helpers.h>
+#include <kernel_ops.h>
 #include <shared_memory_helper.h>
 #include <array.h>
 
@@ -8,26 +8,22 @@ namespace quda
 {
 
   /**
-     @brief Class that provides indexable per-thread storage.  On CUDA
-     this maps to using assigning each thread a unique window of
-     shared memory using the SharedMemoryCache object.
+     @brief Class that provides indexable per-thread storage for n
+     elements of type T.  This version uses shared memory for storage.
+     The offset into the shared memory region is determined from the
+     type O.
    */
-  template <typename T, int n, typename O = void>
-  class thread_array : SharedMemory<array<T,n>, SizePerThread<1>, O>
+  template <typename T, int n, typename O = void> class thread_array : SharedMemory<array<T, n>, SizePerThread<1>, O>
   {
-  public:
-    using SharedMemoryT = SharedMemory<array<T,n>, SizePerThread<1>, O>;
-
-  private:
-    using SharedMemoryT::sharedMem;
+    using Smem = SharedMemory<array<T, n>, SizePerThread<1>, O>;
+    using Smem::sharedMem;
     array<T, n> &array_;
 
   public:
-    using SharedMemoryT::shared_mem_size;
+    using Smem::shared_mem_size;
 
 #if 0
-    __device__ __host__ constexpr thread_array() :
-      array_(sharedMem()[target::thread_idx_linear<3>()])
+    __device__ __host__ constexpr thread_array() : array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       array_ = array<T, n>(); // call default constructor
     }
@@ -44,7 +40,7 @@ namespace quda
 
     template <typename... U>
     __device__ __host__ constexpr thread_array(const SpecialOps<U...> &ops) :
-      SharedMemoryT(ops),
+      Smem(ops),
       array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       checkSpecialOp<thread_array<T,n,O>,U...>();

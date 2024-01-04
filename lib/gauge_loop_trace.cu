@@ -13,7 +13,7 @@ namespace quda {
     std::vector<reduce_t>& loop_traces;
     double factor;
     const paths<1> p;
-    unsigned int sharedBytesPerThread() const override { return 4 * sizeof(int); } // for threda_array
+    unsigned int sharedBytesPerThread() const override { return 4 * sizeof(int); } // for thread_array
 
   public:
     // max block size of 8 is arbitrary for now
@@ -47,7 +47,8 @@ namespace quda {
       return (p.count * mat_mul_flops + p.num_paths * (2 * Nc + 2)) * u.Volume();
     }
 
-    long long bytes() const override {
+    long long bytes() const override
+    {
       // links * one LatticeColorMatrix worth of data
       return p.count * u.Bytes() / 4;
     }

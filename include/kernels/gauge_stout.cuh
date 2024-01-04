@@ -117,8 +117,8 @@ namespace quda
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using StapCacheT = ThreadLocalCache<Link,0,computeStapleRectangleOps>;
-    using RectCacheT = ThreadLocalCache<Link,0,StapCacheT>;
+    using StapCacheT = ThreadLocalCache<Link,0,computeStapleRectangleOps>;  // offset by computeStapleRectangleOps
+    using RectCacheT = ThreadLocalCache<Link,0,StapCacheT>;  // offset by StapCacheT
     using Ops = combineOps<computeStapleRectangleOps,SpecialOps<StapCacheT,RectCacheT>>;
   };
 
@@ -148,8 +148,6 @@ namespace quda
       }
 
       Link U, Q;
-      //SharedMemoryCache<Link> Stap(target::block_dim());
-      //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link));
       typename OvrImpSTOUTOps<Arg>::StapCacheT Stap{*this};
       typename OvrImpSTOUTOps<Arg>::RectCacheT Rect{*this};
 

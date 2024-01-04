@@ -174,15 +174,16 @@ namespace quda {
   };
 
   template <> struct site_max<true> {
-    template <typename Arg> static constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
-    template <typename Arg> static constexpr int Mc = colors_per_thread<true>(Arg::nColor);
-    template <typename Arg> static constexpr int color_spin_threads = (Arg::nSpin/Ms<Arg>) * (Arg::nColor/Mc<Arg>);
     template <typename Arg> struct CacheDims {
-      template <typename ...A> static constexpr dim3 dims(dim3 b, A &...) {
-	dim3 block = b;
-	if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-	block.y = color_spin_threads<Arg>; // state the y block since we know it at compile time
-	return block;
+      static constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
+      static constexpr int Mc = colors_per_thread<true>(Arg::nColor);
+      static constexpr int color_spin_threads = (Arg::nSpin / Ms) * (Arg::nColor / Mc);
+      static constexpr dim3 dims(dim3 block)
+      {
+        // pad the shared block size to avoid bank conflicts for native ordering
+        if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+        block.y = color_spin_threads; // state the y block since we know it at compile time
+        return block;
       }
     };
     template <typename Arg> using Cache = SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
@@ -192,12 +193,13 @@ namespace quda {
     {
       using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
+      constexpr int color_spin_threads = CacheDims<Arg>::color_spin_threads;
       Cache<Arg> cache{ftor};
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
 #pragma unroll
-      for (int sc = 0; sc < color_spin_threads<Arg>; sc++) {
+      for (int sc = 0; sc < color_spin_threads; sc++) {
         auto sc_max = cache.load_y(sc);
         this_site_max = this_site_max > sc_max ? this_site_max : sc_max;
       }

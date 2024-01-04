@@ -303,7 +303,6 @@ namespace quda {
     //template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
     template <typename T, typename Ftor> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
     {
-      //SharedMemoryCache<T> cache(target::block_dim());
       SharedMemoryCache<T> cache{ftor};
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);

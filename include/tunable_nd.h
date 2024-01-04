@@ -283,8 +283,7 @@ namespace quda
 
         auto next = param;
         next.block.y += step_y;
-        auto shared_bytes = std::max(this->sharedBytesPerThread() * next.block.x * next.block.y * next.block.z,
-                                     this->sharedBytesPerBlock(next));
+        auto shared_bytes = this->setSharedBytes(next);
 
         // we can advance spin/block-color since this is valid
         if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1)
@@ -297,7 +296,6 @@ namespace quda
         } else { // we have run off the end so let's reset
           param.block.y = step_y;
           param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-
           return false;
         }
       }
@@ -312,8 +310,7 @@ namespace quda
       Tunable::initTuneParam(param);
       param.block.y = step_y;
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
-      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z,
-                                    this->sharedBytesPerBlock(param));
+      this->setSharedBytes(param);
     }
 
     /**
@@ -325,8 +322,7 @@ namespace quda
       Tunable::defaultTuneParam(param);
       param.block.y = step_y;
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
-      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z,
-                                    this->sharedBytesPerBlock(param));
+      this->setSharedBytes(param);
     }
 
     /**
@@ -552,8 +548,7 @@ namespace quda
 
         auto next = param;
         next.block.z += step_z;
-        auto shared_bytes = std::max(this->sharedBytesPerThread() * next.block.x * next.block.y * next.block.z,
-                                     this->sharedBytesPerBlock(next));
+        auto shared_bytes = this->setSharedBytes(next);
 
         // we can advance spin/block-color since this is valid
         if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2)
@@ -580,8 +575,7 @@ namespace quda
       TunableKernel2D_base<grid_stride>::initTuneParam(param);
       param.block.z = step_z;
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
-      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z,
-                                    this->sharedBytesPerBlock(param));
+      this->setSharedBytes(param);
     }
 
     /**
@@ -593,8 +587,7 @@ namespace quda
       TunableKernel2D_base<grid_stride>::defaultTuneParam(param);
       param.block.z = step_z;
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
-      param.shared_bytes = std::max(this->sharedBytesPerThread() * param.block.x * param.block.y * param.block.z,
-                                    this->sharedBytesPerBlock(param));
+      this->setSharedBytes(param);
     }
 
     /**

@@ -62,8 +62,8 @@ namespace quda
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
     using WilsonOps = computeStapleOps;
-    using StapOp = ThreadLocalCache<Link,0,computeStapleRectangleOps>;
-    using RectOp = ThreadLocalCache<Link,0,StapOp>;
+    using StapOp = ThreadLocalCache<Link,0,computeStapleRectangleOps>;  // offset by computeStapleRectangleOps
+    using RectOp = ThreadLocalCache<Link,0,StapOp>;  // offset by StapOp
     using SymanzikOps = combineOps<computeStapleRectangleOps,SpecialOps<StapOp,RectOp>>;
     using Ops = std::conditional_t<Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, SymanzikOps, WilsonOps>;
   };
@@ -92,12 +92,8 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      //SharedMemoryCache<Link> Stap(target::block_dim());
-      //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link)); // offset to ensure non-overlapping allocations
       typename computeStapleOpsWF<Arg>::StapOp Stap{ftor};
       typename computeStapleOpsWF<Arg>::RectOp Rect{ftor};
-      //ThreadLocalCache<Link,0,computeStapleRectangleOps> Stap{ftor};
-      //ThreadLocalCache<Link,0,decltype(Stap)> Rect{ftor};
       computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
       //break;
