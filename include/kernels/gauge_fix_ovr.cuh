@@ -139,8 +139,6 @@ namespace quda {
   /**
    * @brief Perform gauge fixing with overrelaxation
    */
-  //template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<array<typename Arg::real,4>>> {
-  //template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<typename Arg::real>> {
   template <typename Arg> struct computeFix : computeFixOps<Arg> {
     const Arg &arg;
     using typename computeFixOps<Arg>::KernelOpsT;

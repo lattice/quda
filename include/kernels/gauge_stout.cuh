@@ -119,7 +119,7 @@ namespace quda
     using Link = Matrix<complex<real>, Arg::nColor>;
     using StapCacheT = ThreadLocalCache<Link,0,computeStapleRectangleOps>;  // offset by computeStapleRectangleOps
     using RectCacheT = ThreadLocalCache<Link,0,StapCacheT>;  // offset by StapCacheT
-    using Ops = combineOps<computeStapleRectangleOps,SpecialOps<StapCacheT,RectCacheT>>;
+    using Ops = combineOps<computeStapleRectangleOps,KernelOps<StapCacheT,RectCacheT>>;
   };
 
   template <typename Arg_> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg_>::Ops

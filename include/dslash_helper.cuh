@@ -11,7 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
-#include <special_ops.h>
+#include <kernel_ops.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
@@ -660,24 +660,24 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-  template <typename Arg> struct dslash_functor : getSpecialOps<typename Arg::D> {
-    static_assert(explicitSpecialOps<typename Arg::D>);
-    static_assert(!hasSpecialOps<typename Arg::template P<Arg::D::pc_type()>>);
+  template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
+    //static_assert(explicitKernelOps<typename Arg::D>);
+    //static_assert(!hasKernelOps<typename Arg::template P<Arg::D::pc_type()>>);
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
-    using typename getSpecialOps<typename Arg::D>::KernelOpsT;
-    template <typename ...Ops>
-    constexpr dslash_functor(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg.arg) { }
+    using typename getKernelOps<typename Arg::D>::KernelOpsT;
+    template <typename ...OpsArgs>
+    constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg) { }
 
     template <bool allthreads = false>
     __forceinline__ __device__ void operator()(int, int s, int parity, bool active = true)
     {
       //typename Arg::D dslash(arg);
-      //if constexpr (hasSpecialOps<typename Arg::D>) {
-      //dslash.setSpecialOps(*this);
+      //if constexpr (hasKernelOps<typename Arg::D>) {
+      //dslash.setKernelOps(*this);
       //}
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting

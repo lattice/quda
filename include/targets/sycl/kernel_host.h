@@ -19,8 +19,8 @@ namespace quda
 
   template <template <typename> class Functor, typename Arg> void Kernel3D_host(const Arg &arg)
   {
-    if constexpr (needsSharedMem<getSpecialOps<Functor<Arg>>>) {
-      constexpr auto smemsize = sharedMemSize<getSpecialOps<Functor<Arg>>>(dim3(1,1,1));
+    if constexpr (needsSharedMem<getKernelOps<Functor<Arg>>>) {
+      constexpr auto smemsize = sharedMemSize<getKernelOps<Functor<Arg>>>(dim3(1,1,1));
       char smem[smemsize];
       Functor<Arg> f{arg, &smem[0]};
       for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {

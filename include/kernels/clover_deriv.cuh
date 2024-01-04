@@ -33,7 +33,7 @@ namespace quda
     }
   };
 
-  using computeForceOps = SpecialOps<thread_array<int, 4>>;
+  using computeForceOps = KernelOps<thread_array<int, 4>>;
   template <typename Link, typename Force, typename Ftor>
   __device__ __host__ void computeForce(Force &force_total, const Ftor &ftor, int xIndex, int parity, int mu, int nu)
   {

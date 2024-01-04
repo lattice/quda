@@ -87,7 +87,7 @@ namespace quda {
     static constexpr int block_dim = 1;
     using BlockReduceDot = BlockReduce<dot_t, block_dim>;
     using BlockReduceNorm = BlockReduce<typename Arg::sum_t, block_dim>;
-    using Ops = SpecialOps<BlockReduceDot,BlockReduceNorm>;
+    using Ops = KernelOps<BlockReduceDot,BlockReduceNorm>;
   };
 
   template <typename Arg> struct BlockOrtho_ : BlockOrtho_Params<Arg>::Ops {

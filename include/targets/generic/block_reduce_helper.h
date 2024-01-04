@@ -2,7 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
-#include <special_ops.h>
+#include <kernel_ops.h>
 
 /**
    @file block_reduce_helper.h
@@ -161,8 +161,8 @@ namespace quda
 
   public:
     template <typename ...U>
-    HOSTDEVICE constexpr BlockReduce(SpecialOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
-      checkSpecialOp<BlockReduce_t, U...>();
+    HOSTDEVICE constexpr BlockReduce(KernelOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
+      checkKernelOp<BlockReduce_t, U...>();
     }
 
     constexpr BlockReduce(const BlockReduce<T,block_dim,batch_size> &) = delete;

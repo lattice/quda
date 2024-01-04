@@ -41,7 +41,7 @@ namespace quda
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = std::conditional_t<!dagger || Arg::asymmetric, SpecialOps<Cache>, NoSpecialOps>;
+    using Ops = std::conditional_t<!dagger || Arg::asymmetric, KernelOps<Cache>, NoKernelOps>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>

@@ -125,7 +125,7 @@ namespace quda
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     __shared__ bool isLastBlockDone[n_batch_block];
 
-    SpecialOps<BlockReduce> ops{};
+    KernelOps<BlockReduce> ops{};
     T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::thread_idx_linear<2>() == 0) {

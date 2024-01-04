@@ -3,7 +3,7 @@
 #include <target_device.h>
 #include <reducer.h>
 #include <group_reduce.h>
-#include <special_ops_target.h>
+#include <kernel_ops_target.h>
 #include <shared_memory_helper.h>
 
 /**
@@ -94,7 +94,7 @@ namespace quda
   template <typename T, int block_dim, int batch_size>
   struct block_reduceG {
     //using dependencies = op_Sequential<op_blockSync>;
-    //using dependentOps = SpecialOps<op_blockSync>;
+    //using dependentOps = KernelOps<op_blockSync>;
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
     template <typename S> inline block_reduceG(S &) {};
     /**
@@ -220,6 +220,6 @@ namespace quda
   template <typename T, int block_dim, int batch_size> static constexpr bool needsFullBlockImpl<BlockReduce<T,block_dim,batch_size>> = true;
 } // namespace quda
 
-static_assert(needsFullBlock<SpecialOps<BlockReduce<double,1>>> == true);
+static_assert(needsFullBlock<KernelOps<BlockReduce<double,1>>> == true);
 static_assert(BlockReduce<double,1>::shared_mem_size(dim3{8,8,8}) > 0);
-static_assert(needsSharedMem<SpecialOps<BlockReduce<double,1>>> == true);
+static_assert(needsSharedMem<KernelOps<BlockReduce<double,1>>> == true);

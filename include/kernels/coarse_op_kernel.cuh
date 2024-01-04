@@ -1392,7 +1392,7 @@ namespace quda {
     using CacheT = complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4]
                                      [Arg::coarseSpin][Arg::coarseSpin];
     template <typename Arg> using Cache = SharedMemoryCache<CacheT<Arg>, DimsStatic<2, 1, 1>>;
-    template <typename Arg> using Ops = SpecialOps<Cache<Arg>>;
+    template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
 
     template <bool allthreads, typename VUV, typename Pack, typename Ftor>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity,

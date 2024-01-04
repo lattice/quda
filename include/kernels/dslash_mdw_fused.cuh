@@ -279,7 +279,7 @@ namespace quda {
       @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha * M5inv operator
       The integer kernel types corresponds to the enum MdwfFusedDslashType.
     */
-    template <typename Arg> struct FusedMobiusDslash : SpecialOps<SharedMemoryCache<half2>> {
+    template <typename Arg> struct FusedMobiusDslash : KernelOps<SharedMemoryCache<half2>> {
       Arg &arg;
       constexpr FusedMobiusDslash(Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }

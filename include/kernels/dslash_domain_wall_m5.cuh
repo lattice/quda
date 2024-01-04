@@ -210,7 +210,7 @@ namespace quda
   template <typename Arg> struct d5Params {
     using Vec = ColorSpinor<typename Arg::real, Arg::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = SpecialOps<Cache>;
+    using Ops = KernelOps<Cache>;
   };
 
   template <bool allthreads, bool sync, bool dagger, bool shared, class Vector, class Ftor, Dslash5Type type = Ftor::Arg::type>
@@ -585,7 +585,7 @@ namespace quda
     static constexpr int Nc = mobius_m5::var_inverse() && mobius_m5::use_half_vector() ? 4 / 2 : 4;
     using Vec = ColorSpinor<typename Arg::real, Arg::nColor, Nc>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = SpecialOps<Cache>;
+    using Ops = KernelOps<Cache>;
   };
 
   template <typename Arg_> struct dslash5inv : dslash5invParams<Arg_>::Ops {

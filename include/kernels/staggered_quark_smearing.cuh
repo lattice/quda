@@ -147,7 +147,7 @@ namespace quda
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct staggered_qsmear : dslash_default, NoSpecialOps {
+  struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr staggered_qsmear(const Ftor &ftor) : arg(ftor.arg) {}

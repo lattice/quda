@@ -91,7 +91,7 @@ namespace quda
     };
 
     template <typename Arg> using eofa_dslash5Ops =
-      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
+      KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the D5 operator at given site
       @param[in] arg    Argument struct containing any meta data and accessors
@@ -174,7 +174,7 @@ namespace quda
     };
 
     template <typename Arg> using eofa_dslash5invOps =
-      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
+      KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the M5 inverse operator at a given site on the
       lattice.  This is the original algorithm as described in Kim and

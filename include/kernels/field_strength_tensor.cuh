@@ -35,7 +35,7 @@ namespace quda
     }
   };
 
-  using computeFmunuCoreOps = SpecialOps<thread_array<int,4>>;
+  using computeFmunuCoreOps = KernelOps<thread_array<int,4>>;
   template <typename Ftor>
   __device__ __host__ inline void computeFmunuCore(const Ftor &ftor, int idx, int parity, int mu, int nu)
   {

@@ -331,7 +331,7 @@ namespace quda {
   template <typename Arg> struct CoarseDslashParams {
     static constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
     using array_t = array<complex<typename Arg::real>, Mc>;
-    using Ops = SpecialOps<SharedMemoryCache<array_t>, op_warp_combine<array_t>>;
+    using Ops = KernelOps<SharedMemoryCache<array_t>, op_warp_combine<array_t>>;
   };
 
   template <typename Arg_> struct CoarseDslash : CoarseDslashParams<Arg_>::Ops {

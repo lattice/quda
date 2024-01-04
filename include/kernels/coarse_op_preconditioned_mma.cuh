@@ -117,7 +117,7 @@ namespace quda
         }
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
-	  SpecialOps<BlockReduce<unsigned, block_dim>> ops{};
+	  KernelOps<BlockReduce<unsigned, block_dim>> ops{};
           unsigned aggregate = BlockReduce<unsigned, block_dim>{ops}.Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }

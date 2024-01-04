@@ -187,7 +187,7 @@ namespace quda {
       }
     };
     template <typename Arg> using Cache = SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
-    template <typename Arg> using Ops = SpecialOps<Cache<Arg>>;
+    template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
 
     template <typename Ftor> __device__ inline auto operator()(typename Ftor::Arg::real thread_max, const Ftor &ftor)
     {
@@ -295,7 +295,7 @@ namespace quda {
   }
 
   template <typename Arg_> using GhostPackerOps =
-    std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoSpecialOps>;
+    std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoKernelOps>;
 
   template <typename Arg_> struct GhostPacker : GhostPackerOps<Arg_> {
     using Arg = Arg_;

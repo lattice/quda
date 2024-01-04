@@ -97,7 +97,7 @@ namespace quda
 
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -123,7 +123,7 @@ namespace quda
 
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -137,7 +137,7 @@ namespace quda
   }
   template <template <typename> class Functor, typename Arg>
   struct BlockKernel2DS {
-    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
+    using KernelOpsT = getKernelOps<Functor<Arg>>;
     template <typename ...S>
     BlockKernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
     {
@@ -166,7 +166,7 @@ namespace quda
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
-      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }

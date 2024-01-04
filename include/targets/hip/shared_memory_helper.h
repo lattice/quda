@@ -1,7 +1,7 @@
 #pragma once
 
 #include <target_device.h>
-#include <special_ops.h>
+#include <kernel_ops.h>
 
 /**
    @file shared_memory_helper.h
@@ -76,7 +76,7 @@ namespace quda
     HostDevice constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
 
     template <typename ...U, typename ...Arg>
-    HostDevice constexpr SharedMemory(const SpecialOps<U...> &, Arg ...arg) : data(cache(get_offset(target::block_dim(), arg...))) { }
+    HostDevice constexpr SharedMemory(const KernelOps<U...> &, Arg ...arg) : data(cache(get_offset(target::block_dim(), arg...))) { }
 
     /**
        @brief Return this SharedMemory object.

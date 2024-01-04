@@ -64,7 +64,7 @@ namespace quda
     using WilsonOps = computeStapleOps;
     using StapOp = ThreadLocalCache<Link,0,computeStapleRectangleOps>;  // offset by computeStapleRectangleOps
     using RectOp = ThreadLocalCache<Link,0,StapOp>;  // offset by StapOp
-    using SymanzikOps = combineOps<computeStapleRectangleOps,SpecialOps<StapOp,RectOp>>;
+    using SymanzikOps = combineOps<computeStapleRectangleOps,KernelOps<StapOp,RectOp>>;
     using Ops = std::conditional_t<Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, SymanzikOps, WilsonOps>;
   };
 

@@ -4,7 +4,6 @@
 #include <kernel_ops.h>
 #include <target_device.h>
 #include <shared_memory_helper.h>
-#include <special_ops.h>
 
 /**
    @file shared_memory_cache_helper.h
@@ -93,10 +92,10 @@ namespace quda
        @brief Constructor for SharedMemoryCache.
     */
     template <typename ...U, typename ...Arg>
-    constexpr SharedMemoryCache(const SpecialOps<U...> &ops, Arg ...arg) :
+    constexpr SharedMemoryCache(const KernelOps<U...> &ops, Arg ...arg) :
       Smem(ops), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
     {
-      checkSpecialOp<SharedMemoryCache<T,D,O>,U...>();
+      checkKernelOp<SharedMemoryCache<T,D,O>,U...>();
       static_assert(shared_mem_size(dim3 {32, 16, 8})
 		    == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}) * sizeof(T));
     }

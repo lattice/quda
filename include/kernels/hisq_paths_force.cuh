@@ -307,7 +307,7 @@ namespace quda {
 
     template <typename Param> struct AllThreeAllLepageLinkOps {
       using Link = Matrix<complex<typename Param::Arg::real>, Param::Arg::nColor>;
-      using Ops = SpecialOps<ThreadLocalCache<Link>>;
+      using Ops = KernelOps<ThreadLocalCache<Link>>;
     };
 
     template <typename Param> struct AllThreeAllLepageLink : AllThreeAllLepageLinkOps<Param>::Ops
@@ -679,7 +679,7 @@ namespace quda {
     template <typename Param> struct AllFiveAllSevenLinkOps {
       static constexpr int cacheLen = Param::sig_positive ? 3 : 2;
       using Link = Matrix<complex<typename Param::Arg::real>, Param::Arg::nColor>;
-      using Ops = SpecialOps<ThreadLocalCache<Link,cacheLen>>;
+      using Ops = KernelOps<ThreadLocalCache<Link,cacheLen>>;
     };
 
     template <typename Param> struct AllFiveAllSevenLink : AllFiveAllSevenLinkOps<Param>::Ops

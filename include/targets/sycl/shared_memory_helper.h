@@ -54,7 +54,7 @@ namespace quda
 #endif
 
     template <typename ...U>
-    SharedMemory(const SpecialOps<U...> &ops) : size(S::size(target::block_dim()))
+    SharedMemory(const KernelOps<U...> &ops) : size(S::size(target::block_dim()))
     {
       //auto op = getDependentOps<op_SharedMemory<T,SizeSmem<SharedMemory<T,S,O>>>>(ops);
       auto op = ops;

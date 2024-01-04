@@ -110,12 +110,12 @@ namespace quda {
     static constexpr int block_dim = 1;
     using BlockReduce_t = BlockReduce<vector, block_dim, Arg::n_vector_z>;
   };
-  template <typename Arg> struct Restrictor : SpecialOps<typename RestrictorParams<Arg>::BlockReduce_t> {
+  template <typename Arg> struct Restrictor : KernelOps<typename RestrictorParams<Arg>::BlockReduce_t> {
     static constexpr int coarse_color_per_thread = RestrictorParams<Arg>::coarse_color_per_thread;
     using vector = typename RestrictorParams<Arg>::vector;
     using BlockReduce_t = typename RestrictorParams<Arg>::BlockReduce_t;
     const Arg &arg;
-    using typename SpecialOps<BlockReduce_t>::KernelOpsT;
+    using typename KernelOps<BlockReduce_t>::KernelOpsT;
     template <typename ...Ops>
     constexpr Restrictor(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

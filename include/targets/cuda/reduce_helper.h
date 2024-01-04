@@ -247,7 +247,7 @@ namespace quda
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
     //T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
-    SpecialOps<BlockReduce> ops{};
+    KernelOps<BlockReduce> ops{};
     T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::grid_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction

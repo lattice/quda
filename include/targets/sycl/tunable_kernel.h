@@ -8,7 +8,7 @@
 #include <quda_sycl.h>
 #include <quda_sycl_api.h>
 #include <reduce_helper.h>
-#include <special_ops_target.h>
+#include <kernel_ops_target.h>
 
 #define CHECK_SHARED_BYTES
 
@@ -38,7 +38,7 @@ namespace quda {
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
 #if 0
-      auto smemsize = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
+      auto smemsize = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
       if (smemsize < tp.shared_bytes) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
 	warningQuda("Shared bytes mismatch kernel: %u  tp: %u\n", smemsize, tp.shared_bytes);
@@ -113,11 +113,11 @@ namespace quda {
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     try {
-      if constexpr (needsSharedMem<typename F::SpecialOpsT>) {
+      if constexpr (needsSharedMem<typename F::KernelOpsT>) {
 	//auto localsize = ndRange.get_local_range().size();
 	auto block = makeDim3(ndRange.get_local_range());
-	//auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block, arg);
-	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block);
+	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
+	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
 	}
@@ -169,11 +169,11 @@ namespace quda {
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     try {
-      if constexpr (needsSharedMem<typename F::SpecialOpsT>) {
+      if constexpr (needsSharedMem<typename F::KernelOpsT>) {
 	//auto localsize = ndRange.get_local_range().size();
 	auto block = makeDim3(ndRange.get_local_range());
-	//auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block, arg);
-	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block);
+	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
+	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("  Allocating local mem size: %u\n", smemsize);
 	}
@@ -226,11 +226,11 @@ namespace quda {
     memcpy(ph, &arg, size);
     auto p = ph;
     try {
-      if constexpr (needsSharedMem<typename F::SpecialOpsT>) {
+      if constexpr (needsSharedMem<typename F::KernelOpsT>) {
 	//auto localsize = ndRange.get_local_range().size();
 	auto block = makeDim3(ndRange.get_local_range());
-	//auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block, arg);
-	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block);
+	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
+	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("  Allocating local mem size: %u\n", smemsize);
 	}
@@ -278,7 +278,7 @@ namespace quda {
   qudaError_t
   launchX(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
-    static_assert(!needsSharedMem<typename F::SpecialOpsT>);
+    static_assert(!needsSharedMem<typename F::KernelOpsT>);
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     auto size = sizeof(arg);
@@ -310,7 +310,7 @@ namespace quda {
   std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
   launchR(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
-    static_assert(!needsSharedMem<typename F::SpecialOpsT>);
+    static_assert(!needsSharedMem<typename F::KernelOpsT>);
     if ( sizeof(Arg) > device::max_parameter_size() ) {
       errorQuda("Kernel arg too large: %lu > %u\n", sizeof(Arg), device::max_parameter_size());
     }
@@ -350,7 +350,7 @@ namespace quda {
   std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
   launchR(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
-    static_assert(!needsSharedMem<typename F::SpecialOpsT>);
+    static_assert(!needsSharedMem<typename F::KernelOpsT>);
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     auto size = sizeof(arg);
@@ -388,7 +388,7 @@ namespace quda {
     return err;
   }
 
-  template <typename F, bool = hasSpecialOps<F>, bool = needsSharedMem<F>>
+  template <typename F, bool = hasKernelOps<F>, bool = needsSharedMem<F>>
   struct Ftor : F {
     template <typename Arg, typename S>
     Ftor(const Arg &arg, const sycl::nd_item<3> &, S smem) : F{arg,smem} {}

@@ -34,8 +34,8 @@ namespace quda
     constexpr ThreadLocalCache() {}
 
     template <typename ...U>
-    constexpr ThreadLocalCache(const SpecialOps<U...> &ops) {
-      checkSpecialOp<ThreadLocalCache<T,N,O>,U...>();
+    constexpr ThreadLocalCache(const KernelOps<U...> &ops) {
+      checkKernelOp<ThreadLocalCache<T,N,O>,U...>();
     }
 
     static constexpr unsigned int shared_mem_size(dim3) { return 0; }

@@ -32,7 +32,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Reduction2DS {
-    using SpecialOpsT = typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops;
+    using KernelOpsT = typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops;
     template <typename... T>
     Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T ...smem)
     {
@@ -60,7 +60,7 @@ namespace quda {
   }
   template <template <typename> class Functor, bool grid_stride = false>
   struct Reduction2DS {
-    using SpecialOpsT = NoSpecialOps;
+    using KernelOpsT = NoKernelOps;
     template <typename Arg, typename R>
     static void apply(const Arg &arg, const sycl::nd_item<3> &ndi, R &reducer)
     {
@@ -76,7 +76,7 @@ namespace quda {
   qudaError_t Reduction2D(const TuneParam &tp,
 			  const qudaStream_t &stream, Arg &arg)
   {
-    static_assert(!hasSpecialOps<Functor<Arg>>);
+    static_assert(!hasKernelOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -108,7 +108,7 @@ namespace quda {
       printfQuda("  SLM size: %lu\n",
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
 		 device::warp_size());
-      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
       timer.start();
@@ -159,7 +159,7 @@ namespace quda {
     using reduce_t = typename Functor<Arg>::reduce_t;
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -196,7 +196,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
-    using SpecialOpsT = combineOps<getSpecialOps<Functor<Arg>>,
+    using KernelOpsT = combineOps<getKernelOps<Functor<Arg>>,
 				   typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops>;
     template <typename... T>
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
@@ -213,7 +213,7 @@ namespace quda {
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
-    //static_assert(!hasSpecialOps<Functor<Arg>>);
+    //static_assert(!hasKernelOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -250,7 +250,7 @@ namespace quda {
       printfQuda("  SLM size: %lu\n",
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
 		 device::warp_size());
-      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }

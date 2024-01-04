@@ -174,7 +174,7 @@ namespace quda {
   };
 
   template <typename Arg> using NdegTwistCloverApplyOps =
-    SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
+    KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
 
   // if (!inverse) apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1) to the input spinor
   // else apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor

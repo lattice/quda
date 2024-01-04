@@ -52,7 +52,7 @@ namespace quda
     };
     using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
     using CacheT = SharedMemoryCache<color_spinor_t, CacheDims>;
-    using Ops = SpecialOps<CacheT>;
+    using Ops = KernelOps<CacheT>;
   };
 
   template <typename Arg> struct BlockTransposeKernel : BlockTransposeKernelOps<Arg>::Ops {

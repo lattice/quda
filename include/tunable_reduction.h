@@ -123,7 +123,7 @@ namespace quda
     void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
-      auto sizeOps = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
       auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
       if (sizeOps != sizeTp) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
@@ -281,7 +281,7 @@ namespace quda
     void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
-      auto sizeOps = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
       auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
       if (sizeOps != sizeTp) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());

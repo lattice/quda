@@ -114,14 +114,14 @@ namespace quda
     static constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce_t = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     //using reduceConcurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<bool>>;
-    //using opBlockSync = getSpecialOpF<reduceConcurrentOps,0>;
-    //using opSharedMem = getSpecialOpF<reduceConcurrentOps,1>;
-    //using Ops = SpecialOps<BlockReduce_t,reduceConcurrentOps>;
+    //using opBlockSync = getKernelOpF<reduceConcurrentOps,0>;
+    //using opSharedMem = getKernelOpF<reduceConcurrentOps,1>;
+    //using Ops = KernelOps<BlockReduce_t,reduceConcurrentOps>;
     using opBlockSync = op_blockSync;
     //using opSharedMem = op_SharedMemory<bool>;
     using Smem = SharedMemory<bool, SizeZ>;
-    //using Ops = SpecialOps<BlockReduce_t,opBlockSync,opSharedMem>;
-    using Ops = SpecialOps<BlockReduce_t,opBlockSync,Smem>;
+    //using Ops = KernelOps<BlockReduce_t,opBlockSync,opSharedMem>;
+    using Ops = KernelOps<BlockReduce_t,opBlockSync,Smem>;
   };
 
   /**

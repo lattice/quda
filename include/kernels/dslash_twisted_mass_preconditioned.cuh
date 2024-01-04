@@ -132,10 +132,9 @@ namespace quda
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct twistedMassPreconditioned : dslash_default, NoSpecialOps {
+  struct twistedMassPreconditioned : dslash_default {
 
     const Arg &arg;
-    //constexpr twistedMassPreconditioned(const Arg &arg) : arg(arg) {}
     template <typename Ftor> constexpr twistedMassPreconditioned(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 1 : 0; }

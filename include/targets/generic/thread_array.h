@@ -39,11 +39,11 @@ namespace quda
 #endif
 
     template <typename... U>
-    __device__ __host__ constexpr thread_array(const SpecialOps<U...> &ops) :
+    __device__ __host__ constexpr thread_array(const KernelOps<U...> &ops) :
       Smem(ops),
       array_(sharedMem()[target::thread_idx_linear<3>()])
     {
-      checkSpecialOp<thread_array<T,n,O>,U...>();
+      checkKernelOp<thread_array<T,n,O>,U...>();
       array_ = array<T, n>{}; // call default constructor
     }
 

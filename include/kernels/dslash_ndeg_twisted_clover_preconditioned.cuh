@@ -45,7 +45,7 @@ namespace quda
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 2>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = SpecialOps<Cache>;
+    using Ops = KernelOps<Cache>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>

@@ -52,7 +52,7 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template <typename Float> using GaugeFixHit_AtomicAddOps = SpecialOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float> using GaugeFixHit_AtomicAddOps = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu, const Ftor &ftor)
   {
@@ -171,7 +171,7 @@ namespace quda {
    * Uses 4*8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd
    */
-  template <typename Float> using GaugeFixHit_NoAtomicAddOps = SpecialOps<SharedMemoryCache<array<Float,4>>>;
+  template <typename Float> using GaugeFixHit_NoAtomicAddOps = KernelOps<SharedMemoryCache<array<Float,4>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu, const Ftor &ftor)
   {
@@ -264,7 +264,7 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template <typename Float> using GaugeFixHit_NoAtomicAdd_LessSMOps = SpecialOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float> using GaugeFixHit_NoAtomicAdd_LessSMOps = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu, const Ftor &ftor)
   {
@@ -369,7 +369,7 @@ namespace quda {
    * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template <typename Float> using GaugeFixHit_AtomicAdd2Ops = SpecialOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float> using GaugeFixHit_AtomicAdd2Ops = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
 					       const Float relax_boost, int mu, const Ftor &ftor)
@@ -456,7 +456,7 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template <typename Float> using GaugeFixHit_NoAtomicAdd2Ops = SpecialOps<SharedMemoryCache<Float,GaugeFixHitDims<16>>>;
+  template <typename Float> using GaugeFixHit_NoAtomicAdd2Ops = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<16>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
                                                  const Float relax_boost, int mu, const Ftor &ftor)
@@ -537,7 +537,7 @@ namespace quda {
    * Uses 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template <typename Float> using GaugeFixHit_NoAtomicAdd_LessSM2Ops = SpecialOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float> using GaugeFixHit_NoAtomicAdd_LessSM2Ops = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
 							const Float relax_boost, int mu, const Ftor &ftor)

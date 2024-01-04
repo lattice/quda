@@ -96,7 +96,7 @@ namespace quda
       //}
       //using Cache = SharedMemoryCache<typename Arg::real, Transfer5DParams>;
       using Cache = SharedMemoryCache<typename Arg::real>;
-      using Ops = SpecialOps<Cache>;
+      using Ops = KernelOps<Cache>;
     };
 
     template <class Arg> struct Transfer5D : Transfer5DParams<Arg>::Ops {

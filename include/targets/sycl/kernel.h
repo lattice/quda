@@ -36,7 +36,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel1DS {
-    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
+    using KernelOpsT = getKernelOps<Functor<Arg>>;
     Kernel1DS(const Arg &arg, const sycl::nd_item<3> &ndi)
     {
 #ifdef QUDA_THREADS_BLOCKED
@@ -51,7 +51,7 @@ namespace quda {
   qudaError_t
   Kernel1D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
-    static_assert(!hasSpecialOps<Functor<Arg>>);
+    static_assert(!hasKernelOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -79,7 +79,7 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
-      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
@@ -112,7 +112,7 @@ namespace quda {
   {
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -137,7 +137,7 @@ namespace quda {
   {
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -176,7 +176,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel2DS {
-    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
+    using KernelOpsT = getKernelOps<Functor<Arg>>;
     template <typename ...S>
     Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
     {
@@ -219,7 +219,7 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
-      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
@@ -258,7 +258,7 @@ namespace quda {
   {
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -285,7 +285,7 @@ namespace quda {
   {
 #if 0
     Functor<Arg> f(arg);
-    if constexpr (hasSpecialOps<Functor<Arg>>) {
+    if constexpr (hasKernelOps<Functor<Arg>>) {
       f.setNdItem(ndi);
     }
     if constexpr (needsSharedMem<Functor<Arg>>) {
@@ -329,7 +329,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel3DS {
-    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
+    using KernelOpsT = getKernelOps<Functor<Arg>>;
     template <typename ...S>
     Kernel3DS(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
     {
@@ -370,7 +370,7 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
-      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
       //fflush(stdout);
