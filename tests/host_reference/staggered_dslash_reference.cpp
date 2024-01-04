@@ -147,9 +147,6 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
-  auto fwd_nbr_spinor = in.fwdGhostFaceBuffer;
-  auto back_nbr_spinor = in.backGhostFaceBuffer;
-
   void *qdp_fatlink[] = {fat_link.data(0), fat_link.data(1), fat_link.data(2), fat_link.data(3)};
   void *qdp_longlink[] = {long_link.data(0), long_link.data(1), long_link.data(2), long_link.data(3)};
   void *ghost_fatlink[]

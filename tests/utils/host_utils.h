@@ -41,11 +41,13 @@ extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
 // Determine if the Laplace operator has been defined
+constexpr bool is_enabled_laplace() {
 #ifdef QUDA_LAPLACE
-constexpr bool is_laplace_enabled = true;
+  return true;
 #else
-constexpr bool is_laplace_enabled = false;
+  return false;
 #endif
+}
 
 // Set some basic parameters via command line or use defaults
 // Implemented in set_params.cpp

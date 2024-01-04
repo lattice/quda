@@ -273,7 +273,7 @@ int main(int argc, char **argv)
   initRand();
 
   // Only these fermions are supported in this file
-  if (is_laplace_enabled) {
+  if constexpr (is_enabled_laplace()) {
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
