@@ -228,6 +228,8 @@ option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
 option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
 
+option(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST "Whether to run eigensolver ctests against the improved staggered operator (requires QUDA_DIRAC_STAGGERED)" OFF)
+
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
@@ -391,7 +393,11 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
 if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
-  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
+  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC")
+endif()
+
+if (QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST AND NOT QUDA_DIRAC_STAGGERED)
+  message(SEND_ERROR "QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST requires QUDA_DIRAC_STAGGERED")
 endif()
 
 find_package(Threads REQUIRED)

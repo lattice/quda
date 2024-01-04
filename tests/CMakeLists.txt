@@ -1402,15 +1402,16 @@ foreach(prec IN LISTS TEST_PRECS)
       --enable-testing true
       --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
 
-    # Skipping this because it's both time consuming and doesn't have any novel spectral
-    # properties relative to unimproved staggered
-    #add_test(NAME eigensolve_test_asqtad_${prec}
-    #  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    #  --dslash-type asqtad --compute-fat-long true
-    #  --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
-    #  --dim 6 6 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
-    #  --enable-testing true
-    #  --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+    # These tests are particularly expensive so they are disabled by default
+    if(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST)
+      add_test(NAME eigensolve_test_asqtad_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type asqtad --compute-fat-long true
+        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+        --dim 6 6 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+        --enable-testing true
+        --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+    endif()
 
     if (QUDA_LAPLACE)
       add_test(NAME eigensolve_test_laplace_${prec}
