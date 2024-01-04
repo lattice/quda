@@ -29,12 +29,12 @@ namespace quda
   void arpackErrorHelpNEUPD();
 
   void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
-                    QudaEigParam *eig_param, TimeProfile &profile)
+                    QudaEigParam *eig_param)
   {
     // Create Eigensolver object for member function use
-    EigenSolver *eig_solver = EigenSolver::create(eig_param, mat, profile);
+    EigenSolver *eig_solver = EigenSolver::create(eig_param, mat);
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
 // ARPACK logfile name
 #ifdef ARPACK_LOGGING
@@ -195,14 +195,14 @@ namespace quda
 #endif
 #endif
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
 
     // Start ARPACK routines
     //---------------------------------------------------------------------------------
 
     do {
 
-      profile.TPSTART(QUDA_PROFILE_ARPACK);
+      getProfile().TPSTART(QUDA_PROFILE_ARPACK);
 
       // Interface to arpack routines
       //----------------------------
@@ -225,7 +225,7 @@ namespace quda
       }
 #endif
 
-      profile.TPSTOP(QUDA_PROFILE_ARPACK);
+      getProfile().TPSTOP(QUDA_PROFILE_ARPACK);
 
       // If this is the first iteration, we allocate CPU and GPU memory for QUDA
       if (allocate) {
@@ -258,22 +258,22 @@ namespace quda
 
       if (ido_ == -1 || ido_ == 1) {
 
-        profile.TPSTART(QUDA_PROFILE_D2H);
+        getProfile().TPSTART(QUDA_PROFILE_D2H);
 
         d_v = h_v;
 
-        profile.TPSTOP(QUDA_PROFILE_D2H);
-        profile.TPSTART(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTOP(QUDA_PROFILE_D2H);
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
         // apply matrix-vector operation here:
         eig_solver->chebyOp(d_v2, d_v);
 
-        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-        profile.TPSTART(QUDA_PROFILE_H2D);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTART(QUDA_PROFILE_H2D);
 
         h_v2 = d_v2;
 
-        profile.TPSTOP(QUDA_PROFILE_H2D);
+        getProfile().TPSTOP(QUDA_PROFILE_H2D);
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
@@ -289,7 +289,7 @@ namespace quda
       printfQuda("Computing eigenvectors\n");
     }
 
-    profile.TPSTART(QUDA_PROFILE_ARPACK);
+    getProfile().TPSTART(QUDA_PROFILE_ARPACK);
 
     // Interface to arpack routines
     //----------------------------
@@ -323,7 +323,7 @@ namespace quda
     }
 #endif
 
-    profile.TPSTOP(QUDA_PROFILE_ARPACK);
+    getProfile().TPSTOP(QUDA_PROFILE_ARPACK);
 
     // Print additional convergence information.
     if ((info_) == 1) {
@@ -382,18 +382,18 @@ namespace quda
 
       for (int i = 0; i < nconv; i++) {
 
-	profile.TPSTART(QUDA_PROFILE_H2D);
+	getProfile().TPSTART(QUDA_PROFILE_H2D);
 	d_v = h_evecs_arpack[arpack_index[i]];
-	profile.TPSTOP(QUDA_PROFILE_H2D);
+	getProfile().TPSTOP(QUDA_PROFILE_H2D);
 
-	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
 	double sigma_tmp = sqrt(blas::norm2(d_v2));
 	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
 	blas::ax(1.0 / sigma_tmp, d_v2);
-	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp,
@@ -403,17 +403,17 @@ namespace quda
       printfQuda("Computing Eigenvalues\n");
       for (int i = 0; i < nconv; i++) {
 
-	profile.TPSTART(QUDA_PROFILE_D2H);
+	getProfile().TPSTART(QUDA_PROFILE_D2H);
 	d_v = h_evecs_arpack[arpack_index[i]];
-	profile.TPSTOP(QUDA_PROFILE_D2H);
+	getProfile().TPSTOP(QUDA_PROFILE_D2H);
 
-	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 	// d_v2 = M*v = lambda_measured * v
 	mat(d_v2, d_v);
 	// d_v = ||lambda_measured*v - lambda_arpack*v||
 	blas::caxpby(Complex {1.0, 0.0}, d_v2, -evals[i], d_v);
 	double L2norm = blas::norm2(d_v);
-	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, evals[i].real(), evals[i].imag(),
@@ -425,9 +425,9 @@ namespace quda
     if (eig_param->compute_svd) {
       for (int i = 0; i < nconv; i++) {
 
-	profile.TPSTART(QUDA_PROFILE_H2D);
+	getProfile().TPSTART(QUDA_PROFILE_H2D);
 	d_v = h_evecs_arpack[arpack_index[i]];
-	profile.TPSTOP(QUDA_PROFILE_H2D);
+	getProfile().TPSTOP(QUDA_PROFILE_H2D);
 
 	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
@@ -439,9 +439,9 @@ namespace quda
 	blas::ax(1.0 / sigma_tmp, d_v2);
 
 	h_evecs[i] = h_evecs_arpack[arpack_index[i]];
-	profile.TPSTART(QUDA_PROFILE_D2H);
+	getProfile().TPSTART(QUDA_PROFILE_D2H);
 	h_evecs[i + nconv] = d_v2;
-	profile.TPSTOP(QUDA_PROFILE_D2H);
+	getProfile().TPSTOP(QUDA_PROFILE_D2H);
 
 	h_evals[i].real(sigma_tmp);
 	h_evals[i].imag(0.0);
@@ -453,11 +453,11 @@ namespace quda
       }
     }
 
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     delete eig_solver;
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void arpackErrorHelpNAUPD()
@@ -538,8 +538,7 @@ namespace quda
 
 #else
 
-  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *,
-                    TimeProfile &)
+  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");
   }

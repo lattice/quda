@@ -224,9 +224,6 @@ namespace quda {
     double Last(QudaProfileType idx) { return profile[idx].last_interval; }
 
     static void PrintGlobal();
-
-    bool isRunning(QudaProfileType idx) { return profile[idx].running; }
-
   };
 
   /**

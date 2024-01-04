@@ -104,8 +104,8 @@ namespace quda {
   }
 
   GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+           const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param),
     matMdagM(DiracMdagM(matEig.Expose())),
     K(0),
     Kparam(param),
@@ -119,12 +119,12 @@ namespace quda {
     // Preconditioners do not need a deflation space (for now?) so we explicily set this here.
     Kparam.deflate = false;
 
-    K = createPreconditioner(matSloppy, matPrecon, matPrecon, matEig, param, Kparam, profile);
+    K = createPreconditioner(matSloppy, matPrecon, matPrecon, matEig, param, Kparam);
   }
 
   GCR::GCR(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+           const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param),
     matMdagM(matEig.Expose()),
     K(nullptr),
     Kparam(param),
@@ -138,11 +138,11 @@ namespace quda {
   }
 
   GCR::~GCR() {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
     extractInnerSolverParam(param, Kparam);
 
     destroyDeflationSpace();
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void GCR::create(ColorSpinorField &x, const ColorSpinorField &b)
@@ -150,7 +150,7 @@ namespace quda {
     Solver::create(x, b);
 
     if (!init) {
-      profile.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
@@ -173,7 +173,7 @@ namespace quda {
         r_sloppy = mixed() ? ColorSpinorField(csParam) : r.create_alias();
       }
 
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     }
   }
@@ -188,7 +188,7 @@ namespace quda {
 
     create(x, b);
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
@@ -200,7 +200,7 @@ namespace quda {
       }
       if (deflate_compute) {
         // compute the deflation space.
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
         if (param.deflate) {
           // double the size of the Krylov space
@@ -208,7 +208,7 @@ namespace quda {
           // populate extra memory with L/R singular vectors
           eig_solve->computeSVD(evecs, evals);
         }
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        getProfile().TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -245,7 +245,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-	profile.TPSTOP(QUDA_PROFILE_INIT);
+	getProfile().TPSTOP(QUDA_PROFILE_INIT);
 	warningQuda("inverting on zero-field source\n");
 	x = b;
 	param.true_res = 0.0;
@@ -273,8 +273,8 @@ namespace quda {
     int resIncrease = 0;
     int resIncreaseTotal = 0;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     blas::copy(r_sloppy, r);
 
@@ -289,8 +289,8 @@ namespace quda {
     if (Ap[0].Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
     if (pipeline > n_krylov) pipeline = n_krylov;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
     int k_break = 0;
@@ -381,8 +381,8 @@ namespace quda {
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     if (k >= param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
@@ -405,12 +405,12 @@ namespace quda {
 
     param.iter += total_iter;
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
 } // namespace quda

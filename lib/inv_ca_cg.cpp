@@ -15,21 +15,21 @@ namespace quda
 {
 
   CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), lambda_init(false), basis(param.ca_basis)
+             const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param), lambda_init(false), basis(param.ca_basis)
   {
   }
 
   CACG::~CACG()
   {
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
+                 const DiracMatrix &matEig, SolverParam &param) :
+    CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
@@ -110,8 +110,8 @@ namespace quda
   }
 
   CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
+                 const DiracMatrix &matEig, SolverParam &param) :
+    CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
@@ -184,7 +184,7 @@ namespace quda
   {
     Solver::create(x, b);
     if (!init) {
-      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       Q_AQandg.resize(param.Nkrylov * (param.Nkrylov + 1));
       Q_AS.resize(param.Nkrylov * param.Nkrylov);
@@ -215,7 +215,7 @@ namespace quda
 
       if (!mixed()) r = S[0].create_alias(csParam);
 
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
 
       init = true;
     } // init
@@ -244,8 +244,8 @@ namespace quda
   void CACG::compute_alpha()
   {
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     const int N = Q.size();
@@ -285,8 +285,8 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
@@ -312,8 +312,8 @@ namespace quda
   void CACG::compute_beta()
   {
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     const int N = Q.size();
@@ -350,8 +350,8 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
@@ -410,7 +410,7 @@ namespace quda
 
     create(x, b);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
@@ -422,9 +422,9 @@ namespace quda
       constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -468,8 +468,8 @@ namespace quda
 
     if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTART(QUDA_PROFILE_INIT);
       }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r as an initial seed
@@ -480,8 +480,8 @@ namespace quda
       lambda_init = true;
 
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
       }
     }
 
@@ -515,8 +515,8 @@ namespace quda
     int resIncreaseTotal = 0;
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
     int total_iter = 0;
     double r2_old = r2;
@@ -667,7 +667,7 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += total_iter;
     }
 

@@ -114,16 +114,13 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-  MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param,
-                             TimeProfile &profile) :
-    MultiShiftSolver(mat, matSloppy, param, profile), init(false)
-  {
-  }
+  MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param) :
+    MultiShiftSolver(mat, matSloppy, param), init(false) { }
 
   void MultiShiftCG::create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p)
   {
     if (!init) {
-      profile.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
       MultiShiftSolver::create(x, b);
       num_offset = param.num_offset;
 
@@ -160,7 +157,7 @@ namespace quda {
       csParam.create = QUDA_NULL_FIELD_CREATE;
       Ap = ColorSpinorField(csParam);
 
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
     }
   }
 
@@ -231,7 +228,7 @@ namespace quda {
     int j_low = 0;
     int num_offset_now = num_offset;
 
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // stopping condition of each shift
     std::vector<double> r2(num_offset, b2);
@@ -267,8 +264,8 @@ namespace quda {
     bool aux_update = false;
     ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0] / b2));
 
@@ -436,8 +433,8 @@ namespace quda {
       if (group_update) blas::xpy(x_sloppy[i], x[i]);
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     logQuda(QUDA_VERBOSE, "Reliable updates = %d\n", rUpdate);
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
@@ -486,7 +483,7 @@ namespace quda {
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
     popOutputPrefix();
   }
 

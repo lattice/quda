@@ -2286,9 +2286,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // Perfrom the eigensolve
   if (eig_param->arpack_check) {
-    arpack_solve(host_evecs_, evals, *m, eig_param, profileEigensolve);
+    arpack_solve(host_evecs_, evals, *m, eig_param);
   } else {
-    auto *eig_solve = quda::EigenSolver::create(eig_param, *m, profileEigensolve);
+    auto *eig_solve = quda::EigenSolver::create(eig_param, *m);
     (*eig_solve)(kSpace, evals);
     delete eig_solve;
   }
@@ -2314,8 +2314,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   saveTuneCache();
 }
 
-multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
-  : profile(profile) {
+multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
+{
   QudaInvertParam *param = mg_param.invert_param;
   // set whether we are going use native or generic blas
   blas_lapack::set_native(param->native_blas_lapack);
@@ -2387,19 +2387,20 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
 
-  mg = new MG(*mgParam, profile);
+  mg = new MG(*mgParam);
   mgParam->updateInvertParam(*param);
 
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
 }
 
-void* newMultigridQuda(QudaMultigridParam *mg_param) {
+void* newMultigridQuda(QudaMultigridParam *mg_param)
+{
   profilerStart(__func__);
   auto profile = pushProfile(profileInvert, mg_param->secs, mg_param->gflops);
   pushVerbosity(mg_param->invert_param->verbosity);
 
-  auto *mg = new multigrid_solver(*mg_param, profileInvert);
+  auto *mg = new multigrid_solver(*mg_param);
 
   saveTuneCache();
 
@@ -2795,7 +2796,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
     SolverParam solverParam(*param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
     (*solve)(*out, *in);
     blas::copy(*in, *out);
     delete solve;
@@ -2832,7 +2833,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
 
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
     (*solve)(*out, *in);
     delete solve;
     solverParam.updateInvertParam(*param);
@@ -2870,12 +2871,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
     if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
       DiracMdagMLocal mPreLocal(diracPre);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, mEig, profileInvert);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, mEig);
       (*solve)(*out, *in);
       delete solve;
       solverParam.updateInvertParam(*param);
     } else {
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
       (*solve)(*out, *in);
       delete solve;
       solverParam.updateInvertParam(*param);
@@ -2884,7 +2885,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
     ColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
     (*solve)(tmp, *in); // y = (M M^\dag) b
     dirac.Mdag(*out, tmp);  // x = M^dag y
     delete solve;
@@ -3522,7 +3523,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 
   SolverParam solverParam(*param);
   {
-    MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
+    MultiShiftCG cg_m(*m, *mSloppy, solverParam);
     cg_m(x, b, p, r2_old);
   }
   solverParam.updateInvertParam(*param);
@@ -3624,7 +3625,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
         solverParam.delta = param->reliable_delta_refinement;
 
         {
-          CG cg(*m, *mSloppy, *mSloppy, *mSloppy, solverParam, profileMulti);
+          CG cg(*m, *mSloppy, *mSloppy, *mSloppy, solverParam);
           if (i==0)
             cg(x[i], b, &p[i], r2_old[i]);
           else

@@ -20,8 +20,8 @@
 namespace quda {
 
   CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
-         SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+         SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param),
     yp(nullptr),
     rp(nullptr),
     rnewp(nullptr),
@@ -35,7 +35,7 @@ namespace quda {
 
   CG::~CG()
   {
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       if (rp) delete rp;
       if (pp) delete pp;
@@ -51,12 +51,12 @@ namespace quda {
 
       destroyDeflationSpace();
     }
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
+             const DiracMatrix &matEig, SolverParam &param) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
@@ -137,8 +137,8 @@ namespace quda {
   }
 
   CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
+             const DiracMatrix &matEig, SolverParam &param) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
@@ -248,13 +248,13 @@ namespace quda {
     */
     bool advanced_feature = !(param.precondition_no_advanced_feature && param.is_preconditioner);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -287,9 +287,9 @@ namespace quda {
       constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -357,8 +357,8 @@ namespace quda {
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
     }
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
@@ -367,8 +367,8 @@ namespace quda {
     double pAp;
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
     int k = 0;
@@ -540,8 +540,8 @@ namespace quda {
     blas::xpy(y, x);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
       param.iter += k;
 
@@ -559,7 +559,7 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, 0.0);
 
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     if (param.is_preconditioner) commGlobalReductionPop();
   }
@@ -580,7 +580,7 @@ namespace quda {
               "HQ solves don't support alternative reliable updates, reverting to traditional reliable updates\n");
     if (param.pipeline) logQuda(QUDA_SUMMARIZE, "HQ solves don't support pipelining, disabling...");
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b);
 
@@ -591,7 +591,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -660,8 +660,8 @@ namespace quda {
 
     double r2_old = 0.0;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
@@ -678,8 +678,8 @@ namespace quda {
     bool L2breakdown = !L2_required;
     const double L2breakdown_eps = 100. * uhigh;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
 
@@ -972,8 +972,8 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.iter += k;
 
@@ -990,7 +990,7 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
@@ -1007,7 +1007,7 @@ namespace quda {
   {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     using Eigen::MatrixXcd;
 
@@ -1019,7 +1019,7 @@ namespace quda {
       b2[i] = blas::norm2(b.Component(i));
       b2avg += b2[i];
       if (b2[i] == 0) {
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
         errorQuda("Warning: inverting on zero-field source - undefined for block solver\n");
         x = b;
         param.true_res = 0.0;
@@ -1100,8 +1100,8 @@ namespace quda {
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     if (use_heavy_quark_res) errorQuda("ERROR: heavy quark residual not supported in block solver");
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop[QUDA_MAX_MULTI_SHIFT];
 
@@ -1139,8 +1139,8 @@ namespace quda {
     nt steps_since_reliable = 1;
     */
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
 
@@ -1285,8 +1285,8 @@ namespace quda {
 
     for (int i = 0; i < param.num_src; i++) { blas::xpy(y.Component(i), xSloppy.Component(i)); }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.iter += k;
 
@@ -1306,11 +1306,11 @@ namespace quda {
       PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i], 0.0);
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     delete[] AC;
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }
@@ -1333,7 +1333,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
-  profile.TPSTART(QUDA_PROFILE_INIT);
+  getProfile().TPSTART(QUDA_PROFILE_INIT);
 
   using Eigen::MatrixXcd;
   MatrixXcd mPAP(param.num_src,param.num_src);
@@ -1349,7 +1349,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     b2[i]=blas::norm2(b.Component(i));
     b2avg += b2[i];
     if(b2[i] == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       errorQuda("Warning: inverting on zero-field source\n");
       x=b;
       param.true_res = 0.0;
@@ -1443,8 +1443,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
   bool heavy_quark_restart = false;
 
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-  profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+  getProfile().TPSTOP(QUDA_PROFILE_INIT);
+  getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
   MatrixXcd r2_old(param.num_src, param.num_src);
   double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
@@ -1500,8 +1500,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // only used if we use the heavy_quark_res
   bool L2breakdown = false;
 
-  profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profile.TPSTART(QUDA_PROFILE_COMPUTE);
+  getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
   int k = 0;
 
@@ -1844,8 +1844,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::xpy(y.Component(i), x.Component(i));
   }
 
-  profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+  getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
   param.iter += k;
 
@@ -1866,10 +1866,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
 
-  profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profile.TPSTART(QUDA_PROFILE_FREE);
+  getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
+  getProfile().TPSTART(QUDA_PROFILE_FREE);
 
-  profile.TPSTOP(QUDA_PROFILE_FREE);
+  getProfile().TPSTOP(QUDA_PROFILE_FREE);
 
   return;
 

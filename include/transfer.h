@@ -148,17 +148,6 @@ namespace quda {
      */
     void initializeLazy(QudaFieldLocation location) const;
 
-    /**
-     * Internal flops accumulator
-     */
-    mutable double flops_;
-
-    /**
-     * Reference to profile kept in the corresponding MG instance.
-     * Use this to record restriction and prolongation overhead.
-     */
-    TimeProfile &profile;
-
   public:
     /**
      * The constructor for Transfer
@@ -174,7 +163,7 @@ namespace quda {
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
     Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
-             int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
+             int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -271,12 +260,6 @@ namespace quda {
      * applicable)
      */
     void setSiteSubset(QudaSiteSubset site_subset, QudaParity parity);
-
-    /**
-     * Return flops
-     * @return flops expended by this operator
-     */
-    double flops() const;
   };
 
   /**
