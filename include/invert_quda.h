@@ -1059,12 +1059,24 @@ namespace quda {
     ColorSpinorField x_sloppy; // Sloppy solution accumulator vector
     bool init = false;
 
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
+
   public:
     BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
 

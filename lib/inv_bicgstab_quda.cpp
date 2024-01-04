@@ -25,6 +25,33 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
+  void BiCGstab::create(ColorSpinorField &x, const ColorSpinorField &b)
+  {
+    Solver::create(x, b);
+
+    if (!init) {
+      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      y = ColorSpinorField(csParam);
+      r = ColorSpinorField(csParam);
+      csParam.setPrecision(param.precision_sloppy);
+      p = ColorSpinorField(csParam);
+      v = ColorSpinorField(csParam);
+      t = ColorSpinorField(csParam);
+
+      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      init = true;
+    } // init
+  }
+
+  ColorSpinorField &BiCGstab::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    return r;
+  }
+
   int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
     // reliable updates
     rNorm = sqrt(r2);
@@ -41,6 +68,8 @@ namespace quda {
 
   void BiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    create(x, b);
+
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b); // norm sq of source
@@ -53,26 +82,13 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         b2 = r2;
       } else {
         errorQuda("Null vector computing requires non-zero guess!");
       }
-    }
-
-    if (!init) {
-      ColorSpinorParam csParam(x);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      y = ColorSpinorField(csParam);
-      r = ColorSpinorField(csParam);
-      csParam.setPrecision(param.precision_sloppy);
-      p = ColorSpinorField(csParam);
-      v = ColorSpinorField(csParam);
-      t = ColorSpinorField(csParam);
-
-      init = true;
     }
 
     if (param.deflate) {
