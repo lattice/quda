@@ -75,22 +75,6 @@ namespace quda {
     double b2 = blas::norm2(b); // norm sq of source
     double r2 = 0.0;            // norm sq of residual
 
-    // Check to see that we're not trying to invert on a zero-field source
-    if (b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        warningQuda("inverting on zero-field source");
-        x = b;
-        param.true_res = 0.0;
-        param.true_res_hq = 0.0;
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
-        return;
-      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        b2 = r2;
-      } else {
-        errorQuda("Null vector computing requires non-zero guess!");
-      }
-    }
-
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
@@ -138,6 +122,22 @@ namespace quda {
       // Compute r_defl = RHS - A * LHS
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
+    }
+
+    // Check to see that we're not trying to invert on a zero-field source
+    if (b2 == 0) {
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+        warningQuda("inverting on zero-field source");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+        return;
+      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        b2 = r2;
+      } else {
+        errorQuda("Null vector computing requires non-zero guess!");
+      }
     }
 
     // set field aliasing according to whether we are doing mixed precision or not
