@@ -162,7 +162,8 @@ namespace quda
   public:
     template <typename ...U>
     HOSTDEVICE constexpr BlockReduce(KernelOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
-      checkKernelOp<BlockReduce_t, U...>();
+      //checkKernelOp<BlockReduce_t, U...>();
+      checkKernelOps<BlockReduce_t>(ops);
     }
 
     constexpr BlockReduce(const BlockReduce<T,block_dim,batch_size> &) = delete;

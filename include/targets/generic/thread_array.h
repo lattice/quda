@@ -43,7 +43,8 @@ namespace quda
       Smem(ops),
       array_(sharedMem()[target::thread_idx_linear<3>()])
     {
-      checkKernelOp<thread_array<T,n,O>,U...>();
+      //checkKernelOp<thread_array<T,n,O>,U...>();
+      checkKernelOps<thread_array<T,n,O>>(ops);
       array_ = array<T, n>{}; // call default constructor
     }
 

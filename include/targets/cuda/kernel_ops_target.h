@@ -6,9 +6,9 @@ namespace quda {
   // KernelOps
   template <typename ...T>
   struct KernelOps : KernelOps_Base<T...> {
-    template <typename ...U> constexpr void setKernelOps(const KernelOps<U...> &) {
-      static_assert(std::is_same_v<KernelOps<T...>,KernelOps<U...>>);
-    }
+    //template <typename ...U> constexpr void setKernelOps(const KernelOps<U...> &) {
+    //  static_assert(std::is_same_v<KernelOps<T...>,KernelOps<U...>>);
+    //}
   };
 
   // op implementations

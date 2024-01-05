@@ -73,7 +73,8 @@ namespace quda
     template <typename ...U>
     constexpr ThreadLocalCache(const KernelOps<U...> &ops) : Smem(ops), stride(target::block_size<3>())
     {
-      checkKernelOp<ThreadLocalCache<T,N,O>,U...>();
+      //checkKernelOp<ThreadLocalCache<T,N,O>,U...>();
+      checkKernelOps<ThreadLocalCache<T,N,O>>(ops);
       static_assert(shared_mem_size(dim3{32,16,8})==
 		    Smem::get_offset(dim3{32,16,8})+SizePerThread<len>::size(dim3{32,16,8})*sizeof(T));
     }

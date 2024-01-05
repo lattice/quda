@@ -90,9 +90,10 @@ namespace quda {
 
   // blockSync
   template <typename ...T>
-  inline void blockSync(const KernelOps<T...> &) {
+  inline void blockSync(const KernelOps<T...> &ops) {
     //static_assert(hasBlockSync<T...>);
-    checkKernelOp<op_blockSync,T...>();
+    //checkKernelOp<op_blockSync,T...>();
+    checkKernelOps<op_blockSync>(ops);
     //if (ops->ndi == nullptr) {
     //  errorQuda("KernelOps not set");
     //}
