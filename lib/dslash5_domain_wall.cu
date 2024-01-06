@@ -68,11 +68,9 @@ namespace quda
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const
     {
-      // FIXME: actually, the shared object is still constructed even if not used
-      if (mobius_m5::shared()) {
+      bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         // spin components in shared depend on inversion algorithm
-        bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-          || type == Dslash5Type::M5_INV_ZMOBIUS;
         int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() :
                                                            in.Nspin();
         return 2 * nSpin * nColor * sizeof(typename mapper<Float>::type);
@@ -84,7 +82,8 @@ namespace quda
     // overloaded to return max dynamic shared memory if doing shared-memory inverse
     unsigned int maxSharedBytesPerBlock() const
     {
-      if (mobius_m5::shared()) {
+      bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         return maxDynamicSharedBytesPerBlock();
       } else {
         return TunableKernel3D::maxSharedBytesPerBlock();
@@ -107,9 +106,8 @@ namespace quda
       xpay(a == 0.0 ? false : true),
       type(type)
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) { // only these actually use the shared mem though all still create the object
+      bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
       }
 
@@ -147,9 +145,8 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+      if (mobius_m5::shared() && isInv) {
         tp.set_max_shared_bytes = true; // if inverse kernel uses shared memory then maximize total shared memory pool
       }
 

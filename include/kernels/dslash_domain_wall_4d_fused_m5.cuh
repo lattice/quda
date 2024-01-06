@@ -54,14 +54,16 @@ namespace quda
     }
   };
 
+  constexpr bool domainWall4DFusedM5shared = true; // Use shared memory
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg_>
-  struct domainWall4DFusedM5 : dslash_default, d5Params<Arg_>::Ops  {
+  struct domainWall4DFusedM5 : dslash_default, d5Params<Arg_,domainWall4DFusedM5shared>::Ops  {
     using Arg = Arg_;
 
     static constexpr Dslash5Type dslash5_type = Arg::type;
+    static constexpr bool shared = domainWall4DFusedM5shared;
 
     const Arg &arg;
-    using typename d5Params<Arg_>::Ops::KernelOpsT;
+    using typename d5Params<Arg_,shared>::Ops::KernelOpsT;
     //constexpr domainWall4DFusedM5(const Arg &arg) : arg(arg) { }
     template <typename Ftor> constexpr domainWall4DFusedM5(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
@@ -84,8 +86,6 @@ namespace quda
       }
 
       Vector out;
-
-      constexpr bool shared = true; // Use shared memory
 
       // In the following `x_cb` are all passed as `x_cb = 0`, since it will not be used if `shared = true`, and `shared = true`
 

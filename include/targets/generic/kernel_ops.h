@@ -99,7 +99,8 @@ namespace quda
   template <typename T, typename... U>
   static constexpr bool hasKernelOp<T,KernelOps<U...>> = ( std::is_same_v<T,U> || ... );
 
-  template <typename... T, typename Ops> void checkKernelOps(const Ops &) {
+  // checkKernelOps
+  template <typename... T, typename Ops> static constexpr void checkKernelOps(const Ops &) {
     static_assert((hasKernelOp<T,typename Ops::KernelOpsT> || ...));
   }
 

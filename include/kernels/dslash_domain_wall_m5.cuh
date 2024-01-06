@@ -207,10 +207,11 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct d5Params {
+  template <typename Arg, bool shared = false> struct d5Params {
     using Vec = ColorSpinor<typename Arg::real, Arg::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = KernelOps<Cache>;
+    //using Ops = KernelOps<Cache>;
+    using Ops = std::conditional_t<shared, KernelOps<Cache>, NoKernelOps>;
   };
 
   template <bool allthreads, bool sync, bool dagger, bool shared, class Vector, class Ftor, Dslash5Type type = Ftor::Arg::type>
@@ -227,19 +228,21 @@ namespace quda
     if constexpr (mobius_m5::use_half_vector()) {
       // if using shared-memory caching then load spinor field for my site into cache
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
-      SharedMemoryCache<HalfVector> cache{ftor};
+      //SharedMemoryCache<HalfVector> cache{ftor};
+      using Cache = std::conditional_t<shared, SharedMemoryCache<HalfVector>, const Ftor &>;
+      Cache cache{ftor};
 
       { // forwards direction
         constexpr int proj_dir = dagger ? +1 : -1;
-        if (shared) {
-          if (sync) { cache.sync(); }
+        if constexpr (shared) {
+          if constexpr (sync) { cache.sync(); }
           cache.save(in.project(4, proj_dir));
           cache.sync();
         }
         const int fwd_s = (s + 1) % arg.Ls;
         const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
-        if (shared) {
+        if constexpr (shared) {
           half_in = cache.load(threadIdx.x, fwd_s, parity);
         } else {
 	  if (!allthreads || active) {
@@ -256,7 +259,7 @@ namespace quda
 
       { // backwards direction
         constexpr int proj_dir = dagger ? -1 : +1;
-        if (shared) {
+        if constexpr (shared) {
           cache.sync();
           cache.save(in.project(4, proj_dir));
           cache.sync();
@@ -264,7 +267,7 @@ namespace quda
         const int back_s = (s + arg.Ls - 1) % arg.Ls;
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
-        if (shared) {
+        if constexpr (shared) {
           half_in = cache.load(threadIdx.x, back_s, parity);
         } else {
 	  if (!allthreads || active) {
@@ -282,8 +285,11 @@ namespace quda
     } else { // use_half_vector
 
       // if using shared-memory caching then load spinor field for my site into cache
-      SharedMemoryCache<Vector> cache{ftor};
-      if (shared) {
+      //SharedMemoryCache<Vector> cache{ftor};
+      using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
+      Cache cache{ftor};
+
+      if constexpr (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);
         cache.sync();
@@ -375,6 +381,13 @@ namespace quda
     }
   };
 
+  template <typename Arg, bool shared = false> struct constantInvParams {
+    using Vec = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    //using Ops = KernelOps<Cache>;
+    using Ops = std::conditional_t<shared, KernelOps<Cache>, NoKernelOps>;
+  };
+
   /**
      @brief Apply the M5 inverse operator at a given site on the
      lattice.  This is the original algorithm as described in Kim and
@@ -400,8 +413,10 @@ namespace quda
     const auto inv = arg.inv;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    SharedMemoryCache<Vector> cache{ftor};
-    if (shared) {
+    //SharedMemoryCache<Vector> cache{ftor};
+    using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
+    Cache cache{ftor};
+    if constexpr (shared) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       if (sync) { cache.sync(); }
       cache.save(in);
@@ -434,6 +449,13 @@ namespace quda
     return out;
   }
 
+  template <typename Arg, bool shared = false> struct variableInvParams {
+    using Vec = ColorSpinor<typename Arg::real, Arg::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    //using Ops = KernelOps<Cache>;
+    using Ops = std::conditional_t<shared, KernelOps<Cache>, NoKernelOps>;
+  };
+
   /**
      @brief Apply the M5 inverse operator at a given site on the
      lattice.  This is an alternative algorithm that is applicable to
@@ -463,7 +485,9 @@ namespace quda
     Vector out;
 
     if constexpr (mobius_m5::use_half_vector()) {
-      SharedMemoryCache<HalfVector> cache{ftor};
+      //SharedMemoryCache<HalfVector> cache{ftor};
+      using Cache = std::conditional_t<shared, SharedMemoryCache<HalfVector>, const Ftor &>;
+      Cache cache{ftor};
 
       { // first do R
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -526,7 +550,9 @@ namespace quda
         out += l.reconstruct(4, proj_dir);
       }
     } else { // use_half_vector
-      SharedMemoryCache<Vector> cache{ftor};
+      //SharedMemoryCache<Vector> cache{ftor};
+      using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
+      Cache cache{ftor};
       if (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);
@@ -582,10 +608,13 @@ namespace quda
      @param[in] arg Argument struct containing any meta data and accessors
   */
   template <typename Arg> struct dslash5invParams {
-    static constexpr int Nc = mobius_m5::var_inverse() && mobius_m5::use_half_vector() ? 4 / 2 : 4;
-    using Vec = ColorSpinor<typename Arg::real, Arg::nColor, Nc>;
-    using Cache = SharedMemoryCache<Vec>;
-    using Ops = KernelOps<Cache>;
+    //static constexpr int Nc = mobius_m5::var_inverse() && mobius_m5::use_half_vector() ? 4 / 2 : 4;
+    //using Vec = ColorSpinor<typename Arg::real, Arg::nColor, Nc>;
+    //using Cache = SharedMemoryCache<Vec>;
+    //using Ops = KernelOps<Cache>;
+    using Ops = std::conditional_t<mobius_m5::var_inverse(),
+      typename variableInvParams<Arg,mobius_m5::shared()>::Ops,
+      typename constantInvParams<Arg,mobius_m5::shared()>::Ops>;
   };
 
   template <typename Arg_> struct dslash5inv : dslash5invParams<Arg_>::Ops {
