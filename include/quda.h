@@ -846,6 +846,9 @@ extern "C" {
                              Wilson/Symanzik flow */
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    double alpha1;        /**< The first coefficient used in HYP smearing */
+    double alpha2;        /**< The second coefficient used in HYP smearing */
+    double alpha3;        /**< The third coefficient used in HYP smearing */
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
     int dir_ignore; /**< The direction to be ignored by the smearing algorithm */
