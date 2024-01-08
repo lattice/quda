@@ -169,10 +169,10 @@ namespace quda
   }
 
   template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple &staple)
+  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[3])
   {
     using Link = typename get_type<Staple>::type;
-    staple = Link();
+    staple[0] = Link();
 
     thread_array<int, 4> dx = { };
 #pragma unroll
@@ -200,7 +200,7 @@ namespace quda
         dx[mu]--;
 
         // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-        staple = staple + U1 * U2 * conj(U3);
+        staple[0] = staple[0] + U1 * U2 * conj(U3);
       }
 
       {
@@ -219,7 +219,7 @@ namespace quda
         dx[nu]++;
 
         // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-        staple = staple + conj(U1) * U2 * U3;
+        staple[0] = staple[0] + conj(U1) * U2 * U3;
       }
     }
   }
@@ -268,7 +268,7 @@ namespace quda
           arg.tmp[dir / 2 + 2](dir % 2 * 3 + i, linkIndexShift(x, dx, X), parity) = TestU * U;
         }
       } else if constexpr (Arg::level == 3) {
-        computeStapleLevel3(arg, x, X, parity, dir, Stap[0]);
+        computeStapleLevel3(arg, x, X, parity, dir, Stap);
 
         TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap[0] * conj(U) * (arg.alpha / ((real)6.));
         polarSu3<real>(TestU, arg.tolerance);
@@ -337,7 +337,7 @@ namespace quda
   __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[2], int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
-    for (int i = 0; i < 1; ++i) staple[i] = Link();
+    staple[0] = Link();
 
     thread_array<int, 4> dx = { };
     int cnt = -1;
@@ -347,8 +347,6 @@ namespace quda
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
       if (nu == mu || nu == dir_ignore) continue;
-
-      cnt += 1;
 
       for (int rho = 0; rho < 4; ++rho) {
         if (rho == mu || rho == nu || rho == dir_ignore) continue;
@@ -371,7 +369,7 @@ namespace quda
           dx[mu]--;
 
           // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-          staple[cnt] = staple[cnt] + U1 * U2 * conj(U3);
+          staple[0] = staple[0] + U1 * U2 * conj(U3);
         }
 
         {
@@ -387,10 +385,10 @@ namespace quda
 
           // reset dx
           dx[mu]--;
-          dx[rho]++;
+          dx[nu]++;
 
           // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-          staple[cnt] = staple[cnt] + conj(U1) * U2 * U3;
+          staple[0] = staple[0] + conj(U1) * U2 * U3;
         }
       }
     }
