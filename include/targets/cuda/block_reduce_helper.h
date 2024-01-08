@@ -302,7 +302,7 @@ namespace quda
 
   template <typename T, int block_dim, int batch_size>
   struct block_reduce {
-    template <typename Ops> HostDevice inline block_reduce(Ops &) {};
+    template <typename Ops> HostDevice inline block_reduce(const Ops &) {};
     template <typename ...Arg> static constexpr size_t shared_mem_size(dim3 block) {
       return SizeBlockDivWarp::size(block) * sizeof(T);
     }
