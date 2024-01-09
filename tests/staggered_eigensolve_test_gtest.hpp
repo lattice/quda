@@ -12,7 +12,8 @@ public:
 };
 
 // Get the solve type that this combination corresponds to
-QudaSolveType get_solve_type(QudaBoolean use_norm_op, QudaBoolean use_pc, QudaBoolean compute_svd) {
+QudaSolveType get_solve_type(QudaBoolean use_norm_op, QudaBoolean use_pc, QudaBoolean compute_svd)
+{
   if (use_norm_op == QUDA_BOOLEAN_FALSE && use_pc == QUDA_BOOLEAN_TRUE && compute_svd == QUDA_BOOLEAN_FALSE)
     return QUDA_DIRECT_PC_SOLVE;
   else if (use_norm_op == QUDA_BOOLEAN_TRUE && use_pc == QUDA_BOOLEAN_FALSE && compute_svd == QUDA_BOOLEAN_TRUE)
@@ -37,8 +38,7 @@ bool skip_test(test_t test_param)
     // matpc
 
     // this is only legal for the staggered and asqtad op
-    if (!is_staggered(dslash_type))
-      return true;
+    if (!is_staggered(dslash_type)) return true;
 
     // we can only compute the real part for Lanczos, and real or magnitude for Arnoldi
     switch (eig_type) {
@@ -53,10 +53,9 @@ bool skip_test(test_t test_param)
     }
   } else if (combo_solve_type == QUDA_NORMOP_SOLVE) {
     // matdag_mat
-    
+
     // this is only legal for the staggered and asqtad op
-    if (!is_staggered(dslash_type))
-      return true;
+    if (!is_staggered(dslash_type)) return true;
 
     switch (eig_type) {
     case QUDA_EIG_TR_LANCZOS:
@@ -64,22 +63,22 @@ bool skip_test(test_t test_param)
       if (spectrum != QUDA_SPECTRUM_LR_EIG && spectrum != QUDA_SPECTRUM_SR_EIG) return true;
       break;
     case QUDA_EIG_IR_ARNOLDI:
-      //if (spectrum == QUDA_SPECTRUM_LI_EIG || spectrum == QUDA_SPECTRUM_SI_EIG) return true;
+      // if (spectrum == QUDA_SPECTRUM_LI_EIG || spectrum == QUDA_SPECTRUM_SI_EIG) return true;
       return true; // we skip this because it takes an unnecessarily long time and it's covered elsewhere
       break;
     default: return true; break;
     }
   } else if (combo_solve_type == QUDA_DIRECT_SOLVE) {
     // mat
-    
+
     switch (dslash_type) {
     case QUDA_STAGGERED_DSLASH:
       // only Arnoldi, imaginary part or magnitude works (real part is degenerate)
       // We skip SM because it takes an unnecessarily long time and it's
       // covered by HISQ
       if (eig_type != QUDA_EIG_IR_ARNOLDI) return true;
-      if (spectrum != QUDA_SPECTRUM_LI_EIG && spectrum != QUDA_SPECTRUM_SI_EIG &&
-            spectrum != QUDA_SPECTRUM_LM_EIG) return true;
+      if (spectrum != QUDA_SPECTRUM_LI_EIG && spectrum != QUDA_SPECTRUM_SI_EIG && spectrum != QUDA_SPECTRUM_LM_EIG)
+        return true;
       break;
     case QUDA_ASQTAD_DSLASH:
       // only Arnoldi, imaginary part or magnitude works (real part is degenerate)
@@ -150,7 +149,7 @@ auto hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG);
 auto non_hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG, QUDA_SPECTRUM_LM_EIG,
                                      QUDA_SPECTRUM_SM_EIG, QUDA_SPECTRUM_LI_EIG, QUDA_SPECTRUM_SI_EIG);
 
-//using test_t = ::testing::tuple<QudaEigType,          // different types of Lanczos/Arnoldi
+// using test_t = ::testing::tuple<QudaEigType,          // different types of Lanczos/Arnoldi
 //                                QudaBoolean,          // Norm op or not
 //                                QudaBoolean,          // Preconditioned op or not
 //                                QudaBoolean,          // SVD or not
@@ -167,7 +166,6 @@ INSTANTIATE_TEST_SUITE_P(NormalFull, StaggeredEigensolveTest,
                          ::testing::Combine(hermitian_solvers, Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_FALSE),
                                             Values(QUDA_BOOLEAN_TRUE), hermitian_spectrum),
                          gettestname);
-
 
 // full system direct solve
 INSTANTIATE_TEST_SUITE_P(DirectFull, StaggeredEigensolveTest,

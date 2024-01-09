@@ -81,15 +81,9 @@ struct StaggeredDslashTestWrapper {
     // compare to dslash reference implementation
     printfQuda("Calculating reference implementation...");
     switch (dtest_type) {
-    case dslash_test_type::Dslash:
-      stag_dslash(spinorRef, cpuFat, cpuLong, spinor, parity, dagger, dslash_type);
-      break;
-    case dslash_test_type::MatPC:
-      stag_matpc(spinorRef, cpuFat, cpuLong, spinor, mass, 0, parity, dslash_type);
-      break;
-    case dslash_test_type::Mat:
-      stag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
-      break;
+    case dslash_test_type::Dslash: stag_dslash(spinorRef, cpuFat, cpuLong, spinor, parity, dagger, dslash_type); break;
+    case dslash_test_type::MatPC: stag_matpc(spinorRef, cpuFat, cpuLong, spinor, mass, 0, parity, dslash_type); break;
+    case dslash_test_type::Mat: stag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type); break;
     case dslash_test_type::MatDagMat:
       stag_matdag_mat(spinorRef, cpuFat, cpuLong, spinor, mass, dagger, dslash_type);
       break;
@@ -214,7 +208,6 @@ struct StaggeredDslashTestWrapper {
 
     // set verbosity prior to loadGaugeQuda
     setVerbosity(verbosity);
-
   }
 
   void init()

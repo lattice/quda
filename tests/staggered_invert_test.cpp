@@ -122,8 +122,10 @@ void display_legacy_info()
   printfQuda("--test 2 -> --solve-type direct-pc --solution-type mat    --inv-type cg --matpc odd-odd\n");
   printfQuda("--test 3 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc even-even\n");
   printfQuda("--test 4 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc odd-odd\n");
-  printfQuda("--test 5 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc even-even --multishift 8\n");
-  printfQuda("--test 6 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc odd-odd   --multishift 8\n");
+  printfQuda(
+    "--test 5 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc even-even --multishift 8\n");
+  printfQuda(
+    "--test 6 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc odd-odd   --multishift 8\n");
 }
 
 GaugeField cpuFatQDP = {};
@@ -247,8 +249,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
   // schwarz parameters
   auto schwarz_param = ::testing::get<6>(param);
-  inv_param.schwarz_type           = ::testing::get<0>(schwarz_param);
-  inv_param.inv_type_precondition  = ::testing::get<1>(schwarz_param);
+  inv_param.schwarz_type = ::testing::get<0>(schwarz_param);
+  inv_param.inv_type_precondition = ::testing::get<1>(schwarz_param);
   inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
 
   inv_param.residual_type = ::testing::get<7>(param);
@@ -282,7 +284,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void*>(multishift));
+  std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
 
   // Staggered vector construct END
   //-----------------------------------------------------------------------------------
@@ -370,7 +372,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
       gflops[n] = inv_param.gflops / inv_param.secs;
       iter[n] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-                  inv_param.gflops / inv_param.secs);
+                 inv_param.gflops / inv_param.secs);
     }
   } else {
     inv_param.num_src = Nsrc;
@@ -392,7 +394,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
     inv_param.gflops /= comm_size() / num_sub_partition;
     quda::comm_allreduce_max(inv_param.secs);
     printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
-                inv_param.secs, inv_param.gflops / inv_param.secs);
+               inv_param.secs, inv_param.gflops / inv_param.secs);
   }
 
   // Free the multigrid solver
@@ -408,7 +410,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
       if (multishift > 1) {
         printfQuda("\nSource %d:\n", n);
         // Create an appropriate subset of the full out_multishift vector
-        std::vector<quda::ColorSpinorField> out_subset = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
+        std::vector<quda::ColorSpinorField> out_subset
+          = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
         res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
       } else {
         res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param);
@@ -439,7 +442,8 @@ int main(int argc, char **argv)
   add_multigrid_option_group(app);
   add_comms_option_group(app);
   add_testing_option_group(app);
-  app->add_option("--legacy-test-info", print_legacy_info, "Print info on how to reproduce the old '--test #' behavior with flags, then exit");
+  app->add_option("--legacy-test-info", print_legacy_info,
+                  "Print info on how to reproduce the old '--test #' behavior with flags, then exit");
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -468,10 +472,8 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type))
-      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
-    if (!is_staggered(dslash_type))
-      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
   // Need to add support for LAPLACE MG?
@@ -490,12 +492,24 @@ int main(int argc, char **argv)
     // the staggered tests will fail. These checks are designed to be consistent
     // with what's in [src]/tests/CMakeFiles.txt, which have been "sanity checked"
     bool changes = false;
-    if (!compute_fatlong) { compute_fatlong = true; changes = true; }
+    if (!compute_fatlong) {
+      compute_fatlong = true;
+      changes = true;
+    }
 
     double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-5 : 1e-6;
-    if (tol != expected_tol) { tol = expected_tol; changes = true; }
-    if (tol_hq != expected_tol) { tol_hq = expected_tol; changes = true; }
-    if (niter != 1000) { niter = 1000; changes = true; }
+    if (tol != expected_tol) {
+      tol = expected_tol;
+      changes = true;
+    }
+    if (tol_hq != expected_tol) {
+      tol_hq = expected_tol;
+      changes = true;
+    }
+    if (niter != 1000) {
+      niter = 1000;
+      changes = true;
+    }
 
     if (changes) {
       printfQuda("For gtest, various defaults are changed:\n");

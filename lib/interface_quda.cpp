@@ -3014,7 +3014,7 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
 template <class Interface, class... Args>
 void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
                       void *h_gauge, void *milc_fatlinks, void *milc_longlinks,
-                      QudaGaugeParam *gauge_param_,     // gauge field pointers
+                      QudaGaugeParam *gauge_param_,    // gauge field pointers
                       void *h_clover, void *h_clovinv, // clover field pointers
                       Interface op, Args... args)
 {
@@ -3036,8 +3036,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
   // Create a local copy of gauge_param that we can modify without perturbing
   // the original one
-  if (!gauge_param_)
-    errorQuda("Input gauge_param is null");
+  if (!gauge_param_) errorQuda("Input gauge_param is null");
   QudaGaugeParam gauge_param = *gauge_param_;
 
   if (num_sub_partition == 1) { // In this case we don't split the grid.
@@ -3069,8 +3068,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     } else if (milc_fatlinks) {
       is_staggered = true;
       if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
-        if (!milc_longlinks)
-          errorQuda("milc_longlinks is null for an asqtad dslash");
+        if (!milc_longlinks) errorQuda("milc_longlinks is null for an asqtad dslash");
         is_asqtad = true;
       }
     } else {
@@ -3239,7 +3237,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       loadGaugeQuda(collected_gauge.raw_pointer(), &gauge_param);
     } else {
       loadFatLongGaugeQuda(param, &gauge_param, collected_milc_fatlink_field.raw_pointer(),
-        (is_asqtad) ? collected_milc_longlink_field.raw_pointer() : nullptr);
+                           (is_asqtad) ? collected_milc_longlink_field.raw_pointer() : nullptr);
     }
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
 

@@ -41,7 +41,7 @@ struct HisqStencilTestWrapper {
   static inline std::array<std::array<double, 6>, 3> act_paths;
 
   // initial links in MILC order
-  static inline void* milc_sitelink = nullptr;
+  static inline void *milc_sitelink = nullptr;
 
   // storage for CPU reference fat and long links w/zero Naik
   static inline void *fat_reflink[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -69,7 +69,8 @@ struct HisqStencilTestWrapper {
   static inline void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
   static inline void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
 
-  void set_naik(bool has_naik) {
+  void set_naik(bool has_naik)
+  {
     if (has_naik) {
       eps_naik = -0.03; // semi-arbitrary
       n_naiks = 2;
@@ -79,7 +80,8 @@ struct HisqStencilTestWrapper {
     }
   }
 
-  void init_ctest(QudaPrecision prec_, QudaReconstructType link_recon_, bool has_naik) {
+  void init_ctest(QudaPrecision prec_, QudaReconstructType link_recon_, bool has_naik)
+  {
     prec = prec_;
     link_recon = link_recon_;
 
@@ -101,7 +103,8 @@ struct HisqStencilTestWrapper {
     init();
   }
 
-  void init_test() {
+  void init_test()
+  {
     gauge_param = newQudaGaugeParam();
     setStaggeredGaugeParam(gauge_param);
 
@@ -113,7 +116,8 @@ struct HisqStencilTestWrapper {
     init();
   }
 
-  void init_host() {
+  void init_host()
+  {
     setDims(gauge_param.X);
     dw_setDims(gauge_param.X, 1);
 
@@ -142,12 +146,12 @@ struct HisqStencilTestWrapper {
     // Second path: create X, long links
     act_paths[1] = {
       ((1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0)), /* one link */
-                                                        /* One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik */
-      (-1.0 / 24.0),                                    /* Naik */
-      (-1.0 / 8.0) * 0.5,                               /* simple staple */
-      (1.0 / 8.0) * 0.25 * 0.5,                         /* displace link in two directions */
-      (-1.0 / 8.0) * 0.125 * (1.0 / 6.0),               /* displace link in three directions */
-      (-2.0 / 16.0)                                     /* Lepage term, correct O(a^2) 2x ASQTAD */
+      /* One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik */
+      (-1.0 / 24.0),                      /* Naik */
+      (-1.0 / 8.0) * 0.5,                 /* simple staple */
+      (1.0 / 8.0) * 0.25 * 0.5,           /* displace link in two directions */
+      (-1.0 / 8.0) * 0.125 * (1.0 / 6.0), /* displace link in three directions */
+      (-2.0 / 16.0)                       /* Lepage term, correct O(a^2) 2x ASQTAD */
     };
 
     // Paths for epsilon corrections. Not used if n_naiks = 1.
@@ -165,7 +169,7 @@ struct HisqStencilTestWrapper {
     ////////////////////////////////////
 
     setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
-                              svd_abs_error);
+                               svd_abs_error);
 
     /////////////////
     // Input links //
@@ -214,7 +218,8 @@ struct HisqStencilTestWrapper {
 #endif
   }
 
-  void init() {
+  void init()
+  {
 
     // reset the reconstruct in gauge param
     gauge_param.reconstruct = link_recon;
@@ -245,7 +250,8 @@ struct HisqStencilTestWrapper {
     }
   }
 
-  static void end() {
+  static void end()
+  {
     if (milc_sitelink) host_free(milc_sitelink);
 
     // Clean up GPU compute links
@@ -262,7 +268,8 @@ struct HisqStencilTestWrapper {
     freeGaugeQuda();
   }
 
-  static void destroy() {
+  static void destroy()
+  {
 
     for (int i = 0; i < 4; i++) {
       host_free(fat_reflink[i]);
@@ -292,7 +299,8 @@ struct HisqStencilTestWrapper {
   // X -- after 2nd level of smearing, non-SU(3)
   /*--------------------------------------------------------------------*/
 
-  double llfatCUDA(int niter) {
+  double llfatCUDA(int niter)
+  {
     host_timer_t host_timer;
 
     comm_barrier();
@@ -337,7 +345,8 @@ struct HisqStencilTestWrapper {
     return host_timer.last();
   }
 
-  void run_test(int niter, bool print_metrics = false) {
+  void run_test(int niter, bool print_metrics = false)
+  {
     //////////////////////
     // Perform GPU test //
     //////////////////////
@@ -357,26 +366,26 @@ struct HisqStencilTestWrapper {
     if (print_metrics) {
       // FIXME: does not include unitarization, extra naiks
       int volume = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3];
-      //long long flops = 61632 * (long long)niter; // Constructing V field
+      // long long flops = 61632 * (long long)niter; // Constructing V field
       // Constructing W field?
       // Constructing separate Naiks
-      //flops += 61632 * (long long)niter;     // Constructing X field
-      //flops += (252 * 4) * (long long)niter; // long-link contribution
+      // flops += 61632 * (long long)niter;     // Constructing X field
+      // flops += (252 * 4) * (long long)niter; // long-link contribution
 
       printfQuda("%fus per HISQ link build\n", 1e6 * secs / niter);
 
       printfQuda("%llu flops per HISQ link build, %llu flops per site %llu bytes per site\n", flops / niter,
-                    (flops / niter) / volume, (bytes / niter) / volume);
+                 (flops / niter) / volume, (bytes / niter) / volume);
 
       double gflops = 1.0e-9 * flops / secs;
-        printfQuda("GFLOPS = %f\n", gflops);
+      printfQuda("GFLOPS = %f\n", gflops);
 
       double gbytes = 1.0e-9 * bytes / secs;
-        printfQuda("GBYTES = %f\n", gbytes);
+      printfQuda("GBYTES = %f\n", gbytes);
 
       // Old metric
-      //double perf = flops / (secs * 1024 * 1024 * 1024);
-      //printfQuda("link computation time =%.2f ms, flops= %.2f Gflops\n", (secs * 1000) / niter, perf);
+      // double perf = flops / (secs * 1024 * 1024 * 1024);
+      // printfQuda("link computation time =%.2f ms, flops= %.2f Gflops\n", (secs * 1000) / niter, perf);
     }
   }
 
@@ -407,8 +416,8 @@ struct HisqStencilTestWrapper {
     if (n_naiks > 1) {
       for (int dir = 0; dir < 4; dir++) {
         res[0] = std::max(res[0],
-          compare_floats_v2(fat_reflink_eps[dir], qdp_fatlink_eps[dir], V * gauge_site_size, max_dev,
-                            gauge_param.cpu_prec));
+                          compare_floats_v2(fat_reflink_eps[dir], qdp_fatlink_eps[dir], V * gauge_site_size, max_dev,
+                                            gauge_param.cpu_prec));
       }
 
       strong_check_link(qdp_fatlink_eps, "Fat link GPU results: ", fat_reflink_eps, "CPU reference results:", V,
@@ -416,32 +425,35 @@ struct HisqStencilTestWrapper {
 
       for (int dir = 0; dir < 4; ++dir) {
         res[1] = std::max(res[1],
-          compare_floats_v2(long_reflink_eps[dir], qdp_longlink_eps[dir], V * gauge_site_size, max_dev,
-                            gauge_param.cpu_prec));
+                          compare_floats_v2(long_reflink_eps[dir], qdp_longlink_eps[dir], V * gauge_site_size, max_dev,
+                                            gauge_param.cpu_prec));
       }
 
       strong_check_link(qdp_longlink_eps, "Long link GPU results: ", long_reflink_eps, "CPU reference results:", V,
                         gauge_param.cpu_prec);
     } else {
       for (int dir = 0; dir < 4; dir++) {
-        res[0] = std::max(res[0],
+        res[0] = std::max(
+          res[0],
           compare_floats_v2(fat_reflink[dir], qdp_fatlink[dir], V * gauge_site_size, max_dev, gauge_param.cpu_prec));
       }
 
-      strong_check_link(qdp_fatlink, "Fat link GPU results: ", fat_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
+      strong_check_link(qdp_fatlink, "Fat link GPU results: ", fat_reflink, "CPU reference results:", V,
+                        gauge_param.cpu_prec);
 
       for (int dir = 0; dir < 4; ++dir) {
-        res[1] = std::max(res[1],
+        res[1] = std::max(
+          res[1],
           compare_floats_v2(long_reflink[dir], qdp_longlink[dir], V * gauge_site_size, max_dev, gauge_param.cpu_prec));
       }
 
-      strong_check_link(qdp_longlink, "Long link GPU results: ", long_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
+      strong_check_link(qdp_longlink, "Long link GPU results: ", long_reflink, "CPU reference results:", V,
+                        gauge_param.cpu_prec);
     }
 
     printfQuda("Fat link test %s\n", (res[0] < max_dev) ? "PASSED" : "FAILED");
     printfQuda("Long link test %s\n", (res[1] < max_dev) ? "PASSED" : "FAILED");
 
     return res;
-
   }
 };

@@ -92,7 +92,7 @@ namespace quda
 
       // Lambda that returns mat_norm for LR and returns the relevant alpha
       // (the corresponding Ritz value) for SR
-      auto check_norm = [&] (double sr_norm) -> double {
+      auto check_norm = [&](double sr_norm) -> double {
         if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
           return mat_norm;
         else

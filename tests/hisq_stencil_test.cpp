@@ -7,30 +7,29 @@ class HisqStencilTest : public ::testing::Test
 protected:
   HisqStencilTestWrapper hisq_stencil_test_wrapper;
 
-  void display_test_info() {
+  void display_test_info()
+  {
     printfQuda("running the following test:\n");
-    printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Ordering\n");
+    printfQuda(
+      "link_precision           link_reconstruct           space_dimension        T_dimension       Ordering\n");
     printfQuda("%s                       %s                         %d/%d/%d/                  %d             %s \n",
-              get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order));
+               get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order));
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-              dimPartitioned(3));
+               dimPartitioned(3));
     printfQuda("Number of Naiks: %d\n", n_naiks);
   }
 
 public:
-  virtual void SetUp() {
+  virtual void SetUp()
+  {
     hisq_stencil_test_wrapper.init_test();
     display_test_info();
   }
 
-  virtual void TearDown() {
-    hisq_stencil_test_wrapper.end();
-  }
+  virtual void TearDown() { hisq_stencil_test_wrapper.end(); }
 
-  static void SetUpTestCase() {
-    initQuda(device_ordinal);
-  }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
@@ -42,10 +41,7 @@ public:
   }
 };
 
-TEST_F(HisqStencilTest, benchmark)
-{
-  hisq_stencil_test_wrapper.run_test(niter, /**show_metrics =*/true);
-}
+TEST_F(HisqStencilTest, benchmark) { hisq_stencil_test_wrapper.run_test(niter, /**show_metrics =*/true); }
 
 TEST_F(HisqStencilTest, verify)
 {

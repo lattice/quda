@@ -178,13 +178,12 @@ std::vector<double> eigensolve(test_t test_param)
   }
 
   logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
-          get_dslash_str(dslash_type),
-          get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          get_dslash_str(dslash_type), get_eig_type_str(eig_param.eig_type),
+          eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
 
-  if (!enable_testing || (enable_testing && getVerbosity() >= QUDA_VERBOSE))
-    display_test_info(eig_param);
+  if (!enable_testing || (enable_testing && getVerbosity() >= QUDA_VERBOSE)) display_test_info(eig_param);
 
   // Vector construct START
   //----------------------------------------------------------------------------
@@ -228,7 +227,8 @@ std::vector<double> eigensolve(test_t test_param)
     for (int i = 0; i < eig_n_conv; i++) {
       if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
         double _Complex sigma = evals[i];
-        residua[i] = verifyStaggeredTypeSingularVector(evecs[i], evecs[i + eig_n_conv], sigma, i, eig_param, cpuFatQDP, cpuLongQDP);
+        residua[i] = verifyStaggeredTypeSingularVector(evecs[i], evecs[i + eig_n_conv], sigma, i, eig_param, cpuFatQDP,
+                                                       cpuLongQDP);
       } else {
         double _Complex lambda = evals[i];
         residua[i] = verifyStaggeredTypeEigenvector(evecs[i], lambda, i, eig_param, cpuFatQDP, cpuLongQDP);
@@ -277,10 +277,8 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type))
-      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
-    if (!is_staggered(dslash_type))
-      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
   if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
@@ -288,10 +286,11 @@ int main(int argc, char **argv)
   }
 
   // Sanity check combinations of solve type and solution type
-  if ((solve_type == QUDA_DIRECT_SOLVE && solution_type != QUDA_MAT_SOLUTION) ||
-    (solve_type == QUDA_DIRECT_PC_SOLVE && solution_type != QUDA_MATPC_SOLUTION) ||
-    (solve_type == QUDA_NORMOP_SOLVE && solution_type != QUDA_MATDAG_MAT_SOLUTION)) {
-    errorQuda("Invalid combination of solve_type %s and solution_type %s", get_solve_str(solve_type), get_solution_str(solution_type));
+  if ((solve_type == QUDA_DIRECT_SOLVE && solution_type != QUDA_MAT_SOLUTION)
+      || (solve_type == QUDA_DIRECT_PC_SOLVE && solution_type != QUDA_MATPC_SOLUTION)
+      || (solve_type == QUDA_NORMOP_SOLVE && solution_type != QUDA_MATDAG_MAT_SOLUTION)) {
+    errorQuda("Invalid combination of solve_type %s and solution_type %s", get_solve_str(solve_type),
+              get_solution_str(solution_type));
   }
 
   initQuda(device_ordinal);
@@ -301,12 +300,24 @@ int main(int argc, char **argv)
     // the staggered tests will fail. These checks are designed to be consistent
     // with what's in [src]/tests/CMakeFiles.txt, which have been "sanity checked"
     bool changes = false;
-    if (!compute_fatlong) { compute_fatlong = true; changes = true; }
+    if (!compute_fatlong) {
+      compute_fatlong = true;
+      changes = true;
+    }
 
     double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-4 : 1e-5;
-    if (eig_tol != expected_tol) { eig_tol = expected_tol; changes = true; }
-    if (niter != 1000) { niter = 1000; changes = true; }
-    if (eig_n_kr != 256) { eig_n_kr = 256; changes = true; }
+    if (eig_tol != expected_tol) {
+      eig_tol = expected_tol;
+      changes = true;
+    }
+    if (niter != 1000) {
+      niter = 1000;
+      changes = true;
+    }
+    if (eig_n_kr != 256) {
+      eig_n_kr = 256;
+      changes = true;
+    }
     if (eig_block_size != 4) { eig_block_size = 4; }
 
     if (changes) {

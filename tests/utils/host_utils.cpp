@@ -339,7 +339,7 @@ bool is_normal_solve(QudaInverterType inv_type, QudaSolveType solve_type)
 
 bool is_hermitian_solver(QudaInverterType type)
 {
-  switch(type) {
+  switch (type) {
   case QUDA_CG_INVERTER:
   case QUDA_CA_CG_INVERTER: return true;
   default: return false;

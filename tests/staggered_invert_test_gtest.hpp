@@ -30,26 +30,29 @@ bool skip_test(test_t param)
   if (prec < prec_sloppy) return true;              // outer precision >= sloppy precision
   if (!(QUDA_PRECISION & prec_sloppy)) return true; // precision not enabled so skip it
   if (!(QUDA_PRECISION & prec_precondition) && prec_precondition != QUDA_INVALID_PRECISION)
-    return true; // precision not enabled so skip it
+    return true;                                    // precision not enabled so skip it
   if (prec_sloppy < prec_precondition) return true; // sloppy precision >= preconditioner precision
 
   // Skip if the inverter does not support batched update and batched update is greater than one
   if (!support_solution_accumulator_pipeline(inverter_type) && solution_accumulator_pipeline > 1) return true;
   // There's no MLocal or MdagMLocal support yet, this is left in for reference
-  //if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ)
+  // if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ)
   //  if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
 
   if (is_laplace(dslash_type)) {
     if (multishift > 1) return true; // Laplace doesn't support multishift
-    if (solution_type != QUDA_MAT_SOLUTION || solve_type != QUDA_DIRECT_SOLVE) return true; // Laplace only supports direct solves
+    if (solution_type != QUDA_MAT_SOLUTION || solve_type != QUDA_DIRECT_SOLVE)
+      return true; // Laplace only supports direct solves
   }
 
   if (is_staggered(dslash_type)) {
     // the staggered and asqtad operators aren't HPD
-    if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && is_hermitian_solver(inverter_type)) return true;
+    if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && is_hermitian_solver(inverter_type))
+      return true;
 
     // MR struggles with the staggered and asqtad spectrum, it's not MR's fault
-    if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_MR_INVERTER) return true;
+    if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_MR_INVERTER)
+      return true;
   }
 
   // split-grid doesn't support multigrid at present
@@ -87,19 +90,16 @@ TEST_P(StaggeredInvertTest, verify)
   if (solution_type == QUDA_MAT_SOLUTION) {
     if (solve_type == QUDA_DIRECT_PC_SOLVE)
       verify_tol /= (0.5 * mass); // to solve the full operator to eps, solve the preconditioned to mass * eps
-    if (solve_type == QUDA_NORMOP_SOLVE)
-      verify_tol /= (0.5 * mass); // a proxy for the condition number
+    if (solve_type == QUDA_NORMOP_SOLVE) verify_tol /= (0.5 * mass); // a proxy for the condition number
   }
 
   // The power iterations method of determining the Chebyshev window
   // breaks down due to the nature of the spectrum of the direct operator
   auto ca_basis_tmp = inv_param.ca_basis;
-  if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER)
-    inv_param.ca_basis = QUDA_POWER_BASIS;
+  if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER) inv_param.ca_basis = QUDA_POWER_BASIS;
 
   // Single precision needs a tiny bump due to small host/device precision deviations
-  if (prec == QUDA_SINGLE_PRECISION)
-    verify_tol *= 1.01;
+  if (prec == QUDA_SINGLE_PRECISION) verify_tol *= 1.01;
 
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], verify_tol); }
@@ -136,14 +136,14 @@ using ::testing::Combine;
 using ::testing::Values;
 
 auto staggered_pc_solvers
-  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER, QUDA_GCR_INVERTER,
-           QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
+  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER, QUDA_GCR_INVERTER, QUDA_CA_GCR_INVERTER,
+           QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
 
 auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER);
 
-auto direct_solvers
-  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
-           QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
+auto direct_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER,
+                             QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER, QUDA_CA_GCR_INVERTER,
+                             QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
 
 auto sloppy_precisions
   = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION);
@@ -166,8 +166,9 @@ INSTANTIATE_TEST_SUITE_P(EvenOdd, StaggeredInvertTest,
 
 // full system normal solve
 INSTANTIATE_TEST_SUITE_P(NormalFull, StaggeredInvertTest,
-                         Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION, QUDA_MAT_SOLUTION), Values(QUDA_NORMOP_SOLVE),
-                                 sloppy_precisions, Values(1), solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
+                         Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION, QUDA_MAT_SOLUTION),
+                                 Values(QUDA_NORMOP_SOLVE), sloppy_precisions, Values(1),
+                                 solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
 // full system direct solve
@@ -178,23 +179,22 @@ INSTANTIATE_TEST_SUITE_P(Full, StaggeredInvertTest,
 
 // preconditioned multi-shift solves
 INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, StaggeredInvertTest,
-                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION),
-                                 Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(10),
-                                 solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
+                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION), Values(QUDA_DIRECT_PC_SOLVE),
+                                 sloppy_precisions, Values(10), solution_accumulator_pipelines, no_schwarz,
+                                 no_heavy_quark),
                          gettestname);
 
 // Heavy-Quark preconditioned solves
 INSTANTIATE_TEST_SUITE_P(HeavyQuarkEvenOdd, StaggeredInvertTest,
-                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION),
-                                 Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(1),
-                                 solution_accumulator_pipelines, no_schwarz,
+                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION), Values(QUDA_DIRECT_PC_SOLVE),
+                                 sloppy_precisions, Values(1), solution_accumulator_pipelines, no_schwarz,
                                  Values(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL, QUDA_HEAVY_QUARK_RESIDUAL)),
                          gettestname);
 
 // These are left in but commented out for future reference
 
 // Schwarz-preconditioned normal solves
-//INSTANTIATE_TEST_SUITE_P(SchwarzNormal, StaggeredInvertTest,
+// INSTANTIATE_TEST_SUITE_P(SchwarzNormal, StaggeredInvertTest,
 //                         Combine(Values(QUDA_PCG_INVERTER), Values(QUDA_MATPCDAG_MATPC_SOLUTION),
 //                                 Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(1),
 //                                 solution_accumulator_pipelines,
@@ -204,11 +204,10 @@ INSTANTIATE_TEST_SUITE_P(HeavyQuarkEvenOdd, StaggeredInvertTest,
 //                         gettestname);
 
 // Schwarz-preconditioned direct solves
-//INSTANTIATE_TEST_SUITE_P(SchwarzEvenOdd, StaggeredInvertTest,
+// INSTANTIATE_TEST_SUITE_P(SchwarzEvenOdd, StaggeredInvertTest,
 //                         Combine(Values(QUDA_GCR_INVERTER), Values(QUDA_MATPC_SOLUTION), Values(QUDA_DIRECT_PC_SOLVE),
 //                                 sloppy_precisions, Values(1), solution_accumulator_pipelines,
 //                                 Combine(Values(QUDA_ADDITIVE_SCHWARZ), Values(QUDA_MR_INVERTER, QUDA_CA_GCR_INVERTER),
 //                                         Values(QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION)),
 //                                 no_heavy_quark),
 //                         gettestname);
-

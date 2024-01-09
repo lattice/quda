@@ -743,15 +743,19 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   return l2r;
 }
 
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out, quda::GaugeField &fat_link,
-                                quda::GaugeField &long_link, QudaInvertParam &inv_param) {
+std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
+                                               quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                               QudaInvertParam &inv_param)
+{
   std::vector<quda::ColorSpinorField> out_vector(1);
   out_vector[0] = out;
   return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param);
 }
 
-std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::vector<quda::ColorSpinorField> &out_vector,
-                                               quda::GaugeField &fat_link, quda::GaugeField &long_link, QudaInvertParam &inv_param)
+std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
+                                               std::vector<quda::ColorSpinorField> &out_vector,
+                                               quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                               QudaInvertParam &inv_param)
 {
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   double l2r_max = 0.0;
@@ -762,8 +766,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
   quda::ColorSpinorField ref(csParam);
 
   if (multishift > 1) {
-    if (dslash_type == QUDA_LAPLACE_DSLASH)
-      errorQuda("Multishift solves do not support the laplace operator (yet)");
+    if (dslash_type == QUDA_LAPLACE_DSLASH) errorQuda("Multishift solves do not support the laplace operator (yet)");
 
     if (inv_param.solution_type != QUDA_MATPC_SOLUTION)
       errorQuda("Invalid staggered multishift solution type %d, expected QUDA_MATPC_SOLUTION", inv_param.solution_type);
@@ -771,13 +774,13 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
     // Check the mat_pc type and make sure it's sane
     QudaParity parity = QUDA_INVALID_PARITY;
     switch (inv_param.matpc_type) {
-      case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
-      case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
-      default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
+    case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
+    case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
+    default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
     }
 
     for (int i = 0; i < multishift; i++) {
-      auto& out = out_vector[i];
+      auto &out = out_vector[i];
       double mass = 0.5 * sqrt(inv_param.offset[i]);
       stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
 
@@ -789,9 +792,9 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
 
       printfQuda("%dth solution: mass=%f, ", i, mass);
       printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, "
-                "QUDA = %9.6e, host = %9.6e\n",
-                i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r,
-                inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+                 "QUDA = %9.6e, host = %9.6e\n",
+                 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
+                 inv_param.true_res_hq_offset[i], hqr);
       // Empirical: if the cpu residue is more than 1 order the target accuracy, then it fails to converge
       if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[i]) {
         printfQuda("Shift %2d has empirically failed to converge\n", i);
@@ -802,20 +805,19 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
     }
 
   } else {
-    auto& out = out_vector[0];
+    auto &out = out_vector[0];
     double mass = inv_param.mass;
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
       stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
 
       // correct for the massRescale function inside invertQuda
-      if (is_laplace(dslash_type))
-        ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
+      if (is_laplace(dslash_type)) ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
       QudaParity parity = QUDA_INVALID_PARITY;
       switch (inv_param.matpc_type) {
-        case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
-        case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
-        default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
+      case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
+      case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
+      default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
       }
       stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
     } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
@@ -831,8 +833,8 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
     double l2r = sqrt(nrm2 / src2);
 
     printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, "
-                "host = %9.6e\n",
-                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+               "host = %9.6e\n",
+               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
     l2r_max = l2r;
     hqr_max = hqr;
@@ -841,10 +843,10 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, std::
   return {l2r_max, hqr_max};
 }
 
-double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Complex lambda, int i,
-                                   QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
+double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Complex lambda, int i,
+                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
 {
-  QudaInvertParam& inv_param = *(eig_param.invert_param);
+  QudaInvertParam &inv_param = *(eig_param.invert_param);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
   bool normop = (eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? true : false);
@@ -853,11 +855,15 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Co
   // Reverse engineer a "solution_type" to help determine which host dslash needs to be applied
   QudaSolutionType sol_type = QUDA_INVALID_SOLUTION;
   if (normop) {
-    if (use_pc) errorQuda("The normal preconditioned staggered op is not supported");
-    else sol_type = QUDA_MATDAG_MAT_SOLUTION;
+    if (use_pc)
+      errorQuda("The normal preconditioned staggered op is not supported");
+    else
+      sol_type = QUDA_MATDAG_MAT_SOLUTION;
   } else {
-    if (use_pc) sol_type = QUDA_MATPC_SOLUTION;
-    else sol_type = QUDA_MAT_SOLUTION;
+    if (use_pc)
+      sol_type = QUDA_MATPC_SOLUTION;
+    else
+      sol_type = QUDA_MAT_SOLUTION;
   }
 
   // Create temporary spinors
@@ -869,9 +875,9 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Co
   } else if (sol_type == QUDA_MATPC_SOLUTION) {
     QudaParity parity = QUDA_INVALID_PARITY;
     switch (inv_param.matpc_type) {
-      case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
-      case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
-      default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
+    case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
+    case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
+    default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
     }
     stag_matpc(ref, fat_link, long_link, spinor, mass, 0, parity, dslash_type);
   } else if (sol_type == QUDA_MATDAG_MAT_SOLUTION) {
@@ -889,16 +895,16 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField& spinor, double _Co
   return l2r;
 }
 
-double verifyStaggeredTypeSingularVector(quda::ColorSpinorField& spinor_left, quda::ColorSpinorField &spinor_right, double _Complex sigma, int i,
-                                         QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
+double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, quda::ColorSpinorField &spinor_right,
+                                         double _Complex sigma, int i, QudaEigParam &eig_param,
+                                         quda::GaugeField &fat_link, quda::GaugeField &long_link)
 {
-  QudaInvertParam& inv_param = *(eig_param.invert_param);
+  QudaInvertParam &inv_param = *(eig_param.invert_param);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
   double mass = inv_param.mass;
 
-  if (use_pc)
-    errorQuda("The SVD of the preconditioned staggered op is not supported");
+  if (use_pc) errorQuda("The SVD of the preconditioned staggered op is not supported");
 
   // Create temporary spinors
   quda::ColorSpinorParam csParam(spinor_left);

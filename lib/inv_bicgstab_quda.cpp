@@ -216,14 +216,13 @@ namespace quda {
     bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n",
-                 blas::norm2(x), blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p),
-                 blas::norm2(r0), blas::norm2(t));
+      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x), blas::norm2(r_sloppy),
+                 blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
 
     // track if we just performed an exact recalculation of y, r, r2
     bool just_updated = false;
 
-    while ( !converged && k < param.maxiter) {
+    while (!converged && k < param.maxiter) {
       just_updated = false;
 
       matSloppy(v, p);
@@ -253,7 +252,7 @@ namespace quda {
         double s2 = blas::norm2(r_sloppy);
         Complex r0t = blas::cDotProduct(r0, t);
         beta = -r0t / r0v;
-        r2 = s2 - real(omega * conj(tr)) ;
+        r2 = s2 - real(omega * conj(tr));
         // now we can work out if we need to do a reliable update
         updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
       } else {
@@ -263,24 +262,24 @@ namespace quda {
       }
 
       if (param.pipeline && !updateR) {
-        //x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
+        // x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
         blas::caxpbypzYmbw(alpha, p, omega, r_sloppy, x_sloppy, t);
-        blas::cxpaypbz(r_sloppy, -beta*omega, v, beta, p);
-        //tripleBiCGstabUpdate(alpha, p, omega, r_sloppy, x_sloppy, t, -beta*omega, v, beta, p
+        blas::cxpaypbz(r_sloppy, -beta * omega, v, beta, p);
+        // tripleBiCGstabUpdate(alpha, p, omega, r_sloppy, x_sloppy, t, -beta*omega, v, beta, p
       } else {
-        //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
+        // x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
         rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, r_sloppy, x_sloppy, t, r0);
         rho0 = rho;
         rho = Complex(rho_r2.x, rho_r2.y);
         r2 = rho_r2.z;
       }
 
-      if (use_heavy_quark_res && k % heavy_quark_check==0) {
+      if (use_heavy_quark_res && k % heavy_quark_check == 0) {
         if (&x != &x_sloppy) {
-           heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x_sloppy, r_sloppy).z);
+          heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x_sloppy, r_sloppy).z);
         } else {
-           blas::copy(r, r_sloppy);
-           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+          blas::copy(r, r_sloppy);
+          heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
         }
       }
 
@@ -309,7 +308,7 @@ namespace quda {
         rNorm = sqrt(r2);
         maxrr = rNorm;
         maxrx = rNorm;
-        //r0Norm = rNorm;
+        // r0Norm = rNorm;
         rUpdate++;
 
         just_updated = true;
@@ -319,9 +318,8 @@ namespace quda {
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n",
-          blas::norm2(x), blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p),
-          blas::norm2(r0), blas::norm2(t));
+        printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x), blas::norm2(r_sloppy),
+                   blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
 
       converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
@@ -347,7 +345,7 @@ namespace quda {
           rNorm = sqrt(r2);
           maxrr = rNorm;
           maxrx = rNorm;
-          //r0Norm = rNorm;
+          // r0Norm = rNorm;
           rUpdate++;
 
           just_updated = true;
@@ -362,9 +360,11 @@ namespace quda {
 
       // update p
       if ((!param.pipeline || updateR) && !converged) { // need to update if not pipeline or did a reliable update
-        if (abs(rho*alpha) == 0.0) beta = 0.0;
-        else beta = (rho/rho0) * (alpha/omega);
-        blas::cxpaypbz(r_sloppy, -beta*omega, v, beta, p);
+        if (abs(rho * alpha) == 0.0)
+          beta = 0.0;
+        else
+          beta = (rho / rho0) * (alpha / omega);
+        blas::cxpaypbz(r_sloppy, -beta * omega, v, beta, p);
       }
     }
 

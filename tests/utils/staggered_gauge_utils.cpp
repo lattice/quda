@@ -31,8 +31,7 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   // Similarly, gauge links can only be built in single or double, so upscale the build precision
   // if neccessary.
   auto gauge_param = gauge_param_in;
-  if (gauge_param.cuda_prec < QUDA_SINGLE_PRECISION)
-    gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  if (gauge_param.cuda_prec < QUDA_SINGLE_PRECISION) gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 

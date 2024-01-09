@@ -22,30 +22,31 @@ protected:
     QudaPrecision precision = static_cast<QudaPrecision>(::testing::get<0>(GetParam()));
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
-    if ((QUDA_PRECISION & precision) == 0
-        || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0)
-      return true;
+    if ((QUDA_PRECISION & precision) == 0 || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) return true;
 
-    const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
-                                                  true, false, false, false, true, false, true, true};
+    const std::array<bool, 16> partition_enabled {true, true,  true,  false, true, false, false, false,
+                                                  true, false, false, false, true, false, true,  true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<3>(GetParam())]) return true;
 
     return false;
   }
 
-  void display_test_info(QudaPrecision prec, QudaReconstructType link_recon, bool has_naik) {
+  void display_test_info(QudaPrecision prec, QudaReconstructType link_recon, bool has_naik)
+  {
     printfQuda("running the following test:\n");
-    printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Ordering\n");
+    printfQuda(
+      "link_precision           link_reconstruct           space_dimension        T_dimension       Ordering\n");
     printfQuda("%s                       %s                         %d/%d/%d/                  %d             %s \n",
-              get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order));
+               get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order));
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-              dimPartitioned(3));
+               dimPartitioned(3));
     printfQuda("Number of Naiks: %d\n", has_naik ? 2 : 1);
   }
 
 public:
-  virtual void SetUp() {
+  virtual void SetUp()
+  {
     QudaPrecision prec = static_cast<QudaPrecision>(::testing::get<0>(GetParam()));
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
     bool has_naik = ::testing::get<2>(GetParam());
@@ -62,14 +63,13 @@ public:
     display_test_info(prec, recon, has_naik);
   }
 
-  virtual void TearDown() {
+  virtual void TearDown()
+  {
     if (skip()) GTEST_SKIP();
     hisq_stencil_test_wrapper.end();
   }
 
-  static void SetUpTestCase() {
-    initQuda(device_ordinal);
-  }
+  static void SetUpTestCase() { initQuda(device_ordinal); }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
@@ -81,10 +81,7 @@ public:
   }
 };
 
-TEST_P(HisqStencilTest, benchmark)
-{
-  hisq_stencil_test_wrapper.run_test(niter, /**show_metrics =*/true);
-}
+TEST_P(HisqStencilTest, benchmark) { hisq_stencil_test_wrapper.run_test(niter, /**show_metrics =*/true); }
 
 TEST_P(HisqStencilTest, verify)
 {
@@ -147,7 +144,8 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-std::string gethisqstenciltestname(testing::TestParamInfo<::testing::tuple<QudaPrecision, QudaReconstructType, bool, int>> param)
+std::string
+gethisqstenciltestname(testing::TestParamInfo<::testing::tuple<QudaPrecision, QudaReconstructType, bool, int>> param)
 {
   const QudaPrecision prec = static_cast<QudaPrecision>(::testing::get<0>(param.param));
   const QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(param.param));
@@ -165,15 +163,11 @@ std::string gethisqstenciltestname(testing::TestParamInfo<::testing::tuple<QudaP
 #ifdef MULTI_GPU
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqStencilTest,
                          Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
-                                 ::testing::Values(QUDA_RECONSTRUCT_NO),
-                                 ::testing::Bool(),
-                                 Range(0, 16)),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO), ::testing::Bool(), Range(0, 16)),
                          gethisqstenciltestname);
 #else
 INSTANTIATE_TEST_SUITE_P(QUDA, HisqStencilTest,
                          Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
-                                 ::testing::Values(QUDA_RECONSTRUCT_NO),
-                                 ::testing::Bool(),
-                                 ::testing::Values(0)),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO), ::testing::Bool(), ::testing::Values(0)),
                          gethisqstenciltestname);
 #endif

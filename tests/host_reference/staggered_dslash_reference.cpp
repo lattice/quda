@@ -129,7 +129,9 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
                  const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
-  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
+  if (in.Precision() != fat_link.Precision()) {
+    errorQuda("The spinor precision and gauge precision are not the same");
+  }
 
   // assert we have single-parity spinors
   if (out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || in.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
@@ -151,27 +153,21 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
   void *qdp_longlink[] = {long_link.data(0), long_link.data(1), long_link.data(2), long_link.data(3)};
   void *ghost_fatlink[]
     = {fat_link.Ghost()[0].data(), fat_link.Ghost()[1].data(), fat_link.Ghost()[2].data(), fat_link.Ghost()[3].data()};
-  void *ghost_longlink[]
-    = {long_link.Ghost()[0].data(), long_link.Ghost()[1].data(), long_link.Ghost()[2].data(), long_link.Ghost()[3].data()};
+  void *ghost_longlink[] = {long_link.Ghost()[0].data(), long_link.Ghost()[1].data(), long_link.Ghost()[2].data(),
+                            long_link.Ghost()[3].data()};
 
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    staggeredDslashReference(static_cast<double*>(out.data()),
-                             reinterpret_cast<double**>(qdp_fatlink),
-                             reinterpret_cast<double**>(qdp_longlink),
-                             reinterpret_cast<double**>(ghost_fatlink),
-                             reinterpret_cast<double**>(ghost_longlink),
-                             static_cast<double*>(in.data()),
-                             reinterpret_cast<double**>(in.fwdGhostFaceBuffer),
-                             reinterpret_cast<double**>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
+    staggeredDslashReference(static_cast<double *>(out.data()), reinterpret_cast<double **>(qdp_fatlink),
+                             reinterpret_cast<double **>(qdp_longlink), reinterpret_cast<double **>(ghost_fatlink),
+                             reinterpret_cast<double **>(ghost_longlink), static_cast<double *>(in.data()),
+                             reinterpret_cast<double **>(in.fwdGhostFaceBuffer),
+                             reinterpret_cast<double **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
   } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-    staggeredDslashReference(static_cast<float*>(out.data()),
-                             reinterpret_cast<float**>(qdp_fatlink),
-                             reinterpret_cast<float**>(qdp_longlink),
-                             reinterpret_cast<float**>(ghost_fatlink),
-                             reinterpret_cast<float**>(ghost_longlink),
-                             static_cast<float*>(in.data()),
-                             reinterpret_cast<float**>(in.fwdGhostFaceBuffer),
-                             reinterpret_cast<float**>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
+    staggeredDslashReference(static_cast<float *>(out.data()), reinterpret_cast<float **>(qdp_fatlink),
+                             reinterpret_cast<float **>(qdp_longlink), reinterpret_cast<float **>(ghost_fatlink),
+                             reinterpret_cast<float **>(ghost_longlink), static_cast<float *>(in.data()),
+                             reinterpret_cast<float **>(in.fwdGhostFaceBuffer),
+                             reinterpret_cast<float **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
   }
 }
 
@@ -179,7 +175,9 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
               const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
-  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
+  if (in.Precision() != fat_link.Precision()) {
+    errorQuda("The spinor precision and gauge precision are not the same");
+  }
 
   // assert we have full-parity spinors
   if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
@@ -201,10 +199,12 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
 }
 
 void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
+                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
-  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
+  if (in.Precision() != fat_link.Precision()) {
+    errorQuda("The spinor precision and gauge precision are not the same");
+  }
 
   // assert we have full-parity spinors
   if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
@@ -219,8 +219,8 @@ void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const Ga
   stag_mat(out, fat_link, long_link, tmp, mass, 1 - daggerBit, dslash_type);
 }
 
-void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, double mass, int,
-                QudaParity parity, QudaDslashType dslash_type)
+void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+                const ColorSpinorField &in, double mass, int, QudaParity parity, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precison are not the same"); }
@@ -248,8 +248,9 @@ void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFi
 
   double msq_x4 = mass * mass * 4;
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    axmy(static_cast<double*>(in.data()), msq_x4, static_cast<double*>(out.data()), Vh * stag_spinor_site_size);
+    axmy(static_cast<double *>(in.data()), msq_x4, static_cast<double *>(out.data()), Vh * stag_spinor_site_size);
   } else {
-    axmy(static_cast<float*>(in.data()), static_cast<float>(msq_x4), static_cast<float*>(out.data()), Vh * stag_spinor_site_size);
+    axmy(static_cast<float *>(in.data()), static_cast<float>(msq_x4), static_cast<float *>(out.data()),
+         Vh * stag_spinor_site_size);
   }
 }

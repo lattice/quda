@@ -52,8 +52,8 @@ TEST_F(StaggeredDslashTest, verify)
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
 
   // give it a tiny bump for fixed precision, recon 8
-  if (dslash_test_wrapper.inv_param.cuda_prec <= QUDA_HALF_PRECISION &&
-      dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9)
+  if (dslash_test_wrapper.inv_param.cuda_prec <= QUDA_HALF_PRECISION
+      && dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9)
     tol *= 1.1;
 
   ASSERT_LE(deviation, tol) << "reference and QUDA implementations do not agree";
@@ -89,10 +89,8 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type))
-      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
-    if (!is_staggered(dslash_type))
-      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash,
