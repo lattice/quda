@@ -64,12 +64,24 @@ namespace quda
     /**
        @brief Constructor for ThreadLocalCache.
     */
+#if 0
     constexpr ThreadLocalCache() : stride(target::block_size<3>())
     {
       // sanity check
       static_assert(shared_mem_size(dim3 {32, 16, 8})
                     == Smem::get_offset(dim3 {32, 16, 8}) + SizePerThread<len>::size(dim3 {32, 16, 8}) * sizeof(T));
     }
+#endif
+
+    template <typename... U>
+    constexpr ThreadLocalCache(const KernelOps<U...> &ops) : Smem(ops), stride(target::block_size<3>())
+    {
+      checkKernelOps<ThreadLocalCache<T, N, O>>(ops);
+      static_assert(shared_mem_size(dim3 {32, 16, 8})
+                    == Smem::get_offset(dim3 {32, 16, 8}) + SizePerThread<len>::size(dim3 {32, 16, 8}) * sizeof(T));
+    }
+
+    constexpr ThreadLocalCache(const ThreadLocalCache<T, N, O> &) = delete;
 
     /**
        @brief Save the value into the thread local cache.  Used when N==0 so cache acts like single object.
@@ -116,7 +128,7 @@ namespace quda
     /**
        @brief Cast operator to allow cache objects to be used where T is expected (when N==0).
      */
-    __device__ __host__ operator T() const
+    __device__ __host__ inline operator T() const
     {
       static_assert(N == 0);
       return load();
@@ -126,7 +138,7 @@ namespace quda
        @brief Assignment operator to allow cache objects to be used on
        the lhs where T is otherwise expected (when N==0).
      */
-    __device__ __host__ void operator=(const T &src) const
+    __device__ __host__ inline void operator=(const T &src) const
     {
       static_assert(N == 0);
       save(src);
@@ -137,7 +149,7 @@ namespace quda
        @param[in] i The index to use
        @return The value stored in the thread local cache at that index
      */
-    __device__ __host__ T operator[](int i)
+    __device__ __host__ inline T operator[](const int i) const
     {
       static_assert(N > 0);
       return load(i);
