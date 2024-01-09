@@ -94,8 +94,11 @@ set (QUDA_OBJS
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
   dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
-  dslash_wilson_clover_preconditioned.cu 
+  dslash_wilson.cu dslash_wilson_distance.cu
+  dslash_wilson_clover.cu dslash_wilson_clover_distance.cu
+  dslash_wilson_clover_preconditioned.cu
+  dslash_wilson_clover_distance_preconditioned.cu
+  dslash5_domain_wall.cu
   dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
   dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
   dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu

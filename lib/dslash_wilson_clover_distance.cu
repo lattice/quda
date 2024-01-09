@@ -62,27 +62,13 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverDistanceApply {
 
-    inline WilsonCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-        double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    inline WilsonCloverDistanceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+        double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
-      WilsonClover<decltype(arg)> wilson(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
-    }
-  };
-
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverWithTwistApply {
-
-    inline WilsonCloverWithTwistApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                      const CloverField &A, double a, double b, const ColorSpinorField &x, int parity,
-                                      bool dagger, const int *comm_override, TimeProfile &profile)
-    {
-      constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
+      WilsonCloverDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, 0.0, alpha0, t0, x, parity, dagger, comm_override);
       WilsonClover<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -93,14 +79,14 @@ namespace quda
   // out(x) = M*in = (A(x)*in(x) + a * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_DIRAC
-  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-      double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyWilsonCloverDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+      double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<WilsonCloverApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
+    instantiate<WilsonCloverDistanceApply>(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyWilsonClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
-                         double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  void ApplyWilsonCloverDistance(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
+                         double, double, int, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Clover dslash has not been built");
   }

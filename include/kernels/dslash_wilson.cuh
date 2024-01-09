@@ -89,7 +89,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline std::enable_if_t<!Arg::distance> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -167,7 +167,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilsonDistance(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline std::enable_if_t<Arg::distance> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -279,11 +279,7 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      if constexpr (Arg::distance) {
-        applyWilsonDistance<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
-      } else {
-        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
-      }
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {

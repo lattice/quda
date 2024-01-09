@@ -107,14 +107,14 @@ namespace quda
 
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverDistancePreconditionedApply {
 
-    inline WilsonCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+    inline WilsonCloverDistancePreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+        const CloverField &A, double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
         TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, x, parity, dagger, comm_override);
+      WilsonCloverDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override);
       WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -125,15 +125,15 @@ namespace quda
   // out(x) = M*in = a * A(x)^{-1} (\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_DIRAC
-  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+  void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+      const CloverField &A, double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
       TimeProfile &profile)
   {
-    instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
+    instantiate<WilsonCloverDistancePreconditionedApply>(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyWilsonCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                       const CloverField &, double, const ColorSpinorField &, int, bool, const int *,
+  void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                       const CloverField &, double, double, int, const ColorSpinorField &, int, bool, const int *,
                                        TimeProfile &)
   {
     errorQuda("Clover dslash has not been built");
