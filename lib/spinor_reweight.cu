@@ -8,15 +8,15 @@ namespace quda {
   template <typename Float, int Ns, int Nc>
   class SpinorDistanceReweight : TunableKernel2D {
     ColorSpinorField &v;
-    Float alpha;
+    Float alpha0;
     int t0;
     unsigned int minThreads() const { return v.VolumeCB(); }
 
   public:
-    SpinorDistanceReweight(ColorSpinorField &v, double alpha, int t0) :
+    SpinorDistanceReweight(ColorSpinorField &v, double alpha0, int t0) :
       TunableKernel2D(v, v.SiteSubset()),
       v(v),
-      alpha(alpha),
+      alpha0(alpha0),
       t0(t0)
     {
       strcat(aux, ",cosh");
@@ -25,11 +25,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (alpha > 0) {
-        launch<DistanceReweightSpinor>(tp, stream, SpinorDistanceReweightArg<Float, Ns, Nc, false>(v, alpha, t0));
-      } else {
-        launch<DistanceReweightSpinor>(tp, stream, SpinorDistanceReweightArg<Float, Ns, Nc, true>(v, alpha, t0));
-      }
+      launch<DistanceReweightSpinor>(tp, stream, SpinorDistanceReweightArg<Float, Ns, Nc>(v, alpha0, t0));
     }
 
     long long bytes() const { return 2 * v.Bytes(); }
@@ -38,15 +34,15 @@ namespace quda {
   };
 
   template <typename Float>
-  void spinorDistanceReweight(ColorSpinorField &src, double alpha, int t0)
+  void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0)
   {
     if (src.Ncolor() == 3) {
       if (src.Nspin() == 4) {
-        if constexpr (is_enabled_spin(4)) SpinorDistanceReweight<Float, 4, 3>(src, alpha, t0);
+        if constexpr (is_enabled_spin(4)) SpinorDistanceReweight<Float, 4, 3>(src, alpha0, t0);
       } else if (src.Nspin() == 2) {
-        if constexpr (is_enabled_spin(2)) SpinorDistanceReweight<Float, 2, 3>(src, alpha, t0);
+        if constexpr (is_enabled_spin(2)) SpinorDistanceReweight<Float, 2, 3>(src, alpha0, t0);
       } else if (src.Nspin() == 1) {
-        if constexpr (is_enabled_spin(1)) SpinorDistanceReweight<Float, 1, 3>(src, alpha, t0);
+        if constexpr (is_enabled_spin(1)) SpinorDistanceReweight<Float, 1, 3>(src, alpha0, t0);
       } else {
         errorQuda("Nspin = %d not implemented", src.Nspin());
       }
@@ -55,7 +51,7 @@ namespace quda {
     }
   }
 
-  void spinorDistanceReweight(ColorSpinorField &src_, double alpha, int t0)
+  void spinorDistanceReweight(ColorSpinorField &src_, double alpha0, int t0)
   {
     // if src is a CPU field then create GPU field
     ColorSpinorField src;
@@ -73,9 +69,9 @@ namespace quda {
     }
 
     if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-      spinorDistanceReweight<double>(src, alpha, t0);
+      spinorDistanceReweight<double>(src, alpha0, t0);
     } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-      spinorDistanceReweight<float>(src, alpha, t0);
+      spinorDistanceReweight<float>(src, alpha0, t0);
     } else {
       errorQuda("Precision %d not implemented", src.Precision());
     }

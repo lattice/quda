@@ -99,7 +99,7 @@ namespace quda
      @param[in] in The input field
      @param[in] U The gauge field used for the operator
      @param[in] kappa Scale factor applied
-     @param[in] alpha Distance preconditioning parameter
+     @param[in] alpha0 Distance preconditioning parameter
      @param[in] t0 Distance preconditioning parameter
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
@@ -108,7 +108,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double kappa,
-                           double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger,
+                           double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger,
                            const int *comm_override, TimeProfile &profile);
 
   /**
@@ -152,6 +152,8 @@ namespace quda
      @param[in] U The gauge field used for the operator
      @param[in] A The clover field used for the operator
      @param[in] kappa Scale factor applied
+     @param[in] alpha0 Distance preconditioning parameter
+     @param[in] t0 Distance preconditioning parameter
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
@@ -159,7 +161,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonCloverDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-      double kappa, double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+      double kappa, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
        @brief Driver for applying the Wilson-clover stencil
@@ -260,6 +262,8 @@ namespace quda
      @param[in] U The gauge field used for the operator
      @param[in] A The clover field used for the operator
      @param[in] kappa Scale factor applied
+     @param[in] alpha0 Distance preconditioning parameter
+     @param[in] t0 Distance preconditioning parameter
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
@@ -267,7 +271,7 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &A, double kappa, double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+      const CloverField &A, double kappa, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
       TimeProfile &profile);
 
   /**

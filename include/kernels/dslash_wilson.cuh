@@ -30,7 +30,7 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    static constexpr bool distance = false;
+    static constexpr bool distance_pc = false;
 
     F out;        /** output vector field */
     const F in;   /** input vector field */
@@ -57,7 +57,7 @@ namespace quda
    */
   template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
   struct WilsonDistanceArg : WilsonArg<Float, nColor_, nDim, reconstruct_> {
-    static constexpr bool distance = true;
+    static constexpr bool distance_pc = true;
 
     typedef typename mapper<Float>::type real;
 
@@ -89,7 +89,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline std::enable_if_t<!Arg::distance> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline std::enable_if_t<!Arg::distance_pc> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -167,7 +167,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline std::enable_if_t<Arg::distance> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline std::enable_if_t<Arg::distance_pc> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -182,9 +182,9 @@ namespace quda
     const int t0 = arg.t0;
     const int t = arg.comm_coord_3 * arg.dim[3] + coord[3];
     const int nt = arg.comm_dim_3 * arg.dim[3];
-    const real denom = genDistanceWeight<false>(alpha0, t0, t, nt);
-    const real ratio_fwd = genDistanceWeight<false>(alpha0, t0, t + 1, nt) / denom;
-    const real ratio_bwd = genDistanceWeight<false>(alpha0, t0, t - 1, nt) / denom;
+    const real denom = genDistanceWeight(alpha0, t0, t, nt);
+    const real ratio_fwd = genDistanceWeight(alpha0, t0, t + 1, nt) / denom;
+    const real ratio_bwd = genDistanceWeight(alpha0, t0, t - 1, nt) / denom;
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well

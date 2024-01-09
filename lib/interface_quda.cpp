@@ -2739,11 +2739,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(b, *param, false);
 
-  const double alpha0 = param->distance_pc_alpha0;
+  // Force the alpha0 to be positive.
+  // A negative alpha0 matches something like Eq.(12) in arXiv:1006.4028, but the effect doesn't
+  // seem to be good. Disable the negative situation as QUDA already has multigrid for light quarks.
+  const double alpha0 = abs(param->distance_pc_alpha0);
   const int t0 = param->distance_pc_t0;
   bool distance_pc = (alpha0 != 0) && (t0 >= 0);
   distance_pc &= (param->dslash_type == QUDA_WILSON_DSLASH) || (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH);
-  distance_pc &= (param->inv_type != QUDA_MG_INVERTER);
+  distance_pc &= (param->inv_type == QUDA_CG_INVERTER);
 
   // Don't apply distance preconditioning in functions other than invertQuda.
   if (distance_pc) {
