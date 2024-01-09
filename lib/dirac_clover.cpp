@@ -37,8 +37,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_pc_alpha, distance_pc_t0, x, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim, profile);
     } else {
       ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
     }
@@ -54,8 +54,8 @@ namespace quda {
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_pc_alpha, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_pc_alpha0, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     } else {
       ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     }
@@ -143,8 +143,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, 0.0, distance_pc_alpha, distance_pc_t0, in, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim, profile);
     } else {
       ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
     }
@@ -158,8 +158,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, k, distance_pc_alpha, distance_pc_t0, x, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim, profile);
     } else {
       ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
     }

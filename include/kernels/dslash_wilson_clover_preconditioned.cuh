@@ -83,7 +83,11 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      if constexpr (Arg::distance) {
+        applyWilsonDistance<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      } else {
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      }
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial

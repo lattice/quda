@@ -46,8 +46,8 @@ namespace quda
     const real b; /** chiral twist factor (twisted-clover only) */
 
     WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, double b, double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, alpha, t0, x, parity, dagger, comm_override),
+                    double a, double b, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, alpha0, t0, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
@@ -85,7 +85,11 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      if constexpr (Arg::distance) {
+        applyWilsonDistance<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      } else {
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      }
 
       if (mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);

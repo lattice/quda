@@ -503,7 +503,7 @@ namespace quda {
   class DiracWilson : public Dirac {
 
   protected:
-    double distance_pc_alpha;
+    double distance_pc_alpha0;
     int distance_pc_t0;
     void initConstants();
 
@@ -529,7 +529,7 @@ namespace quda {
 
     virtual QudaDiracType getDiracType() const { return QUDA_WILSON_DIRAC; }
 
-    virtual void setDistancePrecondition(double alpha, int t0) { this->distance_pc_alpha = alpha; this->distance_pc_t0 = t0; }
+    virtual void setDistancePrecondition(double alpha0, int t0) { this->distance_pc_alpha0 = alpha0; this->distance_pc_t0 = t0; }
 
     /**
      * @brief Create the coarse Wilson operator.

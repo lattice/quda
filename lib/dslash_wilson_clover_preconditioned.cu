@@ -143,11 +143,11 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverDistancePreconditionedApply {
 
     inline WilsonCloverDistancePreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &A, double a, double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+        const CloverField &A, double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
         TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, alpha, t0, x, parity, dagger, comm_override);
+      WilsonCloverDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override);
       WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -159,10 +159,10 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_DIRAC
   void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &A, double a, double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+      const CloverField &A, double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
       TimeProfile &profile)
   {
-    instantiate<WilsonCloverDistancePreconditionedApply>(out, in, U, A, a, alpha, t0, x, parity, dagger, comm_override, profile);
+    instantiate<WilsonCloverDistancePreconditionedApply>(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,

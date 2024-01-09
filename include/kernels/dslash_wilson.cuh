@@ -61,15 +61,15 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    const real alpha;
+    const real alpha0;
     const int t0;
     const int comm_dim_3;
     const int comm_coord_3;
 
-    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha,
+    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0,
               int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor_, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-      alpha(alpha),
+      alpha0(alpha0),
       t0(t0),
       comm_dim_3(comm_dim(3)),
       comm_coord_3(comm_coord(3))
@@ -89,7 +89,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline std::enable_if_t<!Arg::distance, void> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -167,7 +167,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline std::enable_if_t<Arg::distance, void> applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyWilsonDistance(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -178,13 +178,13 @@ namespace quda
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
     // values for distance preconditioning
-    const real alpha = arg.alpha;
+    const real alpha0 = arg.alpha0;
     const int t0 = arg.t0;
     const int t = arg.comm_coord_3 * arg.dim[3] + coord[3];
     const int nt = arg.comm_dim_3 * arg.dim[3];
-    const real denom = genDistanceWeight<false>(alpha, t0, t, nt);
-    const real ratio_fwd = genDistanceWeight<false>(alpha, t0, t + 1, nt) / denom;
-    const real ratio_bwd = genDistanceWeight<false>(alpha, t0, t - 1, nt) / denom;
+    const real denom = genDistanceWeight<false>(alpha0, t0, t, nt);
+    const real ratio_fwd = genDistanceWeight<false>(alpha0, t0, t + 1, nt) / denom;
+    const real ratio_bwd = genDistanceWeight<false>(alpha0, t0, t - 1, nt) / denom;
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -279,7 +279,11 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      if constexpr (Arg::distance) {
+        applyWilsonDistance<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      } else {
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      }
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
