@@ -1,4 +1,3 @@
-#include <stack>
 #include <quda_internal.h>
 #include <timer.h>
 #include <tune_quda.h>
@@ -137,8 +136,6 @@ namespace quda {
 #define POP_RANGE
 #endif
 
-  static std::stack<QudaProfileType> pt_stack;
-
   void TimeProfile::Start_(const char *func, const char *file, int line, QudaProfileType idx)
   {
     // if total timer isn't running, then start it running
@@ -149,7 +146,6 @@ namespace quda {
 
     // if a timer is already running, stop it and push to stack
     for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++) {
-      if (i == static_cast<int>(idx)) continue;
       if (profile[i].running) {
         if (i == QUDA_PROFILE_COMPUTE || i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H) qudaDeviceSynchronize();
         profile[i].stop(file, func, line);
@@ -167,7 +163,12 @@ namespace quda {
   {
     if (idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H)
       qudaDeviceSynchronize(); // ensure accurate profiling
-    profile[idx].stop(func, file, line);
+    if (!profile[idx].stop(func, file, line)) {
+      for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++)
+        if (profile[i].running) errorQuda("Failed to stop timer idx = %d, however idx = %d is running", idx, i);
+      errorQuda("Failed to stop timer idx = %d", idx);
+    }
+    if (use_global) StopGlobal(func, file, line, idx);
     POP_RANGE
 
     if (pt_stack.empty()) {
@@ -176,11 +177,8 @@ namespace quda {
         profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
         switchOff = false;
       }
-      if (use_global) StopGlobal(func, file, line, idx);
-    }
-
-    // restore any pre-existing timers if needed
-    if (!pt_stack.empty()) {
+    } else {
+      // restore any pre-existing timers if needed
       auto i = pt_stack.top();
       pt_stack.pop();
       profile[i].start(func, file, line);

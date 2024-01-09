@@ -1,7 +1,7 @@
 #pragma once
 
 #include <sys/time.h>
-
+#include <stack>
 #include <quda_internal.h>
 #include <util_quda.h>
 #include <device.h>
@@ -84,11 +84,11 @@ namespace quda {
        @brief Update last_interval, but doesn't stop the time or
        increment the count.
      */
-    void peek(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    bool peek(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (!running) {
         printfQuda("ERROR: Cannot peek an unstarted timer (%s:%d in %s())", file ? file : "", line, func ? func : "");
-        errorQuda("Aborting");
+        return false;
       }
       if (!device) {
         gettimeofday(&host_stop, NULL);
@@ -100,22 +100,24 @@ namespace quda {
         qudaEventSynchronize(device_stop);
         last_interval = qudaEventElapsedTime(device_start, device_stop);
       }
+      return true;
     }
 
     /**
        @brief Updates the last_interval time, stops the timer and increments the count.
      */
-    void stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    bool stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (ref_count > 0) {
         ref_count--;
-        return;
+        return true;
       }
-      peek(func, file, line);
+      bool rtn = peek(func, file, line);
       time += last_interval;
       count++;
 
       running = false;
+      return rtn;
     }
 
     double last() { return last_interval; }
@@ -198,6 +200,8 @@ namespace quda {
 
     bool switchOff;
     bool use_global;
+
+    std::stack<QudaProfileType> pt_stack; /**< A stack used for recursive profiling */
 
     static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx);
     static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx);

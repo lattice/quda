@@ -138,11 +138,8 @@ namespace quda {
   }
 
   GCR::~GCR() {
-    getProfile().TPSTART(QUDA_PROFILE_FREE);
     extractInnerSolverParam(param, Kparam);
-
     destroyDeflationSpace();
-    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void GCR::create(ColorSpinorField &x, const ColorSpinorField &b)
@@ -406,11 +403,8 @@ namespace quda {
     param.iter += total_iter;
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
-    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
-
-    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
 } // namespace quda

@@ -315,6 +315,8 @@ namespace quda {
 
   void Solver::destroyDeflationSpace()
   {
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
+
     if (deflate_init) {
       if (param.eig_param.preserve_deflation) {
         logQuda(QUDA_VERBOSE, "Preserving deflation space of size %lu\n", evecs.size());
@@ -339,6 +341,8 @@ namespace quda {
       evals.clear();
       deflate_init = false;
     }
+
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void Solver::injectDeflationSpace(std::vector<ColorSpinorField> &defl_space)
