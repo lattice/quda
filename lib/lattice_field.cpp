@@ -333,7 +333,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill)
+  void LatticeField::createComms(bool no_comms_fill) const
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -394,7 +394,7 @@ namespace quda {
     initComms = true;
   }
 
-  void LatticeField::destroyComms()
+  void LatticeField::destroyComms() const
   {
     if (Location() != QUDA_CUDA_FIELD_LOCATION) return;
 
@@ -444,7 +444,7 @@ namespace quda {
 
   }
 
-  void LatticeField::createIPCComms()
+  void LatticeField::createIPCComms() const
   {
     if ( initIPCComms && !ghost_field_reset ) return;
 

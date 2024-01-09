@@ -179,7 +179,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   int construct_type = 0;
   if (latfile.size() > 0) {
     // load in the command line supplied gauge field using QIO and LIME
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile.c_str());
+    logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
     read_gauge_field(latfile.c_str(), gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {
@@ -189,6 +189,20 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
       construct_type = 1;
   }
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
+}
+
+void constructHostGaugeField(quda::GaugeField &gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
+{
+  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+    constructHostGaugeField(static_cast<void **>(gauge.raw_pointer()), gauge_param, argc, argv);
+  } else {
+    GaugeFieldParam param(gauge);
+    param.order = QUDA_QDP_GAUGE_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField u(param);
+    constructHostGaugeField(static_cast<void **>(u.raw_pointer()), gauge_param, argc, argv);
+    gauge = u;
+  }
 }
 
 void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
@@ -1454,8 +1468,10 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
 
 void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase)
 {
-  void *link[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
-  createSiteLinkCPU(link, precision, phase);
+  if (u.Order() == QUDA_QDP_GAUGE_ORDER)
+    createSiteLinkCPU(static_cast<void **>(u.raw_pointer()), precision, phase);
+  else
+    errorQuda("Unsupported gauge order %d", u.Order());
 }
 
 template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
@@ -1515,16 +1531,16 @@ static int compare_link(void **linkA, void **linkB, int len, QudaPrecision preci
   return ret;
 }
 
-static int compare_link(const GaugeField &linkA, const GaugeField &linkB)
+static int compare_link(const GaugeField &a, const GaugeField &b)
 {
+  if (a.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", a.Order());
   int ret;
-
-  void *a[] = {linkA.data(0), linkA.data(1), linkA.data(2), linkA.data(3)};
-  void *b[] = {linkB.data(0), linkB.data(1), linkB.data(2), linkB.data(3)};
-  if (checkPrecision(linkA, linkB) == QUDA_DOUBLE_PRECISION) {
-    ret = compareLink((double **)a, (double **)b, linkA.Volume());
+  if (checkPrecision(a, b) == QUDA_DOUBLE_PRECISION) {
+    ret = compareLink(reinterpret_cast<double **>(a.raw_pointer()), reinterpret_cast<double **>(b.raw_pointer()),
+                      a.Volume());
   } else {
-    ret = compareLink((float **)a, (float **)b, linkA.Volume());
+    ret = compareLink(reinterpret_cast<float **>(a.raw_pointer()), reinterpret_cast<float **>(b.raw_pointer()),
+                      a.Volume());
   }
 
   return ret;
@@ -1566,6 +1582,7 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
 
 int strong_check_link(const GaugeField &linkA, const std::string &msgA, const GaugeField &linkB, const std::string &msgB)
 {
+  if (linkA.Order() != QUDA_QDP_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", linkA.Order());
   if (verbosity >= QUDA_VERBOSE) {
     printfQuda("%s\n", msgA.c_str());
     printLinkElement(linkA.data(0), 0, prec);
@@ -1587,7 +1604,7 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
-void createMomCPU(void *mom, QudaPrecision precision)
+void createMomCPU(void *mom, QudaPrecision precision, double max_val)
 {
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   void *temp = safe_malloc(4 * V * gauge_site_size * gSize);
@@ -1597,7 +1614,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
       for (int dir = 0; dir < 4; dir++) {
         double *thismom = (double *)mom;
         for (auto k = 0lu; k < mom_site_size; k++) {
-          thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
+          thismom[(4 * i + dir) * mom_site_size + k] = max_val * rand() / RAND_MAX;
           if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
       }
@@ -1605,7 +1622,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
       for (int dir = 0; dir < 4; dir++) {
         float *thismom = (float *)mom;
         for (auto k = 0lu; k < mom_site_size; k++) {
-          thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
+          thismom[(4 * i + dir) * mom_site_size + k] = max_val * rand() / RAND_MAX;
           if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
       }

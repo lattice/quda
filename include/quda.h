@@ -1515,9 +1515,9 @@ extern "C" {
   void createCloverQuda(QudaInvertParam* param);
 
   /**
-   * Compute the clover force contributions in each dimension mu given
-   * the array of solution fields, and compute the resulting momentum
-   * field.
+   * Compute the clover force contributions from a set of partial
+   * fractions stemming from a rational approximation suitable for use
+   * within MILC.
    *
    * @param mom Force matrix
    * @param dt Integrating step size
@@ -1535,6 +1535,23 @@ extern "C" {
   void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
 			      int nvector, double multiplicity, void *gauge,
 			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+
+  /**
+   * Compute the force from a clover or twisted clover determinant or
+   * a set of partial fractions stemming from a rational approximation
+   * suitable for use from within tmLQCD.
+   *
+   * @param h_mom Host force matrix
+   * @param h_x Array of solution vectors x_i = ( Q^2 + s_i )^{-1} b
+   * @param h_x0 Array of source vector necessary to compute the force of a ratio of determinant
+   * @param coeff Array of coefficients for the rational approximation or {1.0} for the determinant.
+   * @param nvector Number of solution vectors and coefficients
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   * @param detratio if 0 compute the force of a determinant otherwise compute the force from a ratio of determinants
+   */
+  void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.

@@ -4,7 +4,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <kernel.h>
-#include <shared_memory_cache_helper.h>
+#include <thread_local_cache.h>
 
 namespace quda {
 
@@ -272,7 +272,7 @@ namespace quda {
      *            A _______ B
      *    mu_next  |       |
      *            H|       |G
-     *   
+     *
      *   Variables have been named to reflection dimensionality for
      *   mu_positive == true, sig_positive == true, mu_next_positive == true
      **************************************************************************/
@@ -372,7 +372,7 @@ namespace quda {
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
         @param[in/out] force_mu Accumulated force in the mu direction
-        @param[in] Uab_cache Shared memory cache that stores the gauge link going from a to b (read)
+        @param[in] Uab_cache Thread local cache that stores the gauge link going from a to b (read)
         @details This subset of the code computes the Lepage contribution to the fermion force.
           Data traffic:
             READ: cb_link, id_link, pMu_at_c
@@ -386,7 +386,10 @@ namespace quda {
           Flops:
             2 multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, SharedMemoryCache<Link> &Uab_cache) {
+      template <typename LinkCache>
+      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu,
+                                                   LinkCache &Uab_cache)
+      {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -414,7 +417,7 @@ namespace quda {
 
         Link Ow = mu_positive ? (conj(Ucb) * Oc) : (Ucb * Oc);
         {
-          Link Uab = Uab_cache.load();
+          Link Uab = Uab_cache;
           Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
           Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
           auto mycoeff_lepage = -coeff_sign<sig_positive, typename Arg::real>(parity_a)*coeff_sign<mu_positive, typename Arg::real>(parity_a)*arg.coeff_lepage;
@@ -440,7 +443,7 @@ namespace quda {
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
-        @param[in] Uab_cache Shared memory cache that stores the gauge link going from a to b (read)
+        @param[in] Uab_cache Thread local cache that stores the gauge link going from a to b (read)
           Data traffic:
             READ: gb_link, oProd_at_h
             WRITE: pMu_next_at_b, p3_at_a
@@ -454,7 +457,8 @@ namespace quda {
           Flops:
             2 multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Uab_cache)
+      template <typename LinkCache>
+      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, LinkCache &Uab_cache)
       {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
@@ -487,7 +491,7 @@ namespace quda {
         arg.pMu_next(0, point_b, parity_b) = Oz;
         {
           // scoped Uab load
-          Link Uab = Uab_cache.load();
+          Link Uab = Uab_cache;
           if constexpr (!sig_positive) Uab = conj(Uab);
           arg.p3(0, point_a, parity_a) = Uab * Oz;
         }
@@ -535,8 +539,7 @@ namespace quda {
         /*
          * The "extra" low point corresponds to the Lepage contribution to the
          * force_mu term.
-         * 
-         *  
+         *
          *            sig
          *         F        E
          *          |      |
@@ -557,7 +560,7 @@ namespace quda {
         int point_a = e_cb;
         int parity_a = parity;
 
-        SharedMemoryCache<Link> Uab_cache(target::block_dim());
+        ThreadLocalCache<Link> Uab_cache;
         // Scoped load of Uab
         {
           int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -636,7 +639,7 @@ namespace quda {
       Link force;
       Link shortP;
       Link p5;
-      
+
       const Link pMu;
 
       // double-buffer: read pNuMu, qNuMu for side 5, middle 7
@@ -688,7 +691,7 @@ namespace quda {
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
-        @param[in/out] Matrix_cache Shared memory cache that maintains the accumulated P5 contribution (write)
+        @param[in/out] Matrix_cache Thread local cache that maintains the accumulated P5 contribution (write)
                        the gauge link going from a to b (read), as well as force_sig when sig is positive (read/write)
         @details This subset of the code computes the full seven link contribution to the HISQ force.
           Data traffic:
@@ -705,8 +708,9 @@ namespace quda {
           Flops:
             4 multiplies, 2 adds, 2 rescales
       */
-      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a,
-          SharedMemoryCache<Link> &Matrix_cache) {
+      template <typename LinkCache>
+      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      {
         auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -735,19 +739,19 @@ namespace quda {
           UbeOeOf = Ube * OeOf;
 
           // Cache Ube to below
-          Matrix_cache.save_z(Ube, 1);
+          Matrix_cache.save(Ube, 1);
         }
 
         // Take care of force_sig --- contribution from the negative rho direction
         Link Uaf = arg.link(arg.rho, point_a, parity_a);
         if constexpr (sig_positive) {
-          Link force_sig = Matrix_cache.load_z(2);
+          Link force_sig = Matrix_cache[2];
           force_sig = mm_add(mycoeff_seven * UbeOeOf, conj(Uaf), force_sig);
-          Matrix_cache.save_z(force_sig, 2);
+          Matrix_cache.save(force_sig, 2);
         }
 
         // Compute the force_rho --- contribution from the negative rho direction
-        Link Uab = Matrix_cache.load_z(0);
+        Link Uab = Matrix_cache[0];
         if constexpr (!sig_positive) Uab = conj(Uab);
         Link force_rho = arg.force(arg.rho, point_a, parity_a);
         force_rho = mm_add(mycoeff_seven * conj(UbeOeOf), conj(Uab), force_rho);
@@ -756,7 +760,7 @@ namespace quda {
         Link Ufe = arg.link(arg.sig, fe_link_nbr_idx, fe_link_nbr_parity);
 
         // Load Ube from the cache
-        Link Ube = Matrix_cache.load_z(1);
+        Link Ube = Matrix_cache[1];
 
         // Form the product UfeUebOb
         Link UfeUeb = (sig_positive ? Ufe : conj(Ufe)) * conj(Ube);
@@ -788,7 +792,7 @@ namespace quda {
         Link Oz = Ucb * Ob;
         Link Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
         p5_sig = mm_add(arg.accumu_coeff_seven * conj(Uda), Oy, p5_sig);
-        Matrix_cache.save_z(p5_sig, 1);
+        Matrix_cache.save(p5_sig, 1);
 
         // When sig is positive, compute the force_sig contribution from the
         // positive rho direction
@@ -796,11 +800,10 @@ namespace quda {
           Link Od = arg.qNuMu(0, point_d, parity_d);
           Link Oc = arg.pNuMu(0, point_c, parity_c);
           Link Oz = conj(Ucb) * Oc;
-          Link force_sig = Matrix_cache.load_z(2);
+          Link force_sig = Matrix_cache[2];
           force_sig = mm_add(mycoeff_seven * Oz, Od * Uda, force_sig);
-          Matrix_cache.save_z(force_sig, 2);
+          Matrix_cache.save(force_sig, 2);
         }
-
       }
 
       /**
@@ -808,7 +811,7 @@ namespace quda {
         @param[in] x Local coordinate
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] parity_a Parity of the coordinate x
-        @param[in/out] Matrix_cache Shared memory cache that maintains the full P5 contribution
+        @param[in/out] Matrix_cache Thread local cache that maintains the full P5 contribution
                        summed from the previous middle five and all seven (read), as well as force_sig
                        when sig is positive (read/write)
         @details This subset of the code computes the side link five link contribution to the HISQ force.
@@ -818,7 +821,9 @@ namespace quda {
           Flops:
             2 multiplies, 2 adds, 2 rescales
       */
-      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Matrix_cache) {
+      template <typename LinkCache>
+      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_positive)>(y, arg.nu, arg);
         int parity_h = 1 - parity_a;
@@ -832,7 +837,7 @@ namespace quda {
         int qh_link_nbr_idx = mu_positive ? point_q : point_h;
         int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
-        Link P5 = Matrix_cache.load_z(1);
+        Link P5 = Matrix_cache[1];
         Link Uah = arg.link(arg.nu, ha_link_nbr_idx, ha_link_nbr_parity);
         Link Ow = nu_positive ? Uah * P5 : conj(Uah) * P5;
 
@@ -857,7 +862,7 @@ namespace quda {
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
-        @param[in/out] Matrix_cache Helper shared memory cache that maintains  the gauge link going
+        @param[in/out] Matrix_cache Thread local cache that maintains the gauge link going
                        from a to b (read) and, when sig is positive, force_sig (read/write)
         @details This subset of the code computes the middle link five link contribution to the HISQ force.
           Data traffic:
@@ -870,8 +875,9 @@ namespace quda {
           Flops:
             1 multiply, 1 add, 1 rescale
       */
-      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
-          SharedMemoryCache<Link> &Matrix_cache) {
+      template <typename LinkCache>
+      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a, LinkCache &Matrix_cache)
+      {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -902,7 +908,7 @@ namespace quda {
         arg.pNuMu_next(0, point_b, parity_b) = Ow;
         {
           // scoped Uab load
-          Link Uab = Matrix_cache.load_z(0);
+          Link Uab = Matrix_cache[0];
           if constexpr (!sig_positive) Uab = conj(Uab);
           arg.p5(0, point_a, parity_a) = Uab * Ow;
         }
@@ -917,9 +923,9 @@ namespace quda {
 
         // compute the force in the sigma direction if sig is positive
         if constexpr (sig_positive) {
-          Link force_sig = Matrix_cache.load_z(2);
+          Link force_sig = Matrix_cache[2];
           force_sig = mm_add(arg.coeff_five * Ow, Ox, force_sig);
-          Matrix_cache.save_z(force_sig, 2);
+          Matrix_cache.save(force_sig, 2);
         }
       }
 
@@ -955,14 +961,14 @@ namespace quda {
 
         int point_a = e_cb;
         int parity_a = parity;
-        
+
         // calculate p5_sig
-        auto block_dim = target::block_dim();
-        block_dim.z = (sig_positive ? 3 : 2);
-        SharedMemoryCache<Link> Matrix_cache(block_dim);
+        constexpr int cacheLen = sig_positive ? 3 : 2;
+        ThreadLocalCache<Link, cacheLen> Matrix_cache;
+
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);
-          Matrix_cache.save_z(force_sig, 2);
+          Matrix_cache.save(force_sig, 2);
         }
 
         // Scoped load of Uab
@@ -972,7 +978,7 @@ namespace quda {
           int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
           Link Uab = arg.link(arg.sig, ab_link_nbr_idx, ab_link_nbr_parity);
-          Matrix_cache.save_z(Uab, 0);
+          Matrix_cache.save(Uab, 0);
         }
 
         // accumulate into P5, force_sig
@@ -987,7 +993,7 @@ namespace quda {
 
         // update the force in the sigma direction
         if constexpr (sig_positive) {
-          Link force_sig = Matrix_cache.load_z(2);
+          Link force_sig = Matrix_cache[2];
           arg.force(arg.sig, point_a, parity_a) = force_sig;
         }
 

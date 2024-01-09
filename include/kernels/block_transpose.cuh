@@ -47,6 +47,15 @@ namespace quda
     constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
+    struct CacheDims {
+      static constexpr dim3 dims(dim3 block)
+      {
+        block.x += 1;
+        block.z = 1;
+        return block;
+      }
+    };
+
     /**
       @brief Transpose between the two different orders of batched colorspinor fields:
         - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
@@ -60,7 +69,7 @@ namespace quda
       int parity = parity_color / Arg::nColor;
       using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
 
-      SharedMemoryCache<color_spinor_t> cache({target::block_dim().x + 1, target::block_dim().y, 1});
+      SharedMemoryCache<color_spinor_t, CacheDims> cache;
 
       int x_offset = target::block_dim().x * target::block_idx().x;
       int v_offset = target::block_dim().y * target::block_idx().y;

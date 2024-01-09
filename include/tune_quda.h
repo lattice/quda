@@ -133,6 +133,13 @@ namespace quda {
       }
     }
 
+    auto setSharedBytes(TuneParam &param) const
+    {
+      int nthreads = param.block.x * param.block.y * param.block.z;
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      return param.shared_bytes;
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
@@ -140,14 +147,12 @@ namespace quda {
       bool ret;
 
       param.block.x += blockStep();
-      int nthreads = param.block.x * param.block.y * param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
 
       if (param.block.x > max_threads || param.shared_bytes > max_shared
           || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
         resetBlockDim(param);
-        int nthreads = param.block.x * param.block.y * param.block.z;
-        param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+        setSharedBytes(param);
         ret = false;
       } else {
         ret = true;
@@ -197,8 +202,7 @@ namespace quda {
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
-	  int nthreads = next.block.x * next.block.y * next.block.z;
-          param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
+          param.shared_bytes = setSharedBytes(next);
           return false;
 	} else {
 	  return true;
@@ -284,8 +288,7 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
-      int nthreads = param.block.x*param.block.y*param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
     }
 
     /** sets default values for when tuning is disabled */
@@ -333,6 +336,23 @@ namespace quda {
 
       if (tuneAuxDim() && tp.aux.x == -1 && tp.aux.y == -1 && tp.aux.z == -1 && tp.aux.w == -1)
         errorQuda("aux tuning enabled but param.aux is not initialized");
+    }
+
+    /**
+     * @brief self-consistency check that the shared memory is set
+     * correctly (e.g., check that block size has been correctly
+     * factored in when set setting shared_bytes)
+     */
+    void checkSharedBytes(const TuneParam &tp) const
+    {
+      auto tp2 = TuneParam(tp);
+      auto expected = setSharedBytes(tp2);
+      if (tp.shared_bytes < expected)
+        errorQuda("Shared bytes %u insufficient (expected %u)", tp.shared_bytes, expected);
+
+      if (sharedBytesPerThread() && sharedBytesPerBlock(tp))
+        errorQuda("Not supported: non-zero shared bytes per thread (%u) and per block (%u)", sharedBytesPerThread(),
+                  sharedBytesPerBlock(tp));
     }
 
     /**

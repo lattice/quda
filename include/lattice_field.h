@@ -317,82 +317,82 @@ namespace quda {
     /**
        Pinned memory buffer used for sending messages
     */
-    array<void *, 2> my_face_h = {};
+    mutable array<void *, 2> my_face_h = {};
 
     /**
        Mapped version of my_face_h
     */
-    array<void *, 2> my_face_hd = {};
+    mutable array<void *, 2> my_face_hd = {};
 
     /**
        Device memory buffer for sending messages
      */
-    array<void *, 2> my_face_d = {};
+    mutable array<void *, 2> my_face_d = {};
 
     /**
        Local pointers to the pinned my_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h = {};
 
     /**
        Local pointers to the mapped my_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd = {};
 
     /**
        Local pointers to the device ghost_send buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d = {};
 
     /**
        Memory buffer used for receiving all messages
     */
-    array<void *, 2> from_face_h = {};
+    mutable array<void *, 2> from_face_h = {};
 
     /**
        Mapped version of from_face_h
     */
-    array<void *, 2> from_face_hd = {};
+    mutable array<void *, 2> from_face_hd = {};
 
     /**
        Device memory buffer for receiving messages
      */
-    array<void *, 2> from_face_d = {};
+    mutable array<void *, 2> from_face_d = {};
 
     /**
        Local pointers to the pinned from_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h = {};
 
     /**
        Local pointers to the mapped from_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd = {};
 
     /**
        Local pointers to the device ghost_recv buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d = {};
+    mutable array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d = {};
 
     /**
        Message handles for receiving
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv = {};
 
     /**
        Message handles for sending
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send = {};
 
     /**
        Message handles for receiving
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma = {};
 
     /**
        Message handles for sending
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
+    mutable array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
 
     /**
        Message handles for receiving
@@ -427,7 +427,7 @@ namespace quda {
     /**
        Whether we have initialized communication for this field
     */
-    bool initComms = false;
+    mutable bool initComms = false;
 
     /**
        Whether we have initialized peer-to-peer communication
@@ -543,17 +543,17 @@ namespace quda {
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
     */
-    void createComms(bool no_comms_fill = false);
+    void createComms(bool no_comms_fill = false) const;
 
     /**
        Destroy the communication handlers
     */
-    void destroyComms();
+    void destroyComms() const;
 
     /**
        Create the inter-process communication handlers
     */
-    void createIPCComms();
+    void createIPCComms() const;
 
     /**
        Destroy the statically allocated inter-process communication handlers
@@ -774,19 +774,19 @@ namespace quda {
      */
     void *remoteFace_r() const;
 
-    virtual void gather(int, const qudaStream_t &) { errorQuda("Not implemented"); }
+    virtual void gather(int, const qudaStream_t &) const { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
+    virtual void commsStart(int, const qudaStream_t &, bool, bool) const { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int, const qudaStream_t &, bool, bool)
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool) const
     {
       errorQuda("Not implemented");
       return 0;
     }
 
-    virtual void commsWait(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
+    virtual void commsWait(int, const qudaStream_t &, bool, bool) const { errorQuda("Not implemented"); }
 
-    virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
+    virtual void scatter(int, const qudaStream_t &) const { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
     auto VolString() const { return vol_string; }

@@ -52,6 +52,7 @@ set (QUDA_OBJS
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
+  clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu

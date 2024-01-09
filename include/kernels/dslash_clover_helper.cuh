@@ -203,7 +203,7 @@ namespace quda {
 
       Mat A = arg.clover(x_cb, clover_parity, chirality);
 
-      SharedMemoryCache<half_fermion> cache(target::block_dim());
+      SharedMemoryCache<half_fermion> cache;
 
       half_fermion in_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
