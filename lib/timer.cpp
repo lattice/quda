@@ -161,8 +161,11 @@ namespace quda {
 
   void TimeProfile::Stop_(const char *func, const char *file, int line, QudaProfileType idx)
   {
-    if (idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H)
+    auto i = !pt_stack.empty() ? pt_stack.top() : QUDA_PROFILE_COUNT;
+    if ((idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H) &&
+        i != idx) // don't synchronize if nesting same profile type
       qudaDeviceSynchronize(); // ensure accurate profiling
+
     if (!profile[idx].stop(func, file, line)) {
       for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++)
         if (profile[i].running) errorQuda("Failed to stop timer idx = %d, however idx = %d is running", idx, i);
