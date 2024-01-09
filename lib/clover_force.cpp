@@ -30,6 +30,16 @@ namespace quda
     std::vector<ColorSpinorField> p(x.size());
     for (auto i = 0u; i < p.size(); i++) p[i] = ColorSpinorField(csParam);
 
+    // create oprod and trace field
+    GaugeFieldParam param(mom);
+    param.link_type = QUDA_GENERAL_LINKS;
+    param.reconstruct = QUDA_RECONSTRUCT_NO;
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    param.setPrecision(param.Precision(), true);
+    GaugeField force(param);
+    param.geometry = QUDA_TENSOR_GEOMETRY;
+    GaugeField oprod(param);
+
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     for (auto i = 0u; i < x.size(); i++) {
@@ -54,18 +64,6 @@ namespace quda
       gamma5(p[i], p[i]);
     }
 
-    delete dirac;
-
-    // create oprod and trace field
-    GaugeFieldParam param(mom);
-    param.link_type = QUDA_GENERAL_LINKS;
-    param.reconstruct = QUDA_RECONSTRUCT_NO;
-    param.create = QUDA_ZERO_FIELD_CREATE;
-    param.setPrecision(param.Precision(), true);
-    GaugeField force(param);
-    param.geometry = QUDA_TENSOR_GEOMETRY;
-    GaugeField oprod(param);
-
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
     computeCloverForce(force, gauge, x, p, coeff);
     // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
@@ -83,6 +81,8 @@ namespace quda
     updateMomentum(mom, -1.0, force, "clover");
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    delete dirac;
   }
 
 } // namespace quda

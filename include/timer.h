@@ -218,6 +218,9 @@ namespace quda {
     /**< Print out the profile information */
     void Print();
 
+    void StartTotal(const char *func, const char *file, int line, QudaProfileType idx);
+    void StopTotal(const char *func, const char *file, int line, QudaProfileType idx);
+
     void Start_(const char *func, const char *file, int line, QudaProfileType idx);
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx);
 

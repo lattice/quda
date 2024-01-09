@@ -136,18 +136,34 @@ namespace quda {
 #define POP_RANGE
 #endif
 
-  void TimeProfile::Start_(const char *func, const char *file, int line, QudaProfileType idx)
+  void TimeProfile::StartTotal(const char *func, const char *file, int line, QudaProfileType idx)
   {
     // if total timer isn't running, then start it running
     if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
       profile[QUDA_PROFILE_TOTAL].start(func, file, line);
       switchOff = true;
     }
+  }
+
+  void TimeProfile::StopTotal(const char *func, const char *file, int line, QudaProfileType idx)
+  {
+    // switch off total timer if we need to
+    if (switchOff && idx != QUDA_PROFILE_TOTAL) {
+      profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
+      switchOff = false;
+    }
+  }
+
+  void TimeProfile::Start_(const char *func, const char *file, int line, QudaProfileType idx)
+  {
+    StartTotal(func, file, line, idx);
 
     // if a timer is already running, stop it and push to stack
     for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++) {
       if (profile[i].running) {
-        if (i == QUDA_PROFILE_COMPUTE || i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H) qudaDeviceSynchronize();
+        if ((i == QUDA_PROFILE_COMPUTE || i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H) &&
+            i != idx) // don't synchronize if nesting the same profile type
+          qudaDeviceSynchronize();
         profile[i].stop(file, func, line);
         if (use_global) StopGlobal(func, file, line, static_cast<QudaProfileType>(i));
         pt_stack.push(static_cast<QudaProfileType>(i));
@@ -175,11 +191,7 @@ namespace quda {
     POP_RANGE
 
     if (pt_stack.empty()) {
-      // switch off total timer if we need to (only if no timer being popped)
-      if (switchOff && idx != QUDA_PROFILE_TOTAL) {
-        profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
-        switchOff = false;
-      }
+      StopTotal(func, file, line, idx);
     } else {
       // restore any pre-existing timers if needed
       auto i = pt_stack.top();
