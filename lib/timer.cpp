@@ -166,12 +166,13 @@ namespace quda {
           qudaDeviceSynchronize();
         profile[i].stop(file, func, line);
         if (use_global) StopGlobal(func, file, line, static_cast<QudaProfileType>(i));
+        POP_RANGE;
         pt_stack.push(static_cast<QudaProfileType>(i));
       }
     }
 
     profile[idx].start(func, file, line);
-    PUSH_RANGE(fname.c_str(), idx)
+    PUSH_RANGE(fname.c_str(), idx);
     if (use_global) StartGlobal(func, file, line, idx);
   }
 
@@ -188,7 +189,7 @@ namespace quda {
       errorQuda("Failed to stop timer idx = %d", idx);
     }
     if (use_global) StopGlobal(func, file, line, idx);
-    POP_RANGE
+    POP_RANGE;
 
     if (pt_stack.empty()) {
       StopTotal(func, file, line, idx);
@@ -197,6 +198,7 @@ namespace quda {
       auto i = pt_stack.top();
       pt_stack.pop();
       profile[i].start(func, file, line);
+      PUSH_RANGE(fname.c_str(), i);
       if (use_global) StartGlobal(func, file, line, i);
     }
   }
