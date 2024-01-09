@@ -22,20 +22,6 @@ namespace quda
   public:
     using Smem::shared_mem_size;
 
-#if 0
-    __device__ __host__ constexpr thread_array() : array_(sharedMem()[target::thread_idx_linear<3>()])
-    {
-      array_ = array<T, n>(); // call default constructor
-    }
-
-    template <typename... Ts>
-    __device__ __host__ constexpr thread_array(T first, const Ts... other) :
-      array_(sharedMem()[target::thread_idx_linear<3>()])
-    {
-      array_ = array<T, n> {first, other...};
-    }
-#endif
-
     template <typename... U>
     __device__ __host__ constexpr thread_array(const KernelOps<U...> &ops) :
       Smem(ops), array_(sharedMem()[target::thread_idx_linear<3>()])

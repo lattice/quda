@@ -52,15 +52,15 @@ namespace quda {
     }
   };
 
-  template <typename Arg>
-  struct GaugeLoop : plus<typename Arg::reduce_t>, KernelOps<thread_array<int,4>>
-  {
+  template <typename Arg> struct GaugeLoop : plus<typename Arg::reduce_t>, KernelOps<thread_array<int, 4>> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     static constexpr int reduce_block_dim = 2; // x_cb and parity are mapped to x
     const Arg &arg;
-    template <typename ...OpsArgs>
-    constexpr GaugeLoop(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr GaugeLoop(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id)
@@ -73,7 +73,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx{*this};
+      thread_array<int, 4> dx {*this};
 
       double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return operator()(loop_trace, value);
@@ -92,5 +92,4 @@ namespace quda {
       return operator()(loop_trace, value);
     }
   };
-
 }

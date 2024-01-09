@@ -64,15 +64,6 @@ namespace quda
     /**
        @brief Constructor for ThreadLocalCache.
     */
-#if 0
-    constexpr ThreadLocalCache() : stride(target::block_size<3>())
-    {
-      // sanity check
-      static_assert(shared_mem_size(dim3 {32, 16, 8})
-                    == Smem::get_offset(dim3 {32, 16, 8}) + SizePerThread<len>::size(dim3 {32, 16, 8}) * sizeof(T));
-    }
-#endif
-
     template <typename... U>
     constexpr ThreadLocalCache(const KernelOps<U...> &ops) : Smem(ops), stride(target::block_size<3>())
     {

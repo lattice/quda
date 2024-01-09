@@ -51,8 +51,7 @@ namespace quda
     using Link = Matrix<complex<real>, Arg::nColor>;
 
     const Arg &arg;
-    template <typename... OpsArgs>
-    constexpr STOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    template <typename... OpsArgs> constexpr STOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
     {
     }
     static constexpr const char *filename() { return KERNEL_FILE; }

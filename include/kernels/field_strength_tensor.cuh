@@ -35,7 +35,7 @@ namespace quda
     }
   };
 
-  using computeFmunuCoreOps = KernelOps<thread_array<int,4>>;
+  using computeFmunuCoreOps = KernelOps<thread_array<int, 4>>;
   template <typename Ftor>
   __device__ __host__ inline void computeFmunuCore(const Ftor &ftor, int idx, int parity, int mu, int nu)
   {
@@ -56,7 +56,7 @@ namespace quda
     { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
       // load U(x)_(+mu)
-      thread_array<int, 4> dx{ftor};
+      thread_array<int, 4> dx {ftor};
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+mu)_(+nu)
@@ -79,7 +79,7 @@ namespace quda
     { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
 
       // load U(x)_(+nu)
-      thread_array<int, 4> dx{ftor};
+      thread_array<int, 4> dx {ftor};
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
@@ -106,7 +106,7 @@ namespace quda
     { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
 
       // load U(x)_(-nu)
-      thread_array<int, 4> dx{ftor};
+      thread_array<int, 4> dx {ftor};
       dx[nu]--;
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
@@ -133,7 +133,7 @@ namespace quda
     { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
 
       // load U(x)_(-mu)
-      thread_array<int, 4> dx{ftor};
+      thread_array<int, 4> dx {ftor};
       dx[mu]--;
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;
@@ -180,8 +180,10 @@ namespace quda
   template <typename Arg_> struct ComputeFmunu : computeFmunuCoreOps {
     using Arg = Arg_;
     const Arg &arg;
-    template <typename ...OpsArgs>
-    constexpr ComputeFmunu(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr ComputeFmunu(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)

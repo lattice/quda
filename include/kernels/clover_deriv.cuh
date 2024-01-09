@@ -46,7 +46,7 @@ namespace quda
 
     // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
     {
-      thread_array<int, 4> d{ftor};
+      thread_array<int, 4> d {ftor};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -80,7 +80,7 @@ namespace quda
     }
 
     {
-      thread_array<int, 4> d{ftor};
+      thread_array<int, 4> d {ftor};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -119,7 +119,7 @@ namespace quda
     }
 
     {
-      thread_array<int, 4> d{ftor};
+      thread_array<int, 4> d {ftor};
 
       // load U(x)_(+mu)
       Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
@@ -157,7 +157,7 @@ namespace quda
     // Lower leaf
     // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
     {
-      thread_array<int, 4> d{ftor};
+      thread_array<int, 4> d {ftor};
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -196,11 +196,12 @@ namespace quda
     }
   }
 
-  template <typename Arg> struct CloverDerivative : computeForceOps
-  {
+  template <typename Arg> struct CloverDerivative : computeForceOps {
     const Arg &arg;
-    template <typename ...OpsArgs>
-    constexpr CloverDerivative(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr CloverDerivative(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __host__ __device__ void operator()(int x_cb, int parity, int mu)

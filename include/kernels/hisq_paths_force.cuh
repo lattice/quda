@@ -310,8 +310,7 @@ namespace quda {
       using Ops = KernelOps<ThreadLocalCache<Link>>;
     };
 
-    template <typename Param> struct AllThreeAllLepageLink : AllThreeAllLepageLinkOps<Param>::Ops
-    {
+    template <typename Param> struct AllThreeAllLepageLink : AllThreeAllLepageLinkOps<Param>::Ops {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
@@ -324,8 +323,10 @@ namespace quda {
       static constexpr int compute_lepage = Param::compute_lepage;
 
       using typename AllThreeAllLepageLinkOps<Param>::Ops::KernelOpsT;
-      template <typename ...OpsArgs>
-      constexpr AllThreeAllLepageLink(const Param &param, const OpsArgs &...ops) : KernelOpsT(ops...), arg(param.arg) {}
+      template <typename... OpsArgs>
+      constexpr AllThreeAllLepageLink(const Param &param, const OpsArgs &...ops) : KernelOpsT(ops...), arg(param.arg)
+      {
+      }
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       /**
@@ -567,7 +568,7 @@ namespace quda {
         int point_a = e_cb;
         int parity_a = parity;
 
-        ThreadLocalCache<Link> Uab_cache{*this};
+        ThreadLocalCache<Link> Uab_cache {*this};
         // Scoped load of Uab
         {
           int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -679,11 +680,10 @@ namespace quda {
     template <typename Param> struct AllFiveAllSevenLinkOps {
       static constexpr int cacheLen = Param::sig_positive ? 3 : 2;
       using Link = Matrix<complex<typename Param::Arg::real>, Param::Arg::nColor>;
-      using Ops = KernelOps<ThreadLocalCache<Link,cacheLen>>;
+      using Ops = KernelOps<ThreadLocalCache<Link, cacheLen>>;
     };
 
-    template <typename Param> struct AllFiveAllSevenLink : AllFiveAllSevenLinkOps<Param>::Ops
-    {
+    template <typename Param> struct AllFiveAllSevenLink : AllFiveAllSevenLinkOps<Param>::Ops {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
@@ -696,8 +696,10 @@ namespace quda {
       static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for AllFiveAllSevenLink");
 
       using typename AllFiveAllSevenLinkOps<Param>::Ops::KernelOpsT;
-      template <typename ...OpsArgs>
-      constexpr AllFiveAllSevenLink(const Param &param, const OpsArgs &...ops) : KernelOpsT(ops...), arg(param.arg) {}
+      template <typename... OpsArgs>
+      constexpr AllFiveAllSevenLink(const Param &param, const OpsArgs &...ops) : KernelOpsT(ops...), arg(param.arg)
+      {
+      }
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       /**
@@ -978,8 +980,8 @@ namespace quda {
         int parity_a = parity;
 
         // calculate p5_sig
-	constexpr int cacheLen = sig_positive ? 3 : 2;
-        ThreadLocalCache<Link, cacheLen> Matrix_cache{*this};
+        constexpr int cacheLen = sig_positive ? 3 : 2;
+        ThreadLocalCache<Link, cacheLen> Matrix_cache {*this};
 
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);
