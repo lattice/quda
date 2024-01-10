@@ -10,6 +10,7 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <timer.h>
+#include "instantiate.h"
 
 using namespace quda;
 
@@ -29,7 +30,6 @@ QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
 void init()
 {
-
   param.cpu_prec = prec_cpu;
   param.cuda_prec = prec;
   param.reconstruct = link_recon;
@@ -103,12 +103,13 @@ void packTest()
 
   printfQuda("Sending fields to GPU...\n");
 
-#ifdef BUILD_CPS_INTERFACE
-  {
+  if (is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>()) {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
 
     GaugeFieldParam cpsParam(param, cpsCpuGauge_p);
+    cpsParam.location = QUDA_CPU_FIELD_LOCATION;
     GaugeField cpsCpuGauge(cpsParam);
+    cpsParam.location = QUDA_CUDA_FIELD_LOCATION;
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
     cpsParam.reconstruct = param.reconstruct;
     cpsParam.setPrecision(param.cuda_prec, true);
@@ -125,14 +126,14 @@ void packTest()
     host_timer.stop();
     printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.last());
   }
-#endif
 
-#ifdef BUILD_QDP_INTERFACE
-  {
+  if (is_enabled<QUDA_QDP_GAUGE_ORDER>) {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
     GaugeFieldParam qdpParam(param, qdpCpuGauge_p);
+    qdpParam.location = QUDA_CPU_FIELD_LOCATION;
     GaugeField qdpCpuGauge(qdpParam);
+    qdpParam.location = QUDA_CUDA_FIELD_LOCATION;
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
     qdpParam.reconstruct = param.reconstruct;
     qdpParam.setPrecision(param.cuda_prec, true);
@@ -149,7 +150,6 @@ void packTest()
     host_timer.stop();
     printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.last());
   }
-#endif
 
   host_timer.start();
   *cudaSpinor = *spinor;
