@@ -8,9 +8,6 @@
 namespace quda
 {
 
-#define DOUBLE_TOL 2e-15
-#define SINGLE_TOL 1e-6
-
   template <typename Float_, int nColor_, QudaReconstructType recon_, int level_, int hypDim_>
   struct GaugeHYPArg : kernel_param<> {
     using Float = Float_;
@@ -38,7 +35,7 @@ namespace quda
       in(in),
       alpha(alpha),
       dir_ignore(dir_ignore),
-      tolerance(in.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL)
+      tolerance(in.toleranceSU3())
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
