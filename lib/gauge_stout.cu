@@ -99,7 +99,7 @@ namespace quda {
     out.exchangeExtendedGhost(out.R(), false);
   }
 
-  void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon, int dir_ignore)
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, double rho, double epsilon, int dir_ignore)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);

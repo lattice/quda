@@ -59,7 +59,7 @@ namespace quda {
 
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, GaugeField& in, double alpha, int dir_ignore)
+  void APEStep(GaugeField &out, GaugeField &in, double alpha, int dir_ignore)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);

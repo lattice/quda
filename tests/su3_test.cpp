@@ -98,7 +98,8 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-smear-alpha2", gauge_smear_alpha2, "alpha2 coefficient for HYP smearing (default 0.6)");
   opgroup->add_option("--su3-smear-alpha3", gauge_smear_alpha3, "alpha3 coefficient for HYP smearing (default 0.3)");
 
-  opgroup->add_option("--su3-smear-dir-ignore", gauge_smear_dir_ignore, "direction to be ignored by the smearing (default 4)");
+  opgroup->add_option("--su3-smear-dir-ignore", gauge_smear_dir_ignore,
+                      "direction to be ignored by the smearing (default 4)");
 
   opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
 

@@ -8,8 +8,8 @@
 namespace quda
 {
 
-#define  DOUBLE_TOL	2e-15
-#define  SINGLE_TOL	1e-6
+#define DOUBLE_TOL 2e-15
+#define SINGLE_TOL 1e-6
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_>
   struct GaugeAPEArg : kernel_param<> {
@@ -72,7 +72,7 @@ namespace quda
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
-    
+
       Stap = Stap * (arg.alpha / ((real)(2 * (Arg::apeDim - 1))));
       setIdentity(&I);
 

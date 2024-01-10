@@ -8,8 +8,8 @@
 namespace quda
 {
 
-#define  DOUBLE_TOL	2e-15
-#define  SINGLE_TOL	1e-6
+#define DOUBLE_TOL 2e-15
+#define SINGLE_TOL 1e-6
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, int level_, int hypDim_>
   struct GaugeHYPArg : kernel_param<> {
@@ -19,13 +19,13 @@ namespace quda
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int hypDim = hypDim_;
     static constexpr int level = level_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge out;
     Gauge tmp[4];
     const Gauge in;
 
-    int X[4];    // grid dimensions
+    int X[4]; // grid dimensions
     int border[4];
     const Float alpha;
     const int dir_ignore;
@@ -34,7 +34,7 @@ namespace quda
     GaugeHYPArg(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, hypDim)),
       out(out),
-      tmp{*tmp[0], *tmp[1], *tmp[2], *tmp[3]},
+      tmp {*tmp[0], *tmp[1], *tmp[2], *tmp[3]},
       in(in),
       alpha(alpha),
       dir_ignore(dir_ignore),
@@ -48,12 +48,13 @@ namespace quda
   };
 
   template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[3])
+  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                      const int mu, Staple staple[3])
   {
     using Link = typename get_type<Staple>::type;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx = {};
     int cnt = -1;
 #pragma unroll
     for (int nu = 0; nu < 4; ++nu) {
@@ -104,12 +105,13 @@ namespace quda
   }
 
   template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[3])
+  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                      const int mu, Staple staple[3])
   {
     using Link = typename get_type<Staple>::type;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx = {};
     int cnt = -1;
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
@@ -169,14 +171,15 @@ namespace quda
   }
 
   template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[3])
+  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                      const int mu, Staple staple[3])
   {
     using Link = typename get_type<Staple>::type;
     staple[0] = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx = {};
 #pragma unroll
-    for (int nu = 0; nu < 4 ; nu++) {
+    for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
@@ -226,8 +229,8 @@ namespace quda
 
   template <typename Arg> struct HYP {
     const Arg &arg;
-    constexpr HYP(const Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; }
+    constexpr HYP(const Arg &arg) : arg(arg) { }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
@@ -278,12 +281,13 @@ namespace quda
   };
 
   template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[2], const int dir_ignore)
+  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                        const int mu, Staple staple[2], const int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
     for (int i = 0; i < 2; ++i) staple[i] = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx = {};
     int cnt = -1;
 #pragma unroll
     for (int nu = 0; nu < 4; ++nu) {
@@ -334,12 +338,13 @@ namespace quda
   }
 
   template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, const int *x, const Int *X, const int parity, const int mu, Staple staple[2], int dir_ignore)
+  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, const int *x, const Int *X, const int parity,
+                                                        const int mu, Staple staple[2], int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
     staple[0] = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx = {};
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and
@@ -395,8 +400,8 @@ namespace quda
 
   template <typename Arg> struct HYP3D {
     const Arg &arg;
-    constexpr HYP3D(const Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; }
+    constexpr HYP3D(const Arg &arg) : arg(arg) { }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {

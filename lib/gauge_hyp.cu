@@ -4,7 +4,8 @@
 #include <instantiate.h>
 #include <kernels/gauge_hyp.cuh>
 
-namespace quda {
+namespace quda
+{
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeHYP : TunableKernel3D
   {
@@ -23,7 +24,7 @@ namespace quda {
     GaugeHYP(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int level, int dir_ignore) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
-      tmp{tmp[0], tmp[1], tmp[2], tmp[3]},
+      tmp {tmp[0], tmp[1], tmp[2], tmp[3]},
       in(in),
       alpha(static_cast<Float>(alpha)),
       level(level),
@@ -43,17 +44,17 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (hypDim == 4) {
         if (level == 1) {
-          launch<HYP>(tp, stream, GaugeHYPArg<Float,nColor,recon,1,4>(out, tmp, in, alpha, dir_ignore));
+          launch<HYP>(tp, stream, GaugeHYPArg<Float, nColor, recon, 1, 4>(out, tmp, in, alpha, dir_ignore));
         } else if (level == 2) {
-          launch<HYP>(tp, stream, GaugeHYPArg<Float,nColor,recon,2,4>(out, tmp, in, alpha, dir_ignore));
+          launch<HYP>(tp, stream, GaugeHYPArg<Float, nColor, recon, 2, 4>(out, tmp, in, alpha, dir_ignore));
         } else if (level == 3) {
-          launch<HYP>(tp, stream, GaugeHYPArg<Float,nColor,recon,3,4>(out, tmp, in, alpha, dir_ignore));
+          launch<HYP>(tp, stream, GaugeHYPArg<Float, nColor, recon, 3, 4>(out, tmp, in, alpha, dir_ignore));
         }
       } else if (hypDim == 3) {
         if (level == 1) {
-          launch<HYP3D>(tp, stream, GaugeHYPArg<Float,nColor,recon,1,3>(out, tmp, in, alpha, dir_ignore));
+          launch<HYP3D>(tp, stream, GaugeHYPArg<Float, nColor, recon, 1, 3>(out, tmp, in, alpha, dir_ignore));
         } else if (level == 2) {
-          launch<HYP3D>(tp, stream, GaugeHYPArg<Float,nColor,recon,2,3>(out, tmp, in, alpha, dir_ignore));
+          launch<HYP3D>(tp, stream, GaugeHYPArg<Float, nColor, recon, 2, 3>(out, tmp, in, alpha, dir_ignore));
         }
       }
     }
@@ -79,8 +80,7 @@ namespace quda {
     {
       long long bytes = 0;
       if ((hypDim == 4 && level == 1) || (hypDim == 3 && level == 1)) { // 6 links per dim, 1 in, hypDim-1 tmp
-        bytes += (in.Reconstruct() * in.Precision()
-                  + (hypDim - 1) * 6 * in.Reconstruct() * in.Precision()
+        bytes += (in.Reconstruct() * in.Precision() + (hypDim - 1) * 6 * in.Reconstruct() * in.Precision()
                   + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
           * hypDim * in.LocalVolume();
       } else if (hypDim == 4 && level == 2) { // 6 links per dim, 1 in, hypDim-1 tmp
@@ -89,8 +89,7 @@ namespace quda {
                   + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
           * hypDim * in.LocalVolume();
       } else if ((hypDim == 4 && level == 3) || (hypDim == 3 && level == 2)) { // 6 links per dim, 1 in, 1 out
-        bytes += (in.Reconstruct() * in.Precision()
-                  + (hypDim - 1) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
+        bytes += (in.Reconstruct() * in.Precision() + (hypDim - 1) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
                   + out.Reconstruct() * out.Precision())
           * hypDim * in.LocalVolume();
       }
@@ -99,7 +98,8 @@ namespace quda {
 
   }; // GaugeAPE
 
-  void HYPStep(GaugeField &out, GaugeField *tmp[4], GaugeField& in, double alpha1, double alpha2, double alpha3, int dir_ignore)
+  void HYPStep(GaugeField &out, GaugeField *tmp[4], GaugeField &in, double alpha1, double alpha2, double alpha3,
+               int dir_ignore)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
@@ -128,4 +128,4 @@ namespace quda {
     }
   }
 
-}
+} // namespace quda
