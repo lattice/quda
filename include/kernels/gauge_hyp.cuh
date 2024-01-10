@@ -340,7 +340,6 @@ namespace quda
     staple[0] = Link();
 
     thread_array<int, 4> dx = { };
-    int cnt = -1;
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and

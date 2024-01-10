@@ -63,34 +63,38 @@ namespace quda {
 
     long long flops() const
     {
+      long long flops = 0;
       auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2ll);
       if ((hypDim == 4 && level == 1) || (hypDim == 3 && level == 1)) {
-        return ((hypDim - 1) * 2 + (hypDim - 1) * 4) * mat_flops * hypDim * in.LocalVolume();
+        flops += ((hypDim - 1) * 2 + (hypDim - 1) * 4) * mat_flops * hypDim * in.LocalVolume();
       } else if (hypDim == 4 && level == 2) {
-        return ((hypDim - 1) * 2 + (hypDim - 1) * (hypDim - 2) * 4) * mat_flops * hypDim * in.LocalVolume();
+        flops += ((hypDim - 1) * 2 + (hypDim - 1) * (hypDim - 2) * 4) * mat_flops * hypDim * in.LocalVolume();
       } else if ((hypDim == 4 && level == 3) || (hypDim == 3 && level == 2)) {
-        return (2 + (hypDim - 1) * 4) * mat_flops * hypDim * in.LocalVolume();
+        flops += (2 + (hypDim - 1) * 4) * mat_flops * hypDim * in.LocalVolume();
       }
+      return flops;
     }
 
     long long bytes() const
     {
+      long long bytes = 0;
       if ((hypDim == 4 && level == 1) || (hypDim == 3 && level == 1)) { // 6 links per dim, 1 in, hypDim-1 tmp
-        return (in.Reconstruct() * in.Precision()
-                + (hypDim - 1) * 6 * in.Reconstruct() * in.Precision()
-                + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
+        bytes += (in.Reconstruct() * in.Precision()
+                  + (hypDim - 1) * 6 * in.Reconstruct() * in.Precision()
+                  + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
           * hypDim * in.LocalVolume();
       } else if (hypDim == 4 && level == 2) { // 6 links per dim, 1 in, hypDim-1 tmp
-        return (in.Reconstruct() * in.Precision()
-                + (hypDim - 1) * (hypDim - 2) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
-                + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
+        bytes += (in.Reconstruct() * in.Precision()
+                  + (hypDim - 1) * (hypDim - 2) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
+                  + (hypDim - 1) * tmp[0]->Reconstruct() * tmp[0]->Precision())
           * hypDim * in.LocalVolume();
       } else if ((hypDim == 4 && level == 3) || (hypDim == 3 && level == 2)) { // 6 links per dim, 1 in, 1 out
-        return (in.Reconstruct() * in.Precision()
-                + (hypDim - 1) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
-                + out.Reconstruct() * out.Precision())
+        bytes += (in.Reconstruct() * in.Precision()
+                  + (hypDim - 1) * 6 * tmp[0]->Reconstruct() * tmp[0]->Precision()
+                  + out.Reconstruct() * out.Precision())
           * hypDim * in.LocalVolume();
       }
+      return bytes;
     }
 
   }; // GaugeAPE
