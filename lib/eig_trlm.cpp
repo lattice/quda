@@ -174,7 +174,7 @@ namespace quda
       logQuda(QUDA_SUMMARIZE, "TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n",
               n_conv, restart_iter, iter);
 
-      // Dump all Ritz values and residua if using Chebyshev
+      // Dump all Ritz values and residua
       for (int i = 0; i < n_conv; i++) {
         logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
       }
