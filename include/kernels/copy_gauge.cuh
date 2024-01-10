@@ -108,7 +108,8 @@ namespace quda {
 
     template <bool fine_grain> __device__ __host__ inline std::enable_if_t<!fine_grain, void> copy(int d, int parity, int x, int)
     {
-      Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in.Ghost(d + arg.in_offset, x, parity);
+      Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in;
+      in = arg.in.Ghost(d + arg.in_offset, x, parity);
       Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
       arg.out.Ghost(d + arg.out_offset, x, parity) = out;
     }
