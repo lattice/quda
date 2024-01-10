@@ -71,7 +71,10 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
       param.aux.x = (param.aux.x + 1) % 6;
-       // mu must be contained in the block, types 0, 1, 2 have mu = 8 and 3, 4, 5 have mu = 4
+      if (!device::shared_memory_atomic_supported()) { // 1, 4 use shared memory atomics
+	if(param.aux.x == 1 || param.aux.x == 4) param.aux.x++;
+      }
+      // mu must be contained in the block, types 0, 1, 2 have mu = 8 and 3, 4, 5 have mu = 4
       TunableKernel2D::resizeVector(param.aux.x < 3 ? 8 : 4);
       TunableKernel2D::resizeStep(param.aux.x < 3 ? 8 : 4);
       TunableKernel2D::initTuneParam(param);
@@ -413,7 +416,7 @@ namespace quda {
 
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_VERBOSE)
+      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
@@ -500,7 +503,9 @@ namespace quda {
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
                       const double tolerance, const int reunit_interval, const int stopWtheta)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 }   //namespace quda

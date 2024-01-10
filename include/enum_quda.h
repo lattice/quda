@@ -10,8 +10,11 @@ typedef enum qudaError_t { QUDA_SUCCESS = 0, QUDA_ERROR = 1, QUDA_ERROR_UNINITIA
 
 typedef enum QudaMemoryType_s {
   QUDA_MEMORY_DEVICE,
-  QUDA_MEMORY_PINNED,
+  QUDA_MEMORY_DEVICE_PINNED,
+  QUDA_MEMORY_HOST,
+  QUDA_MEMORY_HOST_PINNED,
   QUDA_MEMORY_MAPPED,
+  QUDA_MEMORY_MANAGED,
   QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
 } QudaMemoryType;
 
@@ -359,10 +362,11 @@ typedef enum QudaFieldOrder_s {
 } QudaFieldOrder;
 
 typedef enum QudaFieldCreate_s {
-  QUDA_NULL_FIELD_CREATE,      // create new field
-  QUDA_ZERO_FIELD_CREATE,      // create new field and zero it
-  QUDA_COPY_FIELD_CREATE,      // create copy to field
-  QUDA_REFERENCE_FIELD_CREATE, // create reference to field
+  QUDA_NULL_FIELD_CREATE,      // new field
+  QUDA_ZERO_FIELD_CREATE,      // new field and zero it
+  QUDA_COPY_FIELD_CREATE,      // copy to field
+  QUDA_REFERENCE_FIELD_CREATE, // reference to field
+  QUDA_GHOST_FIELD_CREATE,     // dummy field used only for ghost storage
   QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
 } QudaFieldCreate;
 
@@ -393,6 +397,7 @@ typedef enum QudaDilutionType_s {
   QUDA_DILUTION_COLOR,
   QUDA_DILUTION_SPIN_COLOR,
   QUDA_DILUTION_SPIN_COLOR_EVEN_ODD,
+  QUDA_DILUTION_BLOCK,
   QUDA_DILUTION_INVALID = QUDA_INVALID_ENUM
 } QudaDilutionType;
 
@@ -476,6 +481,12 @@ typedef enum QudaBoolean_s {
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
+typedef enum QudaBLASType_s {
+  QUDA_BLAS_GEMM = 0,
+  QUDA_BLAS_LU_INV = 1,
+  QUDA_BLAS_INVALID = QUDA_INVALID_ENUM
+} QudaBLASType;
+
 typedef enum QudaBLASOperation_s {
   QUDA_BLAS_OP_N = 0, // No transpose
   QUDA_BLAS_OP_T = 1, // Transpose only
@@ -525,7 +536,7 @@ typedef enum QudaGhostExchange_s {
 typedef enum QudaStaggeredPhase_s {
   QUDA_STAGGERED_PHASE_NO = 0,
   QUDA_STAGGERED_PHASE_MILC = 1,
-  QUDA_STAGGERED_PHASE_CPS = 2,
+  QUDA_STAGGERED_PHASE_CHROMA = 2,
   QUDA_STAGGERED_PHASE_TIFR = 3,
   QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
 } QudaStaggeredPhase;
@@ -564,6 +575,12 @@ typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_SYMANZIK_FLOW,
   QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeSmearType;
+
+typedef enum QudaFermionSmearType_s {
+  QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+  QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+  QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaFermionSmearType;
 
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {

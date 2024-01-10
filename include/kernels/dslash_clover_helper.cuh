@@ -4,6 +4,7 @@
 #include <clover_field_order.h>
 #include "color_spinor.h"
 #include <linalg.cuh>
+#include "shared_memory_cache_helper.h"
 #include "kernel.h"
 
 namespace quda {
@@ -44,7 +45,8 @@ namespace quda {
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 	      int parity, real kappa=0.0, real mu=0.0, real epsilon = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset())),
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB()/2 : in.VolumeCB(),
+                        in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? 2 : 1, in.SiteSubset())),
       out(out), in(in),
       clover(clover, inverse && !dynamic_clover && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
       cloverInv(clover, !dynamic_clover), // only inverse if !dynamic
@@ -90,7 +92,7 @@ namespace quda {
     constexpr CloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int, int parity)
     {
       using namespace linalg; // for Cholesky
       int clover_parity = arg.nParity == 2 ? parity : arg.parity;
@@ -133,7 +135,7 @@ namespace quda {
     constexpr TwistCloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int, int parity)
     {
       using namespace linalg; // for Cholesky
       int clover_parity = arg.nParity == 2 ? parity : arg.parity;
@@ -184,63 +186,73 @@ namespace quda {
     constexpr NdegTwistCloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int flavor, int parity)
     {
       using namespace linalg; // for Cholesky
       const int clover_parity = arg.nParity == 2 ? parity : arg.parity;
       const int spinor_parity = arg.nParity == 2 ? parity : 0;
       constexpr int n_flavor = 2;
-      fermion in[n_flavor];
-      fermion out[n_flavor];
 
+      int my_flavor_idx = x_cb + flavor * arg.volumeCB;
+      fermion in = arg.in(my_flavor_idx, spinor_parity);
+      in.toRel(); // change to chiral basis here
+
+      int chirality = flavor; // relabel flavor as chirality
+      // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
+      const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
+
+      Mat A = arg.clover(x_cb, clover_parity, chirality);
+
+      SharedMemoryCache<half_fermion> cache;
+
+      half_fermion in_chi[n_flavor]; // flavor array of chirally projected fermion
+#pragma unroll
+      for (int i = 0; i < n_flavor; i++) in_chi[i] = in.chiral_project(i);
+
+      enum swizzle_direction {
+        FORWARDS = 0,
+        BACKWARDS = 1
+      };
+
+      auto swizzle = [&](half_fermion x[2], int chirality, swizzle_direction dir) {
+        if (chirality == 0) cache.save_y(x[1], dir);
+        else                cache.save_y(x[0], 1 - dir);
+        cache.sync();
+        if (chirality == 0) x[1] = cache.load_y(1 - dir);
+        else                x[0] = cache.load_y(dir);
+      };
+
+      swizzle(in_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
+
+      half_fermion out_chi[n_flavor];
 #pragma unroll
       for (int flavor = 0; flavor < n_flavor; flavor++) {
-        in[flavor] = arg.in(x_cb + flavor * arg.volumeCB, spinor_parity);
-        in[flavor].toRel(); // change to chiral basis here
+        out_chi[flavor] = A * in_chi[flavor];
+        out_chi[flavor] += (flavor == 0 ? a : -a) * in_chi[flavor];
+        out_chi[flavor] += arg.b * in_chi[1 - flavor];
       }
 
+      if (arg.inverse) {
+        if (arg.dynamic_clover) {
+          Mat A2 = A.square();
+          A2 += arg.a2_minus_b2;
+          Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A2);
 #pragma unroll
-      for (int chirality = 0; chirality < 2; chirality++) {
-        // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
-        const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
-
-        Mat A = arg.clover(x_cb, clover_parity, chirality);
-
-        half_fermion in_chi[n_flavor] = {in[0].chiral_project(chirality), in[1].chiral_project(chirality)};
-        half_fermion out_chi[n_flavor];
-
+          for (int flavor = 0; flavor < n_flavor; flavor++)
+            out_chi[flavor] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(out_chi[flavor]));
+        } else {
+          Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
 #pragma unroll
-        for (int flavor = 0; flavor < n_flavor; flavor++) {
-          out_chi[flavor] = A * in_chi[flavor];
-          out_chi[flavor] += (flavor == 0 ? a : -a) * in_chi[flavor];
-          out_chi[flavor] += arg.b * in_chi[1 - flavor];
+          for (int flavor = 0; flavor < n_flavor; flavor++)
+            out_chi[flavor] = static_cast<real>(2.0) * (Ainv * out_chi[flavor]);
         }
-
-        if (arg.inverse) {
-          if (arg.dynamic_clover) {
-            Mat A2 = A.square();
-            A2 += arg.a2_minus_b2;
-            Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A2);
-#pragma unroll
-            for (int flavor = 0; flavor < n_flavor; flavor++)
-              out_chi[flavor] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(out_chi[flavor]));
-          } else {
-            Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
-#pragma unroll
-            for (int flavor = 0; flavor < n_flavor; flavor++)
-              out_chi[flavor] = static_cast<real>(2.0) * (Ainv * out_chi[flavor]);
-          }
-        }
-
-#pragma unroll
-        for (int flavor = 0; flavor < n_flavor; flavor++) out[flavor] += (out_chi[flavor]).chiral_reconstruct(chirality);
       }
 
-#pragma unroll
-      for (int flavor = 0; flavor < n_flavor; flavor++) {
-        out[flavor].toNonRel(); // change basis back
-        arg.out(x_cb + flavor * arg.volumeCB, spinor_parity) = out[flavor];
-      }
+      swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
+      fermion out = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
+      out.toNonRel(); // change basis back
+
+      arg.out(my_flavor_idx, spinor_parity) = out;
     }
   };
 

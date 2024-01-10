@@ -13,6 +13,8 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
+#include <dslash_reference.h>
+
 #include <qio_field.h>
 
 #define XUP 0
@@ -24,59 +26,12 @@ template <typename T> using complex = std::complex<T>;
 
 // Staggered gauge field utils
 //------------------------------------------------------
-void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
-                                            void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
-                                            int argc, char **argv, bool &gauge_loaded)
-{
-  // load a field WITHOUT PHASES
-  if (latfile.size() > 0) {
-    if (!gauge_loaded) {
-      read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-      if (dslash_type != QUDA_LAPLACE_DSLASH) {
-        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-      }
-      gauge_loaded = true;
-    } // else it's already been loaded
-  } else {
-    int construct_type = (unit_gauge) ? 0 : 1;
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, construct_type, gauge_param.cpu_prec, &gauge_param,
-                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
-    }
-  }
-
-  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
-  // "compute" the fat/long links or not.
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-      memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-      memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
-      memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
-    }
-  } else {
-    // QUDA_ASQTAD_DSLASH
-    if (compute_fatlong) {
-      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
-                              gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
-    } else {
-      // Not computing FatLong
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-        memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-        memcpy(qdp_longlink_gpu[dir], qdp_longlink_cpu[dir], V * gauge_site_size * host_gauge_data_type_size);
-      }
-    }
-  }
-}
-
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv)
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu)
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
+  // load a field WITHOUT PHASES
   if (latfile.size() > 0) {
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -103,10 +58,43 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   } else {
     // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
-      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+      if (compute_on_gpu)
+        computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
+      else
+        computeFatLongCPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
     } else {
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+  }
+}
+
+void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
+                                            void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
+                                            int argc, char **argv)
+{
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_fatlink_cpu, gauge_param, argc, argv, false);
+
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+    }
+  } else {
+    // QUDA_ASQTAD_DSLASH
+    if (compute_fatlong) {
+      computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                        eps_naik);
+    } else {
+      // Not computing FatLong
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+        memcpy(qdp_longlink_gpu[dir], qdp_longlink_cpu[dir], V * gauge_site_size * host_gauge_data_type_size);
       }
     }
   }
@@ -186,6 +174,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
   // FIXME: may break host comparison
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
     for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
       for (int i = 0; i < V; ++i) {
         for (auto j = 0lu; j < gauge_site_size; j += 2) {
           if (precision == QUDA_DOUBLE_PRECISION) {
@@ -250,11 +239,12 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
 template <typename su3_matrix, typename Float>
 void computeLongLinkCPU(void **longlink, su3_matrix **sitelink, Float *act_path_coeff)
 {
-  su3_matrix temp;
   for (int dir = XUP; dir <= TUP; ++dir) {
-    int dx[4] = {0, 0, 0, 0};
+#pragma omp parallel for
     for (int i = 0; i < V; ++i) {
+      int dx[4] = {0, 0, 0, 0};
       // Initialize the longlinks
+      su3_matrix temp;
       su3_matrix *llink = ((su3_matrix *)longlink[dir]) + i;
       llfat_scalar_mult_su3_matrix(sitelink[dir] + i, act_path_coeff[1], llink);
       dx[dir] = 1;
@@ -265,7 +255,6 @@ void computeLongLinkCPU(void **longlink, su3_matrix **sitelink, Float *act_path_
       llfat_mult_su3_nn(&temp, sitelink[dir] + nbr_idx, llink);
     }
   }
-  return;
 }
 #else
 
@@ -276,7 +265,7 @@ void computeLongLinkCPU(void **longlink, su3_matrix **sitelinkEx, Float *act_pat
   for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
   const int extended_volume = E[3] * E[2] * E[1] * E[0];
 
-  su3_matrix temp;
+#pragma omp parallel for
   for (int t = 0; t < Z[3]; ++t) {
     for (int z = 0; z < Z[2]; ++z) {
       for (int y = 0; y < Z[1]; ++y) {
@@ -292,6 +281,7 @@ void computeLongLinkCPU(void **longlink, su3_matrix **sitelinkEx, Float *act_pat
             llfat_scalar_mult_su3_matrix(sitelinkEx[dir] + large_index, act_path_coeff[1], llink);
             dx[dir] = 1;
             int nbr_index = neighborIndexFullLattice(E, large_index, dx);
+            su3_matrix temp;
             llfat_mult_su3_nn(llink, sitelinkEx[dir] + nbr_index, &temp);
             dx[dir] = 2;
             nbr_index = neighborIndexFullLattice(E, large_index, dx);
@@ -301,7 +291,6 @@ void computeLongLinkCPU(void **longlink, su3_matrix **sitelinkEx, Float *act_pat
       }   // y
     }     // z
   }       // t
-  return;
 }
 #endif
 
@@ -324,11 +313,166 @@ void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, vo
   } // if(longlink)
 }
 
+template <typename su3_matrix>
+void computeTwoLinkCPU(void **twolink, su3_matrix **sitelinkEx)
+{
+  int E[4];
+  for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
+  const int extended_volume = E[3] * E[2] * E[1] * E[0];
+
+  for (int t = 0; t < Z[3]; ++t) {
+    for (int z = 0; z < Z[2]; ++z) {
+      for (int y = 0; y < Z[1]; ++y) {
+        for (int x = 0; x < Z[0]; ++x) {
+          const int oddBit = (x + y + z + t) & 1;
+          int little_index = ((((t * Z[2] + z) * Z[1] + y) * Z[0] + x) / 2) + oddBit * Vh;
+          int large_index
+            = (((((t + 2) * E[2] + (z + 2)) * E[1] + (y + 2)) * E[0] + x + 2) / 2) + oddBit * (extended_volume / 2);
+
+          for (int dir = XUP; dir <= TUP; ++dir) {
+            int dx[4] = {0, 0, 0, 0};
+            su3_matrix *llink = ((su3_matrix *)twolink[dir]) + little_index;
+            dx[dir] = 1;
+            int nbr_index = neighborIndexFullLattice(E, large_index, dx);
+            llfat_mult_su3_nn(sitelinkEx[dir] + large_index, sitelinkEx[dir] + nbr_index, llink);
+          }
+        } // x
+      }   // y
+    }     // z
+  }       // t
+  return;
+}
+
+void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaugeParam)
+{
+  quda::lat_dim_t R = {2,2,2,2};
+
+  quda::lat_dim_t X={qudaGaugeParam->X[0], qudaGaugeParam->X[1], qudaGaugeParam->X[2], qudaGaugeParam->X[3]}; 
+
+  exchange_cpu_sitelink_ex(X, R, sitelink, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam->cpu_prec, 0, 4);
+
+  switch (qudaGaugeParam->cpu_prec) {
+  case QUDA_DOUBLE_PRECISION:
+    computeTwoLinkCPU((void **)twolink, (su3_matrix<double> **)sitelink);
+    break;
+
+  case QUDA_SINGLE_PRECISION:
+    computeTwoLinkCPU((void **)twolink, (su3_matrix<float> **)sitelink);
+    break;
+  default:
+    fprintf(stderr, "ERROR: unsupported precision(%d)\n", qudaGaugeParam->cpu_prec);
+    exit(1);
+    break;
+  }
+}
+
+#ifdef MULTI_GPU
+template <typename sFloat, typename gFloat>
+void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghostTwolink, sFloat *spinorField,
+                                   sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int t0, int oddBit)
+{
+  for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
+
+  gFloat *twolinkEven[4], *twolinkOdd[4];
+
+  gFloat *ghostTwolinkEven[4], *ghostTwolinkOdd[4];
+
+  for (int dir = 0; dir < 4; dir++) {
+    twolinkEven[dir] = twolink[dir];
+    twolinkOdd[dir]  = twolink[dir] + Vh * gauge_site_size;
+
+    ghostTwolinkEven[dir] = ghostTwolink ? ghostTwolink[dir] : nullptr;
+    ghostTwolinkOdd[dir]  = ghostTwolink ? ghostTwolink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
+  }
+
+  {
+#pragma omp parallel for
+    for (int i = 0; i < Vh; i++) {
+      // Get local time-slice index:
+      const int local_t = i / Vsh_t;
+      const int glob_t = quda::comm_coord(3) * Z[3] + local_t;
+
+      if (glob_t != t0) continue;
+
+      int offset = stag_spinor_site_size * i;
+
+      for (int dir = 0; dir < 8; dir++) {
+
+        const int nFace = 3;//3->2??
+        gFloat *twolnk = 
+          gaugeLink_mg4dir(i, dir, oddBit, twolinkEven, twolinkOdd, ghostTwolinkEven, ghostTwolinkOdd, 3, 2);//?
+          
+        sFloat *second_neighbor_spinor = 
+          spinorNeighbor_5d_mgpu<QUDA_4D_PC>(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 2, nFace,
+                                             stag_spinor_site_size);
+       
+        sFloat gaugedSpinor[stag_spinor_site_size];
+
+        if (dir % 2 == 0) {
+        
+          su3Mul(gaugedSpinor, twolnk, second_neighbor_spinor);
+          sum(&res[offset], &res[offset], gaugedSpinor, stag_spinor_site_size);
+         
+        } else {
+          su3Tmul(gaugedSpinor,twolnk, second_neighbor_spinor);
+          
+          sum(&res[offset], &res[offset], gaugedSpinor, stag_spinor_site_size);
+          
+        }
+      }
+    } // 4-d volume
+  }   // right-hand-side
+  return;
+}
+
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
+                                   quda::ColorSpinorField &in, QudaGaugeParam * /*qudaGaugeParam*/,
+                                   QudaInvertParam * /*inv_param*/, const int oddBit, const double /*width*/,
+                                   const int t0, QudaPrecision prec)
+{
+  void *ghost[4];
+  for (int i = 0; i < 4; i++) ghost[i] = twolnk.Ghost()[i].data();
+
+  QudaParity otherparity = QUDA_INVALID_PARITY;
+  if (oddBit == QUDA_EVEN_PARITY) {
+    otherparity = QUDA_ODD_PARITY;
+  } else if (oddBit == QUDA_ODD_PARITY) {
+    otherparity = QUDA_EVEN_PARITY;
+  } else {
+    errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
+  }
+  const int nFace = 3;
+
+  in.exchangeGhost(otherparity, nFace, 0/*daggerBit*/);
+
+  void **fwd_nbr_spinor = in.fwdGhostFaceBuffer;
+  void **back_nbr_spinor = in.backGhostFaceBuffer;
+
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    {
+      staggeredTwoLinkGaussianSmear((double *)out.data(), (double **)qdp_twolnk, (double **)ghost, (double *)in.data(),
+                                    (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0, oddBit);
+    } 
+  } else {
+    {
+      staggeredTwoLinkGaussianSmear((float *)out.data(), (float **)qdp_twolnk, (float **)ghost, (float *)in.data(),
+                                    (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
+    }
+  }
+  return;
+}
+#else
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, const quda::GaugeField &, quda::ColorSpinorField &,
+                                   QudaGaugeParam *, QudaInvertParam *, const int, const double, const int, QudaPrecision)
+{}
+#endif
+
+
 // Compute the full HISQ stencil on the CPU.
 // If "eps_naik" is 0, there's no naik correction,
 // and this routine skips building the paths in "act_path_coeffs[2]"
 void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik)
+                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik)
 {
   // Prepare various things
   QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
@@ -361,6 +505,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   int X3 = Z[2];
   int X4 = Z[3];
 
+#pragma omp parallel for
   for (int i = 0; i < V_ex; i++) {
     int sid = i;
     int oddBit = 0;
@@ -490,7 +635,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
   // Copy back into "w_reflink"
-  reorderMILCtoQDP(w_reflink, cpuWLink->Gauge_p(), V, gauge_site_size, prec, prec);
+  reorderMILCtoQDP(w_reflink, cpuWLink->data(), V, gauge_site_size, prec, prec);
 
   // Clean up cpuGaugeFields, we don't need them anymore.
   delete cpuVLink;
@@ -500,6 +645,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   // Prepare for extended W fields //
   ///////////////////////////////////
 
+#pragma omp parallel for
   for (int i = 0; i < V_ex; i++) {
     int sid = i;
     int oddBit = 0;
@@ -667,11 +813,10 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
   cs_param->nSpin = 1;
-  cs_param->nDim = 5;
+  cs_param->nDim = 4;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = isPCSolution(inv_param->solution_type);
+  bool pc = is_pc_solution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
-  cs_param->x[4] = 1;
   cs_param->pc_type = QUDA_4D_PC;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
@@ -717,6 +862,7 @@ void reorderQDPtoMILC(void *milc_out, void **qdp_in, int V, int siteSize, QudaPr
 
 template <typename Out, typename In> void reorderMILCtoQDP(Out **qdp_out, In *milc_in, int V, int siteSize)
 {
+#pragma omp parallel for
   for (int i = 0; i < V; i++) {
     for (int dir = 0; dir < 4; dir++) {
       for (int j = 0; j < siteSize; j++) {
@@ -771,6 +917,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   for (int d = 0; d < 3; d++) {
 
     // even
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
 
       int index = fullLatticeIndex(i, 0);
@@ -819,6 +966,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
   // Apply boundary conditions to temporal links
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
+#pragma omp parallel for
     for (int j = 0; j < Vh; j++) {
       int sign = 1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {

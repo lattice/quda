@@ -7,6 +7,19 @@
 
 namespace quda {
 
+  /**
+     @brief Helper function that returns whether we have enabled
+     clover fermions.
+   */
+  constexpr bool is_enabled_clover()
+  {
+#ifdef GPU_CLOVER_DIRAC
+    return true;
+#else
+    return false;
+#endif
+  }
+
   namespace clover
   {
 
@@ -61,20 +74,25 @@ namespace quda {
 #endif
     }
 
-    inline bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
+    template <typename T> constexpr auto getNative() { return QUDA_FLOAT2_CLOVER_ORDER; }
+    template <> constexpr auto getNative<float>() { return QUDA_FLOAT4_CLOVER_ORDER; }
+    template <> constexpr auto getNative<short>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
+    template <> constexpr auto getNative<int8_t>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
+
+    constexpr QudaCloverFieldOrder getNative(QudaPrecision precision)
     {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_CLOVER_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-#ifdef FLOAT8
-        if (order == QUDA_FLOAT8_CLOVER_ORDER) return true;
-#else
-        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-#endif
+      switch (precision) {
+      case QUDA_DOUBLE_PRECISION: return getNative<double>();
+      case QUDA_SINGLE_PRECISION: return getNative<float>();
+      case QUDA_HALF_PRECISION: return getNative<short>();
+      case QUDA_QUARTER_PRECISION: return getNative<int8_t>();
+      default: return QUDA_INVALID_CLOVER_ORDER;
       }
-      return false;
+    }
+
+    constexpr bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
+    {
+      return order == getNative(precision);
     }
 
   } // namespace clover
@@ -117,19 +135,7 @@ namespace quda {
       this->precision = precision;
       this->ghost_precision = precision;
 
-      if (native) {
-        if (precision == QUDA_DOUBLE_PRECISION) {
-          order = QUDA_FLOAT2_CLOVER_ORDER;
-        } else if (precision == QUDA_SINGLE_PRECISION) {
-          order = QUDA_FLOAT4_CLOVER_ORDER;
-        } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-#ifdef FLOAT8
-          order = QUDA_FLOAT8_CLOVER_ORDER;
-#else
-          order = QUDA_FLOAT4_CLOVER_ORDER;
-#endif
-        }
-      }
+      if (native) order = clover::getNative(precision);
     }
 
     CloverFieldParam() = default;
@@ -185,9 +191,10 @@ namespace quda {
     int nColor = 0;
     int nSpin = 0;
 
-    void *clover = nullptr;
-    void *cloverInv = nullptr;
+    quda_ptr clover = {};
+    quda_ptr cloverInv = {};
 
+    bool inverse = false;
     double diagonal = 0.0;
     array<double, 2> max = {};
 
@@ -220,12 +227,18 @@ namespace quda {
 
   public:
     CloverField(const CloverFieldParam &param);
-    virtual ~CloverField();
 
     static CloverField *Create(const CloverFieldParam &param);
 
-    void* V(bool inverse=false) { return inverse ? cloverInv : clover; }
-    const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
+    template <typename T = void *> auto data(bool inverse = false) const
+    {
+      return inverse ? reinterpret_cast<T>(cloverInv.data()) : reinterpret_cast<T>(clover.data());
+    }
+
+    /**
+       @return whether the inverse is explicitly been allocated
+     */
+    bool Inverse() const { return inverse; }
 
     /**
        @return diagonal scaling factor applied to the identity
@@ -413,10 +426,6 @@ namespace quda {
     */
     void copy_from_buffer(void *buffer);
 
-    friend class DiracClover;
-    friend class DiracCloverPC;
-    friend class DiracTwistedClover;
-    friend class DiracTwistedCloverPC;
   };
 
   /**
@@ -468,6 +477,29 @@ namespace quda {
   void cloverInvert(CloverField &clover, bool computeTraceLog);
 
   /**
+     @brief Driver for the clover force computation.  Eventually the
+     construction of the x and p fields will be delegated to this
+     function, but for now, we pre-compute these and pass them in.
+     @param mom[in,out] Momentum field to be updates
+     @param gaugeEx[in] Extended gauge field
+     @param gauge[in] Gauge field
+     @param clover[in] Clover field
+     @param x[in] Vector of quark solution fields
+     @param x0[in] Vector of auxilary quark fields for determinant ratio
+     @param coeff[in] Vector of coefficients for the quark field outer
+     products
+     @param epsilon[in] Vector of scalar coefficient pairs (one per
+     parity) for the clover sigma outer product
+     @param sigma_coeff[in] Coefficient for the tr log clover force
+     @param detratio[in] Whether to compute determinant ratio
+     @param parity[in] Which parity do we need compute the tr log clover force
+  */
+  void computeCloverForce(GaugeField &mom, const GaugeField &gaugeEx, const GaugeField &gauge,
+                          const CloverField &clover, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &x0,
+                          const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+                          double sigma_coeff, bool detratio, QudaInvertParam &param);
+
+  /**
      @brief Compute the force contribution from the solver solution fields
 
      Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
@@ -484,9 +516,8 @@ namespace quda {
      @param p Intermediate vectors (both parities)
      @param coeff Multiplicative coefficient (e.g., dt * residue)
    */
-  void computeCloverForce(GaugeField& force, const GaugeField& U,
-			  std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &p,
-			  std::vector<double> &coeff);
+  void computeCloverForce(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
@@ -497,10 +528,8 @@ namespace quda {
      @param p[in] Intermediate vectors (both parities)
      @coeff coeff[in] Multiplicative coefficient (e.g., dt * residiue), one for each parity
   */
-  void computeCloverSigmaOprod(GaugeField& oprod,
-			       std::vector<ColorSpinorField*> &x,
-			       std::vector<ColorSpinorField*> &p,
-			       std::vector< std::vector<double> > &coeff);
+  void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff);
   /**
      @brief Compute the matrix tensor field necessary for the force calculation from
      the clover trace action.  This computes a tensor field [mu,nu].
@@ -508,8 +537,9 @@ namespace quda {
      @param output The computed matrix field (tensor matrix field)
      @param clover The input clover field
      @param coeff  Scalar coefficient multiplying the result (e.g., stepsize)
+     @param parity The field parity we are working on
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity);
 
   /**
      @brief Compute the derivative of the clover matrix in the direction
@@ -520,9 +550,8 @@ namespace quda {
      @param gauge The input gauge field
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
-     @param parity The field parity we are working on
    */
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field

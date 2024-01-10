@@ -1,8 +1,8 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <worker.h>
-#include <dslash_policy.cuh>
 #include <kernels/dslash_domain_wall_4d_fused_m5.cuh>
+#include <dslash_policy.cuh>
 #include <dslash.h>
 
 /**

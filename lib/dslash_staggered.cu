@@ -53,7 +53,7 @@ namespace quda
     {
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
 #ifdef BUILD_MILC_INTERFACE
-        constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+        constexpr int nDim = 4;
         constexpr bool improved = false;
 
         StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
@@ -66,7 +66,7 @@ namespace quda
 #endif
       } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
 #ifdef BUILD_TIFR_INTERFACE
-        constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+        constexpr int nDim = 4;
         constexpr bool improved = false;
 
         StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(

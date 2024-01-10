@@ -51,7 +51,7 @@ namespace quda
 
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
+      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
                              comm_override),
       out(out),
       in(in, improved_ ? 3 : 1),
@@ -65,12 +65,6 @@ namespace quda
       is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
       dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      checkOrder(out, in, x);        // check all orders match
-      checkPrecision(out, in, x, U); // check all precisions match
-      checkLocation(out, in, x, U);  // check all locations match
-      if (!in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
   };
 

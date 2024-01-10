@@ -4,6 +4,7 @@
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/gauge_random.cuh>
+#include "timer.h"
 
 namespace quda {
 
@@ -24,9 +25,10 @@ namespace quda {
       sigma(static_cast<Float>(sigma)),
       group(U.LinkType() == QUDA_SU3_LINKS)
     {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
-        else printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
+      if (group) {
+        logQuda(QUDA_SUMMARIZE, "Creating Gaussian distributed Lie group field with sigma = %e\n", sigma);
+      } else {
+        logQuda(QUDA_SUMMARIZE, "Creating Gaussian distributed Lie algebra field\n");
       }
       strcat(aux, group ? ",lie_group" : "lie_algebra");
       apply(device::get_default_stream());
@@ -42,7 +44,6 @@ namespace quda {
       }
     }
 
-    long long flops() const { return 0; }
     long long bytes() const { return U.Bytes(); }
 
     void preTune() { rng.backup(); }
@@ -55,19 +56,27 @@ namespace quda {
     if (U.LinkType() != QUDA_SU3_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
       errorQuda("Unexpected link type %d", U.LinkType());
 
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // ensure multi-gpu consistency if required
+    getProfile().TPSTART(QUDA_PROFILE_COMMS);
     if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {
       U.exchangeExtendedGhost(U.R());
     } else if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
       U.exchangeGhost();
     }
+    getProfile().TPSTOP(QUDA_PROFILE_COMMS);
   }
 
   void gaugeGauss(GaugeField &U, unsigned long long seed, double sigma)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMMS);
     RNG randstates(U, seed);
+    getProfile().TPSTOP(QUDA_PROFILE_COMMS);
+
     gaugeGauss(U, randstates, sigma);
   }
+
 }

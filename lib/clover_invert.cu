@@ -46,18 +46,17 @@ namespace quda {
     void postTune() { if (clover::dynamic_inverse()) clover.restore(); }
   };
 
-#ifdef GPU_CLOVER_DIRAC
   void cloverInvert(CloverField &clover, bool computeTraceLog)
   {
-    if (clover.Reconstruct()) errorQuda("Cannot store the inverse with a reconstruct field");
-    if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
-    instantiate<CloverInvert>(clover, computeTraceLog);
+    if constexpr (is_enabled_clover()) {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      if (clover.Reconstruct()) errorQuda("Cannot store the inverse with a reconstruct field");
+      if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
+      instantiate<CloverInvert>(clover, computeTraceLog);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Clover has not been built");
+    }
   }
-#else
-  void cloverInvert(CloverField &, bool)
-  {
-    errorQuda("Clover has not been built");
-  }
-#endif
 
 } // namespace quda

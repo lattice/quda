@@ -64,7 +64,7 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# QUDA may be built to run using HIP or CUDA, which we call the
+# QUDA may be built to run using CUDA, HIP or SYCL, which we call the
 # Target type. By default, the target is CUDA.
 if(DEFINED ENV{QUDA_TARGET})
   set(DEFTARGET $ENV{QUDA_TARGET})
@@ -72,11 +72,11 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
-set(VALID_TARGET_TYPES CUDA HIP)
+set(VALID_TARGET_TYPES CUDA HIP SYCL)
 set(QUDA_TARGET_TYPE
   "${DEFTARGET}"
   CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
-set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP SYCL)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
@@ -157,6 +157,8 @@ option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
+option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
+
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
@@ -194,11 +196,19 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
-option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
 option(QUDA_BITPACK_SPINOR "use bit-packed formats for the quark fields (where supported)?" OFF)
 option(QUDA_BITPACK_GAUGE "use bit-packed formats for the gauge fields (where supported)?" OFF)
 
+set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
+set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
+set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
+
+set_property(CACHE QUDA_ORDER_FP PROPERTY STRINGS 4 8)
+set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
+set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
+
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
+option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
 # QUDA uses tiling routines to compute certain BLAS routines. The maximum allowable
 # tile size is governed by this number. The larger the number, the faster the routines
@@ -221,6 +231,8 @@ option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
 option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
 
+option(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST "Whether to run eigensolver ctests against the improved staggered operator (requires QUDA_DIRAC_STAGGERED)" OFF)
+
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
@@ -239,9 +251,11 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
+option(QUDA_MULTIGRID "build multigrid solvers" OFF)
+option(QUDA_MULTIGRID_DSLASH_PROMOTE "Whether to promote the internal precision when computing the coarse dslash" OFF)
+
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
-option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
 option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
@@ -255,9 +269,13 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_BITPACK_SPINOR)
 mark_as_advanced(QUDA_BITPACK_GAUGE)
+
+mark_as_advanced(QUDA_ORDER_FP)
+mark_as_advanced(QUDA_ORDER_SP_MG)
+mark_as_advanced(QUDA_ORDER_FP_MG)
+
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 
@@ -267,9 +285,8 @@ mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
+mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
-mark_as_advanced(QUDA_CTEST_LAUNCH)
-mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
@@ -304,6 +321,10 @@ if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()
 
+if(QUDA_SMEAR_GAUSS_TWOLINK AND NOT QUDA_DIRAC_STAGGERED)
+  message(SEND_ERROR "Specifying QUDA_SMEAR_GAUSS_TWOLINK requires QUDA_DIRAC_STAGGERED.")
+endif()
+
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
 # CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
 
@@ -325,10 +346,10 @@ set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-  "${CXX_OPT}"
+  "-O3 ${CXX_OPT}"
   CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-g"
@@ -347,7 +368,7 @@ set(CMAKE_C_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
   "-O3"
@@ -379,7 +400,11 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
 if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
-  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
+  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC")
+endif()
+
+if (QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST AND NOT QUDA_DIRAC_STAGGERED)
+  message(SEND_ERROR "QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST requires QUDA_DIRAC_STAGGERED")
 endif()
 
 find_package(Threads REQUIRED)
@@ -405,15 +430,13 @@ if(QUDA_DOWNLOAD_EIGEN)
       CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
   mark_as_advanced(QUDA_EIGEN_VERSION)
   CPMAddPackage(
-    NAME
-    Eigen
-    VERSION
-    ${QUDA_EIGEN_VERSION}
-    URL
-    https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
-    DOWNLOAD_ONLY
-    YES)
+    NAME Eigen
+    VERSION ${QUDA_EIGEN_VERSION}
+    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
+    DOWNLOAD_ONLY YES
+    SYSTEM YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
+  install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)
@@ -437,26 +460,28 @@ endif()
 if(QUDA_MPI OR QUDA_QMP)
   # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line
   # check for MPICXX and MPICC environment variables
-  if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
-    set(MPI_CXX_COMPILER $ENV{MPICXX})
-    set(mpimessage True)
-    message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
-  endif()
-  if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
-    message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
-    set(MPI_C_COMPILER $ENV{MPICC})
-    set(mpimessage True)
-  endif()
-  # I think we don't use that at all but
-  if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
-    message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
-    set(MPI_Fortran_COMPILER $ENV{MPIFORT})
-    set(mpimessage True)
-  endif()
-  if(mpimessage)
-    message(
-      "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
-      )
+  if( NOT QUDA_SPACK_BUILD )
+    if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
+      set(MPI_CXX_COMPILER $ENV{MPICXX})
+      set(mpimessage True)
+      message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
+    endif()
+    if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
+      message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
+      set(MPI_C_COMPILER $ENV{MPICC})
+      set(mpimessage True)
+    endif()
+    # I think we don't use that at all but
+    if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
+      message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
+      set(MPI_Fortran_COMPILER $ENV{MPIFORT})
+      set(mpimessage True)
+    endif()
+    if(mpimessage)
+      message(
+        "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
+        )
+    endif()
   endif()
   find_package(MPI REQUIRED)
 endif()
@@ -538,7 +563,7 @@ if(QUDA_QIO)
 endif()
 
 # ######################################################################################################################
- # USQCD QDPJIT
+# USQCD QDPJIT
 # ######################################################################################################################
  if(QUDA_QDPJIT)
    if(NOT QUDA_QMP)
@@ -551,11 +576,11 @@ endif()
    set(QUDA_INTERFACE_QDPJIT ON)
  endif()
 
-####################################
+
+# ######################################################################################################################
 # ARPACK
 # ######################################################################################################################
 if(QUDA_ARPACK)
-  enable_language(Fortran)
 
   if(QUDA_MPI OR QUDA_QMP)
     set(ARPACK_MPI ON)
@@ -564,35 +589,22 @@ if(QUDA_ARPACK)
   endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
-  #TODO: switch to CPM
-    include(GNUInstallDirs)
-    ExternalProject_Add(
+    CPMAddPackage(
+      NAME
       ARPACK-NG
-      GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
-      GIT_TAG 3.7.0
-      GIT_SHALLOW YES
-      PREFIX arpack-ng
-      CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      CMAKE_GENERATOR "Unix Makefiles")
-    ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
-    set(QUDA_ARPACK_HOME ${INSTALL_DIR})
-    add_library(arpack-ng STATIC IMPORTED)
-    add_dependencies(arpack-ng ARPACK-NG)
-    find_package(BLAS REQUIRED)
-    find_package(LAPACK REQUIRED)
-    target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION
-      ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
-    if(QUDA_MPI OR QUDA_QMP)
-      add_library(parpack-ng STATIC IMPORTED)
-      target_link_libraries(parpack-ng INTERFACE arpack-ng MPI::MPI_Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION
-        ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
+      GITHUB_REPOSITORY
+      opencollab/arpack-ng
+      GIT_TAG 3.8.0
+      OPTIONS
+      "EXAMPLES OFF ON"
+      "MPI ${ARPACK_MPI}"
+      "BLAS_openblas_LIBRARY ${OpenBLAS_LIBS}"
+    )
+    add_library(ARPACK::arpack ALIAS arpack)
+    if(ARPACK_MPI)
+      add_library(ARPACK::parpack ALIAS parpack)
     endif()
-
-  else(QUDA_DOWNLOAD_ARPACK)
+else(QUDA_DOWNLOAD_ARPACK)
     find_package(PkgConfig REQUIRED)
     # We always need the serial library
     pkg_check_modules(ARPACK QUIET arpack)
@@ -622,6 +634,7 @@ if(QUDA_OPENBLAS)
   if(QUDA_DOWNLOAD_OPENBLAS)
   #TODO: switch to CPM
     include(GNUInstallDirs)
+    include(ExternalProject)
     ExternalProject_Add(
       OPENBLAS
       GIT_REPOSITORY https://github.com/xianyi/OpenBLAS.git

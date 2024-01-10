@@ -58,7 +58,7 @@ namespace quda {
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
+        logQuda(QUDA_VERBOSE, "Global U_max = %e\n", max_scale);
         X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
       }
 
@@ -113,7 +113,8 @@ namespace quda {
      @param mass[in] Mass of staggered fermion
      @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
    */
-  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const GaugeField &gauge, const double mass,
+                                        const bool dagger_approximation)
   {
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
@@ -154,13 +155,7 @@ namespace quda {
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
       gParam.pad = 0;
 
-      if (location == QUDA_CUDA_FIELD_LOCATION)
-        xInvMilcOrder = std::make_unique<cudaGaugeField>(gParam);
-      else if (location == QUDA_CPU_FIELD_LOCATION)
-        xInvMilcOrder = std::make_unique<cpuGaugeField>(gParam);
-      else
-        errorQuda("Invalid field location %d", location);
-
+      xInvMilcOrder = std::make_unique<GaugeField>(gParam);
     }
 
     // Step 2: build a host or device gauge field as appropriate, but
@@ -190,10 +185,10 @@ namespace quda {
         gf_param.nFace = 1;
         gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-        tmp_U = std::make_unique<cpuGaugeField>(gf_param);
+        tmp_U = std::make_unique<GaugeField>(gf_param);
 
         //Copy the cuda gauge field to the cpu
-        gauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_U));
+        tmp_U.get()->copy(gauge);
 
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
 
@@ -202,7 +197,7 @@ namespace quda {
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         gf_param.order = QUDA_FLOAT2_GAUGE_ORDER; // guaranteed for no recon
         gf_param.setPrecision( QUDA_SINGLE_PRECISION );
-        tmp_U = std::make_unique<cudaGaugeField>(gf_param);
+        tmp_U = std::make_unique<GaugeField>(gf_param);
 
         tmp_U->copy(gauge);
       }
@@ -216,18 +211,16 @@ namespace quda {
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       x_param.setPrecision(x_param.Precision());
-      tmp_X = std::make_unique<cudaGaugeField>(x_param);
-    } else {
-      tmp_X = std::make_unique<cpuGaugeField>(x_param);
     }
+    tmp_X = std::make_unique<GaugeField>(x_param);
     GaugeField& X = *tmp_X;
 
     // Step 4: Calculate X from U
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+    logQuda(QUDA_VERBOSE, "Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     calculateStaggeredKDBlock(X, U, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", X.norm2(0));
 
     // Step 5: Calculate Xinv
     if (dagger_approximation) {
@@ -241,34 +234,33 @@ namespace quda {
         GaugeFieldParam param(*xInvMilcOrder);
         param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
         param.setPrecision(QUDA_SINGLE_PRECISION);
-        cudaGaugeField X_(param);
-        
+        GaugeField X_(param);
+
         X_.copy(X);
 
-        blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+        Tunable::flops_global(invert(xInvMilcOrder->data(), X_.data(), n, X_.Volume(), X_.Precision(), X.Location())
+                              + Tunable::flops_global());
 
       } else if (location == QUDA_CPU_FIELD_LOCATION) {
-
-        blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X.Precision(), X.Location());
+        Tunable::flops_global(invert(xInvMilcOrder->data(), X.data(), n, X.Volume(), X.Precision(), X.Location())
+                              + Tunable::flops_global());
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
-
+      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
     }
 
     // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
     // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
     ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      if (dagger_approximation) printfQuda("Using the dagger approximation to Xinv\n");
-      printfQuda("xInvKdGeometry = %e\n", Xinv.norm2());
-    }
+    if (dagger_approximation) logQuda(QUDA_VERBOSE, "Using the dagger approximation to Xinv\n");
+    logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
   }
 
 
   // Allocates and calculates the inverse KD block, returning Xinv
-  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, const double mass,
+                                                                          const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -282,7 +274,7 @@ namespace quda {
     // latter true is to force FLOAT2
     gParam.setPrecision(gauge.Precision(), true);
 
-    std::shared_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
+    std::shared_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField *>(new GaugeField(gParam)));
 
     BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation);
 

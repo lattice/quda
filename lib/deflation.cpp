@@ -1,9 +1,7 @@
-#include <deflation.h>
-#include <qio_field.h>
-#include <string.h>
-
 #include <memory>
 
+#include <deflation.h>
+#include <vector_io.h>
 #include <eigen_helper.h>
 
 namespace quda
@@ -26,7 +24,10 @@ namespace quda
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
 
-    if (param.eig_global.import_vectors) loadVectors(param.RV); // whether to load eigenvectors
+    if (param.eig_global.import_vectors) { // whether to load eigenvectors
+      VectorIO io(param.eig_global.vec_infile);
+      io.load(*param.RV);
+    }
     // create aux fields
     ColorSpinorParam csParam(param.RV->Component(0));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -314,76 +315,6 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     // reset current dimension:
     param.cur_dim = idx; // idx never exceeds cur_dim.
     param.tot_dim = idx;
-  }
-
-  //supports seperate reading or single file read
-  void Deflation::loadVectors(ColorSpinorField *RV)
-  {
-    if (RV->IsComposite()) errorQuda("Not a composite field");
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_IO);
-
-    std::string vec_infile(param.eig_global.vec_infile);
-    std::vector<ColorSpinorField *> &B = RV->Components();
-
-    const int Nvec = B.size();
-    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
-
-    void **V = new void*[Nvec];
-    for (int i = 0; i < Nvec; i++) {
-      V[i] = B[i]->V();
-      if (V[i] == NULL) {
-	printfQuda("Could not allocate V[%d]\n", i);
-      }
-    }
-
-    if (strcmp(vec_infile.c_str(),"")!=0) {
-      auto parity = (B[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(), B[0]->SiteSubset(), parity,
-                        B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0, (char **)0);
-    } else {
-      errorQuda("No eigenspace file defined");
-    }
-
-    printfQuda("Done loading vectors\n");
-    profile.TPSTOP(QUDA_PROFILE_IO);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-  }
-
-  void Deflation::saveVectors(ColorSpinorField *RV)
-  {
-    if (RV->IsComposite()) errorQuda("Not a composite field");
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_IO);
-
-    std::string vec_outfile(param.eig_global.vec_outfile);
-    std::vector<ColorSpinorField*> &B = RV->Components();
-
-    if (strcmp(param.eig_global.vec_outfile,"")!=0) {
-      const int Nvec = B.size();
-      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
-
-      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) {
-	V[i] = B[i]->V();
-	if (V[i] == NULL) {
-	  printfQuda("Could not allocate V[%d]\n", i);
-	}
-      }
-
-      // assumes even parity if a single-parity field...
-      auto parity = (B[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(), B[0]->SiteSubset(), parity,
-                         B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0, (char **)0);
-
-      host_free(V);
-      printfQuda("Done saving vectors\n");
-    }
-
-    profile.TPSTOP(QUDA_PROFILE_IO);
-    profile.TPSTART(QUDA_PROFILE_INIT);
   }
 
 } // namespace quda

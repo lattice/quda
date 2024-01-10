@@ -9,6 +9,8 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
+#include <tune_quda.h>
+
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 
@@ -91,7 +93,6 @@ enum class Kernel {
   axpbyzNorm,
   axpyCGNorm,
   caxpyNorm,
-  caxpyXmazNormX,
   cabxpyzAxNorm,
   cDotProduct,
   caxpyDotzy,
@@ -138,7 +139,6 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::axpbyzNorm, "axpbyzNorm"},
      {Kernel::axpyCGNorm, "axpyCGNorm"},
      {Kernel::caxpyNorm, "caxpyNorm"},
-     {Kernel::caxpyXmazNormX, "caxpyXmazNormX"},
      {Kernel::cabxpyzAxNorm, "cabxpyzAxNorm"},
      {Kernel::cDotProduct, "cDotProduct"},
      {Kernel::caxpyDotzy, "caxpyDotzy"},
@@ -286,10 +286,10 @@ private:
     yH = ColorSpinorField(param);
     zH = ColorSpinorField(param);
 
-    xmH.resize(Nsrc, param);
-    ymH.resize(Msrc, param);
-    zmH.resize(Nsrc, param);
-    wmH.resize(Msrc, param);
+    resize(xmH, Nsrc, param);
+    resize(ymH, Msrc, param);
+    resize(zmH, Nsrc, param);
+    resize(wmH, Msrc, param);
 
     vH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
     wH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -323,15 +323,15 @@ private:
 
     // create device multi-field
     param.setPrecision(prec, prec, true);
-    xmD.resize(Nsrc, param);
-    ymD.resize(Msrc, param);
-    zmD.resize(Nsrc, param);
-    wmD.resize(Msrc, param);
+    resize(xmD, Nsrc, param);
+    resize(ymD, Msrc, param);
+    resize(zmD, Nsrc, param);
+    resize(wmD, Msrc, param);
 
     param.setPrecision(prec_other, prec_other, true);
-    xmoD.resize(Nsrc, param);
-    ymoD.resize(Msrc, param);
-    zmoD.resize(Nsrc, param);
+    resize(xmoD, Nsrc, param);
+    resize(ymoD, Msrc, param);
+    resize(zmoD, Nsrc, param);
 
     // only do copy if not doing half precision with mg
     bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
@@ -436,10 +436,6 @@ protected:
 
       case Kernel::caxpyNorm:
         for (int i = 0; i < niter; ++i) blas::caxpyNorm(a2, xD, yD);
-        break;
-
-      case Kernel::caxpyXmazNormX:
-        for (int i = 0; i < niter; ++i) blas::caxpyXmazNormX(a2, xD, yD, zD);
         break;
 
       case Kernel::cabxpyzAxNorm:
@@ -725,9 +721,9 @@ protected:
       xD = xH;
       yoD = yH;
       {
-        quda::Complex d = blas::axpyCGNorm(a, xD, yoD);
-        quda::Complex h = blas::axpyCGNorm(a, xH, yH);
-        error = ERROR(yo) + fabs(d.real() - h.real()) / fabs(h.real()) + fabs(d.imag() - h.imag()) / fabs(h.imag());
+        double2 d = blas::axpyCGNorm(a, xD, yoD);
+        double2 h = blas::axpyCGNorm(a, xH, yH);
+        error = ERROR(yo) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y);
       }
       break;
 
@@ -738,17 +734,6 @@ protected:
         double d = blas::caxpyNorm(a, xD, yD);
         double h = blas::caxpyNorm(a, xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
-      }
-      break;
-
-    case Kernel::caxpyXmazNormX:
-      xD = xH;
-      yD = yH;
-      zD = zH;
-      {
-        double d = blas::caxpyXmazNormX(a, xD, yD, zD);
-        double h = blas::caxpyXmazNormX(a, xH, yH, zH);
-        error = ERROR(y) + ERROR(x) + fabs(d - h) / fabs(h);
       }
       break;
 
@@ -1169,14 +1154,13 @@ TEST_P(BlasTest, benchmark)
   // do the initial tune
   benchmark(kernel, 1);
 
-  // now rerun with more iterations to get accurate speed measurements
-  quda::blas::flops = 0;
-  quda::blas::bytes = 0;
+  auto flops0 = quda::Tunable::flops_global();
+  auto bytes0 = quda::Tunable::bytes_global();
 
   double secs = benchmark(kernel, niter);
 
-  double gflops = (quda::blas::flops * 1e-9) / (secs);
-  double gbytes = quda::blas::bytes / (secs * 1e9);
+  double gflops = (quda::Tunable::flops_global() - flops0) * 1e-9 / secs;
+  double gbytes = (quda::Tunable::bytes_global() - bytes0) / (secs * 1e9);
   RecordProperty("Gflops", std::to_string(gflops));
   RecordProperty("GBs", std::to_string(gbytes));
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", kernel_map.at(kernel).c_str(), gflops, gbytes);

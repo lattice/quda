@@ -2,8 +2,6 @@
 #include <dslash_quda.h>
 #include <blas_quda.h>
 
-#include <iostream>
-
 namespace quda {
 
   // FIXME: At the moment, it's unsafe for more than one Dirac operator to be active unless
@@ -16,9 +14,6 @@ namespace quda {
     laplace3D(param.laplace3D),
     matpcType(param.matpcType),
     dagger(param.dagger),
-    flops(0),
-    tmp1(param.tmp1),
-    tmp2(param.tmp2),
     type(param.type),
     halo_precision(param.halo_precision),
     use_mobius_fused_kernel(param.use_mobius_fused_kernel),
@@ -33,9 +28,6 @@ namespace quda {
     laplace3D(dirac.laplace3D),
     matpcType(dirac.matpcType),
     dagger(dirac.dagger),
-    flops(0),
-    tmp1(dirac.tmp1),
-    tmp2(dirac.tmp2),
     type(dirac.type),
     halo_precision(dirac.halo_precision),
     profile("Dirac", false)
@@ -57,9 +49,6 @@ namespace quda {
       laplace3D = dirac.laplace3D;
       matpcType = dirac.matpcType;
       dagger = dirac.dagger;
-      flops = 0;
-      tmp1 = dirac.tmp1;
-      tmp2 = dirac.tmp2;
 
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
@@ -70,31 +59,16 @@ namespace quda {
     return *this;
   }
 
-  bool Dirac::newTmp(ColorSpinorField **tmp, const ColorSpinorField &a) const {
-    if (*tmp) return false;
-    ColorSpinorParam param(a);
-    param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
-    *tmp = ColorSpinorField::Create(param);
-    return true;
-  }
-
-  void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
-    if (reset) {
-      delete *a;
-      *a = nullptr;
-    }
-  }
-
 #define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
-  void Dirac::Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::Mdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     flip(dagger);
     M(out, in);
     flip(dagger);
   }
 
-  void Dirac::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::MMdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     flip(dagger);
     MdagM(out, in);
@@ -107,17 +81,13 @@ namespace quda {
   {
     if ( (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) && 
 	 in.Nspin() == 4) {
-      errorQuda("CUDA Dirac operator requires UKQCD basis, out = %d, in = %d", 
-		out.GammaBasis(), in.GammaBasis());
+      errorQuda("Dirac operator requires UKQCD basis, out = %d, in = %d", out.GammaBasis(), in.GammaBasis());
     }
 
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
     }
-
-    if (!in.isNative()) errorQuda("Input field is not in native order");
-    if (!out.isNative()) errorQuda("Output field is not in native order");
 
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
@@ -142,7 +112,7 @@ namespace quda {
   }
 
   void Dirac::checkSpinorAlias(const ColorSpinorField &a, const ColorSpinorField &b) const {
-    if (a.V() == b.V()) errorQuda("Aliasing pointers");
+    if (a.data() == b.data()) errorQuda("Aliasing pointers");
   }
 
   // Dirac operator factory
@@ -312,8 +282,6 @@ namespace quda {
   void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     if (gauge) gauge->prefetch(mem_space, stream);
-    if (tmp1) tmp1->prefetch(mem_space, stream);
-    if (tmp2) tmp2->prefetch(mem_space, stream);
   }
 
 } // namespace quda

@@ -51,7 +51,7 @@ namespace quda
 
   size_t Communicator::comm_size(void) { return 1; }
 
-  void Communicator::comm_gather_hostname(char *hostname_recv_buf) { strncpy(hostname_recv_buf, comm_hostname(), 128); }
+  void Communicator::comm_gather_hostname(char *hostname_recv_buf) { strncpy(hostname_recv_buf, comm_hostname(), QUDA_MAX_HOSTNAME_STRING); }
 
   void Communicator::comm_gather_gpuid(int *gpuid_recv_buf) { gpuid_recv_buf[0] = comm_gpuid(); }
 
@@ -83,6 +83,10 @@ namespace quda
 
   void Communicator::comm_allreduce_sum_array(double *, size_t) { }
 
+  void Communicator::comm_allreduce_sum(size_t &) { }
+
+  void Communicator::comm_allreduce_max_array(deviation_t<double> *, size_t) { }
+
   void Communicator::comm_allreduce_max_array(double *, size_t) { }
 
   void Communicator::comm_allreduce_min_array(double *, size_t) { }
@@ -91,7 +95,7 @@ namespace quda
 
   void Communicator::comm_allreduce_xor(uint64_t &) { }
 
-  void Communicator::comm_broadcast(void *, size_t) { }
+  void Communicator::comm_broadcast(void *, size_t, int) { }
 
   void Communicator::comm_barrier(void) { }
 

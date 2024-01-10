@@ -38,7 +38,8 @@ namespace quda
       constexpr int t_n = divide_b_no ? 1 : (Arg::N + bN - 1) / bN;
       tp.grid = dim3(arg.threads.x * t_m * t_n, 2, 4);
 
-      tp.shared_bytes = shared_memory_bytes(bM, bN, bK);
+      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+      tp.shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.set_max_shared_bytes = true;
 
       tunable.template launch_cuda<CalculateYhatMMA>(
@@ -148,6 +149,13 @@ namespace quda
       return -1;
     }
 
+    template <bool query_max = false, class Arg, typename Tunable>
+    typename std::enable_if_t<!(Arg::N == 12 || Arg::N == 48 || Arg::N == 64 || Arg::N == 128 || Arg::N == 192), int>
+    launch_yhat_kernel(TuneParam &, const qudaStream_t &, Arg &, Tunable &)
+    {
+      errorQuda("MMA implementation not available for N = %d", Arg::N);
+      return -1;
+    }
 #else
 
     template <bool query_max = false, class Arg, typename Tunable>

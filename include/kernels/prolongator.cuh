@@ -14,7 +14,7 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, QudaFieldOrder order>
+  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_>
   struct ProlongateArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
@@ -22,9 +22,9 @@ namespace quda {
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseColor = coarseColor_;
 
-    FieldOrderCB<Float,fineSpin,fineColor,1,order> out;
-    const FieldOrderCB<Float,coarseSpin,coarseColor,1,order> in;
-    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order,vFloat> V;
+    FieldOrderCB<Float,fineSpin,fineColor,1, colorspinor::getNative<Float>(fineSpin)> out;;
+    const FieldOrderCB<Float,coarseSpin,coarseColor,1, colorspinor::getNative<Float>(coarseSpin)> in;
+    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat> V;
     const int *geo_map;  // need to make a device copy of this
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)
