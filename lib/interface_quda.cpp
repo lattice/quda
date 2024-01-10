@@ -3746,7 +3746,7 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
     // project onto SU(3) if using the Chroma convention
     if (param->staggered_phase_type == QUDA_STAGGERED_PHASE_CHROMA) {
       *num_failures_h = 0;
-      const double tol = unitarizedLink.Precision() == QUDA_DOUBLE_PRECISION ? 1e-15 : 2e-6;
+      const double tol = unitarizedLink.Precision() == QUDA_DOUBLE_PRECISION ? 2e-15 : 1e-6;
       if (unitarizedLink.StaggeredPhaseApplied()) unitarizedLink.removeStaggeredPhase();
       projectSU3(unitarizedLink, tol, num_failures_d);
       if (!unitarizedLink.StaggeredPhaseApplied() && param->staggered_phase_applied)

@@ -8,8 +8,8 @@
 namespace quda
 {
 
-#define  DOUBLE_TOL	1e-15
-#define  SINGLE_TOL	2e-6
+#define  DOUBLE_TOL	2e-15
+#define  SINGLE_TOL	1e-6
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, int level_, int hypDim_>
   struct GaugeHYPArg : kernel_param<> {
