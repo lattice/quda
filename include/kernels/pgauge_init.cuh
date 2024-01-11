@@ -18,7 +18,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     using real = typename mapper<Float>::type;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     int X[4]; // grid dimensions
     Gauge U;
     InitGaugeColdArg(const GaugeField &U) :
@@ -38,7 +38,7 @@ namespace quda {
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> U;
       setIdentity(&U);
-      for ( int d = 0; d < 4; d++ ) arg.U(d, x_cb, parity) = U;
+      for (int d = 0; d < 4; d++) arg.U(d, x_cb, parity) = U;
     }
   };
 
@@ -47,7 +47,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     using real = typename mapper<Float>::type;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     int X[4]; // grid dimensions
     Gauge U;
     RNGState *rng;

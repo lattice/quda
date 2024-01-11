@@ -14,7 +14,7 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     static constexpr compute_type type = type_;
     using real = typename mapper<Float>::type;
-    using Gauge = typename gauge_mapper<real, recon>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
