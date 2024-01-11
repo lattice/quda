@@ -32,6 +32,10 @@ TEST_P(DilutionTest, verify)
   using namespace quda;
 
   if (!is_enabled_spin(nSpin)) GTEST_SKIP();
+#ifdef BITPACK_SPINOR
+  // bitpacking doesn't work fine-grained accessors
+  if (nSpin == 1 && prec == QUDA_SINGLE_PRECISION) GTEST_SKIP();
+#endif
 
   // Set some parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
