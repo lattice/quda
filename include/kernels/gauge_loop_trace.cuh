@@ -26,7 +26,7 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
 
     const Gauge u;
 

@@ -11,11 +11,11 @@ namespace quda
   namespace staggered_quark_smearing
   {
 
-    template <typename real_, int nColor_, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
+    template <typename store_t, int nColor_, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
     struct BaseArg : kernel_param<> {
-      using real = real_;
+      using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      typedef typename gauge_mapper<real, reconstruct>::type G;
+      typedef typename gauge_mapper<store_t, reconstruct>::type G;
       const G link;
       int X[4]; // regular grid dims
       int E[4]; // extended grid dims

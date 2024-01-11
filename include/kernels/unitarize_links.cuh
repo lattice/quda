@@ -10,12 +10,12 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct UnitarizeArg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
     Gauge out;
     const Gauge in;
 
@@ -224,12 +224,12 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct ProjectSU3Arg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
     Gauge u;
 
     real tol;

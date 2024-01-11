@@ -14,7 +14,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     using Link = Matrix<complex<real>, 3>;
 
     int X_bulk[4];
@@ -108,7 +108,7 @@ namespace quda {
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY;
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     using AccumGauge = typename gauge_mapper<AccumFloat,recon>::type;
     using Link = Matrix<complex<real>, 3>;
     using HighPrecLink = Matrix<complex<double>, 3>;
@@ -171,7 +171,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     using Link = Matrix<complex<real>, 3>;
     using HighPrecLink = Matrix<complex<double>, 3>;
 
