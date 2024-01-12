@@ -1042,9 +1042,23 @@ namespace quda {
 
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+
+    ColorSpinorField y;        // Full precision solution accumulator
+    ColorSpinorField r;        // Full precision residual vector
+    ColorSpinorField p;        // Sloppy precision search direction
+    ColorSpinorField v;        // Sloppy precision A * p
+    ColorSpinorField t;        // Sloppy precision vector used for minres step
+    ColorSpinorField r0;       // Bi-orthogonalization vector
+    ColorSpinorField r_sloppy; // Slopy precision residual vector
+    ColorSpinorField x_sloppy; // Sloppy solution accumulator vector
     bool init = false;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -1052,6 +1066,11 @@ namespace quda {
     virtual ~BiCGstab();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
 
