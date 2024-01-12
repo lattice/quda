@@ -22,9 +22,7 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param) :
-    mat(mat),
-    eig_param(eig_param)
+  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param) : mat(mat), eig_param(eig_param)
   {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
@@ -776,8 +774,8 @@ namespace quda
   template <class T> using eigen_matrix_t = typename eigen_matrix_map<T>::type;
 
   template <typename T>
-  void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array,
-                               int offset, int dim, int keep, int locked)
+  void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array, int offset,
+                               int dim, int keep, int locked)
   {
     using matrix_t = eigen_matrix_t<T>;
 
@@ -901,10 +899,12 @@ namespace quda
     }
   }
 
-  template void EigenSolver::rotateVecs<double>(std::vector<ColorSpinorField> &kSpace, const std::vector<double> &rot_array,
-                                                int offset, int dim, int keep, int locked);
+  template void EigenSolver::rotateVecs<double>(std::vector<ColorSpinorField> &kSpace,
+                                                const std::vector<double> &rot_array, int offset, int dim, int keep,
+                                                int locked);
 
-  template void EigenSolver::rotateVecs<Complex>(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
-                                                 int offset, int dim, int keep, int locked);
+  template void EigenSolver::rotateVecs<Complex>(std::vector<ColorSpinorField> &kSpace,
+                                                 const std::vector<Complex> &rot_array, int offset, int dim, int keep,
+                                                 int locked);
 
 } // namespace quda

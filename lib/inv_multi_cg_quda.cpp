@@ -115,7 +115,9 @@ namespace quda {
   }
 
   MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param) :
-    MultiShiftSolver(mat, matSloppy, param), init(false) { }
+    MultiShiftSolver(mat, matSloppy, param), init(false)
+  {
+  }
 
   void MultiShiftCG::create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p)
   {

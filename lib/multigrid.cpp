@@ -707,13 +707,15 @@ namespace quda
                                         *matCoarseSmoother, *matCoarseSmoother);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, coarse_prefix);
+        coarse_solver
+          = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, coarse_prefix);
       } else {
         Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual,
                                         *matCoarseResidual, *matCoarseResidual);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-        coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, coarse_prefix);
+        coarse_solver
+          = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, coarse_prefix);
       }
 
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid

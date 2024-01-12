@@ -382,20 +382,20 @@ namespace quda
 
       for (int i = 0; i < nconv; i++) {
 
-	getProfile().TPSTART(QUDA_PROFILE_H2D);
-	d_v = h_evecs_arpack[arpack_index[i]];
-	getProfile().TPSTOP(QUDA_PROFILE_H2D);
+        getProfile().TPSTART(QUDA_PROFILE_H2D);
+        d_v = h_evecs_arpack[arpack_index[i]];
+        getProfile().TPSTOP(QUDA_PROFILE_H2D);
 
-	getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+        // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
 	double sigma_tmp = sqrt(blas::norm2(d_v2));
 	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
 	blas::ax(1.0 / sigma_tmp, d_v2);
-	getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
-	if (getVerbosity() >= QUDA_SUMMARIZE)
+        if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp,
 		     sigma_tmp - sqrt(abs(evals[i].real())));
       }
@@ -403,19 +403,19 @@ namespace quda
       printfQuda("Computing Eigenvalues\n");
       for (int i = 0; i < nconv; i++) {
 
-	getProfile().TPSTART(QUDA_PROFILE_D2H);
-	d_v = h_evecs_arpack[arpack_index[i]];
-	getProfile().TPSTOP(QUDA_PROFILE_D2H);
+        getProfile().TPSTART(QUDA_PROFILE_D2H);
+        d_v = h_evecs_arpack[arpack_index[i]];
+        getProfile().TPSTOP(QUDA_PROFILE_D2H);
 
-	getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-	// d_v2 = M*v = lambda_measured * v
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+        // d_v2 = M*v = lambda_measured * v
 	mat(d_v2, d_v);
 	// d_v = ||lambda_measured*v - lambda_arpack*v||
 	blas::caxpby(Complex {1.0, 0.0}, d_v2, -evals[i], d_v);
 	double L2norm = blas::norm2(d_v);
-	getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
-	if (getVerbosity() >= QUDA_SUMMARIZE)
+        if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, evals[i].real(), evals[i].imag(),
 		     abs(evals[i]), sqrt(L2norm));
       }
@@ -425,11 +425,11 @@ namespace quda
     if (eig_param->compute_svd) {
       for (int i = 0; i < nconv; i++) {
 
-	getProfile().TPSTART(QUDA_PROFILE_H2D);
-	d_v = h_evecs_arpack[arpack_index[i]];
-	getProfile().TPSTOP(QUDA_PROFILE_H2D);
+        getProfile().TPSTART(QUDA_PROFILE_H2D);
+        d_v = h_evecs_arpack[arpack_index[i]];
+        getProfile().TPSTOP(QUDA_PROFILE_H2D);
 
-	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+        // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
 
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
@@ -439,11 +439,11 @@ namespace quda
 	blas::ax(1.0 / sigma_tmp, d_v2);
 
 	h_evecs[i] = h_evecs_arpack[arpack_index[i]];
-	getProfile().TPSTART(QUDA_PROFILE_D2H);
-	h_evecs[i + nconv] = d_v2;
-	getProfile().TPSTOP(QUDA_PROFILE_D2H);
+        getProfile().TPSTART(QUDA_PROFILE_D2H);
+        h_evecs[i + nconv] = d_v2;
+        getProfile().TPSTOP(QUDA_PROFILE_D2H);
 
-	h_evals[i].real(sigma_tmp);
+        h_evals[i].real(sigma_tmp);
 	h_evals[i].imag(0.0);
       }
     } else {

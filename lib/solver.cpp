@@ -129,9 +129,9 @@ namespace quda {
 	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
 	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
 	param.precision_precondition = param.precision_sloppy;
-	solver = new GMResDR(mat, *(mg->mg), matSloppy, matPrecon, param);
+        solver = new GMResDR(mat, *(mg->mg), matSloppy, matPrecon, param);
       } else {
-	solver = new GMResDR(mat, matSloppy, matPrecon, param);
+        solver = new GMResDR(mat, matSloppy, matPrecon, param);
       }
       break;
     case QUDA_CGNE_INVERTER:

@@ -17,8 +17,7 @@
 namespace quda
 {
   // Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param) :
-    EigenSolver(mat, eig_param)
+  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : EigenSolver(mat, eig_param)
   {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 

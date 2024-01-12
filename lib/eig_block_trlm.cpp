@@ -17,8 +17,7 @@
 namespace quda
 {
   // Thick Restarted Block Lanczos Method constructor
-  BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param) :
-    TRLM(mat, eig_param)
+  BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : TRLM(mat, eig_param)
   {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 

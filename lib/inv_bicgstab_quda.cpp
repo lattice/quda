@@ -13,15 +13,11 @@ namespace quda {
 
   BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param) :
-    Solver(mat, matSloppy, matPrecon, matEig, param),
-    matMdagM(matEig.Expose())
+    Solver(mat, matSloppy, matPrecon, matEig, param), matMdagM(matEig.Expose())
   {
   }
 
-  BiCGstab::~BiCGstab()
-  {
-    destroyDeflationSpace();
-  }
+  BiCGstab::~BiCGstab() { destroyDeflationSpace(); }
 
   void BiCGstab::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
@@ -208,8 +204,8 @@ namespace quda {
 
     bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
-    logQuda(QUDA_DEBUG_VERBOSE, "BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x), blas::norm2(r_sloppy),
-            blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
+    logQuda(QUDA_DEBUG_VERBOSE, "BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x),
+            blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
 
     // track if we just performed an exact recalculation of y, r, r2
     bool just_updated = false;
@@ -309,8 +305,8 @@ namespace quda {
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
-      logQuda(QUDA_DEBUG_VERBOSE, "BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x), blas::norm2(r_sloppy),
-              blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
+      logQuda(QUDA_DEBUG_VERBOSE, "BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x),
+              blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
 
       converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 

@@ -223,7 +223,7 @@ namespace quda {
     else {
       printfQuda("\nDeflation space is complete, running initCG solver.");
       fillInitCGSolverParam(Kparam, param);
-      //K = new CG(mat, matPrecon, Kparam);//Preconditioned Mat has comms flag on
+      // K = new CG(mat, matPrecon, Kparam);//Preconditioned Mat has comms flag on
       return;
     }
 

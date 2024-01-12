@@ -115,8 +115,7 @@ namespace quda {
     }
   }
 
-  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-               SolverParam &param) :
+  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param) :
     CG3(mdagm, mdagmSloppy, mdagmPrecon, param),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),

@@ -2390,7 +2390,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
   saveTuneCache();
 }
 
-void* newMultigridQuda(QudaMultigridParam *mg_param)
+void *newMultigridQuda(QudaMultigridParam *mg_param)
 {
   profilerStart(__func__);
   auto profile = pushProfile(profileInvert, mg_param->secs, mg_param->gflops);

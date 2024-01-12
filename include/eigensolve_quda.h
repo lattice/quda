@@ -188,8 +188,8 @@ namespace quda
        @param[in] locked The number of locked vectors in kSpace
     */
     template <typename T>
-    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array,
-                    int offset, int dim, int keep, int locked);
+    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array, int offset, int dim,
+                    int keep, int locked);
 
     /**
        @brief Permute the vector space using the permutation matrix.

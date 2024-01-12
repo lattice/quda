@@ -1691,27 +1691,27 @@ public:
   public:
     IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-  virtual ~IncEigCG();
+    virtual ~IncEigCG();
 
-  /**
-     @brief Expands deflation space.
-     @param V Composite field container of new eigenvectors
-     @param n_ev number of vectors to load
-   */
-  void increment(ColorSpinorField &V, int n_ev);
+    /**
+       @brief Expands deflation space.
+       @param V Composite field container of new eigenvectors
+       @param n_ev number of vectors to load
+     */
+    void increment(ColorSpinorField &V, int n_ev);
 
-  void RestartVT(const double beta, const double rho);
-  void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
-  // EigCG solver:
-  int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-  // InitCG solver:
-  int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-  // Incremental eigCG solver (for eigcg and initcg calls)
-  void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void RestartVT(const double beta, const double rho);
+    void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
+    // EigCG solver:
+    int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    // InitCG solver:
+    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    // Incremental eigCG solver (for eigcg and initcg calls)
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-  virtual bool hermitian() const final { return true; } // EigCG is only for Hermitian systems
+    virtual bool hermitian() const final { return true; } // EigCG is only for Hermitian systems
 
-  virtual QudaInverterType getInverterType() const final { return QUDA_INC_EIGCG_INVERTER; }
+    virtual QudaInverterType getInverterType() const final { return QUDA_INC_EIGCG_INVERTER; }
   };
 
 //forward declaration
@@ -1737,9 +1737,9 @@ public:
     bool init = false;
 
   public:
-   GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
-   GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           SolverParam &param);
+    GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
+    GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+            SolverParam &param);
 
     virtual ~GMResDR();
 

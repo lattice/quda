@@ -343,9 +343,7 @@ namespace quda {
 
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig,
                        SolverParam &param) :
-    Solver(mat, matSloppy, matSloppy, matEig, param),
-    matMdagM(matEig.Expose()),
-    n_krylov(param.Nkrylov)
+    Solver(mat, matSloppy, matSloppy, matEig, param), matMdagM(matEig.Expose()), n_krylov(param.Nkrylov)
   {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
