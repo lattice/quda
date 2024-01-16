@@ -912,8 +912,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   popVerbosity();
 }
 
-void freeSloppyCloverQuda();
-
 void loadSloppyCloverQuda(const QudaPrecision *prec)
 {
   freeSloppyCloverQuda();

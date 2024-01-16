@@ -142,10 +142,10 @@ namespace quda {
 
       for (auto i = 0u; i < x.size(); i++) {
         for (int parity = 0; parity < 2; parity++) {
-          const ColorSpinorField &inA = (parity & 1) ? x[i].Odd() : x[i].Even();
-          const ColorSpinorField &inB = (parity & 1) ? p[i].Even() : p[i].Odd();
-          const ColorSpinorField &inC = (parity & 1) ? p[i].Odd() : p[i].Even();
-          const ColorSpinorField &inD = (parity & 1) ? x[i].Even() : x[i].Odd();
+          const ColorSpinorField &inA = (parity & 1) ? p[i].Odd() : p[i].Even();
+          const ColorSpinorField &inB = (parity & 1) ? x[i].Even() : x[i].Odd();
+          const ColorSpinorField &inC = (parity & 1) ? x[i].Odd() : x[i].Even();
+          const ColorSpinorField &inD = (parity & 1) ? p[i].Even() : p[i].Odd();
 
           getProfile().TPSTART(QUDA_PROFILE_COMMS);
           exchangeGhost(inB, parity, dag);
