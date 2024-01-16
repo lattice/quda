@@ -77,7 +77,6 @@ set (QUDA_OBJS
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  make_4d_prop_quda.cpp
   tune.cpp
   device_vector.cu
   inv_gmresdr_quda.cpp
