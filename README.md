@@ -264,10 +264,11 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Marco Garofalo (HISKP, University of Bonn)
 *  Joel Giedt (Rensselaer Polytechnic Institute) 
 *  Steven Gottlieb (Indiana University) 
+*  Anthony Grebe (Fermilab)
 *  Kyriakos Hadjiyiannakou (Cyprus)
 *  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Hwancheol Jeong (Indiana University)
-*  Xiangyu Jiang (Chinese Academy of Sciences)
+*  Xiangyu Jiang (ITP, Chinese Academy of Sciences)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartosz Kostrzewa (HPC/A-Lab, University of Bonn)
@@ -283,13 +284,12 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Jiqun Tu (NVIDIA)
 *  Carsten Urbach (HISKP, University of Bonn)
 *  Alejandro Vaquero (Utah University)
+*  Michael Wagman (Fermilab)
 *  Mathias Wagner (NVIDIA)
 *  Andre Walker-Loud (Lawrence Berkley Laboratory)
 *  Evan Weinberg (NVIDIA)
 *  Frank Winter (Jefferson Lab)
-*  Yi-Bo Yang (Chinese Academy of Sciences)
-*  Anthony Grebe (Fermilab)
-*  Michael Wagman (Fermilab)
+*  Yi-Bo Yang (ITP, Chinese Academy of Sciences)
 
 
 Portions of this software were developed at the Innovative Systems Lab,

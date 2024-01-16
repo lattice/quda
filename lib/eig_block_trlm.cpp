@@ -105,16 +105,25 @@ namespace quda
       eigensolveFromBlockArrowMat();
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-      // mat_norm is updated.
+      // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
         if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+
+      // Lambda that returns mat_norm for LR and returns the relevant alpha
+      // (the corresponding Ritz value) for SR
+      auto check_norm = [&](double sr_norm) -> double {
+        if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+          return mat_norm;
+        else
+          return sr_norm;
+      };
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
-        if (residua[i + num_locked] < epsilon * mat_norm) {
+        if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  epsilon * mat_norm);
+                  epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -125,9 +134,9 @@ namespace quda
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
-        if (residua[i + num_locked] < tol * mat_norm) {
+        if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  tol * mat_norm);
+                  tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs

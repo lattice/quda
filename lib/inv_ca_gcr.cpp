@@ -141,6 +141,7 @@ namespace quda
     create(x, b);
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
@@ -374,6 +375,8 @@ namespace quda
     }
 
     PrintSummary("CA-GCR", total_iter, r2, b2, stop, param.tol_hq);
+
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 } // namespace quda
