@@ -1282,7 +1282,8 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
-  setGaugeParams(gparam, dparam, links, localDim, host_precision, device_precision,
+
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision,
                  device_precision_sloppy, 1.0, 0.0);
   gparam.type = QUDA_WILSON_LINKS;
   gparam.make_resident_gauge = true;
@@ -1299,11 +1300,14 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   invertParam.dslash_type = QUDA_COVDEV_DSLASH;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
-
-  if (invalidate_quda_gauge || !create_quda_gauge || (reloadGaugeField && links != nullptr)) {
+  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)){
+    if(links == nullptr) {
+      errorQuda("Can't offload a null gauge field\n");
+      exit(1);
+    }
     loadGaugeQuda(const_cast<void *>(links), &gparam);
-    invalidate_quda_gauge = false;
+    // Assume the caller resets reloadGaugeField
+    // invalidate_quda_gauge = false;
   }
   invertParam.dslash_type = saveDslash;
 
@@ -1317,7 +1321,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 } // qudaShift
 
 void qudaSpinTaste(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int spin, int taste, int *reloadGaugeField)
+               void* src, void* dst, int spin, int taste, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1329,7 +1333,8 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
 
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
-  setGaugeParams(gparam, dparam, links, localDim, host_precision, device_precision,
+
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision,
                  device_precision_sloppy, 1.0, 0.0);
   gparam.type = QUDA_WILSON_LINKS;
   gparam.make_resident_gauge = true;
@@ -1346,11 +1351,13 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   invertParam.dslash_type = QUDA_COVDEV_DSLASH;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
-
-  if (invalidate_quda_gauge || !create_quda_gauge || (reloadGaugeField && links != nullptr)) {
+  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)){
+    if(links == nullptr) {
+      errorQuda("Can't offload a null gauge field\n");
+      exit(1);
+    }
     loadGaugeQuda(const_cast<void *>(links), &gparam);
-    invalidate_quda_gauge = false;
+    // Assume the caller resets reloadGaugeField
   }
   invertParam.dslash_type = saveDslash;
 
