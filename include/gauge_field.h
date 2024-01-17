@@ -476,6 +476,17 @@ namespace quda {
       return reinterpret_cast<T>(gauge_array[d].data());
     }
 
+    void *raw_pointer() const
+    {
+      if (is_pointer_array(order)) {
+        static void *data_array[8];
+        for (int i = 0; i < site_dim; i++) data_array[i] = gauge_array[i].data();
+        return data_array;
+      } else {
+        return gauge.data();
+      }
+    }
+
     /**
        @brief Return array of pointers to the per dimension gauge field allocation(s).
        @tparam T Optional type to cast the pointer to (default is
@@ -700,7 +711,7 @@ namespace quda {
      @param recon The reconsturction type
      @return the pointer to the extended gauge field
   */
-  GaugeField *createExtendedGauge(GaugeField &in, const lat_dim_t &R, TimeProfile &profile,
+  GaugeField *createExtendedGauge(const GaugeField &in, const lat_dim_t &R, TimeProfile &profile = getProfile(),
                                   bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
 
   /**

@@ -4,8 +4,6 @@
 #include <string.h>
 #include <type_traits>
 
-#include "quda.h"
-#include "gauge_field.h"
 #include "host_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
@@ -69,7 +67,15 @@ struct fcomplex {
 struct dcomplex {
   double real;
   double imag;
+
+  void operator+=(const dcomplex &other)
+  {
+    real += other.real;
+    imag += other.imag;
+  }
 };
+
+#pragma omp declare reduction(dcomplex_sum:dcomplex : omp_out += omp_in)
 
 struct fsu3_matrix {
   using real_t = float;
@@ -111,25 +117,7 @@ struct danti_hermitmat {
   double space;
 };
 
-// convenience struct for passing around lattice meta data
-struct lattice_t {
-  int n_color;
-  size_t volume;
-  size_t volume_ex;
-  int x[4];
-  int r[4];
-  int e[4];
 
-  lattice_t(const quda::GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
-  {
-    for (int d = 0; d < 4; d++) {
-      x[d] = lat.X()[d] - 2 * lat.R()[d];
-      r[d] = lat.R()[d];
-      e[d] = lat.X()[d];
-      volume *= x[d];
-    }
-  };
-};
 
 extern int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
 
@@ -322,9 +310,7 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
 template <typename su3_matrix>
 static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, int len, int dx[4], const lattice_t &lat)
 {
-  su3_matrix prev_matrix, curr_matrix;
-
-  memset(&curr_matrix, 0, sizeof(curr_matrix));
+  su3_matrix prev_matrix, curr_matrix = {};
 
   curr_matrix.e[0][0].real = 1;
   curr_matrix.e[1][1].real = 1;
@@ -366,16 +352,14 @@ template <typename su3_matrix, typename Float>
 static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff,
                                  int dir, const lattice_t &lat)
 {
-  su3_matrix curr_matrix, tmat;
-  int dx[4];
-
+#pragma omp parallel for
   for (size_t i = 0; i < lat.volume; i++) {
-    memset(dx, 0, sizeof(dx));
-
+    int dx[4] = {};
     dx[dir] = 1;
 
-    curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
+    su3_matrix curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
 
+    su3_matrix tmat;
     su3_adjoint(&curr_matrix, &tmat);
     scalar_mult_add_su3_matrix(staple + i, &tmat, loop_coeff, staple + i);
   } // i
@@ -384,16 +368,14 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int 
 template <typename su3_matrix>
 static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, double loop_coeff, const lattice_t &lat)
 {
-  su3_matrix tmat;
-  dcomplex accum;
-  memset(&accum, 0, sizeof(accum));
-  int dx[4];
+  dcomplex accum = {};
 
+#pragma omp parallel for reduction(dcomplex_sum : accum)
   for (size_t i = 0; i < lat.volume; i++) {
-    memset(dx, 0, sizeof(dx));
-    tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
+    int dx[4] = {};
+    su3_matrix tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
     auto tr = trace_su3(&tmat);
-    CSUM(accum, tr);
+    accum += dcomplex {tr.real, tr.imag};
   }
 
   CSCALE(accum, loop_coeff);
@@ -405,6 +387,7 @@ template <typename su3_matrix, typename anti_hermitmat, typename Float>
 static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
                        const lattice_t &lat)
 {
+#pragma omp parallel for
   for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat1;
     su3_matrix tmat2;
@@ -426,6 +409,7 @@ template <typename su3_matrix, typename Float>
 static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
                          const lattice_t &lat)
 {
+#pragma omp parallel for
   for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat;
 

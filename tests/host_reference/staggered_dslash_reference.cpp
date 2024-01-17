@@ -11,6 +11,7 @@
 #include <command_line_params.h>
 #include "misc.h"
 #include <blas_quda.h>
+#include <gauge_field.h>
 
 #include <dslash_reference.h>
 
@@ -32,24 +33,25 @@ template <typename Float> void display_link_internal(Float *link)
 // if oddBit is one:  calculate odd parity spinor elements
 // if daggerBit is zero: perform ordinary dslash operator
 // if daggerBit is one:  perform hermitian conjugate of dslash
-template <typename sFloat, typename gFloat>
+template <typename real_t>
 #ifdef MULTI_GPU
-void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink,
-                              gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor,
-                              sFloat **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
+void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **ghostFatlink,
+                              real_t **ghostLonglink, real_t *spinorField, real_t **fwd_nbr_spinor,
+                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
 #else
-void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **, gFloat **, sFloat *spinorField,
-                              sFloat **, sFloat **, int oddBit, int daggerBit, QudaDslashType dslash_type)
+void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **, real_t **, real_t *spinorField,
+                              real_t **, real_t **, int oddBit, int daggerBit, QudaDslashType dslash_type)
 #endif
 {
+#pragma omp parallel for
   for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
-  gFloat *fatlinkEven[4], *fatlinkOdd[4];
-  gFloat *longlinkEven[4], *longlinkOdd[4];
+  real_t *fatlinkEven[4], *fatlinkOdd[4];
+  real_t *longlinkEven[4], *longlinkOdd[4];
 
 #ifdef MULTI_GPU
-  gFloat *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
-  gFloat *ghostLonglinkEven[4], *ghostLonglinkOdd[4];
+  real_t *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
+  real_t *ghostLonglinkEven[4], *ghostLonglinkOdd[4];
 #endif
 
   for (int dir = 0; dir < 4; dir++) {
@@ -66,34 +68,35 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
 #endif
   }
 
+#pragma omp parallel for
   for (int sid = 0; sid < Vh; sid++) {
     int offset = stag_spinor_site_size * sid;
 
     for (int dir = 0; dir < 8; dir++) {
 #ifdef MULTI_GPU
       const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
-      gFloat *fatlnk
+      real_t *fatlnk
         = gaugeLink_mg4dir(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-      gFloat *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
+      real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
         gaugeLink_mg4dir(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
         nullptr;
-      sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(
+      real_t *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(
         sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, stag_spinor_site_size);
-      sFloat *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+      real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
         spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
                                            stag_spinor_site_size) :
         nullptr;
 #else
-      gFloat *fatlnk = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
-      gFloat *longlnk
+      real_t *fatlnk = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
+      real_t *longlnk
         = dslash_type == QUDA_ASQTAD_DSLASH ? gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, 3) : nullptr;
-      sFloat *first_neighbor_spinor
+      real_t *first_neighbor_spinor
         = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 1, stag_spinor_site_size);
-      sFloat *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+      real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
         spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, stag_spinor_site_size) :
         nullptr;
 #endif
-      sFloat gaugedSpinor[stag_spinor_site_size];
+      real_t gaugedSpinor[stag_spinor_site_size];
 
       if (dir % 2 == 0) {
         su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
@@ -122,10 +125,18 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
   } // 4-d volume
 }
 
-void staggeredDslash(ColorSpinorField &out, void *const *fatlink, void *const *longlink, void *const *ghost_fatlink,
-                     void *const *ghost_longlink, const ColorSpinorField &in, int oddBit, int daggerBit,
-                     QudaPrecision sPrecision, QudaPrecision gPrecision, QudaDslashType dslash_type)
+void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
+  // assert sPrecision and gPrecision must be the same
+  if (in.Precision() != fat_link.Precision()) {
+    errorQuda("The spinor precision and gauge precision are not the same");
+  }
+
+  // assert we have single-parity spinors
+  if (out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || in.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_dslash, out %d in %d", out.SiteSubset(), in.SiteSubset());
+
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
@@ -138,39 +149,85 @@ void staggeredDslash(ColorSpinorField &out, void *const *fatlink, void *const *l
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
-  auto fwd_nbr_spinor = in.fwdGhostFaceBuffer;
-  auto back_nbr_spinor = in.backGhostFaceBuffer;
+  void *qdp_fatlink[] = {fat_link.data(0), fat_link.data(1), fat_link.data(2), fat_link.data(3)};
+  void *qdp_longlink[] = {long_link.data(0), long_link.data(1), long_link.data(2), long_link.data(3)};
+  void *ghost_fatlink[]
+    = {fat_link.Ghost()[0].data(), fat_link.Ghost()[1].data(), fat_link.Ghost()[2].data(), fat_link.Ghost()[3].data()};
+  void *ghost_longlink[] = {long_link.Ghost()[0].data(), long_link.Ghost()[1].data(), long_link.Ghost()[2].data(),
+                            long_link.Ghost()[3].data()};
 
-  if (sPrecision == QUDA_DOUBLE_PRECISION) {
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      staggeredDslashReference((double *)out.data(), (double **)fatlink, (double **)longlink, (double **)ghost_fatlink,
-                               (double **)ghost_longlink, (double *)in.data(), (double **)fwd_nbr_spinor,
-                               (double **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
-    } else {
-      staggeredDslashReference((double *)out.data(), (float **)fatlink, (float **)longlink, (float **)ghost_fatlink,
-                               (float **)ghost_longlink, (double *)in.data(), (double **)fwd_nbr_spinor,
-                               (double **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
-    }
-  } else {
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      staggeredDslashReference((float *)out.data(), (double **)fatlink, (double **)longlink, (double **)ghost_fatlink,
-                               (double **)ghost_longlink, (float *)in.data(), (float **)fwd_nbr_spinor,
-                               (float **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
-    } else {
-      staggeredDslashReference((float *)out.data(), (float **)fatlink, (float **)longlink, (float **)ghost_fatlink,
-                               (float **)ghost_longlink, (float *)in.data(), (float **)fwd_nbr_spinor,
-                               (float **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
-    }
+  if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+    staggeredDslashReference(static_cast<double *>(out.data()), reinterpret_cast<double **>(qdp_fatlink),
+                             reinterpret_cast<double **>(qdp_longlink), reinterpret_cast<double **>(ghost_fatlink),
+                             reinterpret_cast<double **>(ghost_longlink), static_cast<double *>(in.data()),
+                             reinterpret_cast<double **>(in.fwdGhostFaceBuffer),
+                             reinterpret_cast<double **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
+  } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+    staggeredDslashReference(static_cast<float *>(out.data()), reinterpret_cast<float **>(qdp_fatlink),
+                             reinterpret_cast<float **>(qdp_longlink), reinterpret_cast<float **>(ghost_fatlink),
+                             reinterpret_cast<float **>(ghost_longlink), static_cast<float *>(in.data()),
+                             reinterpret_cast<float **>(in.fwdGhostFaceBuffer),
+                             reinterpret_cast<float **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
   }
 }
 
-void staggeredMatDagMat(ColorSpinorField &out, void *const *fatlink, void *const *longlink, void *const *ghost_fatlink,
-                        void *const *ghost_longlink, const ColorSpinorField &in, double mass, int dagger_bit,
-                        QudaPrecision sPrecision, QudaPrecision gPrecision, ColorSpinorField &tmp, QudaParity parity,
-                        QudaDslashType dslash_type)
+void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
-  if (sPrecision != gPrecision) { errorQuda("Spinor precision and gPrecison is not the same"); }
+  if (in.Precision() != fat_link.Precision()) {
+    errorQuda("The spinor precision and gauge precision are not the same");
+  }
+
+  // assert we have full-parity spinors
+  if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_mat, out %d in %d", out.SiteSubset(), in.SiteSubset());
+
+  // In QUDA, the full staggered operator has the sign convention
+  // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
+  // have the minus sign. Inverting the expected dagger convention
+  // solves this discrepancy.
+  stag_dslash(out.Even(), fat_link, long_link, in.Odd(), QUDA_EVEN_PARITY, 1 - daggerBit, dslash_type);
+  stag_dslash(out.Odd(), fat_link, long_link, in.Even(), QUDA_ODD_PARITY, 1 - daggerBit, dslash_type);
+
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    double kappa = 1.0 / (8 + mass);
+    xpay(in.data(), kappa, out.data(), out.Length(), out.Precision());
+  } else {
+    axpy(2 * mass, in.data(), out.data(), out.Length(), out.Precision());
+  }
+}
+
+void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
+{
+  // assert sPrecision and gPrecision must be the same
+  if (in.Precision() != fat_link.Precision()) {
+    errorQuda("The spinor precision and gauge precision are not the same");
+  }
+
+  // assert we have full-parity spinors
+  if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_matdagmat, out %d in %d", out.SiteSubset(), in.SiteSubset());
+
+  // Create temporary spinors
+  quda::ColorSpinorParam csParam(in);
+  quda::ColorSpinorField tmp(csParam);
+
+  // Apply mat in sequence
+  stag_mat(tmp, fat_link, long_link, in, mass, daggerBit, dslash_type);
+  stag_mat(out, fat_link, long_link, tmp, mass, 1 - daggerBit, dslash_type);
+}
+
+void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+                const ColorSpinorField &in, double mass, int, QudaParity parity, QudaDslashType dslash_type)
+{
+  // assert sPrecision and gPrecision must be the same
+  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precison are not the same"); }
+
+  // assert we have single-parity spinors
+  if (out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || in.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_matpc, out %d in %d", out.SiteSubset(), in.SiteSubset());
 
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (parity == QUDA_EVEN_PARITY) {
@@ -181,16 +238,19 @@ void staggeredMatDagMat(ColorSpinorField &out, void *const *fatlink, void *const
     errorQuda("full parity not supported in function");
   }
 
-  staggeredDslash(tmp, fatlink, longlink, ghost_fatlink, ghost_longlink, in, otherparity, dagger_bit, sPrecision,
-                  gPrecision, dslash_type);
+  // Create temporary spinors
+  quda::ColorSpinorParam csParam(in);
+  quda::ColorSpinorField tmp(csParam);
 
-  staggeredDslash(out, fatlink, longlink, ghost_fatlink, ghost_longlink, tmp, parity, dagger_bit, sPrecision,
-                  gPrecision, dslash_type);
+  // dagger bit does not matter
+  stag_dslash(tmp, fat_link, long_link, in, otherparity, 0, dslash_type);
+  stag_dslash(out, fat_link, long_link, tmp, parity, 0, dslash_type);
 
   double msq_x4 = mass * mass * 4;
-  if (sPrecision == QUDA_DOUBLE_PRECISION) {
-    axmy((double *)in.data(), (double)msq_x4, (double *)out.data(), Vh * stag_spinor_site_size);
+  if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+    axmy(static_cast<double *>(in.data()), msq_x4, static_cast<double *>(out.data()), Vh * stag_spinor_site_size);
   } else {
-    axmy((float *)in.data(), (float)msq_x4, (float *)out.data(), Vh * stag_spinor_site_size);
+    axmy(static_cast<float *>(in.data()), static_cast<float>(msq_x4), static_cast<float *>(out.data()),
+         Vh * stag_spinor_site_size);
   }
 }

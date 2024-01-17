@@ -52,6 +52,7 @@ set (QUDA_OBJS
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
+  clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spinor_noise.cu spinor_dilute.cu
@@ -174,6 +175,7 @@ configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
 configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
+configure_file(spinor_dilute.in.cu spinor_dilute.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
 configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
@@ -469,6 +471,7 @@ endif()
 
 if(QUDA_OPENMP)
   target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
+  target_compile_definitions(quda PUBLIC QUDA_OPENMP)
 endif()
 
 # set which precisions to enable

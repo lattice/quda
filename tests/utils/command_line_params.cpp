@@ -121,6 +121,7 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
+std::array<int, 4> dilution_block_size = {8, 8, 8, 8};
 
 int mg_levels = 2;
 
@@ -301,6 +302,8 @@ bool   smear_delete_two_link  = true;
 
 bool enable_testing = false;
 
+bool detratio = false;
+
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
@@ -471,7 +474,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
-  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
+  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type (default wilson or asqtad as appropriate)")
     ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
@@ -499,7 +502,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(mass_normalization_map));
 
   quda_app
-    ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym)")
+    ->add_option("--matpc", matpc_type,
+                 "Matrix preconditioning type (even-even (default), odd-odd, even-even-asym, odd-odd-asym)")
     ->transform(CLI::QUDACheckedTransformer(matpc_type_map));
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
@@ -598,9 +602,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
 
   quda_app
-    ->add_option(
-      "--solution-type", solution_type,
-      "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
+    ->add_option("--solution-type", solution_type,
+                 "The solution we desire (mat (default for Wilson-type), mat-dag-mat, mat-pc (default for "
+                 "staggered-type), mat-pc-dag-mat-pc (default for Wilson-type multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
   quda_app
@@ -609,8 +613,14 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(fermion_t_boundary_map));
 
   quda_app
-    ->add_option("--solve-type", solve_type,
-                 "The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc)")
+    ->add_option("--dilution-block-size", dilution_block_size,
+                 "Set the dilution block size in all four dimension (default 1 1 1 1)")
+    ->expected(4);
+
+  quda_app
+    ->add_option(
+      "--solve-type",
+      solve_type, "The type of solve to do (direct, direct-pc (default for staggered-type), normop, normop-pc (default for Wilson-type), normerr, normerr-pc)")
     ->transform(CLI::QUDACheckedTransformer(solve_type_map));
   quda_app
     ->add_option("--solver-ext-lib-type", solver_ext_lib, "Set external library for the solvers  (default Eigen library)")
@@ -751,9 +761,12 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--eig-use-dagger", eig_use_dagger,
                       "Solve the Mdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
-  opgroup->add_option("--eig-use-normop", eig_use_normop,
-                      "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
-  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false)");
+  opgroup->add_option(
+    "--eig-use-normop",
+    eig_use_normop, "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false for Wilson-type, true for staggered-type)");
+  opgroup->add_option(
+    "--eig-use-pc", eig_use_pc,
+    "Solve the Even-Odd preconditioned problem (default false for Wilson-type, true for staggered-type)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 }
 
@@ -1109,4 +1122,10 @@ void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--smear-coeff", smear_coeff, "Set smearing coefficient (default 0.1)");
   opgroup->add_option("--smear-nsteps", smear_n_steps, "Number of smearing steps (default 50)");
   opgroup->add_option("--smear-t0", smear_t0, "Index of the time slice (default -1)");
+}
+
+void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
+  opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
 }

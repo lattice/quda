@@ -9,6 +9,15 @@ target_compile_options(
   $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
+
+# ignore any unkown pragmas if not using OpenMP
+if(NOT ${QUDA_OPENMP})
+  target_compile_options(quda_test PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
+    $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+    >)
+endif()
+
 if(BUILD_SHARED_LIBS)
   install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
@@ -221,6 +230,11 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(hisq_stencil_ctest hisq_stencil_ctest.cpp)
+  target_link_libraries(hisq_stencil_ctest ${TEST_LIBS})
+  quda_checkbuildtest(hisq_stencil_ctest QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_stencil_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
   add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
@@ -236,6 +250,13 @@ add_executable(gauge_path_test gauge_path_test.cpp)
 target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+  add_executable(clover_force_test clover_force_test.cpp)
+  target_link_libraries(clover_force_test ${TEST_LIBS})
+  quda_checkbuildtest(clover_force_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS clover_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 add_executable(gauge_alg_test gauge_alg_test.cpp)
 target_link_libraries(gauge_alg_test ${TEST_LIBS})
@@ -265,6 +286,7 @@ if(QUDA_MPI OR QUDA_QMP)
   if(DEFINED ENV{QUDA_TEST_GRID_SIZE})
     get_test_ranks($ENV{QUDA_TEST_GRID_SIZE} QUDA_TEST_NUM_PROCS)
   endif()
+  message(STATUS "ctest will run on ${QUDA_TEST_NUM_PROCS} processes")
   set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE};${MPIEXEC_NUMPROC_FLAG};${QUDA_TEST_NUM_PROCS};${MPIEXEC_PREFLAGS}
     CACHE STRING "CTest Launcher command for QUDA's tests")
 endif()
@@ -374,6 +396,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Dslash
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_splitgrid_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
 
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -830,10 +864,21 @@ endif()
       set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPC
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
-            --test 0
+            --test MatPC
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
@@ -869,7 +914,7 @@ endif()
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
             --all-partitions 1
-            --test 0
+            --test MatPC
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
@@ -889,6 +934,19 @@ endif()
         --gtest_output=xml:dslash_${DIRAC_NAME}_build_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    if(QUDA_LAPLACE)
+      set(DIRAC_NAME laplace)
+      add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+               COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                       --dslash-type ${DIRAC_NAME}
+                       --test Mat
+                       --dim 2 4 6 8
+                       --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+      if(polenv)
+        set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      endif()
     endif()
   endif()
 
@@ -915,7 +973,7 @@ elseif(single_prec)
   set(TEST_PRECS single)
 endif()
 
-# Inversions
+# Wilson-type Inversions
 foreach(prec IN LISTS TEST_PRECS)
 
   if(${prec} STREQUAL "double")
@@ -931,6 +989,20 @@ foreach(prec IN LISTS TEST_PRECS)
       --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
       --enable-testing true
       --gtest_output=xml:invert_test_wilson_${prec}.xml)
+
+      if(DEFINED ENV{QUDA_ENABLE_TUNING})
+        if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+          add_test(NAME invert_test_splitgrid_wilson_${prec}
+            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+            --dslash-type wilson --ngcrkrylov 8
+            --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+            --nsrc ${QUDA_TEST_NUM_PROCS}
+            --enable-testing true
+            --gtest_output=xml:invert_test_splitgrid_wilson_${prec}.xml)
+
+          set_tests_properties(invert_test_splitgrid_wilson_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+        endif()
+      endif()
   endif()
   
   if(QUDA_DIRAC_TWISTED_MASS)
@@ -1076,7 +1148,73 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 endforeach(prec)
 
-# Eigensolves
+# Staggered-type Inversions
+foreach(prec IN LISTS TEST_PRECS)
+
+  # These require looser tolerances to keep iterations to solution in check
+  if(${prec} STREQUAL "double")
+    set(tol 1e-6)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-5)
+  endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    # --compute-fat-long true is necessary to get well-behaved fields
+
+    add_test(NAME invert_test_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_staggered_${prec}.xml)
+
+    if(DEFINED ENV{QUDA_ENABLE_TUNING})
+      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+        add_test(NAME invert_test_splitgrid_staggered_${prec}
+          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+          --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+          --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+          --nsrc ${QUDA_TEST_NUM_PROCS}
+          --enable-testing true
+          --gtest_output=xml:invert_test_splitgrid_staggered_${prec}.xml)
+
+        set_tests_properties(invert_test_splitgrid_staggered_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+      endif()
+    endif()
+
+    add_test(NAME invert_test_asqtad_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+      --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_asqtad_${prec}.xml)
+
+    if(DEFINED ENV{QUDA_ENABLE_TUNING})
+      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+        add_test(NAME invert_test_splitgrid_asqtad_${prec}
+          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+          --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+          --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+          --nsrc ${QUDA_TEST_NUM_PROCS}
+          --enable-testing true
+          --gtest_output=xml:invert_test_splitgrid_asqtad_${prec}.xml)
+
+        set_tests_properties(invert_test_splitgrid_asqtad_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+      endif()
+    endif()
+
+    if (QUDA_LAPLACE)
+      add_test(NAME invert_test_laplace_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type laplace --ngcrkrylov 8 --compute-fat-long true
+        --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+        --enable-testing true
+        --gtest_output=xml:invert_test_laplace_${prec}.xml)
+    endif()
+  endif()
+endforeach(prec)
+
+# Wilson-type eigensolves
 foreach(prec IN LISTS TEST_PRECS)
 
   if(${prec} STREQUAL "double")
@@ -1242,13 +1380,88 @@ foreach(prec IN LISTS TEST_PRECS)
       --gtest_output=xml:eigensolve_test_mobius_eofa_asym_${prec}.xml)
   endif()
 endforeach(prec)
-  
+
+# Staggered-type eigensolves
+foreach(prec IN LISTS TEST_PRECS)
+
+  # These require looser tolerances to keep iterations to solution in check
+  if(${prec} STREQUAL "double")
+    set(tol 1e-5)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-4)
+  endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    # --compute-fat-long true is necessary to get well-behaved fields
+
+    add_test(NAME eigensolve_test_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --compute-fat-long true
+      --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --enable-testing true
+      --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+
+    # These tests are particularly expensive so they are disabled by default
+    if(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST)
+      add_test(NAME eigensolve_test_asqtad_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type asqtad --compute-fat-long true
+        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+        --dim 6 6 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+        --enable-testing true
+        --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+    endif()
+
+    if (QUDA_LAPLACE)
+      add_test(NAME eigensolve_test_laplace_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type laplace --compute-fat-long true
+        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 256
+        --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+        --enable-testing true
+        --gtest_output=xml:staggered_eigensolve_test_laplace_${prec}.xml)
+    endif()
+  endif()
+endforeach(prec)
+
+
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME hisq_stencil
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_stencil_test.xml)
+endif()
+
 foreach(prec IN LISTS TEST_PRECS)
 
   add_test(NAME gauge_path_${prec}
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --gtest_output=xml:gauge_path_test_${prec}.xml)
+
+
+  if(QUDA_DIRAC_CLOVER)
+    add_test(NAME clover_force_test_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --dslash-type clover --compute-clover true
+                   --solution-type mat-pc-dag-mat-pc
+                   --matpc odd-odd-asym --dagger
+                   --enable-testing true
+                   --gtest_output=xml:clover_force_test_${prec}.xml)
+   endif()
+
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    add_test(NAME tmc_clover_force_test_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --dslash-type twisted-clover --compute-clover true
+                   --solution-type mat-pc-dag-mat-pc
+                   --matpc odd-odd-asym --dagger
+                   --enable-testing true
+                   --gtest_output=xml:tmc_clover_force_test_${prec}.xml)
+   endif()
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
@@ -1275,7 +1488,7 @@ foreach(prec IN LISTS TEST_PRECS)
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 4 6 8 10 --prec ${prec}
+                     --dim 4 6 8 10 --dilution-block-size 4 6 4 5 --prec ${prec}
                      --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 

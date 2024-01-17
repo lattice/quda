@@ -72,7 +72,10 @@ namespace quda
           && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
               || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         // spin components in shared depend on inversion algorithm
-        int nSpin = mobius_m5::var_inverse() ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
+        bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+          || type == Dslash5Type::M5_INV_ZMOBIUS;
+        int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() :
+                                                           in.Nspin();
         return 2 * nSpin * nColor * sizeof(typename mapper<Float>::type);
       } else {
         return 0;
@@ -129,7 +132,7 @@ namespace quda
     }
 
     template <bool dagger, bool xpay, Dslash5Type type> using Arg = Dslash5Arg<Float, nColor, dagger, xpay, type>;
-    
+
     template <Dslash5Type type, template <typename> class F>
     void Launch(TuneParam &tp, const qudaStream_t &stream)
     {

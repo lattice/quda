@@ -96,23 +96,6 @@ const char *get_test_type(int t)
   return ret;
 }
 
-const char *get_staggered_test_type(int t)
-{
-  const char *ret;
-  switch (t) {
-  case 0: ret = "full"; break;
-  case 1: ret = "full_ee_prec"; break;
-  case 2: ret = "full_oo_prec"; break;
-  case 3: ret = "even"; break;
-  case 4: ret = "odd"; break;
-  case 5: ret = "mcg_even"; break;
-  case 6: ret = "mcg_odd"; break;
-  default: ret = "unknown"; break;
-  }
-
-  return ret;
-}
-
 const char *get_dslash_str(QudaDslashType type)
 {
   const char *ret;
@@ -371,6 +354,7 @@ std::string get_dilution_type_str(QudaDilutionType type)
   case QUDA_DILUTION_COLOR: s = std::string("color"); break;
   case QUDA_DILUTION_SPIN_COLOR: s = std::string("spin_color"); break;
   case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
+  case QUDA_DILUTION_BLOCK: s = std::string("block"); break;
   default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
   }
   return s;

@@ -10,39 +10,49 @@ namespace quda {
   class CloverSigmaTrace : TunableKernel1D {
     GaugeField &output;
     const CloverField &clover;
+    const bool twisted;
     Float coeff;
-    unsigned int minThreads() const { return clover.VolumeCB(); }
+    const int parity;
+    unsigned int minThreads() const override { return clover.VolumeCB(); }
 
   public:
-    CloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff) :
+    CloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity) :
       TunableKernel1D(output),
       output(output),
       clover(clover),
-      coeff(static_cast<Float>(coeff))
+      twisted(clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      coeff(static_cast<Float>(coeff)),
+      parity(parity)
     {
+      if (twisted) strcat(aux, ",twisted");
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream) override
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor>(output, clover, coeff));
+      if (twisted) {
+        launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, true>(output, clover, coeff, parity));
+      } else {
+        launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor, false>(output, clover, coeff, parity));
+      }
     }
 
-    long long flops() const { return 0; } // Fix this
-    long long bytes() const { return clover.Bytes() + output.Bytes(); }
+    void preTune() override { output.backup(); }
+    void postTune() override { output.restore(); }
+
+    long long flops() const override { return 0; } // Fix this
+    long long bytes() const override { return clover.Bytes() + output.Bytes(); }
   };
 
-#ifdef GPU_CLOVER_DIRAC
-  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff)
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity)
   {
-    checkNative(output, clover);
-    instantiate<CloverSigmaTrace>(output, clover, coeff);
+    if constexpr (is_enabled_clover()) {
+      checkNative(output, clover);
+      instantiate<CloverSigmaTrace>(output, clover, coeff, parity);
+    } else {
+      errorQuda("Clover has not been built");
+    }
   }
-#else
-  void computeCloverSigmaTrace(GaugeField&, const CloverField&, double)
-  {
-    errorQuda("Clover has not been built");
-  }
-#endif
 
 } // namespace quda

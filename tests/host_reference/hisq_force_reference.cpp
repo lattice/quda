@@ -99,8 +99,9 @@ template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vecto
 template <typename su3_matrix, typename su3_vector>
 void computeLinkOrderedOuterProduct(su3_vector *src, quda::GaugeField &dest, size_t nhops)
 {
-  int dx[4];
+#pragma omp parallel for
   for (int i = 0; i < V; ++i) {
+    int dx[4];
     for (int dir = 0; dir < 4; ++dir) {
       dx[3] = dx[2] = dx[1] = dx[0] = 0;
       dx[dir] = nhops;
@@ -894,10 +895,12 @@ void computeMiddleLinkField(const int dim[4], const Real *const oprod, const Rea
   // To keep the code as close to the GPU code as possible, we'll
   // loop over the even sites first and then the odd sites
   LoadStore<Real> ls(volume);
+#pragma omp parallel for
   for (int site = 0; site < loop_count; ++site) {
     computeMiddleLinkSite<Real, 0>(site, dim, oprod, Qprev, link, sig, mu, coeff, ls, Pmu, P3, Qmu, newOprod);
   }
   // Loop over odd lattice sites
+#pragma omp parallel for
   for (int site = 0; site < loop_count; ++site) {
     computeMiddleLinkSite<Real, 1>(site, dim, oprod, Qprev, link, sig, mu, coeff, ls, Pmu, P3, Qmu, newOprod);
   }
@@ -988,10 +991,12 @@ void computeSideLinkField(const int dim[4], const Real *const P3,
 #endif
   LoadStore<Real> ls(volume);
 
+#pragma omp parallel for
   for (int site = 0; site < loop_count; ++site) {
     computeSideLinkSite<Real, 0>(site, dim, P3, Qprod, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
   }
 
+#pragma omp parallel for
   for (int site = 0; site < loop_count; ++site) {
     computeSideLinkSite<Real, 1>(site, dim, P3, Qprod, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
   }
@@ -1098,6 +1103,7 @@ void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *
 #endif
 
   LoadStore<Real> ls(volume);
+#pragma omp parallel for
   for (int site = 0; site < loop_count; ++site) {
 
     computeAllLinkSite<Real, 0>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
@@ -1297,10 +1303,12 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   const int half_volume = volume / 2;
 
   LoadStore<Real> ls(volume);
+#pragma omp parallel for
   for (int site = 0; site < half_volume; ++site) {
     computeLongLinkSite<Real, 0>(site, dim, oprod, link, sig, coeff, ls, output);
   }
   // Loop over odd lattice sites
+#pragma omp parallel for
   for (int site = 0; site < half_volume; ++site) {
     computeLongLinkSite<Real, 1>(site, dim, oprod, link, sig, coeff, ls, output);
   }
@@ -1363,7 +1371,9 @@ void completeForceField(const int dim[4], const Real *const oprod, const Real *c
   const int half_volume = volume / 2;
   LoadStore<Real> ls(volume);
 
+#pragma omp parallel for
   for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 0>(site, dim, oprod, link, sig, ls, mom); }
+#pragma omp parallel for
   for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 1>(site, dim, oprod, link, sig, ls, mom); }
 }
 

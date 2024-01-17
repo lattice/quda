@@ -528,12 +528,15 @@ namespace quda
       errorQuda("hipPointerGetAttributes returned error: %s\n", hipGetErrorString(error));
     }
 
-    switch (attr.memoryType) {
+    switch (attr.type) {
+#if HIP_VERSION_MAJOR >= 6
+    case hipMemoryTypeUnregistered: return QUDA_CPU_FIELD_LOCATION;
+#endif  // HIP_VERSION_MAJOR >= 6
     case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION;
     case hipMemoryTypeDevice: return QUDA_CUDA_FIELD_LOCATION;
     case hipMemoryTypeArray: return QUDA_CUDA_FIELD_LOCATION;
     case hipMemoryTypeUnified: return QUDA_CUDA_FIELD_LOCATION; ///< Not used currently
-    default: errorQuda("Unknown memory type %d\n", attr.memoryType); return QUDA_INVALID_FIELD_LOCATION;
+    default: errorQuda("Unknown memory type %d\n", attr.type); return QUDA_INVALID_FIELD_LOCATION;
     }
   }
 

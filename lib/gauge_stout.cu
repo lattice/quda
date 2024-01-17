@@ -18,8 +18,9 @@ namespace quda {
     unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
     unsigned int sharedBytesPerThread() const
     {
-      // use SharedMemoryCache if using over improvement for two link fields
-      return improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
+      // use ThreadLocalCache if using over improvement for two link fields
+      return (improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0)
+        + 4 * sizeof(int); // for thread_array
     }
 
   public:
