@@ -1325,6 +1325,44 @@ namespace quda {
           }
         }
 
+        __device__ __host__ inline double sinfold(double x) const
+        {
+          double y = x - floor(x + 0.5);// wrap onto -pi/2, pi/2 (optimize?)
+          return max(min(y, 0.5 - y), -0.5 - y);
+        };
+
+        __device__ __host__ inline double sin2pi(double x) const
+        {
+          double x1 = sinfold(x);
+          double x2 = x1 * x1;
+          return x1*(6.28318527379078585274731929079414949 + x2*(-41.3416774783915252855640244027643612 + x2*(81.6022312427274226421465134076212909 + x2*(-76.5749921819992128192000934020817094 + 39.7109181438058471453004860893416233*x2))));
+        }
+
+        __device__ __host__ inline double cosfold(double x) const
+        {
+          double y = x - floor(x + 0.5); // wrap onto -pi/2, pi/2 (optimize?)
+          return max(min(y, 0.5 - y), -0.5 - y);
+        };
+
+        __device__ __host__ inline double cos2pi(double x) const
+        {
+          double x1 = cosfold(x);
+          double x2 = x1 * x1;
+          double c = 0.99999999901810067632218592152414676 + x2*(-19.7392080320548995682599111266827624 + x2*(64.9392878245787538584194003810854251 + x2*(-85.4511616308164044967465654262107341 + x2*(60.1029288012462159679724965251436792 - 24.7337944595523781372950725036124394*x2))));
+          double y = x - floor(x + 0.5);
+          return (y >= 0.25 || y < -0.25) ? -c : c;
+        }
+
+        __device__ __host__ inline void sincospi(real x, real &s, real &c) const
+        {
+          if constexpr (std::is_same_v<Float, float> && std::is_same_v<real, double>) {
+            s = sin2pi(x * 0.5); // should remove this multiply
+            c = cos2pi(x * 0.5);
+          } else {
+            quda::sincospi(x, &s, &c);
+          }
+        }
+
         template <typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[8], int, int, real, const I *, const int *,
                                                const complex, const complex u) const
@@ -1337,10 +1375,10 @@ namespace quda {
             out[i] = complex(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
 
           real tmp[2];
-          quda::sincospi(in[0], &tmp[1], &tmp[0]);
+          sincospi(in[0], tmp[1], tmp[0]);
           out[0] = complex(tmp[0], tmp[1]);
 
-          quda::sincospi(in[1], &tmp[1], &tmp[0]);
+          sincospi(in[1], tmp[1], tmp[0]);
           out[6] = complex(tmp[0], tmp[1]);
 
           // First, reconstruct first row
@@ -1472,7 +1510,7 @@ namespace quda {
 
           if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) {
             real cos_sin[2];
-            sincospi(static_cast<real>(-phase), &cos_sin[1], &cos_sin[0]);
+            reconstruct_8.sincospi(static_cast<real>(-phase), cos_sin[1], cos_sin[0]);
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale_inv;
 #pragma unroll
@@ -1493,7 +1531,7 @@ namespace quda {
 
           if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phase
             real cos_sin[2];
-            sincospi(static_cast<real>(phase), &cos_sin[1], &cos_sin[0]);
+            reconstruct_8.sincospi(static_cast<real>(phase), cos_sin[1], cos_sin[0]);
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale;
 #pragma unroll
