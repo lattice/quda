@@ -848,6 +848,8 @@ extern "C" {
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+    QudaBoolean restart; /**< Used to restart the smearing from existing gaugeSmeared */
+    double t0;  /**< Starting flow time for Wilson flow */
   } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
