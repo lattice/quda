@@ -3889,7 +3889,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   } else {
     delete cudaGauge;
   }
-
+  
+  // save TuneCache even if execution gets interrupted somehow
+  saveTuneCache();
   return 0;
 }
 
@@ -4187,6 +4189,8 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
     momResident = GaugeField();
 
   for (int i=0; i<nvector; i++) delete X[i];
+  // save TuneCache even if execution gets interrupted somehow
+  saveTuneCache();
 }
 
 void computeHISQForceQuda(void* const milc_momentum,
@@ -4485,6 +4489,9 @@ void computeHISQForceQuda(void* const milc_momentum,
     std::exchange(momResident, mom);
   else if (!gParam->make_resident_mom)
     momResident = GaugeField();
+  
+  // save TuneCache even if execution gets interrupted somehow
+  saveTuneCache();
 }
 
 void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double *coeff, double kappa2, double ck,
@@ -4558,6 +4565,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
     std::exchange(momResident, cudaMom);
   else if (!gauge_param->make_resident_mom)
     momResident = GaugeField();
+  
+  // save TuneCache even if execution gets interrupted somehow
+  saveTuneCache();
 }
 
 void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
@@ -4630,6 +4640,9 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
     std::exchange(momResident, gpuMom);
   else if (!gauge_param->make_resident_mom)
     momResident = GaugeField();
+  
+  // save TuneCache even if execution gets interrupted somehow
+  saveTuneCache();
 }
 
 void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, int exact, QudaGaugeParam *param)
@@ -5149,6 +5162,9 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
               obs_param[measurement_n].energy[1], obs_param[measurement_n].energy[2], obs_param[measurement_n].qcharge);
     }
   }
+  
+  // save TuneCache even if execution gets interrupted somehow
+  saveTuneCache();
 
   popOutputPrefix();
 }
