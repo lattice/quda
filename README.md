@@ -278,6 +278,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Eloy Romero (William and Mary)
 *  Hauke Sandmeyer (Bielefeld)
 *  Mario Schröck (INFN)
+*  Aniket Sen (HISKP, University of Bonn)
 *  Guochun Shi (NCSA)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
 *  Jiqun Tu (NVIDIA)
