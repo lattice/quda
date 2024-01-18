@@ -48,7 +48,7 @@ using releases 10.1 through 11.4 of the CUDA toolkit.  Earlier versions
 of the CUDA toolkit will not work, and we highly recommend the use of
 11.x.  QUDA has been tested in conjunction with x86-64, IBM
 POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
-supported, with the mininum recommended versions being 7.x and 6, respectively.
+supported, with the minimum recommended versions being 7.x and 6, respectively.
 CMake 3.15 or greater to required to build QUDA.
 
 See also Known Issues below.

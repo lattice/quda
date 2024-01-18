@@ -165,7 +165,7 @@ option(QUDA_MPI "build the MPI multi-GPU code" OFF)
 
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
-option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
+option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not available for NG)" OFF)
 
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
@@ -352,7 +352,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
     "-g -fno-inline \"-fsanitize=address,undefined\""
-    CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
+    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 enable_language(CXX)
 

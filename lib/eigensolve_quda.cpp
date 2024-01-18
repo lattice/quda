@@ -584,8 +584,10 @@ namespace quda
   {
     if (size > (int)evecs.size())
       errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size())
-      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    // we make sure that we have enough space for eigenvalues
+    // required for coarse-grid deflated solver used from within tmLQCD or PLEGMA with
+    // `preserve_deflation` enabled
+    if (size > (int)evals.size()) evals.resize(size);
 
     ColorSpinorParam csParamClone(evecs[0]);
     csParamClone.create = QUDA_NULL_FIELD_CREATE;
