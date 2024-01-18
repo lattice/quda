@@ -1216,28 +1216,23 @@ namespace quda {
 
           out[6] = cmul(out[2], out[4]);
           out[6] = cmac(out[1], out[5], -out[6]);
-          out[6] = scale_inv * conj(out[6]);
 
           out[7] = cmul(out[0], out[5]);
           out[7] = cmac(out[2], out[3], -out[7]);
-          out[7] = scale_inv * conj(out[7]);
 
           out[8] = cmul(out[1], out[3]);
           out[8] = cmac(out[0], out[4], -out[8]);
-          out[8] = scale_inv * conj(out[8]);
 
           if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
             // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
             real cos_sin[2];
             sincospi(static_cast<real>(3.0) * phase, &cos_sin[1], &cos_sin[0]);
             complex A(cos_sin[0], cos_sin[1]);
-            out[6] = cmul(A, out[6]);
-            out[7] = cmul(A, out[7]);
-            out[8] = cmul(A, out[8]);
+#pragma unroll
+            for (int j = 6; j < 9; j++) out[j] = cmul(scale_inv * A, conj(out[j]));
           } else { // phase is +/- 1 so real multiply is sufficient
-            out[6] *= phase;
-            out[7] *= phase;
-            out[8] *= phase;
+#pragma unroll
+            for (int j = 6; j < 9; j++) out[j] = (scale_inv * phase) * conj(out[j]);
           }
         }
 
@@ -1310,6 +1305,26 @@ namespace quda {
           out[7] = in[0].imag(); // b1 -> a1
         }
 
+        __device__ __host__ inline real rsqrt(real y) const
+        {
+          if constexpr (std::is_same_v<Float, float> && std::is_same_v<real, double>) {
+            double x = quda::rsqrt(static_cast<float>(y));
+            return x - 0.5 * x * (y * x * x - 1);
+          } else {
+            return quda::rsqrt(y);
+          }
+        }
+
+        __device__ __host__ inline real inverse(real y) const
+        {
+          if constexpr (std::is_same_v<Float, float> && std::is_same_v<real, double>) {
+            double x = fdividef(1.0f, static_cast<float>(y));
+            return x * (2.0 - y * x);
+          } else {
+            return static_cast<real>(1.0) / y;
+          }
+        }
+
         template <typename I>
         __device__ __host__ inline void Unpack(complex out[9], const real in[8], int, int, real, const I *, const int *,
                                                const complex, const complex u) const
@@ -1333,10 +1348,10 @@ namespace quda {
           row_sum += out[1].imag() * out[1].imag();
           row_sum += out[2].real() * out[2].real();
           row_sum += out[2].imag() * out[2].imag();
-          real row_sum_inv = static_cast<real>(1.0) / row_sum;
+          real row_sum_inv = inverse(row_sum);
 
           real diff = u0_inv * u0_inv - row_sum;
-          real U00_mag = diff > 0.0 ? diff * quda::rsqrt(diff) : static_cast<real>(0.0);
+          real U00_mag = diff > 0.0 ? diff * rsqrt(diff) : static_cast<real>(0.0);
 
           out[0] *= U00_mag;
 
@@ -1347,7 +1362,7 @@ namespace quda {
           column_sum += out[3].imag() * out[3].imag();
 
           diff = u0_inv * u0_inv - column_sum;
-          real U20_mag = diff > 0.0 ? diff * quda::rsqrt(diff) : static_cast<real>(0.0);
+          real U20_mag = diff > 0.0 ? diff * rsqrt(diff) : static_cast<real>(0.0);
 
           out[6] *= U20_mag;
 
