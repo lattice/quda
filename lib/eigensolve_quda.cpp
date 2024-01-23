@@ -250,9 +250,9 @@ namespace quda
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       for (auto &k : kSpace) k.setSuggestedParity(mat_parity);
 
-      // save the vectors
+      // save the required eigenvectors or right singular vectors to file
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE, eig_param->partfile);
-      io.save(kSpace, save_prec, n_eig);
+      io.save(kSpace, save_prec, n_conv);
     }
 
     logQuda(QUDA_SUMMARIZE, "********************************\n");
