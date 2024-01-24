@@ -265,12 +265,6 @@ namespace quda {
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
 
-    /** TimeProfile for all levels (refers to profile from parent solver) */
-    TimeProfile &profile_global;
-
-    /** TimeProfile for this level */
-    TimeProfile profile;
-
     /** Prefix label used for printf at this level */
     char prefix[128];
 
@@ -367,9 +361,8 @@ namespace quda {
     /**
        Constructor for MG class
        @param param MGParam struct that defines all meta data
-       @param profile Timeprofile instance used to profile
     */
-    MG(MGParam &param, TimeProfile &profile);
+    MG(MGParam &param);
 
     /**
        Destructor for MG class. Frees any existing coarse grid MG
@@ -736,13 +729,12 @@ namespace quda {
     MGParam *mgParam;
 
     MG *mg;
-    TimeProfile &profile;
 
-    multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile);
+    multigrid_solver(QudaMultigridParam &mg_param);
 
     virtual ~multigrid_solver()
     {
-      profile.TPSTART(QUDA_PROFILE_FREE);
+      getProfile().TPSTART(QUDA_PROFILE_FREE);
       if (mg) delete mg;
 
       if (mgParam) delete mgParam;
@@ -756,7 +748,7 @@ namespace quda {
       if (d) delete d;
       if (dSmooth) delete dSmooth;
       if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
-      profile.TPSTOP(QUDA_PROFILE_FREE);
+      getProfile().TPSTOP(QUDA_PROFILE_FREE);
     }
   };
 

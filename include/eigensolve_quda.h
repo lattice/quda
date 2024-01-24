@@ -20,7 +20,6 @@ namespace quda
   protected:
     const DiracMatrix &mat;
     QudaEigParam *eig_param;
-    TimeProfile &profile;
 
     // Problem parameters
     //------------------
@@ -63,9 +62,8 @@ namespace quda
     /**
        @brief Constructor for base Eigensolver class
        @param eig_param MGParam struct that defines all meta data
-       @param profile Timeprofile instance used to profile
     */
-    EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+    EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param);
 
     /**
        Destructor for EigenSolver class.
@@ -88,9 +86,8 @@ namespace quda
        @brief Creates the eigensolver using the parameters given and the matrix.
        @param eig_param The eigensolver parameters
        @param mat The operator to solve
-       @param profile Time Profile
      */
-    static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
+    static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat);
 
     /**
        @brief Check for an initial guess. If none present, populate with rands, then
@@ -189,11 +186,10 @@ namespace quda
        @param[in] dim The number of rows in the rotation array
        @param[in] keep The number of columns in the rotation array
        @param[in] locked The number of locked vectors in kSpace
-       @param[in] profile Time profiler
     */
     template <typename T>
-    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array,
-                    int offset, int dim, int keep, int locked, TimeProfile &profile);
+    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array, int offset, int dim,
+                    int keep, int locked);
 
     /**
        @brief Permute the vector space using the permutation matrix.
@@ -355,9 +351,8 @@ namespace quda
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
        @param mat The operator to solve
-       @param profile Time Profile
     */
-    TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+    TRLM(const DiracMatrix &mat, QudaEigParam *eig_param);
 
     /**
        @return Whether the solver is only for Hermitian systems
@@ -414,9 +409,8 @@ namespace quda
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
        @param mat The operator to solve
-       @param profile Time Profile
     */
-    BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+    BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param);
 
     virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
 
@@ -482,9 +476,8 @@ namespace quda
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
        @param mat The operator to solve
-       @param profile Time Profile
     */
-    IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+    IRAM(const DiracMatrix &mat, QudaEigParam *eig_param);
 
     /**
        @return Whether the solver is only for Hermitian systems
@@ -559,9 +552,8 @@ namespace quda
      @param[in] param Parameter container defining the how the matrix
      is to be solved.
      @param[in] eig_param Parameter structure for all QUDA eigensolvers
-     @param[in,out] profile TimeProfile instance used for profiling
   */
   void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
-                    QudaEigParam *eig_param, TimeProfile &profile);
+                    QudaEigParam *eig_param);
 
 } // namespace quda

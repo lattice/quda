@@ -22,13 +22,9 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    mat(mat),
-    eig_param(eig_param),
-    profile(profile)
+  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param) : mat(mat), eig_param(eig_param)
   {
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
@@ -96,28 +92,28 @@ namespace quda
     // underlying operators (M, Mdag) is computed.
     compute_svd = eig_param->compute_svd;
 
-    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
   // eigensolver.
-  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile)
+  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat)
   {
     EigenSolver *eig_solver = nullptr;
 
     switch (eig_param->eig_type) {
     case QUDA_EIG_IR_ARNOLDI:
       logQuda(QUDA_VERBOSE, "Creating IR Arnoldi eigensolver\n");
-      eig_solver = new IRAM(mat, eig_param, profile);
+      eig_solver = new IRAM(mat, eig_param);
       break;
     case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       logQuda(QUDA_VERBOSE, "Creating TR Lanczos eigensolver\n");
-      eig_solver = new TRLM(mat, eig_param, profile);
+      eig_solver = new TRLM(mat, eig_param);
       break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       logQuda(QUDA_VERBOSE, "Creating Block TR Lanczos eigensolver\n");
-      eig_solver = new BLKTRLM(mat, eig_param, profile);
+      eig_solver = new BLKTRLM(mat, eig_param);
       break;
     default: errorQuda("Invalid eig solver type");
     }
@@ -254,9 +250,9 @@ namespace quda
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       for (auto &k : kSpace) k.setSuggestedParity(mat_parity);
 
-      // save the vectors
+      // save the required eigenvectors or right singular vectors to file
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE, eig_param->partfile);
-      io.save(kSpace, save_prec, n_eig);
+      io.save(kSpace, save_prec, n_conv);
     }
 
     logQuda(QUDA_SUMMARIZE, "********************************\n");
@@ -780,8 +776,8 @@ namespace quda
   template <class T> using eigen_matrix_t = typename eigen_matrix_map<T>::type;
 
   template <typename T>
-  void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array,
-                               int offset, int dim, int keep, int locked, TimeProfile &profile)
+  void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array, int offset,
+                               int dim, int keep, int locked)
   {
     using matrix_t = eigen_matrix_t<T>;
 
@@ -799,9 +795,9 @@ namespace quda
       // zero the workspace
       blas::zero(kSpace_ref);
 
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       blas::axpy(rot_array, vecs_ref, kSpace_ref);
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
       // Copy compressed Krylov
       for (int i = 0; i < keep; i++) std::swap(kSpace[locked + i], kSpace[offset + i]);
@@ -819,7 +815,7 @@ namespace quda
         resize(kSpace, offset + batch_size, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
       }
 
-      profile.TPSTART(QUDA_PROFILE_EIGENLU);
+      getProfile().TPSTART(QUDA_PROFILE_EIGENLU);
       matrix_t mat = matrix_t::Zero(dim, keep);
       for (int j = 0; j < keep; j++)
         for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
@@ -840,9 +836,9 @@ namespace quda
       MatrixXi matQ = MatrixXi::Zero(keep, keep);
       matP = matLU.permutationP().inverse();
       matQ = matLU.permutationQ().inverse();
-      profile.TPSTOP(QUDA_PROFILE_EIGENLU);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGENLU);
 
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       // Compute V * A = V * PLUQ
 
       // Do P Permute
@@ -901,14 +897,16 @@ namespace quda
       // Do Q Permute
       //---------------------------------------------------------------------------
       permuteVecs(kSpace, matQ, keep);
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
   }
 
-  template void EigenSolver::rotateVecs<double>(std::vector<ColorSpinorField> &kSpace, const std::vector<double> &rot_array,
-                                                int offset, int dim, int keep, int locked, TimeProfile &profile);
+  template void EigenSolver::rotateVecs<double>(std::vector<ColorSpinorField> &kSpace,
+                                                const std::vector<double> &rot_array, int offset, int dim, int keep,
+                                                int locked);
 
-  template void EigenSolver::rotateVecs<Complex>(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
-                                                 int offset, int dim, int keep, int locked, TimeProfile &profile);
+  template void EigenSolver::rotateVecs<Complex>(std::vector<ColorSpinorField> &kSpace,
+                                                 const std::vector<Complex> &rot_array, int offset, int dim, int keep,
+                                                 int locked);
 
 } // namespace quda

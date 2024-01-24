@@ -14,19 +14,15 @@ namespace quda {
 
   using namespace blas;
 
-  SD::SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, mat, mat, mat, param, profile)
-  {
-
-  }
+  SD::SD(const DiracMatrix &mat, SolverParam &param) : Solver(mat, mat, mat, mat, param) { }
 
   SD::~SD(){
-    if(!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_FREE);
     if(init){
       delete r;
       delete Ar; 
     }
-    if(!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
 

@@ -17,11 +17,9 @@
 namespace quda
 {
   // Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    EigenSolver(mat, eig_param, profile)
+  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : EigenSolver(mat, eig_param)
   {
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
     alpha.resize(n_kr, 0.0);
@@ -34,7 +32,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
@@ -73,7 +71,7 @@ namespace quda
 
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
@@ -82,9 +80,9 @@ namespace quda
       iter += (n_kr - num_keep);
 
       // The eigenvalues are returned in the alpha array
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromArrowMat();
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
@@ -127,9 +125,9 @@ namespace quda
 
       iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
 
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz(kSpace);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       num_converged = num_locked + iter_converged;
       num_keep = num_locked + iter_keep;
@@ -156,7 +154,7 @@ namespace quda
       restart_iter++;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // Post computation report
     //---------------------------------------------------------------------------
@@ -254,7 +252,7 @@ namespace quda
 
   void TRLM::eigensolveFromArrowMat()
   {
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     int dim = n_kr - num_locked;
     int arrow_pos = num_keep - num_locked;
 
@@ -311,7 +309,7 @@ namespace quda
       for (int i = num_locked; i < n_kr; i++) { alpha[i] *= -1.0; }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField> &kSpace)
@@ -325,7 +323,7 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked);
 
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);

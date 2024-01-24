@@ -462,7 +462,6 @@ namespace quda {
       }
     }
 
-    qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() >= QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);

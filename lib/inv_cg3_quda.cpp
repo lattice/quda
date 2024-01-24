@@ -13,9 +13,8 @@
 
 namespace quda {
 
-  CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-           TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile)
+  CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matPrecon, param)
   {
   }
 
@@ -36,9 +35,8 @@ namespace quda {
     }
   }
 
-  CG3NE::CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-               TimeProfile &profile) :
-    CG3(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+  CG3NE::CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param) :
+    CG3(mmdag, mmdagSloppy, mmdagPrecon, param),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose())
@@ -117,9 +115,8 @@ namespace quda {
     }
   }
 
-  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-               SolverParam &param, TimeProfile &profile) :
-    CG3(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param) :
+    CG3(mdagm, mdagmSloppy, mdagmPrecon, param),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose())
@@ -194,13 +191,13 @@ namespace quda {
     if (x.Precision() != param.precision || b.Precision() != param.precision)
       errorQuda("Precision mismatch");
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     double b2 = blas::norm2(b);
     if(b2 == 0 &&
        (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO || param.use_init_guess == QUDA_USE_INIT_GUESS_NO)){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -265,8 +262,8 @@ namespace quda {
 
     int pipeline = param.pipeline;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute initial residual depending on whether we have an initial guess or not
     double r2;
@@ -294,9 +291,9 @@ namespace quda {
       heavy_quark_res_old = heavy_quark_res;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
     if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) return;
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     double r2_old = r2;
     double rNorm  = sqrt(r2);
@@ -469,8 +466,8 @@ namespace quda {
     }
 
     if (mixed_precision) blas::copy(x, y);
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.iter += k;
 
@@ -485,7 +482,7 @@ namespace quda {
 
     PrintSummary("CG3", k, r2, b2, stop, param.tol_hq);
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
 } // namespace quda

@@ -15,15 +15,13 @@ namespace quda
 
   static bool debug = false;
 
-  MG::MG(MGParam &param, TimeProfile &profile_global) :
-    Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, param, profile),
+  MG::MG(MGParam &param) :
+    Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, param),
     param(param),
     transfer(0),
     resetTransfer(false),
     presmoother(nullptr),
     postsmoother(nullptr),
-    profile_global(profile_global),
-    profile("MG level " + std::to_string(param.level), false),
     coarse(nullptr),
     coarse_solver(nullptr),
     param_coarse(nullptr),
@@ -158,7 +156,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
         transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
                                 param.spinBlockSize, param.mg_global.precision_null[param.level],
-                                param.mg_global.transfer_type[param.level], profile);
+                                param.mg_global.transfer_type[param.level]);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
@@ -227,7 +225,7 @@ namespace quda
         param_coarse->delta = 1e-20;
         param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
 
-        coarse = new MG(*param_coarse, profile_global);
+        coarse = new MG(*param_coarse);
       }
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
@@ -364,7 +362,7 @@ namespace quda
     presmoother = ((param.level < param.Nlevel - 1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ)
                    && param_presmooth->inv_type != QUDA_INVALID_INVERTER && param_presmooth->maxiter > 0) ?
       Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                     *param.matSmoothSloppy, profile) :
+                     *param.matSmoothSloppy) :
       nullptr;
     if (param.level < param.Nlevel - 1) { // Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
@@ -380,7 +378,7 @@ namespace quda
 
       postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
         Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                       *param.matSmoothSloppy, profile) :
+                       *param.matSmoothSloppy) :
         nullptr;
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
@@ -706,17 +704,18 @@ namespace quda
 
       if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
         Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother,
-                                        *matCoarseSmoother, *matCoarseSmoother, profile);
+                                        *matCoarseSmoother, *matCoarseSmoother);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile,
-                                                 coarse_prefix);
+        coarse_solver
+          = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, coarse_prefix);
       } else {
         Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual,
-                                        *matCoarseResidual, *matCoarseResidual, profile);
+                                        *matCoarseResidual, *matCoarseResidual);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-        coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+        coarse_solver
+          = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, coarse_prefix);
       }
 
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
@@ -798,8 +797,6 @@ namespace quda
     if (tmp_coarse_sloppy) delete tmp_coarse_sloppy;
 
     if (param_coarse) delete param_coarse;
-
-    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
 
     popLevel();
   }
@@ -1322,9 +1319,7 @@ namespace quda
     if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
     } else {
-      bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
-      if (is_running) profile_global.TPSTOP(QUDA_PROFILE_INIT);
-      profile_global.TPSTART(QUDA_PROFILE_IO);
+      getProfile().TPSTART(QUDA_PROFILE_IO);
       pushLevel(param.level);
       std::string vec_infile(param.mg_global.vec_infile[param.level]);
       vec_infile += "_level_";
@@ -1336,8 +1331,7 @@ namespace quda
       for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
       io.load(std::move(B_ref));
       popLevel();
-      profile_global.TPSTOP(QUDA_PROFILE_IO);
-      if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_IO);
     }
   }
 
@@ -1346,9 +1340,7 @@ namespace quda
     if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot save near-null vectors for top level of staggered MG solve.");
     } else {
-      bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
-      if (is_running) profile_global.TPSTOP(QUDA_PROFILE_INIT);
-      profile_global.TPSTART(QUDA_PROFILE_IO);
+      getProfile().TPSTART(QUDA_PROFILE_IO);
       pushLevel(param.level);
       std::string vec_outfile(param.mg_global.vec_outfile[param.level]);
       vec_outfile += "_level_";
@@ -1360,8 +1352,7 @@ namespace quda
       for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
       io.save(std::move(B_ref));
       popLevel();
-      profile_global.TPSTOP(QUDA_PROFILE_IO);
-      if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_IO);
     }
   }
 
@@ -1440,7 +1431,7 @@ namespace quda
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
     if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
-      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy, profile);
+      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy);
     } else if (solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
       if (!transfer) createSmoother();
@@ -1459,11 +1450,11 @@ namespace quda
 
       solverParam.inv_type = QUDA_GCR_INVERTER;
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy,
-                             *param.matSmoothSloppy, profile);
+                             *param.matSmoothSloppy);
       solverParam.inv_type = QUDA_MG_INVERTER;
     } else {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                             *param.matSmoothSloppy, profile);
+                             *param.matSmoothSloppy);
     }
 
     for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
@@ -1765,25 +1756,25 @@ namespace quda
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
       DiracM *mat = new DiracM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (!normop && dagger) {
       DiracMdag *mat = new DiracMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && !dagger) {
       DiracMdagM *mat = new DiracMdagM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && dagger) {
       DiracMMdag *mat = new DiracMMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;

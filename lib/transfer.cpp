@@ -20,8 +20,7 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
   Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass,
-                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type,
-                     TimeProfile &profile) :
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type) :
     B(B),
     Nvec(Nvec),
     NblockOrtho(n_block_ortho),
@@ -46,9 +45,7 @@ namespace quda {
     enable_gpu(false),
     enable_cpu(false),
     use_gpu(true),
-    transfer_type(transfer_type),
-    flops_(0),
-    profile(profile)
+    transfer_type(transfer_type)
   {
     postTrace();
     int ndim = B[0]->Ndim();
@@ -360,7 +357,7 @@ namespace quda {
 
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
@@ -369,7 +366,6 @@ namespace quda {
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
-      flops_ += 0; // it's only a permutation
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
@@ -382,7 +378,6 @@ namespace quda {
       } else {
         *output = *input;
       }
-      flops_ += 0;
 
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
@@ -409,21 +404,19 @@ namespace quda {
       }
 
       Prolongate(*output, *input, *V, fine_to_coarse, spin_map, parity);
-
-      flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
     } else {
       errorQuda("Invalid transfer type in prolongate");
     }
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
@@ -433,7 +426,6 @@ namespace quda {
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
-      flops_ += 0; // it's only a permutation
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
@@ -447,7 +439,6 @@ namespace quda {
       } else {
         *output = *input;
       }
-      flops_ += 0;
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
@@ -473,7 +464,6 @@ namespace quda {
 
       Restrict(*output, *input, *V, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
-      flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
     } else {
       errorQuda("Invalid transfer type in restrict");
     }
@@ -484,13 +474,7 @@ namespace quda {
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
       qudaDeviceSynchronize();
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-  }
-
-  double Transfer::flops() const {
-    double rtn = flops_;
-    flops_ = 0;
-    return rtn;
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda
