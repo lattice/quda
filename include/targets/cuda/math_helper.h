@@ -1,4 +1,4 @@
-#if defined(__NVCC__)
+#if defined(__CUDACC__)
 
 #include <math_helper.cuh>
 
