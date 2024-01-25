@@ -234,13 +234,13 @@ namespace quda {
 	for (int color_local=0; color_local<Mc; color_local++) {
 	  int c = color_block + color_local;
 	  complex<real> z = ftor.arg.in[src_idx](spinor_parity, x_cb, s, c);
-	  thread_max.real(std::max(thread_max.real(), std::abs(z.real())));
-	  thread_max.imag(std::max(thread_max.imag(), std::abs(z.imag())));
+	  thread_max.real(max(thread_max.real(), abs(z.real())));
+	  thread_max.imag(max(thread_max.imag(), abs(z.imag())));
 	}
       }
     }
 
-    return target::dispatch<site_max>(std::max(thread_max.real(), thread_max.imag()), ftor);
+    return target::dispatch<site_max>(max(thread_max.real(), thread_max.imag()), ftor);
   }
 
   /**

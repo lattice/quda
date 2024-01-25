@@ -207,15 +207,15 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<N; ++i){
-            if( fabs(identity(i,i).real() - 1.0) > max_error ||
-                fabs(identity(i,i).imag()) > max_error) return false;
+            if( abs(identity(i,i).real() - 1.0) > max_error ||
+                abs(identity(i,i).imag()) > max_error) return false;
 
 #pragma unroll
             for (int j=i+1; j<N; ++j){
-              if( fabs(identity(i,j).real()) > max_error ||
-                  fabs(identity(i,j).imag()) > max_error ||
-                  fabs(identity(j,i).real()) > max_error ||
-                  fabs(identity(j,i).imag()) > max_error ){
+              if( abs(identity(i,j).real()) > max_error ||
+                  abs(identity(i,j).imag()) > max_error ||
+                  abs(identity(j,i).real()) > max_error ||
+                  abs(identity(j,i).imag()) > max_error ){
                 return false;
               }
             }

@@ -1563,7 +1563,7 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
     for (auto i = 0lu; i < V * gauge_site_size; i++) {
       if (precision == QUDA_SINGLE_PRECISION) {
         float *f = (float *)link[dir];
-        if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3)) {
+        if (f[i] != f[i] || (abs(f[i]) > 1.e+3)) {
           fprintf(stderr, "ERROR:  %luth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
           exit(1);
         }

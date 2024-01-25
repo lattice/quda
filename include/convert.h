@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <target_device.h>
 #include <register_traits.h>
+#include <math_helper.cuh>
 
 namespace quda
 {

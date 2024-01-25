@@ -16,7 +16,7 @@ namespace quda
   {
     using real = typename Cmplx::value_type;
     real max, ratio, square;
-    if (fabs(z.x) > fabs(z.y)) {
+    if (abs(z.x) > abs(z.y)) {
       max = z.x;
       ratio = z.y / max;
     } else {
@@ -30,7 +30,7 @@ namespace quda
   template <class T, class U> inline DEVICEHOST typename PromoteTypeId<T, U>::type quadSum(const T &a, const U &b)
   {
     typename PromoteTypeId<T, U>::type ratio, square, max;
-    if (fabs(a) > fabs(b)) {
+    if (abs(a) > abs(b)) {
       max = a;
       ratio = b / a;
     } else {
@@ -99,7 +99,7 @@ namespace quda
     if (beta == 0.0) {
       c = 1.0;
       s = 0.0;
-    } else if (fabs(beta) > fabs(alpha)) {
+    } else if (abs(beta) > abs(alpha)) {
       ratio = -alpha / beta;
       s = quda::rsqrt(1.0 + ratio * ratio);
       c = ratio * s;
@@ -176,8 +176,8 @@ namespace quda
     } else if (m(0, 1) != 0.0) {
 
       // need to calculate (m(1,1)**2 + m(0,1)**2 - m(0,0)**2)/(2*m(0,0)*m(0,1))
-      Real abs01 = fabs(m(0, 1));
-      Real abs11 = fabs(m(1, 1));
+      Real abs01 = abs(m(0, 1));
+      Real abs11 = abs(m(1, 1));
       Real min, max;
       if (abs01 > abs11) {
         min = abs11;
@@ -190,7 +190,7 @@ namespace quda
       Real ratio = min / max;
       Real alpha = 2.0 * log(max) + log(1.0 + ratio * ratio);
 
-      Real abs00 = fabs(m(0, 0));
+      Real abs00 = abs(m(0, 0));
       Real beta = 2.0 * log(abs00);
 
       int sign;
@@ -390,8 +390,8 @@ namespace quda
 
     int it = 0;
     do {
-      if (fabs(b(0, 1)) < SVDPREC * (fabs(b(0, 0)) + fabs(b(1, 1)))) { b(0, 1) = 0.0; }
-      if (fabs(b(1, 2)) < SVDPREC * (fabs(b(0, 0)) + fabs(b(2, 2)))) { b(1, 2) = 0.0; }
+      if (abs(b(0, 1)) < SVDPREC * (abs(b(0, 0)) + abs(b(1, 1)))) { b(0, 1) = 0.0; }
+      if (abs(b(1, 2)) < SVDPREC * (abs(b(0, 0)) + abs(b(2, 2)))) { b(1, 2) = 0.0; }
 
       if (b(0, 1) != 0.0 && b(1, 2) != 0.0) {
         if (b(0, 0) == 0.0) {

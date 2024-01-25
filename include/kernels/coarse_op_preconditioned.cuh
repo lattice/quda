@@ -4,6 +4,7 @@
 #include <index_helper.cuh>
 #include <matrix_tile.cuh>
 #include <kernel.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
@@ -113,7 +114,7 @@ namespace quda {
         yHat.mma_nn(X, Y);
       }
       if constexpr (Arg::compute_max) {
-        yHatMax = fmax(yHatMax, yHat.abs_max());
+        yHatMax = max(yHatMax, yHat.abs_max());
       } else {
         yHat.save(arg.Yhat, d + 4, parity, x_cb, i0, j0);
       }

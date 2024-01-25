@@ -137,7 +137,7 @@ namespace quda
   inline void check_displacement(const int displacement[], int ndim)
   {
     for (int i = 0; i < ndim; i++) {
-      if (abs(displacement[i]) > max_displacement) {
+      if (std::abs(displacement[i]) > max_displacement) {
         errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
       }
     }
@@ -232,7 +232,7 @@ namespace quda
           disable_peer_to_peer_bidir = true;
         }
 
-        enable_peer_to_peer = abs(enable_peer_to_peer);
+        enable_peer_to_peer = std::abs(enable_peer_to_peer);
 
       } else { // !enable_peer_to_peer_env
         if (getVerbosity() > QUDA_SILENT && rank == 0)

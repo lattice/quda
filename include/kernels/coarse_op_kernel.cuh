@@ -11,6 +11,7 @@
 #include <target_device.h>
 #include <kernel.h>
 #include <shared_memory_cache_helper.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
@@ -303,7 +304,7 @@ namespace quda {
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
       if constexpr (Arg::compute_max) {
-        uv_max = fmax(UV[s].abs_max(), uv_max);
+        uv_max = max(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
       }
@@ -375,7 +376,7 @@ namespace quda {
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
       if constexpr (Arg::compute_max) {
-        uv_max = fmax(UV[s].abs_max(), uv_max);
+        uv_max = max(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
       }
@@ -494,7 +495,7 @@ namespace quda {
 #pragma unroll
       for (int s = 0; s < uvSpin; s++) {
         if constexpr (Arg::compute_max) {
-          uv_max = fmax(UV[s].abs_max(), uv_max);
+          uv_max = max(UV[s].abs_max(), uv_max);
         } else {
           UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
         }
@@ -598,7 +599,7 @@ namespace quda {
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
       if constexpr (Arg::compute_max) {
-        uv_max = fmax(UV[s].abs_max(), uv_max);
+        uv_max = max(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
       }
@@ -751,8 +752,8 @@ namespace quda {
         for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
           for (int ic = 0; ic < Arg::fineColor; ic++) {
-            auto abs_max = fmax(abs(AV(s, ic).real()), abs(AV(s, ic).imag()));
-            max = fmax(abs_max, max);
+            auto abs_max = quda::max(abs(AV(s, ic).real()), abs(AV(s, ic).imag()));
+            max = quda::max(abs_max, max);
           }
         }
         atomic_fetch_abs_max(arg.max, max);
@@ -887,8 +888,8 @@ namespace quda {
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
             for (int c = 0; c < Arg::fineColor; c++) {
-              auto abs_max = fmax(abs(AV(s, c).real()), abs(AV(s, c).imag()));
-              max = fmax(abs_max, max);
+              auto abs_max = quda::max(abs(AV(s, c).real()), abs(AV(s, c).imag()));
+              max = quda::max(abs_max, max);
             }
           }
           atomic_fetch_abs_max(arg.max, max);
@@ -913,8 +914,8 @@ namespace quda {
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
             for (int c = 0; c < Arg::fineColor; c++) {
-              auto abs_max = fmax(abs(AV(s, c).real()), abs(AV(s, c).imag()));
-              max = fmax(abs_max, max);
+              auto abs_max = quda::max(abs(AV(s, c).real()), abs(AV(s, c).imag()));
+              max = quda::max(abs_max, max);
             }
           }
           atomic_fetch_abs_max(arg.max, max);
@@ -1019,8 +1020,8 @@ namespace quda {
         real max = static_cast<real>(0.0);
 #pragma unroll
         for (int ic_f = 0; ic_f < Arg::fineColor; ic_f++) {
-          auto abs_max = fmax(abs(out(0, ic_f).real()), abs(out(0, ic_f).imag()));
-          max = fmax(abs_max, max);
+          auto abs_max = quda::max(abs(out(0, ic_f).real()), abs(out(0, ic_f).imag()));
+          max = quda::max(abs_max, max);
         }
         atomic_fetch_abs_max(arg.max, max);
       }
