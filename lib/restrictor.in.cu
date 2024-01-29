@@ -23,7 +23,20 @@ namespace quda {
     const int *coarse_to_fine;
     const int parity;
 
+#if defined(QUDA_TARGET_SYCL)
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const {
+      //static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
+      //using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
+      //static constexpr int block_dim = 1;
+      //using BlockReduce_t = BlockReduce<vector, block_dim, Arg::n_vector_z>;
+      int coarse_color_per_thread = fineColor != 3 ? 2 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
+      int vsize = 2 * sizeof(Float) * coarseSpin * coarse_color_per_thread;
+      return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
+    }
+#else
     bool tuneSharedBytes() const { return false; }
+#endif
+
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
