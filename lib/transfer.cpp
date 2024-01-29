@@ -356,59 +356,79 @@ namespace quda {
   }
 
   // apply the prolongator
-  void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
+  void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
-    ColorSpinorField *output = &out;
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
+      StaggeredProlongate(out, in, fine_to_coarse, spin_map, parity);
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
-      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
-
-      if (output->VolumeCB() != input->VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
+      if (in[0].SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
+      if (out[0].VolumeCB() != in[0].VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
-      if (out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
-        *output = input->Even();
+      if (out[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+        for (auto i = 0u; i < out.size(); i++) out[i] = in[i].Even();
       } else {
-        *output = *input;
+        for (auto i = 0u; i < out.size(); i++) out[i] = in[i];
       }
 
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
+      std::vector<ColorSpinorField> input(in.size());
+      std::vector<ColorSpinorField> output(out.size());
 
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
 
+      // the below are borked for m-rhs since we have only a single tmp available
       if (use_gpu) {
-        if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-        if (out.Location() == QUDA_CPU_FIELD_LOCATION || out.GammaBasis() != V->GammaBasis())
-          output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+
+        // set input fields
+        if (in[0].Location() == QUDA_CPU_FIELD_LOCATION) {
+          for (auto i = 0u; i < in.size(); i++) input[i] = coarse_tmp_d->create_alias();
+        } else {
+          for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField&>(in[i]).create_alias();
+        }
+
+        // set output fields
+        if (out[0].Location() == QUDA_CPU_FIELD_LOCATION || out[0].GammaBasis() != V->GammaBasis()) {
+          for (auto i = 0u; i < out.size(); i++) output[i] = (out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d->create_alias() : fine_tmp_d->Even().create_alias();
+        } else {
+          for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
+        }
         if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
       } else {
-        if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
-          output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+
+        // set input fields
+        for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField&>(in[i]).create_alias();
+
+        // set output fields
+        if (out[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
+          for (auto i = 0u; i < out.size(); i++) output[i] = (out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h->create_alias() : fine_tmp_h->Even().create_alias();
+        } else {
+          for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
+        }
+
       }
 
-      *input = in; // copy result to input field (aliasing handled automatically)
+      for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically) FIXME - maybe not?
 
-      if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))) {
+      if ((V->Nspin() != 1) && ((output[0].GammaBasis() != V->GammaBasis()) || (input[0].GammaBasis() != V->GammaBasis()))) {
         errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
-                  output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
+                  output[0].GammaBasis(), in[0].GammaBasis(), V->GammaBasis());
       }
 
-      Prolongate(*output, *input, *V, fine_to_coarse, spin_map, parity);
+      Prolongate(output, input, *V, fine_to_coarse, spin_map, parity);
+
+      for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
     } else {
       errorQuda("Invalid transfer type in prolongate");
     }
-
-    out = *output; // copy result to out field (aliasing handled automatically)
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }

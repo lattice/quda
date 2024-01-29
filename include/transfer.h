@@ -178,7 +178,7 @@ namespace quda {
      * @param out The resulting field on the fine lattice
      * @param in The input field on the coarse lattice
      */
-    void P(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     /**
      * Apply the restrictor
@@ -313,11 +313,11 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+  void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   template <int coarseColor, int fineColor>
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+  void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
@@ -345,7 +345,7 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse,
+  void StaggeredProlongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int *fine_to_coarse,
                            const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
