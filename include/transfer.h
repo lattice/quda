@@ -32,7 +32,7 @@ namespace quda {
   private:
 
     /** The raw null space components */
-    const std::vector<ColorSpinorField*> &B;
+    const std::vector<ColorSpinorField> &B;
 
     /** The number of null space components */
     const int Nvec;
@@ -164,7 +164,7 @@ namespace quda {
      * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
+    Transfer(const std::vector<ColorSpinorField> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
              int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type);
 
     /** The destructor for Transfer */
@@ -194,7 +194,7 @@ namespace quda {
      */
     QudaPrecision NullPrecision(QudaFieldLocation location) const
     {
-      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
+      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0].Precision(), QUDA_SINGLE_PRECISION);
     }
 
     /**
@@ -205,7 +205,7 @@ namespace quda {
     const ColorSpinorField& Vectors(QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION) const {
       if (location == QUDA_INVALID_FIELD_LOCATION) {
         // if not set then we return the memory space where the input vectors are stored
-        return B[0]->Location() == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
+        return B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
       } else {
         return location == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
       }
@@ -281,11 +281,11 @@ namespace quda {
      calculation.  This this provides better accuracy in fixed-point
      precision.
    */
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
 
   template <int coarseColor, int fineColor>
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
 
   /**

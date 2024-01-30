@@ -69,7 +69,7 @@ namespace quda {
       nParity(meta.SiteSubset()),
       nBlockOrtho(n_block_ortho),
       fineVolumeCB(meta.VolumeCB()),
-      B{*B...},
+      B{B...},
       grid_dim(),
       block_dim()
     {

@@ -18,34 +18,11 @@ namespace quda
   MG::MG(MGParam &param) :
     Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, param),
     param(param),
-    transfer(0),
-    resetTransfer(false),
-    presmoother(nullptr),
-    postsmoother(nullptr),
-    coarse(nullptr),
-    coarse_solver(nullptr),
-    param_coarse(nullptr),
-    param_presmooth(nullptr),
-    param_postsmooth(nullptr),
-    param_coarse_solver(nullptr),
-    r(nullptr),
-    b_tilde(nullptr),
-    r_coarse(nullptr),
-    x_coarse(nullptr),
-    tmp_coarse(nullptr),
-    tmp_coarse_sloppy(nullptr),
     xInvKD(nullptr),
     xInvKD_sloppy(nullptr),
     diracResidual(param.matResidual->Expose()),
     diracSmoother(param.matSmooth->Expose()),
-    diracSmootherSloppy(param.matSmoothSloppy->Expose()),
-    diracCoarseResidual(nullptr),
-    diracCoarseSmoother(nullptr),
-    diracCoarseSmootherSloppy(nullptr),
-    matCoarseResidual(nullptr),
-    matCoarseSmoother(nullptr),
-    matCoarseSmootherSloppy(nullptr),
-    rng(nullptr)
+    diracSmootherSloppy(param.matSmoothSloppy->Expose())
   {
     sprintf(prefix, "MG level %d (%s): ", param.level, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
     pushLevel(param.level);
@@ -59,7 +36,7 @@ namespace quda
     // allocating vectors
     {
       // create residual vectors
-      ColorSpinorParam csParam(*(param.B[0]));
+      ColorSpinorParam csParam(param.B[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.location = param.location;
       csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
@@ -67,7 +44,8 @@ namespace quda
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
         csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
       }
-      if (param.B[0]->Nspin() == 1) csParam.gammaBasis = param.B[0]->GammaBasis(); // hack for staggered to avoid unnecessary basis checks
+      if (param.B[0].Nspin() == 1)
+        csParam.gammaBasis = param.B[0].GammaBasis(); // hack for staggered to avoid unnecessary basis checks
       r = new ColorSpinorField(csParam);
 
       // if we're using preconditioning then allocate storage for the preconditioned source vector
@@ -78,7 +56,7 @@ namespace quda
       }
     }
 
-    rng = new RNG(*param.B[0], 1234);
+    rng = new RNG(param.B[0], 1234);
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.level < param.Nlevel - 1) {
@@ -88,7 +66,7 @@ namespace quda
             // Initializing to random vectors
             for (int i = 0; i < (int)param.B.size(); i++) {
               spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
-              *param.B[i] = *r;
+              param.B[i] = *r;
             }
           }
           if (param.mg_global.num_setup_iter[param.level] > 0) {
@@ -122,7 +100,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
+    logQuda(QUDA_VERBOSE, "%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -153,50 +131,51 @@ namespace quda
         }
       } else {
         // create transfer operator
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
+        logQuda(QUDA_VERBOSE, "Creating transfer operator\n");
         transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
                                 param.spinBlockSize, param.mg_global.precision_null[param.level],
                                 param.mg_global.transfer_type[param.level]);
-        for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
+        for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
+          param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
         if (!tmp_coarse)
-          tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                                param.mg_global.location[param.level + 1]);
+          tmp_coarse = param.B[0].CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                               param.mg_global.location[param.level + 1]);
 
         // create coarse residual vector if not already created in verify()
         if (!r_coarse)
-          r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                              param.mg_global.location[param.level + 1]);
+          r_coarse = param.B[0].CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                             param.mg_global.location[param.level + 1]);
 
         // create coarse solution vector if not already created in verify()
         if (!x_coarse)
-          x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                              param.mg_global.location[param.level + 1]);
+          x_coarse = param.B[0].CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                             param.mg_global.location[param.level + 1]);
 
-        B_coarse = new std::vector<ColorSpinorField*>();
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
-        B_coarse->resize(nVec_coarse);
+        B_coarse.resize(nVec_coarse);
 
         // only have single precision B vectors on the coarse grid
         QudaPrecision B_coarse_precision = std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
         for (int i=0; i<nVec_coarse; i++)
-          (*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, B_coarse_precision, param.mg_global.setup_location[param.level+1]);
+          B_coarse[i] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
+                                                 B_coarse_precision, param.mg_global.setup_location[param.level + 1]);
 
         // if we're not generating on all levels then we need to propagate the vectors down
         if ((param.level != 0 || param.Nlevel - 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
-          for (int i=0; i<param.Nvec; i++) {
-            zero(*(*B_coarse)[i]);
-            transfer->R(*(*B_coarse)[i], *(param.B[i]));
+          logQuda(QUDA_VERBOSE, "Restricting null space vectors\n");
+          for (int i = 0; i < param.Nvec; i++) {
+            zero(B_coarse[i]);
+            transfer->R(B_coarse[i], param.B[i]);
           }
         }
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer operator done\n");
+        logQuda(QUDA_VERBOSE, "Transfer operator done\n");
       }
 
       // we no longer need the B fields for this level, can evict them to host memory
       // (only if using managed memory and prefetching is enabled, otherwise no-op)
-      for (int i = 0; i < param.Nvec; i++) { param.B[i]->prefetch(QUDA_CPU_FIELD_LOCATION); }
+      for (int i = 0; i < param.Nvec; i++) { param.B[i].prefetch(QUDA_CPU_FIELD_LOCATION); }
 
       createCoarseDirac();
     }
@@ -219,8 +198,8 @@ namespace quda
         coarse->reset(refresh);
       } else {
         // create the next multigrid level
-        param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy,
-                                   param.level + 1);
+        param_coarse
+          = new MGParam(param, B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level + 1);
         param_coarse->fine = this;
         param_coarse->delta = 1e-20;
         param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
@@ -238,7 +217,7 @@ namespace quda
     diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
     diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
+    logQuda(QUDA_VERBOSE, "Setup of level %d done\n", param.level);
 
     popLevel();
   }
@@ -321,7 +300,7 @@ namespace quda
     pushLevel(param.level);
 
     // create the smoother for this level
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating smoother\n");
+    logQuda(QUDA_VERBOSE, "Creating smoother\n");
     destroySmoother();
     param_presmooth = new SolverParam(param);
 
@@ -381,7 +360,7 @@ namespace quda
                        *param.matSmoothSloppy) :
         nullptr;
     }
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
+    logQuda(QUDA_VERBOSE, "Smoother done\n");
 
     popLevel();
   }
@@ -389,7 +368,7 @@ namespace quda
   void MG::createCoarseDirac() {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse Dirac operator\n");
+    logQuda(QUDA_VERBOSE, "Creating coarse Dirac operator\n");
 
     // check if we are coarsening the preconditioned system then
     bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
@@ -415,7 +394,7 @@ namespace quda
 
       // Parameters that matter for coarse construction and application
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac *>(diracSmoother) : const_cast<Dirac *>(diracResidual);
-      diracParam.kappa = (param.B[0]->Nspin() == 1) ?
+      diracParam.kappa = (param.B[0].Nspin() == 1) ?
         -1.0 :
         diracParam.dirac->Kappa(); // -1 cancels automatic kappa in application of Y fields
       diracParam.mass = diracParam.dirac->Mass();
@@ -475,7 +454,7 @@ namespace quda
     matCoarseSmoother = new DiracM(*diracCoarseSmoother);
     matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
+    logQuda(QUDA_VERBOSE, "Coarse Dirac operator done\n");
 
     popLevel();
   }
@@ -596,7 +575,7 @@ namespace quda
         int defl_size = coarse_solver_inner.deflationSpaceSize();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
           // Deflation space exists and we are going to create a new solver. Extract deflation space.
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Extracting deflation space size %d to MG\n", defl_size);
+          logQuda(QUDA_VERBOSE, "Extracting deflation space size %d to MG\n", defl_size);
           coarse_solver_inner.extractDeflationSpace(evecs);
         }
         delete coarse_solver;
@@ -616,12 +595,12 @@ namespace quda
   void MG::createCoarseSolver() {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse solver wrapper\n");
+    logQuda(QUDA_VERBOSE, "Creating coarse solver wrapper\n");
     destroyCoarseSolver();
     if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE && param.level < param.Nlevel-2) {
       // if coarse solver is not a bottom solver and on the second to bottom level then we can just use the coarse solver as is
       coarse_solver = coarse;
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to coarse MG operator\n");
+      logQuda(QUDA_VERBOSE, "Assigned coarse solver to coarse MG operator\n");
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
 
       param_coarse_solver = new SolverParam(param);
@@ -730,8 +709,7 @@ namespace quda
           // vectors stored in the parent MG instead
           coarse_solver_inner.setDeflateCompute(false);
           coarse_solver_inner.setRecomputeEvals(true);
-          if (getVerbosity() >= QUDA_VERBOSE)
-            printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
+          logQuda(QUDA_VERBOSE, "Transferring deflation space size %d to coarse solver\n", defl_size);
           // Create space in coarse solver to hold deflation space, destroy space in MG.
           coarse_solver_inner.injectDeflationSpace(evecs);
         }
@@ -745,11 +723,11 @@ namespace quda
         param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
+      logQuda(QUDA_VERBOSE, "Assigned coarse solver to preconditioned GCR solver\n");
     } else {
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
     }
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
+    logQuda(QUDA_VERBOSE, "Coarse solver wrapper done\n");
 
     popLevel();
   }
@@ -765,12 +743,6 @@ namespace quda
 	if (param_coarse_solver) delete param_coarse_solver;
       }
 
-      if (B_coarse) {
-        int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
-        for (int i = 0; i < nVec_coarse; i++)
-          if ((*B_coarse)[i]) delete (*B_coarse)[i];
-        delete B_coarse;
-      }
       if (transfer) delete transfer;
       if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
       if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
@@ -841,7 +813,7 @@ namespace quda
 
       for (int i = 0; i < param.Nvec; i++) {
         // as well as copying to the correct location this also changes basis if necessary
-        tmp1 = *param.B[i];
+        tmp1 = param.B[i];
 
         transfer->R(*r_coarse, tmp1);
         transfer->P(tmp2, *r_coarse);
@@ -867,14 +839,14 @@ namespace quda
         logQuda(QUDA_SUMMARIZE, "Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for %d vectors\n", param.Nvec);
 
         for (int i = 0; i < param.Nvec; i++) {
-          transfer->R(*r_coarse, *(param.B[i]));
+          transfer->R(*r_coarse, param.B[i]);
           (*coarse_solver)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
           setOutputPrefix(prefix);                // restore prefix after return from coarse grid
           transfer->P(tmp2, *x_coarse);
           (*param.matResidual)(tmp1, tmp2);
-          tmp2 = *(param.B[i]);
-          logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, norm2(*param.B[i]), norm2(tmp1));
-          logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(*param.B[i])));
+          tmp2 = param.B[i];
+          logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, norm2(param.B[i]), norm2(tmp1));
+          logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(param.B[i])));
         }
         sprintf(prefix, "MG level %d (%s): ", param.level + 1,
                 param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -887,14 +859,14 @@ namespace quda
             param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
-      transfer->R(*r_coarse, *(param.B[i]));
+      transfer->R(*r_coarse, param.B[i]);
       (*coarse)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
       setOutputPrefix(prefix); // restore output prefix
       transfer->P(tmp2, *x_coarse);
       param.matResidual(tmp1, tmp2);
-      tmp2 = *(param.B[i]);
-      logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e ", i, norm2(*param.B[i]), norm2(tmp1));
-      logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(*param.B[i])) );
+      tmp2 = param.B[i];
+      logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e ", i, norm2(param.B[i]), norm2(tmp1));
+      logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(param.B[i])) );
     }
 #endif
 
@@ -902,18 +874,18 @@ namespace quda
     // Otherwise these get created in the coarse `reset()` routine later
 
     if (!tmp_coarse)
-      tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                            param.mg_global.location[param.level + 1]);
+      tmp_coarse = param.B[0].CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                           param.mg_global.location[param.level + 1]);
 
     // create coarse residual vector if not already created in verify()
     if (!r_coarse)
-      r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                          param.mg_global.location[param.level + 1]);
+      r_coarse = param.B[0].CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                         param.mg_global.location[param.level + 1]);
 
     // create coarse solution vector if not already created in verify()
     if (!x_coarse)
-      x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                          param.mg_global.location[param.level + 1]);
+      x_coarse = param.B[0].CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                         param.mg_global.location[param.level + 1]);
 
     {
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P^\\dagger P) eta_c\n");
@@ -1135,16 +1107,16 @@ namespace quda
         for (int i = 0; i < param.Nvec; i++) {
 
           // Restrict Evec, place result in r_coarse
-          transfer->R(*r_coarse, *param.B[i]);
+          transfer->R(*r_coarse, param.B[i]);
           // Prolong r_coarse, place result in tmp2
           transfer->P(tmp2, *r_coarse);
 
-          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, norm2(*param.B[i]),
+          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, norm2(param.B[i]),
                      norm2(*r_coarse), norm2(tmp2));
 
           // Compare v_k and PP^dag v_k.
-          auto max_deviation = blas::max_deviation(tmp2, *param.B[i]);
-          auto l2_deviation = sqrt(xmyNorm(*param.B[i], tmp2) / norm2(*param.B[i]));
+          auto max_deviation = blas::max_deviation(tmp2, param.B[i]);
+          auto l2_deviation = sqrt(xmyNorm(param.B[i], tmp2) / norm2(param.B[i]));
           printfQuda("L2 relative deviation = %e max deviation = %e\n", l2_deviation, max_deviation[0]);
 
           if (param.mg_global.run_oblique_proj_check) {
@@ -1156,17 +1128,17 @@ namespace quda
             // Oblique projections
             logQuda(QUDA_SUMMARIZE, "Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for vector %d\n", i);
 
-            transfer->R(*r_coarse, *param.B[i]);
+            transfer->R(*r_coarse, param.B[i]);
             (*coarse_solver)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
             setOutputPrefix(prefix);                // restore prefix after return from coarse grid
             transfer->P(tmp2, *x_coarse);
             (*param.matResidual)(tmp1, tmp2);
 
-            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*param.B[i]),
+            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(param.B[i]),
                     norm2(tmp1));
-            max_deviation = blas::max_deviation(tmp1, *param.B[i]);
+            max_deviation = blas::max_deviation(tmp1, param.B[i]);
             logQuda(QUDA_SUMMARIZE, "L2 relative deviation = %e, max deviation = %e\n",
-                    sqrt(xmyNorm(*param.B[i], tmp1) / norm2(*param.B[i])), max_deviation[0]);
+                    sqrt(xmyNorm(param.B[i], tmp1) / norm2(param.B[i])), max_deviation[0]);
           }
 
           sprintf(prefix, "MG level %d (%s): ", param.level + 1,
@@ -1314,7 +1286,7 @@ namespace quda
   }
 
   // supports separate reading or single file read
-  void MG::loadVectors(std::vector<ColorSpinorField *> &B)
+  void MG::loadVectors(cvector_ref<ColorSpinorField> &B)
   {
     if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
@@ -1327,15 +1299,13 @@ namespace quda
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_infile);
-      vector_ref<ColorSpinorField> B_ref;
-      for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
-      io.load(std::move(B_ref));
+      io.load(B);
       popLevel();
       getProfile().TPSTOP(QUDA_PROFILE_IO);
     }
   }
 
-  void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
+  void MG::saveVectors(cvector_ref<const ColorSpinorField> &B) const
   {
     if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot save near-null vectors for top level of staggered MG solve.");
@@ -1348,9 +1318,7 @@ namespace quda
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_outfile, false, param.mg_global.mg_vec_partfile[param.level]);
-      vector_ref<const ColorSpinorField> B_ref;
-      for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
-      io.save(std::move(B_ref));
+      io.save(B);
       popLevel();
       getProfile().TPSTOP(QUDA_PROFILE_IO);
     }
@@ -1366,7 +1334,7 @@ namespace quda
     if (param.level < param.Nlevel - 2) coarse->dumpNullVectors();
   }
 
-  void MG::generateNullVectors(std::vector<ColorSpinorField *> &B, bool refresh)
+  void MG::generateNullVectors(std::vector<ColorSpinorField> &B, bool refresh)
   {
     pushLevel(param.level);
 
@@ -1402,11 +1370,11 @@ namespace quda
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-    ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
+    ColorSpinorParam csParam(B[0]);                             // Create spinor field parameters:
     csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = B[0]->Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
-                                              QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
+    csParam.gammaBasis = B[0].Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
+                                             QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField b(csParam);
     ColorSpinorField x(csParam);
@@ -1417,7 +1385,7 @@ namespace quda
     bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
       && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
     if (schwarz_reset) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
+      logQuda(QUDA_VERBOSE, "Disabling Schwarz for null-space finding");
       int commDim[QUDA_MAX_DIM];
       for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
       diracSmootherSloppy->setCommDim(commDim);
@@ -1458,54 +1426,55 @@ namespace quda
     }
 
     for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
-      if (getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
-                   param.mg_global.num_setup_iter[param.level]);
+      logQuda(QUDA_VERBOSE, "Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
+              param.mg_global.num_setup_iter[param.level]);
 
       // global orthonormalization of the initial null-space vectors
-      if(param.mg_global.pre_orthonormalize) {
-        for(int i=0; i<(int)B.size(); i++) {
-          for (int j=0; j<i; j++) {
-            Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
-            caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
+      if (param.mg_global.pre_orthonormalize) {
+        for (auto i = 0u; i < B.size(); i++) {
+          for (auto j = 0u; j < i; j++) {
+            Complex alpha = cDotProduct(B[j], B[i]); // <j,i>
+            caxpy(-alpha, B[j], B[i]);               // i-<j,i>j
           }
-          double nrm2 = norm2(*B[i]);
-          if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+          double nrm2 = norm2(B[i]);
+          if (nrm2 > 1e-16)
+            ax(1.0 / sqrt(nrm2), B[i]); // i/<i,i>
           else errorQuda("\nCannot normalize %u vector\n", i);
         }
       }
 
       // launch solver for each source
-      for (int i=0; i<(int)B.size(); i++) {
+      for (auto i = 0u; i < B.size(); i++) {
         if (param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
-          b = *B[i];                                                // inverting against the vector
+          b = B[i];                                                 // inverting against the vector
           zero(x);                                                  // with zero initial guess
         } else {
-          x = *B[i];
+          x = B[i];
           zero(b);
         }
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(x));
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(b));
+        logQuda(QUDA_VERBOSE, "Initial guess = %g\n", norm2(x));
+        logQuda(QUDA_VERBOSE, "Initial rhs = %g\n", norm2(b));
 
         ColorSpinorField *out=nullptr, *in=nullptr;
         diracSmoother->prepare(in, out, x, b, QUDA_MAT_SOLUTION);
         (*solve)(*out, *in);
         diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(x));
-        *B[i] = x;
+        logQuda(QUDA_VERBOSE, "Solution = %g\n", norm2(x));
+        B[i] = x;
       }
 
       // global orthonormalization of the generated null-space vectors
       if (param.mg_global.post_orthonormalize) {
-        for(int i=0; i<(int)B.size(); i++) {
-          for (int j=0; j<i; j++) {
-            Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
-            caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
+        for (auto i = 0u; i < B.size(); i++) {
+          for (auto j = 0u; j < i; j++) {
+            Complex alpha = cDotProduct(B[j], B[i]); // <j,i>
+            caxpy(-alpha, B[j], B[i]);               // i-<j,i>j
           }
-          double nrm2 = norm2(*B[i]);
-          if (sqrt(nrm2) > 1e-16) ax(1.0/sqrt(nrm2), *B[i]);// i/<i,i>
+          double nrm2 = norm2(B[i]);
+          if (sqrt(nrm2) > 1e-16)
+            ax(1.0 / sqrt(nrm2), B[i]); // i/<i,i>
           else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, sqrt(nrm2));
         }
       }
@@ -1517,12 +1486,12 @@ namespace quda
           reset();
           if ( param.level < param.Nlevel-2 ) {
             if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE ) {
-              coarse->generateNullVectors(*B_coarse, refresh);
+              coarse->generateNullVectors(B_coarse, refresh);
             } else {
-              if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
-              for (int i=0; i<param.Nvec; i++) {
-                zero(*(*B_coarse)[i]);
-                transfer->R(*(*B_coarse)[i], *(param.B[i]));
+              logQuda(QUDA_VERBOSE, "Restricting null space vectors\n");
+              for (auto i = 0; i < param.Nvec; i++) {
+                zero(B_coarse[i]);
+                transfer->R(B_coarse[i], param.B[i]);
               }
               // rebuild the transfer operator in the coarse level
               coarse->resetTransfer = true;
@@ -1543,7 +1512,7 @@ namespace quda
 
     // reenable Schwarz
     if (schwarz_reset) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reenabling Schwarz for null-space finding");
+      logQuda(QUDA_VERBOSE, "Reenabling Schwarz for null-space finding\n");
       int commDim[QUDA_MAX_DIM];
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
       diracSmootherSloppy->setCommDim(commDim);
@@ -1558,15 +1527,15 @@ namespace quda
 
   // generate a full span of free vectors.
   // FIXME: Assumes fine level is SU(3).
-  void MG::buildFreeVectors(std::vector<ColorSpinorField *> &B)
+  void MG::buildFreeVectors(std::vector<ColorSpinorField> &B)
   {
     pushLevel(param.level);
     const int Nvec = B.size();
 
     // Given the number of colors and spins, figure out if the number
     // of vectors in 'B' makes sense.
-    const int Ncolor = B[0]->Ncolor();
-    const int Nspin = B[0]->Nspin();
+    const int Ncolor = B[0].Ncolor();
+    const int Nspin = B[0].Nspin();
 
     if (Ncolor == 3) // fine level
     {
@@ -1575,14 +1544,13 @@ namespace quda
         // There needs to be 6 null vectors -> 12 after chirality.
         if (Nvec != 6) errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
 
-        if (getVerbosity() >= QUDA_VERBOSE)
-          printfQuda("Building %d free field vectors for Wilson-type fermions\n", Nvec);
+        logQuda(QUDA_VERBOSE, "Building %d free field vectors for Wilson-type fermions\n", Nvec);
 
         // Zero the null vectors.
-        for (int i = 0; i < Nvec; i++) zero(*B[i]);
+        for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
+        ColorSpinorParam csParam(B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
@@ -1590,9 +1558,9 @@ namespace quda
         for (int c = 0; c < Ncolor; c++) {
           for (int s = 0; s < 2; s++) {
             tmp.Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-            xpy(tmp, *B[counter]);
+            xpy(tmp, B[counter]);
             tmp.Source(QUDA_CONSTANT_SOURCE, 1, s + 2, c);
-            xpy(tmp, *B[counter]);
+            xpy(tmp, B[counter]);
             counter++;
           }
         }
@@ -1602,68 +1570,67 @@ namespace quda
         // There needs to be 24 null vectors -> 48 after chirality.
         if (Nvec != 24) errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24\n");
 
-        if (getVerbosity() >= QUDA_VERBOSE)
-          printfQuda("Building %d free field vectors for Staggered-type fermions\n", Nvec);
+        logQuda(QUDA_VERBOSE, "Building %d free field vectors for Staggered-type fermions\n", Nvec);
 
         // Zero the null vectors.
-        for (int i = 0; i < Nvec; i++) zero(*B[i]);
+        for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
+        ColorSpinorParam csParam(B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
         // Build free null vectors.
-        for (int c = 0; c < B[0]->Ncolor(); c++) {
+        for (int c = 0; c < B[0].Ncolor(); c++) {
           // Need to pair an even+odd corner together
           // since they'll get split up.
           // 0000, 0001
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x0, c);
-          xpy(tmp, *B[8 * c + 0]);
+          xpy(tmp, B[8 * c + 0]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x1, c);
-          xpy(tmp, *B[8 * c + 0]);
+          xpy(tmp, B[8 * c + 0]);
 
           // 0010, 0011
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x2, c);
-          xpy(tmp, *B[8 * c + 1]);
+          xpy(tmp, B[8 * c + 1]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x3, c);
-          xpy(tmp, *B[8 * c + 1]);
+          xpy(tmp, B[8 * c + 1]);
 
           // 0100, 0101
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x4, c);
-          xpy(tmp, *B[8 * c + 2]);
+          xpy(tmp, B[8 * c + 2]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x5, c);
-          xpy(tmp, *B[8 * c + 2]);
+          xpy(tmp, B[8 * c + 2]);
 
           // 0110, 0111
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x6, c);
-          xpy(tmp, *B[8 * c + 3]);
+          xpy(tmp, B[8 * c + 3]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x7, c);
-          xpy(tmp, *B[8 * c + 3]);
+          xpy(tmp, B[8 * c + 3]);
 
           // 1000, 1001
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x8, c);
-          xpy(tmp, *B[8 * c + 4]);
+          xpy(tmp, B[8 * c + 4]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0x9, c);
-          xpy(tmp, *B[8 * c + 4]);
+          xpy(tmp, B[8 * c + 4]);
 
           // 1010, 1011
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0xA, c);
-          xpy(tmp, *B[8 * c + 5]);
+          xpy(tmp, B[8 * c + 5]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0xB, c);
-          xpy(tmp, *B[8 * c + 5]);
+          xpy(tmp, B[8 * c + 5]);
 
           // 1100, 1101
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0xC, c);
-          xpy(tmp, *B[8 * c + 6]);
+          xpy(tmp, B[8 * c + 6]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0xD, c);
-          xpy(tmp, *B[8 * c + 6]);
+          xpy(tmp, B[8 * c + 6]);
 
           // 1110, 1111
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0xE, c);
-          xpy(tmp, *B[8 * c + 7]);
+          xpy(tmp, B[8 * c + 7]);
           tmp.Source(QUDA_CORNER_SOURCE, 1, 0xF, c);
-          xpy(tmp, *B[8 * c + 7]);
+          xpy(tmp, B[8 * c + 7]);
         }
 
       } else {
@@ -1674,40 +1641,40 @@ namespace quda
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
+        logQuda(QUDA_VERBOSE, "Building %d free field vectors for Coarse fermions\n", Ncolor);
 
         // Zero the null vectors.
-        for (int i = 0; i < Nvec; i++) zero(*B[i]);
+        for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
+        ColorSpinorParam csParam(B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
         for (int c = 0; c < Ncolor; c++) {
           tmp.Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
-          xpy(tmp, *B[c]);
+          xpy(tmp, B[c]);
           tmp.Source(QUDA_CONSTANT_SOURCE, 1, 1, c);
-          xpy(tmp, *B[c]);
+          xpy(tmp, B[c]);
         }
 
       } else if (Nspin == 1) {
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
+        logQuda(QUDA_VERBOSE, "Building %d free field vectors for Coarse fermions\n", Ncolor);
 
         // Zero the null vectors.
-        for (int i = 0; i < Nvec; i++) zero(*B[i]);
+        for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
+        ColorSpinorParam csParam(B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
         for (int c = 0; c < Ncolor; c++) {
           tmp.Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
-          xpy(tmp, *B[c]);
+          xpy(tmp, B[c]);
         }
 
       } else {
@@ -1717,14 +1684,15 @@ namespace quda
 
     // global orthonormalization of the generated null-space vectors
     if(param.mg_global.post_orthonormalize) {
-      for(int i=0; i<(int)B.size(); i++) {
-        double nrm2 = norm2(*B[i]);
-        if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+      for (auto i = 0u; i < B.size(); i++) {
+        double nrm2 = norm2(B[i]);
+        if (nrm2 > 1e-16)
+          ax(1.0 / sqrt(nrm2), B[i]); // i/<i,i>
         else errorQuda("\nCannot normalize %u vector\n", i);
       }
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done building free vectors\n");
+    logQuda(QUDA_VERBOSE, "Done building free vectors\n");
 
     popLevel();
   }
@@ -1739,7 +1707,7 @@ namespace quda
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
-    ColorSpinorParam csParam(*param.B[0]);
+    ColorSpinorParam csParam(param.B[0]);
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
@@ -1750,8 +1718,8 @@ namespace quda
     for (auto &b : B_evecs) b = ColorSpinorField(csParam);
 
     // before entering the eigen solver, let's free the B vectors to save some memory
-    ColorSpinorParam bParam(*param.B[0]);
-    for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
+    ColorSpinorParam bParam(param.B[0]);
+    for (auto &b : param.B) b = ColorSpinorField();
 
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
@@ -1781,9 +1749,10 @@ namespace quda
     }
 
     // now reallocate the B vectors copy in e-vectors
-    for (int i = 0; i < (int)param.B.size(); i++) {
-      param.B[i] = new ColorSpinorField(bParam);
-      *param.B[i] = B_evecs[i]; // FIXME can std::move this
+    bParam.create = QUDA_NULL_FIELD_CREATE;
+    for (auto i = 0u; i < param.B.size(); i++) {
+      param.B[i] = ColorSpinorField(bParam);
+      param.B[i] = B_evecs[i];
     }
 
     // only save if outfile is defined

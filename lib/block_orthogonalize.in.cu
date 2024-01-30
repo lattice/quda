@@ -49,7 +49,7 @@ namespace quda {
     template <bool is_device, typename Rotator, typename Vector> using Arg = BlockOrthoArg<is_device, vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
 
     ColorSpinorField &V;
-    const std::vector<ColorSpinorField*> B;
+    const std::vector<ColorSpinorField> &B;
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int *geo_bs;
@@ -61,7 +61,7 @@ namespace quda {
     double max;
 
   public:
-    BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField *> B, const int *fine_to_coarse,
+    BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                const int *coarse_to_fine, const int *geo_bs, int n_block_ortho, bool two_pass) :
       TunableBlock2D(V, false, chiral_blocks),
       V(V),
@@ -113,8 +113,8 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector, std::size_t... S>
-    void launch_host_(const TuneParam &tp, const qudaStream_t &stream,
-                     const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    void launch_host_(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField> &B,
+                      std::index_sequence<S...>)
     {
       Arg<false, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
@@ -122,8 +122,8 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector, std::size_t... S>
-    void launch_device_(const TuneParam &tp, const qudaStream_t &stream,
-                        const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    void launch_device_(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField> &B,
+                        std::index_sequence<S...>)
     {
       Arg<true, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       arg.swizzle_factor = tp.aux.x;
@@ -136,7 +136,8 @@ namespace quda {
       constexpr bool disable_ghost = true;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
-        if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+        if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
+            && B[0].FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,disable_ghost> Vector;
           launch_host_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
@@ -146,12 +147,12 @@ namespace quda {
       } else {
         constexpr auto vOrder = colorspinor::getNative<vFloat>(nSpin);
         constexpr auto bOrder = colorspinor::getNative<bFloat>(nSpin);
-        if (V.FieldOrder() == vOrder && B[0]->FieldOrder() == bOrder) {
+        if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,vOrder,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,bOrder,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
           launch_device_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
-          errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0]->FieldOrder());
+          errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
         }
       }
     }
@@ -203,7 +204,7 @@ namespace quda {
 
     long long bytes() const
     {
-      return nVec * B[0]->Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes()
+      return nVec * B[0].Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes()
         + (n_block_ortho - 1) * (V.Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes());
     }
 
@@ -212,7 +213,7 @@ namespace quda {
   };
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor, int nVec>
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int n_block_ortho, bool two_pass)
   {
     int geo_blocksize = 1;
@@ -233,7 +234,7 @@ namespace quda {
   }
 
   template <typename vFloat, typename bFloat, int fineColor, int coarseColor>
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass)
   {
     if (!is_enabled_spin(V.Nspin())) errorQuda("nSpin %d has not been built", V.Nspin());
@@ -270,34 +271,35 @@ namespace quda {
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
 
   template <>
-  void BlockOrthogonalize<fineColor, coarseColor>(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
-                                                  const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass)
+  void BlockOrthogonalize<fineColor, coarseColor>(ColorSpinorField &V, const std::vector<ColorSpinorField> &B,
+                                                  const int *fine_to_coarse, const int *coarse_to_fine,
+                                                  const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass)
   {
-    if (!is_enabled(V.Precision()) || !is_enabled(B[0]->Precision()))
-      errorQuda("QUDA_PRECISION=%d does not enable required precision combination (V = %d B = %d)",
-                QUDA_PRECISION, V.Precision(), B[0]->Precision());
+    if (!is_enabled(V.Precision()) || !is_enabled(B[0].Precision()))
+      errorQuda("QUDA_PRECISION=%d does not enable required precision combination (V = %d B = %d)", QUDA_PRECISION,
+                V.Precision(), B[0].Precision());
 
     if constexpr (is_enabled_multigrid()) {
-      if (B[0]->data() == nullptr) {
+      if (B[0].data() == nullptr) {
         warningQuda("Trying to BlockOrthogonalize staggered transform, skipping...");
         return;
       }
-      if (V.Precision() == QUDA_DOUBLE_PRECISION && B[0]->Precision() == QUDA_DOUBLE_PRECISION) {
+      if (V.Precision() == QUDA_DOUBLE_PRECISION && B[0].Precision() == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())
           BlockOrthogonalize<double, double, fineColor, coarseColor>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass);
         else
           errorQuda("Double precision multigrid has not been enabled");
-      } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0]->Precision() == QUDA_SINGLE_PRECISION) {
+      } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0].Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
           BlockOrthogonalize<float, float, fineColor, coarseColor>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass);
-      } else if (V.Precision() == QUDA_HALF_PRECISION && B[0]->Precision() == QUDA_SINGLE_PRECISION) {
+      } else if (V.Precision() == QUDA_HALF_PRECISION && B[0].Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_HALF_PRECISION) && is_enabled(QUDA_SINGLE_PRECISION))
           BlockOrthogonalize<short, float, fineColor, coarseColor>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass);
-      } else if (V.Precision() == QUDA_HALF_PRECISION && B[0]->Precision() == QUDA_HALF_PRECISION) {
+      } else if (V.Precision() == QUDA_HALF_PRECISION && B[0].Precision() == QUDA_HALF_PRECISION) {
         if constexpr (is_enabled(QUDA_HALF_PRECISION))
           BlockOrthogonalize<short, short, fineColor, coarseColor>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass);
       } else {
-        errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0]->Precision());
+        errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0].Precision());
       }
     } else {
       errorQuda("Multigrid has not been built");
