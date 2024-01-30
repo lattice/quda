@@ -38,6 +38,10 @@ namespace quda {
       strcat(vol, out[0].VolString().c_str());
       strcat(aux, ",");
       strcat(aux, out[0].AuxString().c_str());
+      strcat(aux, ",n_rhs=");
+      char rhs_str[16];
+      i32toa(rhs_str, out.size());
+      strcat(aux, rhs_str);
 
       apply(device::get_default_stream());
     }
@@ -99,7 +103,7 @@ namespace quda {
       param.aux.x = 2; // swizzle factor
     }
 
-    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in[0].SiteSubset()*in[0].VolumeCB(); }
+    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in[0].SiteSubset() * in[0].VolumeCB(); }
 
     long long bytes() const
     {
