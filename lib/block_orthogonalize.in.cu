@@ -112,20 +112,18 @@ namespace quda {
       }
     }
 
-    template <typename Rotator, typename Vector, std::size_t... S>
-    void launch_host_(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField> &B,
-                      std::index_sequence<S...>)
+    template <typename Rotator, typename Vector>
+    void launch_host_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<false, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
+      Arg<false, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
     }
 
-    template <typename Rotator, typename Vector, std::size_t... S>
-    void launch_device_(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField> &B,
-                        std::index_sequence<S...>)
+    template <typename Rotator, typename Vector>
+    void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<true, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
+      Arg<true, Rotator, Vector> arg(V, B, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V);
       arg.swizzle_factor = tp.aux.x;
       launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
       if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
@@ -140,7 +138,7 @@ namespace quda {
             && B[0].FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,disable_ghost> Vector;
-          launch_host_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+          launch_host_<Rotator, Vector>(tp, stream);
         } else {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
@@ -150,7 +148,7 @@ namespace quda {
         if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,vOrder,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,bOrder,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
-          launch_device_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+          launch_device_<Rotator, Vector>(tp, stream);
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
         }
