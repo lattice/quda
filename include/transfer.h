@@ -187,7 +187,7 @@ namespace quda {
      * @param out The resulting field on the coarse lattice
      * @param in The input field on the fine lattice
      */
-    void R(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     /**
      * @brief The precision of the packed null-space vectors
@@ -332,12 +332,12 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the input fine field (if single parity input field)
    */
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, const int *fine_to_coarse,
-                const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+  void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   template <int coarseColor, int fineColor>
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, const int *fine_to_coarse,
-                const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+  void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
      @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning
@@ -358,7 +358,7 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void StaggeredRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse,
+  void StaggeredRestrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int *fine_to_coarse,
                          const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
 } // namespace quda

@@ -122,6 +122,14 @@ namespace quda {
   void StaggeredRestrict(ColorSpinorField &, const ColorSpinorField &, const int *, const int * const *, int) { errorQuda("Staggered multigrid has not been build"); }
 #endif
 
+  void StaggeredRestrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                         const int *fine_to_coarse, const int * const * spin_map, int parity)
+  {
+    for (auto i = 0u; i < out.size(); i++) {
+      StaggeredProlongateRestrict<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(out[i], in[i], fine_to_coarse, spin_map, parity);
+    }
+  }
+
   void StaggeredProlongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                            const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
