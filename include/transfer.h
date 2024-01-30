@@ -47,47 +47,47 @@ namespace quda {
     const QudaPrecision null_precision;
 
     /** CPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField *V_h;
+    mutable ColorSpinorField *V_h = nullptr;
 
     /** GPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField *V_d;
+    mutable ColorSpinorField *V_d = nullptr;
 
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable ColorSpinorField *fine_tmp_h;
+    mutable std::vector<ColorSpinorField> fine_tmp_h;
 
     /** A GPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable ColorSpinorField *fine_tmp_d;
+    mutable std::vector<ColorSpinorField> fine_tmp_d;
 
     /** A CPU temporary field with coarse geometry and coarse color */
-    mutable ColorSpinorField *coarse_tmp_h;
+    mutable std::vector<ColorSpinorField> coarse_tmp_h;
 
     /** A GPU temporary field with coarse geometry and coarse color we use for CPU input / output */
-    mutable ColorSpinorField *coarse_tmp_d;
+    mutable std::vector<ColorSpinorField> coarse_tmp_d;
 
     /** The geometrical coase grid blocking */
-    int *geo_bs;
+    int *geo_bs = nullptr;
 
     /** The mapping onto coarse sites from fine sites.  This has
 	length equal to the fine-grid volume, and is sorted into
 	lexicographical fine-grid order, with each value corresponding
 	to a coarse-grid offset. (CPU) */
-    mutable int *fine_to_coarse_h;
+    mutable int *fine_to_coarse_h = nullptr;
 
     /** The mapping onto fine sites from coarse sites. This has length
 	equal to the fine-grid volume, and is sorted into lexicographical
 	block order, with each value corresponding to a fine-grid offset. (CPU) */
-    mutable int *coarse_to_fine_h;
+    mutable int *coarse_to_fine_h = nullptr;
 
     /** The mapping onto coarse sites from fine sites.  This has
 	length equal to the fine-grid volume, and is sorted into
 	lexicographical fine-grid order, with each value corresponding
 	to a coarse-grid offset. (GPU) */
-    mutable int *fine_to_coarse_d;
+    mutable int *fine_to_coarse_d = nullptr;
 
     /** The mapping onto fine sites from coarse sites. This has length
 	equal to the fine-grid volume, and is sorted into lexicographical
 	block order, with each value corresponding to a fine-grid offset. (GPU) */
-    mutable int *coarse_to_fine_d;
+    mutable int *coarse_to_fine_d = nullptr;
 
     /** The spin blocking. Defined as zero when the fine operator is staggered. */
     int spin_bs;
@@ -105,10 +105,10 @@ namespace quda {
     QudaParity parity;
 
     /** Whether the GPU transfer operator has been constructed */
-    mutable bool enable_gpu;
+    mutable bool enable_gpu = false;
 
     /** Whether the CPU transfer operator has been constructed */
-    mutable bool enable_cpu;
+    mutable bool enable_cpu = false;
 
     /** Whether to apply the transfer operaton the GPU (requires
 	enable_gpu=true in the constructor) */
@@ -127,8 +127,9 @@ namespace quda {
     /**
      * @brief Allocate temporaries used when applying transfer operators
      * @param[in] location Where to allocate the temporaries
+     * @param[in] n_src Number of temporaries to allocate
      */
-    void createTmp(QudaFieldLocation location) const;
+    void createTmp(QudaFieldLocation location, size_t n_src) const;
 
     /**
      * @brief Creates the map between fine and coarse grids
@@ -145,8 +146,9 @@ namespace quda {
     /**
      * @brief Lazy allocation of the transfer operator in a given location
      * @param[in] location Where to allocate the temporaries
+     * @param[in] n_src Number of temporaries to allocate
      */
-    void initializeLazy(QudaFieldLocation location) const;
+    void initializeLazy(QudaFieldLocation location, size_t n_src) const;
 
   public:
     /**
