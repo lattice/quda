@@ -53,16 +53,10 @@ namespace quda {
     mutable ColorSpinorField *V_d = nullptr;
 
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable std::vector<ColorSpinorField> fine_tmp_h;
-
-    /** A GPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable std::vector<ColorSpinorField> fine_tmp_d;
+    mutable ColorSpinorField fine_tmp_h;
 
     /** A CPU temporary field with coarse geometry and coarse color */
-    mutable std::vector<ColorSpinorField> coarse_tmp_h;
-
-    /** A GPU temporary field with coarse geometry and coarse color we use for CPU input / output */
-    mutable std::vector<ColorSpinorField> coarse_tmp_d;
+    mutable ColorSpinorField coarse_tmp_h;
 
     /** The geometrical coase grid blocking */
     int *geo_bs = nullptr;
@@ -125,11 +119,19 @@ namespace quda {
     void createV(QudaFieldLocation location) const;
 
     /**
-     * @brief Allocate temporaries used when applying transfer operators
+     * @brief Allocate host temporaries used when applying transfer operators
      * @param[in] location Where to allocate the temporaries
-     * @param[in] n_src Number of temporaries to allocate
      */
-    void createTmp(QudaFieldLocation location, size_t n_src) const;
+    void createTmp() const;
+
+    /**
+     * @brief Allocate temporaries needed for prolongator / restrictor
+     * application (if changing location)
+     * @param[in,out] tmp Storaage for temporaries
+     * @param[in] location Location for new temporaries
+     * @param[in] a Field whose metadata we are cloning (aside from location and ordering)
+     */
+    void createTmp(std::vector<ColorSpinorField> &tmp, QudaFieldLocation new_location, ColorSpinorField &a) const;
 
     /**
      * @brief Creates the map between fine and coarse grids
@@ -146,9 +148,8 @@ namespace quda {
     /**
      * @brief Lazy allocation of the transfer operator in a given location
      * @param[in] location Where to allocate the temporaries
-     * @param[in] n_src Number of temporaries to allocate
      */
-    void initializeLazy(QudaFieldLocation location, size_t n_src) const;
+    void initializeLazy(QudaFieldLocation location) const;
 
   public:
     /**

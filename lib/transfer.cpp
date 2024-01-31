@@ -96,7 +96,7 @@ namespace quda {
     }
 
     createV(B[0].Location());              // allocate V field
-    createTmp(QUDA_CPU_FIELD_LOCATION, 1); // allocate temporaries (needed for geomap creation)
+    createTmp();                           // allocate temporaries (needed for geomap creation)
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
     fine_to_coarse_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
@@ -160,45 +160,33 @@ namespace quda {
     postTrace();
   }
 
-  void Transfer::createTmp(QudaFieldLocation location, size_t n_src) const
+  void Transfer::createTmp() const
   {
     // The CPU temporaries are needed for creating geometry mappings.
     if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
-        && location != QUDA_CPU_FIELD_LOCATION) {
+         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG))
       return;
-    }
 
-    if (location == QUDA_CUDA_FIELD_LOCATION && fine_tmp_d.size() == n_src && coarse_tmp_d.size() == n_src) return;
-    if (location == QUDA_CPU_FIELD_LOCATION && fine_tmp_h.size() == n_src && coarse_tmp_h.size() == n_src) return;
+    if (!fine_tmp_h.empty()) return;
 
     postTrace();
     ColorSpinorParam param(B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
-    param.location = location;
-    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
-                                                              QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.location = QUDA_CPU_FIELD_LOCATION;
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
 
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      resize(fine_tmp_d, n_src, param);
-      coarse_tmp_d.push_back(fine_tmp_d[0].create_coarse(geo_bs, spin_bs, Nvec));
-      resize(coarse_tmp_d, n_src, ColorSpinorParam(coarse_tmp_d[0]));
-    } else {
-      resize(fine_tmp_h, n_src, param);
-      coarse_tmp_h.push_back(fine_tmp_h[0].create_coarse(geo_bs, spin_bs, Nvec));
-      resize(coarse_tmp_h, n_src, ColorSpinorParam(coarse_tmp_h[0]));
-    }
+    fine_tmp_h = ColorSpinorParam(param);
+    coarse_tmp_h = fine_tmp_h.create_coarse(geo_bs, spin_bs, Nvec);
+
     postTrace();
   }
 
-  void Transfer::initializeLazy(QudaFieldLocation location, size_t n_src) const
+  void Transfer::initializeLazy(QudaFieldLocation location) const
   {
     if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
 
-    // delayed allocating this temporary until we need it
-    // if (B[0].Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION, n_src);
-    createTmp(location, n_src);
+    createTmp();
 
     switch (location) {
     case QUDA_CUDA_FIELD_LOCATION:
@@ -289,8 +277,8 @@ namespace quda {
 
     int x[QUDA_MAX_DIM];
 
-    ColorSpinorField &fine(fine_tmp_h[0]);
-    ColorSpinorField &coarse(coarse_tmp_h[0]);
+    ColorSpinorField &fine(fine_tmp_h);
+    ColorSpinorField &coarse(coarse_tmp_h);
 
     // compute the coarse grid point for every site (assuming parity ordering currently)
     for (size_t i = 0; i < fine.Volume(); i++) {
@@ -340,11 +328,22 @@ namespace quda {
     }
   }
 
+  void Transfer::createTmp(std::vector<ColorSpinorField> &tmp, QudaFieldLocation new_location, ColorSpinorField &a) const
+  {
+    ColorSpinorParam param(a);
+    param.location = QUDA_CUDA_FIELD_LOCATION;
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER; // set to CPU order and override below if needed
+    param.setPrecision(param.Precision(), param.Precision(), new_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+    // ideally we'd want to be able to have tmp[0] on the temp stack as well
+    tmp[0] = ColorSpinorParam(param);
+    for (auto i = 1u; i < tmp.size(); i++) tmp[i] = getFieldTmp(tmp[0]);
+  }
+
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION, in.size());
+    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
@@ -371,18 +370,19 @@ namespace quda {
 
         // set input fields
         if (in[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          for (auto i = 0u; i < in.size(); i++) input[i] = coarse_tmp_d[i].create_alias();
+          createTmp(input, QUDA_CUDA_FIELD_LOCATION, coarse_tmp_h);
         } else {
           for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField&>(in[i]).create_alias();
         }
 
         // set output fields
         if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          for (auto i = 0u; i < out.size(); i++) output[i] = (out[i].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d[i].create_alias() : fine_tmp_d[i].Even().create_alias();
+          createTmp(output, QUDA_CUDA_FIELD_LOCATION, fine_tmp_h);
         } else {
           for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
         }
         if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
+
       } else {
 
         // set input fields
@@ -390,7 +390,7 @@ namespace quda {
 
         // set output fields
         if (out[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
-          for (auto i = 0u; i < out.size(); i++) output[i] = (out[i].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h[i].create_alias() : fine_tmp_h[i].Even().create_alias();
+          createTmp(output, QUDA_CPU_FIELD_LOCATION, fine_tmp_h);
         } else {
           for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
         }
@@ -417,7 +417,7 @@ namespace quda {
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION, in.size());
+    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
@@ -446,14 +446,14 @@ namespace quda {
 
         // set input fields
         if (in[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          for (auto i = 0u; i < in.size(); i++) input[i] = (in[i].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d[i].create_alias() : fine_tmp_d[i].Even().create_alias();
+          createTmp(input, QUDA_CUDA_FIELD_LOCATION, fine_tmp_h);
         } else {
           for (auto i = 0u; i < out.size(); i++) input[i] = const_cast<ColorSpinorField &>(in[i]).create_alias();
         }
 
         // set output fields
         if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          for (auto i = 0u; i < out.size(); i++) output[i] = coarse_tmp_d[i].create_alias();
+          createTmp(output, QUDA_CUDA_FIELD_LOCATION, coarse_tmp_h);
         } else {
           for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
         }
@@ -462,15 +462,13 @@ namespace quda {
 
         // set input fields
         if (in[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
-          for (auto i = 0u; i < in.size(); i++) input[i] = (in[i].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h[i].create_alias() : fine_tmp_h[i].Even().create_alias();
+          createTmp(input, QUDA_CPU_FIELD_LOCATION, coarse_tmp_h);
         } else {
           for (auto i = 0u; i < in.size(); i++) input[i] = const_cast<ColorSpinorField &>(in[i]).create_alias();
         }
 
         // set output fields
-        // set input fields
         for (auto i = 0u; i < out.size(); i++) output[i] = const_cast<ColorSpinorField&>(out[i]).create_alias();
-
       }
 
       for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically) FIXME - maybe not?
