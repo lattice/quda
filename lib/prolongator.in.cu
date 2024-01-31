@@ -7,7 +7,8 @@ namespace quda {
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class ProlongateLaunch : public TunableKernel3D {
-    using Arg = ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor>;
+    template <bool to_non_rel>
+    using Arg = ProlongateArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, to_non_rel>;
 
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
@@ -37,6 +38,7 @@ namespace quda {
       char rhs_str[16];
       i32toa(rhs_str, out.size());
       strcat(aux, rhs_str);
+      if (out[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",to_non_rel");
 
       apply(device::get_default_stream());
     }
@@ -45,7 +47,15 @@ namespace quda {
     {
       if (checkNative(out[0], in[0], V)) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        launch<Prolongator>(tp, stream, Arg(out, in, V, fine_to_coarse, parity));
+        if constexpr (fineSpin == 4) {
+          if (out[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+            launch<Prolongator>(tp, stream, Arg<true>(out, in, V, fine_to_coarse, parity));
+          } else {
+            launch<Prolongator>(tp, stream, Arg<false>(out, in, V, fine_to_coarse, parity));
+          }
+        } else {
+          launch<Prolongator>(tp, stream, Arg<false>(out, in, V, fine_to_coarse, parity));
+        }
       }
     }
 

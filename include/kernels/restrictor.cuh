@@ -21,13 +21,14 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_>
+  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, bool from_non_rel_>
   struct RestrictArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int coarseColor = coarseColor_;
+    static constexpr bool from_non_rel = from_non_rel_;
 
     // disable ghost to reduce arg size
     using F = FieldOrderCB<Float, fineSpin, fineColor, 1, colorspinor::getNative<Float>(fineSpin), Float, Float, true>;
@@ -52,6 +53,7 @@ namespace quda {
     static constexpr bool swizzle = true;
     int_fastdiv swizzle_factor; // for transposing blockIdx.x mapping to coarse grid coordinate
 
+    // when setting n_vector_z we can only use the compile-time part so can't include n_src in this min (not really an issue)
     static constexpr int n_vector_z = std::min(coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), max_z_block());
     static_assert(n_vector_z > 0, "n_vector_z cannot be less than 1");
 
@@ -92,33 +94,30 @@ namespace quda {
     const int v_parity = (arg.v.Nparity() == 2) ? parity : 0;
 
 #pragma unroll
-    for (int s=0; s<Arg::fineSpin; s++)
+    for (int s = 0; s < Arg::fineSpin; s++)
 #pragma unroll
       for (int coarse_color_local=0; coarse_color_local<coarse_color_per_thread; coarse_color_local++) {
 	out[s*coarse_color_per_thread+coarse_color_local] = 0.0;
       }
 
 #pragma unroll
-    for (int coarse_color_local=0; coarse_color_local<coarse_color_per_thread; coarse_color_local++) {
+    for (int coarse_color_local = 0; coarse_color_local < coarse_color_per_thread; coarse_color_local++) {
       int i = coarse_color_block + coarse_color_local;
-#pragma unroll
-      for (int s=0; s<Arg::fineSpin; s++) {
 
-	constexpr int color_unroll = Arg::fineColor == 3 ? 3 : 2;
+      ColorSpinor<typename Arg::real, Arg::fineColor, Arg::fineSpin> in;
+      arg.in[src_idx].load<Arg::fineSpin>(in.data, spinor_parity, x_cb);
 
-	complex<typename Arg::real> partial[color_unroll];
-#pragma unroll
-	for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
-
-#pragma unroll
-	for (int j=0; j<Arg::fineColor; j+=color_unroll) {
-#pragma unroll
-	  for (int k=0; k<color_unroll; k++)
-	    partial[k] = cmac(conj(arg.v(v_parity, x_cb, s, j+k, i)), arg.in[src_idx](spinor_parity, x_cb, s, j+k), partial[k]);
-	}
+      if constexpr (Arg::fineSpin == 4 && Arg::from_non_rel) {
+        in.toRel();
+        in *= rsqrt(static_cast<typename Arg::real>(2.0));
+      }
 
 #pragma unroll
-	for (int k=0; k<color_unroll; k++) out[s*coarse_color_per_thread + coarse_color_local] += partial[k];
+      for (int s = 0; s < Arg::fineSpin; s++) {
+	for (int c = 0; c < Arg::fineColor; c++) {
+          out[s * coarse_color_per_thread + coarse_color_local] =
+            cmac(conj(arg.v(v_parity, x_cb, s, c, i)), in(s, c), out[s * coarse_color_per_thread + coarse_color_local]);
+        }
       }
     }
   }

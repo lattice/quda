@@ -1,4 +1,5 @@
 #include <color_spinor_field_order.h>
+#include <color_spinor.h>
 #include <multigrid_helper.cuh>
 #include <kernel.h>
 
@@ -14,13 +15,14 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_>
+  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, bool to_non_rel_>
   struct ProlongateArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseColor = coarseColor_;
+    static constexpr bool to_non_rel = to_non_rel_;
 
     // disable ghost to reduce arg size
     using F = FieldOrderCB<Float, fineSpin, fineColor, 1, colorspinor::getNative<Float>(fineSpin), Float, Float, true>;
@@ -36,7 +38,7 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)
     const int nParity; // number of parities of input fine field
-
+    
     ProlongateArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *geo_map,  const int parity) :
       kernel_param(dim3(out[0].VolumeCB(), out[0].SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>())),
@@ -88,6 +90,8 @@ namespace quda {
 
     constexpr int color_unroll = 2;
 
+    ColorSpinor<typename Arg::real, fine_color_per_thread, Arg::fineSpin> out;
+
 #pragma unroll
     for (int s=0; s<Arg::fineSpin; s++) {
 #pragma unroll
@@ -107,11 +111,23 @@ namespace quda {
         }
 
 #pragma unroll
-        for (int k=1; k<color_unroll; k++) partial[0] += partial[k];
-        arg.out[src_idx](spinor_parity, x_cb, s, i) = partial[0];
+        for (int k = 0; k < color_unroll; k++) out(s, fine_color_local) += partial[k];
       }
     }
 
+    if constexpr (Arg::fineSpin == 4 && Arg::to_non_rel) {
+      out.toNonRel();
+      out *= rsqrt(static_cast<typename Arg::real>(2.0));
+    }
+
+#pragma unroll
+    for (int s = 0; s < Arg::fineSpin; s++) {
+#pragma unroll
+      for (int fine_color_local = 0; fine_color_local < fine_color_per_thread; fine_color_local++) {
+        int i = fine_color_block + fine_color_local; // global fine color index
+        arg.out[src_idx](spinor_parity, x_cb, s, i) = out(s, fine_color_local);
+      }
+    }
   }
 
   template <typename Arg> struct Prolongator

@@ -15,7 +15,8 @@ namespace quda {
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class RestrictLaunch : public TunableBlock2D {
-    using Arg = RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>;
+    template <bool from_non_rel>
+    using Arg = RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, from_non_rel>;
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     const ColorSpinorField &v;
@@ -42,6 +43,7 @@ namespace quda {
       char rhs_str[16];
       i32toa(rhs_str, out.size());
       strcat(aux, rhs_str);
+      if (in[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",from_non_rel");
 
       apply(device::get_default_stream());
     }
@@ -50,15 +52,27 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (checkNative(out[0], in[0], v)) {
-        Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-        arg.swizzle_factor = tp.aux.x;
-        launch<Restrictor, Aggregates>(tp, stream, arg);
+        if constexpr (fineSpin == 4) {
+          if (in[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+            Arg<true> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+            arg.swizzle_factor = tp.aux.x;
+            launch<Restrictor, Aggregates>(tp, stream, arg);
+          } else {
+            Arg<false> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+            arg.swizzle_factor = tp.aux.x;
+            launch<Restrictor, Aggregates>(tp, stream, arg);
+          }
+        } else {
+          Arg<false> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+          arg.swizzle_factor = tp.aux.x;
+          launch<Restrictor, Aggregates>(tp, stream, arg);
+        }
       }
     }
 
     bool advanceAux(TuneParam &param) const
     {
-      if (Arg::swizzle) {
+      if (Arg<false>::swizzle) {
         if (param.aux.x < 2 * (int)device::processor_count()) {
           param.aux.x++;
           return true;

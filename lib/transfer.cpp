@@ -377,7 +377,7 @@ namespace quda {
         }
 
         // set output fields
-        if (out[0].Location() == QUDA_CPU_FIELD_LOCATION || out[0].GammaBasis() != V->GammaBasis()) {
+        if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
           for (auto i = 0u; i < out.size(); i++) output[i] = (out[i].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d[i].create_alias() : fine_tmp_d[i].Even().create_alias();
         } else {
           for (auto i = 0u; i < out.size(); i++) output[i] = out[i].create_alias();
@@ -402,11 +402,6 @@ namespace quda {
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      if ((V->Nspin() != 1) && ((output[0].GammaBasis() != V->GammaBasis()) || (input[0].GammaBasis() != V->GammaBasis()))) {
-        errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
-                  output[0].GammaBasis(), in[0].GammaBasis(), V->GammaBasis());
-      }
-
       Prolongate(output, input, *V, fine_to_coarse, spin_map, parity);
 
       for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
@@ -422,7 +417,7 @@ namespace quda {
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION, 1);
+    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION, in.size());
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
@@ -450,12 +445,11 @@ namespace quda {
       if (use_gpu) {
 
         // set input fields
-        if (in[0].Location() == QUDA_CPU_FIELD_LOCATION || in[0].GammaBasis() != V->GammaBasis()) {
+        if (in[0].Location() == QUDA_CPU_FIELD_LOCATION) {
           for (auto i = 0u; i < in.size(); i++) input[i] = (in[i].SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d[i].create_alias() : fine_tmp_d[i].Even().create_alias();
         } else {
           for (auto i = 0u; i < out.size(); i++) input[i] = const_cast<ColorSpinorField &>(in[i]).create_alias();
         }
-        if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
 
         // set output fields
         if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -483,10 +477,6 @@ namespace quda {
 
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
-
-      if (V->Nspin() != 1 && (output[0].GammaBasis() != V->GammaBasis() || input[0].GammaBasis() != V->GammaBasis()))
-        errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
-                  out[0].GammaBasis(), input[0].GammaBasis(), V->GammaBasis());
 
       Restrict(output, input, *V, fine_to_coarse, coarse_to_fine, spin_map, parity);
 

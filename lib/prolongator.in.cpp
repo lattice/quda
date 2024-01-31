@@ -47,6 +47,10 @@ namespace quda
                   const int *fine_to_coarse, const int *const *spin_map, int parity)
   {
     if constexpr (is_enabled_multigrid()) {
+      if (v.Nspin() != 1 && in[0].GammaBasis() != v.GammaBasis())
+        errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
+                  out[0].GammaBasis(), in[0].GammaBasis(), v.GammaBasis());
+
       // clang-format off
       IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
       // clang-format on
