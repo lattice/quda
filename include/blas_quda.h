@@ -28,17 +28,7 @@ namespace quda {
       for (auto i = 0u; i < x.size(); i++) x[i].zero();
     }
 
-    inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)
-    {
-      if (dst.data() == src.data()) {
-        // check the fields are equivalent else error
-        if (ColorSpinorField::are_compatible(dst, src))
-          return;
-        else
-          errorQuda("Aliasing pointers with incompatible fields");
-      }
-      dst.copy(src);
-    }
+    inline void copy(ColorSpinorField &dst, const ColorSpinorField &src) { dst.copy(src); }
 
     /**
        @brief Apply the operation y = a * x

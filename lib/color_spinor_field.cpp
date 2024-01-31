@@ -401,6 +401,12 @@ namespace quda
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
   {
+    // if these are the same field then return
+    if (data() == src.data()) {
+      if (are_compatible(*this, src)) return;
+      else errorQuda("Aliasing pointers with incompatible fields");
+    }
+
     test_compatible_weak(*this, src);
 
     if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
@@ -672,7 +678,7 @@ namespace quda
 
   bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
   {
-    return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && are_compatible_weak(a, b));
+    return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && a.GammaBasis() == b.GammaBasis() && are_compatible_weak(a, b));
   }
 
   void ColorSpinorField::test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
@@ -691,6 +697,7 @@ namespace quda
     test_compatible_weak(a, b);
     if (a.Precision() != b.Precision()) errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
     if (a.FieldOrder() != b.FieldOrder()) errorQuda("orders do not match: %d %d", a.FieldOrder(), b.FieldOrder());
+    if (a.GammaBasis() != b.GammaBasis()) errorQuda("basis does not match: %d %d", a.GammaBasis(), b.GammaBasis());
   }
 
   const ColorSpinorField &ColorSpinorField::Even() const

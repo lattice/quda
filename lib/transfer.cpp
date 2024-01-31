@@ -397,7 +397,7 @@ namespace quda {
 
       }
 
-      for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically) FIXME - maybe not?
+      for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically)
 
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
