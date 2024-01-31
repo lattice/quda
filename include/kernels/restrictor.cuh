@@ -16,7 +16,7 @@ namespace quda {
     //coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
   }
 
-  constexpr int max_z_block() { return 8; }
+  constexpr int max_z_block() { return 12; }
 
   /** 
       Kernel argument struct
