@@ -47,13 +47,6 @@ namespace quda
       if (param.B[0].Nspin() == 1)
         csParam.gammaBasis = param.B[0].GammaBasis(); // hack for staggered to avoid unnecessary basis checks
       r = ColorSpinorField(csParam);
-
-      // if we're using preconditioning then allocate storage for the preconditioned source vector
-      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      	csParam.x[0] /= 2;
-      	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-        b_tilde = ColorSpinorField(csParam);
-      }
     }
 
     rng = new RNG(param.B[0], 1234);
@@ -138,11 +131,6 @@ namespace quda
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
-        // create coarse temporary vector if not already created in verify()
-        if (tmp_coarse.empty())
-          tmp_coarse = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r.Precision(),
-                                                param.mg_global.location[param.level + 1]);
-
         // create coarse residual vector if not already created in verify()
         if (r_coarse.empty())
           r_coarse = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r.Precision(),
@@ -184,9 +172,6 @@ namespace quda
     createSmoother();
 
     if (param.level < param.Nlevel-1) {
-      // If enabled, verify the coarse links and fine solvers were correctly built
-      if (param.mg_global.run_verify) verify();
-
       // creating or resetting the coarse level temporaries and solvers
       if (coarse) {
         coarse->param.updateInvertParam(*param.mg_global.invert_param);
@@ -209,6 +194,9 @@ namespace quda
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
       createCoarseSolver();
+
+      // If enabled, verify the coarse links and fine solvers were correctly built
+      if (param.mg_global.run_verify) verify();
     }
 
     // We're going back up the coarse construct stack now, prefetch the gauge fields on
@@ -504,11 +492,6 @@ namespace quda
       xInvKD_sloppy = std::shared_ptr<GaugeField>(reinterpret_cast<GaugeField *>(new GaugeField(xinv_param)));
       xInvKD_sloppy->copy(*xInvKD);
 
-      ColorSpinorParam sloppy_tmp_param(tmp_coarse);
-      sloppy_tmp_param.setPrecision(param.mg_global.invert_param->cuda_prec_precondition);
-
-      tmp_coarse_sloppy = ColorSpinorField(sloppy_tmp_param);
-
     } else {
       // We can just alias fields
       xInvKD_sloppy = xInvKD;
@@ -777,15 +760,8 @@ namespace quda
   {
     pushLevel(param.level);
 
-    // temporary fields used for verification
-    ColorSpinorParam csParam(r);
-    csParam.create = QUDA_NULL_FIELD_CREATE;
-    ColorSpinorField tmp1(csParam);
-    ColorSpinorField tmp2(csParam);
-
-    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision()) ?
-      param.mg_global.precision_null[param.level] :
-      csParam.Precision();
+    QudaPrecision prec = (param.mg_global.precision_null[param.level] < r.Precision()) ?
+      param.mg_global.precision_null[param.level] : r.Precision();
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
@@ -798,28 +774,44 @@ namespace quda
     default: tol = 1e-8;
     }
 
+    // temporary fields used for verification
+    std::vector<ColorSpinorField> fine_tmp(param.Nvec);
+    ColorSpinorParam fine_param(r);
+    fine_param.create = QUDA_NULL_FIELD_CREATE;
+    for (auto &f : fine_tmp) f = ColorSpinorField(fine_param);
+
+    std::vector<ColorSpinorField> coarse_tmp(param.Nvec);
+    ColorSpinorParam coarse_param(r_coarse);
+    coarse_param.create = QUDA_NULL_FIELD_CREATE;
+    for (auto &c : coarse_tmp) c = ColorSpinorField(coarse_param);
+
+    auto &tmp1 = fine_tmp[0];
+    auto &tmp2 = fine_tmp[1];
+    auto &tmp_coarse = coarse_tmp[0];
+
     // No need to check (projector) v_k for staggered case
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
-      for (int i = 0; i < param.Nvec; i++) {
-        // as well as copying to the correct location this also changes basis if necessary
-        tmp1 = param.B[i];
+      // change fine_tmp to match B basis to allow comparison
+      for (auto &f : fine_tmp) f.GammaBasis(param.B[0].GammaBasis());
+      transfer->R(coarse_tmp, param.B);
+      transfer->P(fine_tmp, coarse_tmp);
 
-        transfer->R(r_coarse, tmp1);
-        transfer->P(tmp2, r_coarse);
-        auto max_deviation = blas::max_deviation(tmp2, tmp1);
-        auto l2_deviation = sqrt(xmyNorm(tmp1, tmp2) / norm2(tmp1));
+      for (auto i = 0; i < param.Nvec; i++) {
+        auto max_deviation = blas::max_deviation(fine_tmp[i], param.B[i]);
+        auto l2_deviation = sqrt(xmyNorm(param.B[i], fine_tmp[i]) / norm2(param.B[i]));
 
-        logQuda(
-          QUDA_VERBOSE, "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
-          i, norm2(tmp1), norm2(r_coarse), norm2(tmp2), l2_deviation, max_deviation[0]);
+        logQuda(QUDA_VERBOSE,
+                "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
+                i, norm2(param.B[i]), norm2(coarse_tmp[i]), norm2(fine_tmp[i]), l2_deviation, max_deviation[0]);
         if (check_deviation(l2_deviation, tol))
           errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
         if (check_deviation(max_deviation[0], tol))
           errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[0], tol);
       }
+      for (auto &f : fine_tmp) f.GammaBasis(r.GammaBasis()); // restore basis
 
       // the oblique check
       if (param.mg_global.run_oblique_proj_check) {
@@ -840,8 +832,8 @@ namespace quda
           logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, norm2(param.B[i]), norm2(tmp1));
           logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(param.B[i])));
         }
-        sprintf(prefix, "MG level %d (%s): ", param.level + 1,
-                param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+
+        sprintf(prefix, "MG level %d (%s): ", param.level + 1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         setOutputPrefix(prefix);
       }
     }
@@ -861,13 +853,6 @@ namespace quda
       logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(param.B[i])) );
     }
 #endif
-
-    // We need to create temporary coarse vectors here for various verifications
-    // Otherwise these get created in the coarse `reset()` routine later
-
-    if (tmp_coarse.empty())
-      tmp_coarse = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r.Precision(),
-                                            param.mg_global.location[param.level + 1]);
 
     // create coarse residual vector if not already created in verify()
     if (r_coarse.empty())
@@ -1185,8 +1170,12 @@ namespace quda
 
       diracSmoother->prepare(in, out, x, b, outer_solution_type);
 
-      // b_tilde holds either a copy of preconditioned source or a pointer to original source
-      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) b_tilde = *in;
+      ColorSpinorField b_tilde;
+      // if we're using preconditioning then allocate storage for the preconditioned source vector
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+        b_tilde = getFieldTmp(r.Even());
+        b_tilde = *in; // b_tilde holds either a copy of preconditioned source or a pointer to original source
+      }
 
       if (presmoother) (*presmoother)(*out, *in); else zero(*out);
 

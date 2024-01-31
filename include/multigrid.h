@@ -297,20 +297,11 @@ namespace quda {
     /** Residual vector */
     ColorSpinorField r;
 
-    /** Projected source vector for preconditioned system, else just points to source */
-    ColorSpinorField b_tilde;
-
     /** Coarse residual vector */
     ColorSpinorField r_coarse;
 
     /** Coarse solution vector */
     ColorSpinorField x_coarse;
-
-    /** Coarse temporary vector */
-    ColorSpinorField tmp_coarse;
-
-    /** Sloppy coarse temporary vector */
-    ColorSpinorField tmp_coarse_sloppy;
 
     /** Kahler-Dirac Xinv */
     std::shared_ptr<GaugeField> xInvKD;
