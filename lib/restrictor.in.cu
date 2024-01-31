@@ -95,7 +95,7 @@ namespace quda {
     {
       auto aggregate_size = in[0].Volume() / out[0].Volume();
       auto max_block = 128u;
-      for (uint32_t b = blockMin(); b < max_block; b += blockStep()) if (aggregate_size < b) return b;
+      for (uint32_t b = blockMin(); b < max_block; b += blockStep()) if (aggregate_size <= b) return b;
       return max_block;
     }
 
