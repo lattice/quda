@@ -105,7 +105,7 @@ namespace quda {
       int i = coarse_color_block + coarse_color_local;
 
       ColorSpinor<typename Arg::real, Arg::fineColor, Arg::fineSpin> in;
-      arg.in[src_idx].load<Arg::fineSpin>(in.data, spinor_parity, x_cb);
+      arg.in[src_idx].template load<Arg::fineSpin>(in.data, spinor_parity, x_cb);
 
       if constexpr (Arg::fineSpin == 4 && Arg::from_non_rel) {
         in.toRel();
