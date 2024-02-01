@@ -45,7 +45,8 @@ if(QUDA_OMPTARGET_JIT)
     set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64 -fopenmp-version=60 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
 else()
     #set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=60 "SHELL:-mllvm -pragma-unroll-threshold=16" "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
-    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-device-code-split=per_kernel -fopenmp-max-parallel-link-jobs=64 -fopenmp-version=60 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+    #set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-device-code-split=per_kernel -fopenmp-max-parallel-link-jobs=64 -fopenmp-version=60 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=60 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
 endif()
 
 if(QUDA_OMPTARGET_DEBUG)
@@ -92,9 +93,9 @@ target_compile_options(
 target_compile_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS})
 
 if(QUDA_OMPTARGET_JIT)
-    target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS})
+    target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS} -flink-huge-device-code)
 else()
-    target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS} -Xopenmp-target-backend "-device ${QUDA_GPU_ARCH}")
+    target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS} -Xopenmp-target-backend "-device ${QUDA_GPU_ARCH}" -flink-huge-device-code)
 endif()
 
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
