@@ -20,7 +20,7 @@ namespace quda
 
     Gauge out;
     Gauge tmp[4];
-    const Gauge in;
+    Gauge in;
 
     int E[4]; // extended grid dimensions
     int X[4]; // grid dimensions
@@ -46,11 +46,98 @@ namespace quda
     }
   };
 
-  template <typename Arg, typename Staple>
-  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, const int *x, const int parity,
-                                                      const int mu, Staple staple[3])
+  template <int mu, int nu, typename Arg>
+  __host__ __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg, const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[], int parity)
   {
-    using Link = typename get_type<Staple>::type;
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    int dx[4] = {0, 0, 0, 0};
+
+    /* Computes the upper staple :
+     *                 mu (B)
+     *               +-------+
+     *       nu	   |	   |
+     *	     (A)   |	   |(C)
+     *		   X	   X
+     */
+    {
+      /* load matrix A*/
+      Link a = gauge_nu(nu, linkIndex(x, arg.E), parity);
+
+      /* load matrix B*/
+      dx[nu]++;
+      Link b = gauge_mu(mu, linkIndexShift(x, dx, arg.E), 1-parity);
+      dx[nu]--;
+
+      /* load matrix C*/
+      dx[mu]++;
+      Link c = gauge_nu(nu, linkIndexShift(x, dx, arg.E), 1-parity);
+      dx[mu]--;
+
+      staple = a * b * conj(c);
+    }
+
+    /* Computes the lower staple :
+     *                 X       X
+     *           nu    |       |
+     *	         (A)   |       | (C)
+     *		       +-------+
+     *                  mu (B)
+     */
+    {
+      /* load matrix A*/
+      dx[nu]--;
+      Link a = gauge_nu(nu, linkIndexShift(x, dx, arg.E), 1-parity);
+
+      /* load matrix B*/
+      Link b = gauge_mu(mu, linkIndexShift(x, dx, arg.E), 1-parity);
+
+      /* load matrix C*/
+      dx[mu]++;
+      Link c = gauge_nu(nu, linkIndexShift(x, dx, arg.E), parity);
+      dx[mu]--;
+      dx[nu]++;
+
+      staple = staple + conj(a)*b*c;
+    }
+  }
+
+  template <typename Arg>
+  __host__ __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
+          const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[], int parity, int mu, int nu)
+  {
+    switch (mu) {
+      case 0:
+        switch (nu) {
+        case 1: computeStaple<0,1>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 2: computeStaple<0,2>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 3: computeStaple<0,3>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        } break;
+      case 1:
+        switch (nu) {
+        case 0: computeStaple<1,0>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 2: computeStaple<1,2>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 3: computeStaple<1,3>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        } break;
+      case 2:
+        switch (nu) {
+        case 0: computeStaple<2,0>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 1: computeStaple<2,1>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 3: computeStaple<2,3>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+      } break;
+      case 3:
+        switch (nu) {
+        case 0: computeStaple<3,0>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 1: computeStaple<3,1>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 2: computeStaple<3,2>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        } break;
+      }
+  }
+
+  template <typename Arg>
+  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], int parity,
+                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
+  {
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
     thread_array<int, 4> dx = {};
@@ -64,42 +151,7 @@ namespace quda
 
       cnt += 1;
 
-      {
-        // Get link U_{\nu}(x)
-        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // Get link U_{\mu}(x+\nu)
-        dx[nu]++;
-        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[nu]--;
-
-        // Get link U_{\nu}(x+\mu)
-        dx[mu]++;
-        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[mu]--;
-
-        // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-        staple[cnt] = staple[cnt] + U1 * U2 * conj(U3);
-      }
-
-      {
-        // Get link U_{\nu}(x-\nu)
-        dx[nu]--;
-        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        // Get link U_{\mu}(x-\nu)
-        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-
-        // Get link U_{\nu}(x-\nu+\mu)
-        dx[mu]++;
-        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // reset dx
-        dx[mu]--;
-        dx[nu]++;
-
-        // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-        staple[cnt] = staple[cnt] + conj(U1) * U2 * U3;
-      }
+      computeStaple(staple[cnt], arg, arg.in, arg.in, x, parity, mu, nu);
     }
   }
 
@@ -169,12 +221,11 @@ namespace quda
     }
   }
 
-  template <typename Arg, typename Staple>
+  template <typename Arg>
   __host__ __device__ inline void computeStapleLevel3(const Arg &arg, const int *x, const int parity,
-                                                      const int mu, Staple staple[3])
+                                                      const int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
   {
-    using Link = typename get_type<Staple>::type;
-    staple[0] = Link();
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
     thread_array<int, 4> dx = {};
 #pragma unroll
@@ -234,7 +285,7 @@ namespace quda
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
       using real = typename Arg::Float;
-      typedef Matrix<complex<real>, Arg::nColor> Link;
+      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
       // compute spacetime and local coords
       int x[4];
