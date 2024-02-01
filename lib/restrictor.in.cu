@@ -72,7 +72,7 @@ namespace quda {
 
     bool advanceAux(TuneParam &param) const
     {
-      if (Arg<false>::swizzle) {
+      if (Arg<false>::swizzle && in.size() == 1) {
         if (param.aux.x < 2 * (int)device::processor_count()) {
           param.aux.x++;
           return true;
