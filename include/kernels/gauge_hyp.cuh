@@ -30,7 +30,7 @@ namespace quda
     const int dir_ignore;
     const Float tolerance;
 
-    GaugeHYPArg(GaugeField &out, GaugeField* tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
+    GaugeHYPArg(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, hypDim)),
       out(out),
       tmp {*tmp[0], *tmp[1], *tmp[2], *tmp[3]},
@@ -61,9 +61,9 @@ namespace quda
      @return The computed staple
   */
   template <typename Arg>
-  __host__ __device__ inline Matrix<complex<typename Arg::Float>, Arg::nColor> accumulateStaple(const Arg &arg,
-          const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu,
-          int x[], thread_array<int, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
+  __host__ __device__ inline Matrix<complex<typename Arg::Float>, Arg::nColor>
+  accumulateStaple(const Arg &arg, const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[],
+                   thread_array<int, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     Link staple;
@@ -85,12 +85,12 @@ namespace quda
 
       /* load matrix B*/
       dx[nu]++;
-      Link b = gauge_mu(tensor_arg.x, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link b = gauge_mu(tensor_arg.x, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[nu]--;
 
       /* load matrix C*/
       dx[mu]++;
-      Link c = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link c = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1 - parity);
       dx[mu]--;
 
       staple = a * b * conj(c);
@@ -106,10 +106,10 @@ namespace quda
     {
       /* load matrix A*/
       dx[nu]--;
-      Link a = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link a = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1 - parity);
 
       /* load matrix B*/
-      Link b = gauge_mu(tensor_arg.x, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link b = gauge_mu(tensor_arg.x, linkIndexShift(x, dx, arg.E), 1 - parity);
 
       /* load matrix C*/
       dx[mu]++;
@@ -117,7 +117,7 @@ namespace quda
       dx[mu]--;
       dx[nu]++;
 
-      staple = staple + conj(a)*b*c;
+      staple = staple + conj(a) * b * c;
     }
 
     return staple;
@@ -137,7 +137,7 @@ namespace quda
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
       if (nu != mu) {
-        Link accum = accumulateStaple(arg, arg.in, arg.in, x, dx, parity, { mu, nu }, { mu, nu });
+        Link accum = accumulateStaple(arg, arg.in, arg.in, x, dx, parity, {mu, nu}, {mu, nu});
         switch (cnt) {
         case 0: staple[0] = staple[0] + accum; break;
         case 1: staple[1] = staple[1] + accum; break;
@@ -171,7 +171,8 @@ namespace quda
           const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
           const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
 
-          Link accum = accumulateStaple(arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity, {sigma_with_mu, sigma_with_rho}, {mu, rho});
+          Link accum = accumulateStaple(arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity,
+                                        {sigma_with_mu, sigma_with_rho}, {mu, rho});
           switch (cnt) {
           case 0: staple[0] = staple[0] + accum; break;
           case 1: staple[1] = staple[1] + accum; break;
@@ -199,7 +200,9 @@ namespace quda
         const int mu_with_nu = nu % 2 * 3 + mu - (mu > nu);
         const int nu_with_mu = mu % 2 * 3 + nu - (nu > mu);
 
-        staple = staple + accumulateStaple(arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, dx, parity, {nu_with_mu, mu_with_nu}, {mu, nu});
+        staple = staple
+          + accumulateStaple(arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, dx, parity, {nu_with_mu, mu_with_nu},
+                             {mu, nu});
       }
     }
   }
@@ -218,7 +221,7 @@ namespace quda
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
-      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       thread_array<int, 4> dx = {0, 0, 0, 0};
 
@@ -257,8 +260,9 @@ namespace quda
   };
 
   template <typename Arg>
-  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
-                                                        int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[2], const int dir_ignore)
+  __host__ __device__ inline void
+  computeStaple3DLevel1(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity, int mu,
+                        Matrix<complex<typename Arg::Float>, Arg::nColor> staple[2], const int dir_ignore)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     for (int i = 0; i < 2; ++i) staple[i] = Link();
@@ -282,7 +286,8 @@ namespace quda
 
   template <typename Arg>
   __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
-                                                        int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, int dir_ignore)
+                                                        int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple,
+                                                        int dir_ignore)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     staple = Link();
@@ -299,7 +304,8 @@ namespace quda
             const int rho_with_nu = (nu - (nu > dir_ignore)) * 2 + rho - (rho > nu) - (rho > dir_ignore);
             const int rho_with_mu = (mu - (mu > dir_ignore)) * 2 + rho - (rho > mu) - (rho > dir_ignore);
 
-            staple = staple + accumulateStaple(arg, arg.tmp[0], arg.tmp[0], x, dx, parity, {rho_with_mu, rho_with_nu}, {mu, nu});
+            staple = staple
+              + accumulateStaple(arg, arg.tmp[0], arg.tmp[0], x, dx, parity, {rho_with_mu, rho_with_nu}, {mu, nu});
           }
         }
       }
@@ -320,7 +326,7 @@ namespace quda
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
-      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       thread_array<int, 4> dx = {0, 0, 0, 0};
 
