@@ -21,7 +21,7 @@ namespace quda
 
     Gauge out;
     Gauge tmp[4];
-    Gauge in;
+    const Gauge in;
 
     int_fastdiv E[4]; // extended grid dimensions
     int_fastdiv X[4]; // grid dimensions
@@ -47,8 +47,22 @@ namespace quda
     }
   };
 
+  /**
+     @brief Calculates a staple as part of the HYP calculation, returning the product
+
+     @param[in,out] staple The accumulated staple
+     @param[in] arg Kernel argument
+     @param[in] gauge_mu Gauge/tensor field used for the parallel direction
+     @param[in] gauge_nu Gauge/tensor field used for the perpendicular direction
+     @param[in] x Full index array
+     @param[in] parity Parity index
+     @param[in] tensor_arg The {parallel, perpendicular} indices into the gauge/tensor fields
+     @tparam The {parallel, perpendicular} pair of directions for coordinate offsets
+  */
   template <int mu, int nu, typename Arg>
-  __host__ __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg, const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[], int parity)
+  __host__ __device__ inline void accumulateStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
+    const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu,
+    int x[], int parity, int2 tensor_arg)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     int dx[4] = {0, 0, 0, 0};
@@ -62,19 +76,19 @@ namespace quda
      */
     {
       /* load matrix A*/
-      Link a = gauge_nu(nu, linkIndex(x, arg.E), parity);
+      Link a = gauge_nu(tensor_arg.y, linkIndex(x, arg.E), parity);
 
       /* load matrix B*/
       dx[nu]++;
-      Link b = gauge_mu(mu, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link b = gauge_mu(tensor_arg.x, linkIndexShift(x, dx, arg.E), 1-parity);
       dx[nu]--;
 
       /* load matrix C*/
       dx[mu]++;
-      Link c = gauge_nu(nu, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link c = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1-parity);
       dx[mu]--;
 
-      staple = a * b * conj(c);
+      staple = staple + a * b * conj(c);
     }
 
     /* Computes the lower staple :
@@ -87,14 +101,14 @@ namespace quda
     {
       /* load matrix A*/
       dx[nu]--;
-      Link a = gauge_nu(nu, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link a = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1-parity);
 
       /* load matrix B*/
-      Link b = gauge_mu(mu, linkIndexShift(x, dx, arg.E), 1-parity);
+      Link b = gauge_mu(tensor_arg.x, linkIndexShift(x, dx, arg.E), 1-parity);
 
       /* load matrix C*/
       dx[mu]++;
-      Link c = gauge_nu(nu, linkIndexShift(x, dx, arg.E), parity);
+      Link c = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), parity);
       dx[mu]--;
       dx[nu]++;
 
@@ -102,34 +116,50 @@ namespace quda
     }
   }
 
+  /**
+     @brief Calculates a staple as part of the HYP calculation, returning the product
+
+     @param[in,out] staple The accumulated staple
+     @param[in] arg Kernel argument
+     @param[in] gauge_mu Gauge/tensor field used for the parallel direction
+     @param[in] gauge_nu Gauge/tensor field used for the perpendicular direction
+     @param[in] x Full index array
+     @param[in] parity Parity index
+     @param[in] tensor_arg The {parallel, perpendicular} indices into the gauge/tensor fields
+     @param[in] shifts The {parallel, perpendicular} pair of directions for coordinate offsets
+  */
   template <typename Arg>
-  __host__ __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
-          const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[], int parity, int mu, int nu)
+  __host__ __device__ inline void accumulateStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
+          const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu, int x[], int parity, int2 tensor_arg, int2 shifts)
   {
+    // for readability
+    const int mu = shifts.x;
+    const int nu = shifts.y;
+
     switch (mu) {
       case 0:
         switch (nu) {
-        case 1: computeStaple<0,1>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 2: computeStaple<0,2>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 3: computeStaple<0,3>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 1: accumulateStaple<0,1>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 2: accumulateStaple<0,2>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 3: accumulateStaple<0,3>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
         } break;
       case 1:
         switch (nu) {
-        case 0: computeStaple<1,0>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 2: computeStaple<1,2>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 3: computeStaple<1,3>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 0: accumulateStaple<1,0>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 2: accumulateStaple<1,2>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 3: accumulateStaple<1,3>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
         } break;
       case 2:
         switch (nu) {
-        case 0: computeStaple<2,0>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 1: computeStaple<2,1>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 3: computeStaple<2,3>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 0: accumulateStaple<2,0>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 1: accumulateStaple<2,1>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 3: accumulateStaple<2,3>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
       } break;
       case 3:
         switch (nu) {
-        case 0: computeStaple<3,0>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 1: computeStaple<3,1>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
-        case 2: computeStaple<3,2>(staple, arg, gauge_mu, gauge_nu, x, parity); break;
+        case 0: accumulateStaple<3,0>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 1: accumulateStaple<3,1>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
+        case 2: accumulateStaple<3,2>(staple, arg, gauge_mu, gauge_nu, x, parity, tensor_arg); break;
         } break;
       }
   }
@@ -152,42 +182,8 @@ namespace quda
 
       cnt += 1;
 
-      computeStaple(staple[cnt], arg, arg.in, arg.in, x, parity, mu, nu);
+      accumulateStaple(staple[cnt], arg, arg.in, arg.in, x, parity, { mu, nu }, { mu, nu });
 
-      /*{
-        // Get link U_{\nu}(x)
-        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // Get link U_{\mu}(x+\nu)
-        dx[nu]++;
-        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[nu]--;
-
-        // Get link U_{\nu}(x+\mu)
-        dx[mu]++;
-        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[mu]--;
-
-        // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-        staple[cnt] = staple[cnt] + U1 * U2 * conj(U3);
-      }
-      {
-        // Get link U_{\nu}(x-\nu)
-        dx[nu]--;
-        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        // Get link U_{\mu}(x-\nu)
-        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-
-        // Get link U_{\nu}(x-\nu+\mu)
-        dx[mu]++;
-        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // reset dx
-        dx[mu]--;
-        dx[nu]++;
-        // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-        staple[cnt] = staple[cnt] + conj(U1) * U2 * U3;
-      }*/
     }
   }
 
@@ -217,51 +213,14 @@ namespace quda
         const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
         const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
 
-        //computeStaple(staple[cnt], arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, parity, sigma_with_mu, sigma_with_rho);
-
-        {
-          // Get link U_{\rho}(x)
-          Link U1 = arg.tmp[rho / 2](sigma_with_rho, linkIndexShift(x, dx, arg.E), parity);
-
-          // Get link U_{\mu}(x+\rho)
-          dx[rho]++;
-          Link U2 = arg.tmp[mu / 2](sigma_with_mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-          dx[rho]--;
-
-          // Get link U_{\rho}(x+\mu)
-          dx[mu]++;
-          Link U3 = arg.tmp[rho / 2](sigma_with_rho, linkIndexShift(x, dx, arg.E), 1 - parity);
-          dx[mu]--;
-
-          // staple += U_{\rho}(x) * U_{\mu}(x+\rho) * U^\dag_{\rho}(x+\mu)
-          staple[cnt] = staple[cnt] + U1 * U2 * conj(U3);
-        }
-
-        {
-          // Get link U_{\rho}(x-\rho)
-          dx[rho]--;
-          Link U1 = arg.tmp[rho / 2](sigma_with_rho, linkIndexShift(x, dx, arg.E), 1 - parity);
-          // Get link U_{\mu}(x-\rho)
-          Link U2 = arg.tmp[mu / 2](sigma_with_mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-
-          // Get link U_{\rho}(x-\rho+\mu)
-          dx[mu]++;
-          Link U3 = arg.tmp[rho / 2](sigma_with_rho, linkIndexShift(x, dx, arg.E), parity);
-
-          // reset dx
-          dx[mu]--;
-          dx[rho]++;
-
-          // staple += U^\dag_{\rho}(x-\rho) * U_{\mu}(x-\rho) * U_{\rho}(x-\rho+\mu)
-          staple[cnt] = staple[cnt] + conj(U1) * U2 * U3;
-        }
+        accumulateStaple(staple[cnt], arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, parity, {sigma_with_mu, sigma_with_rho}, {mu, rho});
       }
     }
   }
 
   template <typename Arg>
-  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, const int *x, const int parity,
-                                                      const int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
+  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], int parity,
+                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
@@ -276,42 +235,7 @@ namespace quda
       const int mu_with_nu = nu % 2 * 3 + mu - (mu > nu);
       const int nu_with_mu = mu % 2 * 3 + nu - (nu > mu);
 
-      {
-        // Get link U_{\nu}(x)
-        Link U1 = arg.tmp[nu / 2 + 2](mu_with_nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // Get link U_{\mu}(x+\nu)
-        dx[nu]++;
-        Link U2 = arg.tmp[mu / 2 + 2](nu_with_mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[nu]--;
-
-        // Get link U_{\nu}(x+\mu)
-        dx[mu]++;
-        Link U3 = arg.tmp[nu / 2 + 2](mu_with_nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[mu]--;
-
-        // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-        staple[0] = staple[0] + U1 * U2 * conj(U3);
-      }
-
-      {
-        // Get link U_{\nu}(x-\nu)
-        dx[nu]--;
-        Link U1 = arg.tmp[nu / 2 + 2](mu_with_nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        // Get link U_{\mu}(x-\nu)
-        Link U2 = arg.tmp[mu / 2 + 2](nu_with_mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-
-        // Get link U_{\nu}(x-\nu+\mu)
-        dx[mu]++;
-        Link U3 = arg.tmp[nu / 2 + 2](mu_with_nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // reset dx
-        dx[mu]--;
-        dx[nu]++;
-
-        // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-        staple[0] = staple[0] + conj(U1) * U2 * U3;
-      }
+      accumulateStaple(staple[0], arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, parity, {nu_with_mu, mu_with_nu}, {mu, nu});
     }
   }
 
@@ -365,8 +289,8 @@ namespace quda
   };
 
   template <typename Arg, typename Staple>
-  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, const int *x, const int parity,
-                                                        const int mu, Staple staple[2], const int dir_ignore)
+  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, int x[], int parity,
+                                                        int mu, Staple staple[2], const int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
     for (int i = 0; i < 2; ++i) staple[i] = Link();
@@ -382,48 +306,13 @@ namespace quda
 
       cnt += 1;
 
-      {
-        // Get link U_{\nu}(x)
-        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // Get link U_{\mu}(x+\nu)
-        dx[nu]++;
-        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[nu]--;
-
-        // Get link U_{\nu}(x+\mu)
-        dx[mu]++;
-        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        dx[mu]--;
-
-        // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-        staple[cnt] = staple[cnt] + U1 * U2 * conj(U3);
-      }
-
-      {
-        // Get link U_{\nu}(x-\nu)
-        dx[nu]--;
-        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-        // Get link U_{\mu}(x-\nu)
-        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-
-        // Get link U_{\nu}(x-\nu+\mu)
-        dx[mu]++;
-        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
-
-        // reset dx
-        dx[mu]--;
-        dx[nu]++;
-
-        // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-        staple[cnt] = staple[cnt] + conj(U1) * U2 * U3;
-      }
+      accumulateStaple(staple[cnt], arg, arg.in, arg.in, x, parity, {mu, nu}, {mu, nu});
     }
   }
 
   template <typename Arg, typename Staple>
-  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, const int *x, const int parity,
-                                                        const int mu, Staple staple[2], int dir_ignore)
+  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], int parity,
+                                                        int mu, Staple staple[2], int dir_ignore)
   {
     using Link = typename get_type<Staple>::type;
     staple[0] = Link();
@@ -442,42 +331,7 @@ namespace quda
         const int rho_with_nu = (nu - (nu > dir_ignore)) * 2 + rho - (rho > nu) - (rho > dir_ignore);
         const int rho_with_mu = (mu - (mu > dir_ignore)) * 2 + rho - (rho > mu) - (rho > dir_ignore);
 
-        {
-          // Get link U_{\nu}(x)
-          Link U1 = arg.tmp[0](rho_with_nu, linkIndexShift(x, dx, arg.E), parity);
-
-          // Get link U_{\mu}(x+\nu)
-          dx[nu]++;
-          Link U2 = arg.tmp[0](rho_with_mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-          dx[nu]--;
-
-          // Get link U_{\nu}(x+\mu)
-          dx[mu]++;
-          Link U3 = arg.tmp[0](rho_with_nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-          dx[mu]--;
-
-          // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
-          staple[0] = staple[0] + U1 * U2 * conj(U3);
-        }
-
-        {
-          // Get link U_{\nu}(x-\nu)
-          dx[nu]--;
-          Link U1 = arg.tmp[0](rho_with_nu, linkIndexShift(x, dx, arg.E), 1 - parity);
-          // Get link U_{\mu}(x-\nu)
-          Link U2 = arg.tmp[0](rho_with_mu, linkIndexShift(x, dx, arg.E), 1 - parity);
-
-          // Get link U_{\nu}(x-\nu+\mu)
-          dx[mu]++;
-          Link U3 = arg.tmp[0](rho_with_nu, linkIndexShift(x, dx, arg.E), parity);
-
-          // reset dx
-          dx[mu]--;
-          dx[nu]++;
-
-          // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
-          staple[0] = staple[0] + conj(U1) * U2 * U3;
-        }
+        accumulateStaple(staple[0], arg, arg.tmp[0], arg.tmp[0], x, parity, {rho_with_mu, rho_with_nu}, {mu, nu});
       }
     }
   }
