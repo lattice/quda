@@ -128,20 +128,40 @@ namespace quda
     if (dir_ignore == 4) {
       copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
       in.exchangeExtendedGhost(in.R(), false);
+
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<GaugeHYP>(out, tmp, in, alpha3, 1, dir_ignore);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
       tmp[0]->exchangeExtendedGhost(tmp[0]->R(), false);
       tmp[1]->exchangeExtendedGhost(tmp[1]->R(), false);
+
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<GaugeHYP>(out, tmp, in, alpha2, 2, dir_ignore);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
       tmp[2]->exchangeExtendedGhost(tmp[2]->R(), false);
       tmp[3]->exchangeExtendedGhost(tmp[3]->R(), false);
+
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<GaugeHYP>(out, tmp, in, alpha1, 3, dir_ignore);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
       out.exchangeExtendedGhost(out.R(), false);
     } else {
       copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
       in.exchangeExtendedGhost(in.R(), false);
+
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<GaugeHYP>(out, tmp, in, alpha3, 1, dir_ignore);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
       tmp[0]->exchangeExtendedGhost(tmp[0]->R(), false);
+
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<GaugeHYP>(out, tmp, in, alpha2, 2, dir_ignore);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+
       out.exchangeExtendedGhost(out.R(), false);
     }
 
