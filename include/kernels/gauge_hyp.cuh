@@ -3,6 +3,7 @@
 #include <quda_matrix.h>
 #include <su3_project.cuh>
 #include <kernel.h>
+#include <fast_intdiv.h>
 #include <kernels/gauge_utils.cuh>
 
 namespace quda
@@ -22,8 +23,8 @@ namespace quda
     Gauge tmp[4];
     Gauge in;
 
-    int E[4]; // extended grid dimensions
-    int X[4]; // grid dimensions
+    int_fastdiv E[4]; // extended grid dimensions
+    int_fastdiv X[4]; // grid dimensions
     int border[4];
     const Float alpha;
     const int dir_ignore;
@@ -55,9 +56,9 @@ namespace quda
     /* Computes the upper staple :
      *                 mu (B)
      *               +-------+
-     *       nu	   |	   |
-     *	     (A)   |	   |(C)
-     *		   X	   X
+     *         nu    |       |
+     *         (A)   |       |(C)
+     *               X       X
      */
     {
       /* load matrix A*/
@@ -79,9 +80,9 @@ namespace quda
     /* Computes the lower staple :
      *                 X       X
      *           nu    |       |
-     *	         (A)   |       | (C)
-     *		       +-------+
-     *                  mu (B)
+     *           (A)   |       | (C)
+     *                 +-------+
+     *                   mu (B)
      */
     {
       /* load matrix A*/
@@ -152,14 +153,49 @@ namespace quda
       cnt += 1;
 
       computeStaple(staple[cnt], arg, arg.in, arg.in, x, parity, mu, nu);
+
+      /*{
+        // Get link U_{\nu}(x)
+        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
+
+        // Get link U_{\mu}(x+\nu)
+        dx[nu]++;
+        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
+        dx[nu]--;
+
+        // Get link U_{\nu}(x+\mu)
+        dx[mu]++;
+        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
+        dx[mu]--;
+
+        // staple += U_{\nu}(x) * U_{\mu}(x+\nu) * U^\dag_{\nu}(x+\mu)
+        staple[cnt] = staple[cnt] + U1 * U2 * conj(U3);
+      }
+      {
+        // Get link U_{\nu}(x-\nu)
+        dx[nu]--;
+        Link U1 = arg.in(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
+        // Get link U_{\mu}(x-\nu)
+        Link U2 = arg.in(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
+
+        // Get link U_{\nu}(x-\nu+\mu)
+        dx[mu]++;
+        Link U3 = arg.in(nu, linkIndexShift(x, dx, arg.E), parity);
+
+        // reset dx
+        dx[mu]--;
+        dx[nu]++;
+        // staple += U^\dag_{\nu}(x-\nu) * U_{\mu}(x-\nu) * U_{\nu}(x-\nu+\mu)
+        staple[cnt] = staple[cnt] + conj(U1) * U2 * U3;
+      }*/
     }
   }
 
-  template <typename Arg, typename Staple>
-  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, const int *x, const int parity,
-                                                      const int mu, Staple staple[3])
+  template <typename Arg>
+  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], int parity,
+                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
   {
-    using Link = typename get_type<Staple>::type;
+    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
     thread_array<int, 4> dx = {};
@@ -180,6 +216,8 @@ namespace quda
 
         const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
         const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
+
+        //computeStaple(staple[cnt], arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, parity, sigma_with_mu, sigma_with_rho);
 
         {
           // Get link U_{\rho}(x)
@@ -289,7 +327,7 @@ namespace quda
 
       // compute spacetime and local coords
       int x[4];
-      getCoords(x, x_cb, arg.E, parity);
+      getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
@@ -297,7 +335,7 @@ namespace quda
       Link U, Stap[3], TestU, I;
 
       // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, arg.X), parity);
+      U = arg.in(dir, linkIndexShift(x, dx, arg.E), parity);
       setIdentity(&I);
 
       if constexpr (Arg::level == 1) {
