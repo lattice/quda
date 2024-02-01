@@ -50,7 +50,6 @@ namespace quda
   /**
      @brief Calculates a staple as part of the HYP calculation, returning the product
 
-     @param[in,out] staple The accumulated staple
      @param[in] arg Kernel argument
      @param[in] gauge_mu Gauge/tensor field used for the parallel direction
      @param[in] gauge_nu Gauge/tensor field used for the perpendicular direction
@@ -58,14 +57,20 @@ namespace quda
      @param[in,out] dx Full index offset array; leaves the function with the same values it entered with
      @param[in] parity Parity index
      @param[in] tensor_arg The {parallel, perpendicular} indices into the gauge/tensor fields
-     @tparam The {parallel, perpendicular} pair of directions for coordinate offsets
+     @param[in] shifts The {parallel, perpendicular} pair of directions for coordinate offsets
+     @return The computed staple
   */
-  template <int mu, int nu, typename Arg, typename Coord>
-  __host__ __device__ inline void accumulateStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
-    const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu,
-    int x[], Coord &dx, int parity, int2 tensor_arg)
+  template <typename Arg>
+  __host__ __device__ inline Matrix<complex<typename Arg::Float>, Arg::nColor> accumulateStaple(const Arg &arg,
+          const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu,
+          int x[], thread_array<int, 4> &dx, int parity, int2 tensor_arg, int2 shifts)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    Link staple;
+
+    // for readability
+    const int mu = shifts.x;
+    const int nu = shifts.y;
 
     /* Computes the upper staple :
      *                 mu (B)
@@ -88,7 +93,7 @@ namespace quda
       Link c = gauge_nu(tensor_arg.y, linkIndexShift(x, dx, arg.E), 1-parity);
       dx[mu]--;
 
-      staple = staple + a * b * conj(c);
+      staple = a * b * conj(c);
     }
 
     /* Computes the lower staple :
@@ -114,113 +119,74 @@ namespace quda
 
       staple = staple + conj(a)*b*c;
     }
+
+    return staple;
   }
 
-  /**
-     @brief Calculates a staple as part of the HYP calculation, returning the product
-
-     @param[in,out] staple The accumulated staple
-     @param[in] arg Kernel argument
-     @param[in] gauge_mu Gauge/tensor field used for the parallel direction
-     @param[in] gauge_nu Gauge/tensor field used for the perpendicular direction
-     @param[in] x Full index array
-     @param[in,out] dx Full index offset array; leaves the function with the same values it entered with
-     @param[in] parity Parity index
-     @param[in] tensor_arg The {parallel, perpendicular} indices into the gauge/tensor fields
-     @param[in] shifts The {parallel, perpendicular} pair of directions for coordinate offsets
-  */
-  template <typename Arg, typename Coord>
-  __host__ __device__ inline void accumulateStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
-          const typename Arg::Gauge &gauge_mu, const typename Arg::Gauge &gauge_nu,
-          int x[], Coord &dx, int parity, int2 tensor_arg, int2 shifts)
-  {
-    // for readability
-    const int mu = shifts.x;
-    const int nu = shifts.y;
-
-    switch (mu) {
-      case 0:
-        switch (nu) {
-        case 1: accumulateStaple<0,1>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 2: accumulateStaple<0,2>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 3: accumulateStaple<0,3>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        } break;
-      case 1:
-        switch (nu) {
-        case 0: accumulateStaple<1,0>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 2: accumulateStaple<1,2>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 3: accumulateStaple<1,3>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        } break;
-      case 2:
-        switch (nu) {
-        case 0: accumulateStaple<2,0>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 1: accumulateStaple<2,1>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 3: accumulateStaple<2,3>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-      } break;
-      case 3:
-        switch (nu) {
-        case 0: accumulateStaple<3,0>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 1: accumulateStaple<3,1>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        case 2: accumulateStaple<3,2>(staple, arg, gauge_mu, gauge_nu, x, dx, parity, tensor_arg); break;
-        } break;
-      }
-  }
-
-  template <typename Arg, typename Coord>
-  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], Coord &dx, int parity,
+  template <typename Arg>
+  __host__ __device__ inline void computeStapleLevel1(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
                                                       int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
-    int cnt = -1;
+    int cnt = 0;
 #pragma unroll
     for (int nu = 0; nu < 4; ++nu) {
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
-      if (nu == mu) continue;
-
-      cnt += 1;
-
-      accumulateStaple(staple[cnt], arg, arg.in, arg.in, x, dx, parity, { mu, nu }, { mu, nu });
-
+      if (nu != mu) {
+        Link accum = accumulateStaple(arg, arg.in, arg.in, x, dx, parity, { mu, nu }, { mu, nu });
+        switch (cnt) {
+        case 0: staple[0] = staple[0] + accum; break;
+        case 1: staple[1] = staple[1] + accum; break;
+        case 2: staple[2] = staple[2] + accum; break;
+        }
+        cnt++;
+      }
     }
   }
 
-  template <typename Arg, typename Coord>
-  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], Coord &dx, int parity,
+  template <typename Arg>
+  __host__ __device__ inline void computeStapleLevel2(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
                                                       int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
     for (int i = 0; i < 3; ++i) staple[i] = Link();
 
-    int cnt = -1;
+    int cnt = 0;
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
-      if (nu == mu) continue;
+      if (nu != mu) {
+#pragma unroll
+        for (int rho = 0; rho < 4; ++rho) {
+          if (rho == mu || rho == nu) continue;
+          int sigma = 0;
+          while (sigma == mu || sigma == nu || sigma == rho) sigma += 1;
 
-      cnt += 1;
+          const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
+          const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
 
-      for (int rho = 0; rho < 4; ++rho) {
-        if (rho == mu || rho == nu) continue;
-        int sigma = 0;
-        while (sigma == mu || sigma == nu || sigma == rho) sigma += 1;
+          Link accum = accumulateStaple(arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity, {sigma_with_mu, sigma_with_rho}, {mu, rho});
+          switch (cnt) {
+          case 0: staple[0] = staple[0] + accum; break;
+          case 1: staple[1] = staple[1] + accum; break;
+          case 2: staple[2] = staple[2] + accum; break;
+          }
+        }
 
-        const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
-        const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
-
-        accumulateStaple(staple[cnt], arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity, {sigma_with_mu, sigma_with_rho}, {mu, rho});
+        cnt++;
       }
     }
   }
 
-  template <typename Arg, typename Coord>
-  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], Coord &dx, int parity,
-                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[3])
+  template <typename Arg>
+  __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
+                                                      int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
@@ -229,12 +195,12 @@ namespace quda
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
-      if (nu == mu) continue;
+      if (nu != mu) {
+        const int mu_with_nu = nu % 2 * 3 + mu - (mu > nu);
+        const int nu_with_mu = mu % 2 * 3 + nu - (nu > mu);
 
-      const int mu_with_nu = nu % 2 * 3 + mu - (mu > nu);
-      const int nu_with_mu = mu % 2 * 3 + nu - (nu > mu);
-
-      accumulateStaple(staple[0], arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, dx, parity, {nu_with_mu, mu_with_nu}, {mu, nu});
+        staple = staple + accumulateStaple(arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, dx, parity, {nu_with_mu, mu_with_nu}, {mu, nu});
+      }
     }
   }
 
@@ -281,7 +247,7 @@ namespace quda
           arg.tmp[dir / 2 + 2](dir % 2 * 3 + i, linkIndexShift(x, dx, arg.E), parity) = TestU * U;
         }
       } else if constexpr (Arg::level == 3) {
-        computeStapleLevel3(arg, x, dx, parity, dir, Stap);
+        computeStapleLevel3(arg, x, dx, parity, dir, Stap[0]);
 
         TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap[0] * conj(U) * (arg.alpha / ((real)6.));
         polarSu3<real>(TestU, arg.tolerance);
@@ -290,8 +256,8 @@ namespace quda
     }
   };
 
-  template <typename Arg, typename Coord>
-  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, int x[], Coord &dx, int parity,
+  template <typename Arg>
+  __host__ __device__ inline void computeStaple3DLevel1(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
                                                         int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[2], const int dir_ignore)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
@@ -300,37 +266,42 @@ namespace quda
     int cnt = 0;
 #pragma unroll
     for (int nu = 0; nu < 4; ++nu) {
+      // Identify directions orthogonal to the link and
+      // ignore the dir_ignore direction (usually the temporal dim
+      // when used with STOUT or APE for measurement smearing)
       if (nu != mu && nu != dir_ignore) {
-        // Identify directions orthogonal to the link and
-        // ignore the dir_ignore direction (usually the temporal dim
-        // when used with STOUT or APE for measurement smearing)
-        accumulateStaple(staple[cnt], arg, arg.in, arg.in, x, dx, parity, {mu, nu}, {mu, nu});
+        Link accum = accumulateStaple(arg, arg.in, arg.in, x, dx, parity, {mu, nu}, {mu, nu});
+        switch (cnt) {
+        case 0: staple[0] = staple[0] + accum; break;
+        case 1: staple[1] = staple[1] + accum; break;
+        }
         cnt++;
       }
     }
   }
 
-  template <typename Arg, typename Coord>
-  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], Coord &dx, int parity,
-                                                        int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> staple[2], int dir_ignore)
+  template <typename Arg>
+  __host__ __device__ inline void computeStaple3DLevel2(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
+                                                        int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, int dir_ignore)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
-    staple[0] = Link();
+    staple = Link();
 
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
-      if (nu == mu || nu == dir_ignore) continue;
+      if (nu != mu && nu != dir_ignore) {
+#pragma unroll
+        for (int rho = 0; rho < 4; ++rho) {
+          if (rho != mu && rho != nu && rho != dir_ignore) {
+            const int rho_with_nu = (nu - (nu > dir_ignore)) * 2 + rho - (rho > nu) - (rho > dir_ignore);
+            const int rho_with_mu = (mu - (mu > dir_ignore)) * 2 + rho - (rho > mu) - (rho > dir_ignore);
 
-      for (int rho = 0; rho < 4; ++rho) {
-        if (rho == mu || rho == nu || rho == dir_ignore) continue;
-
-        const int rho_with_nu = (nu - (nu > dir_ignore)) * 2 + rho - (rho > nu) - (rho > dir_ignore);
-        const int rho_with_mu = (mu - (mu > dir_ignore)) * 2 + rho - (rho > mu) - (rho > dir_ignore);
-
-        accumulateStaple(staple[0], arg, arg.tmp[0], arg.tmp[0], x, dx, parity, {rho_with_mu, rho_with_nu}, {mu, nu});
+            staple = staple + accumulateStaple(arg, arg.tmp[0], arg.tmp[0], x, dx, parity, {rho_with_mu, rho_with_nu}, {mu, nu});
+          }
+        }
       }
     }
   }
@@ -371,7 +342,7 @@ namespace quda
           arg.tmp[0](dir_ * 2 + i, linkIndexShift(x, dx, arg.E), parity) = TestU * U;
         }
       } else if constexpr (Arg::level == 2) {
-        computeStaple3DLevel2(arg, x, dx, parity, dir, Stap, arg.dir_ignore);
+        computeStaple3DLevel2(arg, x, dx, parity, dir, Stap[0], arg.dir_ignore);
 
         TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap[0] * conj(U) * (arg.alpha / ((real)4.));
         polarSu3<real>(TestU, arg.tolerance);
