@@ -28,7 +28,7 @@ namespace quda
     const int dir_ignore;
     const Float tolerance;
 
-    GaugeHYPArg(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
+    GaugeHYPArg(GaugeField &out, GaugeField* tmp[4], const GaugeField &in, double alpha, int dir_ignore) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, hypDim)),
       out(out),
       tmp {*tmp[0], *tmp[1], *tmp[2], *tmp[3]},

@@ -5082,20 +5082,6 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   GaugeField tmp(gParam);
 
-  const int smearDim = (smear_param->dir_ignore >= 0 && smear_param->dir_ignore <= 3) ? 3 : 4;
-  GaugeField *aux[4];
-  if (smear_param->smear_type == QUDA_GAUGE_SMEAR_HYP) {
-    gParam.geometry = QUDA_TENSOR_GEOMETRY;
-    if (smearDim == 3) {
-      aux[0] = new GaugeField(gParam);
-      // aux[1], aux[2] and aux[3] will not be used for smearDim=3
-      gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      for (int i = 1; i < 4; ++i) { aux[i] = new GaugeField(gParam); }
-    } else {
-      for (int i = 0; i < 4; ++i) { aux[i] = new GaugeField(gParam); }
-    }
-  }
-
   int measurement_n = 0; // The nth measurement to take
   gaugeObservablesQuda(&obs_param[measurement_n]);
   logQuda(QUDA_SUMMARIZE, "Q charge at step %03d = %+.16e\n", 0, obs_param[measurement_n].qcharge);
@@ -5108,7 +5094,7 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
       OvrImpSTOUTStep(*gaugeSmeared, tmp, smear_param->rho, smear_param->epsilon, smear_param->dir_ignore);
       break;
     case QUDA_GAUGE_SMEAR_HYP:
-      HYPStep(*gaugeSmeared, aux, tmp, smear_param->alpha1, smear_param->alpha2, smear_param->alpha3,
+      HYPStep(*gaugeSmeared, tmp, smear_param->alpha1, smear_param->alpha2, smear_param->alpha3,
               smear_param->dir_ignore);
       break;
     default: errorQuda("Unkown gauge smear type %d", smear_param->smear_type);
@@ -5119,10 +5105,6 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
       gaugeObservablesQuda(&obs_param[measurement_n]);
       logQuda(QUDA_SUMMARIZE, "Q charge at step %03d = %+.16e\n", i + 1, obs_param[measurement_n].qcharge);
     }
-  }
-
-  if (smear_param->smear_type == QUDA_GAUGE_SMEAR_HYP) {
-    for (int i = 0; i < 4; ++i) { delete aux[i]; }
   }
 
   popOutputPrefix();
