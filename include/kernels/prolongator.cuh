@@ -29,7 +29,7 @@ namespace quda {
     using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, colorspinor::getNative<Float>(coarseSpin), Float, Float, true>;
     using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat, vFloat>;
 
-    static constexpr unsigned int max_n_src = 96;
+    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
     F out[max_n_src];
     C in[max_n_src];
