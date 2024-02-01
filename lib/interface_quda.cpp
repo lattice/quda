@@ -2376,7 +2376,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   }
 
-  for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField::Create(csParam); }
+  for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField(csParam); }
 
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
