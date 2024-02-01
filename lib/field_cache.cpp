@@ -17,6 +17,10 @@ namespace quda {
       param.create = QUDA_ZERO_FIELD_CREATE;
       tmp = T(param);
     }
+
+    if constexpr (std::is_same_v<T, ColorSpinorField>) {
+      tmp.GammaBasis(a.GammaBasis()); // ensure gamma basis matches
+    }
   }
 
   template <typename T> FieldTmp<T>::FieldTmp(const FieldKey<T> &key, const typename T::param_type &param) : key(key)

@@ -7,7 +7,7 @@ namespace quda
   };
 
   template <int fineColor, int coarseColor, int... N>
-  void BlockOrthogonalize2(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize2(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                            const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass,
                            IntList<coarseColor, N...>)
   {
@@ -29,7 +29,7 @@ namespace quda
   }
 
   template <int fineColor, int... N>
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass,
                           IntList<fineColor, N...>)
   {
@@ -49,7 +49,7 @@ namespace quda
     }
   }
 
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass)
   {
     if constexpr (is_enabled_multigrid()) {

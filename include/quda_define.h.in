@@ -18,6 +18,13 @@
  */
 #define MAX_MULTI_BLAS_N @QUDA_MAX_MULTI_BLAS_N@
 
+/**
+ * @def   MAX_MULTI_BLAS_N
+ * @brief This macro sets the limit of blas fusion in the multi-blas
+ * and multi-reduce kernels
+ */
+#define MAX_MULTI_RHS @QUDA_MAX_MULTI_RHS@
+
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**

@@ -914,7 +914,7 @@ namespace quda
        */
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], int parity, int x_cb,
-                                           int chi) const
+                                           int chi = 0) const
       {
         if (!fixed) {
           accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v.v, parity, x_cb, chi, volumeCB);
