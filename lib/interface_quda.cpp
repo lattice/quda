@@ -3103,17 +3103,17 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     lat_dim_t X = {gauge_param.X[0], gauge_param.X[1], gauge_param.X[2], gauge_param.X[3]};
     ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
-    std::vector<ColorSpinorField *> _h_b(param->num_src);
+    std::vector<ColorSpinorField> _h_b(param->num_src);
     for (int i = 0; i < param->num_src; i++) {
       cpuParam.v = _hp_b[i];
-      _h_b[i] = ColorSpinorField::Create(cpuParam);
+      _h_b[i] = ColorSpinorField(cpuParam);
     }
 
     cpuParam.location = param->output_location;
-    std::vector<ColorSpinorField *> _h_x(param->num_src);
+    std::vector<ColorSpinorField> _h_x(param->num_src);
     for (int i = 0; i < param->num_src; i++) {
       cpuParam.v = _hp_x[i];
-      _h_x[i] = ColorSpinorField::Create(cpuParam);
+      _h_x[i] = ColorSpinorField(cpuParam);
     }
 
     // Make the gauge param dimensions larger
@@ -3169,9 +3169,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         clover_param.create = QUDA_NULL_FIELD_CREATE;
         collected_clover = new CloverField(clover_param);
 
-        std::vector<quda::CloverField *> v_c(1);
-        v_c[0] = input_clover;
-        quda::split_field(*collected_clover, v_c, split_key); // Clover uses 4d even-odd preconditioning.
+        quda::split_field(*collected_clover, {*input_clover}, split_key); // Clover uses 4d even-odd preconditioning.
       }
     }
 
@@ -3182,22 +3180,19 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (!is_staggered) {
       gf_param.create = QUDA_NULL_FIELD_CREATE;
       collected_gauge = quda::GaugeField(gf_param);
-      std::vector<quda::GaugeField *> v_g(1);
-      v_g[0] = &in;
-      quda::split_field(collected_gauge, v_g, split_key);
+      quda::split_field(collected_gauge, {in}, split_key);
     } else {
       std::vector<quda::GaugeField *> v_g(1);
 
       milc_fatlink_param.create = QUDA_NULL_FIELD_CREATE;
       collected_milc_fatlink_field = GaugeField(milc_fatlink_param);
-      v_g[0] = &milc_fatlink_field;
-      quda::split_field(collected_milc_fatlink_field, v_g, split_key);
+      quda::split_field(collected_milc_fatlink_field, {milc_fatlink_field}, split_key);
 
       if (is_asqtad) {
         milc_longlink_param.create = QUDA_NULL_FIELD_CREATE;
         collected_milc_longlink_field = GaugeField(milc_longlink_param);
         v_g[0] = &milc_longlink_field;
-        quda::split_field(collected_milc_longlink_field, v_g, split_key);
+        quda::split_field(collected_milc_longlink_field, {milc_longlink_field}, split_key);
       }
     }
 
@@ -3206,18 +3201,15 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     comm_barrier();
 
     // Split input fermion field
-    quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
+    quda::ColorSpinorParam cpu_cs_param_split(_h_x[0]);
     cpu_cs_param_split.location = QUDA_CPU_FIELD_LOCATION;
     for (int d = 0; d < CommKey::n_dim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
-    std::vector<quda::ColorSpinorField *> _collect_b(param->num_src_per_sub_partition, nullptr);
-    std::vector<quda::ColorSpinorField *> _collect_x(param->num_src_per_sub_partition, nullptr);
+    std::vector<quda::ColorSpinorField> _collect_b(param->num_src_per_sub_partition, cpu_cs_param_split);
+    std::vector<quda::ColorSpinorField> _collect_x(param->num_src_per_sub_partition, cpu_cs_param_split);
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-      _collect_b[n] = new quda::ColorSpinorField(cpu_cs_param_split);
-      _collect_x[n] = new quda::ColorSpinorField(cpu_cs_param_split);
       auto first = _h_b.begin() + n * num_sub_partition;
       auto last = _h_b.begin() + (n + 1) * num_sub_partition;
-      std::vector<ColorSpinorField *> _v_b(first, last);
-      split_field(*_collect_b[n], _v_b, split_key, pc_type);
+      split_field(_collect_b[n], {first, last}, split_key, pc_type);
     }
     comm_barrier();
 
@@ -3250,7 +3242,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     }
 
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-      op(_collect_x[n]->data(), _collect_b[n]->data(), param, args...);
+      op(_collect_x[n].data(), _collect_b[n].data(), param, args...);
     }
 
     profileInvertMultiSrc.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -3266,15 +3258,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
       auto first = _h_x.begin() + n * num_sub_partition;
       auto last = _h_x.begin() + (n + 1) * num_sub_partition;
-      std::vector<ColorSpinorField *> _v_x(first, last);
-      join_field(_v_x, *_collect_x[n], split_key, pc_type);
+      join_field({first, last}, _collect_x[n], split_key, pc_type);
     }
-
-    for (auto p : _collect_b) { delete p; }
-    for (auto p : _collect_x) { delete p; }
-
-    for (auto p : _h_x) { delete p; }
-    for (auto p : _h_b) { delete p; }
 
     if (input_clover) { delete input_clover; }
     if (collected_clover) { delete collected_clover; }
