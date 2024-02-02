@@ -167,8 +167,8 @@ namespace quda {
      Compute the new values of alpha and zeta
    */
   void updateAlphaZeta(std::vector<double> &alpha, std::vector<double> &zeta, std::vector<double> &zeta_old,
-                       const std::vector<double> &r2, const std::vector<double> &beta, double pAp, const double *offset,
-                       const int nShift, const int j_low)
+                       const std::vector<double> &r2, const std::vector<double> &beta, double pAp,
+                       const array<double, QUDA_MAX_MULTI_SHIFT> &offset, const int nShift, const int j_low)
   {
     std::vector<double> alpha_old(alpha);
 
@@ -193,7 +193,7 @@ namespace quda {
 
     if (num_offset == 0) return;
 
-    double *offset = param.offset;
+    auto &offset = param.offset;
 
     const double b2 = blas::norm2(b);
     // Check to see that we're not trying to invert on a zero-field source

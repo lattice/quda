@@ -22,23 +22,23 @@ namespace quda {
     /**
        Which linear solver to use
     */
-    QudaInverterType inv_type;
+    QudaInverterType inv_type = QUDA_INVALID_INVERTER;
 
     /**
      * The inner Krylov solver used in the preconditioner.  Set to
      * QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      */
-    QudaInverterType inv_type_precondition;
+    QudaInverterType inv_type_precondition = QUDA_INVALID_INVERTER;
 
     /**
      * Preconditioner instance, e.g., multigrid
      */
-    void *preconditioner;
+    void *preconditioner = nullptr;
 
     /**
      * Deflation operator
      */
-    void *deflation_op;
+    void *deflation_op = nullptr;
 
     /**
      * Whether to use the L2 relative residual, L2 absolute residual
@@ -49,28 +49,28 @@ namespace quda {
      * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
      *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
      */
-    QudaResidualType residual_type;
+    QudaResidualType residual_type = QUDA_INVALID_RESIDUAL;
 
     /**< Whether deflate the initial guess */
-    bool deflate;
+    bool deflate = false;
 
     /**< Used to define deflation */
     QudaEigParam eig_param;
 
     /**< Whether to use an initial guess in the solver or not */
-    QudaUseInitGuess use_init_guess;
+    QudaUseInitGuess use_init_guess = QUDA_USE_INIT_GUESS_NO;;
 
     /**< Whether to solve linear system with zero RHS */
-    QudaComputeNullVector compute_null_vector;
+    QudaComputeNullVector compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;
 
     /**< Reliable update tolerance */
-    double delta;
+    double delta = 0.0;
 
     /**< Whether to user alternative reliable updates (CG only at the moment) */
-    bool use_alternative_reliable;
+    bool use_alternative_reliable = false;
 
     /**< Whether to keep the partial solution accumulator in sloppy precision */
-    bool use_sloppy_partial_accumulator;
+    bool use_sloppy_partial_accumulator = false;
 
     /**< This parameter determines how often we accumulate into the
        solution vector from the direction vectors in the solver.
@@ -80,197 +80,189 @@ namespace quda {
        increases performance of mixed-precision solvers since it means
        less high-precision vector round-trip memory travel, but
        requires more low-precision memory allocation. */
-    int solution_accumulator_pipeline;
+    int solution_accumulator_pipeline = 0;
 
     /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
-    int max_res_increase;
+    int max_res_increase = 0;
 
     /**< This parameter determines how many total reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
-    int max_res_increase_total;
+    int max_res_increase_total = 0;
 
     /**< This parameter determines how many consecutive heavy-quark
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
-    int max_hq_res_increase;
+    int max_hq_res_increase = 0;
 
     /**< This parameter determines how many total heavy-quark residual
     restarts we tolerate before terminating the solver, i.e., how long
     do we want to keep trying to converge */
-    int max_hq_res_restart_total;
+    int max_hq_res_restart_total = 0;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
 
     /**< Enable pipeline solver */
-    int pipeline;
+    int pipeline = 0;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol;
+    double tol = 0.0;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol_restart;
+    double tol_restart = 0.0;
 
     /**< Solver tolerance in the heavy quark residual norm */
-    double tol_hq;
+    double tol_hq = 0.0;
 
     /**< Whether to compute the true residual post solve */
-    bool compute_true_res;
+    bool compute_true_res = true;
 
     /** Whether to declare convergence without checking the true residual */
-    bool sloppy_converge;
+    bool sloppy_converge = false;
 
     /**< Actual L2 residual norm achieved in solver */
-    double true_res;
+    double true_res = 0.0;
 
     /**< Actual heavy quark residual norm achieved in solver */
-    double true_res_hq;
+    double true_res_hq = 0.0;
 
     /**< Maximum number of iterations in the linear solver */
-    int maxiter;
+    int maxiter = 0;
 
     /**< The number of iterations performed by the solver */
-    int iter;
+    int iter = 0;
 
     /**< The precision used by the QUDA solver */
-    QudaPrecision precision;
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
 
     /**< The precision used by the QUDA sloppy operator */
-    QudaPrecision precision_sloppy;
+    QudaPrecision precision_sloppy = QUDA_INVALID_PRECISION;;
 
     /**< The precision used by the QUDA sloppy operator for multishift refinement */
-    QudaPrecision precision_refinement_sloppy;
+    QudaPrecision precision_refinement_sloppy = QUDA_INVALID_PRECISION;;
 
     /**< The precision used by the QUDA preconditioner */
-    QudaPrecision precision_precondition;
+    QudaPrecision precision_precondition = QUDA_INVALID_PRECISION;
 
     /**< The precision used by the QUDA eigensolver */
-    QudaPrecision precision_eigensolver;
+    QudaPrecision precision_eigensolver = QUDA_INVALID_PRECISION;
 
     /**< Whether the source vector should contain the residual vector
        when the solver returns */
-    bool return_residual;
+    bool return_residual = false;
 
     /**< Domain overlap to use in the preconditioning */
-    int overlap_precondition;
+    int overlap_precondition = 0;
 
     /**< Number of sources in the multi-src solver */
-    int num_src;
+    int num_src = 0;
 
     // Multi-shift solver parameters
 
     /**< Number of offsets in the multi-shift solver */
-    int num_offset;
+    int num_offset = 0;
 
     /** Offsets for multi-shift solver */
-    double offset[QUDA_MAX_MULTI_SHIFT];
+    array<double, QUDA_MAX_MULTI_SHIFT> offset = {};
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_MULTI_SHIFT];
+    array<double, QUDA_MAX_MULTI_SHIFT> tol_offset = {};
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
-    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
+    array<double, QUDA_MAX_MULTI_SHIFT> tol_hq_offset = {};
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    double true_res_offset[QUDA_MAX_MULTI_SHIFT];
+    array<double, QUDA_MAX_MULTI_SHIFT> true_res_offset = {};
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+    array<double, QUDA_MAX_MULTI_SHIFT>  iter_res_offset = {};
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
+    array<double, QUDA_MAX_MULTI_SHIFT> true_res_hq_offset = {};
 
     /** Number of steps in s-step algorithms */
-    int Nsteps;
+    int Nsteps = 0;
 
     /** Maximum size of Krylov space used by solver */
-    int Nkrylov;
+    int Nkrylov = 0;
 
     /** Number of preconditioner cycles to perform per iteration */
-    int precondition_cycle;
+    int precondition_cycle = 0;
 
     /** Tolerance in the inner solver */
-    double tol_precondition;
+    double tol_precondition = 0.0;
 
     /** Maximum number of iterations allowed in the inner solver */
-    int maxiter_precondition;
+    int maxiter_precondition = 0;
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
-    double omega;
+    double omega = 0.0;
 
     /** Basis for CA algorithms */
-    QudaCABasis ca_basis;
+    QudaCABasis ca_basis = QUDA_INVALID_BASIS;
 
     /** Minimum eigenvalue for Chebyshev CA basis */
-    double ca_lambda_min;
+    double ca_lambda_min = 0.0;
 
     /** Maximum eigenvalue for Chebyshev CA basis */
-    double ca_lambda_max; // -1 -> power iter generate
+    double ca_lambda_max = 0.0; // -1 -> power iter generate
 
     /** Basis for CA algorithms in a preconditioner */
-    QudaCABasis ca_basis_precondition;
+    QudaCABasis ca_basis_precondition = QUDA_INVALID_BASIS;
 
     /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner */
-    double ca_lambda_min_precondition;
+    double ca_lambda_min_precondition = 0.0;
 
     /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner */
-    double ca_lambda_max_precondition; // -1 -> power iter generate
+    double ca_lambda_max_precondition = 0.0; // -1 -> power iter generate
 
     /** Whether to use additive or multiplicative Schwarz preconditioning */
-    QudaSchwarzType schwarz_type;
+    QudaSchwarzType schwarz_type = QUDA_INVALID_SCHWARZ;
 
     /** The type of accelerator type to use for preconditioner */
-    QudaAcceleratorType accelerator_type_precondition;
+    QudaAcceleratorType accelerator_type_precondition = QUDA_INVALID_ACCELERATOR;
 
     // Incremental EigCG solver parameters
     /**< The precision of the Ritz vectors */
-    QudaPrecision precision_ritz;//also search space precision
+    QudaPrecision precision_ritz = QUDA_INVALID_PRECISION;//also search space precision
 
-    int n_ev; // number of eigenvectors produced by EigCG
-    int m;//Dimension of the search space
-    int deflation_grid;
-    int rhs_idx;
+    int n_ev = 0; // number of eigenvectors produced by EigCG
+    int m = 0; //Dimension of the search space
+    int deflation_grid = 0;
+    int rhs_idx = 0;
 
-    int     eigcg_max_restarts;
-    int     max_restart_num;
-    double  inc_tol;
-    double  eigenval_tol;
+    int     eigcg_max_restarts = 0;
+    int     max_restart_num = 0;
+    double  inc_tol = 0.0;
+    double  eigenval_tol = 0.0;
 
-    QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
+    QudaVerbosity verbosity_precondition = QUDA_SILENT; //! verbosity to use for preconditioner
 
-    bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
+    bool is_preconditioner = false; //! whether the solver acting as a preconditioner for another solver
 
-    bool global_reduction; //! whether to use a global or local (node) reduction for this solver
+    bool global_reduction = true; //! whether to use a global or local (node) reduction for this solver
 
     /** Whether the MG preconditioner (if any) is an instance of MG
         (used internally in MG) or of multigrid_solver (used in the
         interface)*/
-    bool mg_instance;
+    bool mg_instance = false;
 
-    MadwfParam madwf_param;
+    MadwfParam madwf_param = {};
 
     /** Whether to perform advanced features in a preconditioning inversion,
         including reliable updates, pipelining, and mixed precision. */
-    bool precondition_no_advanced_feature;
+    bool precondition_no_advanced_feature = false;
 
     /** Which external lib to use in the solver */
-    QudaExtLibType extlib_type;
+    QudaExtLibType extlib_type = QUDA_EXTLIB_INVALID;
 
     /**
        Default constructor
      */
-    SolverParam() :
-      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
-      compute_true_res(true),
-      sloppy_converge(false),
-      verbosity_precondition(QUDA_SILENT),
-      mg_instance(false)
-    {
-      ;
-    }
+    SolverParam() = default;
 
     /**
        Constructor that matches the initial values to that of the
@@ -300,7 +292,6 @@ namespace quda {
       tol_restart(param.tol_restart),
       tol_hq(param.tol_hq),
       compute_true_res(param.compute_true_res),
-      sloppy_converge(false),
       true_res(param.true_res),
       true_res_hq(param.true_res_hq),
       maxiter(param.maxiter),
@@ -310,7 +301,6 @@ namespace quda {
       precision_refinement_sloppy(param.cuda_prec_refinement_sloppy),
       precision_precondition(param.cuda_prec_precondition),
       precision_eigensolver(param.cuda_prec_eigensolver),
-      return_residual(false),
       num_src(param.num_src),
       num_offset(param.num_offset),
       Nsteps(param.Nsteps),
@@ -331,15 +321,11 @@ namespace quda {
       n_ev(param.n_ev),
       m(param.max_search_dim),
       deflation_grid(param.deflation_grid),
-      rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts),
       max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol),
       eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(false),
-      global_reduction(true),
-      mg_instance(false),
       precondition_no_advanced_feature(param.schwarz_type == QUDA_ADDITIVE_SCHWARZ),
       extlib_type(param.extlib_type)
     {
@@ -366,87 +352,7 @@ namespace quda {
       if (madwf_param.madwf_param_save) madwf_param.madwf_param_outfile = std::string(param.madwf_param_outfile);
     }
 
-    SolverParam(const SolverParam &param) :
-      inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition),
-      preconditioner(param.preconditioner),
-      deflation_op(param.deflation_op),
-      residual_type(param.residual_type),
-      deflate(param.deflate),
-      eig_param(param.eig_param),
-      use_init_guess(param.use_init_guess),
-      compute_null_vector(param.compute_null_vector),
-      delta(param.delta),
-      use_alternative_reliable(param.use_alternative_reliable),
-      use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
-      solution_accumulator_pipeline(param.solution_accumulator_pipeline),
-      max_res_increase(param.max_res_increase),
-      max_res_increase_total(param.max_res_increase_total),
-      heavy_quark_check(param.heavy_quark_check),
-      pipeline(param.pipeline),
-      tol(param.tol),
-      tol_restart(param.tol_restart),
-      tol_hq(param.tol_hq),
-      compute_true_res(param.compute_true_res),
-      sloppy_converge(param.sloppy_converge),
-      true_res(param.true_res),
-      true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter),
-      iter(param.iter),
-      precision(param.precision),
-      precision_sloppy(param.precision_sloppy),
-      precision_refinement_sloppy(param.precision_refinement_sloppy),
-      precision_precondition(param.precision_precondition),
-      precision_eigensolver(param.precision_eigensolver),
-      return_residual(param.return_residual),
-      num_offset(param.num_offset),
-      Nsteps(param.Nsteps),
-      Nkrylov(param.Nkrylov),
-      precondition_cycle(param.precondition_cycle),
-      tol_precondition(param.tol_precondition),
-      maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega),
-      ca_basis(param.ca_basis),
-      ca_lambda_min(param.ca_lambda_min),
-      ca_lambda_max(param.ca_lambda_max),
-      ca_basis_precondition(param.ca_basis_precondition),
-      ca_lambda_min_precondition(param.ca_lambda_min_precondition),
-      ca_lambda_max_precondition(param.ca_lambda_max_precondition),
-      schwarz_type(param.schwarz_type),
-      accelerator_type_precondition(param.accelerator_type_precondition),
-      precision_ritz(param.precision_ritz),
-      n_ev(param.n_ev),
-      m(param.m),
-      deflation_grid(param.deflation_grid),
-      rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts),
-      max_restart_num(param.max_restart_num),
-      inc_tol(param.inc_tol),
-      eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(param.is_preconditioner),
-      global_reduction(param.global_reduction),
-      mg_instance(param.mg_instance),
-      madwf_param(param.madwf_param),
-      precondition_no_advanced_feature(param.precondition_no_advanced_feature),
-      extlib_type(param.extlib_type)
-    {
-      for (int i=0; i<num_offset; i++) {
-	offset[i] = param.offset[i];
-	tol_offset[i] = param.tol_offset[i];
-	tol_hq_offset[i] = param.tol_hq_offset[i];
-      }
-
-      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
-        m = (m / 16) * 16 + 16;
-        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
-      }
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
-        rhs_idx = param.rhs_idx;
-      }
-    }
-
-    ~SolverParam() { }
+    SolverParam(const SolverParam &param) = default;
 
     /**
        Update the QudaInvertParam with the data from this
@@ -479,11 +385,8 @@ namespace quda {
       if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
     }
 
-    void updateRhsIndex(QudaInvertParam &param) {
-      //for incremental eigCG:
-      rhs_idx = param.rhs_idx;
-    }
-
+    //for incremental eigCG:
+    void updateRhsIndex(QudaInvertParam &param) {  rhs_idx = param.rhs_idx; }
   };
 
   class Solver {
