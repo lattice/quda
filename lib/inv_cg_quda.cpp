@@ -45,7 +45,6 @@ namespace quda {
       Ap = ColorSpinorField(csParam);
 
       rSloppy = (r.Precision() != param.precision_sloppy) ? ColorSpinorField(csParam) : r.create_alias();
-      tmp = ColorSpinorField(csParam);
       param.use_sloppy_partial_accumulator = false; // hard-code precise accumulation
       xSloppy = (param.use_sloppy_partial_accumulator == true) ? ColorSpinorField(csParam) : x.create_alias();
 
@@ -754,12 +753,11 @@ namespace quda {
         blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
         if (k % param.heavy_quark_check == 0) {
-          if (&x != &xSloppy) {
-            blas::copy(tmp, y);
-            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
-          } else {
+          if (xSloppy.Precision() != rSloppy.Precision()) {
             blas::copy(r, rSloppy);
-            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, y, r).z);
+          } else {
+            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, y, rSloppy).z);
           }
         }
 

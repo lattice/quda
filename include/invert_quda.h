@@ -710,7 +710,6 @@ namespace quda {
     ColorSpinorField rnew;
     ColorSpinorField p;
     ColorSpinorField Ap;
-    ColorSpinorField tmp;
     ColorSpinorField rSloppy;
     ColorSpinorField xSloppy;
     bool init = false;
