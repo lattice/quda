@@ -14,6 +14,19 @@
 
 namespace quda {
 
+// temporary addition until multi-RHS for all Dirac operator functions
+#ifdef __CUDACC__
+#ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
+#pragma nv_diag_suppress 611
+#else
+#pragma diag_suppress 611
+#endif
+#endif
+
+#ifdef __NVCOMPILER
+#pragma diag_suppress partial_override
+#endif
+
   /**
      SolverParam is the meta data used to define linear solvers.
    */
@@ -398,13 +411,13 @@ namespace quda {
     const DiracMatrix &matEig;
 
     SolverParam &param;
-    int node_parity;
-    EigenSolver *eig_solve; /** Eigensolver object. */
-    bool deflate_init;      /** If true, the deflation space has been computed. */
-    bool deflate_compute;   /** If true, instruct the solver to create a deflation space. */
-    bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
-    std::vector<ColorSpinorField> evecs; /** Holds the eigenvectors. */
-    std::vector<Complex> evals;          /** Holds the eigenvalues. */
+    int node_parity = 0;
+    EigenSolver *eig_solve = nullptr; /** Eigensolver object. */
+    bool deflate_init = false;      /** If true, the deflation space has been computed. */
+    bool deflate_compute = false;   /** If true, instruct the solver to create a deflation space. */
+    bool recompute_evals = false;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
+    std::vector<ColorSpinorField> evecs = {}; /** Holds the eigenvectors. */
+    std::vector<Complex> evals = {};          /** Holds the eigenvalues. */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -414,6 +427,16 @@ namespace quda {
     virtual ~Solver();
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
+
+    /**
+       @brief Naive loop over RHS, for solvers that are not yet multi-RHS aware
+     */
+    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in)
+    {
+      for (auto i = 0u; i < in.size(); i++) {
+        this->operator()(out[i], in[i]);
+      }
+    }
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
