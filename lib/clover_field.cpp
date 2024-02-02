@@ -31,31 +31,92 @@ namespace quda {
     for (int dir = 0; dir < nDim; ++dir) x[dir] = a.X()[dir];
   }
 
-  CloverField::CloverField(const CloverFieldParam &param) :
-    LatticeField(param),
-    reconstruct(param.reconstruct),
-    nColor(3),
-    nSpin(4),
-    inverse(param.inverse),
-    csw(param.csw),
-    coeff(param.coeff),
-    twist_flavor(param.twist_flavor),
-    mu2(param.mu2),
-    rho(param.rho),
-    order(param.order),
-    create(param.create)
+  CloverField::CloverField(const CloverFieldParam &param) : LatticeField(param)
   {
+    create(param); // create switch-case here for create type
+
+    switch (param.create) {
+    case QUDA_NULL_FIELD_CREATE:
+    case QUDA_REFERENCE_FIELD_CREATE: break;
+    case QUDA_ZERO_FIELD_CREATE:
+      qudaMemset(clover, '\0', bytes);
+      if (inverse) qudaMemset(cloverInv, '\0', bytes);
+      break;
+    case QUDA_COPY_FIELD_CREATE: copy(*param.field); break;
+    default: errorQuda("Unexpected create type %d", param.create);
+    }
+  }
+
+  CloverField::CloverField(const CloverField &field) noexcept : LatticeField(field)
+  {
+    CloverFieldParam param;
+    field.fill(param);
+    param.create = QUDA_COPY_FIELD_CREATE;
+    create(param);
+    copy(field);
+  }
+
+  CloverField::CloverField(CloverField &&field) noexcept : LatticeField(std::move(field))
+  {
+    move(std::move(field));
+  }
+
+  CloverField &CloverField::operator=(const CloverField &src)
+  {
+    if (&src != this) {
+      if (!init) { // keep current attributes unless unset
+        LatticeField::operator=(src);
+        CloverFieldParam param;
+        src.fill(param);
+        param.create = QUDA_COPY_FIELD_CREATE;
+        create(param);
+      }
+
+      copy(src);
+    }
+    return *this;
+  }
+
+  CloverField &CloverField::operator=(CloverField &&src)
+  {
+    if (&src != this) {
+      // if field not already initialized then move the field
+      if (!init) {
+        LatticeField::operator=(std::move(src));
+        move(std::move(src));
+      } else {
+        // we error if the field is not compatible with this
+        errorQuda("Moving to already created field");
+      }
+    }
+    return *this;
+  }
+
+  void CloverField::create(const CloverFieldParam &param)
+  {
+    reconstruct = param.reconstruct;
+    nColor = 3;
+    nSpin = 4;
+    inverse = param.inverse;
+    csw = param.csw;
+    coeff = param.coeff;
+    twist_flavor = param.twist_flavor;
+    mu2 = param.mu2;
+    rho = param.rho;
+    order = param.order;
+
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", siteSubset);
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
     if (!isNative() && precision < QUDA_SINGLE_PRECISION)
       errorQuda("Fixed-point precision only supported on native field");
-    if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
+    if (order == QUDA_QDPJIT_CLOVER_ORDER && param.create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
-    if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE)
-      errorQuda("Create type %d not supported", create);
+    if (param.create != QUDA_NULL_FIELD_CREATE && param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_ZERO_FIELD_CREATE)
+      errorQuda("Create type %d not supported", param.create);
 
     // for now we only support compressed blocks for Nc = 3
     if (reconstruct && !isNative()) errorQuda("Clover reconstruct only supported on native fields");
+
     compressed_block = (reconstruct && nColor == 3 && nSpin == 4) ? 28 : (nColor * nSpin / 2) * (nColor * nSpin / 2);
     real_length = 2 * ((size_t)volumeCB) * 2 * compressed_block; // block-diagonal Hermitian (72 reals)
     length = 2 * ((size_t)stride) * 2 * compressed_block;
@@ -64,14 +125,11 @@ namespace quda {
     if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
 
     // for twisted mass only:
-    twist_flavor = param.twist_flavor;
-    mu2 = param.mu2;
-    epsilon2 = param.epsilon2;
 
     setTuningString();
 
     if (bytes) {
-      if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
         clover = quda_ptr(mem_type, bytes);
       } else {
         clover = quda_ptr(param.clover, mem_type);
@@ -80,7 +138,7 @@ namespace quda {
       total_bytes += bytes;
 
       if (inverse) {
-        if (create != QUDA_REFERENCE_FIELD_CREATE) {
+        if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
           cloverInv = quda_ptr(mem_type, bytes);
         } else {
           cloverInv = quda_ptr(param.cloverInv, mem_type);
@@ -88,12 +146,55 @@ namespace quda {
 
         total_bytes += bytes;
       }
-
-      if (create == QUDA_ZERO_FIELD_CREATE) {
-        qudaMemset(clover, '\0', bytes);
-        if (inverse) qudaMemset(cloverInv, '\0', bytes);
-      }
     }
+
+    twist_flavor = param.twist_flavor;
+    mu2 = param.mu2;
+    epsilon2 = param.epsilon2;
+
+    init = true;
+  }
+
+  // Fills the param with the contents of this field
+  void CloverField::fill(CloverFieldParam &param) const
+  {
+    LatticeField::fill(param);
+    param.reconstruct = reconstruct;
+    param.inverse = inverse;
+    param.clover = data(false);
+    param.cloverInv = data(true);
+    param.csw = csw;
+    param.coeff = coeff;
+    param.twist_flavor = twist_flavor;
+    param.mu2 = mu2;
+    param.epsilon2 = epsilon2;
+    param.rho = rho;
+    param.order = order;
+  }
+
+  void CloverField::move(CloverField &&src)
+  {
+    reconstruct = std::exchange(src.reconstruct, false);
+    bytes = std::exchange(src.bytes, 0);
+    length = std::exchange(src.length, 0);
+    real_length = std::exchange(src.real_length, 0);
+    compressed_block = std::exchange(src.compressed_block, 0);
+    nColor = std::exchange(src.nColor, 0);
+    nSpin = std::exchange(src.nSpin, 0);
+    clover = std::exchange(src.clover, {});
+    cloverInv = std::exchange(src.cloverInv, {});
+    inverse = std::exchange(src.inverse, false);
+    diagonal = std::exchange(src.diagonal, 0.0);
+    max = std::exchange(src.max, {});
+    csw = std::exchange(src.csw, 0.0);
+    coeff = std::exchange(src.coeff, 0.0);
+    twist_flavor = std::exchange(src.twist_flavor, QUDA_TWIST_INVALID);
+    mu2 = std::exchange(src.mu2, 0.0);
+    epsilon2 = std::exchange(src.epsilon2, 0.0);
+    rho = std::exchange(src.rho, 0.0);
+    order = std::exchange(src.order, QUDA_INVALID_CLOVER_ORDER);
+    trlog = std::exchange(src.trlog, {});
+    init = std::exchange(src.init, false);
   }
 
   void CloverField::setTuningString()

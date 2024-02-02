@@ -109,12 +109,12 @@ namespace quda {
     bool reconstruct
       = clover::reconstruct(); /** Whether to create a compressed clover field that requires reconstruction */
     bool inverse = true;       /** Whether to create the inverse clover field */
+    CloverField *field = nullptr; /** Pointer to another field instance from which we can clone */
     void *clover = nullptr;    /** Pointer to the clover field */
     void *cloverInv = nullptr; /** Pointer to the clover inverse field */
     double csw = 0.0;          /** C_sw clover coefficient */
     double coeff = 0.0;        /** Overall clover coefficient */
     QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID; /** Twisted-mass flavor type */
-    bool twisted = false;                                  /** Whether to create twisted mass clover */
     double mu2 = 0.0;                                      /** Chiral twisted mass term */
     double epsilon2 = 0.0;                                 /** Flavor twisted mass term */
     double rho = 0.0;                                      /** Hasenbusch rho term */
@@ -182,7 +182,7 @@ namespace quda {
   class CloverField : public LatticeField {
 
   protected:
-    const bool reconstruct = clover::reconstruct(); /** Whether this field is compressed and requires reconstruction */
+    bool reconstruct = clover::reconstruct(); /** Whether this field is compressed and requires reconstruction */
 
     size_t bytes = 0; // bytes allocated per clover full field
     size_t length = 0;
@@ -206,9 +206,17 @@ namespace quda {
     double rho = 0.0;
 
     QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER;
-    QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
 
     mutable array<double, 2> trlog = {};
+
+    bool init = false;
+
+    /**
+       @brief Fills the param with this field's meta data (used for
+       creating a cloned field)
+       @param[in] param The parameter we are filling
+    */
+    void fill(CloverFieldParam &) const;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -226,7 +234,55 @@ namespace quda {
     void restore(bool which) const;
 
   public:
+    /**
+       @brief Default constructor
+    */
+    CloverField() = default;
+
+    /**
+       @brief Copy constructor for creating a CloverField from another CloverField
+       @param[in] field Instance of CloverField from which we are cloning
+    */
+    CloverField(const CloverField &field) noexcept;
+
+    /**
+       @brief Move constructor for creating a CloverField from another CloverField
+       @param[in] field Instance of CloverField from which we are moving
+    */
+    CloverField(CloverField &&field) noexcept;
+
+    /**
+       @brief Constructor for creating a CloverField from a CloverFieldParam
+       @param param Contains the metadata for creating the field
+    */
     CloverField(const CloverFieldParam &param);
+
+    /**
+       @brief Copy assignment operator
+       @param[in] field Instance from which we are copying
+       @return Reference to this field
+     */
+    CloverField &operator=(const CloverField &field);
+
+    /**
+       @brief Move assignment operator
+       @param[in] field Instance from which we are moving
+       @return Reference to this field
+     */
+    CloverField &operator=(CloverField &&field);
+
+    /**
+       @brief Field creation using the meta data provided in the param
+       struct
+       @param[in] param Contains the metadata for creating the field
+     */
+    void create(const CloverFieldParam &param);
+
+    /**
+       @brief Move the contents of a field to this
+       @param[in,out] other Field we are moving from
+    */
+    void move(CloverField &&src);
 
     static CloverField *Create(const CloverFieldParam &param);
 
