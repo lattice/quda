@@ -45,13 +45,6 @@ namespace quda
     batched_rotate = eig_param->batched_rotate;
     block_size = eig_param->block_size;
     ortho_block_size = eig_param->ortho_block_size;
-    iter = 0;
-    iter_converged = 0;
-    iter_locked = 0;
-    iter_keep = 0;
-    num_converged = 0;
-    num_locked = 0;
-    num_keep = 0;
 
     save_prec = eig_param->save_prec;
 
@@ -68,22 +61,22 @@ namespace quda
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
-    case QUDA_SPECTRUM_LM_EIG: strcpy(spectrum, "LM"); break;
-    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;
-    case QUDA_SPECTRUM_LR_EIG: strcpy(spectrum, "LR"); break;
-    case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
-    case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
-    case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
+    case QUDA_SPECTRUM_LM_EIG: spectrum = "LM"; break;
+    case QUDA_SPECTRUM_SM_EIG: spectrum = "SM"; break;
+    case QUDA_SPECTRUM_LR_EIG: spectrum = "LR"; break;
+    case QUDA_SPECTRUM_SR_EIG: spectrum = "SR"; break;
+    case QUDA_SPECTRUM_LI_EIG: spectrum = "LI"; break;
+    case QUDA_SPECTRUM_SI_EIG: spectrum = "SI"; break;
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
     // Deduce whether to reverse the sorting
-    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
+    if (spectrum.compare(0, 1, "L") == 0 && !eig_param->use_poly_acc) {
       reverse = true;
-    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
+    } else if (spectrum.compare(0, 1, "S") == 0 && eig_param->use_poly_acc) {
       reverse = true;
       spectrum[0] = 'L';
-    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
+    } else if (spectrum.compare(0, 1, "L") == 0 && eig_param->use_poly_acc) {
       reverse = true;
       spectrum[0] = 'S';
     }
@@ -196,7 +189,7 @@ namespace quda
     logQuda(QUDA_SUMMARIZE, "**** START QUDA EIGENSOLVER ****\n");
     logQuda(QUDA_SUMMARIZE, "********************************\n");
 
-    logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum);
+    logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum.c_str());
     logQuda(QUDA_VERBOSE, "tol %.4e\n", tol);
     logQuda(QUDA_VERBOSE, "n_conv %d\n", n_conv);
     logQuda(QUDA_VERBOSE, "n_ev %d\n", n_ev);
