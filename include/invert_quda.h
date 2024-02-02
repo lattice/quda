@@ -705,9 +705,22 @@ namespace quda {
   class CG : public Solver {
 
   private:
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *rSloppyp, *xSloppyp;
+    ColorSpinorField y;
+    ColorSpinorField r;
+    ColorSpinorField rnew;
+    ColorSpinorField p;
+    ColorSpinorField Ap;
+    ColorSpinorField tmp;
+    ColorSpinorField rSloppy;
+    ColorSpinorField xSloppy;
     bool init = false;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -731,6 +744,11 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
     void blocksolve(ColorSpinorField &out, ColorSpinorField &in) override;
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
