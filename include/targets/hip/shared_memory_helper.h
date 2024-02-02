@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <kernel_ops.h>
 
 /**
    @file shared_memory_helper.h
@@ -73,6 +74,11 @@ namespace quda
     */
     constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
 
+    template <typename... U>
+    constexpr SharedMemory(const KernelOps<U...> &) : data(cache(get_offset(target::block_dim())))
+    {
+    }
+
     /**
        @brief Return this SharedMemory object.
     */
@@ -83,7 +89,7 @@ namespace quda
        @param[in] i The index to use.
        @return Reference to value stored at that index.
      */
-    __device__ __host__ T &operator[](const int i) const { return data[i]; }
+    __device__ __host__ inline T &operator[](const int i) const { return data[i]; }
   };
 
 } // namespace quda

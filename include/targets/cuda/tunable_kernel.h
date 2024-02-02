@@ -5,6 +5,7 @@
 #include <lattice_field.h>
 #include <kernel_helper.h>
 #include <kernel.h>
+#include <kernel_ops_target.h>
 
 #ifdef JITIFY
 #include <jitify_helper.h>
