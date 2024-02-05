@@ -142,7 +142,8 @@ namespace quda
       )) {
         // if we go over the boundary and have a shifted boundary condition,
         // we shift Nx/2 ranks in x-direction:
-        // shift_integer in {-1, 0, 1}
+        // shift_integer       in { 0, 1, 2}
+        // (shift_integer - 1) in {-1, 0, 1}
         shift_integer = (comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i]) / comm_dims(topo)[i];
         Nx_displacement += (shift_integer - 1) * (comm_dims(topo)[0]/2);
       }
@@ -406,6 +407,12 @@ namespace quda
     {
       Topology *topo = comm_default_topology();
       return comm_dims(topo)[dim];
+    }
+
+    bool comm_dim_cstar(int dim)
+    {
+      Topology *topo = comm_default_topology();
+      return (topo->cstar >= 2 && dim == 1) || (topo->cstar >= 3 && dim == 2);
     }
 
     int comm_coord(int dim)

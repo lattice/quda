@@ -506,7 +506,11 @@ static QudaInvertParam newOpenQCDParam(void)
    */
   param.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
 
-  /* Gamma basis of the input and output host fields */
+  /**
+   * Gamma basis of the input and output host fields. Specifies the basis change
+   * into QUDAs internal gamma basis. Note that QUDA applies the basis change U
+   * to a spinor field when uploading and U^dagger when downloading.
+   */
   param.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
 
   return param;

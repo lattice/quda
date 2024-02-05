@@ -62,6 +62,8 @@ namespace quda
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
+  bool comm_dim_cstar(int dim) { return get_current_communicator().comm_dim_cstar(dim); }
+
   int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
 
   int comm_rank_from_coords(const int *coords) { return get_current_communicator().comm_rank_from_coords(coords); }
