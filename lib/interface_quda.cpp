@@ -3137,8 +3137,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Deal with clover field. For Multi source computatons, clover field construction is done
     // exclusively on the GPU.
-    quda::CloverField *input_clover = nullptr;
-    quda::CloverField *collected_clover = nullptr;
+    quda::CloverField collected_clover;
     bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
       || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
 
@@ -3163,13 +3162,13 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         // routines uses that value
         param->clover_coeff = (param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff);
 
-        input_clover = new CloverField(clover_param);
+        CloverField input_clover(clover_param);
 
         for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
         clover_param.create = QUDA_NULL_FIELD_CREATE;
-        collected_clover = new CloverField(clover_param);
+        collected_clover = CloverField(clover_param);
 
-        quda::split_field(*collected_clover, {*input_clover}, split_key); // Clover uses 4d even-odd preconditioning.
+        quda::split_field(collected_clover, {input_clover}, split_key); // Clover uses 4d even-odd preconditioning.
       }
     }
 
@@ -3233,8 +3232,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading clover field...\n");
-      if (collected_clover) {
-        loadCloverQuda(collected_clover->data(false), collected_clover->data(true), param);
+      if (!collected_clover.empty()) {
+        loadCloverQuda(collected_clover.data(false), collected_clover.data(true), param);
       } else {
         loadCloverQuda(nullptr, nullptr, param);
       }
@@ -3260,9 +3259,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       auto last = _h_x.begin() + (n + 1) * num_sub_partition;
       join_field({first, last}, _collect_x[n], split_key, pc_type);
     }
-
-    if (input_clover) { delete input_clover; }
-    if (collected_clover) { delete collected_clover; }
 
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
