@@ -365,8 +365,9 @@ double openQCD_qudaPlaquette(void);
  *
  * @param[in]  gauge  The gauge fields (in openqcd order)
  * @param[in]  prec   Precision of the incoming gauge field
+ * @param[in]  rec    How the field should be stored internally in QUDA
  */
-void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
+void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec);
 
 
 /**
@@ -374,8 +375,9 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
  *
  * @param[out] gauge  The gauge fields (will be stored in openqcd order)
  * @param[in]  prec   Precision of the outgoing gauge field
+ * @param[in]  rec    How the field should be stored internally in QUDA
  */
-void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec);
+void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec);
 
 
 /**

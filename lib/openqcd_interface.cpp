@@ -517,10 +517,11 @@ static QudaInvertParam newOpenQCDParam(void)
  * @brief      Initialize quda gauge param struct
  *
  * @param[in]  prec  precision
+ * @param[in]  rec   QUDA internal gauge field format
  *
  * @return     The quda gauge parameter struct.
  */
-static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
+static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructType rec = QUDA_RECONSTRUCT_NO)
 {
   QudaGaugeParam param = newQudaGaugeParam();
 
@@ -528,13 +529,13 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
   param.cuda_prec_sloppy = param.cpu_prec = param.cuda_prec = prec;
   param.type = QUDA_SU3_LINKS;
 
-  param.reconstruct_sloppy = param.reconstruct = QUDA_RECONSTRUCT_NO;
+  param.reconstruct_sloppy = param.reconstruct = rec;
 
-  /* This make quda to instantiate OpenQCDOrder */
+  /* This makes quda to instantiate OpenQCDOrder */
   param.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
 
-  /* Seems to have no effect ... */
-  param.t_boundary = QUDA_PERIODIC_T;
+  /* Seems to have only effect if reconstruct != QUDA_RECONSTRUCT_NO ... */
+  param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
@@ -579,17 +580,17 @@ double openQCD_qudaPlaquette(void)
 }
 
 
-void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec)
+void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(prec);
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec);
   loadGaugeQuda(gauge, &param);
   qudaState.gauge_loaded = true;
 }
 
 
-void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec)
+void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(prec);
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec);
 
   void* buffer = pool_pinned_malloc((4*qudaState.init.volume + 7*qudaState.init.bndry/4)*18*prec);
   saveGaugeQuda(buffer, &param);
@@ -1185,13 +1186,15 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
     void *h_gauge = qudaState.layout.h_gauge();
     PUSH_RANGE("openQCD_qudaGaugeLoad",3);
-    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION);
+    QudaReconstructType rec = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
+    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION, rec);
     POP_RANGE;
   }
 
-  if (qudaState.layout.dirac_parms().su3csw != 0.0) {
+  if (param->clover_csw != 0.0) {
     if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
       /**
+       * SU3 case:
        * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
        * the GPU and finally calls @createCloverQuda to calculate the clover
        * field.
@@ -1202,7 +1205,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       POP_RANGE;
     } else {
       /**
-       * Transfer the SW-field from openQCD.
+       * U3 case: Transfer the SW-field from openQCD.
        */
       logQuda(QUDA_VERBOSE, "Loading clover field from openQCD ...\n");
       void *h_sw = qudaState.layout.h_sw();
