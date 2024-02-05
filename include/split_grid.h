@@ -71,9 +71,8 @@ namespace quda
     }
 
     using param_type = typename Field::param_type;
-
     param_type param(meta);
-    Field *buffer_field = Field::Create(param);
+    Field buffer_field(param);
 
     CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
@@ -87,7 +86,7 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      size_t bytes = buffer_field->TotalBytes();
+      size_t bytes = buffer_field.TotalBytes();
 
       void *recv_buffer_h = pinned_malloc(bytes);
 
@@ -96,17 +95,15 @@ namespace quda
       comm_start(mh_recv);
       comm_wait(mh_recv);
 
-      buffer_field->copy_from_buffer(recv_buffer_h);
+      buffer_field.copy_from_buffer(recv_buffer_h);
 
       comm_free(mh_recv);
       host_free(recv_buffer_h);
 
       auto offset = partition_idx * field_dim;
 
-      quda::copyFieldOffset(collect_field, *buffer_field, offset, pc_type);
+      quda::copyFieldOffset(collect_field, buffer_field, offset, pc_type);
     }
-
-    delete buffer_field;
 
     comm_barrier();
 
@@ -144,7 +141,7 @@ namespace quda
     using param_type = typename Field::param_type;
 
     param_type param(meta);
-    Field *buffer_field = Field::Create(param);
+    Field buffer_field(param);
 
     CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
@@ -160,10 +157,10 @@ namespace quda
       size_t bytes = meta.TotalBytes();
 
       auto offset = partition_idx * field_dim;
-      quda::copyFieldOffset(*buffer_field, collect_field, offset, pc_type);
+      quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
-      buffer_field->copy_to_buffer(v_send_buffer_h[i]);
+      buffer_field.copy_to_buffer(v_send_buffer_h[i]);
 
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
 
@@ -181,7 +178,7 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      size_t bytes = buffer_field->TotalBytes();
+      size_t bytes = buffer_field.TotalBytes();
 
       void *recv_buffer_h = pinned_malloc(bytes);
 
@@ -195,8 +192,6 @@ namespace quda
       comm_free(mh_recv);
       host_free(recv_buffer_h);
     }
-
-    delete buffer_field;
 
     comm_barrier();
 
