@@ -35,7 +35,7 @@ namespace quda {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       ColorSpinorParam csParam(x);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
       r = ColorSpinorField(csParam);
       y = ColorSpinorField(csParam);
 
@@ -209,11 +209,6 @@ namespace quda {
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
     if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
-
-    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
-      errorQuda("Not supported");
-    if (checkPrecision(x, b) != param.precision)
-      errorQuda("Precision mismatch: expected=%d, received=%d", param.precision, x.Precision());
 
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -955,8 +950,6 @@ namespace quda {
 
   void CG::blocksolve(ColorSpinorField &x, ColorSpinorField &b)
   {
-    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");
-
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     using Eigen::MatrixXcd;
@@ -1279,8 +1272,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   printfQuda("BCQ Solver\n");
   #endif
   const bool use_block = true;
-  if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
-  errorQuda("Not supported");
 
   getProfile().TPSTART(QUDA_PROFILE_INIT);
 

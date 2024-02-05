@@ -339,8 +339,6 @@ namespace quda {
 
     int k=0;
 
-    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
-
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source

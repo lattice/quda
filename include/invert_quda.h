@@ -835,15 +835,32 @@ namespace quda {
   {
 
   private:
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
+    ColorSpinorField y;
+    ColorSpinorField r;
+    ColorSpinorField tmp;
+    ColorSpinorField ArS;
+    ColorSpinorField rS;
+    ColorSpinorField xS;
+    ColorSpinorField xS_old;
+    ColorSpinorField rS_old;
     bool init = false;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
-    virtual ~CG3();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
@@ -1417,15 +1434,26 @@ namespace quda {
   // Steepest descent solver used as a preconditioner
   class SD : public Solver {
   private:
-    ColorSpinorField *Ar;
-    ColorSpinorField *r;
+    ColorSpinorField Ar;
+    ColorSpinorField r;
     bool init = false;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     SD(const DiracMatrix &mat, SolverParam &param);
-    virtual ~SD();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+
+    /**
+       @return Return the residual from the prior solve
+     */
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** SD is for any linear system */
 
