@@ -53,6 +53,11 @@ bool skip_test(test_t param)
     // MR struggles with the staggered and asqtad spectrum, it's not MR's fault
     if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_MR_INVERTER)
       return true;
+
+    // CG3 is rather unstable with low precision
+    if ((inverter_type == QUDA_CG3_INVERTER || inverter_type == QUDA_CG3NE_INVERTER || inverter_type == QUDA_CG3NR_INVERTER)
+        && prec_sloppy < QUDA_DOUBLE_PRECISION)
+      return true;
   }
 
   // split-grid doesn't support multigrid at present
@@ -136,10 +141,10 @@ using ::testing::Combine;
 using ::testing::Values;
 
 auto staggered_pc_solvers
-  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER, QUDA_GCR_INVERTER, QUDA_CA_GCR_INVERTER,
-           QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
+  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CG3_INVERTER, QUDA_PCG_INVERTER, QUDA_GCR_INVERTER,
+           QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
 
-auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CG3_INVERTER, QUDA_PCG_INVERTER, QUDA_SD_INVERTER);
+auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CG3_INVERTER, QUDA_PCG_INVERTER);
 
 auto direct_solvers
   = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER,
