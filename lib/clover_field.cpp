@@ -181,8 +181,8 @@ namespace quda {
     compressed_block = std::exchange(src.compressed_block, 0);
     nColor = std::exchange(src.nColor, 0);
     nSpin = std::exchange(src.nSpin, 0);
-    clover = std::exchange(src.clover, {});
-    cloverInv = std::exchange(src.cloverInv, {});
+    clover.exchange(src.clover, {});
+    cloverInv.exchange(src.cloverInv, {});
     inverse = std::exchange(src.inverse, false);
     diagonal = std::exchange(src.diagonal, 0.0);
     max = std::exchange(src.max, {});
