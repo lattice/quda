@@ -129,8 +129,7 @@ namespace quda
      @param[in] alpha3 smearing parameter
      @param[in] dir_ignore ignored direction
   */
-  void HYPStep(GaugeField &dataDs, GaugeField &dataOr, double alpha1, double alpha2,
-               double alpha3, int dir_ignore);
+  void HYPStep(GaugeField &dataDs, GaugeField &dataOr, double alpha1, double alpha2, double alpha3, int dir_ignore);
 
   /**
      @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field.

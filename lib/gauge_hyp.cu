@@ -10,7 +10,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeHYP : TunableKernel3D
   {
     GaugeField &out;
-    GaugeField* tmp[4];
+    GaugeField *tmp[4];
     const GaugeField &in;
     const Float alpha;
     const int level;
@@ -21,7 +21,7 @@ namespace quda
 
   public:
     // (2,3): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeHYP(GaugeField &out, GaugeField* tmp[4], const GaugeField &in, double alpha, int level, int dir_ignore) :
+    GaugeHYP(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int level, int dir_ignore) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       tmp {tmp[0], tmp[1], tmp[2], tmp[3]},
@@ -98,8 +98,7 @@ namespace quda
 
   }; // GaugeAPE
 
-  void HYPStep(GaugeField &out, GaugeField &in, double alpha1, double alpha2, double alpha3,
-               int dir_ignore)
+  void HYPStep(GaugeField &out, GaugeField &in, double alpha1, double alpha2, double alpha3, int dir_ignore)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
@@ -108,12 +107,12 @@ namespace quda
     GaugeFieldParam gParam(out);
     gParam.location = QUDA_CUDA_FIELD_LOCATION;
     const int smearDim = (dir_ignore >= 0 && dir_ignore <= 3) ? 3 : 4;
-    //GaugeField tmp[4];
+    // GaugeField tmp[4];
     gParam.geometry = QUDA_TENSOR_GEOMETRY;
     GaugeFieldParam gParam2(gParam);
     gParam2.create = QUDA_REFERENCE_FIELD_CREATE;
 
-    GaugeField* tmp[4];
+    GaugeField *tmp[4];
     if (smearDim == 3) {
       tmp[0] = new GaugeField(gParam);
       // aux[1], aux[2] and aux[3] will not be used for smearDim == 3
@@ -148,7 +147,6 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     for (int i = 0; i < 4; i++) delete tmp[i];
-
   }
 
 } // namespace quda
