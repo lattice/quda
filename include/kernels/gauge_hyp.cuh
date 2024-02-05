@@ -188,8 +188,6 @@ namespace quda
   __host__ __device__ inline void computeStapleLevel3(const Arg &arg, int x[], thread_array<int, 4> &dx, int parity,
                                                       int mu, Matrix<complex<typename Arg::Float>, Arg::nColor> &staple)
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
-
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and
