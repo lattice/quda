@@ -272,6 +272,12 @@ namespace quda {
     CloverField &operator=(CloverField &&field);
 
     /**
+       @brief Returns if the object is empty (not initialized)
+       @return true if the object has not been allocated, otherwise false
+    */
+    bool empty() const { return !init; }
+
+    /**
        @brief Field creation using the meta data provided in the param
        struct
        @param[in] param Contains the metadata for creating the field

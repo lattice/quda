@@ -14,7 +14,7 @@ namespace quda {
 
   CloverFieldParam::CloverFieldParam(const CloverField &a) :
     LatticeFieldParam(a),
-    reconstruct(clover::reconstruct()),
+    reconstruct(a.Reconstruct()),
     inverse(a.Inverse()),
     csw(a.Csw()),
     coeff(a.Coeff()),
