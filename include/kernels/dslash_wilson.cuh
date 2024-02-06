@@ -67,7 +67,7 @@ namespace quda
     const int nt;
 
     WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0,
-              int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+                      int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor_, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       alpha0(alpha0),
       t0(t0),
@@ -105,8 +105,12 @@ namespace quda
       const int t = arg.t + coord[3];
 #pragma unroll
       for (int d = 0; d < 4; d++) {
-        coeff_fwd[d] = (d < 3) ? 1.0 : distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
-        coeff_bwd[d] = (d < 3) ? 1.0 : distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+        coeff_fwd[d] = (d < 3) ?
+          1.0 :
+          distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+        coeff_bwd[d] = (d < 3) ?
+          1.0 :
+          distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
       }
     }
 

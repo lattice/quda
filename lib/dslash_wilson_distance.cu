@@ -22,9 +22,7 @@ namespace quda
   public:
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      if(in.Ndim() == 5) {
-        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
-      }
+      if (in.Ndim() == 5) { TunableKernel3D::resizeVector(in.X(4), arg.nParity); }
     }
 
     void apply(const qudaStream_t &stream)
@@ -42,8 +40,7 @@ namespace quda
                                const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, alpha, t0, x, parity, dagger,
-                                                        comm_override);
+      WilsonDistanceArg<Float, nColor, nDim, recon> arg(out, in, U, a, alpha, t0, x, parity, dagger, comm_override);
       Wilson<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -55,8 +52,8 @@ namespace quda
                            double alpha, int t0, const ColorSpinorField &x, int parity, bool dagger,
                            const int *comm_override, TimeProfile &profile)
   {
-    instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, alpha, t0, x, parity, dagger,
-                                                        comm_override, profile);
+    instantiate<WilsonDistanceApply, WilsonReconstruct>(out, in, U, a, alpha, t0, x, parity, dagger, comm_override,
+                                                        profile);
   }
 #else
   void ApplyWilsonDistance(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double, int,

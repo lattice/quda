@@ -45,8 +45,9 @@ namespace quda
     const real a; /** xpay scale factor */
     const real b; /** chiral twist factor (twisted-clover only) */
 
-    WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, double b, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                            const CloverField &A, double a, double b, double alpha0, int t0, const ColorSpinorField &x,
+                            int parity, bool dagger, const int *comm_override) :
       WilsonDistanceArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, alpha0, t0, x, parity, dagger, comm_override),
       A(A, false),
       a(a),

@@ -160,8 +160,9 @@ namespace quda
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
-  void ApplyWilsonCloverDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-      double kappa, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+  void ApplyWilsonCloverDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                 const CloverField &A, double kappa, double alpha0, int t0, const ColorSpinorField &x,
+                                 int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
        @brief Driver for applying the Wilson-clover stencil
@@ -271,8 +272,9 @@ namespace quda
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &A, double kappa, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-      TimeProfile &profile);
+                                               const CloverField &A, double kappa, double alpha0, int t0,
+                                               const ColorSpinorField &x, int parity, bool dagger,
+                                               const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the twisted-mass stencil

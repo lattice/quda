@@ -3,10 +3,11 @@
 #include <kernels/spinor_reweight.cuh>
 #include <instantiate.h>
 
-namespace quda {
+namespace quda
+{
 
-  template <typename Float, int Ns, int Nc>
-  class SpinorDistanceReweight : TunableKernel2D {
+  template <typename Float, int Ns, int Nc> class SpinorDistanceReweight : TunableKernel2D
+  {
     ColorSpinorField &v;
     Float alpha0;
     int t0;
@@ -14,27 +15,24 @@ namespace quda {
 
   public:
     SpinorDistanceReweight(ColorSpinorField &v, double alpha0, int t0) :
-      TunableKernel2D(v, v.SiteSubset()),
-      v(v),
-      alpha0(alpha0),
-      t0(t0)
+      TunableKernel2D(v, v.SiteSubset()), v(v), alpha0(alpha0), t0(t0)
     {
       strcat(aux, ",cosh");
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<DistanceReweightSpinor>(tp, stream, SpinorDistanceReweightArg<Float, Ns, Nc>(v, alpha0, t0));
     }
 
     long long bytes() const { return 2 * v.Bytes(); }
     void preTune() { v.backup(); }
-    void postTune(){ v.restore(); }
+    void postTune() { v.restore(); }
   };
 
-  template <typename Float>
-  void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0)
+  template <typename Float> void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0)
   {
     if (src.Ncolor() == 3) {
       if (src.Nspin() == 4) {

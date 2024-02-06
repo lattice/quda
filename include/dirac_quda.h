@@ -66,7 +66,7 @@ namespace quda {
                     // applied like a twisted mass and ignored in the inverse)
 
     double distance_pc_alpha0; // used by distance preconditioning
-    double distance_pc_t0; // used by distance preconditioning
+    double distance_pc_t0;     // used by distance preconditioning
 
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
