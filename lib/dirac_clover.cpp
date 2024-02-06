@@ -78,13 +78,19 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     src = &b;
     sol = &x;
   }
 
-  void DiracClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &, const QudaSolutionType) const
   {
-    // do nothing
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
+    }
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -221,6 +227,10 @@ namespace quda {
 			      ColorSpinorField &x, ColorSpinorField &b, 
 			      const QudaSolutionType solType) const
   {
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
@@ -288,6 +298,10 @@ namespace quda {
       CloverInv(x.Even(), tmp, QUDA_EVEN_PARITY);
     } else {
       errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
+    }
+
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
     }
   }
 

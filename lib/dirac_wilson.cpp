@@ -5,7 +5,7 @@
 
 namespace quda {
 
-  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param), distance_pc_alpha0(0.0), distance_pc_t0(-1) { }
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param), distance_pc_alpha0(param.distance_pc_alpha0), distance_pc_t0(param.distance_pc_t0) { }
 
   DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), distance_pc_alpha0(dirac.distance_pc_alpha0), distance_pc_t0(dirac.distance_pc_t0) { }
 
@@ -75,13 +75,19 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     src = &b;
     sol = &x;
   }
 
-  void DiracWilson::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &, const QudaSolutionType) const
   {
-    // do nothing
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
+    }
   }
 
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -142,6 +148,10 @@ namespace quda {
   void DiracWilsonPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                               const QudaSolutionType solType) const
   {
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
@@ -183,6 +193,10 @@ namespace quda {
       DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
     } else {
       errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+    }
+
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
     }
   }
 

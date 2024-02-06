@@ -29,7 +29,7 @@ namespace quda {
 
 
   template<typename Float>
-  __device__ __host__ inline Float genDistanceWeight(Float alpha0, int t0, int t, int nt) {
+  __device__ __host__ inline Float distanceWeight(Float alpha0, int t0, int t, int nt) {
     if (alpha0 > 0) {
         return cosh(alpha0 * Float((t - t0 + nt) % nt - nt / 2));
     } else {
@@ -48,7 +48,7 @@ namespace quda {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       Vector tmp = arg.v(x_cb, parity);
-      tmp *= genDistanceWeight(arg.alpha0, arg.comms_coord[3] * arg.X[3] + x[3], arg.t0, arg.comms_dim[3] * arg.X[3]);
+      tmp *= distanceWeight(arg.alpha0, arg.comms_coord[3] * arg.X[3] + x[3], arg.t0, arg.comms_dim[3] * arg.X[3]);
       arg.v(x_cb, parity) = tmp;
     }
   };
