@@ -67,6 +67,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
+      (void)tp;
       Kernel1D_host<Functor, Arg>(arg);
     }
 
@@ -233,6 +234,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
+      (void)tp;
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       Kernel2D_host<Functor, Arg>(arg);
     }
@@ -495,6 +497,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
+      (void)tp;
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       Kernel3D_host<Functor, Arg>(arg);

@@ -116,6 +116,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
+      (void)tp;
       if (arg.threads.y != block_size_y)
         errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       std::vector<T> result_(1);
@@ -283,6 +284,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
+      (void)tp;
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
 
