@@ -120,7 +120,6 @@ namespace quda
       for (int i = 1; i < 4; ++i) { tmp[i] = new GaugeField(gParam); }
     }
 
-
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (dir_ignore == 4) {
       copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);

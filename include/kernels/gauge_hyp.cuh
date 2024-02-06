@@ -172,7 +172,7 @@ namespace quda
           const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
 
           Link accum = accumulateStaple(arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity,
-                                        {sigma_with_mu, sigma_with_rho}, {mu, rho});
+                                        int2 {sigma_with_mu, sigma_with_rho}, {mu, rho});
           switch (cnt) {
           case 0: staple[0] = staple[0] + accum; break;
           case 1: staple[1] = staple[1] + accum; break;
@@ -199,8 +199,8 @@ namespace quda
         const int nu_with_mu = mu % 2 * 3 + nu - (nu > mu);
 
         staple = staple
-          + accumulateStaple(arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, dx, parity, {nu_with_mu, mu_with_nu},
-                             {mu, nu});
+          + accumulateStaple(arg, arg.tmp[mu / 2 + 2], arg.tmp[nu / 2 + 2], x, dx, parity,
+                             int2 {nu_with_mu, mu_with_nu}, {mu, nu});
       }
     }
   }
@@ -303,7 +303,7 @@ namespace quda
             const int rho_with_mu = (mu - (mu > dir_ignore)) * 2 + rho - (rho > mu) - (rho > dir_ignore);
 
             staple = staple
-              + accumulateStaple(arg, arg.tmp[0], arg.tmp[0], x, dx, parity, {rho_with_mu, rho_with_nu}, {mu, nu});
+              + accumulateStaple(arg, arg.tmp[0], arg.tmp[0], x, dx, parity, int2 {rho_with_mu, rho_with_nu}, {mu, nu});
           }
         }
       }
