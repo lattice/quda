@@ -105,7 +105,7 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename T, typename Arg>
-    void launch_host(T &result, const TuneParam &tp, const qudaStream_t &, Arg &arg)
+    void launch_host(T &result, [[maybe_unused]] const TuneParam &tp, const qudaStream_t &, Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
@@ -116,7 +116,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
-      (void)tp;
+      //(void)tp;
       if (arg.threads.y != block_size_y)
         errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       std::vector<T> result_(1);
@@ -273,7 +273,7 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename T, typename Arg>
-    void launch_host(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &, Arg &arg)
+    void launch_host(std::vector<T> &result, [[maybe_unused]] const TuneParam &tp, const qudaStream_t &, Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
@@ -284,7 +284,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
-      (void)tp;
+      //(void)tp;
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
 

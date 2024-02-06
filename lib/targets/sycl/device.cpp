@@ -380,8 +380,8 @@ namespace quda
       //auto caps = myDevice.get_info<sycl::info::device::atomic_memory_scope_capabilities>;
       // work_item, sub_group, work_group, device and system
       //return false;  // used in coarse_op, but not portable yet
-      //return false;
-      return true;
+      return false;
+      //return true;
     }
 
     size_t max_default_shared_memory() {

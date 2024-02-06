@@ -121,7 +121,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool /*active*/ = true)
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool active = true)
     {
       int x_fine_offset = thread.x;
       const int x_coarse = block.x;
@@ -129,6 +129,7 @@ namespace quda {
       const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
 
       vector reduced{0};
+      if (!allthreads || active) {
       while (x_fine_offset < arg.aggregate_size) {
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
@@ -159,6 +160,7 @@ namespace quda {
         }
 
         x_fine_offset += target::block_dim().x;
+      }
       }
 
       reduced = BlockReduce_t(*this, thread.z).Sum(reduced);

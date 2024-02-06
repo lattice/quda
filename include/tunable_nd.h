@@ -56,7 +56,7 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
+    void launch_host([[maybe_unused]] const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
@@ -67,7 +67,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
-      (void)tp;
+      //(void)tp;
       Kernel1D_host<Functor, Arg>(arg);
     }
 
@@ -223,7 +223,7 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
+    void launch_host([[maybe_unused]] const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
@@ -234,7 +234,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
-      (void)tp;
+      //(void)tp;
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       Kernel2D_host<Functor, Arg>(arg);
     }
@@ -485,7 +485,7 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
+    void launch_host([[maybe_unused]] const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
@@ -497,7 +497,7 @@ namespace quda
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
 #endif
-      (void)tp;
+      //(void)tp;
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       Kernel3D_host<Functor, Arg>(arg);
