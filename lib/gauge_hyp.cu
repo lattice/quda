@@ -104,25 +104,22 @@ namespace quda
     checkReconstruct(out, in);
     checkNative(out, in);
 
+    if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
+
     GaugeFieldParam gParam(out);
     gParam.location = QUDA_CUDA_FIELD_LOCATION;
-    const int smearDim = (dir_ignore >= 0 && dir_ignore <= 3) ? 3 : 4;
-    // GaugeField tmp[4];
     gParam.geometry = QUDA_TENSOR_GEOMETRY;
-    GaugeFieldParam gParam2(gParam);
-    gParam2.create = QUDA_REFERENCE_FIELD_CREATE;
 
     GaugeField *tmp[4];
-    if (smearDim == 3) {
+    if (dir_ignore == 4) { // hypDim == 4
+      for (int i = 0; i < 4; ++i) { tmp[i] = new GaugeField(gParam); }
+    } else { // hypDim == 3
       tmp[0] = new GaugeField(gParam);
-      // aux[1], aux[2] and aux[3] will not be used for smearDim == 3
+      // tmp[1], tmp[2] and tmp[3] will not be used for hypDim == 3
       gParam.create = QUDA_REFERENCE_FIELD_CREATE;
       for (int i = 1; i < 4; ++i) { tmp[i] = new GaugeField(gParam); }
-    } else {
-      for (int i = 0; i < 4; ++i) { tmp[i] = new GaugeField(gParam); }
     }
 
-    if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (dir_ignore == 4) {
