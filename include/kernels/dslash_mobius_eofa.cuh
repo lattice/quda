@@ -90,6 +90,8 @@ namespace quda
       }
     };
 
+    template <typename Arg> using eofa_dslash5Ops =
+      KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the D5 operator at given site
       @param[in] arg    Argument struct containing any meta data and accessors
@@ -97,20 +99,25 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5 {
+    template <typename Arg> struct eofa_dslash5 : eofa_dslash5Ops<Arg> {
       const Arg &arg;
-      constexpr eofa_dslash5(const Arg &arg) : arg(arg) {}
+      using typename eofa_dslash5Ops<Arg>::KernelOpsT;
+      template <typename ...Ops>
+      constexpr eofa_dslash5(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-        SharedMemoryCache<Vector> cache;
+        SharedMemoryCache<Vector> cache{*this};
 
         Vector out;
-        cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
+	if (!allthreads || active) {
+	  cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
+	}
         cache.sync();
 
         auto Ls = arg.Ls;
@@ -154,14 +161,20 @@ namespace quda
           }
 
           if (Arg::xpay) { // really axpy
-            Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-            out = arg.a * x + out;
+	    if (!allthreads || active) {
+	      Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+	      out = arg.a * x + out;
+	    }
           }
         }
-        arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+	if (!allthreads || active) {
+	  arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+	}
       }
     };
 
+    template <typename Arg> using eofa_dslash5invOps =
+      KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the M5 inverse operator at a given site on the
       lattice.  This is the original algorithm as described in Kim and
@@ -174,19 +187,24 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5inv {
+    template <typename Arg> struct eofa_dslash5inv : eofa_dslash5invOps<Arg> {
       const Arg &arg;
-      constexpr eofa_dslash5inv(const Arg &arg) : arg(arg) {}
+      using typename eofa_dslash5invOps<Arg>::KernelOpsT;
+      template <typename ...Ops>
+      constexpr eofa_dslash5inv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
         const auto sherman_morrison = arg.sherman_morrison;
-        SharedMemoryCache<Vector> cache;
-        cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
+        SharedMemoryCache<Vector> cache{*this};
+	if (!allthreads || active) {
+	  cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
+	}
         cache.sync();
 
         Vector out;
@@ -213,10 +231,14 @@ namespace quda
           }
         }
         if (Arg::xpay) { // really axpy
-          Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-          out = x + arg.a * out;
+	  if (!allthreads || active) {
+	    Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+	    out = x + arg.a * out;
+	  }
         }
-        arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+	if (!allthreads || active) {
+	  arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+	}
       }
     };
 

@@ -35,6 +35,15 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeTp) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+      }
+#endif
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg);
     }
 
@@ -47,8 +56,18 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
+    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeTp) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+      }
+#endif
+      (void)tp;
       Kernel1D_host<Functor, Arg>(arg);
     }
 
@@ -182,6 +201,15 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeTp) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+      }
+#endif
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg);
     }
@@ -195,8 +223,18 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
+    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeTp) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+      }
+#endif
+      (void)tp;
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       Kernel2D_host<Functor, Arg>(arg);
     }
@@ -423,6 +461,16 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeTp) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+      }
+#endif
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg);
@@ -437,8 +485,19 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
+    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeTp) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+      }
+#endif
+      (void)tp;
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       Kernel3D_host<Functor, Arg>(arg);

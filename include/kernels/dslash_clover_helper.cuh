@@ -172,21 +172,27 @@ namespace quda {
       arg.out(x_cb, spinor_parity) = out;
     }
   };
-  
+
+  template <typename Arg> using NdegTwistCloverApplyOps =
+    KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
+
   // if (!inverse) apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1) to the input spinor
   // else apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor
   // noting that appropriate signs are carried by a and b depending on inverse
-  template <typename Arg> struct NdegTwistCloverApply {
+  template <typename Arg> struct NdegTwistCloverApply : NdegTwistCloverApplyOps<Arg> {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
     const Arg &arg;
-    constexpr NdegTwistCloverApply(const Arg &arg) : arg(arg) {}
+    using typename NdegTwistCloverApplyOps<Arg>::KernelOpsT;
+    template <typename ...Ops>
+    constexpr NdegTwistCloverApply(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int flavor, int parity)
+    template <bool allthreads = false>
+    __device__ __host__ inline void operator()(int x_cb, int flavor, int parity, bool active = true)
     {
       using namespace linalg; // for Cholesky
       const int clover_parity = arg.nParity == 2 ? parity : arg.parity;
@@ -203,7 +209,7 @@ namespace quda {
 
       Mat A = arg.clover(x_cb, clover_parity, chirality);
 
-      SharedMemoryCache<half_fermion> cache;
+      SharedMemoryCache<half_fermion> cache{*this};
 
       half_fermion in_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
@@ -215,11 +221,15 @@ namespace quda {
       };
 
       auto swizzle = [&](half_fermion x[2], int chirality, swizzle_direction dir) {
-        if (chirality == 0) cache.save_y(x[1], dir);
-        else                cache.save_y(x[0], 1 - dir);
+	if (!allthreads || active) {
+	  if (chirality == 0) cache.save_y(x[1], dir);
+	  else                cache.save_y(x[0], 1 - dir);
+	}
         cache.sync();
-        if (chirality == 0) x[1] = cache.load_y(1 - dir);
-        else                x[0] = cache.load_y(dir);
+	if (!allthreads || active) {
+	  if (chirality == 0) x[1] = cache.load_y(1 - dir);
+	  else                x[0] = cache.load_y(dir);
+	}
       };
 
       swizzle(in_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads

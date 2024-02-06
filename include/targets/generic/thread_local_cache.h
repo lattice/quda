@@ -64,12 +64,22 @@ namespace quda
     /**
        @brief Constructor for ThreadLocalCache.
     */
-    constexpr ThreadLocalCache() : stride(target::block_size<3>())
-    {
-      // sanity check
-      static_assert(shared_mem_size(dim3 {32, 16, 8})
-                    == Smem::get_offset(dim3 {32, 16, 8}) + SizePerThread<len>::size(dim3 {32, 16, 8}) * sizeof(T));
+#if 0
+    constexpr ThreadLocalCache() : stride(target::block_size<3>()) {
+      static_assert(shared_mem_size(dim3{32,16,8})==Smem::get_offset(dim3{32,16,8})+SizePerThread<len>::size(dim3{32,16,8})*sizeof(T));
     }
+#endif
+
+    template <typename ...U>
+    constexpr ThreadLocalCache(const KernelOps<U...> &ops) : Smem(ops), stride(target::block_size<3>())
+    {
+      //checkKernelOp<ThreadLocalCache<T,N,O>,U...>();
+      checkKernelOps<ThreadLocalCache<T,N,O>>(ops);
+      static_assert(shared_mem_size(dim3{32,16,8})==
+		    Smem::get_offset(dim3{32,16,8})+SizePerThread<len>::size(dim3{32,16,8})*sizeof(T));
+    }
+
+    constexpr ThreadLocalCache(const ThreadLocalCache<T,N,O> &) = delete;
 
     /**
        @brief Save the value into the thread local cache.  Used when N==0 so cache acts like single object.

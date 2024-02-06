@@ -46,14 +46,15 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct STOUT
+  template <typename Arg> struct STOUT : computeStapleOps
   {
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
 
     const Arg &arg;
-    constexpr STOUT(const Arg &arg) : arg(arg) {}
+    template <typename ...OpsArgs>
+    constexpr STOUT(const Arg &arg, const OpsArgs &...ops) : computeStapleOps(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -71,7 +72,7 @@ namespace quda
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
+      computeStaple(*this, x, X, parity, dir, Stap, Arg::stoutDim);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -112,14 +113,26 @@ namespace quda
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-  template <typename Arg> struct OvrImpSTOUT
-  {
+  template <typename Arg> struct OvrImpSTOUTOps {
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
+    using StapCacheT = ThreadLocalCache<Link,0,computeStapleRectangleOps>;  // offset by computeStapleRectangleOps
+    using RectCacheT = ThreadLocalCache<Link,0,StapCacheT>;  // offset by StapCacheT
+    using Ops = combineOps<computeStapleRectangleOps,KernelOps<StapCacheT,RectCacheT>>;
+  };
+
+  template <typename Arg_> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg_>::Ops
+  {
+    using Arg = Arg_;
+    using real = typename Arg::Float;
+    using Complex = complex<real>;
+    using Link = Matrix<complex<real>, Arg::nColor>;
+    using typename OvrImpSTOUTOps<Arg_>::Ops::KernelOpsT;
 
     const Arg &arg;
-    constexpr OvrImpSTOUT(const Arg &arg) : arg(arg) {}
+    template <typename ...OpsArgs>
+    constexpr OvrImpSTOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -135,13 +148,13 @@ namespace quda
       }
 
       Link U, Q;
-      ThreadLocalCache<Link, 0, computeStapleRectangleOps> Stap;
-      ThreadLocalCache<Link, 0, decltype(Stap)> Rect; // offset by Stap type to ensure non-overlapping allocations
+      typename OvrImpSTOUTOps<Arg>::StapCacheT Stap{*this};
+      typename OvrImpSTOUTOps<Arg>::RectCacheT Rect{*this};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
+      computeStapleRectangle(*this, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);

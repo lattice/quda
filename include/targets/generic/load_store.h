@@ -6,6 +6,12 @@ namespace quda
 {
 
   /**
+     @brief Element type used for coalesced storage.
+   */
+  template <typename T>
+  using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
+
+  /**
      @brief Non-specialized load operation
   */
   template <bool is_device> struct vector_load_impl {

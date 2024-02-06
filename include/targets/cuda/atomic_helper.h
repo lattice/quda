@@ -78,6 +78,12 @@ namespace quda
     atomic_fetch_add(reinterpret_cast<int *>(addr) + 3, val.w);
   }
 
+  template <typename T>
+  __device__ __host__ inline void atomic_add_local(T *addr, T val)
+  {
+    atomic_fetch_add(addr, val);
+  }
+
   template <bool is_device> struct atomic_fetch_abs_max_impl {
     template <typename T> inline void operator()(T *addr, T val)
     {
