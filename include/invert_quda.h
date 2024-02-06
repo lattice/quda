@@ -1591,10 +1591,6 @@ public:
      solution as a linear combination of a given number of previous
      solutions.  Following Brower et al, only the orthogonalised vector
      basis is stored to conserve memory.
-
-     If Eigen support is enabled then Eigen's SVD algorithm is used
-     for solving the linear system, else Gaussian elimination with
-     partial pivots is used.
   */
   class MinResExt {
 
@@ -1633,6 +1629,17 @@ public:
     void operator()(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p,
                     std::vector<ColorSpinorField> &q);
   };
+
+  /**
+     @brief Driver for using MinResExt from the context of molecular dynamics
+     @param[out] x Construct solution prediction
+     @param[in] b Source against which we are solving
+     @param[in,out] basis Basis vectors (orthogonalized during the process)
+     @param[in] m Linear operator we are solving against
+     @param[in] hermitian Whether the operator is Hermitian or not
+   */
+  void chronoExtrapolate(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &basis,
+                         DiracMatrix &m, bool hermitian);
 
   using ColorSpinorFieldSet = ColorSpinorField;
 

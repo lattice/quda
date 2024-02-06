@@ -2583,7 +2583,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
     size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.Precision());
     printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)", byte_estimate, ritzVolume, ritzParam.Precision());
-    if(ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
+    if (ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
     else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED)
       printfQuda("Using mapped memory type.\n");
   }
@@ -2717,16 +2717,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
-    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(x));
-    }
-  } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Source: %g\n", nb);
-    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(x)); }
-  }
+  logQuda(QUDA_VERBOSE, "Source: %g\n", nb);
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) logQuda(QUDA_VERBOSE, "Initial guess: %g\n", blas::norm2(x));
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
@@ -2762,26 +2754,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // taken care of by Dirac::prepare() and Dirac::reconstruct(),
   // respectively.
 
-  if (pc_solution && !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
-
-  if (!mat_solution && !pc_solution && pc_solve) {
-    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
-  }
-
-  if (!mat_solution && norm_error_solve) {
-    errorQuda("Normal-error solve requires Mat solution");
-  }
-
-  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
-    errorQuda("Multigrid preconditioning only supported for direct solves");
-  }
-
-  if (param->chrono_use_resident && ( norm_error_solve) ){
-    errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
-  }
-
   profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
@@ -2800,31 +2772,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
     SolverParam solverParam(*param);
+
     // chronological forecasting
     if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
-      profileInvert.TPSTART(QUDA_PROFILE_CHRONO);
-
-      auto &basis = chronoResident[param->chrono_index];
-
-      ColorSpinorParam cs_param(basis[0]);
-      std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
-
-      if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j]);
-      } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j]);
-      } else {
-        errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
-                  param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
-      }
-
-      bool orthogonal = true;
-      bool apply_mat = false;
       bool hermitian = false;
-      MinResExt mre(m, orthogonal, apply_mat, hermitian);
-      mre(*out, *in, basis, Ap);
-
-      profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
+      auto &mChrono = param->chrono_precision == param->cuda_prec ? m : mSloppy;
+      chronoExtrapolate(*out, *in, chronoResident[param->chrono_index], mChrono, hermitian);
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
@@ -2837,29 +2790,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     // chronological forecasting
     if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
-      profileInvert.TPSTART(QUDA_PROFILE_CHRONO);
-
-      auto &basis = chronoResident[param->chrono_index];
-
-      ColorSpinorParam cs_param(basis[0]);
-      std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
-
-      if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j]);
-      } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j]);
-      } else {
-        errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
-                  param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
-      }
-
-      bool orthogonal = true;
-      bool apply_mat = false;
       bool hermitian = true;
-      MinResExt mre(m, orthogonal, apply_mat, hermitian);
-      mre(*out, *in, basis, Ap);
-
-      profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
+      auto &mChrono = param->chrono_precision == param->cuda_prec ? m : mSloppy;
+      chronoExtrapolate(*out, *in, chronoResident[param->chrono_index], mChrono, hermitian);
     }
 
     // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
@@ -2890,10 +2823,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
-    if(param->chrono_max_dim < 1){
-      errorQuda("Cannot chrono_make_resident with chrono_max_dim %i", param->chrono_max_dim);
-    }
-
     const int i = param->chrono_index;
     if (i >= QUDA_MAX_CHRONO)
       errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
@@ -2923,11 +2852,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     // rescale the solution
     blas::ax(sqrt(nb), x);
   }
-  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
-
-  if (!param->make_resident_solution) h_x = x;
-
-  profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   if (param->compute_action) {
     Complex action = blas::cDotProduct(b, x);
@@ -2935,12 +2859,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     param->action[1] = action.imag();
   }
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(x), blas::norm2(h_x));
-  } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Reconstructed solution: %g\n", blas::norm2(x));
-  }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+  if (!param->make_resident_solution) h_x = x;
+
+  logQuda(QUDA_VERBOSE, "Reconstructed solution: %g\n", blas::norm2(x));
 
   if (param->use_resident_solution && !param->make_resident_solution) solutionResident.clear();
 
@@ -3428,13 +3351,13 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
   ColorSpinorField h_b(cpuParam);
 
-  std::vector<std::unique_ptr<ColorSpinorField>> h_x;
+  std::vector<ColorSpinorField> h_x;
   h_x.resize(param->num_offset);
 
   cpuParam.location = param->output_location;
   for(int i=0; i < param->num_offset; i++) {
     cpuParam.v = hp_x[i];
-    h_x[i] = std::make_unique<ColorSpinorField>(cpuParam);
+    h_x[i] = ColorSpinorField(cpuParam);
   }
 
   // Now I need a colorSpinorParam for the device
@@ -3468,12 +3391,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   // Check source norms
   double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
-  } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Source: %g\n", nb);
-  }
+  logQuda(QUDA_VERBOSE, "Source: %g\n", nb);
 
   // rescale the source vector to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { blas::ax(1.0 / sqrt(nb), b); }
@@ -3640,7 +3558,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     logQuda(QUDA_VERBOSE, "Solution %d = %g\n", i, blas::norm2(x[i]));
-    if (!param->make_resident_solution) *h_x[i] = x[i];
+    if (!param->make_resident_solution) h_x[i] = x[i];
   }
 
   profileMulti.TPSTART(QUDA_PROFILE_EPILOGUE);
