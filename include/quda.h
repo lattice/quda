@@ -846,10 +846,15 @@ extern "C" {
                              Wilson/Symanzik flow */
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/
+    double alpha2;                 /**< The coefficient used in HYP smearing step 2*/
+    double alpha3;                 /**< The coefficient used in HYP smearing step 1*/
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
-    QudaBoolean restart; /**< Used to restart the smearing from existing gaugeSmeared */
-    double t0;  /**< Starting flow time for Wilson flow */
+    QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
+    double t0;                     /**< Starting flow time for Wilson flow */
+    int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
+                                        A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
   } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
