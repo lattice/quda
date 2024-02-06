@@ -156,6 +156,15 @@ namespace quda {
       }
     }
 
+#if defined(QUDA_TARGET_SYCL)
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const {
+      using sum_t = double;
+      int mVec = quda::tile_size<nColor, nVec>(tp.block.x);
+      int vsize = 2 * sizeof(sum_t) * mVec;
+      return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
+    }
+#endif
+
 #ifdef SWIZZLE
     bool advanceAux(TuneParam &param) const
     {
