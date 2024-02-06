@@ -20,7 +20,7 @@ namespace quda
     unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
-    // (2,3): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
+    // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
     GaugeHYP(GaugeField &out, GaugeField *tmp[4], const GaugeField &in, double alpha, int level, int dir_ignore) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),

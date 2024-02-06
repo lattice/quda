@@ -133,9 +133,6 @@ namespace quda
     int cnt = 0;
 #pragma unroll
     for (int nu = 0; nu < 4; ++nu) {
-      // Identify directions orthogonal to the link and
-      // ignore the dir_ignore direction (usually the temporal dim
-      // when used with STOUT or APE for measurement smearing)
       if (nu != mu) {
         Link accum = accumulateStaple(arg, arg.in, arg.in, x, dx, parity, {mu, nu}, {mu, nu});
         switch (cnt) {
@@ -158,25 +155,23 @@ namespace quda
     int cnt = 0;
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
-      // Identify directions orthogonal to the link and
-      // ignore the dir_ignore direction (usually the temporal dim
-      // when used with STOUT or APE for measurement smearing)
       if (nu != mu) {
 #pragma unroll
         for (int rho = 0; rho < 4; ++rho) {
-          if (rho == mu || rho == nu) continue;
-          int sigma = 0;
-          while (sigma == mu || sigma == nu || sigma == rho) sigma += 1;
+          if (rho != mu && rho != nu) {
+            int sigma = 0;
+            while (sigma == mu || sigma == nu || sigma == rho) sigma += 1;
 
-          const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
-          const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
+            const int sigma_with_rho = rho % 2 * 3 + sigma - (sigma > rho);
+            const int sigma_with_mu = mu % 2 * 3 + sigma - (sigma > mu);
 
-          Link accum = accumulateStaple(arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity,
-                                        int2 {sigma_with_mu, sigma_with_rho}, {mu, rho});
-          switch (cnt) {
-          case 0: staple[0] = staple[0] + accum; break;
-          case 1: staple[1] = staple[1] + accum; break;
-          case 2: staple[2] = staple[2] + accum; break;
+            Link accum = accumulateStaple(arg, arg.tmp[mu / 2], arg.tmp[rho / 2], x, dx, parity,
+                                          int2 {sigma_with_mu, sigma_with_rho}, {mu, rho});
+            switch (cnt) {
+            case 0: staple[0] = staple[0] + accum; break;
+            case 1: staple[1] = staple[1] + accum; break;
+            case 2: staple[2] = staple[2] + accum; break;
+            }
           }
         }
 
@@ -191,9 +186,6 @@ namespace quda
   {
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
-      // Identify directions orthogonal to the link and
-      // ignore the dir_ignore direction (usually the temporal dim
-      // when used with STOUT or APE for measurement smearing)
       if (nu != mu) {
         const int mu_with_nu = nu % 2 * 3 + mu - (mu > nu);
         const int nu_with_mu = mu % 2 * 3 + nu - (nu > mu);
@@ -269,8 +261,7 @@ namespace quda
 #pragma unroll
     for (int nu = 0; nu < 4; ++nu) {
       // Identify directions orthogonal to the link and
-      // ignore the dir_ignore direction (usually the temporal dim
-      // when used with STOUT or APE for measurement smearing)
+      // ignore the dir_ignore direction (usually the temporal dim)
       if (nu != mu && nu != dir_ignore) {
         Link accum = accumulateStaple(arg, arg.in, arg.in, x, dx, parity, {mu, nu}, {mu, nu});
         switch (cnt) {
@@ -293,8 +284,7 @@ namespace quda
 #pragma unroll
     for (int nu = 0; nu < 4; nu++) {
       // Identify directions orthogonal to the link and
-      // ignore the dir_ignore direction (usually the temporal dim
-      // when used with STOUT or APE for measurement smearing)
+      // ignore the dir_ignore direction (usually the temporal dim)
       if (nu != mu && nu != dir_ignore) {
 #pragma unroll
         for (int rho = 0; rho < 4; ++rho) {
