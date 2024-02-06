@@ -478,8 +478,6 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  loadTuneCache();
-
   device::create_context();
 
   loadTuneCache();
@@ -897,10 +895,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     CloverFieldParam param(*cloverPrecise);
     param.create = QUDA_NULL_FIELD_CREATE;
     param.setPrecision(inv_param->clover_cuda_prec, true);
-    CloverField *tmp = new CloverField(param);
-    tmp->copy(*cloverPrecise);
-    std::swap(tmp, cloverPrecise);
-    delete tmp;
+    CloverField tmp(param);
+    tmp.copy(*cloverPrecise);
+    std::exchange(*cloverPrecise, tmp);
   }
 
   if (in) delete in; // delete object referencing input field
@@ -2278,7 +2275,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     errorQuda("Invalid use_norm_op, dagger, gamma_5 combination");
   }
 
-  // Perfrom the eigensolve
+  // Perform the eigensolve
   if (eig_param->arpack_check) {
     arpack_solve(host_evecs_, evals, *m, eig_param);
   } else {
@@ -2656,10 +2653,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorField *in = nullptr;
   ColorSpinorField *out = nullptr;
 
-  const auto X = cudaGauge->X();
-
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
+  ColorSpinorParam cpuParam(hp_b, *param, cudaGauge->X(), pc_solution, param->input_location);
   ColorSpinorField h_b(cpuParam);
 
   cpuParam.v = hp_x;
