@@ -246,7 +246,7 @@ namespace quda
     even = std::exchange(src.even, nullptr);
     odd = std::exchange(src.odd, nullptr);
     composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
-    components = std::move(src.components);
+    components = std::exchange(src.components, {});
   }
 
   void ColorSpinorField::destroy()

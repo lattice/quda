@@ -135,4 +135,22 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
   }
 
+  void chronoExtrapolate(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &basis,
+                         DiracMatrix &m, bool hermitian)
+  {
+    getProfile().TPSTART(QUDA_PROFILE_CHRONO);
+
+    ColorSpinorParam cs_param(basis[0]);
+    std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
+
+    m(Ap, basis);
+
+    bool orthogonal = true;
+    bool apply_mat = false;
+    MinResExt mre(m, orthogonal, apply_mat, hermitian);
+    mre(x, b, basis, Ap);
+
+    getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
+  }
+
 } // namespace quda

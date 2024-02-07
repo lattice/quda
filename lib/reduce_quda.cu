@@ -240,7 +240,7 @@ namespace quda {
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      auto rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, y, r, r, r);
+      auto rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, true>(0.0, 0.0, 0.0, x, y, r, r, r);
       rtn[2] /= (x.Volume()*comm_size());
       return make_double3(rtn[0], rtn[1], rtn[2]);
     }

@@ -19,44 +19,44 @@ namespace quda
 
   protected:
     const DiracMatrix &mat;
-    QudaEigParam *eig_param;
+    QudaEigParam *eig_param = nullptr;
 
     // Problem parameters
     //------------------
-    int n_ev;         /** Size of initial factorisation */
-    int n_kr;         /** Size of Krylov space after extension */
-    int n_conv;       /** Number of converged eigenvalues requested */
-    int n_ev_deflate; /** Number of converged eigenvalues to use in deflation */
-    double tol;       /** Tolerance on eigenvalues */
-    bool reverse;     /** True if using polynomial acceleration */
-    char spectrum[3]; /** Part of the spectrum to be computed */
+    int n_ev = 0;         /** Size of initial factorisation */
+    int n_kr = 0;         /** Size of Krylov space after extension */
+    int n_conv = 0;       /** Number of converged eigenvalues requested */
+    int n_ev_deflate = 0; /** Number of converged eigenvalues to use in deflation */
+    double tol = 0.0;     /** Tolerance on eigenvalues */
+    bool reverse = false; /** True if using polynomial acceleration */
+    std::string spectrum; /** Part of the spectrum to be computed */
     bool compute_svd; /** Compute the SVD if requested **/
 
     // Algorithm variables
     //--------------------
-    bool converged;
-    int restart_iter;
-    int max_restarts;
-    int max_ortho_attempts;
-    int check_interval;
-    int batched_rotate;
-    int block_size;
-    int ortho_block_size;
-    int iter;
-    int iter_converged;
-    int iter_locked;
-    int iter_keep;
-    int num_converged;
-    int num_locked;
-    int num_keep;
+    bool converged = false;
+    int restart_iter = 0;
+    int max_restarts = 0;
+    int max_ortho_attempts = 0;
+    int check_interval = 0;
+    int batched_rotate = 0;
+    int block_size = 0;
+    int ortho_block_size = 0;
+    int iter = 0;
+    int iter_converged = 0;
+    int iter_locked = 0;
+    int iter_keep = 0;
+    int num_converged = 0;
+    int num_locked = 0;
+    int num_keep = 0;
 
-    std::vector<double> residua;
+    std::vector<double> residua = {};
 
     // Device side vector workspace
-    std::vector<ColorSpinorField> r;
-    std::vector<ColorSpinorField> d_vecs_tmp;
+    std::vector<ColorSpinorField> r = {};
+    std::vector<ColorSpinorField> d_vecs_tmp = {};
 
-    QudaPrecision save_prec;
+    QudaPrecision save_prec = QUDA_INVALID_PRECISION;
 
   public:
     /**
@@ -345,6 +345,13 @@ namespace quda
   */
   class TRLM : public EigenSolver
   {
+  protected:
+    // Variable size matrix
+    std::vector<double> ritz_mat = {};
+
+    // Tridiagonal/Arrow matrix, fixed size.
+    std::vector<double> alpha = {};
+    std::vector<double> beta = {};
 
   public:
     /**
@@ -358,13 +365,6 @@ namespace quda
        @return Whether the solver is only for Hermitian systems
     */
     virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
-
-    // Variable size matrix
-    std::vector<double> ritz_mat;
-
-    // Tridiagonal/Arrow matrix, fixed size.
-    std::vector<double> alpha;
-    std::vector<double> beta;
 
     /**
        @brief Compute eigenpairs
@@ -404,6 +404,19 @@ namespace quda
   */
   class BLKTRLM : public TRLM
   {
+    // Variable size matrix
+    std::vector<Complex> block_ritz_mat = {};
+
+    /** Block Tridiagonal/Arrow matrix, fixed size. */
+    std::vector<Complex> block_alpha = {};
+    std::vector<Complex> block_beta = {};
+
+    /** Temp storage used in blockLanczosStep, fixed size. */
+    std::vector<Complex> jth_block = {};
+
+    /** Size of blocks of data in alpha/beta */
+    int block_data_length = 0;
+
   public:
     /**
        @brief Constructor for Thick Restarted Eigensolver class
@@ -413,19 +426,6 @@ namespace quda
     BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param);
 
     virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
-
-    // Variable size matrix
-    std::vector<Complex> block_ritz_mat;
-
-    /** Block Tridiagonal/Arrow matrix, fixed size. */
-    std::vector<Complex> block_alpha;
-    std::vector<Complex> block_beta;
-
-    /** Temp storage used in blockLanczosStep, fixed size. */
-    std::vector<Complex> jth_block;
-
-    /** Size of blocks of data in alpha/beta */
-    int block_data_length;
 
     /**
        @brief Compute eigenpairs
@@ -466,12 +466,11 @@ namespace quda
   */
   class IRAM : public EigenSolver
   {
+    std::vector<std::vector<Complex>> upperHess = {};
+    std::vector<std::vector<Complex>> Qmat = {};
+    std::vector<std::vector<Complex>> Rmat = {};
 
   public:
-    std::vector<std::vector<Complex>> upperHess;
-    std::vector<std::vector<Complex>> Qmat;
-    std::vector<std::vector<Complex>> Rmat;
-
     /**
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters

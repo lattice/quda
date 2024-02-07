@@ -18,9 +18,6 @@ namespace quda {
     matPrecon(matPrecon),
     matEig(matEig),
     param(param),
-    node_parity(0),
-    eig_solve(nullptr),
-    deflate_init(false),
     deflate_compute(true),
     recompute_evals(!param.eig_param.preserve_evals)
   {
