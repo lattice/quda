@@ -136,7 +136,7 @@ namespace quda
   }
 
   void chronoExtrapolate(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &basis,
-                          DiracMatrix &m, bool hermitian)
+                         DiracMatrix &m, bool hermitian)
   {
     getProfile().TPSTART(QUDA_PROFILE_CHRONO);
 

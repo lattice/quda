@@ -2580,7 +2580,8 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
     size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.Precision());
     printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)", byte_estimate, ritzVolume, ritzParam.Precision());
-    if (ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
+    if (ritzParam.mem_type == QUDA_MEMORY_DEVICE)
+      printfQuda("Using device memory type.\n");
     else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED)
       printfQuda("Using mapped memory type.\n");
   }

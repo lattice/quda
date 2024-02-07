@@ -71,7 +71,7 @@ namespace quda {
     QudaEigParam eig_param;
 
     /**< Whether to use an initial guess in the solver or not */
-    QudaUseInitGuess use_init_guess = QUDA_USE_INIT_GUESS_NO;;
+    QudaUseInitGuess use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
     /**< Whether to solve linear system with zero RHS */
     QudaComputeNullVector compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;
@@ -152,10 +152,10 @@ namespace quda {
     QudaPrecision precision = QUDA_INVALID_PRECISION;
 
     /**< The precision used by the QUDA sloppy operator */
-    QudaPrecision precision_sloppy = QUDA_INVALID_PRECISION;;
+    QudaPrecision precision_sloppy = QUDA_INVALID_PRECISION;
 
     /**< The precision used by the QUDA sloppy operator for multishift refinement */
-    QudaPrecision precision_refinement_sloppy = QUDA_INVALID_PRECISION;;
+    QudaPrecision precision_refinement_sloppy = QUDA_INVALID_PRECISION;
 
     /**< The precision used by the QUDA preconditioner */
     QudaPrecision precision_precondition = QUDA_INVALID_PRECISION;
@@ -191,7 +191,7 @@ namespace quda {
     array<double, QUDA_MAX_MULTI_SHIFT> true_res_offset = {};
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    array<double, QUDA_MAX_MULTI_SHIFT>  iter_res_offset = {};
+    array<double, QUDA_MAX_MULTI_SHIFT> iter_res_offset = {};
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
     array<double, QUDA_MAX_MULTI_SHIFT> true_res_hq_offset = {};
@@ -240,17 +240,17 @@ namespace quda {
 
     // Incremental EigCG solver parameters
     /**< The precision of the Ritz vectors */
-    QudaPrecision precision_ritz = QUDA_INVALID_PRECISION;//also search space precision
+    QudaPrecision precision_ritz = QUDA_INVALID_PRECISION; // also search space precision
 
     int n_ev = 0; // number of eigenvectors produced by EigCG
-    int m = 0; //Dimension of the search space
+    int m = 0;    // Dimension of the search space
     int deflation_grid = 0;
     int rhs_idx = 0;
 
-    int     eigcg_max_restarts = 0;
-    int     max_restart_num = 0;
-    double  inc_tol = 0.0;
-    double  eigenval_tol = 0.0;
+    int eigcg_max_restarts = 0;
+    int max_restart_num = 0;
+    double inc_tol = 0.0;
+    double eigenval_tol = 0.0;
 
     QudaVerbosity verbosity_precondition = QUDA_SILENT; //! verbosity to use for preconditioner
 
@@ -398,8 +398,8 @@ namespace quda {
       if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
     }
 
-    //for incremental eigCG:
-    void updateRhsIndex(QudaInvertParam &param) {  rhs_idx = param.rhs_idx; }
+    // for incremental eigCG:
+    void updateRhsIndex(QudaInvertParam &param) { rhs_idx = param.rhs_idx; }
   };
 
   class Solver {
@@ -413,9 +413,10 @@ namespace quda {
     SolverParam &param;
     int node_parity = 0;
     EigenSolver *eig_solve = nullptr; /** Eigensolver object. */
-    bool deflate_init = false;      /** If true, the deflation space has been computed. */
-    bool deflate_compute = false;   /** If true, instruct the solver to create a deflation space. */
-    bool recompute_evals = false;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
+    bool deflate_init = false;        /** If true, the deflation space has been computed. */
+    bool deflate_compute = false;     /** If true, instruct the solver to create a deflation space. */
+    bool recompute_evals
+      = false; /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField> evecs = {}; /** Holds the eigenvectors. */
     std::vector<Complex> evals = {};          /** Holds the eigenvalues. */
 
@@ -433,9 +434,7 @@ namespace quda {
      */
     virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in)
     {
-      for (auto i = 0u; i < in.size(); i++) {
-        this->operator()(out[i], in[i]);
-      }
+      for (auto i = 0u; i < in.size(); i++) { this->operator()(out[i], in[i]); }
     }
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);

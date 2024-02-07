@@ -332,7 +332,6 @@ void printQudaCloverParam(QudaInvertParam *param)
 #ifndef INIT_PARAM
   }
 #endif
-
 }
 
 // define the appropriate function for InvertParam
@@ -734,34 +733,27 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #ifdef CHECK_PARAM
   // additional sanity checks here
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
-    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
-    (param->solution_type ==  QUDA_MATPC_SOLUTION);
-  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
-    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
-  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
-    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool pc_solution
+    = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE)
+    || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
-  if (pc_solution && !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
+  if (pc_solution && !pc_solve) { errorQuda("Preconditioned (PC) solution_type requires a PC solve_type"); }
 
   if (!mat_solution && !pc_solution && pc_solve) {
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
-  if (!mat_solution && norm_error_solve) {
-    errorQuda("Normal-error solve requires Mat solution");
-  }
+  if (!mat_solution && norm_error_solve) { errorQuda("Normal-error solve requires Mat solution"); }
 
   if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
     errorQuda("Multigrid preconditioning only supported for direct solves");
   }
 
-  if (param->chrono_use_resident && ( norm_error_solve) ){
+  if (param->chrono_use_resident && (norm_error_solve)) {
     errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
   }
 

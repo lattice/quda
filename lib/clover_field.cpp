@@ -43,10 +43,7 @@ namespace quda {
     copy(field);
   }
 
-  CloverField::CloverField(CloverField &&field) noexcept : LatticeField(std::move(field))
-  {
-    move(std::move(field));
-  }
+  CloverField::CloverField(CloverField &&field) noexcept : LatticeField(std::move(field)) { move(std::move(field)); }
 
   CloverField &CloverField::operator=(const CloverField &src)
   {
