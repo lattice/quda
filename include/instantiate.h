@@ -112,8 +112,13 @@ namespace quda
   };
 
   struct ReconstructWilson {
+#ifdef BUILD_OPENQCD_INTERFACE
+    static constexpr std::array<QudaReconstructType, 5> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
   };
 
   struct ReconstructStaggered {
@@ -498,8 +503,13 @@ namespace quda
   // these are used in dslash.h
 
   struct WilsonReconstruct {
+#ifdef BUILD_OPENQCD_INTERFACE
+    static constexpr std::array<QudaReconstructType, 5> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
   };
 
   struct StaggeredReconstruct {
