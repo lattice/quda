@@ -303,13 +303,6 @@ namespace quda {
     inline double axpyNorm(double a, const ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(a, x, 1.0, y, y); }
 
     /**
-       @brief Compute y -= x and then ||y||^2
-       @param[in] x input vector
-       @param[in,out] y update vector
-    */
-    inline double xmyNorm(const ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(1.0, x, -1.0, y, y); }
-
-    /**
        @brief Compute the complex-valued inner product (x, y)
        @param[in] x input vector
        @param[in] y input vector
@@ -361,12 +354,28 @@ namespace quda {
                                            const ColorSpinorField &w, const ColorSpinorField &u);
 
     /**
+       @brief Compute y = a * x + b * y and then ||y||^2
+       @param[in] a scalar multiplier
+       @param[in] x input vector
+       @param[in] b scalar multiplier
+       @param[in,out] y update vector
+    */
+    double caxpbyNorm(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
+
+    /**
        @brief Compute y += a * x and then ||y||^2
        @param[in] a scalar multiplier
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y);
+    inline double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y) { return caxpbyNorm(a, x, 1.0, y); }
+
+    /**
+       @brief Compute y -= x and then ||y||^2
+       @param[in] x input vector
+       @param[in,out] y update vector
+    */
+    inline double xmyNorm(const ColorSpinorField &x, ColorSpinorField &y) { return caxpbyNorm(1.0, x, -1.0, y); }
 
     /**
        @brief Compute z = a * b * x + y, x = a * x, and then ||x||^2
