@@ -109,8 +109,6 @@ namespace quda {
     bytes = length * precision;
     if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
 
-    // for twisted mass only:
-
     setTuningString();
 
     if (bytes) {
