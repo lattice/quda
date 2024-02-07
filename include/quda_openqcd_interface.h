@@ -363,21 +363,23 @@ double openQCD_qudaPlaquette(void);
  *             fields have to be up2date; i.e. call copy_bnd_hd(), copy_bnd_ud()
  *             before pass fields into this function.
  *
- * @param[in]  gauge  The gauge fields (in openqcd order)
- * @param[in]  prec   Precision of the incoming gauge field
- * @param[in]  rec    How the field should be stored internally in QUDA
+ * @param[in]  gauge       The gauge fields (in openqcd order)
+ * @param[in]  prec        Precision of the incoming gauge field
+ * @param[in]  rec         How the field should be stored internally in QUDA
+ * @param[in]  t_boundary  Time boundary condition
  */
-void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec);
+void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary);
 
 
 /**
  * @brief      Save the gauge fields from quda to host.
  *
- * @param[out] gauge  The gauge fields (will be stored in openqcd order)
- * @param[in]  prec   Precision of the outgoing gauge field
- * @param[in]  rec    How the field should be stored internally in QUDA
+ * @param[out] gauge       The gauge fields (will be stored in openqcd order)
+ * @param[in]  prec        Precision of the outgoing gauge field
+ * @param[in]  rec         How the field should be stored internally in QUDA
+ * @param[in]  t_boundary  Time boundary condition
  */
-void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec);
+void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary);
 
 
 /**

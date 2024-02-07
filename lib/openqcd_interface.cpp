@@ -520,12 +520,13 @@ static QudaInvertParam newOpenQCDParam(void)
 /**
  * @brief      Initialize quda gauge param struct
  *
- * @param[in]  prec  precision
- * @param[in]  rec   QUDA internal gauge field format
+ * @param[in]  prec        Precision
+ * @param[in]  rec         QUDA internal gauge field format
+ * @param[in]  t_boundary  Time boundary condition
  *
  * @return     The quda gauge parameter struct.
  */
-static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructType rec = QUDA_RECONSTRUCT_NO)
+static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
   QudaGaugeParam param = newQudaGaugeParam();
 
@@ -538,9 +539,7 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructTy
   /* This makes quda to instantiate OpenQCDOrder */
   param.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
 
-  /* Seems to have only effect if reconstruct != QUDA_RECONSTRUCT_NO ... */
-  param.t_boundary = QUDA_ANTI_PERIODIC_T;
-
+  param.t_boundary = t_boundary;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
   param.anisotropy = 1.0; /* 1.0 means not anisotropic */
@@ -584,17 +583,17 @@ double openQCD_qudaPlaquette(void)
 }
 
 
-void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec)
+void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec);
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
   loadGaugeQuda(gauge, &param);
   qudaState.gauge_loaded = true;
 }
 
 
-void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec)
+void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec);
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
 
   void* buffer = pool_pinned_malloc((4*qudaState.init.volume + 7*qudaState.init.bndry/4)*18*prec);
   saveGaugeQuda(buffer, &param);
@@ -1191,7 +1190,25 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     void *h_gauge = qudaState.layout.h_gauge();
     PUSH_RANGE("openQCD_qudaGaugeLoad",3);
     QudaReconstructType rec = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
-    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION, rec);
+
+    /**
+     * We set t_boundary = QUDA_ANTI_PERIODIC_T. This setting is a label that
+     * tells QUDA the current state of the residing gauge field, that is the
+     * same state as the one we transfer from openqxd. In openqxd the hdfld
+     * exhibits phases of -1 for the temporal time boundaries, meaning that the
+     * gauge fields are explicitly multiplied by -1 on the t=0 time slice, see
+     * chs_hd0() in hflds.c. The QUDA_ANTI_PERIODIC_T flag says that these
+     * phases are incorporated into the field and that QUDA has to add these
+     * phases on the t=0 time slice when reconstructing the field from
+     * QUDA_RECONSTRUCT_8/12, but not from QUDA_RECONSTRUCT_NO. In case of
+     * QUDA_RECONSTRUCT_NO the value if t_boundary has no effect.
+     *
+     * @see        https://github.com/lattice/quda/issues/1315
+     * @see        Reconstruct#Unpack() in gauge_field_order.h
+     * @see        Reconstruct<8,...>#Unpack() in gauge_field_order.h
+     * @see        Reconstruct<12,...>#Unpack() in gauge_field_order.h
+     */
+    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION, rec, QUDA_ANTI_PERIODIC_T);
     POP_RANGE;
   }
 
