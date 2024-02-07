@@ -12,23 +12,10 @@
 
 namespace quda {
 
-  CloverFieldParam::CloverFieldParam(const CloverField &a) :
-    LatticeFieldParam(a),
-    reconstruct(a.Reconstruct()),
-    inverse(a.Inverse()),
-    csw(a.Csw()),
-    coeff(a.Coeff()),
-    twist_flavor(a.TwistFlavor()),
-    mu2(a.Mu2()),
-    epsilon2(a.Epsilon2()),
-    rho(a.Rho()),
-    order(a.Order()),
-    create(QUDA_NULL_FIELD_CREATE)
+  CloverFieldParam::CloverFieldParam(const CloverField &a) : LatticeFieldParam(a)
   {
-    precision = a.Precision();
-    nDim = a.Ndim();
-    siteSubset = QUDA_FULL_SITE_SUBSET;
-    for (int dir = 0; dir < nDim; ++dir) x[dir] = a.X()[dir];
+    a.fill(*this);
+    create = QUDA_NULL_FIELD_CREATE;
   }
 
   CloverField::CloverField(const CloverFieldParam &param) : LatticeField(param)
@@ -111,7 +98,8 @@ namespace quda {
       errorQuda("Fixed-point precision only supported on native field");
     if (order == QUDA_QDPJIT_CLOVER_ORDER && param.create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
-    if (param.create != QUDA_NULL_FIELD_CREATE && param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_ZERO_FIELD_CREATE)
+    if (param.create != QUDA_NULL_FIELD_CREATE && param.create != QUDA_REFERENCE_FIELD_CREATE
+        && param.create != QUDA_ZERO_FIELD_CREATE && param.create != QUDA_COPY_FIELD_CREATE)
       errorQuda("Create type %d not supported", param.create);
 
     // for now we only support compressed blocks for Nc = 3
@@ -161,8 +149,9 @@ namespace quda {
     LatticeField::fill(param);
     param.reconstruct = reconstruct;
     param.inverse = inverse;
+    param.field = const_cast<CloverField *>(this);
     param.clover = data(false);
-    param.cloverInv = data(true);
+    if (inverse) param.cloverInv = data(true);
     param.csw = csw;
     param.coeff = coeff;
     param.twist_flavor = twist_flavor;
@@ -182,7 +171,7 @@ namespace quda {
     nColor = std::exchange(src.nColor, 0);
     nSpin = std::exchange(src.nSpin, 0);
     clover.exchange(src.clover, {});
-    cloverInv.exchange(src.cloverInv, {});
+    if (src.inverse) cloverInv.exchange(src.cloverInv, {});
     inverse = std::exchange(src.inverse, false);
     diagonal = std::exchange(src.diagonal, 0.0);
     max = std::exchange(src.max, {});
