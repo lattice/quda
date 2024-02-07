@@ -288,7 +288,7 @@ bool gf_fft_autotune = false;
 int eofa_pm = 1;
 double eofa_shift = -1.2345;
 double eofa_mq1 = 1.0;
-double eofa_mq2 = 0.085;
+double eofa_mq2 = 0.85;
 double eofa_mq3 = 1.0;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
