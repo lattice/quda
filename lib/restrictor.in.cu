@@ -166,7 +166,7 @@ namespace quda {
       Restrict<store_t, store_t, 2, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if constexpr (fineColor == 3) {
       if (in[0].Nspin() == 4) {
-        if constexpr (is_enabled_spin(4))
+        if constexpr (is_enabled_spin(4)) {
           if (in[0].Precision() == out[0].Precision()) {
             Restrict<store_t, store_t, 4, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
           } else if (in[0].Precision() == QUDA_HALF_PRECISION)  {
@@ -178,6 +178,7 @@ namespace quda {
           } else {
             errorQuda("Unsupoort precision %d", in[0].Precision());
           }
+        }
       } else if (in[0].Nspin() == 1) {
         if constexpr (is_enabled_spin(1))
           Restrict<store_t, store_t, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
