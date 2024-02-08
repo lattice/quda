@@ -176,12 +176,25 @@ namespace quda {
               errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
             }
           } else {
-            errorQuda("Unsupoort precision %d", in[0].Precision());
+            errorQuda("Unsupported precision %d", in[0].Precision());
           }
         }
       } else if (in[0].Nspin() == 1) {
-        if constexpr (is_enabled_spin(1))
-          Restrict<store_t, store_t, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        if constexpr (is_enabled_spin(1)) {
+          if (in[0].Precision() == out[0].Precision()) {
+            Restrict<store_t, store_t, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+          } else if (in[0].Precision() == QUDA_HALF_PRECISION) {
+            if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+              Restrict<store_t, short, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+            } else {
+              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+            }
+          } else {
+            errorQuda("Unsupported precision %d", in[0].Precision());
+          }
+        }
       } else {
         errorQuda("Unexpected nSpin = %d", in[0].Nspin());
       }
@@ -198,7 +211,7 @@ namespace quda {
                                         const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
     checkLocation(out[0], in[0], v);
-    if (in[0].Nspin() != 4) checkPrecision(in[0], out[0]);
+    if (in[0].Nspin() == 2) checkPrecision(in[0], out[0]);
     QudaPrecision precision = out[0].Precision();
 
     if constexpr (is_enabled_multigrid()) {
