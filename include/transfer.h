@@ -47,10 +47,10 @@ namespace quda {
     const QudaPrecision null_precision;
 
     /** CPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField *V_h = nullptr;
+    mutable ColorSpinorField V_h;
 
     /** GPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField *V_d = nullptr;
+    mutable ColorSpinorField V_d;
 
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
     mutable ColorSpinorField fine_tmp_h;
@@ -206,9 +206,9 @@ namespace quda {
     const ColorSpinorField& Vectors(QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION) const {
       if (location == QUDA_INVALID_FIELD_LOCATION) {
         // if not set then we return the memory space where the input vectors are stored
-        return B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
+        return B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? V_d : V_h;
       } else {
-        return location == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
+        return location == QUDA_CUDA_FIELD_LOCATION ? V_d : V_h;
       }
     }
 

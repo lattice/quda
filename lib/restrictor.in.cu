@@ -13,10 +13,11 @@ namespace quda {
     static constexpr array_type block = array_type();
   };
 
-  template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
-  class RestrictLaunch : public TunableBlock2D {
+  template <typename out_t, typename in_t, typename v_t, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
+  class RestrictLaunch : public TunableBlock2D
+  {
     template <bool from_non_rel>
-    using Arg = RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, from_non_rel>;
+    using Arg = RestrictArg<out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, from_non_rel>;
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     const ColorSpinorField &v;
@@ -125,12 +126,11 @@ namespace quda {
       size_t v_bytes = v.Bytes() / (v.SiteSubset() == in[0].SiteSubset() ? 1 : 2);
       return out.size() * (in[0].Bytes() + out[0].Bytes() + v_bytes + in[0].SiteSubset() * in[0].VolumeCB() * sizeof(int));
     }
-
   };
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor>
+  template <typename store_t, typename in_t, int fineSpin, int fineColor, int coarseColor>
   void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
-                const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
     if (out[0].Nspin() != 2) errorQuda("Unsupported nSpin %d", out[0].Nspin());
     constexpr int coarseSpin = 2;
@@ -143,34 +143,60 @@ namespace quda {
 
     if (v.Precision() == QUDA_HALF_PRECISION) {
       if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-        RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-          restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        RestrictLaunch<store_t, in_t, short, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(
+          out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
     } else if (v.Precision() == in[0].Precision()) {
-      RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
-        restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      RestrictLaunch<store_t, in_t, store_t, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(
+        out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
   }
 
-  template <typename Float, int fineColor, int coarseColor>
+  template <typename store_t, int fineColor, int coarseColor>
   void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
-                const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
     if (!is_enabled_spin(in[0].Nspin())) errorQuda("nSpin %d has not been built", in[0].Nspin());
 
     if (in[0].Nspin() == 2) {
-      Restrict<Float, 2, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      Restrict<store_t, store_t, 2, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if constexpr (fineColor == 3) {
       if (in[0].Nspin() == 4) {
-        if constexpr (is_enabled_spin(4))
-          Restrict<Float, 4, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        if constexpr (is_enabled_spin(4)) {
+          if (in[0].Precision() == out[0].Precision()) {
+            Restrict<store_t, store_t, 4, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+          } else if (in[0].Precision() == QUDA_HALF_PRECISION) {
+            if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+              Restrict<store_t, short, 4, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+            } else {
+              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+            }
+          } else {
+            errorQuda("Unsupported precision %d", in[0].Precision());
+          }
+        }
       } else if (in[0].Nspin() == 1) {
-        if constexpr (is_enabled_spin(1))
-          Restrict<Float, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        if constexpr (is_enabled_spin(1)) {
+          if (in[0].Precision() == out[0].Precision()) {
+            Restrict<store_t, store_t, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+          } else if (in[0].Precision() == QUDA_HALF_PRECISION) {
+            if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+              Restrict<store_t, short, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+            } else {
+              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+            }
+          } else {
+            errorQuda("Unsupported precision %d", in[0].Precision());
+          }
+        }
       } else {
         errorQuda("Unexpected nSpin = %d", in[0].Nspin());
       }
@@ -187,7 +213,8 @@ namespace quda {
                                         const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
     checkLocation(out[0], in[0], v);
-    QudaPrecision precision = checkPrecision(out[0], in[0]);
+    if (in[0].Nspin() == 2) checkPrecision(in[0], out[0]);
+    QudaPrecision precision = out[0].Precision();
 
     if constexpr (is_enabled_multigrid()) {
       if (precision == QUDA_DOUBLE_PRECISION) {

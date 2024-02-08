@@ -155,7 +155,7 @@ namespace quda {
 
     array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      auto deviation = instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
+      auto deviation = instantiateReduce<MaxDeviation, true>(0.0, 0.0, 0.0, x, y, x, x, x);
       // ensure that if the absolute deviation is zero, so is the relative deviation
       return {deviation.diff, deviation.diff > 0.0 ? deviation.diff / deviation.ref : 0.0};
     }
@@ -185,9 +185,9 @@ namespace quda {
       return instantiateReduce<AxpyReDot, false>(a, 0.0, 0.0, x, y, x, x, x);
     }
 
-    double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y)
+    double caxpbyNorm(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y)
     {
-      return instantiateReduce<caxpyNorm2, false>(a, Complex(0.0), Complex(0.0), x, y, x, x, x);
+      return instantiateReduce<caxpyNorm2, true>(a, b, Complex(0.0), x, y, x, x, x);
     }
 
     double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &z)

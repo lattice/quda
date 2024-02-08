@@ -800,7 +800,7 @@ namespace quda
       transfer->P(fine_tmp, coarse_tmp);
 
       for (auto i = 0; i < param.Nvec; i++) {
-        auto max_deviation = blas::max_deviation(fine_tmp[i], param.B[i]);
+        auto max_deviation = blas::max_deviation(param.B[i], fine_tmp[i]);
         auto l2_deviation = sqrt(xmyNorm(param.B[i], fine_tmp[i]) / norm2(param.B[i]));
 
         logQuda(QUDA_VERBOSE,
