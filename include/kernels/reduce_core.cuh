@@ -285,7 +285,7 @@ namespace quda
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      constexpr int flops() const { return 8; }   //! flops per element
+      constexpr int flops() const { return 8; } //! flops per element
     };
 
     /**

@@ -21,7 +21,8 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename out_t, typename in_t, typename v_t, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, bool from_non_rel_>
+  template <typename out_t, typename in_t, typename v_t, int fineSpin_, int fineColor_, int coarseSpin_,
+            int coarseColor_, bool from_non_rel_>
   struct RestrictArg : kernel_param<> {
     using real = out_t;
     static constexpr int fineSpin = fineSpin_;
@@ -31,8 +32,10 @@ namespace quda {
     static constexpr bool from_non_rel = from_non_rel_;
 
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<real, fineSpin, fineColor, 1, colorspinor::getNative<in_t>(fineSpin), in_t, in_t, true, isFixed<in_t>::value>;
-    using C = FieldOrderCB<real, coarseSpin, coarseColor, 1, colorspinor::getNative<out_t>(coarseSpin), out_t, out_t, true>;
+    using F = FieldOrderCB<real, fineSpin, fineColor, 1, colorspinor::getNative<in_t>(fineSpin), in_t, in_t, true,
+                           isFixed<in_t>::value>;
+    using C
+      = FieldOrderCB<real, coarseSpin, coarseColor, 1, colorspinor::getNative<out_t>(coarseSpin), out_t, out_t, true>;
     using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, colorspinor::getNative<v_t>(fineSpin), v_t>;
 
     static constexpr unsigned int max_n_src = MAX_MULTI_RHS;

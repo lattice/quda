@@ -368,7 +368,10 @@ namespace quda {
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    inline double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y) { return caxpbyNorm(a, x, 1.0, y); }
+    inline double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return caxpbyNorm(a, x, 1.0, y);
+    }
 
     /**
        @brief Compute y -= x and then ||y||^2
