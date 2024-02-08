@@ -86,7 +86,7 @@ namespace quda {
 
     std::string block_str = std::to_string(geo_bs[0]);
     for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str.c_str());
+    logQuda(QUDA_VERBOSE, "Transfer: using block size %s\n", block_str.c_str());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       for (int d = 0; d < 4; d++) {
@@ -151,10 +151,10 @@ namespace quda {
     }
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
-      V_d = new ColorSpinorField(param);
+      V_d = ColorSpinorField(param);
       enable_gpu = true;
     } else {
-      V_h = new ColorSpinorField(param);
+      V_h = ColorSpinorField(param);
       enable_cpu = true;
     }
     postTrace();
@@ -192,7 +192,7 @@ namespace quda {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
       createV(location);
-      if (transfer_type == QUDA_TRANSFER_AGGREGATE) *V_d = *V_h;
+      if (transfer_type == QUDA_TRANSFER_AGGREGATE) V_d = V_h;
       fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
       coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
       qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0].Volume() * sizeof(int), qudaMemcpyHostToDevice);
@@ -201,7 +201,7 @@ namespace quda {
     case QUDA_CPU_FIELD_LOCATION:
       if (enable_cpu) return;
       createV(location);
-      if (transfer_type == QUDA_TRANSFER_AGGREGATE) *V_h = *V_d;
+      if (transfer_type == QUDA_TRANSFER_AGGREGATE) V_h = V_d;
       break;
     default:
       errorQuda("Unknown location %d", location);
@@ -216,23 +216,24 @@ namespace quda {
         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
       return;
     }
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
+    logQuda(QUDA_VERBOSE, "Transfer: block orthogonalizing\n");
 
     if (B[0].Location() == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("enable_gpu = %d so cannot reset", enable_gpu);
-      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
+      BlockOrthogonalize(V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
       if (enable_cpu) {
-        *V_h = *V_d;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
+        V_h = V_d;
+        logQuda(QUDA_VERBOSE, "Transferred prolongator back to CPU\n");
       }
     } else {
       if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
-      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
+      BlockOrthogonalize(V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
       if (enable_gpu) { // if the GPU fields has been initialized then we need to update
-        *V_d = *V_h;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
+        V_d = V_h;
+        logQuda(QUDA_VERBOSE, "Transferred prolongator to GPU\n");
       }
     }
+
     postTrace();
   }
 
@@ -246,8 +247,6 @@ namespace quda {
     if (fine_to_coarse_d) pool_device_free(fine_to_coarse_d);
     if (coarse_to_fine_h) pool_pinned_free(coarse_to_fine_h);
     if (fine_to_coarse_h) pool_pinned_free(fine_to_coarse_h);
-    if (V_h) delete V_h;
-    if (V_d) delete V_d;
 
     if (geo_bs) delete []geo_bs;
   }
@@ -364,7 +363,7 @@ namespace quda {
 
       std::vector<ColorSpinorField> input(in.size());
       std::vector<ColorSpinorField> output(out.size());
-      const ColorSpinorField *V = use_gpu ? V_d : V_h;
+      const ColorSpinorField &V = use_gpu ? V_d : V_h;
 
       if (use_gpu) {
 
@@ -399,10 +398,10 @@ namespace quda {
 
       for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically)
 
-      if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      Prolongate(output, input, *V, fine_to_coarse, spin_map, parity);
+      Prolongate(output, input, V, fine_to_coarse, spin_map, parity);
 
       for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
     } else {
@@ -440,7 +439,7 @@ namespace quda {
 
       std::vector<ColorSpinorField> input(in.size());
       std::vector<ColorSpinorField> output(out.size());
-      const ColorSpinorField *V = use_gpu ? V_d : V_h;
+      const ColorSpinorField &V = use_gpu ? V_d : V_h;
 
       if (use_gpu) {
 
@@ -473,10 +472,10 @@ namespace quda {
 
       for (auto i = 0u; i < in.size(); i++) input[i] = in[i]; // copy result to input field (aliasing handled automatically) FIXME - maybe not?
 
-      if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      Restrict(output, input, *V, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      Restrict(output, input, V, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
       for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
 
