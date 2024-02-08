@@ -306,7 +306,7 @@ namespace quda
       }
     };
 
-    // specialized varient for packed half precision staggered
+    // specialized variant for packed half precision staggered
     template <> struct AccessorCB<short, 1, 3, 1, QUDA_FLOAT2_FIELD_ORDER> {
       int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<short>)) { }
@@ -920,18 +920,24 @@ namespace quda
           accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v.v, parity, x_cb, chi, volumeCB);
         } else {
           complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
-          accessor.template load<nSpinBlock>(tmp, v.v, parity, x_cb, chi, volumeCB);
-
           Float norm_ = 0.0;
-          if constexpr (fixed) {
-            if constexpr (block_float) {
-              if constexpr (nColor == 3 && nSpin == 1 && nVec == 1)
-                // special case where the norm is packed into the per site struct
-                norm_ = v.norm[parity * v.norm_offset + 4 * x_cb + 3];
-              else
+          if constexpr (fixed && block_float && nColor == 3 && nSpin == 1 && nVec == 1) {
+            // special case where the norm is packed into the per site struct
+            complex<storeFloat> tmp2[4];
+            AccessorCB<storeFloat, 1, 4, 1, QUDA_FLOAT8_FIELD_ORDER> accessor;
+            accessor.offset_cb = this->accessor.offset_cb;
+            accessor.template load<nSpinBlock>(tmp2, v.v, parity, x_cb, 0, volumeCB);
+            for (auto i = 0; i < 3; i++) tmp[i] = tmp2[i];
+            memcpy(&norm_, tmp2 + 3, sizeof(float));
+          } else {
+            accessor.template load<nSpinBlock>(tmp, v.v, parity, x_cb, chi, volumeCB);
+
+            if constexpr (fixed) {
+              if constexpr (block_float) {
                 norm_ = v.norm[parity * v.norm_offset + x_cb];
-            } else {
-              norm_ = v.scale_inv;
+              } else {
+                norm_ = v.scale_inv;
+              }
             }
           }
 #pragma unroll
