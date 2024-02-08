@@ -368,10 +368,10 @@ namespace quda {
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim.data, QUDA_INVALID_PRECISION,
                   dslash_use_mma);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim.data, QUDA_INVALID_PRECISION,
                   dslash_use_mma);
     }
   }
@@ -384,10 +384,10 @@ namespace quda {
     if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? Xinv_aos_d : Xinv_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim.data, QUDA_INVALID_PRECISION,
                   dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim.data, QUDA_INVALID_PRECISION,
                   dslash_use_mma);
     }
   }
@@ -401,9 +401,10 @@ namespace quda {
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim.data, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim.data, halo_precision,
+                  dslash_use_mma);
     }
   }
 
@@ -417,9 +418,10 @@ namespace quda {
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, x, *Y, *X, kappa, parity, true, true, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, x, *Y, *X, kappa, parity, true, true, dagger, commDim.data, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim.data, halo_precision,
+                  dslash_use_mma);
     }
   }
 
@@ -430,10 +432,10 @@ namespace quda {
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision,
+      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim.data, halo_precision,
                   dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision,
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim.data, halo_precision,
                   dslash_use_mma);
     }
   }
@@ -445,19 +447,22 @@ namespace quda {
     Mdag(out, tmp);
   }
 
-  void DiracCoarse::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b,
-			    const QudaSolutionType solType) const
+  void DiracCoarse::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                            cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                            const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracCoarse::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracCoarse::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                const QudaSolutionType) const
   {
     /* do nothing */
   }
@@ -519,9 +524,9 @@ namespace quda {
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
       auto Y = apply_mma(out, dslash_use_mma) ? Yhat_aos_d : Yhat_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim.data, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision,
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim.data, halo_precision,
                   dslash_use_mma);
     }
   }
@@ -574,87 +579,63 @@ namespace quda {
     Mdag(out, tmp);
   }
 
-  void DiracCoarsePC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
-			      const QudaSolutionType solType) const
+  void DiracCoarsePC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                              cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                              const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
+      for (auto i = 0u; i < b.size(); i++) {
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
+      }
       return;
     }
 
-    auto tmp = getFieldTmp(b.Even());
+    auto tmp = getFieldTmp(b[0].Even());
 
     // we desire solution to full system
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
-      src = &(x.Odd());
-#if 0
-      CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
-      DiracCoarse::Dslash(tmp, *src, QUDA_EVEN_PARITY);
-      blas::xpay(b.Even(), -1.0, tmp);
-      CloverInv(*src, tmp, QUDA_EVEN_PARITY);
-#endif
-      // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
-      CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
-      Dslash(tmp, *src, QUDA_EVEN_PARITY);
-      CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
-      blas::axpy(-1.0, tmp, *src);
+    for (auto i = 0u; i < b.size(); i++) {
 
-      sol = &(x.Even());
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // src = A_oo^-1 (b_o - D_oe A_ee^-1 b_e)
-      src = &(x.Even());
+      if (symmetric) {
+        // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
+        src[i] = x[i][other_parity].create_alias();
 #if 0
-      CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
-      DiracCoarse::Dslash(tmp, *src, QUDA_ODD_PARITY);
-      blas::xpay(b.Odd(), -1.0, tmp);
-      CloverInv(*src, tmp, QUDA_ODD_PARITY);
+        CloverInv(src[i], b[other_parity], other_parity);
+        DiracCoarse::Dslash(tmp, src[i], this_parity);
+        blas::xpay(b[i][this_parity], -1.0, tmp);
+        CloverInv(src[i], tmp, this_parity);
 #endif
-      // src = A_oo^{-1} b_o - (A_oo^{-1} D_oe) A_ee^{-1} b_e
-      CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
-      Dslash(tmp, *src, QUDA_ODD_PARITY);
-      CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
-      blas::axpy(-1.0, tmp, *src);
+        // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
+        CloverInv(src[i], b[i][other_parity], other_parity);
+        Dslash(tmp, src[i], this_parity);
+        CloverInv(src[i], b[i][this_parity], this_parity);
+        blas::axpy(-1.0, tmp, src[i]);
 
-      sol = &(x.Odd());
-    } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      // src = b_e - D_eo A_oo^-1 b_o
-      src = &(x.Odd());
-      CloverInv(tmp, b.Odd(), QUDA_ODD_PARITY);
-      DiracCoarse::Dslash(*src, tmp, QUDA_EVEN_PARITY);
-      blas::xpay(b.Even(), -1.0, *src);
-      sol = &(x.Even());
-    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // src = b_o - D_oe A_ee^-1 b_e
-      src = &(x.Even());
-      CloverInv(tmp, b.Even(), QUDA_EVEN_PARITY);
-      DiracCoarse::Dslash(*src, tmp, QUDA_ODD_PARITY);
-      blas::xpay(b.Odd(), -1.0, *src);
-      sol = &(x.Odd());
-    } else {
-      errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
+        sol[i] = x[i][this_parity].create_alias();
+      } else {
+        // src = b_e - D_eo A_oo^-1 b_o
+        src[i] = x[i][other_parity].create_alias();
+        CloverInv(tmp, b[i][other_parity], other_parity);
+        DiracCoarse::Dslash(src[i], tmp, this_parity);
+        blas::xpay(b[i][this_parity], -1.0, src[i]);
+        sol[i] = x[i][this_parity].create_alias();
+      }
     }
-
-    // here we use final solution to store parity solution and parity source
-    // b is now up for grabs if we want
   }
 
-  void DiracCoarsePC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracCoarsePC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       return;
     }
 
-    checkFullSpinor(x, b);
+    auto tmp = getFieldTmp(b[0].Even());
 
-    auto tmp = getFieldTmp(b.Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
 
-    // create full solution
-
-    if (matpcType == QUDA_MATPC_EVEN_EVEN ||
-	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 #if 0
       // x_o = A_oo^-1 (b_o - D_oe x_e)
       DiracCoarse::Dslash(tmp, x.Even(), QUDA_ODD_PARITY);
@@ -662,25 +643,9 @@ namespace quda {
       CloverInv(x.Odd(), tmp, QUDA_ODD_PARITY);
 #endif
       // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
-      Dslash(tmp, x.Even(), QUDA_ODD_PARITY);
-      CloverInv(x.Odd(), b.Odd(), QUDA_ODD_PARITY);
-      blas::axpy(-1.0, tmp, x.Odd());
-
-    } else if (matpcType == QUDA_MATPC_ODD_ODD ||
-	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-#if 0
-      // x_e = A_ee^-1 (b_e - D_eo x_o)
-      DiracCoarse::Dslash(tmp, x.Odd(), QUDA_EVEN_PARITY);
-      blas::xpay(b.Even(), -1.0, tmp);
-      CloverInv(x.Even(), tmp, QUDA_EVEN_PARITY);
-#endif
-      // x_e = A_ee^{-1} b_e - (A_ee^{-1} D_eo) x_o
-      Dslash(tmp, x.Odd(), QUDA_EVEN_PARITY);
-      CloverInv(x.Even(), b.Even(), QUDA_EVEN_PARITY);
-      blas::axpy(-1.0, tmp, x.Even());
-
-    } else {
-      errorQuda("MatPCType %d not valid for DiracCoarsePC", matpcType);
+      Dslash(tmp, x[i][this_parity], other_parity);
+      CloverInv(x[other_parity], b[other_parity], other_parity);
+      blas::axpy(-1.0, tmp, x[other_parity]);
     }
   }
 

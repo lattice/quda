@@ -63,15 +63,17 @@ namespace quda {
     //do nothing
   }
 
-  void GaugeCovDev::prepare(ColorSpinorField *&, ColorSpinorField *&, ColorSpinorField &, ColorSpinorField &,
+  void GaugeCovDev::prepare(cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &,
+                            cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
                             const QudaSolutionType) const
   {
-    //do nothing
+    // do nothing
   }
 
-  void GaugeCovDev::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void GaugeCovDev::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                const QudaSolutionType) const
   {
-    //do nothing
+    // do nothing
   }
 
 } // namespace quda
