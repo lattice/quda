@@ -217,7 +217,7 @@ int contract(test_t param)
   const QudaFFTSymmType ev = QUDA_FFT_SYMM_EVEN;
   const QudaFFTSymmType od = QUDA_FFT_SYMM_ODD;
 
-  const std::array<int, 4> source_position = {0,0,0,0};//make command option
+  const std::array<int, 4> source_position = prop_source_position[0];//make command option
 
   constexpr int n_mom = 18;
 
