@@ -363,6 +363,7 @@ bool is_normal_residual(QudaInverterType type)
 {
   switch (type) {
   case QUDA_CGNR_INVERTER:
+  case QUDA_CG3NR_INVERTER:
   case QUDA_CA_CGNR_INVERTER: return true;
   default: return false;
   }

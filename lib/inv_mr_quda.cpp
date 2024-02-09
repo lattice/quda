@@ -12,8 +12,8 @@
 namespace quda
 {
 
-  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile)
+  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param) :
+    Solver(mat, matSloppy, matSloppy, matSloppy, param)
   {
     if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ && param.Nsteps % 2 == 1) {
       errorQuda("For multiplicative Schwarz, number of solver steps %d must be even", param.Nsteps);
@@ -62,7 +62,7 @@ namespace quda
 
     create(x, b); // allocate fields
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     double b2 = blas::norm2(b); // Save norm of b
     double r2 = 0.0;            // if zero source then we will exit immediately doing no work
@@ -156,7 +156,7 @@ namespace quda
     PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += iter;
     }
   }

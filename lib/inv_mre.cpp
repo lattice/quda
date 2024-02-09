@@ -70,8 +70,7 @@ namespace quda
   void MinResExt::operator()(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p,
                              std::vector<ColorSpinorField> &q)
   {
-    bool running = getProfile().isRunning(QUDA_PROFILE_CHRONO);
-    if (!running) getProfile().TPSTART(QUDA_PROFILE_CHRONO);
+    getProfile().TPSTART(QUDA_PROFILE_CHRONO);
 
     const int N = p.size();
     logQuda(QUDA_VERBOSE, "Constructing minimum residual extrapolation with basis size %d\n", N);
@@ -81,7 +80,7 @@ namespace quda
         blas::zero(x);
       else
         blas::copy(x, p[0]);
-      if (!running) getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
+      getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
       return;
     }
 
@@ -133,7 +132,25 @@ namespace quda
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
-    if (!running) getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
+    getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
+  }
+
+  void chronoExtrapolate(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &basis,
+                         DiracMatrix &m, bool hermitian)
+  {
+    getProfile().TPSTART(QUDA_PROFILE_CHRONO);
+
+    ColorSpinorParam cs_param(basis[0]);
+    std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
+
+    m(Ap, basis);
+
+    bool orthogonal = true;
+    bool apply_mat = false;
+    MinResExt mre(m, orthogonal, apply_mat, hermitian);
+    mre(x, b, basis, Ap);
+
+    getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
   }
 
 } // namespace quda

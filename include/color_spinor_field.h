@@ -695,6 +695,7 @@ namespace quda
     QudaSiteOrder SiteOrder() const { return siteOrder; }
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
+    void GammaBasis(QudaGammaBasis new_basis) { gammaBasis = new_basis; }
 
     const int *GhostFace() const { return ghostFace.data; }
     const int *GhostFaceCB() const { return ghostFaceCB.data; }
@@ -790,7 +791,7 @@ namespace quda
        @param[in] location Optionally set the location of the coarse field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
-    ColorSpinorField *CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+    ColorSpinorField create_coarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                    QudaPrecision precision = QUDA_INVALID_PRECISION,
                                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION,
                                    QudaMemoryType mem_Type = QUDA_MEMORY_INVALID);
@@ -804,7 +805,7 @@ namespace quda
        @param[in] location Optionally set the location of the fine field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
-    ColorSpinorField *CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
+    ColorSpinorField create_fine(const int *geoblockSize, int spinBlockSize, int Nvec,
                                  QudaPrecision precision = QUDA_INVALID_PRECISION,
                                  QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION,
                                  QudaMemoryType mem_type = QUDA_MEMORY_INVALID);

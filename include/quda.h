@@ -852,6 +852,24 @@ extern "C" {
                                  with the underlying issue documented https://github.com/lattice/quda/issues/1315 */
   } QudaGaugeObservableParam;
 
+  typedef struct QudaGaugeSmearParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    unsigned int n_steps; /**< The total number of smearing steps to perform. */
+    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
+                             Wilson/Symanzik flow */
+    double alpha;         /**< The single coefficient used in APE smearing */
+    double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/
+    double alpha2;                 /**< The coefficient used in HYP smearing step 2*/
+    double alpha3;                 /**< The coefficient used in HYP smearing step 1*/
+    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
+    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+    QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
+    double t0;                     /**< Starting flow time for Wilson flow */
+    int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
+                                        A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
+  } QudaGaugeSmearParam;
+
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 

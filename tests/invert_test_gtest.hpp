@@ -50,6 +50,10 @@ bool skip_test(test_t param)
     return true;
 #endif
   }
+  // CG3 is rather unstable with low precision
+  if ((inverter_type == QUDA_CG3_INVERTER || inverter_type == QUDA_CG3NE_INVERTER || inverter_type == QUDA_CG3NR_INVERTER)
+      && prec_sloppy < QUDA_DOUBLE_PRECISION)
+    return true;
   // split-grid doesn't support multishift at present
   if (use_split_grid && multishift > 1) return true;
 
@@ -107,11 +111,12 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
 
 using ::testing::Combine;
 using ::testing::Values;
-auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER);
+auto normal_solvers
+  = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_CG3_INVERTER, QUDA_PCG_INVERTER, QUDA_SD_INVERTER);
 
-auto direct_solvers
-  = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
-           QUDA_CA_GCR_INVERTER, QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
+auto direct_solvers = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER,
+                             QUDA_CG3NE_INVERTER, QUDA_CG3NR_INVERTER, QUDA_GCR_INVERTER, QUDA_CA_GCR_INVERTER,
+                             QUDA_BICGSTAB_INVERTER, QUDA_BICGSTABL_INVERTER, QUDA_MR_INVERTER);
 
 auto sloppy_precisions
   = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION);

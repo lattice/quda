@@ -4,20 +4,17 @@
 namespace quda
 {
 
-  MadwfAcc::MadwfAcc(const SolverParam &solve_param, TimeProfile &profile) :
+  MadwfAcc::MadwfAcc(const SolverParam &solve_param) :
     param(solve_param.madwf_param),
     mu(param.madwf_diagonal_suppressor),
-    prec_precondition(solve_param.precision_precondition),
-    profile(profile)
+    prec_precondition(solve_param.precision_precondition)
   {
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("Launching MADWF accelerator ... \n");
-      printfQuda("madwf_mu (low modes suppressor)                   = %.4f\n", param.madwf_diagonal_suppressor);
-      printfQuda("madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
-      printfQuda("madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
-      printfQuda("madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);
-      printfQuda("madwf_train_maxiter (max # of iters for training) = %d\n", param.madwf_train_maxiter);
-    }
+    logQuda(QUDA_VERBOSE, "Launching MADWF accelerator ... \n");
+    logQuda(QUDA_VERBOSE, "madwf_mu (low modes suppressor)                   = %.4f\n", param.madwf_diagonal_suppressor);
+    logQuda(QUDA_VERBOSE, "madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
+    logQuda(QUDA_VERBOSE, "madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
+    logQuda(QUDA_VERBOSE, "madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);
+    logQuda(QUDA_VERBOSE, "madwf_train_maxiter (max # of iters for training) = %d\n", param.madwf_train_maxiter);
   }
 
   void MadwfAcc::fill_random(std::vector<transfer_float> &v)
@@ -59,7 +56,7 @@ namespace quda
                        bool tune_suppressor)
   {
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
 
     if (in.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
@@ -70,8 +67,8 @@ namespace quda
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      profile.TPSTART(QUDA_PROFILE_IO);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_IO);
       load_parameter(Ls, Ls_base);
 
       ColorSpinorParam csParam(in);
@@ -81,7 +78,7 @@ namespace quda
 
       forward_tmp = ColorSpinorField(csParam);
       backward_tmp = ColorSpinorField(csParam);
-      profile.TPSTOP(QUDA_PROFILE_IO);
+      getProfile().TPSTOP(QUDA_PROFILE_IO);
 
       return;
     }
@@ -99,9 +96,9 @@ namespace quda
     csParam.setPrecision(prec_precondition);
     for (auto &pB : B) { pB = ColorSpinorField(csParam); }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
     null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     for (auto &pb : B) { blas::ax(5e3 / sqrt(blas::norm2(pb)), pb); }
 
     commGlobalReductionPush(false);
@@ -154,8 +151,8 @@ namespace quda
       printfQuda("training mu   = %.3f\n", mu);
     }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_TRAINING);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_TRAINING);
 
     for (int iteration = 0; iteration < param.madwf_train_maxiter; iteration++) {
 
@@ -270,13 +267,13 @@ namespace quda
     device_param.from_host(host_param);
 
     commGlobalReductionPop();
-    profile.TPSTOP(QUDA_PROFILE_TRAINING);
+    getProfile().TPSTOP(QUDA_PROFILE_TRAINING);
 
     if (param.madwf_param_save) {
-      profile.TPSTART(QUDA_PROFILE_IO);
+      getProfile().TPSTART(QUDA_PROFILE_IO);
       if (comm_rank() == 0) { save_parameter(Ls, Ls_base); } // Only rank zero write out to the disk
       comm_barrier();
-      profile.TPSTOP(QUDA_PROFILE_IO);
+      getProfile().TPSTOP(QUDA_PROFILE_IO);
     }
   }
 
