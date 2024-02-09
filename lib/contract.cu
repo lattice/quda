@@ -43,8 +43,8 @@ namespace quda {
       switch (cType) {
       case QUDA_CONTRACT_TYPE_OPEN_SUM_T: strcat(aux, "open-sum-t,"); break;
       case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: strcat(aux, "open-sum-z,"); break;
-      case QUDA_CONTRACT_TYPE_DR_FT_T: strcat(aux, "degrand-rossi-ft-t,"); break;
-      case QUDA_CONTRACT_TYPE_DR_FT_Z: strcat(aux, "degrand-rossi-ft-z,"); break;
+      case QUDA_CONTRACT_TYPE_DR_FT_T:    strcat(aux, "degrand-rossi-ft-t,"); break;
+      case QUDA_CONTRACT_TYPE_DR_FT_Z:    strcat(aux, "degrand-rossi-ft-z,"); break;
       case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: strcat(aux, "staggered-ft-t,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }

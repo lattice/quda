@@ -210,8 +210,7 @@ int contractionFT_reference(Float **spinorX, Float **spinorY,
 
   for(size_t idx=0; idx < n_floats; ++idx)
     {
-      double rel = abs(d_result[idx] - h_result[idx]) /
-	( 0.5*abs(d_result[idx] + h_result[idx]) + epsilon );
+      double rel = abs(d_result[idx] - h_result[idx]) / ( abs(h_result[idx]) + epsilon );
       //printfQuda("%5ld: %10.3e %10.3e: %10.3e\n", idx, d_result[idx], h_result[idx], rel);
       for(int d=0; d<ntol; ++d) if(rel > tolerance[d]) ++fails[d];
     }

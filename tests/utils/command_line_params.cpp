@@ -304,8 +304,8 @@ int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 
 // contract options
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
-std::array<int,4> momentum = {0, 0, 0, 0};
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+std::array<int,4> momentum     = {0, 0, 0, 0};
 char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
@@ -342,9 +342,6 @@ bool detratio = false;
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
-
-  CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
-                                                           {"dr", QUDA_CONTRACT_TYPE_DR}};
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
@@ -464,6 +461,10 @@ namespace
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
 
+  CLI::TransformPairs<QudaContractType> contract_type_map {{"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
+ 	                                                   {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
+							   {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}};
+
 } // namespace
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_name)
@@ -507,12 +508,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
-
-  quda_app
-    ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on "
-                 "spin (default open)")
-    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
 
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
@@ -1211,7 +1206,7 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
 
     opgroup->add_option("--contraction-type", contract_type,
                     "Whether to leave spin elemental open or insert a gamma basis, "
-                        "and whether to sum in t,z, or not at all (default dr-sum-t)")
+                        "and whether to sum in t,z, or not at all (default stag-ft-t)")
             ->transform(CLI::QUDACheckedTransformer(contract_type_map));
 
     opgroup->add_option("--correlator-save-dir", correlator_save_dir,"Save propagators in directory <dir>");
