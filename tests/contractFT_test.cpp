@@ -24,7 +24,7 @@ void display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("contraction_type prec    S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s             %d/%d/%d          %d         %d\n", get_contract_str(contract_type), get_prec_str(prec),
+  printfQuda("%s             %s   %d/%d/%d          %d         %d\n", get_contract_str(contract_type), get_prec_str(prec),
              xdim, ydim, zdim, tdim, Lsdim);
 
   printfQuda("contractFTQuda test");
@@ -112,7 +112,7 @@ inline void fill_buffers(std::array<std::vector<Float>, N> &buffs, const std::ar
           int ll = ix+iy*X[0]+iz*X[0]*X[1]+it*X[0]*X[1]*X[2];
 
           srand(l);
-          for (size_t i = 0; i < dofs; i++) {
+          for (int i = 0; i < dofs; i++) {
 #pragma unroll	
 	    for(int n = 0; n < N; n++) {	  
               buffs[n][ll*dofs + i] = 2.*(rand() / (Float)RAND_MAX) - 1.;
