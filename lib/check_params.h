@@ -129,7 +129,6 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gauge_offset, 0);
   P(mom_offset, 0);
   P(site_size, 0);
-  P(smear_gauge, QUDA_BOOLEAN_FALSE);
 #else
   P(overwrite_mom, INVALID_INT);
   P(use_resident_gauge, INVALID_INT);
@@ -141,7 +140,6 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gauge_offset, (size_t)INVALID_INT);
   P(mom_offset, (size_t)INVALID_INT);
   P(site_size, (size_t)INVALID_INT);
-  P(smear_gauge, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

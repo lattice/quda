@@ -23,16 +23,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-  typedef struct QudaGaugeSmearParam_s {
-    size_t struct_size;   /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    unsigned int n_steps; /**< The total number of smearing steps to perform. */
-    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in Wilson/Symanzik flow */
-    double alpha;         /**< The single coefficient used in APE smearing */
-    double rho;           /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
-    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
-    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
-  } QudaGaugeSmearParam;
   
   /**
    * Parameters having to do with the gauge field or the
@@ -101,8 +91,6 @@ extern "C" {
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
 
-    QudaGaugeSmearParam *smear_param; /**< container to hold smearing parameters */
-    QudaBoolean smear_gauge; /**< if true, smear the gauge when loaded into QUDA */    
   } QudaGaugeParam;
 
 

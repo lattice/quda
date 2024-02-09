@@ -80,7 +80,6 @@ void init(int argc, char **argv)
   if (gauge_smear) {
     smear_param = newQudaGaugeSmearParam();
     setGaugeSmearParam(smear_param);
-    gauge_param.smear_param = &smear_param;
   }
   
   // Though no inversions are performed, the inv_param

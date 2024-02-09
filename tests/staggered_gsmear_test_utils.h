@@ -171,7 +171,6 @@ struct StaggeredGSmearTestWrapper { //
     if (gauge_smear) {
       smear_param = newQudaGaugeSmearParam();
       setGaugeSmearParam(smear_param);
-      gauge_param.smear_param = &smear_param;
     }
 
     setStaggeredInvertParam(inv_param);
@@ -200,7 +199,6 @@ struct StaggeredGSmearTestWrapper { //
     if (gauge_smear) {
       smear_param = newQudaGaugeSmearParam();
       setGaugeSmearParam(smear_param);
-      gauge_param.smear_param = &smear_param;
     }
     setStaggeredInvertParam(inv_param);
 

@@ -142,7 +142,6 @@ void init()
   if (gauge_smear) {
     smear_param = newQudaGaugeSmearParam();
     setGaugeSmearParam(smear_param);
-    gauge_param.smear_param = &smear_param;
   }
 
   if (!inv_multigrid) setStaggeredInvertParam(inv_param);
