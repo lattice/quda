@@ -495,6 +495,7 @@ static QudaInvertParam newOpenQCDParam(void)
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;  /* The precision used by the input fermion fields */
   param.cuda_prec = QUDA_DOUBLE_PRECISION; /* The precision used by the QUDA solver */
+  param.cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION; /* The precision used by the QUDA eigensolver */
 
   param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; /* The precision used by the QUDA solver */
   param.cuda_prec_precondition = QUDA_HALF_PRECISION; /* The precision used by the QUDA solver */
@@ -616,6 +617,7 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
   param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
   param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
   param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+  param.clover_cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
 
   param.kappa = kappa;
   param.clover_csw = csw;
@@ -657,6 +659,7 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
     param.clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
     param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    param.clover_cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
     param.clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
 
     param.compute_clover = true;
@@ -910,6 +913,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   param->verbosity = QUDA_SUMMARIZE;
   param->cpu_prec = QUDA_DOUBLE_PRECISION;
   param->cuda_prec = QUDA_DOUBLE_PRECISION;
+  param->cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
   param->cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   param->cuda_prec_precondition = QUDA_HALF_PRECISION;
   param->dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
@@ -929,6 +933,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     param->clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
     param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    param->clover_cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
 
     param->clover_csw = qudaState.layout.dirac_parms().su3csw;
     param->clover_coeff = 0.0;
@@ -1089,7 +1094,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       /* (shallow) copy the struct */
       *invert_param_mg = *param;
 
-      /* these have to be fixed */
+      /* these have to be fixed, and cannot be overwritten by the input file */
       invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
       invert_param_mg->dirac_order = QUDA_DIRAC_ORDER;
 
@@ -1179,7 +1184,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     }
   }
 
-  /* transfer of the struct to all the processes */
+  /* transfer of the struct to all processes */
   MPI_Bcast((void*) param,           sizeof(*param),           MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast((void*) invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast((void*) multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -1322,6 +1327,11 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
       kv.dump();
     }
 
+    if (kv.get<std::string>(section, "solver") != "QUDA") {
+      errorQuda("Eigensolver section \"%s\" in file %s is not a valid quda-eigensolver section (solver = %s)\n",
+        section, infile, kv.get<std::string>(section, "solver").c_str());
+    }
+
     param->eig_type = kv.get<QudaEigType>(section, "eig_type", param->eig_type);
     param->use_poly_acc = kv.get<QudaBoolean>(section, "use_poly_acc", param->use_poly_acc);
     param->poly_deg = kv.get<int>(section, "poly_deg", param->poly_deg);
@@ -1378,10 +1388,12 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
     param->invert_param = new QudaInvertParam(newQudaInvertParam());
   }
 
-  if (inv_section != nullptr && verbosity >= QUDA_DEBUG_VERBOSE) {
-    printQudaEigParam(param);
+  param->invert_param->verbosity = std::max(param->invert_param->verbosity, verbosity);
+
+  if (inv_section != nullptr && param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
+    printQudaInvertParam(param->invert_param);
   }
-  if (inv_section != nullptr && verbosity >= QUDA_DEBUG_VERBOSE) {
+  if (param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaEigParam(param);
   }
 
