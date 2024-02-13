@@ -162,8 +162,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      typename BlockOrtho_Params<Arg>::BlockReduceDot dot_reducer{*this, 0};
-      typename BlockOrtho_Params<Arg>::BlockReduceNorm norm_reducer{*this, 0};
+      typename BlockOrtho_Params<Arg>::BlockReduceDot dot_reducer{*this};
+      typename BlockOrtho_Params<Arg>::BlockReduceNorm norm_reducer{*this};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {

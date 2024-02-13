@@ -168,6 +168,7 @@ namespace quda
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       printfQuda("  KernelOps: %s\n", typeid(getKernelOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  sharedMemSize: %i\n", sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block));
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
     //if (localSize[RANGE_X] % device::warp_size() != 0) {

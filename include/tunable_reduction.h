@@ -73,11 +73,16 @@ namespace quda
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
-      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
-      if (sizeOps != sizeTp) {
+      auto sizeCu = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
+      }
+      if (sizeOps > tp.shared_bytes) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
       if (tp.block.x * tp.block.y < static_cast<unsigned>(device::warp_size()))
@@ -109,14 +114,18 @@ namespace quda
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
-      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
-      if (sizeOps != sizeTp) {
+      auto sizeCu = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
+      }
+      if (sizeOps > tp.shared_bytes) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
-      //(void)tp;
       if (arg.threads.y != block_size_y)
         errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       std::vector<T> result_(1);
@@ -243,11 +252,16 @@ namespace quda
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
-      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
-      if (sizeOps != sizeTp) {
+      auto sizeCu = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
+      }
+      if (sizeOps > tp.shared_bytes) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
       if (tp.block.x * tp.block.y < static_cast<unsigned>(device::warp_size()))
@@ -277,14 +291,18 @@ namespace quda
     {
 #ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
-      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
-      if (sizeOps != sizeTp) {
+      auto sizeCu = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
+      }
+      if (sizeOps > tp.shared_bytes) {
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
-      //(void)tp;
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
 

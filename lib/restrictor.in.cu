@@ -98,16 +98,16 @@ namespace quda {
       TunableBlock2D::initTuneParam(param);
       param.block.x = blockMapper();
       param.grid.x = out.Volume();
-      param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
+      setSharedBytes(param);
     }
 
     void defaultTuneParam(TuneParam &param) const {
       TunableBlock2D::defaultTuneParam(param);
       param.block.x = blockMapper();
       param.grid.x = out.Volume();
-      param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
+      setSharedBytes(param);
     }
 
     long long flops() const { return 8 * fineSpin * fineColor * coarseColor * in.SiteSubset()*(long long)in.VolumeCB(); }

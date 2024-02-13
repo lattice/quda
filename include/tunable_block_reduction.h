@@ -58,11 +58,16 @@ namespace quda
 #ifdef CHECK_SHARED_BYTES
       using BlockArg = BlockKernelArg<Block::block[idx], FunctorArg>;
       auto sizeOps = sharedMemSize<getKernelOps<Functor<BlockArg>>>(tp.block);
-      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
-      if (sizeOps != sizeTp) {
+      auto sizeCu = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<BlockArg>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
+      }
+      if (sizeOps > tp.shared_bytes) {
+	printfQuda("Functor: %s\n", typeid(Functor<BlockArg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
       // in block == 0, then we aren't templating on block size
@@ -102,11 +107,16 @@ namespace quda
 #ifdef CHECK_SHARED_BYTES
       using BlockArg = BlockKernelArg<Block::block[idx], Arg>;
       auto sizeOps = sharedMemSize<getKernelOps<Functor<BlockArg>>>(tp.block);
-      auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
-      if (sizeOps != sizeTp) {
+      auto sizeCu = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<BlockArg>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
+      }
+      if (sizeOps > tp.shared_bytes) {
+	printfQuda("Functor: %s\n", typeid(Functor<BlockArg>).name());
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
       if (tp.block.x == Block::block[idx]) {
@@ -211,6 +221,7 @@ namespace quda
       Tunable::initTuneParam(param);
       param.block.z = step_z;
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
+      setSharedBytes(param);
     }
 
     /**

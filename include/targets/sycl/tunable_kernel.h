@@ -37,15 +37,18 @@ namespace quda {
     inline qudaError_t
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-#if 0
-      auto smemsize = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
-      if (smemsize < tp.shared_bytes) {
+#ifdef CHECK_SHARED_BYTES
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeCu = std::max(sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, sharedBytesPerBlock(tp));
+      if (sizeOps != sizeCu) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
-	warningQuda("Shared bytes mismatch kernel: %u  tp: %u\n", smemsize, tp.shared_bytes);
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
       }
-      if (smemsize > tp.shared_bytes) {
+      if (sizeOps > tp.shared_bytes) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", smemsize, tp.shared_bytes);
+	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
       using launcher_t = qudaError_t(*)(const TuneParam &, const qudaStream_t &, const Arg &);
