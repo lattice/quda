@@ -118,6 +118,7 @@ typedef struct {
   dirac_parms_t (*dirac_parms)(void); /** @see dirac_parms() */
   void* (*h_gauge)(void);    /** function to return a pointer to the gauge fields */
   void* (*h_sw)(void);       /** function to return a pointer to the clover fields */
+  void (*get_gfld_flags)(int *ud, int *ad); /** function pointer to field query function */
 } openQCD_QudaLayout_t;
 
 

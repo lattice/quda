@@ -900,6 +900,10 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 {
   int my_rank;
   void *mgprec;
+  static int ad_rev = -1;
+  static int ud_rev = -1;
+  static int ad_rev_old = -2;
+  static int ud_rev_old = -2;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
@@ -1190,7 +1194,14 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   MPI_Bcast((void*) multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
   multigrid_param->invert_param = invert_param_mg;
 
-  if (qudaState.layout.h_gauge != nullptr) {
+  /* get current residing gauge field revision (residing in openqxd) */
+  qudaState.layout.get_gfld_flags(&ud_rev, &ad_rev);
+
+  /* whether to update the gauge/clover field or not */
+  bool update = ud_rev != ud_rev_old || ad_rev != ad_rev_old;
+  logQuda(QUDA_VERBOSE, "Gauge/Clover field updated in openQxD according to flag-database: %s\n", update ? "true" : "false");
+
+  if (qudaState.layout.h_gauge != nullptr && update) {
     logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
     void *h_gauge = qudaState.layout.h_gauge();
     PUSH_RANGE("openQCD_qudaGaugeLoad",3);
@@ -1214,10 +1225,12 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
      * @see        Reconstruct<12,...>#Unpack() in gauge_field_order.h
      */
     openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION, rec, QUDA_ANTI_PERIODIC_T);
+    ud_rev_old = ud_rev;
+    ad_rev_old = ad_rev;
     POP_RANGE;
   }
 
-  if (param->clover_csw != 0.0) {
+  if (param->clover_csw != 0.0 && update) {
     if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
       /**
        * SU3 case:
