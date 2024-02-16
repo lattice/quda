@@ -43,6 +43,9 @@ int main(int argc, char **argv)
   // command line options:
   auto app = make_app();
 
+  add_propagator_option_group(app);  
+  add_contraction_option_group(app);  
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -80,6 +83,7 @@ int main(int argc, char **argv)
 
   // Check for correctness:
   int result = 0;
+  
   if (enable_testing) { // tests are defined in invert_test_gtest.hpp
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
