@@ -447,6 +447,9 @@ extern "C" {
     /** Whether to use fused kernels for mobius */
     QudaBoolean use_mobius_fused_kernel;
 
+    /** Additional user-defined properties */
+    void *additional_prop;
+
   } QudaInvertParam;
 
   /* Parameter set for solving eigenvalue problems. */

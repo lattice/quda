@@ -729,6 +729,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(additional_prop, 0);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 }
