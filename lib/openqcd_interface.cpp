@@ -16,12 +16,13 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <index_helper.cuh>
+#include <multigrid.h>
 #include <mpi.h>
 
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static openQCD_QudaState_t qudaState = {false, false, false, false, {}, {}};
+static openQCD_QudaState_t qudaState = {false, false, false, false, -1, -1, {}, {}, {}, '\0'};
 
 using namespace quda;
 
@@ -458,10 +459,11 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   sprintf(prefix, "QUDA (rank=%d): ", my_rank);
 
-  if (my_rank == 0 && infile != nullptr) {
+  strcpy(qudaState.infile, infile);
+  if (my_rank == 0) {
     KeyValueStore kv;
     kv.set_map(&enum_map);
-    kv.load(infile);
+    kv.load(qudaState.infile);
     qudaState.init.verbosity = kv.get<QudaVerbosity>("QUDA", "verbosity", qudaState.init.verbosity);
   }
 
@@ -563,6 +565,13 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
 }
 
 void openQCD_qudaFinalize(void) {
+
+  for (int id=0; id<32; ++id) {
+    if (qudaState.handles[id] != nullptr) {
+      openQCD_qudaSolverDestroy(id);
+    }
+  }
+
   qudaState.initialized = false;
   endQuda();
 }
@@ -896,14 +905,267 @@ void openQCD_qudaDw2(void *param, double mu, void *src, void *dst)
 }
 
 
-void* openQCD_qudaSolverSetup(char *infile, char *section)
+
+/**
+ * @brief      Check whether the gauge field from openQCD is in sync with the
+ *             one from QUDA.
+ *
+ * @return     true/false
+ */
+inline bool gauge_field_get_up2date(void)
+{
+  int ud_rev = -2, ad_rev = -2;
+
+  /* get current residing gauge field revision (residing in openqxd) */
+  qudaState.layout.get_gfld_flags(&ud_rev, &ad_rev);
+  logQuda(QUDA_VERBOSE, "Gauge field status according to get_gfld_flags: (ud,ad)=(%d,%d)\n",
+    ud_rev, ad_rev);
+
+  return ud_rev == qudaState.ud_rev && ad_rev == qudaState.ad_rev;
+}
+
+
+
+/**
+ * @brief      Check whether the gauge field is not (yet) set in openQCD.
+ *
+ * @return     true/false
+ */
+inline bool gauge_field_get_unset(void)
+{
+  int ud_rev = -2, ad_rev = -2;
+  qudaState.layout.get_gfld_flags(&ud_rev, &ad_rev);
+  return ud_rev == 0 && ad_rev == 0;
+}
+
+
+
+/**
+ * @brief      Check if the revision of the clover field in openQCD coincides
+ *             with the information on the parameter struct.
+ *
+ * @param      param  The parameter struct
+ *
+ * @return     true/false
+ */
+inline bool clover_field_get_up2date(QudaInvertParam* param)
+{
+  int uswd_rev = -2, aswd_rev = -2;
+
+  /* get current residing clover field revision (residing in openqxd) */
+  qudaState.layout.get_swfld_flags(&uswd_rev, &aswd_rev);
+  logQuda(QUDA_VERBOSE, "Clover field status according to get_swfld_flags: (uswd,aswd)=(%d,%d)\n",
+    uswd_rev, aswd_rev);
+
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+  return uswd_rev == additional_prop->ud_swd_rev && aswd_rev == additional_prop->ad_swd_rev;
+}
+
+
+
+/**
+ * @brief      Set the global revisions numners for the SU(3) and U(1) fields.
+ */
+inline void gauge_field_set_up2date(void)
+{
+  qudaState.layout.get_gfld_flags(&qudaState.ud_rev, &qudaState.ad_rev);
+}
+
+
+/**
+ * @brief      Set the su3csw corfficient and all related properties.
+ *
+ * @param      param   The parameter struct
+ * @param[in]  su3csw  The su3csw coefficient
+ */
+inline void set_su3csw(QudaInvertParam* param, double su3csw)
+{
+  param->clover_csw = su3csw;
+  if (su3csw != 0.0) {
+    param->clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
+    param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
+    param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    param->clover_cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
+
+    param->clover_coeff = 0.0;
+
+    /* Set to Wilson Dirac operator with Clover term */
+    param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+
+    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
+      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
+      param->compute_clover = true;
+    } else {
+      param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
+    }
+  }
+}
+
+
+
+/**
+ * @brief      Check if the solver parameters are in sync with the parameters
+ *             from openQCD.
+ *
+ * @param      param_  The parameter struct
+ *
+ * @return     Whether parameters are in sync or not
+ */
+int openQCD_qudaSolverCheck(void *param_)
+{
+  QudaInvertParam* param = static_cast<QudaInvertParam*>(param_);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+  bool ret = true;
+
+  if (param->kappa != (1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0)))) {
+    logQuda(QUDA_VERBOSE, "Property m0/kappa does not match in QudaInvertParam struct and openQxD:dirac_parms (%.2e, %.2e)\n",
+      (1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0))), param->kappa);
+    ret = false;
+  }
+
+  if (additional_prop->u1csw != qudaState.layout.dirac_parms().u1csw) {
+    logQuda(QUDA_VERBOSE, "Property u1csw does not match in QudaInvertParam struct and openQxD:dirac_parms (%.2e, %.2e)\n",
+      qudaState.layout.dirac_parms().u1csw, additional_prop->u1csw);
+    ret = false;
+  }
+
+  if (param->clover_csw != qudaState.layout.dirac_parms().su3csw) {
+    logQuda(QUDA_VERBOSE, "Property su3csw/clover_csw does not match in QudaInvertParam struct and openQxD:dirac_parms (%.2e, %.2e)\n",
+      qudaState.layout.dirac_parms().su3csw, param->clover_csw);
+    ret = false;
+  }
+
+  return ret;
+}
+
+
+/**
+ * @brief      Transfer the gauge field, and (re-)calculate or transfer the
+ *             clover field if the gauge field was updated in openQxD. Update
+ *             the settings kappa, su3csw and u1csw in the QudaInvertParam
+ *             struct. Set up or update the multigrid instance if set in
+ *             QudaInvertParam.
+ *
+ * @param      param_  The parameter struct, where in param->additional_prop a
+ *                     pointer to the QudaMultigridParam struct was placed.
+ */
+void openQCD_qudaSolverUpdate(void *param_)
+{
+  if (param_ == nullptr) {
+    errorQuda("Solver handle is NULL.");
+  }
+
+  QudaInvertParam* param = static_cast<QudaInvertParam*>(param_);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+
+  bool do_param_update = !openQCD_qudaSolverCheck(param_);
+  bool do_gauge_update = !gauge_field_get_up2date() && !gauge_field_get_unset();
+  bool do_clover_update = do_gauge_update || do_param_update || !clover_field_get_up2date(param);
+  bool do_multigrid_update = param->inv_type_precondition == QUDA_MG_INVERTER && (do_gauge_update || do_clover_update);
+
+  if (do_gauge_update) {
+    if (qudaState.layout.h_gauge == nullptr) {
+      errorQuda("qudaState.layout.h_gauge is not set.");
+    }
+    logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
+    void *h_gauge = qudaState.layout.h_gauge();
+    PUSH_RANGE("openQCD_qudaGaugeLoad",3);
+    QudaReconstructType rec = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
+
+    /**
+     * We set t_boundary = QUDA_ANTI_PERIODIC_T. This setting is a label that
+     * tells QUDA the current state of the residing gauge field, that is the
+     * same state as the one we transfer from openqxd. In openqxd the hdfld
+     * exhibits phases of -1 for the temporal time boundaries, meaning that the
+     * gauge fields are explicitly multiplied by -1 on the t=0 time slice, see
+     * chs_hd0() in hflds.c. The QUDA_ANTI_PERIODIC_T flag says that these
+     * phases are incorporated into the field and that QUDA has to add these
+     * phases on the t=0 time slice when reconstructing the field from
+     * QUDA_RECONSTRUCT_8/12, but not from QUDA_RECONSTRUCT_NO. In case of
+     * QUDA_RECONSTRUCT_NO the value if t_boundary has no effect.
+     *
+     * @see        https://github.com/lattice/quda/issues/1315
+     * @see        Reconstruct#Unpack() in gauge_field_order.h
+     * @see        Reconstruct<8,...>#Unpack() in gauge_field_order.h
+     * @see        Reconstruct<12,...>#Unpack() in gauge_field_order.h
+     */
+    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION, rec, QUDA_ANTI_PERIODIC_T);
+    gauge_field_set_up2date();
+    POP_RANGE;
+  }
+
+  if (do_param_update) {
+    param->kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
+    additional_prop->u1csw = qudaState.layout.dirac_parms().u1csw;
+    set_su3csw(param, qudaState.layout.dirac_parms().su3csw);
+  }
+
+  if (do_clover_update) {
+    if (param->clover_csw == 0.0) {
+      freeCloverQuda();
+    } else {
+      if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
+        /**
+         * SU3 case:
+         * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
+         * the GPU and finally calls @createCloverQuda to calculate the clover
+         * field.
+         */
+        logQuda(QUDA_VERBOSE, "Generating clover field in QUDA ...\n");
+        PUSH_RANGE("loadCloverQuda",3);
+        loadCloverQuda(NULL, NULL, param);
+        POP_RANGE;
+      } else {
+        /**
+         * U3 case: Transfer the SW-field from openQCD.
+         */
+
+        if (qudaState.layout.h_sw == nullptr) {
+          errorQuda("qudaState.layout.h_sw is not set.");
+        }
+
+        logQuda(QUDA_VERBOSE, "Loading clover field from openQCD ...\n");
+        void *h_sw = qudaState.layout.h_sw();
+        PUSH_RANGE("openQCD_qudaCloverLoad",3);
+        openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw);
+        POP_RANGE;
+
+        /*loadCloverQuda(qudaState.layout.h_sw(), NULL, param);*/
+        /* The above line would be prefered over openQCD_qudaCloverLoad, but throws this error, no idea why?
+        QUDA: ERROR: qudaEventRecord_ returned CUDA_ERROR_ILLEGAL_ADDRESS
+         (timer.h:82 in start())
+         (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const char*, const char*, const char*, bool)())
+        QUDA:        last kernel called was (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)*/
+      }
+    }
+  }
+
+  /* setup/update the multigrid instance or do nothing */
+  if (do_multigrid_update) {
+    QudaMultigridParam* mg_param = reinterpret_cast<openQCD_QudaSolver*>(param->additional_prop)->mg_param;
+
+    if (mg_param == nullptr) {
+      errorQuda("No multigrid parameter struct set.");
+    }
+
+    if (param->preconditioner == nullptr) {
+      logQuda(QUDA_VERBOSE, "Setting up multigrid instance ...\n");
+      PUSH_RANGE("newMultigridQuda",4);
+      param->preconditioner = newMultigridQuda(mg_param);
+      POP_RANGE;
+    } else {
+      logQuda(QUDA_VERBOSE, "Updating up multigrid instance ...\n");
+      PUSH_RANGE("updateMultigridQuda",4);
+      updateMultigridQuda(param->preconditioner, mg_param);
+      POP_RANGE;
+    }
+  }
+}
+
+
+void* openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
-  void *mgprec;
-  static int ad_rev = -1;
-  static int ud_rev = -1;
-  static int ad_rev_old = -2;
-  static int ud_rev_old = -2;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
@@ -911,6 +1173,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   QudaInvertParam* param = new QudaInvertParam(newQudaInvertParam());
   QudaInvertParam* invert_param_mg = new QudaInvertParam(newQudaInvertParam());
   QudaMultigridParam* multigrid_param = new QudaMultigridParam(newQudaMultigridParam());
+  std::string section = "Solver " + std::to_string(id);
 
   /* Some default settings */
   /* Some of them should not be changed */
@@ -933,31 +1196,13 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   param->inv_type_precondition = QUDA_INVALID_INVERTER; /* disables any preconditioning   */
   param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  if (qudaState.layout.dirac_parms().su3csw != 0.0) {
-    param->clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
-    param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
-    param->clover_cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION;
-
-    param->clover_csw = qudaState.layout.dirac_parms().su3csw;
-    param->clover_coeff = 0.0;
-
-    /* Set to Wilson Dirac operator with Clover term */
-    param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-
-    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
-      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
-      param->compute_clover = true;
-    } else {
-      param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
-    }
-  }
+  set_su3csw(param, qudaState.layout.dirac_parms().su3csw);
 
   if (my_rank == 0) {
 
     KeyValueStore kv;
     kv.set_map(&enum_map);
-    kv.load(infile);
+    kv.load(qudaState.infile);
 
     param->verbosity = kv.get<QudaVerbosity>(section, "verbosity", param->verbosity);
 
@@ -967,7 +1212,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
     if (kv.get<std::string>(section, "solver") != "QUDA") {
       errorQuda("Solver section \"%s\" in file %s is not a valid quda-solver section (solver = %s)\n",
-        section, infile, kv.get<std::string>(section, "solver").c_str());
+        section.c_str(), qudaState.infile, kv.get<std::string>(section, "solver").c_str());
     }
 
     /* both fields reside on the CPU */
@@ -1093,7 +1338,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
     if (param->inv_type_precondition == QUDA_MG_INVERTER) {
 
-      std::string mg_section = std::string(section) + " Multigrid";
+      std::string mg_section = section + " Multigrid";
 
       /* (shallow) copy the struct */
       *invert_param_mg = *param;
@@ -1119,7 +1364,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       multigrid_param->thin_update_only = kv.get<QudaBoolean>(mg_section, "thin_update_only", multigrid_param->thin_update_only);
 
       for (int i=0; i<multigrid_param->n_level; i++) {
-        std::string subsection = std::string(section) + " Multigrid Level " + std::to_string(i);
+        std::string subsection = section + " Multigrid Level " + std::to_string(i);
 
         multigrid_param->geo_block_size[i][0] = kv.get<int>(subsection, "geo_block_size[1]", multigrid_param->geo_block_size[i][0]);
         multigrid_param->geo_block_size[i][1] = kv.get<int>(subsection, "geo_block_size[2]", multigrid_param->geo_block_size[i][1]);
@@ -1194,131 +1439,165 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   MPI_Bcast((void*) multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
   multigrid_param->invert_param = invert_param_mg;
 
-  /* get current residing gauge field revision (residing in openqxd) */
-  qudaState.layout.get_gfld_flags(&ud_rev, &ad_rev);
-
-  /* whether to update the gauge/clover field or not */
-  bool update = ud_rev != ud_rev_old || ad_rev != ad_rev_old;
-  logQuda(QUDA_VERBOSE, "Gauge/Clover field updated in openQxD according to flag-database: %s\n", update ? "true" : "false");
-
-  if (qudaState.layout.h_gauge != nullptr && update) {
-    logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
-    void *h_gauge = qudaState.layout.h_gauge();
-    PUSH_RANGE("openQCD_qudaGaugeLoad",3);
-    QudaReconstructType rec = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
-
-    /**
-     * We set t_boundary = QUDA_ANTI_PERIODIC_T. This setting is a label that
-     * tells QUDA the current state of the residing gauge field, that is the
-     * same state as the one we transfer from openqxd. In openqxd the hdfld
-     * exhibits phases of -1 for the temporal time boundaries, meaning that the
-     * gauge fields are explicitly multiplied by -1 on the t=0 time slice, see
-     * chs_hd0() in hflds.c. The QUDA_ANTI_PERIODIC_T flag says that these
-     * phases are incorporated into the field and that QUDA has to add these
-     * phases on the t=0 time slice when reconstructing the field from
-     * QUDA_RECONSTRUCT_8/12, but not from QUDA_RECONSTRUCT_NO. In case of
-     * QUDA_RECONSTRUCT_NO the value if t_boundary has no effect.
-     *
-     * @see        https://github.com/lattice/quda/issues/1315
-     * @see        Reconstruct#Unpack() in gauge_field_order.h
-     * @see        Reconstruct<8,...>#Unpack() in gauge_field_order.h
-     * @see        Reconstruct<12,...>#Unpack() in gauge_field_order.h
-     */
-    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION, rec, QUDA_ANTI_PERIODIC_T);
-    ud_rev_old = ud_rev;
-    ad_rev_old = ad_rev;
-    POP_RANGE;
-  }
-
-  if (param->clover_csw != 0.0 && update) {
-    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
-      /**
-       * SU3 case:
-       * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
-       * the GPU and finally calls @createCloverQuda to calculate the clover
-       * field.
-       */
-      logQuda(QUDA_VERBOSE, "Generating clover field in QUDA ...\n");
-      PUSH_RANGE("loadCloverQuda",3);
-      loadCloverQuda(NULL, NULL, param);
-      POP_RANGE;
-    } else {
-      /**
-       * U3 case: Transfer the SW-field from openQCD.
-       */
-      logQuda(QUDA_VERBOSE, "Loading clover field from openQCD ...\n");
-      void *h_sw = qudaState.layout.h_sw();
-      PUSH_RANGE("openQCD_qudaCloverLoad",3);
-      openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw);
-      POP_RANGE;
-
-      /*loadCloverQuda(qudaState.layout.h_sw(), NULL, param);*/
-      /* The above line would be prefered over openQCD_qudaCloverLoad, but throws this error, no idea why?
-      QUDA: ERROR: qudaEventRecord_ returned CUDA_ERROR_ILLEGAL_ADDRESS
-       (timer.h:82 in start())
-       (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const char*, const char*, const char*, bool)())
-      QUDA:        last kernel called was (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)*/
-    }
-  }
-
-  if (param->inv_type_precondition == QUDA_MG_INVERTER) {
-    logQuda(QUDA_VERBOSE, "Setting up multigrid solver ...\n");
-    PUSH_RANGE("newMultigridQuda",4);
-    mgprec = newMultigridQuda(multigrid_param);
-    param->preconditioner = mgprec;
-    POP_RANGE;
-  }
-
-  if (param->verbosity >= QUDA_DEBUG_VERBOSE) {
-    printQudaInvertParam(param);
-  }
-
-  if (param->inv_type_precondition == QUDA_MG_INVERTER) {
-    if (param->verbosity >= QUDA_DEBUG_VERBOSE) {
-      printQudaMultigridParam(multigrid_param);
-    }
-  }
+  /**
+   * We need a void* to store the multigrid_param (QudaMultigridParam) struct,
+   * such that we can access it and setup multigrid in a later stage, for
+   * instance right before calling invertQuda() if multigrid was not
+   * instantiated until then.
+   */
+  openQCD_QudaSolver *additional_prop = new openQCD_QudaSolver();
+  strcpy(additional_prop->infile, qudaState.infile);
+  additional_prop->id = id;
+  additional_prop->mg_param = multigrid_param;
+  qudaState.layout.get_swfld_flags(&additional_prop->ud_swd_rev, &additional_prop->ad_swd_rev);
+  additional_prop->u1csw = qudaState.layout.dirac_parms().u1csw;
+  param->additional_prop = reinterpret_cast<void*>(additional_prop);
 
   return (void*) param;
 }
 
 
-double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, int *status)
+void* openQCD_qudaSolverGetHandle(int id)
 {
-  QudaInvertParam* invert_param = static_cast<QudaInvertParam*>(param);
-  invert_param->mu = mu;
+  if (qudaState.handles[id] == nullptr) {
+    printfQuda("read in solver parameters from file %s for solver id=%d\n",
+      qudaState.infile, id);
+    qudaState.handles[id] = openQCD_qudaSolverReadIn(id);
+  }
+
+  openQCD_qudaSolverUpdate(qudaState.handles[id]);
+  return qudaState.handles[id];
+}
+
+
+/**
+ * @brief      Take the string-hash over a struct using std::hash.
+ *
+ * @param[in]  in    Input struct
+ *
+ * @tparam     T     Type of input struct
+ *
+ * @return     Hash value
+ */
+template <typename T> int hash_struct(T *in)
+{
+  int hash = 0;
+  char* cstruct = reinterpret_cast<char*>(in);
+
+  for (char* c = cstruct; c < cstruct + sizeof(T); c += strlen(c) + 1) {
+    if (strlen(c) != 0) {
+      hash ^= (std::hash<std::string>{}(std::string(c)) << 1);
+    }
+  }
+
+  return hash;
+}
+
+
+int openQCD_qudaSolverGetHash(int id)
+{
+  QudaInvertParam* param = reinterpret_cast<QudaInvertParam*>(openQCD_qudaSolverGetHandle(id));
+  QudaInvertParam hparam = newQudaInvertParam();
+  memset(&hparam, '\0', sizeof(QudaInvertParam)); /* set everything to zero */
+
+  /* Set some properties we want to take the hash over */
+  hparam.inv_type             = param->inv_type;
+  hparam.tol                  = param->tol;
+  hparam.tol_restart          = param->tol_restart;
+  hparam.tol_hq               = param->tol_hq;
+  hparam.maxiter              = param->maxiter;
+  hparam.reliable_delta       = param->reliable_delta;
+  hparam.solution_type        = param->solution_type;
+  hparam.solve_type           = param->solve_type;
+  hparam.matpc_type           = param->matpc_type;
+  hparam.dagger               = param->dagger;
+  hparam.mass_normalization   = param->mass_normalization;
+  hparam.solver_normalization = param->solver_normalization;
+  hparam.cpu_prec             = param->cpu_prec;
+  hparam.cuda_prec            = param->cuda_prec;
+  hparam.use_init_guess       = param->use_init_guess;
+  hparam.gcrNkrylov           = param->gcrNkrylov;
+
+  return hash_struct<QudaInvertParam>(&hparam);
+}
+
+
+void openQCD_qudaSolverPrintSetup(int id)
+{
+  QudaInvertParam *param = static_cast<QudaInvertParam*>(openQCD_qudaSolverGetHandle(id));
+
+  if (param != nullptr) {
+    openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+
+    printQudaInvertParam(param);
+    printfQuda("additional_prop->infile = %s\n",     additional_prop->infile);
+    printfQuda("additional_prop->id = %d\n",         additional_prop->id);
+    printfQuda("additional_prop->mg_param = %p\n",   additional_prop->mg_param);
+    printfQuda("additional_prop->ud_swd_rev = %d\n", additional_prop->ud_swd_rev);
+    printfQuda("additional_prop->ad_swd_rev = %d\n", additional_prop->ad_swd_rev);
+    printfQuda("additional_prop->u1csw = %.2e\n",    additional_prop->u1csw);
+    printfQuda("handle = %p\n", param);
+    printfQuda("hash = %d\n", openQCD_qudaSolverGetHash(id));
+
+    if (param->inv_type_precondition == QUDA_MG_INVERTER) {
+      printQudaMultigridParam(additional_prop->mg_param);
+    }
+  } else {
+    printfQuda("<Solver is not initialized yet>\n");
+  }
+}
+
+
+double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status)
+{
+  if (gauge_field_get_unset()) {
+    errorQuda("Gauge field not populated in openQxD.");
+  }
+
+  QudaInvertParam* param = static_cast<QudaInvertParam*>(openQCD_qudaSolverGetHandle(id));
+  param->mu = mu;
+
+  if (!openQCD_qudaSolverCheck(param)) {
+    errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync.");
+  }
 
   logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n");
   PUSH_RANGE("invertQuda",5);
-  invertQuda(static_cast<char *>(solution), static_cast<char *>(source), invert_param);
+  invertQuda(static_cast<char *>(solution), static_cast<char *>(source), param);
   POP_RANGE;
 
-  logQuda(QUDA_SUMMARIZE, "openQCD_qudaInvert()\n");
-  logQuda(QUDA_SUMMARIZE, "  true_res    = %.2e\n", invert_param->true_res);
-  logQuda(QUDA_SUMMARIZE, "  true_res_hq = %.2e\n", invert_param->true_res_hq);
-  logQuda(QUDA_SUMMARIZE, "  iter        = %d\n",   invert_param->iter);
-  logQuda(QUDA_SUMMARIZE, "  gflops      = %.2e\n", invert_param->gflops);
-  logQuda(QUDA_SUMMARIZE, "  secs        = %.2e\n", invert_param->secs);
+  *status = param->true_res <= param->tol ? param->iter : -1;
 
-  *status = invert_param->true_res <= invert_param->tol ? invert_param->iter : -1;
+  logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
+  logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", param->true_res);
+  logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", param->true_res_hq);
+  logQuda(QUDA_VERBOSE, "  iter        = %d\n",   param->iter);
+  logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", param->gflops);
+  logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", param->secs);
+  logQuda(QUDA_VERBOSE, "  status      = %d\n",   *status);
 
-  return invert_param->true_res;
+  return param->true_res;
 }
 
 
-void openQCD_qudaSolverDestroy(void *param)
+void openQCD_qudaSolverDestroy(int id)
 {
-  QudaInvertParam* invert_param = static_cast<QudaInvertParam*>(param);
+  QudaInvertParam *param = static_cast<QudaInvertParam*>(openQCD_qudaSolverGetHandle(id));
 
-  if (invert_param->inv_type_precondition == QUDA_MG_INVERTER) {
-    destroyMultigridQuda(invert_param->preconditioner);
+  if (param != nullptr) {
+    if (param->inv_type_precondition == QUDA_MG_INVERTER) {
+      destroyMultigridQuda(param->preconditioner);
+    }
+
+    delete static_cast<openQCD_QudaSolver*>(param->additional_prop)->mg_param;
+    delete static_cast<openQCD_QudaSolver*>(param->additional_prop);
+    delete param;
+    qudaState.handles[id] = nullptr;
   }
-
-  delete invert_param;
 }
 
 
-void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_section)
+void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
 {
   int my_rank;
 
@@ -1332,7 +1611,7 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
 
     KeyValueStore kv;
     kv.set_map(&enum_map);
-    kv.load(infile);
+    kv.load(infile == nullptr ? qudaState.infile : infile);
 
     verbosity = kv.get<QudaVerbosity>(section, "verbosity", verbosity);
 
@@ -1342,7 +1621,7 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
 
     if (kv.get<std::string>(section, "solver") != "QUDA") {
       errorQuda("Eigensolver section \"%s\" in file %s is not a valid quda-eigensolver section (solver = %s)\n",
-        section, infile, kv.get<std::string>(section, "solver").c_str());
+        section, infile == nullptr ? qudaState.infile : infile, kv.get<std::string>(section, "solver").c_str());
     }
 
     param->eig_type = kv.get<QudaEigType>(section, "eig_type", param->eig_type);
@@ -1394,18 +1673,19 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
   /* transfer of the struct to all the processes */
   MPI_Bcast((void*) param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
 
-  if (inv_section != nullptr) {
-    void *inv_param = openQCD_qudaSolverSetup(infile, inv_section);
-    param->invert_param = static_cast<QudaInvertParam*>(inv_param);
-  } else {
+  if (solver_id == -1) {
     param->invert_param = new QudaInvertParam(newQudaInvertParam());
+  } else {
+    void *inv_param = openQCD_qudaSolverGetHandle(solver_id);
+    param->invert_param = static_cast<QudaInvertParam*>(inv_param);
   }
 
   param->invert_param->verbosity = std::max(param->invert_param->verbosity, verbosity);
 
-  if (inv_section != nullptr && param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
+  if (solver_id != -1 && param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaInvertParam(param->invert_param);
   }
+
   if (param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaEigParam(param);
   }
@@ -1433,6 +1713,11 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
 void openQCD_qudaEigensolverDestroy(void *param)
 {
   QudaEigParam* eig_param = static_cast<QudaEigParam*>(param);
-  openQCD_qudaSolverDestroy(eig_param->invert_param);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(eig_param->invert_param->additional_prop);
+  if (additional_prop == nullptr) {
+    delete eig_param->invert_param;
+  } else {
+    openQCD_qudaSolverDestroy(additional_prop->id);
+  }
   delete eig_param;
 }
