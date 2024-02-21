@@ -230,7 +230,7 @@ namespace quda
        Unary constructor
        @param[in] v Object to which we are constructing a vector_ref around
      */
-    template <class U> vector_ref(U &v)
+    template <class U> vector_ref(const U &v)
     {
       auto vset = make_set(v);
       vector::reserve(vset.size());
