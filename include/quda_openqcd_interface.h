@@ -116,10 +116,9 @@ typedef struct {
   bc_parms_t (*bc_parms)(void); /** @see bc_parms() */
   flds_parms_t (*flds_parms)(void); /** @see flds_parms() */
   dirac_parms_t (*dirac_parms)(void); /** @see dirac_parms() */
-  void* (*h_gauge)(void);    /** function to return a pointer to the gauge fields */
-  void* (*h_sw)(void);       /** function to return a pointer to the clover fields */
-  void (*get_gfld_flags)(int *ud, int *ad);      /** function pointer to gauge field query function */
-  void (*get_swfld_flags)(int *uswd, int *aswd); /** function pointer to SW field query function */
+  void* (*h_gauge)(void);    /** function to return a pointer to the gauge field */
+  void* (*h_sw)(void);       /** function to return a pointer to the updated Clover field */
+  void (*get_gfld_flags)(int *ud, int *ad);      /** function pointer to gauge field revision query function */
 } openQCD_QudaLayout_t;
 
 
@@ -138,14 +137,17 @@ typedef struct {
 
 typedef struct {
   int initialized;    /** Whether openQCD_qudaInit() was called or not */
-  int gauge_loaded;   /** Whether openQCD_qudaGaugeLoad() was called or not */
-  int clover_loaded;  /** Whether openQCD_qudaCloverLoad() was called or not */
-  int dslash_setup;   /** Whether openQCD_qudaSetDslashOptions() was called or not */
   int ud_rev;         /** Revision of ud field from openqxd */
   int ad_rev;         /** Revision of ad field from openqxd */
+  int swd_ud_rev;     /** Revision of ud field used to calc/transfer the SW field from openqxd */
+  int swd_ad_rev;     /** Revision of ad field used to calc/transfer the SW field from openqxd */
+  double swd_kappa;   /** kappa corresponding to the current SW field in QUDA */
+  double swd_su3csw;  /** SU(3) csw coefficient corresponding to the current SW field in QUDA */
+  double swd_u1csw;   /** U(1) csw coefficient corresponding to the current SW field in QUDA */
   openQCD_QudaInitArgs_t init;
   openQCD_QudaLayout_t layout;
-  void* handles[32];  /** Array of void-pointers to QudaInvertParam structs */
+  void* handles[32];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  void* dirac_handle; /** void-pointer to QudaInvertParam struct for the Dirac operator */
   char infile[1024];  /** Path to the input file (if given to quda_init()) */
 } openQCD_QudaState_t;
 
@@ -154,9 +156,12 @@ typedef struct openQCD_QudaSolver_s {
   char infile[1024];              /** Path to the input file (if given to quda_init()) */
   int id;                         /** Solver section identifier in the input file */
   QudaMultigridParam* mg_param;   /** Pointer to the multigrid param struct */
-  int ud_swd_rev;                 /** Revision of SU3 SW field from openqxd */
-  int ad_swd_rev;                 /** Revision of U1 SW field from openqxd */
-  double u1csw;                   /** Value of u1csw */
+  double u1csw;                   /** u1csw property */
+  int mg_ud_rev;                  /** Revision of ud field from openqxd */
+  int mg_ad_rev;                  /** Revision of ad field from openqxd */
+  double mg_kappa;                /** kappa corresponding to the current mg-instance in QUDA */
+  double mg_su3csw;               /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
+  double mg_u1csw;                /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
 
@@ -180,7 +185,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
 
 
 /**
- * Destroy the QUDA context.
+ * Destroy the QUDA context and deallocate all solvers.
  */
 void openQCD_qudaFinalize(void);
 
@@ -266,8 +271,19 @@ void openQCD_qudaSpinorFree(void** quda_field);
  * @param[out] dst   Destination spinor field
  * @param[in]  p     Dirac parameter struct
  */
-void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
-void openQCD_qudaDw2(void *param, double mu, void *src, void *dst);
+void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p);
+
+
+/**
+ * @brief      Apply the Dirac operator that corresponds to the current openQxD
+ *             setup to a field. All fields passed and returned are host (CPU)
+ *             fields in openQCD order.
+ *
+ * @param[in]  mu    Twisted mass
+ * @param      in    Input spinor
+ * @param      out   Output spinor
+ */
+void openQCD_qudaDw(double mu, void *in, void *out);
 
 
 /**
@@ -281,10 +297,13 @@ void openQCD_qudaDw2(void *param, double mu, void *src, void *dst);
  * one has to provide a subsection called "Solver {id} Multigrid Level {level}",
  * where {level} runs from 0 to n_level-1. All these subsections may have keys
  * given by all the array-valued members of QudaMultigridParam, for example
- * smoother_tol may appear in all subsections.
+ * smoother_tol may appear in all subsections. This function must be called on
+ * all ranks simulaneously.
  *
  * @param[in]  id    The identifier of the solver section, i.e. "Solver #". The
- *                   input file is taken from the arguments of quda_init().
+ *                   input file is taken from the arguments of quda_init(). If
+ *                   id is -1, then the section called "Lattice parameters" is
+ *                   parsed in the same way.
  *
  * @return     Pointer to the solver context
  */
@@ -294,7 +313,8 @@ void* openQCD_qudaSolverGetHandle(int id);
 
 /**
  * @brief      Return a hash from a subset of the settings in the
- *             QudaInvertParam struct.
+ *             QudaInvertParam struct. Return 0 if the struct is not initialized
+ *             yet.
  *
  * @param[in]  id    The solver identifier
  *
@@ -304,7 +324,9 @@ int openQCD_qudaSolverGetHash(int id);
 
 
 /**
- * @brief      Prints solver information about the QUDA solver.
+ * @brief      Print solver information about the QUDA solver. Print
+ *             "Solver is not initialized yet" is the solver struct is nul
+ *             initialized yet.
  *
  * @param[in]  id    The solver identifier
  */
@@ -353,10 +375,8 @@ void openQCD_qudaSolverDestroy(int id);
  * @param[in]  infile     Ini-file containing sections about the eigen-solver,
  *                        if null we use the value of qudaState.infile
  * @param[in]  section    The section name of the eigen-solver
- * @param[in]  solver_id  The section id of the solver as in
- *                        openQCD_qudaSolverSetup(). If -1, the section is not
- *                        read in and the gauge and clover fields are not
- *                        transfered/updated.
+ * @param[in]  solver_id  The section id of the solver. If -1, the section is
+ *                        not read in.
  *
  * @return     Pointer to the eigen-solver context
  */
