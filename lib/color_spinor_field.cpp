@@ -1199,6 +1199,78 @@ namespace quda
     }
   }
 
+#if 0
+  void ColorSpinorField::commsQuery(int done[], int d[], bool gdr_send[], bool gdr_recv[], int n) const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    // note this is scatter centric, so dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards)
+
+    int nq = 0;
+    bool *complete[4*QUDA_MAX_DIM];
+    MsgHandle *mh[4*QUDA_MAX_DIM];
+
+    for (int i=0; i<n; i++) {
+      int dim = d[i] / 2;
+      int dir = d[i] % 2;
+
+      if (!commDimPartitioned(dim)) return 1;
+      if ((gdr_send[i] || gdr_recv[i]) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
+
+      // first query send to backwards
+      if (comm_peer2peer_enabled(dir, dim)) {
+	if (!complete_send[dim][dir]) {
+	  complete[nq] = &complete_send[dim][dir];
+	  mh[nq] = mh_send_p2p[bufferIndex][dim][dir];
+	  nq++;
+	}
+      } else if (gdr_send) {
+	if (!complete_send[dim][dir]) {
+	  complete[nq] = &complete_send[dim][dir];
+	  mh[nq] = mh_send_rdma[bufferIndex][dim][dir];
+	  nq++;
+	}
+      } else {
+	if (!complete_send[dim][dir]) {
+	  complete[nq] = &complete_send[dim][dir];
+	  mh[nq] = mh_send[bufferIndex][dim][dir];
+	  nq++;
+	}
+      }
+
+      // second query receive from forwards
+      if (comm_peer2peer_enabled(1 - dir, dim)) {
+	if (!complete_recv[dim][1 - dir]) {
+	  complete[nq] = &complete_recv[dim][1 - dir];
+	  mh[nq] = mh_recv_p2p[bufferIndex][dim][1 - dir];
+	  nq++;
+	}
+      } else if (gdr_recv) {
+	if (!complete_recv[dim][1 - dir]) {
+	  complete[nq] = &complete_recv[dim][1 - dir];
+	  mh[nq] = mh_recv_rdma[bufferIndex][dim][1 - dir];
+	  nq++;
+	}
+      } else {
+	if (!complete_recv[dim][1 - dir]) {
+	  complete[nq] = &complete_recv[dim][1 - dir];
+	  mh[nq] = mh_recv[bufferIndex][dim][1 - dir];
+	  nq++;
+	}
+      }
+    }
+    comm_query(complete, mh, nq);
+
+    if (complete_recv[dim][1 - dir] && complete_send[dim][dir]) {
+      complete_send[dim][dir] = false;
+      complete_recv[dim][1 - dir] = false;
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+#endif
+
   void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");

@@ -733,6 +733,8 @@ namespace quda
 
   int comm_query(MsgHandle *mh);
 
+  void comm_query(int n, MsgHandle *mh[], int *outcount, int array_of_indices[]);
+
   template <typename T> T deterministic_reduce(T *array, int n)
   {
     std::sort(array, array + n); // sort reduction into ascending order for deterministic reduction

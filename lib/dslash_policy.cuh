@@ -71,7 +71,10 @@ namespace quda
               if (commDim[j]) prev = 2 * j;
             previousDir[2 * i + 1] = prev;
             previousDir[2 * i + 0] = 2 * i + 1; // always valid
-          }
+          } else {
+	    commsCompleted[2*i] = -1;  // mark them invalid for convenience
+	    commsCompleted[2*i+1] = -1;
+	  }
         }
 
         // this tells us how many events / comms occurances there are in
@@ -281,6 +284,23 @@ namespace quda
 
     }
     return comms_test;
+  }
+
+  // checks complete on all communications
+  inline void commsComplete(DslashCommsPattern &pattern, const ColorSpinorField &in, bool gdr_send, bool gdr_recv,
+			    bool zero_copy_recv, int scatterIndex = -1)
+  {
+    for (int i = 3; i >= 0; i--) {
+      for (int dir = 1; dir >= 0; dir--) {
+	// Query if comms has finished
+	if (!pattern.commsCompleted[2 * i + dir]) {
+	  if (commsComplete(in, in, i, dir, gdr_send, gdr_recv, zero_copy_recv, scatterIndex)) {
+	    pattern.commsCompleted[2 * i + dir] = 1;
+	    pattern.completeSum++;
+	  }
+	}
+      } // dir=0,1
+    }
   }
 
   /**
@@ -637,9 +657,10 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
+	commsComplete(pattern, in, true, true, false);
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
-
+#if 0
           for (int dir = 1; dir >= 0; dir--) {
 
             // Query if comms has finished
@@ -651,7 +672,7 @@ namespace quda
             }
 
           } // dir=0,1
-
+#endif
           if (!pattern.dslashCompleted[2 * i] && pattern.dslashCompleted[pattern.previousDir[2 * i + 1]]
               && pattern.commsCompleted[2 * i] && pattern.commsCompleted[2 * i + 1]) {
             dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -720,6 +741,8 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
+	commsComplete(pattern, in, true, true, false);
+#if 0
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
 
@@ -734,6 +757,7 @@ namespace quda
             }
           } // dir=0,1
         }   // i
+#endif
       }     // pattern.completeSum < pattern.CommDimTotal
 
       // Launch exterior kernel

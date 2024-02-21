@@ -271,6 +271,13 @@ namespace quda
     return query;
   }
 
+  void Communicator::comm_query(int n, MsgHandle *mh[], int *outcount, int array_of_indices[])
+  {
+    MPI_Request req[n];
+    for (int i=0; i<n; i++) req[i] = mh[i]->request;
+    MPI_CHECK(MPI_Testsome(n, req, outcount, array_of_indices, MPI_STATUSES_IGNORE));
+  }
+
   void Communicator::comm_allreduce_sum_array(double *data, size_t size)
   {
     if (!comm_deterministic_reduce()) {
