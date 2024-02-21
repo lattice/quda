@@ -597,14 +597,16 @@ namespace quda {
       axpy_L(a_, x_, y_);
     }
 
-    void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
-      std::vector<Complex> a_(x.size() * y.size());
-      memcpy(a_.data(), a, x.size() * y.size() * sizeof(Complex));
-      vector_ref<const ColorSpinorField> x_;
-      for (auto &xi : x) x_.push_back(*xi);
-      vector_ref<ColorSpinorField> y_;
-      for (auto &yi : y) y_.push_back(*yi);
-      caxpy(a_, x_, y_);
+    namespace legacy {
+      void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+        std::vector<Complex> a_(x.size() * y.size());
+        memcpy(a_.data(), a, x.size() * y.size() * sizeof(Complex));
+        vector_ref<const ColorSpinorField> x_;
+        for (auto &xi : x) x_.push_back(*xi);
+        vector_ref<ColorSpinorField> y_;
+        for (auto &yi : y) y_.push_back(*yi);
+        blas::caxpy(a_, x_, y_);
+      }
     }
 
     void caxpy_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {

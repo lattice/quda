@@ -130,7 +130,7 @@ namespace quda {
 
        std::vector<ColorSpinorField *> v_(v->Components().begin(), v->Components().begin() + 2 * k);
 
-       blas::cDotProduct(s.get(), w_, v_);
+       blas::legacy::cDotProduct(s.get(), w_, v_);
 
        Map<VectorXcd, Unaligned> s_(s.get(), 2 * k);
        s_ *= inv_sqrt_r2;
@@ -290,7 +290,7 @@ namespace quda {
     std::vector<ColorSpinorField*> v2k(args.V2k->Components());
 
     RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
-    blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
+    blas::legacy::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
 
     for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
 

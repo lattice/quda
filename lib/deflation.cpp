@@ -101,7 +101,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
 
     for (int i = 0; i < n_evs_to_print; i++) {
       zero(*r);
-      blas::caxpy(&projm.get()[i * param.ld], rv, res); // multiblas
+      blas::legacy::caxpy(&projm.get()[i * param.ld], rv, res); // multiblas
       *r_sloppy = *r;
       param.matDeflation(*Av_sloppy, *r_sloppy);
       double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
@@ -133,7 +133,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     std::vector<ColorSpinorField*> in_;
     in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
 
-    blas::cDotProduct(vec.get(), rv_, in_);//<i, b>
+    blas::legacy::cDotProduct(vec.get(), rv_, in_);//<i, b>
 
     if (!param.use_inv_ritz) {
       if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
@@ -154,7 +154,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     std::vector<ColorSpinorField*> out_;
     out_.push_back(&x);
 
-    blas::caxpy(vec.get(), rv_, out_); //multiblas
+    blas::legacy::caxpy(vec.get(), rv_, out_); //multiblas
 
     check_nrm2 = norm2(x);
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
@@ -198,9 +198,9 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
         std::vector<ColorSpinorField *> vi_;
         vi_.push_back(accum);
 
-        blas::cDotProduct(alpha.get(), vj_, vi_);
+        blas::legacy::cDotProduct(alpha.get(), vj_, vi_);
         for (int j = 0; j < local_length; j++) alpha[j] = -alpha[j];
-        blas::caxpy(alpha.get(), vj_, vi_); // i-<j,i>j
+        blas::legacy::caxpy(alpha.get(), vj_, vi_); // i-<j,i>j
 
         offset += cdot_pipeline_length;
       }
@@ -224,7 +224,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
         std::vector<ColorSpinorField *> av_;
         av_.push_back(Av_sloppy);
 
-        blas::cDotProduct(alpha.get(), vj_, av_);
+        blas::legacy::cDotProduct(alpha.get(), vj_, av_);
 
         for (int j = 0; j < i; j++) {
           param.matProj[i * param.ld + j] = alpha[j];
@@ -292,7 +292,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       res.push_back(r);
 
       blas::zero(*r);
-      blas::caxpy(&projm.get()[idx * param.ld], rv, res); // multiblas
+      blas::legacy::caxpy(&projm.get()[idx * param.ld], rv, res); // multiblas
       blas::copy(buff->Component(idx), *r);
 
       if (do_residual_check) { // if tol=0.0 then disable relative residual norm check
