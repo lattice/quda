@@ -315,7 +315,7 @@ namespace quda
     }
     bool done[2*4] = {};
     if(dslash_comms) {
-      PROFILE(in.commsQuery(n, d, done, gdr_send, gdr_recv), profile, QUDA_PROFILE_COMMS_QUERY);
+      PROFILE(in.commsQuery(nq, d, done, gdr_send, gdr_recv), profile, QUDA_PROFILE_COMMS_QUERY);
     }
     for(int i=0; i<nq; i++) {
       if (!dslash_comms || done[i]) {
