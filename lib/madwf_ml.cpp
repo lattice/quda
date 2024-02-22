@@ -217,7 +217,7 @@ namespace quda
         ref(lambda, tmp);
 
         std::vector<Complex> dot(9);
-        blas::cDotProduct(dot, {chi, theta, lambda}, {chi, theta, lambda});
+        blas::block::cDotProduct(dot, {chi, theta, lambda}, {chi, theta, lambda});
 
         a[0] += dot[0].real();
         a[1] += -2.0 * dot[1].real();

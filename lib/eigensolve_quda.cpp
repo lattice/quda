@@ -346,7 +346,7 @@ namespace quda
     const Complex Unit(1.0, 0.0);
 
     std::vector<Complex> H(size * size);
-    blas::hDotProduct(H, {vecs.begin(), vecs.begin() + size}, {vecs.begin(), vecs.begin() + size});
+    blas::block::hDotProduct(H, {vecs.begin(), vecs.begin() + size}, {vecs.begin(), vecs.begin() + size});
 
     double epsilon = setEpsilon(vecs[0].Precision());
 
@@ -381,9 +381,9 @@ namespace quda
         logQuda(QUDA_DEBUG_VERBOSE, "Current block size = %d\n", array_size);
 
         std::vector<Complex> s(array_size);
-        blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
+        blas::block::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
         for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
-        blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // i = i - proj_{j}(i) = i - <j|i> * j
+        blas::block::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // i = i - proj_{j}(i) = i - <j|i> * j
       }
       double norm = sqrt(blas::norm2(vecs[i]));
       blas::ax(1.0 / norm, vecs[i]); // i/<i|i>
@@ -403,11 +403,11 @@ namespace quda
       std::vector<Complex> s(array_size);
 
       // Block dot products stored in s.
-      blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
+      blas::block::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
 
       // Block orthogonalise
       for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
-      blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
+      blas::block::caxpy(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
     }
   }
 
@@ -484,9 +484,9 @@ namespace quda
     auto k = {kSpace.begin() + offset, kSpace.begin() + offset + j_range.second - j_range.first};
 
     switch (b_type) {
-    case PENCIL: blas::axpy(batch_array, v, k); break;
-    case LOWER_TRI: blas::axpy_L(batch_array, v, k); break;
-    case UPPER_TRI: blas::axpy_U(batch_array, v, k); break;
+    case PENCIL: blas::block::axpy(batch_array, v, k); break;
+    case LOWER_TRI: blas::block::axpy_L(batch_array, v, k); break;
+    case UPPER_TRI: blas::block::axpy_U(batch_array, v, k); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
   }
@@ -556,8 +556,8 @@ namespace quda
 
     // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<Complex> s(n_defl * src.size());
-    blas::cDotProduct(s, {evecs.begin() + eig_param->n_conv, evecs.begin() + eig_param->n_conv + n_defl},
-                      {src.begin(), src.end()});
+    blas::block::cDotProduct(s, {evecs.begin() + eig_param->n_conv, evecs.begin() + eig_param->n_conv + n_defl},
+                             {src.begin(), src.end()});
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
@@ -565,7 +565,7 @@ namespace quda
     if (!accumulate) for (auto &x : sol) blas::zero(x);
     for (int i = 0; i < n_defl; i++) s[i] /= evals[i].real();
 
-    blas::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
+    blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
   void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
@@ -620,7 +620,7 @@ namespace quda
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
     std::vector<Complex> s(n_defl * src.size());
-    blas::cDotProduct(s, {evecs.begin(), evecs.begin() + n_defl}, {src.begin(), src.end()});
+    blas::block::cDotProduct(s, {evecs.begin(), evecs.begin() + n_defl}, {src.begin(), src.end()});
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
@@ -628,7 +628,7 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate) for (auto &x : sol) blas::zero(x);
 
-    blas::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
+    blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
   void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace,
@@ -789,7 +789,7 @@ namespace quda
       blas::zero(kSpace_ref);
 
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-      blas::axpy(rot_array, vecs_ref, kSpace_ref);
+      blas::block::axpy(rot_array, vecs_ref, kSpace_ref);
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
       // Copy compressed Krylov

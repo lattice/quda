@@ -304,6 +304,8 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
+    namespace block {
+
     template <>
     void axpy<double>(const std::vector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
     {
@@ -597,6 +599,8 @@ namespace quda {
       axpy_L(a_, x_, y_);
     }
 
+  }
+
     namespace legacy {
       void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
         std::vector<Complex> a_(x.size() * y.size());
@@ -605,9 +609,8 @@ namespace quda {
         for (auto &xi : x) x_.push_back(*xi);
         vector_ref<ColorSpinorField> y_;
         for (auto &yi : y) y_.push_back(*yi);
-        blas::caxpy(a_, x_, y_);
+        blas::block::caxpy(a_, x_, y_);
       }
-    }
 
     void caxpy_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       std::vector<Complex> a_(x.size() * y.size());
@@ -616,7 +619,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      caxpy_U(a_, x_, y_);
+      blas::block::caxpy_U(a_, x_, y_);
     }
 
     void caxpy_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -626,7 +629,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      caxpy_L(a_, x_, y_);
+      blas::block::caxpy_L(a_, x_, y_);
     }
 
     void axpyz(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -640,7 +643,7 @@ namespace quda {
       for (auto &yi : y) y_.push_back(*yi);
       vector_ref<ColorSpinorField> z_;
       for (auto &zi : z) z_.push_back(*zi);
-      axpyz(a_, x_, y_, z_);
+      blas::block::axpyz(a_, x_, y_, z_);
     }
 
     void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -654,7 +657,7 @@ namespace quda {
       for (auto &yi : y) y_.push_back(*yi);
       vector_ref<ColorSpinorField> z_;
       for (auto &zi : z) z_.push_back(*zi);
-      caxpyz(a_, x_, y_, z_);
+      blas::block::caxpyz(a_, x_, y_, z_);
     }
 
     void axpyBzpcx(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
@@ -671,7 +674,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      axpyBzpcx(a_, x_, y_, b_, z, c_);
+      blas::block::axpyBzpcx(a_, x_, y_, b_, z, c_);
     }
 
     void caxpyBxpz(const Complex *a, std::vector<ColorSpinorField*> &x, ColorSpinorField &y,
@@ -684,26 +687,9 @@ namespace quda {
 
       vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      caxpyBxpz(a_, x_, y, b_, z);
+      blas::block::caxpyBxpz(a_, x_, y, b_, z);
     }
 
-    // Composite field version
-    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y){ caxpy(a, x.Components(), y.Components()); }
-    void caxpy_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_U(a, x.Components(), y.Components()); }
-    void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_L(a, x.Components(), y.Components()); }
-
-    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x.Components(), y.Components()); }
-    void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_U(a, x.Components(), y.Components()); }
-    void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_L(a, x.Components(), y.Components()); }
-
-    void axpyz(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
-    {
-      axpyz(a, x.Components(), y.Components(), z.Components());
-    }
-
-    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
-    {
-      caxpyz(a, x.Components(), y.Components(), z.Components());
     }
 
   } // namespace blas

@@ -31,12 +31,12 @@ namespace quda
       // linear system is Hermitian, solve directly
       // compute rhs vector phi = P* b = (q_i, b) and construct the matrix
       // P* Q = P* A P = (p_i, q_j) = (p_i, A p_j)
-      blas::cDotProduct(A_, p, {q, b});
+      blas::block::cDotProduct(A_, p, {q, b});
     } else {
       // linear system is not Hermitian, solve the normal system
       // compute rhs vector phi = Q* b = (q_i, b) and construct the matrix
       // Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-      blas::cDotProduct(A_, q, {q, b});
+      blas::block::cDotProduct(A_, q, {q, b});
     }
 
     for (int i = 0; i < N; i++) {
@@ -93,13 +93,13 @@ namespace quda
 
         if (i + 1 < N) {
           std::vector<Complex> alpha(N - (i + 1));
-          blas::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
+          blas::block::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
           for (auto &a : alpha) a = -a;
-          blas::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
+          blas::block::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
 
           if (!apply_mat) {
             // if not applying the matrix below then orthogonalize q
-            blas::caxpy(alpha, {q[i]}, {q.begin() + i + 1, q.end()});
+            blas::block::caxpy(alpha, {q[i]}, {q.begin() + i + 1, q.end()});
           }
         }
       }
@@ -122,7 +122,7 @@ namespace quda
     }
 
     blas::zero(x);
-    blas::caxpy(alpha, p, x);
+    blas::block::caxpy(alpha, p, x);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       // compute the residual only if we're going to print it

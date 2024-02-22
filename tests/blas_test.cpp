@@ -487,43 +487,43 @@ protected:
         break;
 
       case Kernel::axpy_block:
-        for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::axpy(Ar, xmD, ymoD);
         break;
 
       case Kernel::caxpy_block:
-        for (int i = 0; i < niter; ++i) blas::caxpy(A, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::caxpy(A, xmD, ymoD);
         break;
 
       case Kernel::axpyz_block:
-        for (int i = 0; i < niter; ++i) blas::axpyz(Ar, xmD, ymD, wmD);
+        for (int i = 0; i < niter; ++i) blas::block::axpyz(Ar, xmD, ymD, wmD);
         break;
 
       case Kernel::caxpyz_block:
-        for (int i = 0; i < niter; ++i) blas::caxpyz(A, xmD, ymD, wmD);
+        for (int i = 0; i < niter; ++i) blas::block::caxpyz(A, xmD, ymD, wmD);
         break;
 
       case Kernel::axpyBzpcx_block:
-        for (int i = 0; i < niter; ++i) blas::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
+        for (int i = 0; i < niter; ++i) blas::block::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
         break;
 
       case Kernel::reDotProductNorm_block:
-        for (int i = 0; i < niter; ++i) blas::reDotProduct(A2r, xmD, xmD);
+        for (int i = 0; i < niter; ++i) blas::block::reDotProduct(A2r, xmD, xmD);
         break;
 
       case Kernel::reDotProduct_block:
-        for (int i = 0; i < niter; ++i) blas::reDotProduct(A2r, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::reDotProduct(A2r, xmD, ymoD);
         break;
 
       case Kernel::cDotProductNorm_block:
-        for (int i = 0; i < niter; ++i) blas::cDotProduct(A2, xmD, xmD);
+        for (int i = 0; i < niter; ++i) blas::block::cDotProduct(A2, xmD, xmD);
         break;
 
       case Kernel::cDotProduct_block:
-        for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::cDotProduct(A, xmD, ymoD);
         break;
 
       case Kernel::hDotProduct_block:
-        for (int i = 0; i < niter; ++i) blas::hDotProduct(A2, xmD, xmD);
+        for (int i = 0; i < niter; ++i) blas::block::hDotProduct(A2, xmD, xmD);
         break;
 
       case Kernel::caxpyXmazMR:
@@ -871,7 +871,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
 
-      blas::axpy(Ar, xmD, ymoD);
+      blas::block::axpy(Ar, xmD, ymoD);
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) { blas::axpy(Ar[Msrc * i + j], xmH[i], ymH[j]); }
       }
@@ -887,7 +887,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
 
-      blas::caxpy(A, xmD, ymoD);
+      blas::block::caxpy(A, xmD, ymoD);
       for (int j = 0; j < Msrc; j++) {
         for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], xmH[i], ymH[j]); }
       }
@@ -902,7 +902,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
 
-      blas::axpyz(Ar, xmD, ymD, wmD);
+      blas::block::axpyz(Ar, xmD, ymD, wmD);
       for (int j = 0; j < Msrc; j++) {
         wmH[j] = ymH[j];
         for (int i = 0; i < Nsrc; i++) { blas::axpy(Ar[Msrc * i + j], xmH[i], wmH[j]); }
@@ -918,7 +918,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
 
-      blas::caxpyz(A, xmD, ymD, wmD);
+      blas::block::caxpyz(A, xmD, ymD, wmD);
       for (int j = 0; j < Msrc; j++) {
         wmH[j] = ymH[j];
         for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], xmH[i], wmH[j]); }
@@ -937,7 +937,7 @@ protected:
       }
       yD = yH;
 
-      blas::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
+      blas::block::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
 
       for (int i = 0; i < Nsrc; i++) blas::axpyBzpcx(A1r[i], xmH[i], zmH[i], B1r[i], yH, C1r[i]);
 
@@ -951,7 +951,7 @@ protected:
 
     case Kernel::reDotProductNorm_block:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
-      blas::reDotProduct(A2r, xmD, xmD);
+      blas::block::reDotProduct(A2r, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
@@ -966,7 +966,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
-      blas::reDotProduct(Ar, xmD, ymoD);
+      blas::block::reDotProduct(Ar, xmD, ymoD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) {
@@ -979,7 +979,7 @@ protected:
 
     case Kernel::cDotProductNorm_block:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
-      blas::cDotProduct(A2, xmD, xmD);
+      blas::block::cDotProduct(A2, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
@@ -994,7 +994,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
-      blas::cDotProduct(A, xmD, ymoD);
+      blas::block::cDotProduct(A, xmD, ymoD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) {
@@ -1007,8 +1007,8 @@ protected:
 
     case Kernel::hDotProduct_block:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
-      blas::hDotProduct(A2, xmD, xmD);
-      blas::cDotProduct(B2, xmD, xmD);
+      blas::block::hDotProduct(A2, xmD, xmD);
+      blas::block::cDotProduct(B2, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {

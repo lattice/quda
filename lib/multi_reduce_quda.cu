@@ -593,6 +593,8 @@ namespace quda {
       void postTune() override {} // FIXME - use write to determine what needs to be saved
     };
 
+    namespace block {
+
     void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &x,
                       cvector_ref<const ColorSpinorField> &y)
     {
@@ -744,18 +746,21 @@ namespace quda {
           result[i * y.size() + j] = conj(result[j * x.size() + i]);
     }
 
-    void reDotProduct(double *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
-    {
-      std::vector<double> result_(x.size() * y.size());
-      vector_ref<const ColorSpinorField> x_;
-      for (auto &xi : x) x_.push_back(*xi);
-      vector_ref<const ColorSpinorField> y_;
-      for (auto &yi : y) y_.push_back(*yi);
-      reDotProduct(result_, std::move(x_), std::move(y_));
-      memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
     }
 
     namespace legacy {
+
+      void reDotProduct(double *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+      {
+        std::vector<double> result_(x.size() * y.size());
+        vector_ref<const ColorSpinorField> x_;
+        for (auto &xi : x) x_.push_back(*xi);
+        vector_ref<const ColorSpinorField> y_;
+        for (auto &yi : y) y_.push_back(*yi);
+        blas::block::reDotProduct(result_, std::move(x_), std::move(y_));
+        memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
+      }
+
       void cDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
       {
         std::vector<Complex> result_(x.size() * y.size());
@@ -763,20 +768,21 @@ namespace quda {
         for (auto &xi : x) x_.push_back(*xi);
         vector_ref<const ColorSpinorField> y_;
         for (auto &yi : y) y_.push_back(*yi);
-        blas::cDotProduct(result_, std::move(x_), std::move(y_));
+        blas::block::cDotProduct(result_, std::move(x_), std::move(y_));
         memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
       }
-    }
 
-    void hDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
-    {
-      std::vector<Complex> result_(x.size() * y.size());
-      vector_ref<const ColorSpinorField> x_;
-      for (auto &xi : x) x_.push_back(*xi);
-      vector_ref<const ColorSpinorField> y_;
-      for (auto &yi : y) y_.push_back(*yi);
-      hDotProduct(result_, std::move(x_), std::move(y_));
-      memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
+      void hDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+      {
+        std::vector<Complex> result_(x.size() * y.size());
+        vector_ref<const ColorSpinorField> x_;
+        for (auto &xi : x) x_.push_back(*xi);
+        vector_ref<const ColorSpinorField> y_;
+        for (auto &yi : y) y_.push_back(*yi);
+        blas::block::hDotProduct(result_, std::move(x_), std::move(y_));
+        memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
+      }
+
     }
 
   } // namespace blas

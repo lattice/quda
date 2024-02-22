@@ -38,7 +38,7 @@ namespace quda {
     auto r_vec = {r.begin(), r.begin() + n_krylov + 1};
 
     std::vector<Complex> r_dagger_dot_r((n_krylov + 1) * n_krylov);
-    blas::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec) ;
+    blas::block::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec) ;
 
     matrix R_dag_R(n_krylov, n_krylov);
     vector R_dag_r0(n_krylov);
@@ -74,7 +74,7 @@ namespace quda {
       {
         // u = u[0] - \sum_{j=1}^L \gamma_L u_L
         for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
-        blas::caxpy(gamma_, {u.begin() + 1, u.end()}, {u.begin(), u.begin() + 1});
+        blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, {u.begin(), u.begin() + 1});
       }
 
       // update x and r
@@ -91,12 +91,12 @@ namespace quda {
         gamma_for_r[0] = 0; // do not want to update with first r
         for (int i = 0; i < n_krylov; i++) gamma_for_r[i + 1] = -gamma(i);
 
-        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, r[0]);
+        blas::block::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, r[0]);
       }
     } else {
       // fixed iteration, only need to update x
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = gamma(i); }
-      blas::caxpy(gamma_, {r.begin(), r.end() - 1}, x_sloppy);
+      blas::block::axpy(gamma_, {r.begin(), r.end() - 1}, x_sloppy);
     }
   }
 
@@ -124,7 +124,7 @@ namespace quda {
   void BiCGstabL::computeTau(int begin, int size, int j)
   {
     std::vector<Complex> Tau(size);
-    blas::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
+    blas::block::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
 
     for (int k = 0; k < size; k++) { tau[(begin + k) * (n_krylov + 1) + j] = Tau[k] / sigma[begin + k]; }
   }
@@ -137,7 +137,7 @@ namespace quda {
     auto r_ = {r.begin() + begin, r.begin() + begin + size};
     auto rj = {r.begin() + j, r.begin() + j + 1};
 
-    blas::caxpy(tau_, r_ , rj);
+    blas::block::caxpy(tau_, r_ , rj);
   }
 
   /**
@@ -230,7 +230,7 @@ namespace quda {
     {
       std::vector<Complex> gamma_(n_krylov);
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
-      blas::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
+      blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
     }
 
     // Update X and R, which has opportunities for reuse
