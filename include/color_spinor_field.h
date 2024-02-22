@@ -617,6 +617,7 @@ namespace quda
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
     int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false) const;
+    void commsQuery(int n, int d[], bool done[], bool gdr_send, bool gdr_recv) const;
 
     /**
        @brief Wait on halo communication to complete

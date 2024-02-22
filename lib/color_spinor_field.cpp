@@ -1199,10 +1199,10 @@ namespace quda
     }
   }
 
-#if 0
-  void ColorSpinorField::commsQuery(int done[], int d[], bool gdr_send[], bool gdr_recv[], int n) const
+  void ColorSpinorField::commsQuery(int n, int d[], bool done[], bool gdr_send, bool gdr_recv) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -1214,8 +1214,10 @@ namespace quda
       int dim = d[i] / 2;
       int dir = d[i] % 2;
 
-      if (!commDimPartitioned(dim)) return 1;
-      if ((gdr_send[i] || gdr_recv[i]) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
+      if (!commDimPartitioned(dim)) {
+	done[i] = true;
+	continue;
+      }
 
       // first query send to backwards
       if (comm_peer2peer_enabled(dir, dim)) {
@@ -1259,17 +1261,24 @@ namespace quda
 	}
       }
     }
-    comm_query(complete, mh, nq);
 
-    if (complete_recv[dim][1 - dir] && complete_send[dim][dir]) {
-      complete_send[dim][dir] = false;
-      complete_recv[dim][1 - dir] = false;
-      return 1;
-    } else {
-      return 0;
+    int outcount;
+    int outidx[4*QUDA_MAX_DIM];
+    comm_query(nq, mh, &outcount, outidx);
+    for(int i=0; i<outcount; i++) {
+      *complete[outidx[i]] = true;
+    }
+
+    for (int i=0; i<n; i++) {
+      int dim = d[i] / 2;
+      int dir = d[i] % 2;
+      if (complete_recv[dim][1 - dir] && complete_send[dim][dir]) {
+	complete_send[dim][dir] = false;
+	complete_recv[dim][1 - dir] = false;
+	done[i] = true;
+      }
     }
   }
-#endif
 
   void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv) const
   {

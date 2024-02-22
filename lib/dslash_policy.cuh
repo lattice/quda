@@ -290,6 +290,7 @@ namespace quda
   inline void commsComplete(DslashCommsPattern &pattern, const ColorSpinorField &in, bool gdr_send, bool gdr_recv,
 			    bool zero_copy_recv, int scatterIndex = -1)
   {
+#if 0
     for (int i = 3; i >= 0; i--) {
       for (int dir = 1; dir >= 0; dir--) {
 	// Query if comms has finished
@@ -301,6 +302,47 @@ namespace quda
 	}
       } // dir=0,1
     }
+#else
+    int nq = 0;
+    int d[2*4] = {};
+    for (int i = 3; i >= 0; i--) {
+      for (int dir = 1; dir >= 0; dir--) {
+	if (!pattern.commsCompleted[2 * i + dir]) {
+	  d[nq] = 2 * i + dir;
+	  nq++;
+	}
+      }
+    }
+    bool done[2*4] = {};
+    if(dslash_comms) {
+      PROFILE(in.commsQuery(n, d, done, gdr_send, gdr_recv), profile, QUDA_PROFILE_COMMS_QUERY);
+    }
+    for(int i=0; i<nq; i++) {
+      if (!dslash_comms || done[i]) {
+	int dim = d[i] / 2;
+	int dir = d[i] % 2;
+	pattern.commsCompleted[2 * dim + dir] = 1;
+	pattern.completeSum++;
+	// now we are receive centric
+	int dir2 = 1-dir;
+
+	// if peer-2-peer in a given direction then we need to insert a wait on that copy event
+	if (comm_peer2peer_enabled(dir2,dim)) {
+	  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	} else {
+
+	  if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
+
+	  if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
+	    // note the ColorSpinorField::scatter transforms from
+	    // scatter centric to gather centric (e.g., flips
+	    // direction) so here just use dir not dir2
+	    PROFILE(if (dslash_copy) in.scatter(2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
+	  }
+	}
+      }
+    }
+#endif
   }
 
   /**
