@@ -194,7 +194,7 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
 
   if ( nspin == 1 ) {
     faults = launch_contract_test<Float, 1, src_colors, n_mom>(cType, X, red_size, source_position, mom, fft_type );	  
-  } else  if ( nspin == 4 ){
+  //} else  if ( nspin == 4 ){
     //faults = launch_contract_test<Float, 4, src_colors, n_mom>(cType, X, red_size, source_position, mom, fft_type );           	  
   } else {
     errorQuda("Unsupported spin.\n");	  
@@ -261,7 +261,7 @@ int contract(test_t param)
   if        ( test_prec == QUDA_SINGLE_PRECISION ) {
     faults = launch_contract_test<float, src_colors, n_mom>( cType, X, nSpin, red_size, source_position, mom, fft_type );  	  
   } else if ( test_prec == QUDA_DOUBLE_PRECISION ) {
-    //faults = launch_contract_test<double, src_colors, n_mom>( cType, X, nSpin, red_size, source_position, mom, fft_type );	  
+    faults = launch_contract_test<double, src_colors, n_mom>( cType, X, nSpin, red_size, source_position, mom, fft_type );	  
   } else {
     errorQuda("Unsupported precision.\n"); 	  
   }

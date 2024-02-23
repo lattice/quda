@@ -39,8 +39,8 @@ TEST_P(ContractFTTest, verify)
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
 {
-  int contractType = ::testing::get<0>(param.param);	
-  int prec         = ::testing::get<1>(param.param);
+  auto contractType = ::testing::get<0>(param.param);	
+  auto prec         = ::testing::get<1>(param.param);
 
   const char *names[] = {"DegrandRossi_FT_t","DegrandRossi_FT_z", "Staggered_FT_t"};
 
