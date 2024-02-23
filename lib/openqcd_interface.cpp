@@ -22,7 +22,7 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, {}, nullptr, '\0'};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, '\0'};
 
 using namespace quda;
 
@@ -1491,18 +1491,16 @@ void* openQCD_qudaSolverReadIn(int id)
 
 void* openQCD_qudaSolverGetHandle(int id)
 {
-  void *ptr = id == -1 ? qudaState.dirac_handle : qudaState.handles[id];
-
-  if (ptr == nullptr) {
+  if (qudaState.handles[id] == nullptr) {
     if (id != -1) {
       logQuda(QUDA_VERBOSE, "Read in solver parameters from file %s for solver (id=%d)\n",
         qudaState.infile, id);
     }
-    ptr = openQCD_qudaSolverReadIn(id);
+    qudaState.handles[id] = openQCD_qudaSolverReadIn(id);
   }
 
-  openQCD_qudaSolverUpdate(ptr);
-  return ptr;
+  openQCD_qudaSolverUpdate(qudaState.handles[id]);
+  return qudaState.handles[id];
 }
 
 
