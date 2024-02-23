@@ -638,7 +638,11 @@ namespace quda {
             errorQuda("Accessor reconstruct = %d does not match field reconstruct %d", enable_reconstruct,
                       clover.Reconstruct());
           if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value)
+#ifdef BUILD_OPENQCD_INTERFACE
+            warningQuda("%p max_element(%d) appears unset", &clover, is_inverse); /* ignore if the SW-field is zero */
+#else
             errorQuda("%p max_element(%d) appears unset", &clover, is_inverse);
+#endif
           if (clover.Diagonal() == 0.0 && clover.Reconstruct()) errorQuda("%p diagonal appears unset", &clover);
           this->clover = clover_ ? clover_ : clover.data<Float *>(is_inverse);
         }
