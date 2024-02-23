@@ -22,7 +22,7 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, '\0'};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, ""};
 
 using namespace quda;
 
