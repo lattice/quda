@@ -1823,7 +1823,7 @@ namespace quda
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
 
-      static const int length = 2*Ns*Nc; // 12 complex (2 floats) numbers per spinor color field
+      static const int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
       Float *field;
       size_t offset;
       Float *ghost[8];
@@ -1835,15 +1835,13 @@ namespace quda
 
       OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
         field(field_ ? field_ : a.data<Float *>()),
-        offset(a.Bytes() / (2 * sizeof(Float))),  // TODO: What's this for??
+        offset(a.Bytes() / (2 * sizeof(Float))), // TODO: What's this for??
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
         dim {a.X(0), a.X(1), a.X(2), a.X(3)}, // *local* lattice dimensions, xyzt
-        L   {a.X(3), a.X(0), a.X(1), a.X(2)}  // *local* lattice dimensions, txyz
+        L {a.X(3), a.X(0), a.X(1), a.X(2)}    // *local* lattice dimensions, txyz
       {
-        if constexpr (length != 24) {
-          errorQuda("Spinor field length %d not supported", length);
-        }
+        if constexpr (length != 24) { errorQuda("Spinor field length %d not supported", length); }
       }
 
       /**
@@ -1859,20 +1857,20 @@ namespace quda
       {
         int x_quda[4], x[4];
         getCoords(x_quda, x_cb, dim, parity); // x_quda contains xyzt local Carthesian corrdinates
-        openqcd::rotate_coords(x_quda, x); // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
-        return openqcd::ipt(x, L)*length;
+        openqcd::rotate_coords(x_quda, x);    // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
+        return openqcd::ipt(x, L) * length;
       }
 
-      __device__ __host__ inline void load(complex v[length/2], int x_cb, int parity = 0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x_cb, int parity = 0) const
       {
         auto in = &field[getSpinorOffset(x_cb, parity)];
-        block_load<complex, length/2>(v, reinterpret_cast<const complex *>(in));
+        block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
       }
 
-      __device__ __host__ inline void save(const complex v[length/2], int x_cb, int parity = 0) const
+      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int parity = 0) const
       {
         auto out = &field[getSpinorOffset(x_cb, parity)];
-        block_store<complex, length/2>(reinterpret_cast<complex *>(out), v);
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
@@ -1889,10 +1887,7 @@ namespace quda
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
       }
 
-      size_t Bytes() const
-      {
-        return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float);
-      }
+      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     }; // openQCDDiracOrder
 
   } // namespace colorspinor

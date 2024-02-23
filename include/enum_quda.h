@@ -51,7 +51,7 @@ typedef enum QudaGaugeFieldOrder_s {
   QUDA_BQCD_GAUGE_ORDER,        /* expect *gauge, mu, even-odd, spacetime+halos, column-row order */
   QUDA_TIFR_GAUGE_ORDER,        /* expect *gauge, mu, even-odd, spacetime, column-row order */
   QUDA_TIFR_PADDED_GAUGE_ORDER, /* expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order */
-  QUDA_OPENQCD_GAUGE_ORDER,     /* expect *gauge, spacetime, mu, parity row-column order -- links attached to odd points only */
+  QUDA_OPENQCD_GAUGE_ORDER, /* expect *gauge, spacetime, mu, parity row-column order -- links attached to odd points only */
   QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
 } QudaGaugeFieldOrder;
 

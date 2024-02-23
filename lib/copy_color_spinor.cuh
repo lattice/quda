@@ -33,8 +33,10 @@ namespace quda {
       else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",RelBasis");
       else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) strcat(aux, ",ChiralToNonRelBasis");
       else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",NonRelToChiralBasis");
-      else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS) strcat(aux, ",ReverseOpenqcdBasis");
-      else if (out.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",OpenqcdBasis");
+      else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS)
+        strcat(aux, ",ReverseOpenqcdBasis");
+      else if (out.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS)
+        strcat(aux, ",OpenqcdBasis");
       else errorQuda("Basis change from %d to %d not supported", in.GammaBasis(), out.GammaBasis());
 
       apply(device::get_default_stream());
@@ -108,8 +110,10 @@ namespace quda {
       else errorQuda("QDPJIT interface has not been built");
     } else if (out.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
       using O = OpenQCDDiracOrder<FloatOut, Ns, Nc>;
-      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
-      else errorQuda("OpenQCD interface has not been built");
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>())
+        CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
+      else
+        errorQuda("OpenQCD interface has not been built");
     } else {
       errorQuda("Order %d not defined (Ns = %d, Nc = %d, precision = %d)", out.FieldOrder(), Ns, Nc, out.Precision());
     }
@@ -140,8 +144,10 @@ namespace quda {
       else errorQuda("QDPJIT interface has not been built");
     } else if (in.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
       using ColorSpinor = OpenQCDDiracOrder<FloatIn, Ns, Nc>;
-      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
-      else errorQuda("OpenQCD interface has not been built");
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>())
+        genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
+      else
+        errorQuda("OpenQCD interface has not been built");
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d, precision = %d)", in.FieldOrder(), Ns, Nc, in.Precision());
     }

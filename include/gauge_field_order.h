@@ -2347,7 +2347,6 @@ namespace quda {
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
     };
 
-
     /**
      * struct to define order of gauge fields in OpenQCD
      */
@@ -2368,13 +2367,11 @@ namespace quda {
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : (Float *)u.data()), // pointer to the gauge field on CPU
         volumeCB(u.VolumeCB()), // Volume and VolumeCB refer to the global lattice, if VolumeLocal, then local lattice
-        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]}, // *local* lattice dimensions, xyzt
-        L   {u.X()[3], u.X()[0], u.X()[1], u.X()[2]}, // *local* lattice dimensions, txyz
+        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},              // *local* lattice dimensions, xyzt
+        L {u.X()[3], u.X()[0], u.X()[1], u.X()[2]},                // *local* lattice dimensions, txyz
         nproc {comm_dim(3), comm_dim(0), comm_dim(1), comm_dim(2)} // txyz
       {
-        if constexpr (length != 18) {
-          errorQuda("Gauge field length %d not supported", length);
-        }
+        if constexpr (length != 18) { errorQuda("Gauge field length %d not supported", length); }
       }
 
       /**
@@ -2389,10 +2386,11 @@ namespace quda {
        *
        * @return     The offset.
        */
-      __device__ __host__ inline int getGaugeOffset_lexi(int x_cb, int dir, int parity) const {
+      __device__ __host__ inline int getGaugeOffset_lexi(int x_cb, int dir, int parity) const
+      {
         int x[4];
         getCoords(x, x_cb, dim, parity);
-        return (4*openqcd::lexi(x, dim, 4) + dir)*length;
+        return (4 * openqcd::lexi(x, dim, 4) + dir) * length;
       }
 
       /**
@@ -2405,41 +2403,42 @@ namespace quda {
        *
        * @return     The offset.
        */
-      __device__ __host__ inline int getGaugeOffset(int x_cb, int dir, int parity) const {
+      __device__ __host__ inline int getGaugeOffset(int x_cb, int dir, int parity) const
+      {
         int quda_x[4], x[4];
         getCoords(quda_x, x_cb, dim, parity); // x_quda = quda local lattice coordinates
-        openqcd::rotate_coords(quda_x, x); // x = openQCD local lattice coordinates
+        openqcd::rotate_coords(quda_x, x);    // x = openQCD local lattice coordinates
 
-        int mu = (dir+1) % 4; // mu = openQCD direction
+        int mu = (dir + 1) % 4; // mu = openQCD direction
         int ix = openqcd::ipt(x, L);
         int iz = openqcd::iup(x, mu, L, nproc);
         int ofs = 0;
         int volume = openqcd::vol(L);
 
-        if (ix < volume/2) { // ix even -> iz odd
-          if (iz < volume) { // iz in interior
-            ofs = 8*(iz - volume/2) + 2*mu + 1;
+        if (ix < volume / 2) { // ix even -> iz odd
+          if (iz < volume) {   // iz in interior
+            ofs = 8 * (iz - volume / 2) + 2 * mu + 1;
           } else {
-            int ib = iz - volume - openqcd::ifc(L, nproc, mu) - openqcd::bndry(L, nproc)/2; // iz in exterior
-            ofs = 4*volume + openqcd::face_offset(L, nproc, mu) + ib;
+            int ib = iz - volume - openqcd::ifc(L, nproc, mu) - openqcd::bndry(L, nproc) / 2; // iz in exterior
+            ofs = 4 * volume + openqcd::face_offset(L, nproc, mu) + ib;
           }
-        } else if (volume/2 <= ix && ix < volume) { // ix odd
-          ofs = 8*(ix - volume/2) + 2*mu;
+        } else if (volume / 2 <= ix && ix < volume) { // ix odd
+          ofs = 8 * (ix - volume / 2) + 2 * mu;
         }
 
-        return ofs*length;
+        return ofs * length;
       }
 
-      __device__ __host__ inline void load(complex v[length/2], int x_cb, int dir, int parity, Float = 1.0) const 
+      __device__ __host__ inline void load(complex v[length / 2], int x_cb, int dir, int parity, Float = 1.0) const
       {
         auto in = &gauge[getGaugeOffset(x_cb, dir, parity)];
-        block_load<complex, length/2>(v, reinterpret_cast<complex *>(in));
+        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
       }
 
-      __device__ __host__ inline void save(const complex v[length/2], int x_cb, int dir, int parity) const
+      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int dir, int parity) const
       {
         auto out = &gauge[getGaugeOffset_lexi(x_cb, dir, parity)];
-        block_store<complex, length/2>(reinterpret_cast<complex *>(out), v);
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
@@ -2457,10 +2456,7 @@ namespace quda {
         return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
 
-      size_t Bytes() const
-      {
-        return 2*Nc*Nc*sizeof(Float);
-      }
+      size_t Bytes() const { return 2 * Nc * Nc * sizeof(Float); }
     }; // class OpenQCDOrder
 
   } // namespace gauge
@@ -2607,6 +2603,8 @@ namespace quda {
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_GAUGE_ORDER,Nc> { typedef gauge::TIFROrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> { typedef gauge::TIFRPaddedOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
-  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_OPENQCD_GAUGE_ORDER,Nc> { typedef gauge::OpenQCDOrder<T, 2*Nc*Nc> type; };
+  template <typename T, int Nc> struct gauge_order_mapper<T, QUDA_OPENQCD_GAUGE_ORDER, Nc> {
+    typedef gauge::OpenQCDOrder<T, 2 * Nc * Nc> type;
+  };
 
 } // namespace quda

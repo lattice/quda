@@ -143,7 +143,6 @@ namespace quda {
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
-
   }
 
   template <typename FloatOut, typename FloatIn, int length>

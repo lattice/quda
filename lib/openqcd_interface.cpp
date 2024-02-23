@@ -19,7 +19,6 @@
 #include <multigrid.h>
 #include <mpi.h>
 
-
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, ""};
@@ -83,314 +82,302 @@ template <bool start> void inline qudaopenqcd_called(const char *func, QudaVerbo
 #endif
 }
 
-template <bool start> void inline qudaopenqcd_called(const char *func) { qudaopenqcd_called<start>(func, getVerbosity()); }
-
+template <bool start> void inline qudaopenqcd_called(const char *func)
+{
+  qudaopenqcd_called<start>(func, getVerbosity());
+}
 
 /**
  * Mapping of enums to their actual values. We have this mapping such that we
  * can use the named parameters in our input files rather than the number. this
  * makes reading and writing the configuration more understandable.
  */
-std::unordered_map<std::string, std::string> enum_map = {
-  {"QUDA_CG_INVERTER",                      std::to_string(QUDA_CG_INVERTER)},
-  {"QUDA_BICGSTAB_INVERTER",                std::to_string(QUDA_BICGSTAB_INVERTER)},
-  {"QUDA_GCR_INVERTER",                     std::to_string(QUDA_GCR_INVERTER)},
-  {"QUDA_MR_INVERTER",                      std::to_string(QUDA_MR_INVERTER)},
-  {"QUDA_SD_INVERTER",                      std::to_string(QUDA_SD_INVERTER)},
-  {"QUDA_PCG_INVERTER",                     std::to_string(QUDA_PCG_INVERTER)},
-  {"QUDA_EIGCG_INVERTER",                   std::to_string(QUDA_EIGCG_INVERTER)},
-  {"QUDA_INC_EIGCG_INVERTER",               std::to_string(QUDA_INC_EIGCG_INVERTER)},
-  {"QUDA_GMRESDR_INVERTER",                 std::to_string(QUDA_GMRESDR_INVERTER)},
-  {"QUDA_GMRESDR_PROJ_INVERTER",            std::to_string(QUDA_GMRESDR_PROJ_INVERTER)},
-  {"QUDA_GMRESDR_SH_INVERTER",              std::to_string(QUDA_GMRESDR_SH_INVERTER)},
-  {"QUDA_FGMRESDR_INVERTER",                std::to_string(QUDA_FGMRESDR_INVERTER)},
-  {"QUDA_MG_INVERTER",                      std::to_string(QUDA_MG_INVERTER)},
-  {"QUDA_BICGSTABL_INVERTER",               std::to_string(QUDA_BICGSTABL_INVERTER)},
-  {"QUDA_CGNE_INVERTER",                    std::to_string(QUDA_CGNE_INVERTER)},
-  {"QUDA_CGNR_INVERTER",                    std::to_string(QUDA_CGNR_INVERTER)},
-  {"QUDA_CG3_INVERTER",                     std::to_string(QUDA_CG3_INVERTER)},
-  {"QUDA_CG3NE_INVERTER",                   std::to_string(QUDA_CG3NE_INVERTER)},
-  {"QUDA_CG3NR_INVERTER",                   std::to_string(QUDA_CG3NR_INVERTER)},
-  {"QUDA_CA_CG_INVERTER",                   std::to_string(QUDA_CA_CG_INVERTER)},
-  {"QUDA_CA_CGNE_INVERTER",                 std::to_string(QUDA_CA_CGNE_INVERTER)},
-  {"QUDA_CA_CGNR_INVERTER",                 std::to_string(QUDA_CA_CGNR_INVERTER)},
-  {"QUDA_CA_GCR_INVERTER",                  std::to_string(QUDA_CA_GCR_INVERTER)},
-  {"QUDA_INVALID_INVERTER",                 std::to_string(QUDA_INVALID_INVERTER)},
-  {"QUDA_MAT_SOLUTION",                     std::to_string(QUDA_MAT_SOLUTION)},
-  {"QUDA_MATDAG_MAT_SOLUTION",              std::to_string(QUDA_MATDAG_MAT_SOLUTION)},
-  {"QUDA_MATPC_SOLUTION",                   std::to_string(QUDA_MATPC_SOLUTION)},
-  {"QUDA_MATPC_DAG_SOLUTION",               std::to_string(QUDA_MATPC_DAG_SOLUTION)},
-  {"QUDA_MATPCDAG_MATPC_SOLUTION",          std::to_string(QUDA_MATPCDAG_MATPC_SOLUTION)},
-  {"QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION",    std::to_string(QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)},
-  {"QUDA_INVALID_SOLUTION",                 std::to_string(QUDA_INVALID_SOLUTION)},
-  {"QUDA_DIRECT_SOLVE",                     std::to_string(QUDA_DIRECT_SOLVE)},
-  {"QUDA_NORMOP_SOLVE",                     std::to_string(QUDA_NORMOP_SOLVE)},
-  {"QUDA_DIRECT_PC_SOLVE",                  std::to_string(QUDA_DIRECT_PC_SOLVE)},
-  {"QUDA_NORMOP_PC_SOLVE",                  std::to_string(QUDA_NORMOP_PC_SOLVE)},
-  {"QUDA_NORMERR_SOLVE",                    std::to_string(QUDA_NORMERR_SOLVE)},
-  {"QUDA_NORMERR_PC_SOLVE",                 std::to_string(QUDA_NORMERR_PC_SOLVE)},
-  {"QUDA_NORMEQ_SOLVE",                     std::to_string(QUDA_NORMEQ_SOLVE)},
-  {"QUDA_NORMEQ_PC_SOLVE",                  std::to_string(QUDA_NORMEQ_PC_SOLVE)},
-  {"QUDA_INVALID_SOLVE",                    std::to_string(QUDA_INVALID_SOLVE)},
-  {"QUDA_MATPC_EVEN_EVEN",                  std::to_string(QUDA_MATPC_EVEN_EVEN)},
-  {"QUDA_MATPC_ODD_ODD",                    std::to_string(QUDA_MATPC_ODD_ODD)},
-  {"QUDA_MATPC_EVEN_EVEN_ASYMMETRIC",       std::to_string(QUDA_MATPC_EVEN_EVEN_ASYMMETRIC)},
-  {"QUDA_MATPC_ODD_ODD_ASYMMETRIC",         std::to_string(QUDA_MATPC_ODD_ODD_ASYMMETRIC)},
-  {"QUDA_MATPC_INVALID",                    std::to_string(QUDA_MATPC_INVALID)},
-  {"QUDA_DEFAULT_NORMALIZATION",            std::to_string(QUDA_DEFAULT_NORMALIZATION)},
-  {"QUDA_SOURCE_NORMALIZATION",             std::to_string(QUDA_SOURCE_NORMALIZATION)},
-  {"QUDA_QUARTER_PRECISION",                std::to_string(QUDA_QUARTER_PRECISION)},
-  {"QUDA_HALF_PRECISION",                   std::to_string(QUDA_HALF_PRECISION)},
-  {"QUDA_SINGLE_PRECISION",                 std::to_string(QUDA_SINGLE_PRECISION)},
-  {"QUDA_DOUBLE_PRECISION",                 std::to_string(QUDA_DOUBLE_PRECISION)},
-  {"QUDA_INVALID_PRECISION",                std::to_string(QUDA_INVALID_PRECISION)},
-  {"QUDA_BOOLEAN_FALSE",                    std::to_string(QUDA_BOOLEAN_FALSE)},
-  {"false",                                 std::to_string(QUDA_BOOLEAN_FALSE)},
-  {"FALSE",                                 std::to_string(QUDA_BOOLEAN_FALSE)},
-  {"no",                                    std::to_string(QUDA_BOOLEAN_FALSE)},
-  {"n",                                     std::to_string(QUDA_BOOLEAN_FALSE)},
-  {"off",                                   std::to_string(QUDA_BOOLEAN_FALSE)},
-  {"QUDA_BOOLEAN_TRUE",                     std::to_string(QUDA_BOOLEAN_TRUE)},
-  {"true",                                  std::to_string(QUDA_BOOLEAN_TRUE)},
-  {"TRUE",                                  std::to_string(QUDA_BOOLEAN_TRUE)},
-  {"yes",                                   std::to_string(QUDA_BOOLEAN_TRUE)},
-  {"y",                                     std::to_string(QUDA_BOOLEAN_TRUE)},
-  {"on",                                    std::to_string(QUDA_BOOLEAN_TRUE)},
-  {"QUDA_BOOLEAN_INVALID",                  std::to_string(QUDA_BOOLEAN_INVALID)},
-  {"QUDA_COMPUTE_NULL_VECTOR_NO",           std::to_string(QUDA_COMPUTE_NULL_VECTOR_NO)},
-  {"QUDA_COMPUTE_NULL_VECTOR_YES",          std::to_string(QUDA_COMPUTE_NULL_VECTOR_YES)},
-  {"QUDA_COMPUTE_NULL_VECTOR_INVALID",      std::to_string(QUDA_COMPUTE_NULL_VECTOR_INVALID)},
-  {"QUDA_MG_CYCLE_VCYCLE",                  std::to_string(QUDA_MG_CYCLE_VCYCLE)},
-  {"QUDA_MG_CYCLE_FCYCLE",                  std::to_string(QUDA_MG_CYCLE_FCYCLE)},
-  {"QUDA_MG_CYCLE_WCYCLE",                  std::to_string(QUDA_MG_CYCLE_WCYCLE)},
-  {"QUDA_MG_CYCLE_RECURSIVE",               std::to_string(QUDA_MG_CYCLE_RECURSIVE)},
-  {"QUDA_MG_CYCLE_INVALID",                 std::to_string(QUDA_MG_CYCLE_INVALID)},
-  {"QUDA_CPU_FIELD_LOCATION",               std::to_string(QUDA_CPU_FIELD_LOCATION)},
-  {"QUDA_CUDA_FIELD_LOCATION",              std::to_string(QUDA_CUDA_FIELD_LOCATION)},
-  {"QUDA_INVALID_FIELD_LOCATION",           std::to_string(QUDA_INVALID_FIELD_LOCATION)},
-  {"QUDA_TWIST_SINGLET",                    std::to_string(QUDA_TWIST_SINGLET)},
-  {"QUDA_TWIST_NONDEG_DOUBLET",             std::to_string(QUDA_TWIST_NONDEG_DOUBLET)},
-  {"QUDA_TWIST_NO",                         std::to_string(QUDA_TWIST_NO)},
-  {"QUDA_TWIST_INVALID",                    std::to_string(QUDA_TWIST_INVALID)},
-  {"QUDA_DAG_NO",                           std::to_string(QUDA_DAG_NO)},
-  {"QUDA_DAG_YES",                          std::to_string(QUDA_DAG_YES)},
-  {"QUDA_DAG_INVALID",                      std::to_string(QUDA_DAG_INVALID)},
-  {"QUDA_KAPPA_NORMALIZATION",              std::to_string(QUDA_KAPPA_NORMALIZATION)},
-  {"QUDA_MASS_NORMALIZATION",               std::to_string(QUDA_MASS_NORMALIZATION)},
-  {"QUDA_ASYMMETRIC_MASS_NORMALIZATION",    std::to_string(QUDA_ASYMMETRIC_MASS_NORMALIZATION)},
-  {"QUDA_INVALID_NORMALIZATION",            std::to_string(QUDA_INVALID_NORMALIZATION)},
-  {"QUDA_PRESERVE_SOURCE_NO",               std::to_string(QUDA_PRESERVE_SOURCE_NO)},
-  {"QUDA_PRESERVE_SOURCE_YES",              std::to_string(QUDA_PRESERVE_SOURCE_YES)},
-  {"QUDA_PRESERVE_SOURCE_INVALID",          std::to_string(QUDA_PRESERVE_SOURCE_INVALID)},
-  {"QUDA_USE_INIT_GUESS_NO",                std::to_string(QUDA_USE_INIT_GUESS_NO)},
-  {"QUDA_USE_INIT_GUESS_YES",               std::to_string(QUDA_USE_INIT_GUESS_YES)},
-  {"QUDA_USE_INIT_GUESS_INVALID",           std::to_string(QUDA_USE_INIT_GUESS_INVALID)},
-  {"QUDA_SILENT",                           std::to_string(QUDA_SILENT)},
-  {"QUDA_SUMMARIZE",                        std::to_string(QUDA_SUMMARIZE)},
-  {"QUDA_VERBOSE",                          std::to_string(QUDA_VERBOSE)},
-  {"QUDA_DEBUG_VERBOSE",                    std::to_string(QUDA_DEBUG_VERBOSE)},
-  {"QUDA_INVALID_VERBOSITY",                std::to_string(QUDA_INVALID_VERBOSITY)},
-  {"QUDA_TUNE_NO",                          std::to_string(QUDA_TUNE_NO)},
-  {"QUDA_TUNE_YES",                         std::to_string(QUDA_TUNE_YES)},
-  {"QUDA_TUNE_INVALID",                     std::to_string(QUDA_TUNE_INVALID)},
-  {"QUDA_POWER_BASIS",                      std::to_string(QUDA_POWER_BASIS)},
-  {"QUDA_CHEBYSHEV_BASIS",                  std::to_string(QUDA_CHEBYSHEV_BASIS)},
-  {"QUDA_INVALID_BASIS",                    std::to_string(QUDA_INVALID_BASIS)},
-  {"QUDA_ADDITIVE_SCHWARZ",                 std::to_string(QUDA_ADDITIVE_SCHWARZ)},
-  {"QUDA_MULTIPLICATIVE_SCHWARZ",           std::to_string(QUDA_MULTIPLICATIVE_SCHWARZ)},
-  {"QUDA_INVALID_SCHWARZ",                  std::to_string(QUDA_INVALID_SCHWARZ)},
-  {"QUDA_MADWF_ACCELERATOR",                std::to_string(QUDA_MADWF_ACCELERATOR)},
-  {"QUDA_INVALID_ACCELERATOR",              std::to_string(QUDA_INVALID_ACCELERATOR)},
-  {"QUDA_L2_RELATIVE_RESIDUAL",             std::to_string(QUDA_L2_RELATIVE_RESIDUAL)},
-  {"QUDA_L2_ABSOLUTE_RESIDUAL",             std::to_string(QUDA_L2_ABSOLUTE_RESIDUAL)},
-  {"QUDA_HEAVY_QUARK_RESIDUAL",             std::to_string(QUDA_HEAVY_QUARK_RESIDUAL)},
-  {"QUDA_INVALID_RESIDUAL",                 std::to_string(QUDA_INVALID_RESIDUAL)},
-  {"QUDA_NULL_VECTOR_SETUP",                std::to_string(QUDA_NULL_VECTOR_SETUP)},
-  {"QUDA_TEST_VECTOR_SETUP",                std::to_string(QUDA_TEST_VECTOR_SETUP)},
-  {"QUDA_INVALID_SETUP_TYPE",               std::to_string(QUDA_INVALID_SETUP_TYPE)},
-  {"QUDA_TRANSFER_AGGREGATE",               std::to_string(QUDA_TRANSFER_AGGREGATE)},
-  {"QUDA_TRANSFER_COARSE_KD",               std::to_string(QUDA_TRANSFER_COARSE_KD)},
-  {"QUDA_TRANSFER_OPTIMIZED_KD",            std::to_string(QUDA_TRANSFER_OPTIMIZED_KD)},
-  {"QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG",  std::to_string(QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)},
-  {"QUDA_TRANSFER_INVALID",                 std::to_string(QUDA_TRANSFER_INVALID)},
-  {"QUDA_EIG_TR_LANCZOS",                   std::to_string(QUDA_EIG_TR_LANCZOS)},
-  {"QUDA_EIG_BLK_TR_LANCZOS",               std::to_string(QUDA_EIG_BLK_TR_LANCZOS)},
-  {"QUDA_EIG_IR_ARNOLDI",                   std::to_string(QUDA_EIG_IR_ARNOLDI)},
-  {"QUDA_EIG_BLK_IR_ARNOLDI",               std::to_string(QUDA_EIG_BLK_IR_ARNOLDI)},
-  {"QUDA_EIG_INVALID",                      std::to_string(QUDA_EIG_INVALID)},
-  {"QUDA_SPECTRUM_LM_EIG",                  std::to_string(QUDA_SPECTRUM_LM_EIG)},
-  {"QUDA_SPECTRUM_SM_EIG",                  std::to_string(QUDA_SPECTRUM_SM_EIG)},
-  {"QUDA_SPECTRUM_LR_EIG",                  std::to_string(QUDA_SPECTRUM_LR_EIG)},
-  {"QUDA_SPECTRUM_SR_EIG",                  std::to_string(QUDA_SPECTRUM_SR_EIG)},
-  {"QUDA_SPECTRUM_LI_EIG",                  std::to_string(QUDA_SPECTRUM_LI_EIG)},
-  {"QUDA_SPECTRUM_SI_EIG",                  std::to_string(QUDA_SPECTRUM_SI_EIG)},
-  {"QUDA_SPECTRUM_INVALID",                 std::to_string(QUDA_SPECTRUM_INVALID)},
-  {"QUDA_MEMORY_DEVICE",                    std::to_string(QUDA_MEMORY_DEVICE)},
-  {"QUDA_MEMORY_DEVICE_PINNED",             std::to_string(QUDA_MEMORY_DEVICE_PINNED)},
-  {"QUDA_MEMORY_HOST",                      std::to_string(QUDA_MEMORY_HOST)},
-  {"QUDA_MEMORY_HOST_PINNED",               std::to_string(QUDA_MEMORY_HOST_PINNED)},
-  {"QUDA_MEMORY_MAPPED",                    std::to_string(QUDA_MEMORY_MAPPED)},
-  {"QUDA_MEMORY_MANAGED",                   std::to_string(QUDA_MEMORY_MANAGED)},
-  {"QUDA_MEMORY_INVALID",                   std::to_string(QUDA_MEMORY_INVALID)},
-  {"QUDA_CUSOLVE_EXTLIB",                   std::to_string(QUDA_CUSOLVE_EXTLIB)},
-  {"QUDA_EIGEN_EXTLIB",                     std::to_string(QUDA_EIGEN_EXTLIB)},
-  {"QUDA_EXTLIB_INVALID",                   std::to_string(QUDA_EXTLIB_INVALID)}
-};
-
+std::unordered_map<std::string, std::string> enum_map
+  = {{"QUDA_CG_INVERTER", std::to_string(QUDA_CG_INVERTER)},
+     {"QUDA_BICGSTAB_INVERTER", std::to_string(QUDA_BICGSTAB_INVERTER)},
+     {"QUDA_GCR_INVERTER", std::to_string(QUDA_GCR_INVERTER)},
+     {"QUDA_MR_INVERTER", std::to_string(QUDA_MR_INVERTER)},
+     {"QUDA_SD_INVERTER", std::to_string(QUDA_SD_INVERTER)},
+     {"QUDA_PCG_INVERTER", std::to_string(QUDA_PCG_INVERTER)},
+     {"QUDA_EIGCG_INVERTER", std::to_string(QUDA_EIGCG_INVERTER)},
+     {"QUDA_INC_EIGCG_INVERTER", std::to_string(QUDA_INC_EIGCG_INVERTER)},
+     {"QUDA_GMRESDR_INVERTER", std::to_string(QUDA_GMRESDR_INVERTER)},
+     {"QUDA_GMRESDR_PROJ_INVERTER", std::to_string(QUDA_GMRESDR_PROJ_INVERTER)},
+     {"QUDA_GMRESDR_SH_INVERTER", std::to_string(QUDA_GMRESDR_SH_INVERTER)},
+     {"QUDA_FGMRESDR_INVERTER", std::to_string(QUDA_FGMRESDR_INVERTER)},
+     {"QUDA_MG_INVERTER", std::to_string(QUDA_MG_INVERTER)},
+     {"QUDA_BICGSTABL_INVERTER", std::to_string(QUDA_BICGSTABL_INVERTER)},
+     {"QUDA_CGNE_INVERTER", std::to_string(QUDA_CGNE_INVERTER)},
+     {"QUDA_CGNR_INVERTER", std::to_string(QUDA_CGNR_INVERTER)},
+     {"QUDA_CG3_INVERTER", std::to_string(QUDA_CG3_INVERTER)},
+     {"QUDA_CG3NE_INVERTER", std::to_string(QUDA_CG3NE_INVERTER)},
+     {"QUDA_CG3NR_INVERTER", std::to_string(QUDA_CG3NR_INVERTER)},
+     {"QUDA_CA_CG_INVERTER", std::to_string(QUDA_CA_CG_INVERTER)},
+     {"QUDA_CA_CGNE_INVERTER", std::to_string(QUDA_CA_CGNE_INVERTER)},
+     {"QUDA_CA_CGNR_INVERTER", std::to_string(QUDA_CA_CGNR_INVERTER)},
+     {"QUDA_CA_GCR_INVERTER", std::to_string(QUDA_CA_GCR_INVERTER)},
+     {"QUDA_INVALID_INVERTER", std::to_string(QUDA_INVALID_INVERTER)},
+     {"QUDA_MAT_SOLUTION", std::to_string(QUDA_MAT_SOLUTION)},
+     {"QUDA_MATDAG_MAT_SOLUTION", std::to_string(QUDA_MATDAG_MAT_SOLUTION)},
+     {"QUDA_MATPC_SOLUTION", std::to_string(QUDA_MATPC_SOLUTION)},
+     {"QUDA_MATPC_DAG_SOLUTION", std::to_string(QUDA_MATPC_DAG_SOLUTION)},
+     {"QUDA_MATPCDAG_MATPC_SOLUTION", std::to_string(QUDA_MATPCDAG_MATPC_SOLUTION)},
+     {"QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION", std::to_string(QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)},
+     {"QUDA_INVALID_SOLUTION", std::to_string(QUDA_INVALID_SOLUTION)},
+     {"QUDA_DIRECT_SOLVE", std::to_string(QUDA_DIRECT_SOLVE)},
+     {"QUDA_NORMOP_SOLVE", std::to_string(QUDA_NORMOP_SOLVE)},
+     {"QUDA_DIRECT_PC_SOLVE", std::to_string(QUDA_DIRECT_PC_SOLVE)},
+     {"QUDA_NORMOP_PC_SOLVE", std::to_string(QUDA_NORMOP_PC_SOLVE)},
+     {"QUDA_NORMERR_SOLVE", std::to_string(QUDA_NORMERR_SOLVE)},
+     {"QUDA_NORMERR_PC_SOLVE", std::to_string(QUDA_NORMERR_PC_SOLVE)},
+     {"QUDA_NORMEQ_SOLVE", std::to_string(QUDA_NORMEQ_SOLVE)},
+     {"QUDA_NORMEQ_PC_SOLVE", std::to_string(QUDA_NORMEQ_PC_SOLVE)},
+     {"QUDA_INVALID_SOLVE", std::to_string(QUDA_INVALID_SOLVE)},
+     {"QUDA_MATPC_EVEN_EVEN", std::to_string(QUDA_MATPC_EVEN_EVEN)},
+     {"QUDA_MATPC_ODD_ODD", std::to_string(QUDA_MATPC_ODD_ODD)},
+     {"QUDA_MATPC_EVEN_EVEN_ASYMMETRIC", std::to_string(QUDA_MATPC_EVEN_EVEN_ASYMMETRIC)},
+     {"QUDA_MATPC_ODD_ODD_ASYMMETRIC", std::to_string(QUDA_MATPC_ODD_ODD_ASYMMETRIC)},
+     {"QUDA_MATPC_INVALID", std::to_string(QUDA_MATPC_INVALID)},
+     {"QUDA_DEFAULT_NORMALIZATION", std::to_string(QUDA_DEFAULT_NORMALIZATION)},
+     {"QUDA_SOURCE_NORMALIZATION", std::to_string(QUDA_SOURCE_NORMALIZATION)},
+     {"QUDA_QUARTER_PRECISION", std::to_string(QUDA_QUARTER_PRECISION)},
+     {"QUDA_HALF_PRECISION", std::to_string(QUDA_HALF_PRECISION)},
+     {"QUDA_SINGLE_PRECISION", std::to_string(QUDA_SINGLE_PRECISION)},
+     {"QUDA_DOUBLE_PRECISION", std::to_string(QUDA_DOUBLE_PRECISION)},
+     {"QUDA_INVALID_PRECISION", std::to_string(QUDA_INVALID_PRECISION)},
+     {"QUDA_BOOLEAN_FALSE", std::to_string(QUDA_BOOLEAN_FALSE)},
+     {"false", std::to_string(QUDA_BOOLEAN_FALSE)},
+     {"FALSE", std::to_string(QUDA_BOOLEAN_FALSE)},
+     {"no", std::to_string(QUDA_BOOLEAN_FALSE)},
+     {"n", std::to_string(QUDA_BOOLEAN_FALSE)},
+     {"off", std::to_string(QUDA_BOOLEAN_FALSE)},
+     {"QUDA_BOOLEAN_TRUE", std::to_string(QUDA_BOOLEAN_TRUE)},
+     {"true", std::to_string(QUDA_BOOLEAN_TRUE)},
+     {"TRUE", std::to_string(QUDA_BOOLEAN_TRUE)},
+     {"yes", std::to_string(QUDA_BOOLEAN_TRUE)},
+     {"y", std::to_string(QUDA_BOOLEAN_TRUE)},
+     {"on", std::to_string(QUDA_BOOLEAN_TRUE)},
+     {"QUDA_BOOLEAN_INVALID", std::to_string(QUDA_BOOLEAN_INVALID)},
+     {"QUDA_COMPUTE_NULL_VECTOR_NO", std::to_string(QUDA_COMPUTE_NULL_VECTOR_NO)},
+     {"QUDA_COMPUTE_NULL_VECTOR_YES", std::to_string(QUDA_COMPUTE_NULL_VECTOR_YES)},
+     {"QUDA_COMPUTE_NULL_VECTOR_INVALID", std::to_string(QUDA_COMPUTE_NULL_VECTOR_INVALID)},
+     {"QUDA_MG_CYCLE_VCYCLE", std::to_string(QUDA_MG_CYCLE_VCYCLE)},
+     {"QUDA_MG_CYCLE_FCYCLE", std::to_string(QUDA_MG_CYCLE_FCYCLE)},
+     {"QUDA_MG_CYCLE_WCYCLE", std::to_string(QUDA_MG_CYCLE_WCYCLE)},
+     {"QUDA_MG_CYCLE_RECURSIVE", std::to_string(QUDA_MG_CYCLE_RECURSIVE)},
+     {"QUDA_MG_CYCLE_INVALID", std::to_string(QUDA_MG_CYCLE_INVALID)},
+     {"QUDA_CPU_FIELD_LOCATION", std::to_string(QUDA_CPU_FIELD_LOCATION)},
+     {"QUDA_CUDA_FIELD_LOCATION", std::to_string(QUDA_CUDA_FIELD_LOCATION)},
+     {"QUDA_INVALID_FIELD_LOCATION", std::to_string(QUDA_INVALID_FIELD_LOCATION)},
+     {"QUDA_TWIST_SINGLET", std::to_string(QUDA_TWIST_SINGLET)},
+     {"QUDA_TWIST_NONDEG_DOUBLET", std::to_string(QUDA_TWIST_NONDEG_DOUBLET)},
+     {"QUDA_TWIST_NO", std::to_string(QUDA_TWIST_NO)},
+     {"QUDA_TWIST_INVALID", std::to_string(QUDA_TWIST_INVALID)},
+     {"QUDA_DAG_NO", std::to_string(QUDA_DAG_NO)},
+     {"QUDA_DAG_YES", std::to_string(QUDA_DAG_YES)},
+     {"QUDA_DAG_INVALID", std::to_string(QUDA_DAG_INVALID)},
+     {"QUDA_KAPPA_NORMALIZATION", std::to_string(QUDA_KAPPA_NORMALIZATION)},
+     {"QUDA_MASS_NORMALIZATION", std::to_string(QUDA_MASS_NORMALIZATION)},
+     {"QUDA_ASYMMETRIC_MASS_NORMALIZATION", std::to_string(QUDA_ASYMMETRIC_MASS_NORMALIZATION)},
+     {"QUDA_INVALID_NORMALIZATION", std::to_string(QUDA_INVALID_NORMALIZATION)},
+     {"QUDA_PRESERVE_SOURCE_NO", std::to_string(QUDA_PRESERVE_SOURCE_NO)},
+     {"QUDA_PRESERVE_SOURCE_YES", std::to_string(QUDA_PRESERVE_SOURCE_YES)},
+     {"QUDA_PRESERVE_SOURCE_INVALID", std::to_string(QUDA_PRESERVE_SOURCE_INVALID)},
+     {"QUDA_USE_INIT_GUESS_NO", std::to_string(QUDA_USE_INIT_GUESS_NO)},
+     {"QUDA_USE_INIT_GUESS_YES", std::to_string(QUDA_USE_INIT_GUESS_YES)},
+     {"QUDA_USE_INIT_GUESS_INVALID", std::to_string(QUDA_USE_INIT_GUESS_INVALID)},
+     {"QUDA_SILENT", std::to_string(QUDA_SILENT)},
+     {"QUDA_SUMMARIZE", std::to_string(QUDA_SUMMARIZE)},
+     {"QUDA_VERBOSE", std::to_string(QUDA_VERBOSE)},
+     {"QUDA_DEBUG_VERBOSE", std::to_string(QUDA_DEBUG_VERBOSE)},
+     {"QUDA_INVALID_VERBOSITY", std::to_string(QUDA_INVALID_VERBOSITY)},
+     {"QUDA_TUNE_NO", std::to_string(QUDA_TUNE_NO)},
+     {"QUDA_TUNE_YES", std::to_string(QUDA_TUNE_YES)},
+     {"QUDA_TUNE_INVALID", std::to_string(QUDA_TUNE_INVALID)},
+     {"QUDA_POWER_BASIS", std::to_string(QUDA_POWER_BASIS)},
+     {"QUDA_CHEBYSHEV_BASIS", std::to_string(QUDA_CHEBYSHEV_BASIS)},
+     {"QUDA_INVALID_BASIS", std::to_string(QUDA_INVALID_BASIS)},
+     {"QUDA_ADDITIVE_SCHWARZ", std::to_string(QUDA_ADDITIVE_SCHWARZ)},
+     {"QUDA_MULTIPLICATIVE_SCHWARZ", std::to_string(QUDA_MULTIPLICATIVE_SCHWARZ)},
+     {"QUDA_INVALID_SCHWARZ", std::to_string(QUDA_INVALID_SCHWARZ)},
+     {"QUDA_MADWF_ACCELERATOR", std::to_string(QUDA_MADWF_ACCELERATOR)},
+     {"QUDA_INVALID_ACCELERATOR", std::to_string(QUDA_INVALID_ACCELERATOR)},
+     {"QUDA_L2_RELATIVE_RESIDUAL", std::to_string(QUDA_L2_RELATIVE_RESIDUAL)},
+     {"QUDA_L2_ABSOLUTE_RESIDUAL", std::to_string(QUDA_L2_ABSOLUTE_RESIDUAL)},
+     {"QUDA_HEAVY_QUARK_RESIDUAL", std::to_string(QUDA_HEAVY_QUARK_RESIDUAL)},
+     {"QUDA_INVALID_RESIDUAL", std::to_string(QUDA_INVALID_RESIDUAL)},
+     {"QUDA_NULL_VECTOR_SETUP", std::to_string(QUDA_NULL_VECTOR_SETUP)},
+     {"QUDA_TEST_VECTOR_SETUP", std::to_string(QUDA_TEST_VECTOR_SETUP)},
+     {"QUDA_INVALID_SETUP_TYPE", std::to_string(QUDA_INVALID_SETUP_TYPE)},
+     {"QUDA_TRANSFER_AGGREGATE", std::to_string(QUDA_TRANSFER_AGGREGATE)},
+     {"QUDA_TRANSFER_COARSE_KD", std::to_string(QUDA_TRANSFER_COARSE_KD)},
+     {"QUDA_TRANSFER_OPTIMIZED_KD", std::to_string(QUDA_TRANSFER_OPTIMIZED_KD)},
+     {"QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG", std::to_string(QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)},
+     {"QUDA_TRANSFER_INVALID", std::to_string(QUDA_TRANSFER_INVALID)},
+     {"QUDA_EIG_TR_LANCZOS", std::to_string(QUDA_EIG_TR_LANCZOS)},
+     {"QUDA_EIG_BLK_TR_LANCZOS", std::to_string(QUDA_EIG_BLK_TR_LANCZOS)},
+     {"QUDA_EIG_IR_ARNOLDI", std::to_string(QUDA_EIG_IR_ARNOLDI)},
+     {"QUDA_EIG_BLK_IR_ARNOLDI", std::to_string(QUDA_EIG_BLK_IR_ARNOLDI)},
+     {"QUDA_EIG_INVALID", std::to_string(QUDA_EIG_INVALID)},
+     {"QUDA_SPECTRUM_LM_EIG", std::to_string(QUDA_SPECTRUM_LM_EIG)},
+     {"QUDA_SPECTRUM_SM_EIG", std::to_string(QUDA_SPECTRUM_SM_EIG)},
+     {"QUDA_SPECTRUM_LR_EIG", std::to_string(QUDA_SPECTRUM_LR_EIG)},
+     {"QUDA_SPECTRUM_SR_EIG", std::to_string(QUDA_SPECTRUM_SR_EIG)},
+     {"QUDA_SPECTRUM_LI_EIG", std::to_string(QUDA_SPECTRUM_LI_EIG)},
+     {"QUDA_SPECTRUM_SI_EIG", std::to_string(QUDA_SPECTRUM_SI_EIG)},
+     {"QUDA_SPECTRUM_INVALID", std::to_string(QUDA_SPECTRUM_INVALID)},
+     {"QUDA_MEMORY_DEVICE", std::to_string(QUDA_MEMORY_DEVICE)},
+     {"QUDA_MEMORY_DEVICE_PINNED", std::to_string(QUDA_MEMORY_DEVICE_PINNED)},
+     {"QUDA_MEMORY_HOST", std::to_string(QUDA_MEMORY_HOST)},
+     {"QUDA_MEMORY_HOST_PINNED", std::to_string(QUDA_MEMORY_HOST_PINNED)},
+     {"QUDA_MEMORY_MAPPED", std::to_string(QUDA_MEMORY_MAPPED)},
+     {"QUDA_MEMORY_MANAGED", std::to_string(QUDA_MEMORY_MANAGED)},
+     {"QUDA_MEMORY_INVALID", std::to_string(QUDA_MEMORY_INVALID)},
+     {"QUDA_CUSOLVE_EXTLIB", std::to_string(QUDA_CUSOLVE_EXTLIB)},
+     {"QUDA_EIGEN_EXTLIB", std::to_string(QUDA_EIGEN_EXTLIB)},
+     {"QUDA_EXTLIB_INVALID", std::to_string(QUDA_EXTLIB_INVALID)}};
 
 /**
  * @brief      Just a simple key-value store
  */
-class KeyValueStore {
+class KeyValueStore
+{
 private:
-    std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<std::string, std::string>>> store;
-    std::unordered_map<std::string, std::string> *map = nullptr;
-    std::string filename = "<not set>";
+  std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<std::string, std::string>>> store;
+  std::unordered_map<std::string, std::string> *map = nullptr;
+  std::string filename = "<not set>";
 
 public:
-    /**
-     * @brief      Sets a key value pair
-     *
-     * @param[in]  section  The section
-     * @param[in]  key      The key
-     * @param[in]  value    The value
-     */
-    void set(const std::string& section, const std::string& key, const std::string& value) {
-        if (map != nullptr) {
-            auto mvalue = map->find(value);
-            if (mvalue != map->end()) {
-                std::get<0>(store[section][key]) = mvalue->second;
-                std::get<1>(store[section][key]) = value;
-                return;
-            }
-        }
-        std::get<0>(store[section][key]) = value;
+  /**
+   * @brief      Sets a key value pair
+   *
+   * @param[in]  section  The section
+   * @param[in]  key      The key
+   * @param[in]  value    The value
+   */
+  void set(const std::string &section, const std::string &key, const std::string &value)
+  {
+    if (map != nullptr) {
+      auto mvalue = map->find(value);
+      if (mvalue != map->end()) {
+        std::get<0>(store[section][key]) = mvalue->second;
         std::get<1>(store[section][key]) = value;
+        return;
+      }
     }
+    std::get<0>(store[section][key]) = value;
+    std::get<1>(store[section][key]) = value;
+  }
 
-    void set_map(std::unordered_map<std::string, std::string> *_map) {
-      map = _map;
-    }
+  void set_map(std::unordered_map<std::string, std::string> *_map) { map = _map; }
 
-    bool section_exists(const std::string& section) {
-      return store.find(section) != store.end();
-    }
+  bool section_exists(const std::string &section) { return store.find(section) != store.end(); }
 
-    /**
-     * @brief      Gets the specified key.
-     *
-     * @param[in]  section        The section
-     * @param[in]  key            The key
-     * @param[in]  default_value  The default value if section/key is absent
-     *
-     * @tparam     T              Desired return type
-     *
-     * @return     The corresponding value
-     */
-    template<typename T>
-    T get(const std::string& section, const std::string& key, T default_value = T(), bool fail = false) {
-        int idx;
-        std::string rkey;
-        std::smatch match;
-        std::regex p_key("([^\\[]+)\\[(\\d+)\\]"); /* key[idx] */
-        auto sec = store.find(section);
+  /**
+   * @brief      Gets the specified key.
+   *
+   * @param[in]  section        The section
+   * @param[in]  key            The key
+   * @param[in]  default_value  The default value if section/key is absent
+   *
+   * @tparam     T              Desired return type
+   *
+   * @return     The corresponding value
+   */
+  template <typename T>
+  T get(const std::string &section, const std::string &key, T default_value = T(), bool fail = false)
+  {
+    int idx;
+    std::string rkey;
+    std::smatch match;
+    std::regex p_key("([^\\[]+)\\[(\\d+)\\]"); /* key[idx] */
+    auto sec = store.find(section);
 
-        if (sec != store.end()) {
-            if (std::regex_search(key, match, p_key)) {
-              rkey = match[1];
-              idx = std::stoi(match[2]);
-            } else {
-              rkey = key;
-              idx = 0;
-            }
+    if (sec != store.end()) {
+      if (std::regex_search(key, match, p_key)) {
+        rkey = match[1];
+        idx = std::stoi(match[2]);
+      } else {
+        rkey = key;
+        idx = 0;
+      }
 
-            auto item = sec->second.find(rkey);
-            if (item != sec->second.end()) {
-                std::stringstream ss(std::get<0>(item->second));
-                if constexpr (std::is_enum_v<T>) {
-                  typename std::underlying_type<T>::type result, dummy;
-                  for (int i=0; i<idx; i++) {
-                    ss >> dummy;
-                  }
-                  if (ss >> result) {
-                    return static_cast<T>(result);
-                  }
-                } else {
-                  T result, dummy;
-                  for (int i=0; i<idx; i++) {
-                    ss >> dummy;
-                  }
-                  if (ss >> result) {
-                    return result;
-                  }
-                }
-            }
-        }
-        if (fail) {
-          errorQuda("Key \"%s\" in section \"%s\" in file %s does not exist.",
-            key.c_str(), section.c_str(), filename.c_str());
-        }
-        return default_value; /* Return default value for non-existent keys */
-    }
-
-    /**
-     * @brief      Fill the store with entries from an ini-file
-     *
-     * @param[in]  fname  The fname
-     */
-    void load(const std::string& fname) {
-        std::string line, section;
-        std::smatch match;
-        filename = fname;
-        std::ifstream file(filename.c_str());
-
-        std::regex p_section("^\\s*\\[([\\w\\ ]+)\\].*$"); /* [section] */
-        std::regex p_comment("^[^#]*(\\s*#.*)$"); /* line # comment */
-        std::regex p_key_val("^([^\\s]+)\\s+(.*[^\\s]+)\\s*$"); /* key value */
-
-        if (file.is_open()) {
-
-            while (std::getline(file, line)) {
-
-                /* remove all comments */
-                if (std::regex_search(line, match, p_comment)) {
-                    line.erase(match.position(1));
-                }
-
-                if (std::regex_search(line, match, p_section)) {
-                    section = match[1];
-                } else if (std::regex_search(line, match, p_key_val)) {
-                    std::string key = match[1];
-                    std::string val = match[2];
-                    this->set(section, key, val);
-                }
-            }
-
-            file.close();
+      auto item = sec->second.find(rkey);
+      if (item != sec->second.end()) {
+        std::stringstream ss(std::get<0>(item->second));
+        if constexpr (std::is_enum_v<T>) {
+          typename std::underlying_type<T>::type result, dummy;
+          for (int i = 0; i < idx; i++) { ss >> dummy; }
+          if (ss >> result) { return static_cast<T>(result); }
         } else {
-            std::cerr << "Error opening file: " << filename << std::endl;
+          T result, dummy;
+          for (int i = 0; i < idx; i++) { ss >> dummy; }
+          if (ss >> result) { return result; }
         }
+      }
     }
+    if (fail) {
+      errorQuda("Key \"%s\" in section \"%s\" in file %s does not exist.", key.c_str(), section.c_str(),
+                filename.c_str());
+    }
+    return default_value; /* Return default value for non-existent keys */
+  }
 
-    /**
-     * @brief      Dumps all entries in the store.
-     */
-    void dump(std::string _section = "") {
-        for (const auto& section : store) {
-            if (_section == "" || _section == section.first) {
-                std::cout << "[" << section.first << "]" << std::endl;
-                for (const auto& pair : section.second) {
-                    std::cout << "  " << pair.first << " = " << std::get<1>(pair.second);
-                    if (std::get<0>(pair.second) != std::get<1>(pair.second)) {
-                      std::cout << " # " << std::get<0>(pair.second);
-                    }
-                    std::cout << std::endl;
-                }
-            }
+  /**
+   * @brief      Fill the store with entries from an ini-file
+   *
+   * @param[in]  fname  The fname
+   */
+  void load(const std::string &fname)
+  {
+    std::string line, section;
+    std::smatch match;
+    filename = fname;
+    std::ifstream file(filename.c_str());
+
+    std::regex p_section("^\\s*\\[([\\w\\ ]+)\\].*$");      /* [section] */
+    std::regex p_comment("^[^#]*(\\s*#.*)$");               /* line # comment */
+    std::regex p_key_val("^([^\\s]+)\\s+(.*[^\\s]+)\\s*$"); /* key value */
+
+    if (file.is_open()) {
+
+      while (std::getline(file, line)) {
+
+        /* remove all comments */
+        if (std::regex_search(line, match, p_comment)) { line.erase(match.position(1)); }
+
+        if (std::regex_search(line, match, p_section)) {
+          section = match[1];
+        } else if (std::regex_search(line, match, p_key_val)) {
+          std::string key = match[1];
+          std::string val = match[2];
+          this->set(section, key, val);
         }
+      }
+
+      file.close();
+    } else {
+      std::cerr << "Error opening file: " << filename << std::endl;
     }
+  }
+
+  /**
+   * @brief      Dumps all entries in the store.
+   */
+  void dump(std::string _section = "")
+  {
+    for (const auto &section : store) {
+      if (_section == "" || _section == section.first) {
+        std::cout << "[" << section.first << "]" << std::endl;
+        for (const auto &pair : section.second) {
+          std::cout << "  " << pair.first << " = " << std::get<1>(pair.second);
+          if (std::get<0>(pair.second) != std::get<1>(pair.second)) { std::cout << " # " << std::get<0>(pair.second); }
+          std::cout << std::endl;
+        }
+      }
+    }
+  }
 };
-
 
 /**
  * @brief      Returns the local lattice dimensions as lat_dim_t
@@ -401,7 +388,7 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
 {
   lat_dim_t X;
 
-  for (int i=0; i<4; i++) {
+  for (int i = 0; i < 4; i++) {
     if (fill) {
       fill[i] = qudaState.layout.L[i];
     } else {
@@ -411,7 +398,6 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
 
   return X;
 }
-
 
 /**
  * @brief      Calculate the rank from coordinates.
@@ -430,10 +416,9 @@ static int rankFromCoords(const int *coords, void *fdata)
   int *ranks = base + 5;
   int i;
 
-  i = coords[3] + NPROC[3]*(coords[2] + NPROC[2]*(coords[1] + NPROC[1]*(coords[0])));
+  i = coords[3] + NPROC[3] * (coords[2] + NPROC[2] * (coords[1] + NPROC[1] * (coords[0])));
   return ranks[i];
 }
-
 
 /**
  * Set set the local dimensions and machine topology for QUDA to use
@@ -477,11 +462,10 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
     qudaState.init.verbosity = kv.get<QudaVerbosity>("QUDA", "verbosity", qudaState.init.verbosity);
   }
 
-  MPI_Bcast((void*) &qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)&qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, MPI_COMM_WORLD);
   setVerbosityQuda(qudaState.init.verbosity, prefix, qudaState.init.logfile);
   initQuda(device);
 }
-
 
 static int getLinkPadding(const int dim[4])
 {
@@ -490,7 +474,6 @@ static int getLinkPadding(const int dim[4])
   padding = MAX(padding, dim[0] * dim[1] * dim[2] / 2);
   return padding;
 }
-
 
 /**
  * @brief      Creates a new quda parameter struct
@@ -505,11 +488,11 @@ static QudaInvertParam newOpenQCDParam(void)
 
   param.verbosity = verbosity;
 
-  param.cpu_prec = QUDA_DOUBLE_PRECISION;  /* The precision used by the input fermion fields */
-  param.cuda_prec = QUDA_DOUBLE_PRECISION; /* The precision used by the QUDA solver */
+  param.cpu_prec = QUDA_DOUBLE_PRECISION;              /* The precision used by the input fermion fields */
+  param.cuda_prec = QUDA_DOUBLE_PRECISION;             /* The precision used by the QUDA solver */
   param.cuda_prec_eigensolver = QUDA_DOUBLE_PRECISION; /* The precision used by the QUDA eigensolver */
 
-  param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; /* The precision used by the QUDA solver */
+  param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;     /* The precision used by the QUDA solver */
   param.cuda_prec_precondition = QUDA_HALF_PRECISION; /* The precision used by the QUDA solver */
 
   /**
@@ -528,7 +511,6 @@ static QudaInvertParam newOpenQCDParam(void)
 
   return param;
 }
-
 
 /**
  * @brief      Initialize quda gauge param struct
@@ -555,12 +537,11 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec, QudaReconstructTy
   param.t_boundary = t_boundary;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
-  param.anisotropy = 1.0; /* 1.0 means not anisotropic */
+  param.anisotropy = 1.0;                 /* 1.0 means not anisotropic */
   param.ga_pad = getLinkPadding(param.X); /* Why this? */
 
   return param;
 }
-
 
 void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, char *infile)
 {
@@ -574,18 +555,16 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
   qudaState.initialized = true;
 }
 
-void openQCD_qudaFinalize(void) {
+void openQCD_qudaFinalize(void)
+{
 
-  for (int id=0; id<32; ++id) {
-    if (qudaState.handles[id] != nullptr) {
-      openQCD_qudaSolverDestroy(id);
-    }
+  for (int id = 0; id < 32; ++id) {
+    if (qudaState.handles[id] != nullptr) { openQCD_qudaSolverDestroy(id); }
   }
 
   qudaState.initialized = false;
   endQuda();
 }
-
 
 double openQCD_qudaPlaquette(void)
 {
@@ -594,9 +573,8 @@ double openQCD_qudaPlaquette(void)
   plaqQuda(plaq);
 
   /* Note different Nc normalization wrt openQCD! */
-  return 3.0*plaq[0];
+  return 3.0 * plaq[0];
 }
-
 
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
@@ -604,23 +582,17 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
   loadGaugeQuda(gauge, &param);
 }
 
-
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
   QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
 
-  void* buffer = pool_pinned_malloc((4*qudaState.init.volume + 7*qudaState.init.bndry/4)*18*prec);
+  void *buffer = pool_pinned_malloc((4 * qudaState.init.volume + 7 * qudaState.init.bndry / 4) * 18 * prec);
   saveGaugeQuda(buffer, &param);
   qudaState.init.reorder_gauge_quda_to_openqcd(buffer, gauge);
   pool_pinned_free(buffer);
 }
 
-
-void openQCD_qudaGaugeFree(void)
-{
-  freeGaugeQuda();
-}
-
+void openQCD_qudaGaugeFree(void) { freeGaugeQuda(); }
 
 void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
 {
@@ -638,12 +610,7 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
   loadCloverQuda(clover, NULL, &param);
 }
 
-
-void openQCD_qudaCloverFree(void)
-{
-  freeCloverQuda();
-}
-
+void openQCD_qudaCloverFree(void) { freeCloverQuda(); }
 
 /**
  * @brief      Set the su3csw corfficient and all related properties.
@@ -651,7 +618,7 @@ void openQCD_qudaCloverFree(void)
  * @param      param   The parameter struct
  * @param[in]  su3csw  The su3csw coefficient
  */
-inline void set_su3csw(QudaInvertParam* param, double su3csw)
+inline void set_su3csw(QudaInvertParam *param, double su3csw)
 {
   param->clover_csw = su3csw;
   if (su3csw != 0.0) {
@@ -673,7 +640,6 @@ inline void set_su3csw(QudaInvertParam* param, double su3csw)
     }
   }
 }
-
 
 /**
  * @brief      Creates a new quda Dirac parameter struct
@@ -703,7 +669,6 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
 
   return param;
 }
-
 
 void openQCD_back_and_forth(void *h_in, void *h_out)
 {
@@ -737,14 +702,12 @@ void openQCD_back_and_forth(void *h_in, void *h_out)
   out_h = out;
 }
 
-
 int openQCD_qudaIndexIpt(const int *x)
 {
   int L_openqcd[4];
   openqcd::rotate_coords(qudaState.layout.L, L_openqcd);
   return openqcd::ipt(x, L_openqcd);
 }
-
 
 int openQCD_qudaIndexIup(const int *x, const int mu)
 {
@@ -753,7 +716,6 @@ int openQCD_qudaIndexIup(const int *x, const int mu)
   openqcd::rotate_coords(qudaState.layout.nproc, nproc_openqcd);
   return openqcd::iup(x, mu, L_openqcd, nproc_openqcd);
 }
-
 
 double openQCD_qudaNorm(void *h_in)
 {
@@ -770,12 +732,7 @@ double openQCD_qudaNorm(void *h_in)
   return blas::norm2(in);
 }
 
-
-double openQCD_qudaNorm_NoLoads(void *d_in)
-{
-  return blas::norm2(*reinterpret_cast<ColorSpinorField*>(d_in));
-}
-
+double openQCD_qudaNorm_NoLoads(void *d_in) { return blas::norm2(*reinterpret_cast<ColorSpinorField *>(d_in)); }
 
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
@@ -800,18 +757,10 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 
   /* gamma_i run within QUDA using QUDA fields */
   switch (dir) {
-  case 0: /* t direction */
-    gamma3(out, in);
-    break;
-  case 1: /* x direction */
-    gamma0(out, in);
-    break;
-  case 2: /* y direction */
-    gamma1(out, in);
-    break;
-  case 3: /* z direction */
-    gamma2(out, in);
-    break;
+  case 0: /* t direction */ gamma3(out, in); break;
+  case 1: /* x direction */ gamma0(out, in); break;
+  case 2: /* y direction */ gamma1(out, in); break;
+  case 3: /* z direction */ gamma2(out, in); break;
   case 4:
   case 5:
     gamma5(out, in);
@@ -823,8 +772,7 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
      * with U the transformation matrix from OpenQCD to UKQCD. */
     blas::ax(-1.0, out);
     break;
-  default:
-    errorQuda("Unknown gamma: %d\n", dir);
+  default: errorQuda("Unknown gamma: %d\n", dir);
   }
 
   /* creates a field on the CPU */
@@ -836,8 +784,7 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
   out_h = out;
 }
 
-
-void* openQCD_qudaH2D(void *openQCD_field)
+void *openQCD_qudaH2D(void *openQCD_field)
 {
   /* sets up the necessary parameters */
   QudaInvertParam param = newOpenQCDParam();
@@ -855,13 +802,11 @@ void* openQCD_qudaH2D(void *openQCD_field)
   return in;
 }
 
-
-void openQCD_qudaSpinorFree(void** quda_field)
+void openQCD_qudaSpinorFree(void **quda_field)
 {
-  delete reinterpret_cast<ColorSpinorField*>(*quda_field);
+  delete reinterpret_cast<ColorSpinorField *>(*quda_field);
   *quda_field = nullptr;
 }
-
 
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 {
@@ -876,9 +821,8 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
   ColorSpinorField out_h(cpuParam);
 
   /* transfer the GPU field to CPU */
-  out_h = *reinterpret_cast<ColorSpinorField*>(quda_field);
+  out_h = *reinterpret_cast<ColorSpinorField *>(quda_field);
 }
-
 
 /**
  * @brief      Check whether the gauge field from openQCD is in sync with the
@@ -895,8 +839,6 @@ inline bool gauge_field_get_up2date(void)
   return ud_rev == qudaState.ud_rev && ad_rev == qudaState.ad_rev;
 }
 
-
-
 /**
  * @brief      Check whether the gauge field is not (yet) set in openQCD.
  *
@@ -909,8 +851,6 @@ inline bool gauge_field_get_unset(void)
   return ud_rev == 0 && ad_rev == 0;
 }
 
-
-
 /**
  * @brief      Check if the current SW field needs to update wrt the parameters from openQCD.
  *
@@ -918,14 +858,11 @@ inline bool gauge_field_get_unset(void)
  */
 inline bool clover_field_get_up2date(void)
 {
-  return (gauge_field_get_up2date()
-    && qudaState.swd_ud_rev == qudaState.ud_rev
-    && qudaState.swd_ad_rev == qudaState.ad_rev
-    && qudaState.swd_kappa == 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0))
-    && qudaState.swd_su3csw == qudaState.layout.dirac_parms().su3csw
-    && qudaState.swd_u1csw == qudaState.layout.dirac_parms().u1csw);
+  return (gauge_field_get_up2date() && qudaState.swd_ud_rev == qudaState.ud_rev && qudaState.swd_ad_rev == qudaState.ad_rev
+          && qudaState.swd_kappa == 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0))
+          && qudaState.swd_su3csw == qudaState.layout.dirac_parms().su3csw
+          && qudaState.swd_u1csw == qudaState.layout.dirac_parms().u1csw);
 }
-
 
 /**
  * @brief      Check whether the multigrid instance associated to the parameter
@@ -938,19 +875,14 @@ inline bool clover_field_get_up2date(void)
  */
 inline bool mg_get_up2date(QudaInvertParam *param)
 {
-  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
 
-  return (param->preconditioner != nullptr
-    && gauge_field_get_up2date()
-    && clover_field_get_up2date()
-    && additional_prop->mg_ud_rev == qudaState.ud_rev
-    && additional_prop->mg_ad_rev == qudaState.ad_rev
-    && additional_prop->mg_kappa == 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0))
-    && additional_prop->mg_su3csw == qudaState.layout.dirac_parms().su3csw
-    && additional_prop->mg_u1csw == qudaState.layout.dirac_parms().u1csw);
+  return (param->preconditioner != nullptr && gauge_field_get_up2date() && clover_field_get_up2date()
+          && additional_prop->mg_ud_rev == qudaState.ud_rev && additional_prop->mg_ad_rev == qudaState.ad_rev
+          && additional_prop->mg_kappa == 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0))
+          && additional_prop->mg_su3csw == qudaState.layout.dirac_parms().su3csw
+          && additional_prop->mg_u1csw == qudaState.layout.dirac_parms().u1csw);
 }
-
-
 
 /**
  * @brief      Sets the multigrid instance associated to the parameter struct to
@@ -960,15 +892,14 @@ inline bool mg_get_up2date(QudaInvertParam *param)
  */
 inline void mg_set_revision(QudaInvertParam *param)
 {
-  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
 
   additional_prop->mg_ud_rev = qudaState.ud_rev;
   additional_prop->mg_ad_rev = qudaState.ad_rev;
-  additional_prop->mg_kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
+  additional_prop->mg_kappa = 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0));
   additional_prop->mg_su3csw = qudaState.layout.dirac_parms().su3csw;
   additional_prop->mg_u1csw = qudaState.layout.dirac_parms().u1csw;
 }
-
 
 /**
  * @brief      Set the global revisions numners for the SW field.
@@ -977,20 +908,15 @@ inline void clover_field_set_revision(void)
 {
   qudaState.swd_ud_rev = qudaState.ud_rev;
   qudaState.swd_ad_rev = qudaState.ad_rev;
-  qudaState.swd_kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
+  qudaState.swd_kappa = 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0));
   qudaState.swd_su3csw = qudaState.layout.dirac_parms().su3csw;
   qudaState.swd_u1csw = qudaState.layout.dirac_parms().u1csw;
 }
 
-
 /**
  * @brief      Set the global revisions numners for the gauge field.
  */
-inline void gauge_field_set_revision(void)
-{
-  qudaState.layout.get_gfld_flags(&qudaState.ud_rev, &qudaState.ad_rev);
-}
-
+inline void gauge_field_set_revision(void) { qudaState.layout.get_gfld_flags(&qudaState.ud_rev, &qudaState.ad_rev); }
 
 /**
  * @brief      Check if the solver parameters are in sync with the parameters
@@ -1002,31 +928,34 @@ inline void gauge_field_set_revision(void)
  */
 int openQCD_qudaInvertParamCheck(void *param_)
 {
-  QudaInvertParam* param = static_cast<QudaInvertParam*>(param_);
-  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(param_);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   bool ret = true;
 
-  if (param->kappa != (1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0)))) {
-    logQuda(QUDA_VERBOSE, "Property m0/kappa does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
-      (1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0))), param->kappa);
+  if (param->kappa != (1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0)))) {
+    logQuda(
+      QUDA_VERBOSE, "Property m0/kappa does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
+      (1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0))), param->kappa);
     ret = false;
   }
 
   if (additional_prop->u1csw != qudaState.layout.dirac_parms().u1csw) {
-    logQuda(QUDA_VERBOSE, "Property u1csw does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
+    logQuda(
+      QUDA_VERBOSE,
+      "Property u1csw does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
       qudaState.layout.dirac_parms().u1csw, additional_prop->u1csw);
     ret = false;
   }
 
   if (param->clover_csw != qudaState.layout.dirac_parms().su3csw) {
-    logQuda(QUDA_VERBOSE, "Property su3csw/clover_csw does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
+    logQuda(
+      QUDA_VERBOSE, "Property su3csw/clover_csw does not match in QudaInvertParam struct and openQxD:dirac_parms (openQxD: %.6e, QUDA: %.6e)\n",
       qudaState.layout.dirac_parms().su3csw, param->clover_csw);
     ret = false;
   }
 
   return ret;
 }
-
 
 /**
  * @brief      Transfer the gauge field if the gauge field was updated in
@@ -1042,27 +971,27 @@ int openQCD_qudaInvertParamCheck(void *param_)
  */
 void openQCD_qudaSolverUpdate(void *param_)
 {
-  if (param_ == nullptr) {
-    errorQuda("Solver handle is NULL.");
-  }
+  if (param_ == nullptr) { errorQuda("Solver handle is NULL."); }
 
-  QudaInvertParam* param = static_cast<QudaInvertParam*>(param_);
-  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(param_);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
 
   bool do_param_update = !openQCD_qudaInvertParamCheck(param_);
   bool do_gauge_transfer = !gauge_field_get_up2date() && !gauge_field_get_unset();
   bool do_clover_update = !clover_field_get_up2date() && !gauge_field_get_unset();
-  bool do_multigrid_update = param_ != qudaState.dirac_handle && param->inv_type_precondition == QUDA_MG_INVERTER && !mg_get_up2date(param) && !gauge_field_get_unset();
-  bool do_multigrid_fat_update = do_multigrid_update && (do_gauge_transfer || additional_prop->mg_ud_rev != qudaState.ud_rev || additional_prop->mg_ad_rev != qudaState.ad_rev);
+  bool do_multigrid_update = param_ != qudaState.dirac_handle && param->inv_type_precondition == QUDA_MG_INVERTER
+    && !mg_get_up2date(param) && !gauge_field_get_unset();
+  bool do_multigrid_fat_update = do_multigrid_update
+    && (do_gauge_transfer || additional_prop->mg_ud_rev != qudaState.ud_rev
+        || additional_prop->mg_ad_rev != qudaState.ad_rev);
 
   if (do_gauge_transfer) {
-    if (qudaState.layout.h_gauge == nullptr) {
-      errorQuda("qudaState.layout.h_gauge is not set.");
-    }
+    if (qudaState.layout.h_gauge == nullptr) { errorQuda("qudaState.layout.h_gauge is not set."); }
     logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
     void *h_gauge = qudaState.layout.h_gauge();
-    PUSH_RANGE("openQCD_qudaGaugeLoad",3);
-    QudaReconstructType rec = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
+    PUSH_RANGE("openQCD_qudaGaugeLoad", 3);
+    QudaReconstructType rec
+      = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
 
     /**
      * We set t_boundary = QUDA_ANTI_PERIODIC_T. This setting is a label that
@@ -1088,12 +1017,12 @@ void openQCD_qudaSolverUpdate(void *param_)
 
   if (do_param_update) {
     logQuda(QUDA_VERBOSE, "Syncing kappa, su3csw, u1csw values from openQCD ...\n");
-    param->kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
+    param->kappa = 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0));
     additional_prop->u1csw = qudaState.layout.dirac_parms().u1csw;
     set_su3csw(param, qudaState.layout.dirac_parms().su3csw);
 
-    QudaInvertParam* mg_inv_param = additional_prop->mg_param->invert_param;
-    mg_inv_param->kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
+    QudaInvertParam *mg_inv_param = additional_prop->mg_param->invert_param;
+    mg_inv_param->kappa = 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0));
     set_su3csw(mg_inv_param, qudaState.layout.dirac_parms().su3csw);
   }
 
@@ -1115,7 +1044,7 @@ void openQCD_qudaSolverUpdate(void *param_)
          * field.
          */
         logQuda(QUDA_VERBOSE, "Generating Clover field in QUDA ...\n");
-        PUSH_RANGE("loadCloverQuda",3);
+        PUSH_RANGE("loadCloverQuda", 3);
         loadCloverQuda(NULL, NULL, param);
         POP_RANGE;
         clover_field_set_revision();
@@ -1124,13 +1053,11 @@ void openQCD_qudaSolverUpdate(void *param_)
          * U3 case: Transfer the SW-field from openQCD.
          */
 
-        if (qudaState.layout.h_sw == nullptr) {
-          errorQuda("qudaState.layout.h_sw is not set.");
-        }
+        if (qudaState.layout.h_sw == nullptr) { errorQuda("qudaState.layout.h_sw is not set."); }
 
         logQuda(QUDA_VERBOSE, "Loading Clover field from openQCD ...\n");
         void *h_sw = qudaState.layout.h_sw();
-        PUSH_RANGE("openQCD_qudaCloverLoad",3);
+        PUSH_RANGE("openQCD_qudaCloverLoad", 3);
         openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw);
         POP_RANGE;
         clover_field_set_revision();
@@ -1139,23 +1066,22 @@ void openQCD_qudaSolverUpdate(void *param_)
         /* TODO: The above line would be prefered over openQCD_qudaCloverLoad, but throws this error, no idea why?
         QUDA: ERROR: qudaEventRecord_ returned CUDA_ERROR_ILLEGAL_ADDRESS
          (timer.h:82 in start())
-         (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const char*, const char*, const char*, bool)())
-        QUDA:        last kernel called was (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)*/
+         (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const
+        char*, const char*, const char*, bool)()) QUDA:        last kernel called was
+        (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)*/
       }
     }
   }
 
   /* setup/update the multigrid instance or do nothing */
   if (do_multigrid_update) {
-    QudaMultigridParam* mg_param = additional_prop->mg_param;
+    QudaMultigridParam *mg_param = additional_prop->mg_param;
 
-    if (mg_param == nullptr) {
-      errorQuda("No multigrid parameter struct set.");
-    }
+    if (mg_param == nullptr) { errorQuda("No multigrid parameter struct set."); }
 
     if (do_multigrid_fat_update && param->preconditioner != nullptr) {
       logQuda(QUDA_VERBOSE, "Destroying existing multigrid instance ...\n");
-      PUSH_RANGE("destroyMultigridQuda",4);
+      PUSH_RANGE("destroyMultigridQuda", 4);
       destroyMultigridQuda(param->preconditioner);
       param->preconditioner = nullptr;
       POP_RANGE;
@@ -1169,13 +1095,13 @@ void openQCD_qudaSolverUpdate(void *param_)
 
     if (param->preconditioner == nullptr) {
       logQuda(QUDA_VERBOSE, "Setting up multigrid instance ...\n");
-      PUSH_RANGE("newMultigridQuda",4);
+      PUSH_RANGE("newMultigridQuda", 4);
       param->preconditioner = newMultigridQuda(mg_param);
       POP_RANGE;
       mg_set_revision(param);
     } else {
       logQuda(QUDA_VERBOSE, "Updating existing multigrid instance ...\n");
-      PUSH_RANGE("updateMultigridQuda",4);
+      PUSH_RANGE("updateMultigridQuda", 4);
       updateMultigridQuda(param->preconditioner, mg_param);
       POP_RANGE;
       mg_set_revision(param);
@@ -1183,17 +1109,16 @@ void openQCD_qudaSolverUpdate(void *param_)
   }
 }
 
-
-void* openQCD_qudaSolverReadIn(int id)
+void *openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
   /* Allocate on the heap */
-  QudaInvertParam* param = new QudaInvertParam(newQudaInvertParam());
-  QudaInvertParam* invert_param_mg = new QudaInvertParam(newQudaInvertParam());
-  QudaMultigridParam* multigrid_param = new QudaMultigridParam(newQudaMultigridParam());
+  QudaInvertParam *param = new QudaInvertParam(newQudaInvertParam());
+  QudaInvertParam *invert_param_mg = new QudaInvertParam(newQudaInvertParam());
+  QudaMultigridParam *multigrid_param = new QudaMultigridParam(newQudaMultigridParam());
   std::string section = "Solver " + std::to_string(id);
 
   /* Some default settings */
@@ -1207,7 +1132,7 @@ void* openQCD_qudaSolverReadIn(int id)
   param->dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
   param->gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   param->dslash_type = QUDA_WILSON_DSLASH;
-  param->kappa = 1.0/(2.0*(qudaState.layout.dirac_parms().m0+4.0));
+  param->kappa = 1.0 / (2.0 * (qudaState.layout.dirac_parms().m0 + 4.0));
   param->mu = 0.0;
   param->dagger = QUDA_DAG_NO;
   param->solution_type = QUDA_MAT_SOLUTION;
@@ -1231,13 +1156,11 @@ void* openQCD_qudaSolverReadIn(int id)
 
     param->verbosity = kv.get<QudaVerbosity>(section, "verbosity", param->verbosity);
 
-    if (param->verbosity >= QUDA_DEBUG_VERBOSE) {
-      kv.dump();
-    }
+    if (param->verbosity >= QUDA_DEBUG_VERBOSE) { kv.dump(); }
 
     if (kv.get<std::string>(section, "solver") != "QUDA") {
-      errorQuda("Solver section \"%s\" in file %s is not a valid quda-solver section (solver = %s).",
-        section.c_str(), qudaState.infile, kv.get<std::string>(section, "solver").c_str());
+      errorQuda("Solver section \"%s\" in file %s is not a valid quda-solver section (solver = %s).", section.c_str(),
+                qudaState.infile, kv.get<std::string>(section, "solver").c_str());
     }
 
     /* both fields reside on the CPU */
@@ -1262,11 +1185,14 @@ void* openQCD_qudaSolverReadIn(int id)
     param->true_res_hq = kv.get<double>(section, "true_res_hq", param->true_res_hq);
     param->maxiter = kv.get<int>(section, "maxiter", param->maxiter);
     param->reliable_delta = kv.get<double>(section, "reliable_delta", param->reliable_delta);
-    param->reliable_delta_refinement = kv.get<double>(section, "reliable_delta_refinement", param->reliable_delta_refinement);
+    param->reliable_delta_refinement
+      = kv.get<double>(section, "reliable_delta_refinement", param->reliable_delta_refinement);
     param->use_alternative_reliable = kv.get<int>(section, "use_alternative_reliable", param->use_alternative_reliable);
-    param->use_sloppy_partial_accumulator = kv.get<int>(section, "use_sloppy_partial_accumulator", param->use_sloppy_partial_accumulator);
+    param->use_sloppy_partial_accumulator
+      = kv.get<int>(section, "use_sloppy_partial_accumulator", param->use_sloppy_partial_accumulator);
 
-    param->solution_accumulator_pipeline = kv.get<int>(section, "solution_accumulator_pipeline", param->solution_accumulator_pipeline);
+    param->solution_accumulator_pipeline
+      = kv.get<int>(section, "solution_accumulator_pipeline", param->solution_accumulator_pipeline);
 
     param->max_res_increase = kv.get<int>(section, "max_res_increase", param->max_res_increase);
     param->max_res_increase_total = kv.get<int>(section, "max_res_increase_total", param->max_res_increase_total);
@@ -1278,7 +1204,8 @@ void* openQCD_qudaSolverReadIn(int id)
     param->pipeline = kv.get<int>(section, "pipeline", param->pipeline);
     param->num_offset = kv.get<int>(section, "num_offset", param->num_offset);
     param->num_src = kv.get<int>(section, "num_src", param->num_src);
-    param->num_src_per_sub_partition = kv.get<int>(section, "num_src_per_sub_partition", param->num_src_per_sub_partition);
+    param->num_src_per_sub_partition
+      = kv.get<int>(section, "num_src_per_sub_partition", param->num_src_per_sub_partition);
 
     param->split_grid[0] = kv.get<int>(section, "split_grid[1]", param->split_grid[0]);
     param->split_grid[1] = kv.get<int>(section, "split_grid[2]", param->split_grid[1]);
@@ -1287,7 +1214,7 @@ void* openQCD_qudaSolverReadIn(int id)
 
     param->overlap = kv.get<int>(section, "overlap", param->overlap);
 
-    for(int i=0; i<param->num_offset; i++) {
+    for (int i = 0; i < param->num_offset; i++) {
       std::string sub_key = "offset[" + std::to_string(i) + "]";
       param->offset[i] = kv.get<double>(section, sub_key, param->offset[i]);
       sub_key = "tol_offset[" + std::to_string(i) + "]";
@@ -1303,24 +1230,31 @@ void* openQCD_qudaSolverReadIn(int id)
     param->matpc_type = kv.get<QudaMatPCType>(section, "matpc_type", param->matpc_type);
     param->dagger = kv.get<QudaDagType>(section, "dagger", param->dagger);
     param->mass_normalization = kv.get<QudaMassNormalization>(section, "mass_normalization", param->mass_normalization);
-    param->solver_normalization = kv.get<QudaSolverNormalization>(section, "solver_normalization", param->solver_normalization);
+    param->solver_normalization
+      = kv.get<QudaSolverNormalization>(section, "solver_normalization", param->solver_normalization);
 
     param->preserve_source = kv.get<QudaPreserveSource>(section, "preserve_source", param->preserve_source);
 
     param->cpu_prec = kv.get<QudaPrecision>(section, "cpu_prec", param->cpu_prec);
     param->cuda_prec = kv.get<QudaPrecision>(section, "cuda_prec", param->cuda_prec);
     param->cuda_prec_sloppy = kv.get<QudaPrecision>(section, "cuda_prec_sloppy", param->cuda_prec_sloppy);
-    param->cuda_prec_refinement_sloppy = kv.get<QudaPrecision>(section, "cuda_prec_refinement_sloppy", param->cuda_prec_refinement_sloppy);
-    param->cuda_prec_precondition = kv.get<QudaPrecision>(section, "cuda_prec_precondition", param->cuda_prec_precondition);
+    param->cuda_prec_refinement_sloppy
+      = kv.get<QudaPrecision>(section, "cuda_prec_refinement_sloppy", param->cuda_prec_refinement_sloppy);
+    param->cuda_prec_precondition
+      = kv.get<QudaPrecision>(section, "cuda_prec_precondition", param->cuda_prec_precondition);
     param->cuda_prec_eigensolver = kv.get<QudaPrecision>(section, "cuda_prec_eigensolver", param->cuda_prec_eigensolver);
 
     param->clover_location = kv.get<QudaFieldLocation>(section, "clover_location", param->clover_location);
     param->clover_cpu_prec = kv.get<QudaPrecision>(section, "clover_cpu_prec", param->clover_cpu_prec);
     param->clover_cuda_prec = kv.get<QudaPrecision>(section, "clover_cuda_prec", param->clover_cuda_prec);
-    param->clover_cuda_prec_sloppy = kv.get<QudaPrecision>(section, "clover_cuda_prec_sloppy", param->clover_cuda_prec_sloppy);
-    param->clover_cuda_prec_refinement_sloppy = kv.get<QudaPrecision>(section, "clover_cuda_prec_refinement_sloppy", param->clover_cuda_prec_refinement_sloppy);
-    param->clover_cuda_prec_precondition = kv.get<QudaPrecision>(section, "clover_cuda_prec_precondition", param->clover_cuda_prec_precondition);
-    param->clover_cuda_prec_eigensolver = kv.get<QudaPrecision>(section, "clover_cuda_prec_eigensolver", param->clover_cuda_prec_eigensolver);
+    param->clover_cuda_prec_sloppy
+      = kv.get<QudaPrecision>(section, "clover_cuda_prec_sloppy", param->clover_cuda_prec_sloppy);
+    param->clover_cuda_prec_refinement_sloppy
+      = kv.get<QudaPrecision>(section, "clover_cuda_prec_refinement_sloppy", param->clover_cuda_prec_refinement_sloppy);
+    param->clover_cuda_prec_precondition
+      = kv.get<QudaPrecision>(section, "clover_cuda_prec_precondition", param->clover_cuda_prec_precondition);
+    param->clover_cuda_prec_eigensolver
+      = kv.get<QudaPrecision>(section, "clover_cuda_prec_eigensolver", param->clover_cuda_prec_eigensolver);
 
     param->use_init_guess = kv.get<QudaUseInitGuess>(section, "use_init_guess", param->use_init_guess);
 
@@ -1332,9 +1266,11 @@ void* openQCD_qudaSolverReadIn(int id)
     param->Nsteps = kv.get<int>(section, "Nsteps", param->Nsteps);
     param->gcrNkrylov = kv.get<int>(section, "gcrNkrylov", param->gcrNkrylov);
 
-    param->inv_type_precondition = kv.get<QudaInverterType>(section, "inv_type_precondition", param->inv_type_precondition);
+    param->inv_type_precondition
+      = kv.get<QudaInverterType>(section, "inv_type_precondition", param->inv_type_precondition);
     param->deflate = kv.get<QudaBoolean>(section, "deflate", param->deflate);
-    param->verbosity_precondition = kv.get<QudaVerbosity>(section, "verbosity_precondition", param->verbosity_precondition);
+    param->verbosity_precondition
+      = kv.get<QudaVerbosity>(section, "verbosity_precondition", param->verbosity_precondition);
     param->tol_precondition = kv.get<double>(section, "tol_precondition", param->tol_precondition);
     param->maxiter_precondition = kv.get<int>(section, "maxiter_precondition", param->maxiter_precondition);
     param->omega = kv.get<double>(section, "omega", param->omega);
@@ -1342,13 +1278,17 @@ void* openQCD_qudaSolverReadIn(int id)
     param->ca_lambda_min = kv.get<double>(section, "ca_lambda_min", param->ca_lambda_min);
     param->ca_lambda_max = kv.get<double>(section, "ca_lambda_max", param->ca_lambda_max);
     param->ca_basis_precondition = kv.get<QudaCABasis>(section, "ca_basis_precondition", param->ca_basis_precondition);
-    param->ca_lambda_min_precondition = kv.get<double>(section, "ca_lambda_min_precondition", param->ca_lambda_min_precondition);
-    param->ca_lambda_max_precondition = kv.get<double>(section, "ca_lambda_max_precondition", param->ca_lambda_max_precondition);
+    param->ca_lambda_min_precondition
+      = kv.get<double>(section, "ca_lambda_min_precondition", param->ca_lambda_min_precondition);
+    param->ca_lambda_max_precondition
+      = kv.get<double>(section, "ca_lambda_max_precondition", param->ca_lambda_max_precondition);
     param->precondition_cycle = kv.get<int>(section, "precondition_cycle", param->precondition_cycle);
     param->schwarz_type = kv.get<QudaSchwarzType>(section, "schwarz_type", param->schwarz_type);
-    param->accelerator_type_precondition = kv.get<QudaAcceleratorType>(section, "accelerator_type_precondition", param->accelerator_type_precondition);
+    param->accelerator_type_precondition
+      = kv.get<QudaAcceleratorType>(section, "accelerator_type_precondition", param->accelerator_type_precondition);
 
-    param->madwf_diagonal_suppressor = kv.get<double>(section, "madwf_diagonal_suppressor", param->madwf_diagonal_suppressor);
+    param->madwf_diagonal_suppressor
+      = kv.get<double>(section, "madwf_diagonal_suppressor", param->madwf_diagonal_suppressor);
     param->madwf_ls = kv.get<int>(section, "madwf_ls", param->madwf_ls);
     param->madwf_null_miniter = kv.get<int>(section, "madwf_null_miniter", param->madwf_null_miniter);
     param->madwf_null_tol = kv.get<double>(section, "madwf_null_tol", param->madwf_null_tol);
@@ -1356,8 +1296,10 @@ void* openQCD_qudaSolverReadIn(int id)
 
     param->madwf_param_load = kv.get<QudaBoolean>(section, "madwf_param_load", param->madwf_param_load);
     param->madwf_param_save = kv.get<QudaBoolean>(section, "madwf_param_save", param->madwf_param_save);
-    strcpy(param->madwf_param_infile, kv.get<std::string>(section, "madwf_param_infile", param->madwf_param_infile).c_str());
-    strcpy(param->madwf_param_outfile, kv.get<std::string>(section, "madwf_param_outfile", param->madwf_param_outfile).c_str());
+    strcpy(param->madwf_param_infile,
+           kv.get<std::string>(section, "madwf_param_infile", param->madwf_param_infile).c_str());
+    strcpy(param->madwf_param_outfile,
+           kv.get<std::string>(section, "madwf_param_outfile", param->madwf_param_outfile).c_str());
 
     param->residual_type = kv.get<QudaResidualType>(section, "residual_type", param->residual_type);
 
@@ -1378,98 +1320,146 @@ void* openQCD_qudaSolverReadIn(int id)
 
       multigrid_param->n_level = kv.get<int>(mg_section, "n_level", multigrid_param->n_level, true);
       multigrid_param->setup_type = kv.get<QudaSetupType>(mg_section, "setup_type", multigrid_param->setup_type);
-      multigrid_param->pre_orthonormalize = kv.get<QudaBoolean>(mg_section, "pre_orthonormalize", multigrid_param->pre_orthonormalize);
-      multigrid_param->post_orthonormalize = kv.get<QudaBoolean>(mg_section, "post_orthonormalize", multigrid_param->post_orthonormalize);
-      multigrid_param->setup_minimize_memory = kv.get<QudaBoolean>(mg_section, "setup_minimize_memory", multigrid_param->setup_minimize_memory);
-      multigrid_param->compute_null_vector = kv.get<QudaComputeNullVector>(mg_section, "compute_null_vector", multigrid_param->compute_null_vector);
-      multigrid_param->generate_all_levels = kv.get<QudaBoolean>(mg_section, "generate_all_levels", multigrid_param->generate_all_levels);
+      multigrid_param->pre_orthonormalize
+        = kv.get<QudaBoolean>(mg_section, "pre_orthonormalize", multigrid_param->pre_orthonormalize);
+      multigrid_param->post_orthonormalize
+        = kv.get<QudaBoolean>(mg_section, "post_orthonormalize", multigrid_param->post_orthonormalize);
+      multigrid_param->setup_minimize_memory
+        = kv.get<QudaBoolean>(mg_section, "setup_minimize_memory", multigrid_param->setup_minimize_memory);
+      multigrid_param->compute_null_vector
+        = kv.get<QudaComputeNullVector>(mg_section, "compute_null_vector", multigrid_param->compute_null_vector);
+      multigrid_param->generate_all_levels
+        = kv.get<QudaBoolean>(mg_section, "generate_all_levels", multigrid_param->generate_all_levels);
       multigrid_param->run_verify = kv.get<QudaBoolean>(mg_section, "run_verify", multigrid_param->run_verify);
-      multigrid_param->run_low_mode_check = kv.get<QudaBoolean>(mg_section, "run_low_mode_check", multigrid_param->run_low_mode_check);
-      multigrid_param->run_oblique_proj_check = kv.get<QudaBoolean>(mg_section, "run_oblique_proj_check", multigrid_param->run_oblique_proj_check);
+      multigrid_param->run_low_mode_check
+        = kv.get<QudaBoolean>(mg_section, "run_low_mode_check", multigrid_param->run_low_mode_check);
+      multigrid_param->run_oblique_proj_check
+        = kv.get<QudaBoolean>(mg_section, "run_oblique_proj_check", multigrid_param->run_oblique_proj_check);
       multigrid_param->coarse_guess = kv.get<QudaBoolean>(mg_section, "coarse_guess", multigrid_param->coarse_guess);
-      multigrid_param->preserve_deflation = kv.get<QudaBoolean>(mg_section, "preserve_deflation", multigrid_param->preserve_deflation);
-      multigrid_param->allow_truncation = kv.get<QudaBoolean>(mg_section, "allow_truncation", multigrid_param->allow_truncation);
-      multigrid_param->staggered_kd_dagger_approximation = kv.get<QudaBoolean>(mg_section, "staggered_kd_dagger_approximation", multigrid_param->staggered_kd_dagger_approximation);
-      multigrid_param->thin_update_only = kv.get<QudaBoolean>(mg_section, "thin_update_only", multigrid_param->thin_update_only);
+      multigrid_param->preserve_deflation
+        = kv.get<QudaBoolean>(mg_section, "preserve_deflation", multigrid_param->preserve_deflation);
+      multigrid_param->allow_truncation
+        = kv.get<QudaBoolean>(mg_section, "allow_truncation", multigrid_param->allow_truncation);
+      multigrid_param->staggered_kd_dagger_approximation = kv.get<QudaBoolean>(
+        mg_section, "staggered_kd_dagger_approximation", multigrid_param->staggered_kd_dagger_approximation);
+      multigrid_param->thin_update_only
+        = kv.get<QudaBoolean>(mg_section, "thin_update_only", multigrid_param->thin_update_only);
 
-      for (int i=0; i<multigrid_param->n_level; i++) {
+      for (int i = 0; i < multigrid_param->n_level; i++) {
         std::string subsection = section + " Multigrid Level " + std::to_string(i);
 
         if (!kv.section_exists(subsection)) {
           errorQuda("Solver section \"%s\" in file %s does not exist.", subsection.c_str(), qudaState.infile);
         }
 
-        multigrid_param->geo_block_size[i][0] = kv.get<int>(subsection, "geo_block_size[1]", multigrid_param->geo_block_size[i][0]);
-        multigrid_param->geo_block_size[i][1] = kv.get<int>(subsection, "geo_block_size[2]", multigrid_param->geo_block_size[i][1]);
-        multigrid_param->geo_block_size[i][2] = kv.get<int>(subsection, "geo_block_size[3]", multigrid_param->geo_block_size[i][2]);
-        multigrid_param->geo_block_size[i][3] = kv.get<int>(subsection, "geo_block_size[0]", multigrid_param->geo_block_size[i][3]);
+        multigrid_param->geo_block_size[i][0]
+          = kv.get<int>(subsection, "geo_block_size[1]", multigrid_param->geo_block_size[i][0]);
+        multigrid_param->geo_block_size[i][1]
+          = kv.get<int>(subsection, "geo_block_size[2]", multigrid_param->geo_block_size[i][1]);
+        multigrid_param->geo_block_size[i][2]
+          = kv.get<int>(subsection, "geo_block_size[3]", multigrid_param->geo_block_size[i][2]);
+        multigrid_param->geo_block_size[i][3]
+          = kv.get<int>(subsection, "geo_block_size[0]", multigrid_param->geo_block_size[i][3]);
 
-        if (i==0) {
+        if (i == 0) {
           multigrid_param->geo_block_size[i][0] = 4;
           multigrid_param->geo_block_size[i][1] = 4;
           multigrid_param->geo_block_size[i][2] = 4;
           multigrid_param->geo_block_size[i][3] = 4;
         }
 
-        multigrid_param->spin_block_size[i] = kv.get<int>(subsection, "spin_block_size", multigrid_param->spin_block_size[i]);
+        multigrid_param->spin_block_size[i]
+          = kv.get<int>(subsection, "spin_block_size", multigrid_param->spin_block_size[i]);
         multigrid_param->n_vec[i] = kv.get<int>(subsection, "n_vec", multigrid_param->n_vec[i]);
-        multigrid_param->precision_null[i] = kv.get<QudaPrecision>(subsection, "precision_null", multigrid_param->precision_null[i]);
+        multigrid_param->precision_null[i]
+          = kv.get<QudaPrecision>(subsection, "precision_null", multigrid_param->precision_null[i]);
         multigrid_param->n_block_ortho[i] = kv.get<int>(subsection, "n_block_ortho", multigrid_param->n_block_ortho[i]);
-        multigrid_param->block_ortho_two_pass[i] = kv.get<QudaBoolean>(subsection, "block_ortho_two_pass", multigrid_param->block_ortho_two_pass[i]);
+        multigrid_param->block_ortho_two_pass[i]
+          = kv.get<QudaBoolean>(subsection, "block_ortho_two_pass", multigrid_param->block_ortho_two_pass[i]);
         multigrid_param->verbosity[i] = kv.get<QudaVerbosity>(subsection, "verbosity", multigrid_param->verbosity[i]);
-        multigrid_param->setup_inv_type[i] = kv.get<QudaInverterType>(subsection, "setup_inv_type", multigrid_param->setup_inv_type[i]);
-        multigrid_param->setup_use_mma[i] = kv.get<QudaBoolean>(subsection, "setup_use_mma", multigrid_param->setup_use_mma[i]);
-        multigrid_param->dslash_use_mma[i] = kv.get<QudaBoolean>(subsection, "dslash_use_mma", multigrid_param->dslash_use_mma[i]);
-        multigrid_param->num_setup_iter[i] = kv.get<int>(subsection, "num_setup_iter", multigrid_param->num_setup_iter[i]);
+        multigrid_param->setup_inv_type[i]
+          = kv.get<QudaInverterType>(subsection, "setup_inv_type", multigrid_param->setup_inv_type[i]);
+        multigrid_param->setup_use_mma[i]
+          = kv.get<QudaBoolean>(subsection, "setup_use_mma", multigrid_param->setup_use_mma[i]);
+        multigrid_param->dslash_use_mma[i]
+          = kv.get<QudaBoolean>(subsection, "dslash_use_mma", multigrid_param->dslash_use_mma[i]);
+        multigrid_param->num_setup_iter[i]
+          = kv.get<int>(subsection, "num_setup_iter", multigrid_param->num_setup_iter[i]);
         multigrid_param->setup_tol[i] = kv.get<double>(subsection, "setup_tol", multigrid_param->setup_tol[i]);
         multigrid_param->setup_maxiter[i] = kv.get<int>(subsection, "setup_maxiter", multigrid_param->setup_maxiter[i]);
-        multigrid_param->setup_maxiter_refresh[i] = kv.get<int>(subsection, "setup_maxiter_refresh", multigrid_param->setup_maxiter_refresh[i]);
-        multigrid_param->setup_ca_basis[i] = kv.get<QudaCABasis>(subsection, "setup_ca_basis", multigrid_param->setup_ca_basis[i]);
-        multigrid_param->setup_ca_basis_size[i] = kv.get<int>(subsection, "setup_ca_basis_size", multigrid_param->setup_ca_basis_size[i]);
-        multigrid_param->setup_ca_lambda_min[i] = kv.get<double>(subsection, "setup_ca_lambda_min", multigrid_param->setup_ca_lambda_min[i]);
-        multigrid_param->setup_ca_lambda_max[i] = kv.get<double>(subsection, "setup_ca_lambda_max", multigrid_param->setup_ca_lambda_max[i]);
+        multigrid_param->setup_maxiter_refresh[i]
+          = kv.get<int>(subsection, "setup_maxiter_refresh", multigrid_param->setup_maxiter_refresh[i]);
+        multigrid_param->setup_ca_basis[i]
+          = kv.get<QudaCABasis>(subsection, "setup_ca_basis", multigrid_param->setup_ca_basis[i]);
+        multigrid_param->setup_ca_basis_size[i]
+          = kv.get<int>(subsection, "setup_ca_basis_size", multigrid_param->setup_ca_basis_size[i]);
+        multigrid_param->setup_ca_lambda_min[i]
+          = kv.get<double>(subsection, "setup_ca_lambda_min", multigrid_param->setup_ca_lambda_min[i]);
+        multigrid_param->setup_ca_lambda_max[i]
+          = kv.get<double>(subsection, "setup_ca_lambda_max", multigrid_param->setup_ca_lambda_max[i]);
 
-        multigrid_param->coarse_solver[i] = kv.get<QudaInverterType>(subsection, "coarse_solver", multigrid_param->coarse_solver[i]);
-        multigrid_param->coarse_solver_tol[i] = kv.get<double>(subsection, "coarse_solver_tol", multigrid_param->coarse_solver_tol[i]);
-        multigrid_param->coarse_solver_maxiter[i] = kv.get<int>(subsection, "coarse_solver_maxiter", multigrid_param->coarse_solver_maxiter[i]);
-        multigrid_param->coarse_solver_ca_basis[i] = kv.get<QudaCABasis>(subsection, "coarse_solver_ca_basis", multigrid_param->coarse_solver_ca_basis[i]);
-        multigrid_param->coarse_solver_ca_basis_size[i] = kv.get<int>(subsection, "coarse_solver_ca_basis_size", multigrid_param->coarse_solver_ca_basis_size[i]);
-        multigrid_param->coarse_solver_ca_lambda_min[i] = kv.get<double>(subsection, "coarse_solver_ca_lambda_min", multigrid_param->coarse_solver_ca_lambda_min[i]);
-        multigrid_param->coarse_solver_ca_lambda_max[i] = kv.get<double>(subsection, "coarse_solver_ca_lambda_max", multigrid_param->coarse_solver_ca_lambda_max[i]);
+        multigrid_param->coarse_solver[i]
+          = kv.get<QudaInverterType>(subsection, "coarse_solver", multigrid_param->coarse_solver[i]);
+        multigrid_param->coarse_solver_tol[i]
+          = kv.get<double>(subsection, "coarse_solver_tol", multigrid_param->coarse_solver_tol[i]);
+        multigrid_param->coarse_solver_maxiter[i]
+          = kv.get<int>(subsection, "coarse_solver_maxiter", multigrid_param->coarse_solver_maxiter[i]);
+        multigrid_param->coarse_solver_ca_basis[i]
+          = kv.get<QudaCABasis>(subsection, "coarse_solver_ca_basis", multigrid_param->coarse_solver_ca_basis[i]);
+        multigrid_param->coarse_solver_ca_basis_size[i]
+          = kv.get<int>(subsection, "coarse_solver_ca_basis_size", multigrid_param->coarse_solver_ca_basis_size[i]);
+        multigrid_param->coarse_solver_ca_lambda_min[i]
+          = kv.get<double>(subsection, "coarse_solver_ca_lambda_min", multigrid_param->coarse_solver_ca_lambda_min[i]);
+        multigrid_param->coarse_solver_ca_lambda_max[i]
+          = kv.get<double>(subsection, "coarse_solver_ca_lambda_max", multigrid_param->coarse_solver_ca_lambda_max[i]);
         multigrid_param->smoother[i] = kv.get<QudaInverterType>(subsection, "smoother", multigrid_param->smoother[i]);
         multigrid_param->smoother_tol[i] = kv.get<double>(subsection, "smoother_tol", multigrid_param->smoother_tol[i]);
         multigrid_param->nu_pre[i] = kv.get<int>(subsection, "nu_pre", multigrid_param->nu_pre[i]);
         multigrid_param->nu_post[i] = kv.get<int>(subsection, "nu_post", multigrid_param->nu_post[i]);
-        multigrid_param->smoother_solver_ca_basis[i] = kv.get<QudaCABasis>(subsection, "smoother_solver_ca_basis", multigrid_param->smoother_solver_ca_basis[i]);
-        multigrid_param->smoother_solver_ca_lambda_min[i] = kv.get<double>(subsection, "smoother_solver_ca_lambda_min", multigrid_param->smoother_solver_ca_lambda_min[i]);
-        multigrid_param->smoother_solver_ca_lambda_max[i] = kv.get<double>(subsection, "smoother_solver_ca_lambda_max", multigrid_param->smoother_solver_ca_lambda_max[i]);
+        multigrid_param->smoother_solver_ca_basis[i]
+          = kv.get<QudaCABasis>(subsection, "smoother_solver_ca_basis", multigrid_param->smoother_solver_ca_basis[i]);
+        multigrid_param->smoother_solver_ca_lambda_min[i] = kv.get<double>(
+          subsection, "smoother_solver_ca_lambda_min", multigrid_param->smoother_solver_ca_lambda_min[i]);
+        multigrid_param->smoother_solver_ca_lambda_max[i] = kv.get<double>(
+          subsection, "smoother_solver_ca_lambda_max", multigrid_param->smoother_solver_ca_lambda_max[i]);
         multigrid_param->omega[i] = kv.get<double>(subsection, "omega", multigrid_param->omega[i]);
-        multigrid_param->smoother_halo_precision[i] = kv.get<QudaPrecision>(subsection, "smoother_halo_precision", multigrid_param->smoother_halo_precision[i]);
-        multigrid_param->smoother_schwarz_type[i] = kv.get<QudaSchwarzType>(subsection, "smoother_schwarz_type", multigrid_param->smoother_schwarz_type[i]);
-        multigrid_param->smoother_schwarz_cycle[i] = kv.get<int>(subsection, "smoother_schwarz_cycle", multigrid_param->smoother_schwarz_cycle[i]);
-        multigrid_param->coarse_grid_solution_type[i] = kv.get<QudaSolutionType>(subsection, "coarse_grid_solution_type", multigrid_param->coarse_grid_solution_type[i]);
-        multigrid_param->smoother_solve_type[i] = kv.get<QudaSolveType>(subsection, "smoother_solve_type", multigrid_param->smoother_solve_type[i]);
-        multigrid_param->cycle_type[i] = kv.get<QudaMultigridCycleType>(subsection, "cycle_type", multigrid_param->cycle_type[i]);
-        multigrid_param->global_reduction[i] = kv.get<QudaBoolean>(subsection, "global_reduction", multigrid_param->global_reduction[i]);
+        multigrid_param->smoother_halo_precision[i]
+          = kv.get<QudaPrecision>(subsection, "smoother_halo_precision", multigrid_param->smoother_halo_precision[i]);
+        multigrid_param->smoother_schwarz_type[i]
+          = kv.get<QudaSchwarzType>(subsection, "smoother_schwarz_type", multigrid_param->smoother_schwarz_type[i]);
+        multigrid_param->smoother_schwarz_cycle[i]
+          = kv.get<int>(subsection, "smoother_schwarz_cycle", multigrid_param->smoother_schwarz_cycle[i]);
+        multigrid_param->coarse_grid_solution_type[i] = kv.get<QudaSolutionType>(
+          subsection, "coarse_grid_solution_type", multigrid_param->coarse_grid_solution_type[i]);
+        multigrid_param->smoother_solve_type[i]
+          = kv.get<QudaSolveType>(subsection, "smoother_solve_type", multigrid_param->smoother_solve_type[i]);
+        multigrid_param->cycle_type[i]
+          = kv.get<QudaMultigridCycleType>(subsection, "cycle_type", multigrid_param->cycle_type[i]);
+        multigrid_param->global_reduction[i]
+          = kv.get<QudaBoolean>(subsection, "global_reduction", multigrid_param->global_reduction[i]);
         multigrid_param->location[i] = kv.get<QudaFieldLocation>(subsection, "location", multigrid_param->location[i]);
-        multigrid_param->setup_location[i] = kv.get<QudaFieldLocation>(subsection, "setup_location", multigrid_param->setup_location[i]);
-        multigrid_param->use_eig_solver[i] = kv.get<QudaBoolean>(subsection, "use_eig_solver", multigrid_param->use_eig_solver[i]);
+        multigrid_param->setup_location[i]
+          = kv.get<QudaFieldLocation>(subsection, "setup_location", multigrid_param->setup_location[i]);
+        multigrid_param->use_eig_solver[i]
+          = kv.get<QudaBoolean>(subsection, "use_eig_solver", multigrid_param->use_eig_solver[i]);
 
         multigrid_param->vec_load[i] = kv.get<QudaBoolean>(subsection, "vec_load", multigrid_param->vec_load[i]);
         multigrid_param->vec_store[i] = kv.get<QudaBoolean>(subsection, "vec_store", multigrid_param->vec_store[i]);
-        /*strcpy(multigrid_param->vec_infile[i], kv.get<std::string>(subsection, "vec_infile", multigrid_param->vec_infile[i]).c_str());
-        strcpy(multigrid_param->vec_outfile[i], kv.get<std::string>(subsection, "vec_outfile", multigrid_param->vec_outfile[i]).c_str());*/
+        /*strcpy(multigrid_param->vec_infile[i], kv.get<std::string>(subsection, "vec_infile",
+        multigrid_param->vec_infile[i]).c_str()); strcpy(multigrid_param->vec_outfile[i],
+        kv.get<std::string>(subsection, "vec_outfile", multigrid_param->vec_outfile[i]).c_str());*/
 
         multigrid_param->mu_factor[i] = kv.get<double>(subsection, "mu_factor", multigrid_param->mu_factor[i]);
-        multigrid_param->transfer_type[i] = kv.get<QudaTransferType>(subsection, "transfer_type", multigrid_param->transfer_type[i]);
+        multigrid_param->transfer_type[i]
+          = kv.get<QudaTransferType>(subsection, "transfer_type", multigrid_param->transfer_type[i]);
       }
     }
   }
 
   /* transfer of the struct to all processes */
-  MPI_Bcast((void*) param,           sizeof(*param),           MPI_BYTE, 0, MPI_COMM_WORLD);
-  MPI_Bcast((void*) invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, MPI_COMM_WORLD);
-  MPI_Bcast((void*) multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
   multigrid_param->invert_param = invert_param_mg;
 
   /**
@@ -1483,18 +1473,16 @@ void* openQCD_qudaSolverReadIn(int id)
   additional_prop->id = id;
   additional_prop->mg_param = multigrid_param;
   additional_prop->u1csw = qudaState.layout.dirac_parms().u1csw;
-  param->additional_prop = reinterpret_cast<void*>(additional_prop);
+  param->additional_prop = reinterpret_cast<void *>(additional_prop);
 
-  return (void*) param;
+  return (void *)param;
 }
 
-
-void* openQCD_qudaSolverGetHandle(int id)
+void *openQCD_qudaSolverGetHandle(int id)
 {
   if (qudaState.handles[id] == nullptr) {
     if (id != -1) {
-      logQuda(QUDA_VERBOSE, "Read in solver parameters from file %s for solver (id=%d)\n",
-        qudaState.infile, id);
+      logQuda(QUDA_VERBOSE, "Read in solver parameters from file %s for solver (id=%d)\n", qudaState.infile, id);
     }
     qudaState.handles[id] = openQCD_qudaSolverReadIn(id);
   }
@@ -1502,7 +1490,6 @@ void* openQCD_qudaSolverGetHandle(int id)
   openQCD_qudaSolverUpdate(qudaState.handles[id]);
   return qudaState.handles[id];
 }
-
 
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
 {
@@ -1519,14 +1506,11 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
   logQuda(QUDA_DEBUG_VERBOSE, "  secs        = %.2e\n", param.secs);
 }
 
-
 void openQCD_qudaDw(double mu, void *in, void *out)
 {
-  if (gauge_field_get_unset()) {
-    errorQuda("Gauge field not populated in openQxD.");
-  }
+  if (gauge_field_get_unset()) { errorQuda("Gauge field not populated in openQxD."); }
 
-  QudaInvertParam* param = static_cast<QudaInvertParam*>(openQCD_qudaSolverGetHandle(-1));
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
   param->mu = mu;
 
   if (!openQCD_qudaInvertParamCheck(param)) {
@@ -1540,7 +1524,6 @@ void openQCD_qudaDw(double mu, void *in, void *out)
   MatQuda(static_cast<char *>(out), static_cast<char *>(in), param);
 }
 
-
 /**
  * @brief      Take the string-hash over a struct using std::hash.
  *
@@ -1553,42 +1536,39 @@ void openQCD_qudaDw(double mu, void *in, void *out)
 template <typename T> int hash_struct(T *in)
 {
   int hash = 0;
-  char* cstruct = reinterpret_cast<char*>(in);
+  char *cstruct = reinterpret_cast<char *>(in);
 
-  for (char* c = cstruct; c < cstruct + sizeof(T); c += strlen(c) + 1) {
-    if (strlen(c) != 0) {
-      hash ^= (std::hash<std::string>{}(std::string(c)) << 1);
-    }
+  for (char *c = cstruct; c < cstruct + sizeof(T); c += strlen(c) + 1) {
+    if (strlen(c) != 0) { hash ^= (std::hash<std::string> {}(std::string(c)) << 1); }
   }
 
   return hash;
 }
 
-
 int openQCD_qudaSolverGetHash(int id)
 {
   if (qudaState.handles[id] != nullptr) {
-    QudaInvertParam* param = reinterpret_cast<QudaInvertParam*>(qudaState.handles[id]);
+    QudaInvertParam *param = reinterpret_cast<QudaInvertParam *>(qudaState.handles[id]);
     QudaInvertParam hparam = newQudaInvertParam();
     memset(&hparam, '\0', sizeof(QudaInvertParam)); /* set everything to zero */
 
     /* Set some properties we want to take the hash over */
-    hparam.inv_type             = param->inv_type;
-    hparam.tol                  = param->tol;
-    hparam.tol_restart          = param->tol_restart;
-    hparam.tol_hq               = param->tol_hq;
-    hparam.maxiter              = param->maxiter;
-    hparam.reliable_delta       = param->reliable_delta;
-    hparam.solution_type        = param->solution_type;
-    hparam.solve_type           = param->solve_type;
-    hparam.matpc_type           = param->matpc_type;
-    hparam.dagger               = param->dagger;
-    hparam.mass_normalization   = param->mass_normalization;
+    hparam.inv_type = param->inv_type;
+    hparam.tol = param->tol;
+    hparam.tol_restart = param->tol_restart;
+    hparam.tol_hq = param->tol_hq;
+    hparam.maxiter = param->maxiter;
+    hparam.reliable_delta = param->reliable_delta;
+    hparam.solution_type = param->solution_type;
+    hparam.solve_type = param->solve_type;
+    hparam.matpc_type = param->matpc_type;
+    hparam.dagger = param->dagger;
+    hparam.mass_normalization = param->mass_normalization;
     hparam.solver_normalization = param->solver_normalization;
-    hparam.cpu_prec             = param->cpu_prec;
-    hparam.cuda_prec            = param->cuda_prec;
-    hparam.use_init_guess       = param->use_init_guess;
-    hparam.gcrNkrylov           = param->gcrNkrylov;
+    hparam.cpu_prec = param->cpu_prec;
+    hparam.cuda_prec = param->cuda_prec;
+    hparam.use_init_guess = param->use_init_guess;
+    hparam.gcrNkrylov = param->gcrNkrylov;
 
     return hash_struct<QudaInvertParam>(&hparam);
   } else {
@@ -1596,44 +1576,38 @@ int openQCD_qudaSolverGetHash(int id)
   }
 }
 
-
 void openQCD_qudaSolverPrintSetup(int id)
 {
   if (qudaState.handles[id] != nullptr) {
-    QudaInvertParam *param = static_cast<QudaInvertParam*>(qudaState.handles[id]);
-    openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(param->additional_prop);
+    QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.handles[id]);
+    openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
 
     printQudaInvertParam(param);
-    printfQuda("additional_prop->infile = %s\n",      additional_prop->infile);
-    printfQuda("additional_prop->id = %d\n",          additional_prop->id);
-    printfQuda("additional_prop->mg_param = %p\n",    additional_prop->mg_param);
-    printfQuda("additional_prop->u1csw = %.6e\n",     additional_prop->u1csw);
-    printfQuda("additional_prop->mg_ud_rev = %d\n",   additional_prop->mg_ud_rev);
-    printfQuda("additional_prop->mg_ad_rev = %d\n",   additional_prop->mg_ad_rev);
-    printfQuda("additional_prop->mg_kappa = %.6e\n",  additional_prop->mg_kappa);
+    printfQuda("additional_prop->infile = %s\n", additional_prop->infile);
+    printfQuda("additional_prop->id = %d\n", additional_prop->id);
+    printfQuda("additional_prop->mg_param = %p\n", additional_prop->mg_param);
+    printfQuda("additional_prop->u1csw = %.6e\n", additional_prop->u1csw);
+    printfQuda("additional_prop->mg_ud_rev = %d\n", additional_prop->mg_ud_rev);
+    printfQuda("additional_prop->mg_ad_rev = %d\n", additional_prop->mg_ad_rev);
+    printfQuda("additional_prop->mg_kappa = %.6e\n", additional_prop->mg_kappa);
     printfQuda("additional_prop->mg_su3csw = %.6e\n", additional_prop->mg_su3csw);
-    printfQuda("additional_prop->mg_u1csw = %.6e\n",  additional_prop->mg_u1csw);
+    printfQuda("additional_prop->mg_u1csw = %.6e\n", additional_prop->mg_u1csw);
     printfQuda("handle = %p\n", param);
     printfQuda("hash = %d\n", openQCD_qudaSolverGetHash(id));
 
     printfQuda("inv_type_precondition = %d\n", param->inv_type_precondition);
 
-    if (param->inv_type_precondition == QUDA_MG_INVERTER) {
-      printQudaMultigridParam(additional_prop->mg_param);
-    }
+    if (param->inv_type_precondition == QUDA_MG_INVERTER) { printQudaMultigridParam(additional_prop->mg_param); }
   } else {
     printfQuda("<Solver is not initialized yet>\n");
   }
 }
 
-
 double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status)
 {
-  if (gauge_field_get_unset()) {
-    errorQuda("Gauge field not populated in openQxD.");
-  }
+  if (gauge_field_get_unset()) { errorQuda("Gauge field not populated in openQxD."); }
 
-  QudaInvertParam* param = static_cast<QudaInvertParam*>(openQCD_qudaSolverGetHandle(id));
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
   param->mu = mu;
 
   if (!openQCD_qudaInvertParamCheck(param)) {
@@ -1650,9 +1624,8 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
     errorQuda("qudaState.layout.h_sw is not set.");
   }
 
-
   logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n");
-  PUSH_RANGE("invertQuda",5);
+  PUSH_RANGE("invertQuda", 5);
   invertQuda(static_cast<char *>(solution), static_cast<char *>(source), param);
   POP_RANGE;
 
@@ -1661,33 +1634,29 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
   logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
   logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", param->true_res);
   logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", param->true_res_hq);
-  logQuda(QUDA_VERBOSE, "  iter        = %d\n",   param->iter);
+  logQuda(QUDA_VERBOSE, "  iter        = %d\n", param->iter);
   logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", param->gflops);
   logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", param->secs);
-  logQuda(QUDA_VERBOSE, "  status      = %d\n",   *status);
+  logQuda(QUDA_VERBOSE, "  status      = %d\n", *status);
 
   return param->true_res;
 }
 
-
 void openQCD_qudaSolverDestroy(int id)
 {
   if (qudaState.handles[id] != nullptr) {
-    QudaInvertParam *param = static_cast<QudaInvertParam*>(qudaState.handles[id]);
+    QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.handles[id]);
 
-    if (param->inv_type_precondition == QUDA_MG_INVERTER) {
-      destroyMultigridQuda(param->preconditioner);
-    }
+    if (param->inv_type_precondition == QUDA_MG_INVERTER) { destroyMultigridQuda(param->preconditioner); }
 
-    delete static_cast<openQCD_QudaSolver*>(param->additional_prop)->mg_param;
-    delete static_cast<openQCD_QudaSolver*>(param->additional_prop);
+    delete static_cast<openQCD_QudaSolver *>(param->additional_prop)->mg_param;
+    delete static_cast<openQCD_QudaSolver *>(param->additional_prop);
     delete param;
     qudaState.handles[id] = nullptr;
   }
 }
 
-
-void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
+void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
 {
   int my_rank;
 
@@ -1695,7 +1664,7 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
   QudaVerbosity verbosity = QUDA_SUMMARIZE;
 
   /* Allocate on the heap */
-  QudaEigParam* param = new QudaEigParam(newQudaEigParam());
+  QudaEigParam *param = new QudaEigParam(newQudaEigParam());
 
   if (my_rank == 0) {
 
@@ -1705,13 +1674,11 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
 
     verbosity = kv.get<QudaVerbosity>(section, "verbosity", verbosity);
 
-    if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      kv.dump();
-    }
+    if (verbosity >= QUDA_DEBUG_VERBOSE) { kv.dump(); }
 
     if (kv.get<std::string>(section, "solver") != "QUDA") {
       errorQuda("Eigensolver section \"%s\" in file %s is not a valid quda-eigensolver section (solver = %s)\n",
-        section, infile == nullptr ? qudaState.infile : infile, kv.get<std::string>(section, "solver").c_str());
+                section, infile == nullptr ? qudaState.infile : infile, kv.get<std::string>(section, "solver").c_str());
     }
 
     param->eig_type = kv.get<QudaEigType>(section, "eig_type", param->eig_type);
@@ -1761,10 +1728,10 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
   }
 
   /* transfer of the struct to all the processes */
-  MPI_Bcast((void*) param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
 
   void *inv_param = openQCD_qudaSolverGetHandle(solver_id);
-  param->invert_param = static_cast<QudaInvertParam*>(inv_param);
+  param->invert_param = static_cast<QudaInvertParam *>(inv_param);
 
   param->invert_param->verbosity = std::max(param->invert_param->verbosity, verbosity);
 
@@ -1772,21 +1739,18 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
     printQudaInvertParam(param->invert_param);
   }
 
-  if (param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
-    printQudaEigParam(param);
-  }
+  if (param->invert_param->verbosity >= QUDA_DEBUG_VERBOSE) { printQudaEigParam(param); }
 
-  return (void*) param;
+  return (void *)param;
 }
-
 
 void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
 {
-  QudaEigParam* eig_param = static_cast<QudaEigParam*>(param);
+  QudaEigParam *eig_param = static_cast<QudaEigParam *>(param);
 
   logQuda(QUDA_VERBOSE, "Calling eigensolveQuda() ...\n");
-  PUSH_RANGE("eigensolveQuda",6);
-  eigensolveQuda(h_evecs, static_cast<openqcd_complex_dble*>(h_evals), eig_param);
+  PUSH_RANGE("eigensolveQuda", 6);
+  eigensolveQuda(h_evecs, static_cast<openqcd_complex_dble *>(h_evals), eig_param);
   POP_RANGE;
 
   logQuda(QUDA_SUMMARIZE, "openQCD_qudaEigensolve()\n");
@@ -1795,11 +1759,10 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
   logQuda(QUDA_SUMMARIZE, "  iter        = %d\n", eig_param->invert_param->iter);
 }
 
-
 void openQCD_qudaEigensolverDestroy(void *param)
 {
-  QudaEigParam* eig_param = static_cast<QudaEigParam*>(param);
-  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver*>(eig_param->invert_param->additional_prop);
+  QudaEigParam *eig_param = static_cast<QudaEigParam *>(param);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(eig_param->invert_param->additional_prop);
   if (additional_prop == nullptr) {
     delete eig_param->invert_param;
   } else {

@@ -1744,7 +1744,7 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
-  
+
   /* Parameter set for quark smearing operations */
   typedef struct QudaQuarkSmearParam_s {
     /*-------------------------------------------------*/

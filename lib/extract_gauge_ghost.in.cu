@@ -113,7 +113,7 @@ namespace quda {
       } else if (u.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
 
         if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
-          ExtractGhost<Float, nColor, OpenQCDOrder<Float,length>>(u, Ghost, extract, offset);
+          ExtractGhost<Float, nColor, OpenQCDOrder<Float, length>>(u, Ghost, extract, offset);
         } else {
           errorQuda("OpenQCD interface has not been built");
         }
@@ -121,7 +121,6 @@ namespace quda {
       } else {
         errorQuda("Gauge field %d order not supported", u.Order());
       }
-
     }
   };
 

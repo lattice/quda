@@ -228,7 +228,7 @@
 #define QUDA_CPS_WILSON_DIRAC_ORDER 4  // odd-even color inside spin
 #define QUDA_LEX_DIRAC_ORDER 5         // lexicographical order color inside spin
 #define QUDA_TIFR_PADDED_DIRAC_ORDER 6
-#define QUDA_OPENQCD_DIRAC_ORDER 7     // openqcd
+#define QUDA_OPENQCD_DIRAC_ORDER 7 // openqcd
 #define QUDA_INVALID_DIRAC_ORDER QUDA_INVALID_ENUM
 
 #define QudaCloverFieldOrder integer(4)

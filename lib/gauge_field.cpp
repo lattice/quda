@@ -162,13 +162,13 @@ namespace quda {
 
         /* analogue to BNDRY in openQCD:include/global.h */
         long int bndry = 0;
-        bndry += (1-(comm_dim(0)%2))*x[1]*x[2]*x[3];
-        bndry += (1-(comm_dim(1)%2))*x[0]*x[2]*x[3];
-        bndry += (1-(comm_dim(2)%2))*x[0]*x[1]*x[3];
-        bndry += (1-(comm_dim(3)%2))*x[0]*x[1]*x[2];
+        bndry += (1 - (comm_dim(0) % 2)) * x[1] * x[2] * x[3];
+        bndry += (1 - (comm_dim(1) % 2)) * x[0] * x[2] * x[3];
+        bndry += (1 - (comm_dim(2) % 2)) * x[0] * x[1] * x[3];
+        bndry += (1 - (comm_dim(3) % 2)) * x[0] * x[1] * x[2];
         bndry *= 2;
 
-        length += 18*7*bndry/4;
+        length += 18 * 7 * bndry / 4;
         bytes = length * precision;
       } else {
         bytes = length * precision;

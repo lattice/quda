@@ -2606,8 +2606,7 @@ public:
           && (pc_type == QUDA_MATPC_EVEN_EVEN || pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC))
         return true;
 
-      if (dirac_type == QUDA_WILSON_DIRAC || dirac_type == QUDA_CLOVER_DIRAC)
-        return true;
+      if (dirac_type == QUDA_WILSON_DIRAC || dirac_type == QUDA_CLOVER_DIRAC) return true;
 
       return false;
     }

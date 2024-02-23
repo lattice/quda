@@ -130,24 +130,23 @@ namespace quda
     int shift_integer;
 
     int Nx_displacement = 0;
-    for (int i = QUDA_MAX_DIM-1; i >=0; i--) {
+    for (int i = QUDA_MAX_DIM - 1; i >= 0; i--) {
       // cstar shift[x] shift[y] shift[z] shift[t]
       // 0     0        0        0        0
       // 1     0        0        0        0
       // 2     0        1        0        0
       // 3     0        1        1        0
-      if(i < topo->ndim && (
-          (i==1 && topo->cstar >= 2) ||
-          (i==2 && topo->cstar >= 3)
-      )) {
+      if (i < topo->ndim && ((i == 1 && topo->cstar >= 2) || (i == 2 && topo->cstar >= 3))) {
         // if we go over the boundary and have a shifted boundary condition,
         // we shift Nx/2 ranks in x-direction:
         // shift_integer       in { 0, 1, 2}
         // (shift_integer - 1) in {-1, 0, 1}
         shift_integer = (comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i]) / comm_dims(topo)[i];
-        Nx_displacement += (shift_integer - 1) * (comm_dims(topo)[0]/2);
+        Nx_displacement += (shift_integer - 1) * (comm_dims(topo)[0] / 2);
       }
-      coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
+      coords[i] = (i < topo->ndim) ?
+        mod(comm_coords(topo)[i] + displacement[i] + (i == 0 ? Nx_displacement : 0), comm_dims(topo)[i]) :
+        0;
     }
 
     return comm_rank_from_coords(topo, coords);

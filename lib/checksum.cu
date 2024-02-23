@@ -52,11 +52,11 @@ namespace quda {
       ChecksumArg<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
     } else if (u.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
-      ChecksumArg<T,QUDA_OPENQCD_GAUGE_ORDER,Nc> arg(u,mini);
+      ChecksumArg<T, QUDA_OPENQCD_GAUGE_ORDER, Nc> arg(u, mini);
       checksum = ChecksumCPU(arg);
     } else {
       errorQuda("Checksum not implemented");
-    }    
+    }
 
     return checksum;
   }

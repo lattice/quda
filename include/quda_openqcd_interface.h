@@ -12,9 +12,8 @@
  * "double _Complex" data types exposed in quda.h.
  */
 
-typedef struct
-{
-  double re,im;
+typedef struct {
+  double re, im;
 } openqcd_complex_dble;
 
 #ifdef __CUDACC_RTC__
@@ -54,37 +53,31 @@ typedef struct
 extern "C" {
 #endif
 
-
-
 /**
  * Copied from flags.h
  * #############################################
  */
 #ifndef FLAGS_H
-typedef struct
-{
-   int type;
-   int cstar;
-   double phi3[2][3];
-   double phi1[2];
+typedef struct {
+  int type;
+  int cstar;
+  double phi3[2][3];
+  double phi1[2];
 } bc_parms_t;
 
-typedef struct
-{
-   int qhat;
-   double m0,su3csw,u1csw,cF[2],theta[3];
+typedef struct {
+  int qhat;
+  double m0, su3csw, u1csw, cF[2], theta[3];
 } dirac_parms_t;
 
-typedef struct
-{
-   int gauge;
-   int nfl;
+typedef struct {
+  int gauge;
+  int nfl;
 } flds_parms_t;
 #endif
 /**
  * #############################################
  */
-
 
 typedef enum OpenQCDGaugeGroup_s {
   OPENQCD_GAUGE_SU3 = 1,
@@ -93,89 +86,83 @@ typedef enum OpenQCDGaugeGroup_s {
   OPENQCD_GAUGE_INVALID = QUDA_INVALID_ENUM
 } OpenQCDGaugeGroup;
 
-
 /**
  * Parameters related to problem size and machine topology. They should hold the
  * numbers in quda format, i.e. xyzt convention. For example L[0] = L1, L[1] =
  * L2, ...
  */
 typedef struct {
-  int L[4];         /** Local lattice dimensions L1, L2, L3, L0 */
-  int nproc[4];     /** Machine grid size NPROC1, NPROC2, NPROC3, NPROC0*/
-  int nproc_blk[4]; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK,
-                        is assumed to be [1, 1, 1, 1] */
-  int N[4];         /** Glocal lattice dimensions N1, N2, N3, N3 */
-  int device;       /** GPU device number */
-  int cstar;        /** number of cstar directions, equals bc_cstar() */
-  int *data;        /** rank topology, length 5 + NPROC1*NPROC2*NPROC3*NPROC0:
-                        data[0] = cstar;
-                        data[1+i] = nproc[i] for 0 <= i < 4
-                        data[5+lex(ix,iy,iz,it)] returns rank number in
-                        openQCD, where lex stands for lexicographical
-                        indexing (in QUDA order (xyzt)) */
-  bc_parms_t (*bc_parms)(void); /** @see bc_parms() */
-  flds_parms_t (*flds_parms)(void); /** @see flds_parms() */
-  dirac_parms_t (*dirac_parms)(void); /** @see dirac_parms() */
-  void* (*h_gauge)(void);    /** function to return a pointer to the gauge field */
-  void* (*h_sw)(void);       /** function to return a pointer to the updated Clover field */
-  void (*get_gfld_flags)(int *ud, int *ad);      /** function pointer to gauge field revision query function */
+  int L[4];                                 /** Local lattice dimensions L1, L2, L3, L0 */
+  int nproc[4];                             /** Machine grid size NPROC1, NPROC2, NPROC3, NPROC0*/
+  int nproc_blk[4];                         /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK,
+                                                is assumed to be [1, 1, 1, 1] */
+  int N[4];                                 /** Glocal lattice dimensions N1, N2, N3, N3 */
+  int device;                               /** GPU device number */
+  int cstar;                                /** number of cstar directions, equals bc_cstar() */
+  int *data;                                /** rank topology, length 5 + NPROC1*NPROC2*NPROC3*NPROC0:
+                                                data[0] = cstar;
+                                                data[1+i] = nproc[i] for 0 <= i < 4
+                                                data[5+lex(ix,iy,iz,it)] returns rank number in
+                                                openQCD, where lex stands for lexicographical
+                                                indexing (in QUDA order (xyzt)) */
+  bc_parms_t (*bc_parms)(void);             /** @see bc_parms() */
+  flds_parms_t (*flds_parms)(void);         /** @see flds_parms() */
+  dirac_parms_t (*dirac_parms)(void);       /** @see dirac_parms() */
+  void *(*h_gauge)(void);                   /** function to return a pointer to the gauge field */
+  void *(*h_sw)(void);                      /** function to return a pointer to the updated Clover field */
+  void (*get_gfld_flags)(int *ud, int *ad); /** function pointer to gauge field revision query function */
 } openQCD_QudaLayout_t;
-
 
 /**
  * Parameters used to create a QUDA context.
  */
 typedef struct {
-  QudaVerbosity verbosity;      /** How verbose QUDA should be (QUDA_SILENT, QUDA_VERBOSE or QUDA_SUMMARIZE) */
-  FILE *logfile;                /** log file handler */
-  void *gauge;                  /** base pointer to the gauge fields */
-  int volume;                   /** VOLUME */
-  int bndry;                    /** BNDRY */
+  QudaVerbosity verbosity; /** How verbose QUDA should be (QUDA_SILENT, QUDA_VERBOSE or QUDA_SUMMARIZE) */
+  FILE *logfile;           /** log file handler */
+  void *gauge;             /** base pointer to the gauge fields */
+  int volume;              /** VOLUME */
+  int bndry;               /** BNDRY */
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
 } openQCD_QudaInitArgs_t;
 
-
 typedef struct {
-  int initialized;    /** Whether openQCD_qudaInit() was called or not */
-  int ud_rev;         /** Revision of ud field from openqxd */
-  int ad_rev;         /** Revision of ad field from openqxd */
-  int swd_ud_rev;     /** Revision of ud field used to calc/transfer the SW field from openqxd */
-  int swd_ad_rev;     /** Revision of ad field used to calc/transfer the SW field from openqxd */
-  double swd_kappa;   /** kappa corresponding to the current SW field in QUDA */
-  double swd_su3csw;  /** SU(3) csw coefficient corresponding to the current SW field in QUDA */
-  double swd_u1csw;   /** U(1) csw coefficient corresponding to the current SW field in QUDA */
+  int initialized;   /** Whether openQCD_qudaInit() was called or not */
+  int ud_rev;        /** Revision of ud field from openqxd */
+  int ad_rev;        /** Revision of ad field from openqxd */
+  int swd_ud_rev;    /** Revision of ud field used to calc/transfer the SW field from openqxd */
+  int swd_ad_rev;    /** Revision of ad field used to calc/transfer the SW field from openqxd */
+  double swd_kappa;  /** kappa corresponding to the current SW field in QUDA */
+  double swd_su3csw; /** SU(3) csw coefficient corresponding to the current SW field in QUDA */
+  double swd_u1csw;  /** U(1) csw coefficient corresponding to the current SW field in QUDA */
   openQCD_QudaInitArgs_t init;
   openQCD_QudaLayout_t layout;
-  void* dirac_handle; /** void-pointer to QudaInvertParam struct for the Dirac operator.
+  void *dirac_handle; /** void-pointer to QudaInvertParam struct for the Dirac operator.
                        * Notice that this void pointer HAS to be directly before
                        * handles[32], because it's possible to call
                        * openQCD_qudaSolverGetHandle with -1. */
-  void* handles[32];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  void *handles[32];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
   char infile[1024];  /** Path to the input file (if given to quda_init()) */
 } openQCD_QudaState_t;
 
-
 typedef struct openQCD_QudaSolver_s {
-  char infile[1024];              /** Path to the input file (if given to quda_init()) */
-  int id;                         /** Solver section identifier in the input file */
-  QudaMultigridParam* mg_param;   /** Pointer to the multigrid param struct */
-  double u1csw;                   /** u1csw property */
-  int mg_ud_rev;                  /** Revision of ud field from openqxd */
-  int mg_ad_rev;                  /** Revision of ad field from openqxd */
-  double mg_kappa;                /** kappa corresponding to the current mg-instance in QUDA */
-  double mg_su3csw;               /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
-  double mg_u1csw;                /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
+  char infile[1024];            /** Path to the input file (if given to quda_init()) */
+  int id;                       /** Solver section identifier in the input file */
+  QudaMultigridParam *mg_param; /** Pointer to the multigrid param struct */
+  double u1csw;                 /** u1csw property */
+  int mg_ud_rev;                /** Revision of ud field from openqxd */
+  int mg_ad_rev;                /** Revision of ad field from openqxd */
+  double mg_kappa;              /** kappa corresponding to the current mg-instance in QUDA */
+  double mg_su3csw;             /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
+  double mg_u1csw;              /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
-
 typedef struct {
-  double kappa;   /* kappa: hopping parameter */
-  double mu;      /* mu: twisted mass */
-  double su3csw;  /* su3csw: csw coefficient for SU(3) fields */
-  double u1csw;   /* u1csw: csw coefficient for U(1) fields, quda doesn't respect that parameter (yet) */
-  int qhat;       /* qhat: quda doesn't respect that parameter (yet) */
+  double kappa;  /* kappa: hopping parameter */
+  double mu;     /* mu: twisted mass */
+  double su3csw; /* su3csw: csw coefficient for SU(3) fields */
+  double u1csw;  /* u1csw: csw coefficient for U(1) fields, quda doesn't respect that parameter (yet) */
+  int qhat;      /* qhat: quda doesn't respect that parameter (yet) */
 } openQCD_QudaDiracParam_t;
-
 
 /**
  * Initialize the QUDA context.
@@ -186,12 +173,10 @@ typedef struct {
  */
 void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, char *infile);
 
-
 /**
  * Destroy the QUDA context and deallocate all solvers.
  */
 void openQCD_qudaFinalize(void);
-
 
 /**
  * Copy a spinor to GPU and back to CPU.
@@ -200,7 +185,6 @@ void openQCD_qudaFinalize(void);
  * @param[out]  h_out Spinor output field
  */
 void openQCD_back_and_forth(void *h_in, void *h_out);
-
 
 /**
  * @brief      Wrapper around openqcd::ipt
@@ -212,7 +196,6 @@ void openQCD_back_and_forth(void *h_in, void *h_out);
  * @see        openqcd::ipt()
  */
 int openQCD_qudaIndexIpt(const int *x);
-
 
 /**
  * @brief      Wrapper around openqcd::iup
@@ -226,7 +209,6 @@ int openQCD_qudaIndexIpt(const int *x);
  */
 int openQCD_qudaIndexIup(const int *x, const int mu);
 
-
 /**
  * @brief      Norm square in QUDA.
  *
@@ -235,7 +217,6 @@ int openQCD_qudaIndexIup(const int *x, const int mu);
  * @return     The norm
  */
 double openQCD_qudaNorm(void *h_in);
-
 
 /**
  * @brief      Prototype function for the norm-square in QUDA without loading
@@ -246,7 +227,6 @@ double openQCD_qudaNorm(void *h_in);
  * @return     The norm
  */
 double openQCD_qudaNorm_NoLoads(void *d_in);
-
 
 /**
  * @brief      Applies Dirac matrix to spinor.
@@ -260,11 +240,9 @@ double openQCD_qudaNorm_NoLoads(void *d_in);
  */
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out);
 
-
-void* openQCD_qudaH2D(void *openQCD_field);
+void *openQCD_qudaH2D(void *openQCD_field);
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field);
-void openQCD_qudaSpinorFree(void** quda_field);
-
+void openQCD_qudaSpinorFree(void **quda_field);
 
 /**
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
@@ -276,7 +254,6 @@ void openQCD_qudaSpinorFree(void** quda_field);
  */
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
-
 /**
  * @brief      Apply the Dirac operator that corresponds to the current openQxD
  *             setup to a field. All fields passed and returned are host (CPU)
@@ -287,7 +264,6 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
  * @param      out   Output spinor
  */
 void openQCD_qudaDw(double mu, void *in, void *out);
-
 
 /**
  * Setup the solver interface to quda.  This function parses the file given by
@@ -311,8 +287,7 @@ void openQCD_qudaDw(double mu, void *in, void *out);
  * @return     Pointer to the solver context
  */
 
-void* openQCD_qudaSolverGetHandle(int id);
-
+void *openQCD_qudaSolverGetHandle(int id);
 
 /**
  * @brief      Return a hash from a subset of the settings in the
@@ -325,7 +300,6 @@ void* openQCD_qudaSolverGetHandle(int id);
  */
 int openQCD_qudaSolverGetHash(int id);
 
-
 /**
  * @brief      Print solver information about the QUDA solver. Print
  *             "Solver is not initialized yet" is the solver struct is nul
@@ -334,7 +308,6 @@ int openQCD_qudaSolverGetHash(int id);
  * @param[in]  id    The solver identifier
  */
 void openQCD_qudaSolverPrintSetup(int id);
-
 
 /**
  * @brief      Solve Ax=b for an Clover Wilson operator with a multigrid solver.
@@ -356,7 +329,6 @@ void openQCD_qudaSolverPrintSetup(int id);
  */
 double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status);
 
-
 /**
  * @brief      Destroys an existing solver context and frees all involed
  *             structs.
@@ -364,7 +336,6 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
  * @param[in]  id    The solver identifier
  */
 void openQCD_qudaSolverDestroy(int id);
-
 
 /**
  * Setup the eigen-solver interface to quda.  This function parses the file
@@ -383,8 +354,7 @@ void openQCD_qudaSolverDestroy(int id);
  *
  * @return     Pointer to the eigen-solver context
  */
-void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id);
-
+void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id);
 
 /**
  * @brief        Solve Ax=b for an Clover Wilson operator with a multigrid
@@ -399,7 +369,6 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id);
  */
 void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals);
 
-
 /**
  * @brief      Destroys an existing eigen-solver context and frees all involed
  *             structs.
@@ -407,7 +376,6 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals);
  * @param      param  Pointer to the context to destroy
  */
 void openQCD_qudaEigensolverDestroy(void *param);
-
 
 /**
  * @brief      Wrapper for the plaquette. We could call plaqQuda() directly in
@@ -418,7 +386,6 @@ void openQCD_qudaEigensolverDestroy(void *param);
  * @see        https://github.com/lattice/quda/wiki/Gauge-Measurements#wilson-plaquette-action
  */
 double openQCD_qudaPlaquette(void);
-
 
 /**
  * @brief      Load the gauge fields from host to quda. Notice that the boundary
@@ -432,7 +399,6 @@ double openQCD_qudaPlaquette(void);
  */
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary);
 
-
 /**
  * @brief      Save the gauge fields from quda to host.
  *
@@ -443,12 +409,10 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
  */
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary);
 
-
 /**
  * @brief      Free the gauge field allocated in quda.
  */
 void openQCD_qudaGaugeFree(void);
-
 
 /**
  * @brief      Load the clover fields from host to quda.
@@ -461,12 +425,10 @@ void openQCD_qudaGaugeFree(void);
  */
 void openQCD_qudaCloverLoad(void *clover, double kappa, double csw);
 
-
 /**
  * @brief      Free the clover field allocated in quda.
  */
 void openQCD_qudaCloverFree(void);
-
 
 #ifdef __cplusplus
 }
