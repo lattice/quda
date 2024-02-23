@@ -2464,7 +2464,7 @@ namespace quda {
     }; // class OpenQCDOrder
 
   } // namespace gauge
-  
+
   template <typename real_out_t, typename store_out_t, typename real_in_t, typename store_in_t, bool block_float, typename norm_t>
   __device__ __host__ inline auto
   operator*(const gauge::fieldorder_wrapper<real_out_t, store_out_t> &a,

@@ -27,7 +27,7 @@ namespace quda {
 
     __device__ __host__ inline int getcol(int row) const {
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS ||
-	  	  basis == QUDA_OPENQCD_GAMMA_BASIS) {
+        basis == QUDA_OPENQCD_GAMMA_BASIS) {
 	switch(dir) {
 	case 0:
 	case 1:

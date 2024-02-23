@@ -112,7 +112,7 @@ namespace quda {
     }
   };
 
-  /** Transform from openqcd into non-relativistic basis (a.k.a UKQCD basis): 
+  /** Transform from openqcd into non-relativistic basis (a.k.a UKQCD basis):
    *    gamma_ukqcd = U gamma_openqcd U^dagger with
    *     U = [-1  0  1  0]
              [ 0 -1  0  1]
@@ -142,7 +142,7 @@ namespace quda {
     }
   };
 
-  /** Transform from non-relativistic (aka ukqcd) into openqcd basis: 
+  /** Transform from non-relativistic (aka ukqcd) into openqcd basis:
    * gamma_ukqcd = U gamma_openqcd U^dagger with
    * U = [-1  0 1 0]
    *     [ 0 -1 0 1]

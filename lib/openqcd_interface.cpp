@@ -418,7 +418,7 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
  *
  * @param[in]  coords  coords is the 4D cartesian coordinate of a rank
  * @param[in]  fdata   should point to an instance of qudaLayout.ranks,
- *                     @see struct openQCD_QudaLayout_t in 
+ *                     @see struct openQCD_QudaLayout_t in
  *                     @file include/quda_openqcd_interface.h
  *
  * @return     rank

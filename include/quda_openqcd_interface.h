@@ -195,7 +195,7 @@ void openQCD_qudaFinalize(void);
 
 /**
  * Copy a spinor to GPU and back to CPU.
- * 
+ *
  * @param[in]   h_in  Spinor input field (from openQCD)
  * @param[out]  h_out Spinor output field
  */
