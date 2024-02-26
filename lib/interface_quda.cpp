@@ -207,6 +207,10 @@ static TimeProfile profileCovDev("covDevQuda");
 //!< Profiler for momentum action
 static TimeProfile profileMomAction("momActionQuda");
 
+//!< Profiler for sink projection
+static TimeProfile profileSinkProject("sinkProjectQuda");
+TimeProfile &getProfileSinkProject() { return profileSinkProject; }
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
@@ -1393,6 +1397,7 @@ void endQuda(void)
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
+    profileSinkProject.Print();
     profileEnd.Print();
 
     profileInit2End.Print();
