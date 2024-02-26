@@ -4,7 +4,7 @@
 #include <tunable_reduction.h>
 #include <instantiate.h>
 #include <kernels/evec_project.cuh>
-#include <communicator_quda.h>
+#include <comm_quda.h>
 
 namespace quda
 {
