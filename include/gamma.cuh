@@ -27,8 +27,8 @@ namespace quda {
 
     __device__ __host__ inline int getcol(int row) const {
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS || basis == QUDA_OPENQCD_GAMMA_BASIS) {
-        switch(dir) {
-	case 0:
+        switch (dir) {
+        case 0:
 	case 1:
 	  switch(row) {
 	  case 0: return 3;
@@ -54,10 +54,10 @@ namespace quda {
 	  case 3: return 3;
 	  }
 	  break;
-	}
+        }
       } else {
-        switch(dir) {
-	case 0:
+        switch (dir) {
+        case 0:
 	case 1:
 	  switch(row) {
 	  case 0: return 3;
@@ -90,7 +90,7 @@ namespace quda {
 	  case 3: return 1;
 	  }
 	  break;
-	}
+        }
       }
       return 0;
     }

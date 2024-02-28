@@ -139,13 +139,13 @@ typedef struct {
   double swd_u1csw;  /** U(1) csw coefficient corresponding to the current SW field in QUDA */
   openQCD_QudaInitArgs_t init;
   openQCD_QudaLayout_t layout;
-  void *dirac_handle; /** void-pointer to QudaInvertParam struct for the Dirac operator.
-                       * Notice that this void pointer HAS to be directly before
-                       * handles[32], because it's possible to call
-                       * openQCD_qudaSolverGetHandle with -1. */
-  void *inv_handles[OPENQCD_MAX_INVERTERS];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
-  void *eig_handles[OPENQCD_MAX_EIGENSOLVERS];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
-  char infile[1024];  /** Path to the input file (if given to quda_init()) */
+  void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
+                                             * Notice that this void pointer HAS to be directly before
+                                             * handles[32], because it's possible to call
+                                             * openQCD_qudaSolverGetHandle with -1. */
+  void *inv_handles[OPENQCD_MAX_INVERTERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  void *eig_handles[OPENQCD_MAX_EIGENSOLVERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  char infile[1024];                           /** Path to the input file (if given to quda_init()) */
 } openQCD_QudaState_t;
 
 typedef struct openQCD_QudaSolver_s {

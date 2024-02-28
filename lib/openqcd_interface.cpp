@@ -968,7 +968,7 @@ int openQCD_qudaInvertParamCheck(void *param_)
  */
 void inline check_solver_id(int id)
 {
-  if (id < -1 || id > OPENQCD_MAX_INVERTERS-1) {
+  if (id < -1 || id > OPENQCD_MAX_INVERTERS - 1) {
     errorQuda("Solver id %d is out of range [%d, %d).", id, -1, OPENQCD_MAX_INVERTERS);
   }
 }
@@ -980,7 +980,7 @@ void inline check_solver_id(int id)
  */
 void inline check_eigensolver_id(int id)
 {
-  if (id < 0 || id > OPENQCD_MAX_EIGENSOLVERS-1) {
+  if (id < 0 || id > OPENQCD_MAX_EIGENSOLVERS - 1) {
     errorQuda("Eigensolver id %d is out of range [%d, %d).", id, 0, OPENQCD_MAX_EIGENSOLVERS);
   }
 }
@@ -1784,7 +1784,6 @@ void *openQCD_qudaEigensolverReadIn(int id, int solver_id)
   return (void *)param;
 }
 
-
 void *openQCD_qudaEigensolverGetHandle(int id, int solver_id)
 {
   check_eigensolver_id(id);
@@ -1798,7 +1797,6 @@ void *openQCD_qudaEigensolverGetHandle(int id, int solver_id)
   openQCD_qudaSolverUpdate(static_cast<QudaEigParam *>(qudaState.eig_handles[id])->invert_param);
   return qudaState.eig_handles[id];
 }
-
 
 void openQCD_qudaEigensolverPrintSetup(int id, int solver_id)
 {
@@ -1814,7 +1812,6 @@ void openQCD_qudaEigensolverPrintSetup(int id, int solver_id)
     printfQuda("<Eigensolver is not initialized yet>\n");
   }
 }
-
 
 void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals)
 {
