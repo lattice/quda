@@ -21,7 +21,7 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
@@ -558,8 +558,12 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
 void openQCD_qudaFinalize(void)
 {
 
-  for (int id = 0; id < 32; ++id) {
-    if (qudaState.handles[id] != nullptr) { openQCD_qudaSolverDestroy(id); }
+  for (int id = 0; id < OPENQCD_MAX_INVERTERS; ++id) {
+    if (qudaState.inv_handles[id] != nullptr) { openQCD_qudaSolverDestroy(id); }
+  }
+
+  for (int id = 0; id < OPENQCD_MAX_EIGENSOLVERS; ++id) {
+    if (qudaState.eig_handles[id] != nullptr) { openQCD_qudaEigensolverDestroy(id); }
   }
 
   qudaState.initialized = false;
@@ -955,6 +959,30 @@ int openQCD_qudaInvertParamCheck(void *param_)
   }
 
   return ret;
+}
+
+/**
+ * @brief      Check if the solver identifier is in bounds
+ *
+ * @param[in]  id    The identifier
+ */
+void inline check_solver_id(int id)
+{
+  if (id < -1 || id > OPENQCD_MAX_INVERTERS-1) {
+    errorQuda("Solver id %d is out of range [%d, %d).", id, -1, OPENQCD_MAX_INVERTERS);
+  }
+}
+
+/**
+ * @brief      Check if the eigen-solver identifier is in bounds
+ *
+ * @param[in]  id    The identifier
+ */
+void inline check_eigensolver_id(int id)
+{
+  if (id < 0 || id > OPENQCD_MAX_EIGENSOLVERS-1) {
+    errorQuda("Eigensolver id %d is out of range [%d, %d).", id, 0, OPENQCD_MAX_EIGENSOLVERS);
+  }
 }
 
 /**
@@ -1480,15 +1508,16 @@ void *openQCD_qudaSolverReadIn(int id)
 
 void *openQCD_qudaSolverGetHandle(int id)
 {
-  if (qudaState.handles[id] == nullptr) {
+  check_solver_id(id);
+  if (qudaState.inv_handles[id] == nullptr) {
     if (id != -1) {
       logQuda(QUDA_VERBOSE, "Read in solver parameters from file %s for solver (id=%d)\n", qudaState.infile, id);
     }
-    qudaState.handles[id] = openQCD_qudaSolverReadIn(id);
+    qudaState.inv_handles[id] = openQCD_qudaSolverReadIn(id);
   }
 
-  openQCD_qudaSolverUpdate(qudaState.handles[id]);
-  return qudaState.handles[id];
+  openQCD_qudaSolverUpdate(qudaState.inv_handles[id]);
+  return qudaState.inv_handles[id];
 }
 
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
@@ -1547,8 +1576,9 @@ template <typename T> int hash_struct(T *in)
 
 int openQCD_qudaSolverGetHash(int id)
 {
-  if (qudaState.handles[id] != nullptr) {
-    QudaInvertParam *param = reinterpret_cast<QudaInvertParam *>(qudaState.handles[id]);
+  check_solver_id(id);
+  if (qudaState.inv_handles[id] != nullptr) {
+    QudaInvertParam *param = reinterpret_cast<QudaInvertParam *>(qudaState.inv_handles[id]);
     QudaInvertParam hparam = newQudaInvertParam();
     memset(&hparam, '\0', sizeof(QudaInvertParam)); /* set everything to zero */
 
@@ -1578,8 +1608,9 @@ int openQCD_qudaSolverGetHash(int id)
 
 void openQCD_qudaSolverPrintSetup(int id)
 {
-  if (qudaState.handles[id] != nullptr) {
-    QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.handles[id]);
+  check_solver_id(id);
+  if (qudaState.inv_handles[id] != nullptr) {
+    QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.inv_handles[id]);
     openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
 
     printQudaInvertParam(param);
@@ -1607,21 +1638,22 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
 {
   if (gauge_field_get_unset()) { errorQuda("Gauge field not populated in openQxD."); }
 
-  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
-  param->mu = mu;
-
-  if (!openQCD_qudaInvertParamCheck(param)) {
-    errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync.");
-  }
-
   /**
-   * This is to make sure we behave in the same way as openQCDs solvers. We have
-   * to make sure that the SW-term in openQxD is setup and in sync with QUDAs.
+   * This is to make sure we behave in the same way as openQCDs solvers, we call
+   * h_sw() which in turn calls sw_term(). We have to make sure that the SW-term
+   * in openQxD is setup and in sync with QUDAs.
    */
   if (qudaState.layout.h_sw != nullptr) {
     qudaState.layout.h_sw();
   } else {
     errorQuda("qudaState.layout.h_sw is not set.");
+  }
+
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+  param->mu = mu;
+
+  if (!openQCD_qudaInvertParamCheck(param)) {
+    errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync.");
   }
 
   logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n");
@@ -1644,33 +1676,41 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
 
 void openQCD_qudaSolverDestroy(int id)
 {
-  if (qudaState.handles[id] != nullptr) {
-    QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.handles[id]);
+  check_solver_id(id);
+  if (qudaState.inv_handles[id] != nullptr) {
+    QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.inv_handles[id]);
 
     if (param->inv_type_precondition == QUDA_MG_INVERTER) { destroyMultigridQuda(param->preconditioner); }
 
     delete static_cast<openQCD_QudaSolver *>(param->additional_prop)->mg_param;
     delete static_cast<openQCD_QudaSolver *>(param->additional_prop);
     delete param;
-    qudaState.handles[id] = nullptr;
+    qudaState.inv_handles[id] = nullptr;
   }
 }
 
-void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
+void *openQCD_qudaEigensolverReadIn(int id, int solver_id)
 {
   int my_rank;
+  QudaEigParam *param;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   QudaVerbosity verbosity = QUDA_SUMMARIZE;
 
   /* Allocate on the heap */
-  QudaEigParam *param = new QudaEigParam(newQudaEigParam());
+  if (qudaState.eig_handles[id] == nullptr) {
+    param = new QudaEigParam(newQudaEigParam());
+  } else {
+    param = static_cast<QudaEigParam *>(qudaState.eig_handles[id]);
+  }
 
   if (my_rank == 0) {
 
     KeyValueStore kv;
     kv.set_map(&enum_map);
-    kv.load(infile == nullptr ? qudaState.infile : infile);
+    kv.load(qudaState.infile);
+
+    std::string section = "Eigensolver " + std::to_string(id);
 
     verbosity = kv.get<QudaVerbosity>(section, "verbosity", verbosity);
 
@@ -1678,7 +1718,7 @@ void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
 
     if (kv.get<std::string>(section, "solver") != "QUDA") {
       errorQuda("Eigensolver section \"%s\" in file %s is not a valid quda-eigensolver section (solver = %s)\n",
-                section, infile == nullptr ? qudaState.infile : infile, kv.get<std::string>(section, "solver").c_str());
+                section.c_str(), qudaState.infile, kv.get<std::string>(section, "solver").c_str());
     }
 
     param->eig_type = kv.get<QudaEigType>(section, "eig_type", param->eig_type);
@@ -1744,9 +1784,53 @@ void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id)
   return (void *)param;
 }
 
-void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
+
+void *openQCD_qudaEigensolverGetHandle(int id, int solver_id)
 {
-  QudaEigParam *eig_param = static_cast<QudaEigParam *>(param);
+  check_eigensolver_id(id);
+  check_solver_id(solver_id);
+
+  if (qudaState.eig_handles[id] == nullptr) {
+    logQuda(QUDA_VERBOSE, "Read in eigensolver parameters from file %s for eigensolver (id=%d)\n", qudaState.infile, id);
+    qudaState.eig_handles[id] = openQCD_qudaEigensolverReadIn(id, solver_id);
+  }
+
+  openQCD_qudaSolverUpdate(static_cast<QudaEigParam *>(qudaState.eig_handles[id])->invert_param);
+  return qudaState.eig_handles[id];
+}
+
+
+void openQCD_qudaEigensolverPrintSetup(int id, int solver_id)
+{
+  check_eigensolver_id(id);
+  check_solver_id(solver_id);
+
+  if (qudaState.eig_handles[id] != nullptr) {
+    QudaEigParam *param = static_cast<QudaEigParam *>(qudaState.eig_handles[id]);
+    printQudaEigParam(param);
+    printfQuda("\n");
+    openQCD_qudaSolverPrintSetup(solver_id);
+  } else {
+    printfQuda("<Eigensolver is not initialized yet>\n");
+  }
+}
+
+
+void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals)
+{
+  if (gauge_field_get_unset()) { errorQuda("Gauge field not populated in openQxD."); }
+
+  if (qudaState.layout.h_sw != nullptr) {
+    qudaState.layout.h_sw();
+  } else {
+    errorQuda("qudaState.layout.h_sw is not set.");
+  }
+
+  QudaEigParam *eig_param = static_cast<QudaEigParam *>(openQCD_qudaEigensolverGetHandle(id, solver_id));
+
+  if (!openQCD_qudaInvertParamCheck(eig_param->invert_param)) {
+    errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync.");
+  }
 
   logQuda(QUDA_VERBOSE, "Calling eigensolveQuda() ...\n");
   PUSH_RANGE("eigensolveQuda", 6);
@@ -1754,19 +1838,26 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
   POP_RANGE;
 
   logQuda(QUDA_SUMMARIZE, "openQCD_qudaEigensolve()\n");
-  logQuda(QUDA_SUMMARIZE, "  gflops      = %.2e\n", eig_param->gflops);
-  logQuda(QUDA_SUMMARIZE, "  secs        = %.2e\n", eig_param->secs);
+  logQuda(QUDA_SUMMARIZE, "  gflops      = %.2e\n", eig_param->invert_param->gflops);
+  logQuda(QUDA_SUMMARIZE, "  secs        = %.2e\n", eig_param->invert_param->secs);
   logQuda(QUDA_SUMMARIZE, "  iter        = %d\n", eig_param->invert_param->iter);
 }
 
-void openQCD_qudaEigensolverDestroy(void *param)
+void openQCD_qudaEigensolverDestroy(int id)
 {
-  QudaEigParam *eig_param = static_cast<QudaEigParam *>(param);
-  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(eig_param->invert_param->additional_prop);
-  if (additional_prop == nullptr) {
-    delete eig_param->invert_param;
-  } else {
-    openQCD_qudaSolverDestroy(additional_prop->id);
+  check_eigensolver_id(id);
+
+  if (qudaState.eig_handles[id] != nullptr) {
+    QudaEigParam *eig_param = static_cast<QudaEigParam *>(qudaState.eig_handles[id]);
+    openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(eig_param->invert_param->additional_prop);
+
+    if (additional_prop == nullptr) {
+      delete eig_param->invert_param;
+    } else {
+      openQCD_qudaSolverDestroy(additional_prop->id);
+    }
+
+    delete eig_param;
+    qudaState.eig_handles[id] = nullptr;
   }
-  delete eig_param;
 }

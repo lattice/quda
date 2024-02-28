@@ -1,5 +1,8 @@
 #pragma once
 
+#define OPENQCD_MAX_INVERTERS 32
+#define OPENQCD_MAX_EIGENSOLVERS 32
+
 /**
  * The macro battle below is to trick quda.h to think that double_complex is
  * defined to be the struct below. For this we need to set the __CUDACC_RTC__,
@@ -140,7 +143,8 @@ typedef struct {
                        * Notice that this void pointer HAS to be directly before
                        * handles[32], because it's possible to call
                        * openQCD_qudaSolverGetHandle with -1. */
-  void *handles[32];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  void *inv_handles[OPENQCD_MAX_INVERTERS];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  void *eig_handles[OPENQCD_MAX_EIGENSOLVERS];  /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
   char infile[1024];  /** Path to the input file (if given to quda_init()) */
 } openQCD_QudaState_t;
 
@@ -346,15 +350,21 @@ void openQCD_qudaSolverDestroy(int id);
  * section given by the [section] parameter may contain every member of the
  * struct [QudaEigParam].
  *
- * @param[in]  infile     Ini-file containing sections about the eigen-solver,
- *                        if null we use the value of qudaState.infile
- * @param[in]  section    The section name of the eigen-solver
+ * @param[in]  id         The section id of the eigensolver
  * @param[in]  solver_id  The section id of the solver. If -1, the section is
  *                        not read in.
  *
  * @return     Pointer to the eigen-solver context
  */
-void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id);
+void *openQCD_qudaEigensolverGetHandle(int id, int solver_id);
+
+/**
+ * @brief      Print the eigensolver setup.
+ *
+ * @param[in]  id         The eigensolver identifier
+ * @param[in]  solver_id  The solver identifier
+ */
+void openQCD_qudaEigensolverPrintSetup(int id, int solver_id);
 
 /**
  * @brief        Solve Ax=b for an Clover Wilson operator with a multigrid
@@ -362,20 +372,21 @@ void *openQCD_qudaEigensolverSetup(char *infile, char *section, int solver_id);
  *               (CPU) field in openQCD order.  This function requires an
  *               existing solver context created with openQCD_qudaSolverSetup().
  *
- * @param[inout] param    Pointer returned by openQCD_qudaEigensolverSetup()
- * @param[inout] h_evecs  Allocated array of void-pointers to param->n_conf
- *                        fields
- * @param[out]   h_evals  Allocated array of param->n_conf complex_dbles
+ * @param[in]    id         The eigensolver section identifier
+ * @param[in]    solver_id  The solver section identifier
+ * @param[inout] h_evecs    Allocated array of void-pointers to param->n_conf
+ *                          fields
+ * @param[out]   h_evals    Allocated array of param->n_conf complex_dbles
  */
-void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals);
+void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals);
 
 /**
  * @brief      Destroys an existing eigen-solver context and frees all involed
  *             structs.
  *
- * @param      param  Pointer to the context to destroy
+ * @param[in]  id    The section id of the eigensolver
  */
-void openQCD_qudaEigensolverDestroy(void *param);
+void openQCD_qudaEigensolverDestroy(int id);
 
 /**
  * @brief      Wrapper for the plaquette. We could call plaqQuda() directly in
