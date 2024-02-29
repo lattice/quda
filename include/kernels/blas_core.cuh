@@ -114,14 +114,14 @@ namespace quda
     template <typename real> struct axy_ : public BlasFunctor {
       static constexpr memory_access<1, 0> read{ };
       static constexpr memory_access<0, 1> write{ };
-      const real a;
-      axy_(const real &a, const real &, const real &) : a(a) { ; }
+      const complex<real> a;
+      axy_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) y[i] = a * x[i];
       }
-      constexpr int flops() const { return 1; }   //! flops per element
+      constexpr int flops() const { return 3; }   //! flops per element
     };
 
     /**

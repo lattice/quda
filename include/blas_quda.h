@@ -39,14 +39,14 @@ namespace quda {
        @param[in] x input vector set
        @param[out] y output vector set
     */
-    void axy(cvector_ref<const double> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+    void axy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
 
     /**
        @brief Apply the rescale operation x = a * x
        @param[in] a scalar multiplier set
        @param[in] x set of vectors
     */
-    inline void ax(cvector_ref<const double> &a, cvector_ref<ColorSpinorField> &x) { axy(a, x, x); }
+    inline void ax(cvector<Complex> &a, cvector_ref<ColorSpinorField> &x) { axy(a, x, x); }
 
     /**
        @brief Apply the operation z = a * x + b * y
@@ -56,7 +56,7 @@ namespace quda {
        @param[in] y input vector set
        @param[out] z output vector set
     */
-    void axpbyz(cvector_ref<const double> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<const double> &b,
+    void axpbyz(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
                 cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -85,8 +85,7 @@ namespace quda {
        @param[in] x input vector set
        @param[in,out] y update vector set
     */
-    inline void axpy(cvector_ref<const double> &a, cvector_ref<const ColorSpinorField> &x,
-                     cvector_ref<ColorSpinorField> &y)
+    inline void axpy(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
     {
       axpbyz(a, x, 1.0, y, y);
     }
@@ -98,8 +97,8 @@ namespace quda {
        @param[in] b scalar multiplier set
        @param[in,out] y update vector set
     */
-    inline void axpby(cvector_ref<const double> &a, cvector_ref<const ColorSpinorField> &x,
-                      cvector_ref<const double> &b, cvector_ref<ColorSpinorField> &y)
+    inline void axpby(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
+                      cvector_ref<ColorSpinorField> &y)
     {
       axpbyz(a, x, b, y, y);
     }
@@ -110,8 +109,7 @@ namespace quda {
        @param[in] a scalar multiplier set
        @param[in,out] y update vector set
     */
-    inline void xpay(cvector_ref<const ColorSpinorField> &x, cvector_ref<const double> &a,
-                     cvector_ref<ColorSpinorField> &y)
+    inline void xpay(cvector_ref<const ColorSpinorField> &x, cvector<double> &a, cvector_ref<ColorSpinorField> &y)
     {
       axpbyz(1.0, x, a, y, y);
     }
@@ -123,7 +121,7 @@ namespace quda {
        @param[in] y update vector set
        @param[out] z output vector set
     */
-    inline void xpayz(cvector_ref<const ColorSpinorField> &x, cvector_ref<const double> &a,
+    inline void xpayz(cvector_ref<const ColorSpinorField> &x, cvector<double> &a,
                       cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z)
     {
       axpbyz(1.0, x, a, y, z);
@@ -137,8 +135,8 @@ namespace quda {
        @param[in] z input vector set
        @param[in] b scalar multiplier set
     */
-    void axpyZpbx(cvector_ref<const double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
-                  cvector_ref<const ColorSpinorField> &z, cvector_ref<const double> &b);
+    void axpyZpbx(cvector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                  cvector_ref<const ColorSpinorField> &z, cvector<double> &b);
 
     /**
        @brief Apply the operation y = a * x + y, x = b * z + c * x
@@ -149,8 +147,8 @@ namespace quda {
        @param[in] z input vector set
        @param[in] c scalar multiplier set
     */
-    void axpyBzpcx(cvector_ref<const double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
-                   cvector_ref<const double> &b, cvector_ref<const ColorSpinorField> &z, cvector_ref<const double> &c);
+    void axpyBzpcx(cvector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<double> &b, cvector_ref<const ColorSpinorField> &z, cvector<double> &c);
 
     /**
        @brief Apply the operation w = a * x + b * y + c * z
@@ -162,9 +160,9 @@ namespace quda {
        @param[in] z input vector set
        @param[out] w output vector set
     */
-    void axpbypczw(cvector_ref<const double> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<const double> &b,
-                   cvector_ref<const ColorSpinorField> &y, cvector_ref<const double> &c,
-                   cvector_ref<const ColorSpinorField> &z, cvector_ref<ColorSpinorField> &w);
+    void axpbypczw(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
+                   cvector_ref<const ColorSpinorField> &y, cvector<double> &c, cvector_ref<const ColorSpinorField> &z,
+                   cvector_ref<ColorSpinorField> &w);
 
     /**
        @brief Apply the operation y = a * x + b * y
@@ -174,7 +172,7 @@ namespace quda {
        @param[in] y input vector set
        @param[out] z output vector set
     */
-    void caxpby(cvector_ref<const Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<const Complex> &b,
+    void caxpby(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector<Complex> &b,
                 cvector_ref<ColorSpinorField> &y);
 
     /**
@@ -183,7 +181,7 @@ namespace quda {
        @param[in] x input vector set
        @param[in] y update vector set
     */
-    void caxpy(cvector_ref<const Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+    void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
 
     /**
        @brief Apply the operation z = x + a * y + b * z
@@ -193,9 +191,8 @@ namespace quda {
        @param[in] b scalar multiplier set
        @param[in,out] z update vector set
     */
-    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector_ref<const Complex> &a,
-                  cvector_ref<const ColorSpinorField> &y, cvector_ref<const Complex> &b,
-                  cvector_ref<ColorSpinorField> &z);
+    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector<Complex> &a, cvector_ref<const ColorSpinorField> &y,
+                  cvector<Complex> &b, cvector_ref<ColorSpinorField> &z);
 
     /**
        @brief Apply the operation z += a * x + b * y, y-= b * w
@@ -206,8 +203,8 @@ namespace quda {
        @param[in,out] z update vector set
        @param[in] w input vector set
     */
-    void caxpbypzYmbw(cvector_ref<const Complex> &a, cvector_ref<const ColorSpinorField> &x,
-                      cvector_ref<const Complex> &b, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+    void caxpbypzYmbw(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector<Complex> &b,
+                      cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                       cvector_ref<const ColorSpinorField> &w);
 
     /**
@@ -218,8 +215,8 @@ namespace quda {
        @param[in] b scalar multiplier set
        @param[in] z input vector set
     */
-    void caxpyBzpx(cvector_ref<const Complex> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
-                   cvector_ref<const Complex> &b, cvector_ref<const ColorSpinorField> &z);
+    void caxpyBzpx(cvector<Complex> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<Complex> &b, cvector_ref<const ColorSpinorField> &z);
 
     /**
        @brief Apply the operation y += a * x, z += b * x
@@ -229,8 +226,8 @@ namespace quda {
        @param[in] b scalar multiplier set
        @param[in,out] z update vector set
     */
-    void caxpyBxpz(cvector_ref<const Complex> &a, cvector_ref<const ColorSpinorField> &x,
-                   cvector_ref<ColorSpinorField> &y, cvector_ref<const Complex> &b, cvector_ref<ColorSpinorField> &z);
+    void caxpyBxpz(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<Complex> &b, cvector_ref<ColorSpinorField> &z);
 
     /**
        @brief Apply the operation y += a * b * x, x = a * x
@@ -239,7 +236,7 @@ namespace quda {
        @param[in,out] x update vector set
        @param[in,out] y update vector set
     */
-    void cabxpyAx(cvector_ref<const double> &a, cvector_ref<const Complex> &b, cvector_ref<ColorSpinorField> &x,
+    void cabxpyAx(cvector<double> &a, cvector<Complex> &b, cvector_ref<ColorSpinorField> &x,
                   cvector_ref<ColorSpinorField> &y);
 
     /**
@@ -249,7 +246,7 @@ namespace quda {
        @param[in,out] y update vector set
        @param[in] z input vector set
     */
-    void caxpyXmaz(cvector_ref<const Complex> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+    void caxpyXmaz(cvector<Complex> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
                    cvector_ref<const ColorSpinorField> &z);
 
     /**
@@ -261,7 +258,7 @@ namespace quda {
        @param[in,out] y update vector set
        @param[in] z input vector set
     */
-    void caxpyXmazMR(cvector_ref<const double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+    void caxpyXmazMR(cvector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
                      cvector_ref<const ColorSpinorField> &z);
 
     /**
@@ -273,9 +270,9 @@ namespace quda {
        @param[in,out] z update vector set
        @param[in,out] w update vector set
     */
-    void tripleCGUpdate(cvector_ref<const double> &a, cvector_ref<const double> &b,
-                        cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
-                        cvector_ref<ColorSpinorField> &z, cvector_ref<ColorSpinorField> &w);
+    void tripleCGUpdate(cvector<double> &a, cvector<double> &b, cvector_ref<const ColorSpinorField> &x,
+                        cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                        cvector_ref<ColorSpinorField> &w);
 
     // reduction kernels - defined in reduce_quda.cu
 
