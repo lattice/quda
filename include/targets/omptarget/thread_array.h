@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef QUDA_OMPTARGET_THREAD_ARRAY_SIMPLE
+
 namespace quda
 {
   template <typename T, int n> struct thread_array {
@@ -11,3 +13,9 @@ namespace quda
     constexpr inline const T &operator[](int i) const { return data[i]; }
   };
 } // namespace quda
+
+#else
+
+#include "../generic/thread_array.h"
+
+#endif

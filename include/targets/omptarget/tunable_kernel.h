@@ -85,6 +85,7 @@ namespace quda {
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     qudaError_t launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+      checkSharedBytes(tp);
       launch_error = QUDA_SUCCESS;
       if (acceptThreads(tp, arg) && 0==target::omptarget::qudaSetupLaunchParameter(tp)) {
         if constexpr (device::use_kernel_arg<Arg>()) {
