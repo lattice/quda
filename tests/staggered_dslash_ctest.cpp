@@ -2,9 +2,6 @@
 
 using namespace quda;
 
-// For loading the gauge fields
-int argc_copy;
-char **argv_copy;
 bool ctest_all_partitions = false;
 
 using ::testing::Bool;
@@ -23,25 +20,11 @@ protected:
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
     if ((QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0
-        || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
+        || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0)
       return true;
-    }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong
-        && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
+    if (is_laplace(dslash_type) && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1))
       return true;
-    }
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && (getReconstructNibble(recon) & 1)) {
-      warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
-      return true;
-    }
-
-    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
-      return true;
-    }
 
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};
@@ -75,7 +58,7 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon);
+    dslash_test_wrapper.init_ctest(prec, recon);
     display_test_info(prec, recon);
   }
 
@@ -104,10 +87,11 @@ TEST_P(StaggeredDslashTest, verify)
 
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
-  if ((dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_8
-       || dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9)
+
+  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9
       && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
-    tol *= 10; // if recon 8, we tolerate a greater deviation
+    tol *= 10; // if recon 9, we tolerate a greater deviation
+
   ASSERT_LE(deviation, tol) << "Reference CPU and QUDA implementations do not agree";
 }
 
@@ -117,6 +101,10 @@ int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
+
+  // override the default dslash from Wilson
+  dslash_type = QUDA_ASQTAD_DSLASH;
+
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
@@ -129,55 +117,35 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // The 'SetUp()' method of the Google Test class from which DslashTest
-  // in derived has no arguments, but QUDA's implementation requires the
-  // use of argc and argv to set up the test via the function 'init'.
-  // As a workaround, we declare argc_copy and argv_copy as global pointers
-  // so that they are visible inside the 'init' function.
-  argc_copy = argc;
-  argv_copy = argv;
-
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-  // Only these fermions are supported in this file. Ensure a reasonable default,
-  // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
+  // Only these fermions are supported in this file
+  if constexpr (is_enabled_laplace()) {
+    if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
+      errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
+  } else {
+    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
   // ask to build the fat/long links... it doesn't make sense.
-  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH)
     errorQuda(
       "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
-    compute_fatlong = true;
-  }
 
   // Set n_naiks to 2 if eps_naik != 0.0
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    if (eps_naik != 0.0) {
-      if (compute_fatlong) {
-        n_naiks = 2;
-        printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
-      } else {
-        eps_naik = 0.0;
-        printfQuda("Not computing fat-long, ignoring epsilon correction.\n");
-      }
-    } else {
-      printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
-    }
+  if (eps_naik != 0.0) {
+    if (compute_fatlong)
+      n_naiks = 2;
+    else
+      eps_naik = 0.0; // to avoid potential headaches
   }
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator.\n",
-                get_string(dtest_type_map, dtest_type).c_str());
-    }
-  }
+  if (is_laplace(dslash_type) && dtest_type != dslash_test_type::Mat)
+    errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
 
   int test_rc = RUN_ALL_TESTS();
 

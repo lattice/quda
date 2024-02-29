@@ -49,8 +49,8 @@ namespace quda {
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     // Compute LDL decomposition, solve least squares problem for gamma
@@ -59,8 +59,8 @@ namespace quda {
     vector gamma = ldlt.solve(R_dag_r0);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
     // Update omega for the next BiCG iteration
@@ -342,10 +342,8 @@ namespace quda {
   }
 
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig,
-                       SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matEig, param, profile),
-    matMdagM(matEig.Expose()),
-    n_krylov(param.Nkrylov)
+                       SolverParam &param) :
+    Solver(mat, matSloppy, matSloppy, matEig, param), matMdagM(matEig.Expose()), n_krylov(param.Nkrylov)
   {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
@@ -364,9 +362,9 @@ namespace quda {
 
   BiCGstabL::~BiCGstabL()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
@@ -391,7 +389,7 @@ namespace quda {
     Solver::create(x, b);
 
     if (!init) {
-      profile.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       // Initialize fields.
       ColorSpinorParam csParam(x);
@@ -431,7 +429,7 @@ namespace quda {
         u[i] = ColorSpinorField(csParam);
       }
 
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     }
   }
@@ -447,7 +445,7 @@ namespace quda {
     create(x, b);
 
     // Begin profiling preamble.
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
@@ -465,7 +463,7 @@ namespace quda {
       }
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
         if (param.deflate) {
           // double the size of the Krylov space
@@ -473,7 +471,7 @@ namespace quda {
           // populate extra memory with L/R singular vectors
           eig_solve->computeSVD(evecs, evals);
         }
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -522,7 +520,7 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         b2 = r2;
@@ -569,8 +567,8 @@ namespace quda {
     BiCGstabLUpdate bicgstabl_update(x_sloppy, r, u, alpha, beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps());
 
     // done with preamble, begin computing.
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // count iteration counts
     int total_iter = 0;
@@ -700,8 +698,8 @@ namespace quda {
     blas::xpy(y, x);
 
     // Done with compute, begin the epilogue.
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.iter += total_iter;
 
@@ -720,7 +718,7 @@ namespace quda {
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r[0]).z) : 0.0;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop, param.tol_hq);
   }

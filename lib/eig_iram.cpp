@@ -17,11 +17,9 @@
 namespace quda
 {
   // Implicitly Restarted Arnoldi Method constructor
-  IRAM::IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    EigenSolver(mat, eig_param, profile)
+  IRAM::IRAM(const DiracMatrix &mat, QudaEigParam *eig_param) : EigenSolver(mat, eig_param)
   {
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Upper Hessenberg, Q and R matrices
     upperHess.resize(n_kr);
@@ -35,7 +33,7 @@ namespace quda
 
     if (eig_param->qr_tol == 0) { eig_param->qr_tol = eig_param->tol * 1e-2; }
 
-    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   // Arnoldi Member functions
@@ -120,7 +118,7 @@ namespace quda
     for (int j = 0; j < n_kr; j++)
       for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
 
-    rotateVecs(kSpace, Qmat_keep, n_kr, n_kr, keep, 0, profile);
+    rotateVecs(kSpace, Qmat_keep, n_kr, n_kr, keep, 0);
   }
 
   void IRAM::reorder(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
@@ -187,7 +185,7 @@ namespace quda
   void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts)
   {
     // This isn't really Eigen, but it's morally equivalent
-    profile.TPSTART(QUDA_PROFILE_HOST_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_HOST_COMPUTE);
 
     // Reset Q to the identity, copy upper Hessenberg
     MatrixXcd UHcopy = MatrixXcd::Zero(n_kr, n_kr);
@@ -211,7 +209,7 @@ namespace quda
       for (int i = 0; i < n_kr; i++) upperHess[i][i] += evals[shift];
     }
 
-    profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
   }
 
   void IRAM::qrIteration(std::vector<std::vector<Complex>> &Q, std::vector<std::vector<Complex>> &R)
@@ -302,7 +300,7 @@ namespace quda
   void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
   {
     if (eig_param->use_eigen_qr) {
-      profile.TPSTART(QUDA_PROFILE_EIGENQR);
+      getProfile().TPSTART(QUDA_PROFILE_EIGENQR);
       // Construct the upper Hessenberg matrix
       MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
       MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
@@ -313,9 +311,9 @@ namespace quda
       // QR the upper Hessenberg matrix
       Eigen::ComplexSchur<MatrixXcd> schurUH;
       schurUH.computeFromHessenberg(R, Q);
-      profile.TPSTOP(QUDA_PROFILE_EIGENQR);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGENQR);
 
-      profile.TPSTART(QUDA_PROFILE_EIGENEV);
+      getProfile().TPSTART(QUDA_PROFILE_EIGENEV);
       // Extract the upper triangular matrix, eigensolve, then
       // get the eigenvectors of the upper Hessenberg
       MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
@@ -330,9 +328,9 @@ namespace quda
         residua[i] = abs(beta * Q.col(i)[n_kr - 1]);
         for (int j = 0; j < n_kr; j++) Qmat[i][j] = Q(i, j);
       }
-      profile.TPSTOP(QUDA_PROFILE_EIGENEV);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGENEV);
     } else {
-      profile.TPSTART(QUDA_PROFILE_HOST_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_HOST_COMPUTE);
       // Copy the upper Hessenberg matrix into Rmat, and set Qmat to the identity
       for (int i = 0; i < n_kr; i++) {
         for (int j = 0; j < n_kr; j++) {
@@ -386,9 +384,9 @@ namespace quda
           iter++;
         }
       }
-      profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
 
-      profile.TPSTART(QUDA_PROFILE_EIGENEV);
+      getProfile().TPSTART(QUDA_PROFILE_EIGENEV);
       // Compute the eigevectors of the origial upper Hessenberg
       // This is now very cheap because the input matrix to Eigen
       // is upper triangular.
@@ -415,7 +413,7 @@ namespace quda
       }
 
       logQuda(QUDA_VERBOSE, "QR iterations = %d\n", iter);
-      profile.TPSTOP(QUDA_PROFILE_EIGENEV);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGENEV);
     }
   }
 
@@ -457,7 +455,7 @@ namespace quda
 
     // Begin IRAM Eigensolver computation
     //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
     num_keep = 0;
@@ -466,9 +464,9 @@ namespace quda
       iter += n_kr - num_keep;
 
       // Ritz values and their errors are updated.
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromUpperHess(evals, beta);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       num_keep = n_ev;
       int num_shifts = n_kr - num_keep;
@@ -505,7 +503,7 @@ namespace quda
 
       if (num_converged >= n_conv) {
 
-        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
         eigensolveFromUpperHess(evals, beta);
         // Rotate the Krylov space
         rotateBasis(kSpace, n_kr);
@@ -513,7 +511,7 @@ namespace quda
         reorder(kSpace, evals, eig_param->spectrum);
 
         // Compute the eigen/singular values.
-        profile.TPSTART(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
         computeEvals(kSpace, evals);
         if (compute_svd) computeSVD(kSpace, evals);
         converged = true;
@@ -526,13 +524,13 @@ namespace quda
           sortArrays(QUDA_SPECTRUM_LM_EIG, num_shifts, residua, evals);
         }
 
-        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
         // Apply the shifts of the unwated Ritz values via QR
         qrShifts(evals, num_shifts);
 
         // Compress the Krylov space using the accumulated Givens rotations in Qmat
         rotateBasis(kSpace, num_keep + 1);
-        profile.TPSTART(QUDA_PROFILE_COMPUTE);
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
         // Update the residual vector
         blas::caxpby(upperHess[num_keep][num_keep - 1], kSpace[num_keep], Qmat[n_kr - 1][num_keep - 1], r[0]);
@@ -542,7 +540,7 @@ namespace quda
       restart_iter++;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // Post computation report
     //---------------------------------------------------------------------------

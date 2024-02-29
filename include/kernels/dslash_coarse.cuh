@@ -54,7 +54,7 @@ namespace quda {
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    static constexpr unsigned int max_n_src = 64;
+    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
     F out[max_n_src];
     F inA[max_n_src];
@@ -303,7 +303,7 @@ namespace quda {
   template <> struct dim_collapse<true> {
     template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
     {
-      SharedMemoryCache<T> cache(target::block_dim());
+      SharedMemoryCache<T> cache;
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
 

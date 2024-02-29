@@ -18,11 +18,9 @@
 namespace quda
 {
   // Thick Restarted Block Lanczos Method constructor
-  BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    TRLM(mat, eig_param, profile)
+  BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : TRLM(mat, eig_param)
   {
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Block Thick restart specific checks
     if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
@@ -53,7 +51,7 @@ namespace quda
     // Temp storage used in blockLanczosStep
     jth_block.resize(block_data_length);
 
-    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
@@ -93,7 +91,7 @@ namespace quda
 
     // Begin BLOCK TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
@@ -102,20 +100,29 @@ namespace quda
       iter += (n_kr - num_keep);
 
       // Solve current block tridiag
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromBlockArrowMat();
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-      // mat_norm is updated.
+      // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
         if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+
+      // Lambda that returns mat_norm for LR and returns the relevant alpha
+      // (the corresponding Ritz value) for SR
+      auto check_norm = [&](double sr_norm) -> double {
+        if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+          return mat_norm;
+        else
+          return sr_norm;
+      };
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
-        if (residua[i + num_locked] < epsilon * mat_norm) {
+        if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  epsilon * mat_norm);
+                  epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -126,9 +133,9 @@ namespace quda
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
-        if (residua[i + num_locked] < tol * mat_norm) {
+        if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
           logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  tol * mat_norm);
+                  tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -140,9 +147,9 @@ namespace quda
       // algorithmic variables to be multiples of the block size
       iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
       iter_keep = (iter_keep / block_size) * block_size;
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       computeBlockKeptRitz(kSpace);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       num_converged = num_locked + iter_converged;
       num_keep = num_locked + iter_keep;
@@ -171,7 +178,7 @@ namespace quda
       restart_iter++;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // Post computation report
     //---------------------------------------------------------------------------
@@ -355,7 +362,7 @@ namespace quda
 
   void BLKTRLM::eigensolveFromBlockArrowMat()
   {
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     int dim = n_kr - num_locked;
     if (dim % block_size != 0) errorQuda("dim = %d modulo block_size = %d != 0", dim, block_size);
     int blocks = dim / block_size;
@@ -443,7 +450,7 @@ namespace quda
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
   void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField> &kSpace)
@@ -457,7 +464,7 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked);
 
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);

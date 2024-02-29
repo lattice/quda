@@ -7,7 +7,6 @@ const char *get_recon_str(QudaReconstructType recon);
 const char *get_prec_str(QudaPrecision prec);
 const char *get_gauge_order_str(QudaGaugeFieldOrder order);
 const char *get_test_type(int t);
-const char *get_staggered_test_type(int t);
 const char *get_unitarization_str(bool svd_only);
 const char *get_mass_normalization_str(QudaMassNormalization);
 const char *get_verbosity_str(QudaVerbosity);

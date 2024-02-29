@@ -20,6 +20,7 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (2*18 + 4*198) = dims*828
+  using computeStapleOps = thread_array<int, 4>;
   template <typename Arg, typename Staple, typename Int>
   __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Staple &staple, const int dir_ignore)
   {
@@ -95,6 +96,7 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
+  using computeStapleRectangleOps = thread_array<int, 4>;
   template <typename Arg, typename Staple, typename Rectangle, typename Int>
   __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity, const int nu,
                                                          Staple &staple, Rectangle &rectangle, const int dir_ignore)

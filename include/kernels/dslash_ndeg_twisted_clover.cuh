@@ -72,7 +72,7 @@ namespace quda
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
         Vector x = arg.x(my_flavor_idx, my_spinor_parity);
-        SharedMemoryCache<Vector> cache(target::block_dim());
+        SharedMemoryCache<Vector> cache;
         cache.save(x);
 
         x.toRel(); // switch to chiral basis

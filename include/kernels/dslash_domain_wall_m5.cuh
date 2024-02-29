@@ -221,7 +221,7 @@ namespace quda
     if (mobius_m5::use_half_vector()) {
       // if using shared-memory caching then load spinor field for my site into cache
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
-      SharedMemoryCache<HalfVector> cache(target::block_dim());
+      SharedMemoryCache<HalfVector> cache;
 
       { // forwards direction
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -272,7 +272,7 @@ namespace quda
     } else { // use_half_vector
 
       // if using shared-memory caching then load spinor field for my site into cache
-      SharedMemoryCache<Vector> cache(target::block_dim());
+      SharedMemoryCache<Vector> cache;
       if (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);
@@ -379,7 +379,7 @@ namespace quda
     const auto inv = arg.inv;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    SharedMemoryCache<Vector> cache(target::block_dim());
+    SharedMemoryCache<Vector> cache;
     if (shared) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       if (sync) { cache.sync(); }
@@ -439,7 +439,7 @@ namespace quda
     Vector out;
 
     if (mobius_m5::use_half_vector()) {
-      SharedMemoryCache<HalfVector> cache(target::block_dim());
+      SharedMemoryCache<HalfVector> cache;
 
       { // first do R
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -498,7 +498,7 @@ namespace quda
         out += l.reconstruct(4, proj_dir);
       }
     } else { // use_half_vector
-      SharedMemoryCache<Vector> cache(target::block_dim());
+      SharedMemoryCache<Vector> cache;
       if (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);

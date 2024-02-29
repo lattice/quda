@@ -10,6 +10,7 @@
 #include <matrix_tile.cuh>
 #include <target_device.h>
 #include <kernel.h>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 
@@ -1390,6 +1391,11 @@ namespace quda {
   };
 
   template <> struct storeCoarseSharedAtomic_impl<true> {
+    template <typename Arg>
+    using CacheT = complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4]
+                                     [Arg::coarseSpin][Arg::coarseSpin];
+    template <typename Arg> using Cache = SharedMemoryCache<CacheT<Arg>, DimsStatic<2, 1, 1>>;
+
     template <typename VUV, typename Pack, typename Arg>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg)
     {
@@ -1397,15 +1403,9 @@ namespace quda {
       using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-#ifndef QUDA_TARGET_OMPTARGET
-      __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
-      __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
-#else
-      typedef complex<storeType> TyX0[Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
-      static_assert(sizeof(TyX0)*Arg::max_color_height_per_block*2 <= device::max_shared_memory_size(), "Shared cache not large enough for X and Y");
-      TyX0 *X = reinterpret_cast<TyX0 *>(device::get_shared_cache());
-      TyX0 *Y = X+Arg::max_color_height_per_block;
-#endif
+      Cache<Arg> cache;
+      auto &X = cache.data()[0];
+      auto &Y = cache.data()[1];
 
       int x_ = coarse_x_cb % arg.aggregates_per_block;
       int tx = virtualThreadIdx(arg);
@@ -1427,7 +1427,7 @@ namespace quda {
         }
       }
 
-      __syncthreads();
+      cache.sync();
 
 #pragma unroll
       for (int i = 0; i < TileType::M; i++) {
@@ -1456,7 +1456,7 @@ namespace quda {
         }
       }
 
-      __syncthreads();
+      cache.sync();
 
       if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
 
