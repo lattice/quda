@@ -30,6 +30,9 @@ set_property(CACHE QUDA_MAX_SHARED_MEMORY_SIZE PROPERTY STRINGS 32768 49152 6553
 target_compile_definitions(quda PUBLIC QUDA_MAX_SHARED_MEMORY_SIZE=${QUDA_MAX_SHARED_MEMORY_SIZE})
 message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}")
 
+option(QUDA_OMPTARGET_THREAD_ARRAY_SLM "Build OpenMP target backend with thread_array on SLM" ON)
+mark_as_advanced(QUDA_OMPTARGET_THREAD_ARRAY_SLM)
+
 option(QUDA_OMPTARGET_JIT "Build OpenMP target backend with JIT" OFF)
 mark_as_advanced(QUDA_OMPTARGET_JIT)
 
@@ -71,6 +74,10 @@ endif()
 
 # ######################################################################################################################
 # omptarget specific compile options
+
+if(NOT QUDA_OMPTARGET_THREAD_ARRAY_SLM)
+    target_compile_definitions(quda PUBLIC QUDA_OMPTARGET_THREAD_ARRAY_SIMPLE)
+endif()
 
 target_include_directories(quda PRIVATE
   ${CMAKE_SOURCE_DIR}/include/targets/omptarget)

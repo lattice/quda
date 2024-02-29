@@ -139,8 +139,13 @@ namespace quda
       dir = dir + (dir >= arg.dir_ignore);
 
       Link U, Q;
+#ifdef QUDA_OMPTARGET_THREAD_ARRAY_SIMPLE
+      Link Stap;
+      Link Rect;
+#else
       ThreadLocalCache<Link, 0, computeStapleRectangleOps> Stap;
       ThreadLocalCache<Link, 0, decltype(Stap)> Rect; // offset by Stap type to ensure non-overlapping allocations
+#endif
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
