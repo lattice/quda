@@ -603,7 +603,8 @@ protected:
       xD = xH;
       yoD = yH;
       blas::axpbyz(a, xD, b, yoD, zoD);
-      blas::axpbyz(a, xH, b, yH, zH);
+      blas::axy(a, xH, zH);
+      blas::axpy(b, yH, zH);
       error = ERROR(zo);
       break;
 
@@ -613,22 +614,24 @@ protected:
       zD = zH;
       wD = wH;
       blas::axpbypczw(a, xD, b, yD, c, zD, wD);
-      blas::axpbypczw(a, xH, b, yH, c, zH, wH);
+      blas::axy(a, xH, wH);
+      blas::axpy(b, yH, wH);
+      blas::axpy(c, zH, wH);
       error = ERROR(w);
       break;
 
     case Kernel::ax:
       xD = xH;
       blas::ax(a, xD);
-      blas::ax(a, xH);
-      error = ERROR(x);
+      error = (blas::norm2(xD) - a * a * blas::norm2(xH)) / (a * a * blas::norm2(xH));
       break;
 
     case Kernel::caxpy:
       xD = xH;
       yoD = yH;
       blas::caxpy(a2, xD, yoD);
-      blas::caxpy(a2, xH, yH);
+      blas::axy(a2, xH, xH);
+      blas::xpy(xH, yH);
       error = ERROR(yo);
       break;
 
@@ -636,7 +639,9 @@ protected:
       xD = xH;
       yD = yH;
       blas::caxpby(a2, xD, b2, yD);
-      blas::caxpby(a2, xH, b2, yH);
+      blas::axy(a2, xH, xH);
+      blas::axy(b2, yH, yH);
+      blas::xpy(xH, yH);
       error = ERROR(y);
       break;
 
@@ -645,7 +650,8 @@ protected:
       yD = yH;
       zD = zH;
       blas::cxpaypbz(xD, a2, yD, b2, zD);
-      blas::cxpaypbz(xH, a2, yH, b2, zH);
+      blas::caxpby(1.0, xH, a2, yH);
+      blas::caxpby(1.0, yH, b2, zH);
       error = ERROR(z);
       break;
 
@@ -654,7 +660,8 @@ protected:
       yoD = yH;
       zD = zH;
       blas::axpyBzpcx(a, xD, yoD, b, zD, c);
-      blas::axpyBzpcx(a, xH, yH, b, zH, c);
+      blas::axpy(a, xH, yH);
+      blas::axpby(b, zH, c, xH);
       error = ERROR(x) + ERROR(yo);
       break;
 
@@ -663,7 +670,8 @@ protected:
       yoD = yH;
       zD = zH;
       blas::axpyZpbx(a, xD, yoD, zD, b);
-      blas::axpyZpbx(a, xH, yH, zH, b);
+      blas::axpy(a, xH, yH);
+      blas::xpay(zH, b, xH);
       error = ERROR(x) + ERROR(yo);
       break;
 
@@ -673,7 +681,9 @@ protected:
       zD = zH;
       wD = wH;
       blas::caxpbypzYmbw(a2, xD, b2, yD, zD, wD);
-      blas::caxpbypzYmbw(a2, xH, b2, yH, zH, wH);
+      blas::caxpy(a2, xH, zH);
+      blas::caxpy(b2, yH, zH);
+      blas::caxpy(-b2, wH, yH);
       error = ERROR(z) + ERROR(y);
       break;
 
@@ -681,7 +691,8 @@ protected:
       xD = xH;
       yD = yH;
       blas::cabxpyAx(a, b2, xD, yD);
-      blas::cabxpyAx(a, b2, xH, yH);
+      blas::caxpy(a * b2, xH, yH);
+      blas::ax(a, xH);
       error = ERROR(y) + ERROR(x);
       break;
 
@@ -690,8 +701,9 @@ protected:
       yD = yH;
       zD = zH;
       {
-        blas::caxpyXmaz(a, xD, yD, zD);
-        blas::caxpyXmaz(a, xH, yH, zH);
+        blas::caxpyXmaz(a2, xD, yD, zD);
+        blas::caxpy(a2, xH, yH);
+        blas::caxpy(-a2, zH, xH);
         error = ERROR(y) + ERROR(x);
       }
       break;
@@ -731,8 +743,9 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double d = blas::caxpyNorm(a, xD, yD);
-        double h = blas::caxpyNorm(a, xH, yH);
+        double d = blas::caxpyNorm(a2, xD, yD);
+        blas::caxpy(a2, xH, yH);
+        double h = blas::norm2(yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
