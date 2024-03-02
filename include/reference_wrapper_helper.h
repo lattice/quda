@@ -320,6 +320,9 @@ namespace quda
   template <class T> struct vector : public std::vector<T> {
     using value_type = T;
 
+    vector() = default;
+    vector(uint64_t size) : std::vector<T>(size) {}
+
     /**
        @brief Constructor using std::vector initialization
        @param[in] u Vector we are copying from
@@ -355,6 +358,16 @@ namespace quda
     template <class U, std::enable_if_t<std::is_same_v<std::complex<U>, T>> * = nullptr>
     vector(const U &u) : std::vector<T>(1, u)
     {
+    }
+
+    /**
+       @brief Cast to scalar.  Only works if the vector size is 1.
+    */
+    operator T() const
+    {
+      if (std::vector<T>::size() != 1)
+        errorQuda("Cast to scalar failed since size = %lu", ::std::vector<T>::size());
+      return std::vector<T>::operator[](0);
     }
   };
 

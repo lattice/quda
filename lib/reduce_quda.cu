@@ -148,125 +148,230 @@ namespace quda {
       return value;
     }
 
-    double max(const ColorSpinorField &x)
+    cvector<double> max(cvector_ref<const ColorSpinorField> &x)
     {
-      return instantiateReduce<Max, false>(0.0, 0.0, 0.0, x, x, x, x, x);
+      vector<double> max(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        max[i] = instantiateReduce<Max, false>(0.0, 0.0, 0.0, x[i], x[i], x[i], x[i], x[i]);
+      return max;
     }
 
-    array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
+    cvector<array<double, 2>> max_deviation(cvector_ref<const ColorSpinorField> &x,
+                                            cvector_ref<const ColorSpinorField> &y)
     {
-      auto deviation = instantiateReduce<MaxDeviation, true>(0.0, 0.0, 0.0, x, y, x, x, x);
-      // ensure that if the absolute deviation is zero, so is the relative deviation
-      return {deviation.diff, deviation.diff > 0.0 ? deviation.diff / deviation.ref : 0.0};
+      check_size(x, y);
+      vector<array<double, 2>> deviation(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto dev = instantiateReduce<MaxDeviation, true>(0.0, 0.0, 0.0, x[i], y[i], x[i], x[i], x[i]);
+        // ensure that if the absolute deviation is zero, so is the relative deviation
+        deviation[i] = {dev.diff, dev.diff > 0.0 ? dev.diff / dev.ref : 0.0};
+      }
+      return deviation;
     }
 
-    double norm1(const ColorSpinorField &x)
+    cvector<double> norm1(cvector_ref<const ColorSpinorField> &x)
     {
-      return instantiateReduce<Norm1, false>(0.0, 0.0, 0.0, x, x, x, x, x);
+      vector<double> norm1(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm1[i] = instantiateReduce<Norm1, false>(0.0, 0.0, 0.0, x[i], x[i], x[i], x[i], x[i]);
+      return norm1;
     }
 
-    double norm2(const ColorSpinorField &x)
+    cvector<double> norm2(cvector_ref<const ColorSpinorField> &x)
     {
-      return instantiateReduce<Norm2, false>(0.0, 0.0, 0.0, x, x, x, x, x);
+      vector<double> norm2(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm2[i] = instantiateReduce<Norm2, false>(0.0, 0.0, 0.0, x[i], x[i], x[i], x[i], x[i]);
+      return norm2;
     }
 
-    double reDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
+    cvector<double> reDotProduct(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y)
     {
-      return instantiateReduce<Dot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      check_size(x, y);
+      vector<double> dot(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        dot[i] = instantiateReduce<Dot, false>(0.0, 0.0, 0.0, x[i], y[i], x[i], x[i], x[i]);
+      return dot;
     }
 
-    double axpbyzNorm(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z)
+    cvector<double> axpbyzNorm(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
+                               cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z)
     {
-      return instantiateReduce<axpbyzNorm2, false>(a, b, 0.0, x, y, z, x, x);
+      check_size(a, x, b, y, z);
+      vector<double> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm[i] = instantiateReduce<axpbyzNorm2, false>(a[i], b[i], 0.0, x[i], y[i], z[i], x[i], x[i]);
+      return norm;
     }
 
-    double axpyReDot(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    cvector<double> axpyReDot(cvector<double> &a, cvector_ref<const ColorSpinorField> &x,
+                              cvector_ref<ColorSpinorField> &y)
     {
-      return instantiateReduce<AxpyReDot, false>(a, 0.0, 0.0, x, y, x, x, x);
+      check_size(a, x, y);
+      vector<double> dot(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        dot[i] = instantiateReduce<AxpyReDot, false>(a[i], 0.0, 0.0, x[i], y[i], x[i], x[i], x[i]);
+      return dot;
     }
 
-    double caxpbyNorm(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y)
+    cvector<double> caxpbyNorm(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector<Complex> &b,
+                               cvector_ref<ColorSpinorField> &y)
     {
-      return instantiateReduce<caxpyNorm2, true>(a, b, Complex(0.0), x, y, x, x, x);
+      check_size(a, x, b, y);
+      vector<double> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm[i] = instantiateReduce<caxpyNorm2, false>(a[i], b[i], Complex(0.0), x[i], y[i], x[i], x[i], x[i]);
+      return norm;
     }
 
-    double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &z)
+    cvector<double> cabxpyzAxNorm(cvector<double> &a, cvector<Complex> &b, cvector_ref<ColorSpinorField> &x,
+                                  cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z)
     {
-      return instantiateReduce<cabxpyzaxnorm, false>(Complex(a), b, Complex(0.0), x, y, z, x, x);
+      check_size(a, b, x, y, z);
+      vector<double> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm[i]
+          = instantiateReduce<cabxpyzaxnorm, false>(Complex(a[i]), b[i], Complex(0.0), x[i], y[i], z[i], x[i], x[i]);
+      return norm;
     }
 
-    Complex cDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
+    cvector<Complex> cDotProduct(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y)
     {
-      auto cdot = instantiateReduce<Cdot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
-      return Complex(cdot[0], cdot[1]);
+      check_size(x, y);
+      vector<Complex> cdots(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto cdot = instantiateReduce<Cdot, false>(0.0, 0.0, 0.0, x[i], y[i], x[i], x[i], x[i]);
+        cdots[i] = {cdot[0], cdot[1]};
+      }
+      return cdots;
     }
 
-    Complex caxpyDotzy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
+    cvector<Complex> caxpyDotzy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+                                cvector_ref<ColorSpinorField> &y, cvector_ref<const ColorSpinorField> &z)
     {
-      auto cdot = instantiateReduce<caxpydotzy, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, x);
-      return Complex(cdot[0], cdot[1]);
+      check_size(a, x, y, z);
+      vector<Complex> cdot(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto c = instantiateReduce<caxpydotzy, false>(a[i], Complex(0.0), Complex(0.0), x[i], y[i], z[i], x[i], x[i]);
+        cdot[i] = {c[0], c[1]};
+      }
+      return cdot;
     }
 
-    double4 cDotProductNormAB(const ColorSpinorField &x, const ColorSpinorField &y)
+    cvector<double4> cDotProductNormAB(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y)
     {
-      auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
-      return make_double4(ab[0], ab[1], ab[2], ab[3]);
+      check_size(x, y);
+      vector<double4> abs(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x[i], y[i], x[i], x[i], x[i]);
+        abs[i] = {ab[0], ab[1], ab[2], ab[3]};
+      }
+      return abs;
     }
 
-    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, const ColorSpinorField &x, const Complex &b,
-                                           ColorSpinorField &y, ColorSpinorField &z,
-                                           const ColorSpinorField &w, const ColorSpinorField &v)
+    cvector<double3> caxpbypzYmbwcDotProductUYNormY(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+                                                    cvector<Complex> &b, cvector_ref<ColorSpinorField> &y,
+                                                    cvector_ref<ColorSpinorField> &z,
+                                                    cvector_ref<const ColorSpinorField> &w,
+                                                    cvector_ref<const ColorSpinorField> &v)
     {
-      auto rtn = instantiateReduce<caxpbypzYmbwcDotProductUYNormY_, true>(a, b, Complex(0.0), x, z, y, w, v);
-      return make_double3(rtn[0], rtn[1], rtn[2]);
+      check_size(a, x, b, y, z, w, v);
+      vector<double3> abs(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto ab = instantiateReduce<caxpbypzYmbwcDotProductUYNormY_, true>(a[i], b[i], Complex(0.0), x[i], z[i], y[i],
+                                                                           w[i], v[i]);
+        abs[i] = {ab[0], ab[1], ab[2]};
+      }
+      return abs;
     }
 
-    double2 axpyCGNorm(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    cvector<double2> axpyCGNorm(cvector<double> &a, cvector_ref<const ColorSpinorField> &x,
+                                cvector_ref<ColorSpinorField> &y)
     {
-      auto cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, x);
-      return make_double2(cg_norm[0], cg_norm[1]);
+      check_size(a, x, y);
+      vector<double2> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto cg_norm = instantiateReduce<axpyCGNorm2, true>(a[i], 0.0, 0.0, x[i], y[i], x[i], x[i], x[i]);
+        norm[i] = {cg_norm[0], cg_norm[1]};
+      }
+      return norm;
     }
 
-    double3 HeavyQuarkResidualNorm(const ColorSpinorField &x, const ColorSpinorField &r)
+    cvector<double3> HeavyQuarkResidualNorm(cvector_ref<const ColorSpinorField> &x,
+                                            cvector_ref<const ColorSpinorField> &r)
     {
-      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
-      if (x.Ncolor() != 3) return make_double3(0.0, 0.0, 0.0);
-      auto rtn = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, r, r, r, r);
-      rtn[2] /= (x.Volume()*comm_size());
-      return make_double3(rtn[0], rtn[1], rtn[2]);
+      check_size(x, r);
+      vector<double3> norm(x.size());
+      if (x[0].Ncolor() != 3) // Nc != 3 (MG mainly) not suppored
+        norm = {};
+      else
+        for (auto i = 0u; i < x.size(); i++) {
+          auto n = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x[i], r[i], x[i], x[i], x[i]);
+          norm[i] = {n[0], n[1], n[2] / (x[0].Volume() * comm_size())};
+        }
+      return norm;
     }
 
-    double3 xpyHeavyQuarkResidualNorm(const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &r)
+    cvector<double3> xpyHeavyQuarkResidualNorm(cvector_ref<const ColorSpinorField> &x,
+                                               cvector_ref<const ColorSpinorField> &y,
+                                               cvector_ref<const ColorSpinorField> &r)
     {
-      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
-      if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      auto rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, true>(0.0, 0.0, 0.0, x, y, r, r, r);
-      rtn[2] /= (x.Volume()*comm_size());
-      return make_double3(rtn[0], rtn[1], rtn[2]);
+      check_size(x, y, r);
+      vector<double3> norm(x.size());
+      if (x[0].Ncolor() != 3) // Nc != 3 (MG mainly) not suppored
+        norm = {};
+      else
+        for (auto i = 0u; i < x.size(); i++) {
+          auto n = instantiateReduce<xpyHeavyQuarkResidualNorm_, true>(0.0, 0.0, 0.0, x[i], y[i], r[i], r[i], r[i]);
+          norm[i] = {n[0], n[1], n[2] / (x[0].Volume() * comm_size())};
+        }
+      return norm;
     }
 
-    double3 tripleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
+    cvector<double3> tripleCGReduction(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
+                                       cvector_ref<const ColorSpinorField> &z)
     {
-      auto rtn = instantiateReduce<tripleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
-      return make_double3(rtn[0], rtn[1], rtn[2]);
+      check_size(x, y, z);
+      vector<double3> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto cg = instantiateReduce<tripleCGReduction_, false>(0.0, 0.0, 0.0, x[i], y[i], z[i], x[i], x[i]);
+        norm[i] = {cg[0], cg[1], cg[2]};
+      }
+      return norm;
     }
 
-    double4 quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
+    cvector<double4> quadrupleCGReduction(cvector_ref<const ColorSpinorField> &x,
+                                          cvector_ref<const ColorSpinorField> &y, cvector_ref<const ColorSpinorField> &z)
     {
-      auto red = instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
-      return make_double4(red[0], red[1], red[2], red[3]);
+      check_size(x, y, z);
+      vector<double4> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++) {
+        auto cg = instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x[i], y[i], z[i], x[i], x[i]);
+        norm[i] = {cg[0], cg[1], cg[2], cg[3]};
+      }
+      return norm;
     }
 
-    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y,
-                                ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
+    cvector<double> quadrupleCG3InitNorm(cvector<double> &a, cvector_ref<ColorSpinorField> &x,
+                                         cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                                         cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v)
     {
-      return instantiateReduce<quadrupleCG3InitNorm_, false>(a, 0.0, 0.0, x, y, z, w, v);
+      check_size(a, x, y, z, w, v);
+      vector<double> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm[i] = instantiateReduce<quadrupleCG3InitNorm_, false>(a[i], 0.0, 0.0, x[i], y[i], z[i], w[i], v[i]);
+      return norm;
     }
 
-    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
-                                  ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
+    cvector<double> quadrupleCG3UpdateNorm(cvector<double> &a, cvector<double> &b, cvector_ref<ColorSpinorField> &x,
+                                           cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                                           cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v)
     {
-      return instantiateReduce<quadrupleCG3UpdateNorm_, false>(a, b, 0.0, x, y, z, w, v);
+      check_size(a, b, x, y, z, w, v);
+      vector<double> norm(x.size());
+      for (auto i = 0u; i < x.size(); i++)
+        norm[i] = instantiateReduce<quadrupleCG3UpdateNorm_, false>(a[i], b[i], 0.0, x[i], y[i], z[i], w[i], v[i]);
+      return norm;
     }
 
   } // namespace blas

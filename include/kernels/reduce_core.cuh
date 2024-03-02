@@ -292,7 +292,7 @@ namespace quda
        double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
        First performs the operation z[i] = y[i] + a*b*x[i]
        Second performs x[i] *= a
-       Third returns the norm of x
+       Third returns the norm of z
     */
     template <typename reduce_t, typename real>
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {

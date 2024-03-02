@@ -134,18 +134,6 @@ namespace quda {
       }
     };
 
-    template <typename A, typename B> void check_size(const A &a, const B &b)
-    {
-      if (a.size() != b.size()) errorQuda("Mismatched sizes a=%lu b=%lu", a.size(), b.size());
-    }
-
-    template <typename A, typename B, typename... Args> void check_size(const A &a, const B &b, const Args &...args)
-    {
-      check_size(a, b);
-      check_size(a, args...);
-      check_size(b, args...);
-    }
-
     void axpbyz(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
                 cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z)
     {

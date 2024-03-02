@@ -295,7 +295,7 @@ namespace quda {
       r2_old = r2[0];
       r2_old_array[0] = r2_old;
 
-      auto cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
+      double2 cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
       r2[0] = cg_norm.x;
       double zn = cg_norm.y;
 
