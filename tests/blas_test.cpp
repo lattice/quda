@@ -724,7 +724,8 @@ protected:
       yD = yH;
       {
         double d = blas::axpbyzNorm(a, xD, b, yD, zD);
-        double h = blas::axpbyzNorm(a, xH, b, yH, zH);
+        blas::axpbyz(a, xH, b, yH, zH);
+        double h = blas::norm2(zH);
         error = ERROR(z) + fabs(d - h) / fabs(h);
       }
       break;
@@ -734,7 +735,11 @@ protected:
       yoD = yH;
       {
         double2 d = blas::axpyCGNorm(a, xD, yoD);
-        double2 h = blas::axpyCGNorm(a, xH, yH);
+        ColorSpinorField yH_old(yH);
+        blas::axpy(a, xH, yH);
+        blas::axpy(-1.0, yH, yH_old);
+        blas::ax(-1.0, yH_old);
+        double2 h = {blas::norm2(yH), blas::reDotProduct(yH, yH_old)};
         error = ERROR(yo) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y);
       }
       break;
@@ -755,7 +760,9 @@ protected:
       yD = yH;
       {
         double d = blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
-        double h = blas::cabxpyzAxNorm(a, b2, xH, yH, yH);
+        blas::ax(a, xH);
+        blas::caxpy(b2, xH, yH);
+        double h = blas::norm2(yH);
         error = ERROR(x) + ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -772,7 +779,8 @@ protected:
       zD = zH;
       {
         quda::Complex d = blas::caxpyDotzy(a, xD, yD, zD);
-        quda::Complex h = blas::caxpyDotzy(a, xH, yH, zH);
+        blas::caxpy(a, xH, yH);
+        quda::Complex h = blas::cDotProduct(zH, yH);
         error = ERROR(y) + abs(d - h) / abs(h);
       }
       break;
@@ -781,7 +789,7 @@ protected:
       xD = xH;
       yD = yH;
       {
-        auto d = blas::cDotProductNormAB(xD, yD);
+        double4 d = blas::cDotProductNormAB(xD, yD);
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
@@ -798,7 +806,10 @@ protected:
       vD = vH;
       {
         double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zD, wD, vD);
-        double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, xH, b2, yH, zH, wH, vH);
+        blas::caxpy(a2, xH, zH);
+        blas::caxpy(b2, yH, zH);
+        blas::caxpy(-b2, wH, yH);
+        double3 h = {blas::cDotProduct(vH, yH).real(), blas::cDotProduct(vH, yH).imag(), blas::norm2(yH)};
         error = ERROR(z) + ERROR(y) + abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y))
           + fabs(d.z - h.z) / fabs(h.z);
       }
@@ -820,8 +831,9 @@ protected:
       zD = zH;
       {
         double3 d = blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
-        double3 h = blas::xpyHeavyQuarkResidualNorm(xH, yH, zH);
-        error = ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
+        blas::xpy(xH, yH);
+        double3 h = blas::HeavyQuarkResidualNorm(yH, zH);
+        error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
       }
       break;
 
@@ -843,7 +855,9 @@ protected:
       wD = wH;
       {
         blas::tripleCGUpdate(a, b, xD, yD, zD, wD);
-        blas::tripleCGUpdate(a, b, xH, yH, zH, wH);
+        blas::axpy(a, wH, yH);
+        blas::axpy(-a, xH, zH);
+        blas::axpbyz(b, wH, 1.0, zH, wH);
         error = ERROR(y) + ERROR(z) + ERROR(w);
       }
       break;
@@ -853,7 +867,8 @@ protected:
       yD = yH;
       {
         double d = blas::axpyReDot(a, xD, yD);
-        double h = blas::axpyReDot(a, xH, yH);
+        blas::axpy(a, xH, yH);
+        double h = blas::reDotProduct(xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -864,7 +879,8 @@ protected:
       zD = zH;
       {
         blas::caxpyBxpz(a, xD, yD, b2, zD);
-        blas::caxpyBxpz(a, xH, yH, b2, zH);
+        blas::caxpy(a, xH, yH);
+        blas::caxpy(b2, xH, zH);
         error = ERROR(x) + ERROR(z);
       }
       break;
@@ -875,7 +891,8 @@ protected:
       zD = zH;
       {
         blas::caxpyBzpx(a, xD, yD, b2, zD);
-        blas::caxpyBzpx(a, xH, yH, b2, zH);
+        blas::caxpy(a, xH, yH);
+        blas::caxpy(b2, zH, xH);
         error = ERROR(x) + ERROR(z);
       }
       break;
