@@ -4898,7 +4898,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
   ColorSpinorField in(cudaParam);
   ColorSpinorField out(cudaParam);
-  ColorSpinorField temp1(cudaParam);
 
   // Create the smearing operator
   //------------------------------------------------------
@@ -4940,13 +4939,11 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   const QudaParity  parity   = QUDA_INVALID_PARITY;
   for (int i = 0; i < smear_param->n_steps; i++) {
     if (i > 0) std::swap(in, out);
-    blas::ax(ftmp, in);
-    blas::axpy(a, in, temp1);
 
     qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
-    logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
-    blas::xpay(temp1, -1.0, out);
-    blas::zero(temp1);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+      logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
+    blas::axpby(a * ftmp, in, -ftmp, out);
   }
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
