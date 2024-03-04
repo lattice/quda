@@ -89,6 +89,13 @@ if(QUDA_DIRAC_WILSON
   target_link_libraries(eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  if(QUDA_DIRAC_LAPLACE)
+    add_executable(laph_test laph_test.cpp)
+    target_link_libraries(laph_test ${TEST_LIBS})
+    quda_checkbuildtest(laph_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS laph_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif()
 
 if(QUDA_DIRAC_WILSON
