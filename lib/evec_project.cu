@@ -42,8 +42,7 @@ namespace quda
       }
     }
 
-    // 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
-    long long flops() const { return 4 * 3 * 6ll * x.Volume(); }
+    long long flops() const { return 8 * x.Nspin() * x.Ncolor() * x.Volume(); }
     long long bytes() const { return x.Bytes() + y.Bytes(); }
   };
 

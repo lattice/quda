@@ -27,7 +27,6 @@ namespace quda {
     F4 x;
     F1 y;
 
-    dim3 threads;     // number of active threads required
     int_fastdiv X[4]; // grid dimensions
     
     EvecProjectionArg(const ColorSpinorField &x, const ColorSpinorField &y) :
@@ -35,7 +34,7 @@ namespace quda {
       x(x),
       y(y)
     {
-      for (int i=0; i<4; i++) X[i] = x.X()[i];
+      for (int i = 0 ; i < 4; i++) X[i] = x.X()[i];
     }
     __device__ __host__ spinor_array init() const { return spinor_array(); }
   };
