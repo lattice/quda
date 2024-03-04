@@ -28,10 +28,8 @@ namespace quda
 
       std::vector<double> result_local(2 * x.Nspin() * x.X()[3]);
 
-      commGlobalReductionPush(false); // defer reduction until we reassemble in global array
       EvecProjectionArg<Float, nColor> arg(x, y);
       launch<EvecProjection>(result_local, tp, stream, arg);
-      commGlobalReductionPop();
 
       // now reassemble global array
       if (!activeTuning()) {
@@ -41,7 +39,6 @@ namespace quda
               = {result_local[(t * 4 + s) * 2 + 0], result_local[(t * 4 + s) * 2 + 1]};
           }
         }
-        comm_allreduce_sum(result);
       }
     }
 

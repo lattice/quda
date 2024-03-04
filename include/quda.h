@@ -1797,6 +1797,22 @@ extern "C" {
    */
   void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param);
 
+  /**
+   * @brief Performs contractions between a set of quark fields and
+   * eigenvectors of the 3-d Laplace operator.
+   * @param[in,out] host_sinks An array representing the inner
+   * products between the quark fields and the eigen-vector fields.
+   * Ordered as [nQuark][nEv][Lt][nSpin][complexity].
+   * @param[in] host_quark Array of quark fields we are taking the inner over
+   * @param[in] nQuark Numner of quark fields
+   * @param[in] host_evec Array of eigenvectors we are taking the inner over
+   * @param[in] nEv Number of eigenvectors
+   * @param[in] inv_param Meta-data structure
+   * @param[in] X Lattice dimensions
+   */
+  void laphSinkProject(double _Complex *host_sinks, void **host_quark, unsigned int nQuark, void **host_evec,
+                       unsigned int nEv, QudaInvertParam *inv_param, const int X[4]);
+
 #ifdef __cplusplus
 }
 #endif

@@ -60,9 +60,12 @@ namespace quda {
     using reduce_t = spinor_array;
     using plus<reduce_t>::operator();    
     static constexpr int reduce_block_dim = 1; // only doing a reduct in the x thread dimension
+    
     const Arg &arg;
     constexpr EvecProjection(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
+    // overload comm_reduce to defer until the entire "tile" is complete
+    template <typename U> static inline void comm_reduce(U &) { }
     
     // Final param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
