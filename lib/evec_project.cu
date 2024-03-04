@@ -26,7 +26,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      std::vector<double> result_local(2 * x.Nspin() * x.X()[3]);
+      std::vector<double> result_local(2 * x.Nspin() * x.X()[3], 0.0);
 
       EvecProjectionArg<Float, nColor> arg(x, y);
       launch<EvecProjection>(result_local, tp, stream, arg);
@@ -35,7 +35,7 @@ namespace quda
       if (!activeTuning()) {
         for (int t = 0; t < x.X()[3]; t++) {
           for (int s = 0; s < 4; s++) {
-            result[(comm_coord(3) * comm_dim(3) + t) * 4 + s]
+            result[(comm_coord(3) * x.X()[3] + t) * 4 + s]
               = {result_local[(t * 4 + s) * 2 + 0], result_local[(t * 4 + s) * 2 + 1]};
           }
         }

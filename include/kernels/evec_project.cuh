@@ -31,11 +31,9 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     EvecProjectionArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<spinor_array>(x.X()[3]),
+      ReduceArg<spinor_array>(dim3(x.Volume()/x.X()[3], 1, x.X()[3]), x.X()[3]),
       x(x),
-      y(y),
-      // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[3], x.X()[3])
+      y(y)
     {
       for (int i=0; i<4; i++) X[i] = x.X()[i];
     }
