@@ -28,32 +28,16 @@ namespace quda
 
   void DiracCloverHasenbuschTwist::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool asymmetric = (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) || (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC);
-
-    if (!asymmetric) {
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        ApplyWilsonCloverHasenbuschTwist(out.Even(), in.Odd(), *gauge, *clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY,
-                                         dagger, commDim.data, profile);
-        ApplyWilsonClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim.data,
-                          profile);
-      } else {
-        ApplyWilsonClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim.data,
-                          profile);
-        ApplyWilsonCloverHasenbuschTwist(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY,
-                                         dagger, commDim.data, profile);
-      }
+    if (symmetric) {
+      ApplyWilsonCloverHasenbuschTwist(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity], this_parity,
+                                       dagger, commDim.data, profile);
+      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity, dagger, commDim.data,
+                        profile);
     } else {
-      if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        ApplyWilsonClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim.data,
-                          profile);
-        ApplyTwistedClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger,
-                           commDim.data, profile);
-      } else {
-        ApplyTwistedClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger,
-                           commDim.data, profile);
-        ApplyWilsonClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim.data,
-                          profile);
-      }
+      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity, dagger, commDim.data,
+                        profile);
+      ApplyTwistedClover(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity], this_parity, dagger,
+                         commDim.data, profile);
     }
   }
 
