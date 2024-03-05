@@ -4941,8 +4941,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     if (i > 0) std::swap(in, out);
 
     qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
+    logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
     blas::axpby(a * ftmp, in, -ftmp, out);
   }
 
