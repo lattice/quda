@@ -560,7 +560,6 @@ namespace quda
   template <typename A, typename B, typename... Args> void check_size(const A &a, const B &b, const Args &...args)
   {
     check_size(a, b);
-    check_size(a, args...);
     check_size(b, args...);
   }
 
