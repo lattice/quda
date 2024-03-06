@@ -1450,9 +1450,10 @@ namespace quda {
       }
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC;
       diracParam.Ls = inv_param->Ls;
-      if (sizeof(Complex) != sizeof(double _Complex)) {
-        errorQuda("Irreconcilable difference between interface and internal complex number conventions");
-      }
+      // check we are safe to cast into a Complex (= std::complex<double>)
+      static_assert(sizeof(Complex) == sizeof(double _Complex),
+                    "Irreconcilable difference between interface and internal complex number conventions");
+
       memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
       memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
       diracParam.eofa_shift = inv_param->eofa_shift;

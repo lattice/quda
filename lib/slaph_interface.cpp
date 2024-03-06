@@ -41,19 +41,15 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, unsigned in
 
   // Create device vectors
   ColorSpinorParam quda_quark_param(cpu_quark_param, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  quda_quark_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   std::vector<ColorSpinorField> quda_quark(1, quda_quark_param);
 
   // Create device vectors for evecs
   ColorSpinorParam quda_evec_param(cpu_evec_param, *inv_param, QUDA_CUDA_FIELD_LOCATION);
   std::vector<ColorSpinorField> quda_evec(1, quda_evec_param);
 
-  // check we are safe to cast into a Complex (= std::complex<double>)
-  if (sizeof(Complex) != sizeof(double _Complex)) {
-    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
-  }
-
   auto Lt = x[3] * comm_dim(3);
-  std::vector<Complex> hostSink(4 * Lt);
+  std::vector<Complex> hostSink(nQuark * nEv * Lt * 4);
 
   for (auto i = 0u; i < nQuark; i++) { // iterate over all quarks
     // Copy quark field from host to device
@@ -62,14 +58,19 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, unsigned in
     for (auto j = 0u; j < nEv; j++) { // iterate over all EV
       quda_evec[0] = evec[j];
 
-      // We now perfrom the projection onto the eigenspace. The data
-      // is placed in host_sinks in  T, spin order
-      evecProjectLaplace3D(hostSink, quda_quark[0], quda_evec[0]);
+      std::vector<Complex> tmp(Lt * 4);
 
-      for (auto k = 0u; k < hostSink.size(); k++)
-        reinterpret_cast<std::complex<double> *>(host_sinks)[(i * nEv + j) * 4 * Lt + k] = hostSink[k];
+      // We now perform the projection onto the eigenspace. The data
+      // is placed in host_sinks in  T, spin order
+      evecProjectLaplace3D(tmp, quda_quark[0], quda_evec[0]);
+
+      for (auto k = 0u; k < tmp.size(); k++) hostSink[(i * nEv + j) * 4 * Lt + k] = tmp[k];
     }
   }
 
   comm_allreduce_sum(hostSink);
+
+  for (auto i = 0u; i < nQuark * nEv * Lt * 4; i++) { // iterate over all quarks
+    reinterpret_cast<std::complex<double> *>(host_sinks)[i] = hostSink[i];
+  }
 }
