@@ -13,7 +13,7 @@ namespace quda
   {
     const ColorSpinorField &x;
     const ColorSpinorField &y;
-    std::vector<Complex> result;
+    std::vector<Complex> &result;
 
   public:
     EvecProjectLaplace3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result) :
@@ -51,6 +51,7 @@ namespace quda
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     checkPrecision(x, y);
+    checkNative(x, y);
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
 
