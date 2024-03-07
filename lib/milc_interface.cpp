@@ -3261,9 +3261,11 @@ void qudaTwoLinkGaussianSmear( int external_precision, int quda_precision, void 
   //--------------------------- gauge setup
 
   // Load gauge field
-  if( qsmear_args.compute_2link == 0 ) gaugeParam.use_resident_gauge = 1;
-  loadGaugeQuda( const_cast<void *>(h_gauge), &gaugeParam );
-  
+  if (qsmear_args.compute_2link == 0)
+    gaugeParam.use_resident_gauge = 1;
+  else
+    loadGaugeQuda(const_cast<void *>(h_gauge), &gaugeParam);
+
   // quark smearing parameters
   QudaQuarkSmearParam qsmearParam;
   qsmearParam.inv_param = &invertParam;
