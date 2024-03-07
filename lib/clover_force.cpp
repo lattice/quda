@@ -34,6 +34,20 @@ namespace quda
 
     for (auto i = 0u; i < x.size(); i++) {
       gamma5(p[i][parity], x[i][parity]);
+      if (dagger) dirac->Dagger(QUDA_DAG_YES);
+      dirac->Dslash(x[i][other_parity], p[i][parity], other_parity);
+      // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
+      dirac->M(p[i][parity], p[i][parity]); // this is the odd part of Y
+      if (dagger) dirac->Dagger(QUDA_DAG_NO);
+
+      gamma5(x[i][other_parity], x[i][other_parity]);
+      if (detratio) blas::xpy(x0[i][parity], p[i][parity]);
+
+      if (not_dagger) dirac->Dagger(QUDA_DAG_YES);
+      dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
+      if (not_dagger) dirac->Dagger(QUDA_DAG_NO);
+      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
+      // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
 //////////////////////////////////////////////
  /// print from QUDA
  //////////////////////////////////////////////
@@ -95,20 +109,6 @@ namespace quda
   free(h_tmp);
   printf("end printing\n");
 //////////////////////////////////////
-      if (dagger) dirac->Dagger(QUDA_DAG_YES);
-      dirac->Dslash(x[i][other_parity], p[i][parity], other_parity);
-      // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
-      dirac->M(p[i][parity], p[i][parity]); // this is the odd part of Y
-      if (dagger) dirac->Dagger(QUDA_DAG_NO);
-
-      gamma5(x[i][other_parity], x[i][other_parity]);
-      if (detratio) blas::xpy(x0[i][parity], p[i][parity]);
-
-      if (not_dagger) dirac->Dagger(QUDA_DAG_YES);
-      dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
-      if (not_dagger) dirac->Dagger(QUDA_DAG_NO);
-      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
-      // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
 
       // the gamma5 application in tmLQCD is done inside deriv_Sb
       gamma5(p[i], p[i]);
