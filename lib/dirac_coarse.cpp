@@ -644,8 +644,8 @@ namespace quda {
 #endif
       // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
       Dslash(tmp, x[i][this_parity], other_parity);
-      CloverInv(x[other_parity], b[other_parity], other_parity);
-      blas::axpy(-1.0, tmp, x[other_parity]);
+      CloverInv(x[i][other_parity], b[i][other_parity], other_parity);
+      blas::axpy(-1.0, tmp, x[i][other_parity]);
     }
   }
 
