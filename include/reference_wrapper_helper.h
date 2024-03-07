@@ -321,7 +321,7 @@ namespace quda
     using value_type = T;
 
     vector() = default;
-    vector(uint64_t size) : std::vector<T>(size) {}
+    vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) {}
 
     /**
        @brief Constructor using std::vector initialization
@@ -341,8 +341,8 @@ namespace quda
     */
     template <class U, std::enable_if_t<std::is_same_v<std::complex<U>, T>> * = nullptr> vector(const vector<U> &u)
     {
-      vector::reserve(u.size());
-      for (auto &v : u) vector::push_back(v);
+      std::vector<T>::reserve(u.size());
+      for (auto &v : u) std::vector<T>::push_back(v);
     }
 
     /**
@@ -366,7 +366,7 @@ namespace quda
     operator T() const
     {
       if (std::vector<T>::size() != 1)
-        errorQuda("Cast to scalar failed since size = %lu", ::std::vector<T>::size());
+        errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
       return std::vector<T>::operator[](0);
     }
   };
