@@ -220,7 +220,7 @@ namespace quda {
       check_size(a, x, b, y);
       vector<double> norm(x.size());
       for (auto i = 0u; i < x.size(); i++)
-        norm[i] = instantiateReduce<caxpyNorm2, false>(a[i], b[i], Complex(0.0), x[i], y[i], x[i], x[i], x[i]);
+        norm[i] = instantiateReduce<caxpyNorm2, true>(a[i], b[i], Complex(0.0), x[i], y[i], x[i], x[i], x[i]);
       return norm;
     }
 
