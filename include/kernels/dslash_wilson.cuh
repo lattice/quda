@@ -7,6 +7,7 @@
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
+#include <kernels/spinor_reweight.cuh>
 
 namespace quda
 {
@@ -29,6 +30,8 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
+    static constexpr bool distance_pc = false;
+
     F out;        /** output vector field */
     const F in;   /** input vector field */
     const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
@@ -45,6 +48,31 @@ namespace quda
       x(x),
       U(U),
       a(a)
+    {
+    }
+  };
+
+  /**
+     @brief Parameter structure for driving the Wilson operator
+   */
+  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
+  struct WilsonDistanceArg : WilsonArg<Float, nColor_, nDim, reconstruct_> {
+    static constexpr bool distance_pc = true;
+
+    typedef typename mapper<Float>::type real;
+
+    const real alpha0;
+    const int t0;
+    const int t;
+    const int nt;
+
+    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0,
+                      int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor_, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      alpha0(alpha0),
+      t0(t0),
+      t(comm_coord(3) * this->dim[3]),
+      nt(comm_dim(3) * this->dim[3])
     {
     }
   };
@@ -71,6 +99,21 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
+    real coeff_fwd[4] = {1.0, 1.0, 1.0, 1.0};
+    real coeff_bwd[4] = {1.0, 1.0, 1.0, 1.0};
+    if constexpr (Arg::distance_pc) {
+      const int t = arg.t + coord[3];
+#pragma unroll
+      for (int d = 0; d < 4; d++) {
+        coeff_fwd[d] = (d < 3) ?
+          1.0 :
+          distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+        coeff_bwd[d] = (d < 3) ?
+          1.0 :
+          distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+      }
+    }
+
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
@@ -89,13 +132,13 @@ namespace quda
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (U * in).reconstruct(d, proj_dir);
+          out += coeff_fwd[d] * (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += coeff_fwd[d] * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
 
@@ -115,13 +158,13 @@ namespace quda
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (conj(U) * in).reconstruct(d, proj_dir);
+          out += coeff_bwd[d] * (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += coeff_bwd[d] * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
     } // nDim

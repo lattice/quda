@@ -5,12 +5,21 @@
 
 namespace quda {
 
-  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
+  DiracWilson::DiracWilson(const DiracParam &param) :
+    Dirac(param), distance_pc_alpha0(param.distance_pc_alpha0), distance_pc_t0(param.distance_pc_t0)
+  {
+  }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
+  DiracWilson::DiracWilson(const DiracWilson &dirac) :
+    Dirac(dirac), distance_pc_alpha0(dirac.distance_pc_alpha0), distance_pc_t0(dirac.distance_pc_t0)
+  {
+  }
 
   // hack (for DW and TM operators)
-  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { }
+  DiracWilson::DiracWilson(const DiracParam &param, const int) :
+    Dirac(param), distance_pc_alpha0(0.0), distance_pc_t0(-1)
+  {
+  }
 
   DiracWilson::~DiracWilson() { }
 
@@ -19,6 +28,8 @@ namespace quda {
     if (&dirac != this) {
       Dirac::operator=(dirac);
     }
+    distance_pc_alpha0 = dirac.distance_pc_alpha0;
+    distance_pc_t0 = dirac.distance_pc_t0;
     return *this;
   }
 
@@ -27,7 +38,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
+    }
   }
 
   void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -36,14 +51,23 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
+    }
   }
 
   void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
 
-    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonDistance(out, in, *gauge, -kappa, distance_pc_alpha0, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger,
+                          commDim, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    }
   }
 
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -61,13 +85,19 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     src = &b;
     sol = &x;
   }
 
-  void DiracWilson::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &, const QudaSolutionType) const
   {
-    // do nothing
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
+    }
   }
 
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -128,6 +158,10 @@ namespace quda {
   void DiracWilsonPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                               const QudaSolutionType solType) const
   {
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
@@ -169,6 +203,10 @@ namespace quda {
       DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
     } else {
       errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+    }
+
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
     }
   }
 

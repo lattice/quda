@@ -37,7 +37,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger,
+                                commDim, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    }
   }
 
   // Public method to apply the clover term only
@@ -50,7 +55,12 @@ namespace quda {
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_pc_alpha0, distance_pc_t0, in,
+                                QUDA_INVALID_PARITY, dagger, commDim, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    }
   }
 
   void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -70,13 +80,19 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     src = &b;
     sol = &x;
   }
 
-  void DiracClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &, const QudaSolutionType) const
   {
-    // do nothing
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
+    }
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -135,7 +151,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in,
+                                              parity, dagger, commDim, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
+    }
   }
 
   // xpay version of the above
@@ -146,7 +167,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x,
+                                              parity, dagger, commDim, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
+    }
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
@@ -205,6 +231,10 @@ namespace quda {
 			      ColorSpinorField &x, ColorSpinorField &b, 
 			      const QudaSolutionType solType) const
   {
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(b, -distance_pc_alpha0, distance_pc_t0);
+    }
+
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
@@ -272,6 +302,10 @@ namespace quda {
       CloverInv(x.Even(), tmp, QUDA_EVEN_PARITY);
     } else {
       errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
+    }
+
+    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+      spinorDistanceReweight(x, distance_pc_alpha0, distance_pc_t0);
     }
   }
 

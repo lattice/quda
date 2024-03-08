@@ -65,6 +65,9 @@ namespace quda {
     double tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
                     // applied like a twisted mass and ignored in the inverse)
 
+    double distance_pc_alpha0; // used by distance preconditioning
+    double distance_pc_t0;     // used by distance preconditioning
+
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
     QudaPrecision halo_precision; // only does something for DiracCoarse at present
@@ -92,6 +95,8 @@ namespace quda {
       mu_factor(0.0),
       epsilon(0.0),
       tm_rho(0.0),
+      distance_pc_alpha0(0.0),
+      distance_pc_t0(-1),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
 #ifdef QUDA_MMA_AVAILABLE
@@ -124,6 +129,8 @@ namespace quda {
       printfQuda("mu = %g\n", mu);
       printfQuda("tm_rho = %g\n", tm_rho);
       printfQuda("epsilon = %g\n", epsilon);
+      printfQuda("distance_pc_alpha0 = %g\n", distance_pc_alpha0);
+      printfQuda("distance_pc_t0 = %d\n", distance_pc_t0);
       printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i = 0; i < Ls; i++)
@@ -501,6 +508,8 @@ namespace quda {
   class DiracWilson : public Dirac {
 
   protected:
+    double distance_pc_alpha0;
+    int distance_pc_t0;
     void initConstants();
 
   public:

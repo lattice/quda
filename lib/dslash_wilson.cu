@@ -58,8 +58,8 @@ namespace quda
     instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
-                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, const ColorSpinorField &,
+                   int, bool, const int *, TimeProfile &)
   {
     errorQuda("Wilson dslash has not been built");
   }

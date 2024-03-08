@@ -1521,6 +1521,8 @@ namespace quda {
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
     diracParam.tm_rho = inv_param->tm_rho;
+    diracParam.distance_pc_alpha0 = inv_param->distance_pc_alpha0;
+    diracParam.distance_pc_t0 = inv_param->distance_pc_t0;
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
@@ -2724,6 +2726,24 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(b, *param, false);
 
+  // Force the alpha0 to be positive.
+  // A negative alpha0 matches something like Eq.(12) in arXiv:1006.4028, but the effect doesn't
+  // seem to be good. Disable the negative situation as QUDA already has multigrid for light quarks.
+  const double alpha0 = abs(param->distance_pc_alpha0);
+  const int t0 = param->distance_pc_t0;
+  bool distance_pc = (alpha0 != 0) && (t0 >= 0);
+  distance_pc &= (param->dslash_type == QUDA_WILSON_DSLASH) || (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH);
+  distance_pc &= (param->inv_type == QUDA_CG_INVERTER);
+
+  // Don't apply distance preconditioning in functions other than invertQuda.
+  // if (distance_pc) {
+  //   // dirac.setDistancePrecondition(alpha0, t0);
+  //   // diracSloppy.setDistancePrecondition(alpha0, t0);
+  //   // diracPre.setDistancePrecondition(alpha0, t0);
+  //   // diracEig.setDistancePrecondition(alpha0, t0);
+  //   spinorDistanceReweight(b, -alpha0, t0);
+  // }
+
   dirac.prepare(in, out, x, b, param->solution_type);
 
   logQuda(QUDA_VERBOSE, "Prepared source = %g\n", blas::norm2(*in));
@@ -2843,6 +2863,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     basis[0] = *out; // set first entry to new solution
   }
   dirac.reconstruct(x, b, param->solution_type);
+
+  // if (distance_pc) {
+  //   spinorDistanceReweight(x, alpha0, t0);
+  // }
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
