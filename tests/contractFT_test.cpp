@@ -70,10 +70,6 @@ int main(int argc, char **argv)
 
   // call srand() with a rank-dependent seed
   initRand();
-  display_test_info();
-
-  // initialize the QUDA library
-  initQuda(device_ordinal);
 
   std::array<int, 4> X = {xdim, ydim, zdim, tdim}; // local dims
 
