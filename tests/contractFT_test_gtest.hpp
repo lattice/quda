@@ -39,14 +39,10 @@ TEST_P(ContractFTTest, verify)
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
 {
-  auto contractType = ::testing::get<0>(param.param);	
-  auto prec         = ::testing::get<1>(param.param);
+  std::string str("contract_");
 
-  const char *names[] = {"DegrandRossi_FT_t","DegrandRossi_FT_z", "Staggered_FT_t"};
-
-  std::string str(names[contractType]);
-  str += std::string("_");
-  str += std::string(get_prec_str(getPrecision(prec)));
+  str += get_contract_str(::testing::get<0>(param.param));
+  str += std::string("_") + get_prec_str(::testing::get<1>(param.param));
 
   return str; 
 }
@@ -58,5 +54,5 @@ auto contract_types = Values(QUDA_CONTRACT_TYPE_STAGGERED_FT_T); //FIXME : exten
 
 auto precisions     = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION);
 
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractFTTest, Combine(contract_types, precisions), gettestname);
+INSTANTIATE_TEST_SUITE_P(contraction_ft, ContractFTTest, Combine(contract_types, precisions), gettestname);
 

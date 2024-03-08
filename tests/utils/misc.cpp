@@ -125,15 +125,15 @@ const char *get_contract_str(QudaContractType type)
 
   switch (type) {
   case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
-  case QUDA_CONTRACT_TYPE_OPEN_SUM_T: ret = "open-sum-t"; break;
-  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: ret = "open-sum-z"; break;
-  case QUDA_CONTRACT_TYPE_OPEN_FT_T: ret  = "open-ft-t"; break;
-  case QUDA_CONTRACT_TYPE_OPEN_FT_Z: ret  = "open-ft-z"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_T: ret = "open_sum_t"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: ret = "open_sum_z"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_FT_T: ret  = "open_ft_t"; break;
+  case QUDA_CONTRACT_TYPE_OPEN_FT_Z: ret  = "open_ft_z"; break;
   case QUDA_CONTRACT_TYPE_DR: ret         = "dr"; break;
-  case QUDA_CONTRACT_TYPE_DR_FT_T: ret    = "dr-ft-t"; break;
-  case QUDA_CONTRACT_TYPE_DR_FT_Z: ret    = "dr-ft-z"; break;
+  case QUDA_CONTRACT_TYPE_DR_FT_T: ret    = "dr_ft_t"; break;
+  case QUDA_CONTRACT_TYPE_DR_FT_Z: ret    = "dr_ft_z"; break;
   case QUDA_CONTRACT_TYPE_STAGGERED: ret  = "stag"; break;
-  case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: ret = "stag-ft-t"; break;
+  case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: ret = "stag_ft_t"; break;
   default: ret = "unknown"; break;
   }
 

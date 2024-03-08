@@ -541,8 +541,6 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern QudaContractType contract_type;
-
 // SU(3) smearing options
 extern double gauge_smear_rho;
 extern double gauge_smear_epsilon;
