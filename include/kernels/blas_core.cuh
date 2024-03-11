@@ -121,7 +121,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) y[i] = a * x[i];
       }
-      constexpr int flops() const { return 3; }   //! flops per element
+      constexpr int flops() const { return 3; } //! flops per element
     };
 
     /**

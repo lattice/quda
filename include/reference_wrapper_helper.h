@@ -321,7 +321,7 @@ namespace quda
     using value_type = T;
 
     vector() = default;
-    vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) {}
+    vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) { }
 
     /**
        @brief Constructor using std::vector initialization
@@ -365,8 +365,7 @@ namespace quda
     */
     operator T() const
     {
-      if (std::vector<T>::size() != 1)
-        errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
+      if (std::vector<T>::size() != 1) errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
       return std::vector<T>::operator[](0);
     }
   };

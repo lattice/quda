@@ -1176,7 +1176,10 @@ namespace quda
         b_tilde = in; // b_tilde holds either a copy of preconditioned source or a pointer to original source
       }
 
-      if (presmoother) (*presmoother)(out, in); else zero(out);
+      if (presmoother)
+        (*presmoother)(out, in);
+      else
+        zero(out);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       diracSmoother->reconstruct(solution, b, inner_solution_type);
@@ -1239,7 +1242,8 @@ namespace quda
       // we should keep a copy of the prepared right hand side as we've already destroyed it
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
 
-      if (postsmoother) (*postsmoother)(out, in); // for inner solve preconditioned, in the should be the original prepared rhs
+      if (postsmoother)
+        (*postsmoother)(out, in); // for inner solve preconditioned, in the should be the original prepared rhs
 
       if (debug) printfQuda("exited postsmooth, about to reconstruct\n");
 

@@ -133,7 +133,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     std::vector<ColorSpinorField*> in_;
     in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
 
-    blas::legacy::cDotProduct(vec.get(), rv_, in_);//<i, b>
+    blas::legacy::cDotProduct(vec.get(), rv_, in_); //<i, b>
 
     if (!param.use_inv_ritz) {
       if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
@@ -154,7 +154,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     std::vector<ColorSpinorField*> out_;
     out_.push_back(&x);
 
-    blas::legacy::caxpy(vec.get(), rv_, out_); //multiblas
+    blas::legacy::caxpy(vec.get(), rv_, out_); // multiblas
 
     check_nrm2 = norm2(x);
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));

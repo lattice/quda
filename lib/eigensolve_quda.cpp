@@ -381,9 +381,11 @@ namespace quda
         logQuda(QUDA_DEBUG_VERBOSE, "Current block size = %d\n", array_size);
 
         std::vector<Complex> s(array_size);
-        blas::block::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
+        blas::block::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size},
+                                 vecs[i]); // <j|i> with i normalised.
         for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
-        blas::block::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // i = i - proj_{j}(i) = i - <j|i> * j
+        blas::block::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size},
+                           vecs[i]); // i = i - proj_{j}(i) = i - <j|i> * j
       }
       double norm = sqrt(blas::norm2(vecs[i]));
       blas::ax(1.0 / norm, vecs[i]); // i/<i|i>

@@ -101,8 +101,9 @@ namespace quda {
       }
 
       if (n_upper > n_lower)
-        blas::block::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper}, {p.begin() + n_lower, p.begin() + n_upper},
-                               {x.begin() + n_lower, x.begin() + n_upper}, {zeta.begin() + n_lower, zeta.begin() + n_upper}, r,
+        blas::block::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper},
+                               {p.begin() + n_lower, p.begin() + n_upper}, {x.begin() + n_lower, x.begin() + n_upper},
+                               {zeta.begin() + n_lower, zeta.begin() + n_upper}, r,
                                {beta.begin() + n_lower, beta.begin() + n_upper});
 
       if (++count == n_update) count = 0;

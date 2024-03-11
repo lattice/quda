@@ -302,7 +302,7 @@ namespace quda {
     {
       check_size(x, r);
       vector<double3> norm(x.size(), {});
-      if (x[0].Ncolor() == 3) {// Nc != 3 (MG mainly) not suppored
+      if (x[0].Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
         for (auto i = 0u; i < x.size(); i++) {
           auto n = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x[i], r[i], x[i], x[i], x[i]);
           norm[i] = {n[0], n[1], n[2] / (x[0].Volume() * comm_size())};

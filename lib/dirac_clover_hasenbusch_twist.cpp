@@ -29,15 +29,15 @@ namespace quda
   void DiracCloverHasenbuschTwist::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (symmetric) {
-      ApplyWilsonCloverHasenbuschTwist(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity], this_parity,
-                                       dagger, commDim.data, profile);
-      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity, dagger, commDim.data,
-                        profile);
+      ApplyWilsonCloverHasenbuschTwist(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity],
+                                       this_parity, dagger, commDim.data, profile);
+      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity,
+                        dagger, commDim.data, profile);
     } else {
-      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity, dagger, commDim.data,
-                        profile);
-      ApplyTwistedClover(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity], this_parity, dagger,
-                         commDim.data, profile);
+      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity,
+                        dagger, commDim.data, profile);
+      ApplyTwistedClover(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity], this_parity,
+                         dagger, commDim.data, profile);
     }
   }
 

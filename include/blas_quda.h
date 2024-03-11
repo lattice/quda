@@ -560,7 +560,8 @@ namespace quda {
                                            cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                            cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v);
 
-    namespace block {
+    namespace block
+    {
 
       // multi-blas kernels - defined in multi_blas.cu
 
@@ -635,7 +636,8 @@ namespace quda {
          @param x[in] vector of input ColorSpinorFields
          @param y[in,out] vector of input/output ColorSpinorFields
       */
-      void caxpy_U(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      void caxpy_U(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+                   cvector_ref<ColorSpinorField> &y);
 
       /**
          @brief Compute the block "caxpy_L" with over the set of
@@ -649,7 +651,8 @@ namespace quda {
          @param x[in] vector of input ColorSpinorFields
          @param y[in,out] vector of input/output ColorSpinorFields
       */
-      void caxpy_L(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      void caxpy_L(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+                   cvector_ref<ColorSpinorField> &y);
 
       /**
          @brief Compute the block "axpyz" with over the set of
@@ -769,9 +772,8 @@ namespace quda {
          @param z[in] input ColorSpinorField
          @param c[in] Array of coefficients
       */
-      void axpyBzpcx(const std::vector<double> &a, cvector_ref<ColorSpinorField> &x,
-                     cvector_ref<ColorSpinorField> &y, const std::vector<double> &b, ColorSpinorField &z,
-                     const std::vector<double> &c);
+      void axpyBzpcx(const std::vector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                     const std::vector<double> &b, ColorSpinorField &z, const std::vector<double> &c);
 
       /**
          @brief Compute the vectorized "caxpyBxpz" over the set of
@@ -792,7 +794,6 @@ namespace quda {
       */
       void caxpyBxpz(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, ColorSpinorField &y,
                      const std::vector<Complex> &b, ColorSpinorField &z);
-
 
       // multi-reduce kernels - defined in multi_reduce.cu
 
@@ -843,7 +844,7 @@ namespace quda {
       */
       void hDotProduct_Anorm(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &a,
                              cvector_ref<const ColorSpinorField> &b);
-    }
+    } // namespace block
 
     // compatibility wrappers until we switch to
     // std::vector<ColorSpinorField> and

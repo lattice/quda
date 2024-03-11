@@ -2808,8 +2808,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     ColorSpinorField tmp(out);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(tmp, in); // y = (M M^\dag) b
-    dirac.Mdag(out, tmp);  // x = M^dag y
+    (*solve)(tmp, in);    // y = (M M^\dag) b
+    dirac.Mdag(out, tmp); // x = M^dag y
     delete solve;
     solverParam.updateInvertParam(*param);
   }

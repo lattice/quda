@@ -145,7 +145,8 @@ namespace quda {
     void axy(const cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
     {
       check_size(a, x, y);
-      for (auto i = 0u; i < x.size(); i++) instantiate<axy_, Blas, false>(a[i], Complex(0.0), Complex(0.0), x[i], y[i], y[i], y[i], y[i]);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<axy_, Blas, false>(a[i], Complex(0.0), Complex(0.0), x[i], y[i], y[i], y[i], y[i]);
     }
 
     void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
@@ -164,16 +165,16 @@ namespace quda {
     }
 
     void axpbypczw(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
-                   cvector_ref<const ColorSpinorField> &y, cvector<double> &c,
-                   cvector_ref<const ColorSpinorField> &z, cvector_ref<ColorSpinorField> &w)
+                   cvector_ref<const ColorSpinorField> &y, cvector<double> &c, cvector_ref<const ColorSpinorField> &z,
+                   cvector_ref<ColorSpinorField> &w)
     {
       check_size(a, x, b, y, c, z, w);
       for (auto i = 0u; i < x.size(); i++)
         instantiate<axpbypczw_, Blas, false>(a[i], b[i], c[i], x[i], y[i], z[i], w[i], y[i]);
     }
 
-    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector<Complex> &a,
-                  cvector_ref<const ColorSpinorField> &y, cvector<Complex> &b, cvector_ref<ColorSpinorField> &z)
+    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector<Complex> &a, cvector_ref<const ColorSpinorField> &y,
+                  cvector<Complex> &b, cvector_ref<ColorSpinorField> &z)
     {
       check_size(x, a, y, b, z);
       for (auto i = 0u; i < x.size(); i++)
@@ -204,16 +205,16 @@ namespace quda {
         instantiate<caxpyBzpx_, Blas, true>(a[i], b[i], Complex(0.0), x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void caxpyBxpz(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
-                   cvector_ref<ColorSpinorField> &y, cvector<Complex> &b, cvector_ref<ColorSpinorField> &z)
+    void caxpyBxpz(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<Complex> &b, cvector_ref<ColorSpinorField> &z)
     {
       check_size(a, x, y, b, z);
       for (auto i = 0u; i < x.size(); i++)
         instantiate<caxpyBxpz_, Blas, true>(a[i], b[i], Complex(0.0), x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void caxpbypzYmbw(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
-                      cvector<Complex> &b, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+    void caxpbypzYmbw(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector<Complex> &b,
+                      cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                       cvector_ref<const ColorSpinorField> &w)
     {
       check_size(a, x, b, y, z, w);
@@ -248,9 +249,9 @@ namespace quda {
         instantiate<caxpyxmazMR_, Blas, false>(a[i], 0.0, 0.0, x[i], y[i], z[i], y[i], y[i]);
     }
 
-    void tripleCGUpdate(cvector<double> &a, cvector<double> &b,
-                        cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
-                        cvector_ref<ColorSpinorField> &z, cvector_ref<ColorSpinorField> &w)
+    void tripleCGUpdate(cvector<double> &a, cvector<double> &b, cvector_ref<const ColorSpinorField> &x,
+                        cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                        cvector_ref<ColorSpinorField> &w)
     {
       check_size(a, b, x, y, z, w);
       for (auto i = 0u; i < x.size(); i++)

@@ -38,7 +38,7 @@ namespace quda {
     auto r_vec = {r.begin(), r.begin() + n_krylov + 1};
 
     std::vector<Complex> r_dagger_dot_r((n_krylov + 1) * n_krylov);
-    blas::block::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec) ;
+    blas::block::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
 
     matrix R_dag_R(n_krylov, n_krylov);
     vector R_dag_r0(n_krylov);
@@ -137,7 +137,7 @@ namespace quda {
     auto r_ = {r.begin() + begin, r.begin() + begin + size};
     auto rj = {r.begin() + j, r.begin() + j + 1};
 
-    blas::block::caxpy(tau_, r_ , rj);
+    blas::block::caxpy(tau_, r_, rj);
   }
 
   /**
