@@ -5,17 +5,25 @@
 #include "test.h"
 
 /*
-  This test will eventually evolve into a full test for 3-d Laplace
-  eigenvector generation and sink projection.  For now it's just a pile of hacks.
+  This test will perhaps eventually evolve into a full test for 3-d
+  Laplace eigenvector generation and sink projection.  For now the
+  focus is eigen-vector projection
  */
 
-using test_t = std::tuple<int, int>;
+using test_t = std::tuple<int, int, int, int>;
 
 struct LaphTest : ::testing::TestWithParam<test_t> {
   int nSink;
   int nEv;
+  int tileSink;
+  int tileEv;
 
-  LaphTest() : nSink(std::get<0>(GetParam())), nEv(std::get<1>(GetParam())) { }
+  LaphTest() :
+    nSink(std::get<0>(GetParam())),
+    nEv(std::get<1>(GetParam())),
+    tileSink(std::get<2>(GetParam())),
+    tileEv(std::get<3>(GetParam()))
+  { }
 };
 
 TEST_P(LaphTest, verify)
@@ -66,8 +74,7 @@ TEST_P(LaphTest, verify)
   auto Lt = tdim * comm_dim(3);
   std::vector<Complex> hostRes(nSink * nEv * Lt * nSpin, 0.);
 
-  // could OMP parallelize outer four loops without running afoul of
-  // reductions over time slice
+#pragma omp parallel for collapse(4)
   for (int iEv = 0; iEv < nEv; ++iEv) {
     for (int iSink = 0; iSink < nSink; ++iSink) {
       for (int iSpin = 0; iSpin < nSpin; ++iSpin) {
@@ -92,7 +99,7 @@ TEST_P(LaphTest, verify)
     }     // sink loop
   }       // ev loop
 
-  // TODO MPI reduction
+  comm_allreduce_sum(hostRes);
 
   // QUDA proper
   void *snkPtr[nSink];
@@ -104,7 +111,9 @@ TEST_P(LaphTest, verify)
   std::vector<Complex> qudaRes(nSink * nEv * Lt * nSpin, 0.);
 
   int X[4] = {xdim, ydim, zdim, tdim};
-  laphSinkProject((__complex__ double *)qudaRes.data(), (void **)snkPtr, nSink, (void **)evPtr, nEv, &invParam, X);
+  laphSinkProject((__complex__ double *)qudaRes.data(), (void **)snkPtr, nSink, tileSink,
+                  (void **)evPtr, nEv, tileEv, &invParam, X);
+  printfQuda("laphSinkProject Done: %g secs, %g Gflops\n", invParam.secs, invParam.gflops / invParam.secs);
 
   // check solutions
   auto tol = getTolerance(cuda_prec);
@@ -118,7 +127,10 @@ TEST_P(LaphTest, verify)
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest, ::testing::Combine(::testing::Values(1), ::testing::Values(1)));
+using ::testing::Combine;
+using ::testing::Values;
+
+INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest, Combine(Values(4), Values(768), Values(4), Values(768)));
 
 int main(int argc, char **argv)
 {

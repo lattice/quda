@@ -1804,14 +1804,16 @@ extern "C" {
    * products between the quark fields and the eigen-vector fields.
    * Ordered as [nQuark][nEv][Lt][nSpin][complexity].
    * @param[in] host_quark Array of quark fields we are taking the inner over
-   * @param[in] nQuark Numner of quark fields
+   * @param[in] n_quark Number of quark fields
+   * @param[in] tile_quark Tile size for quark fields (batch size)
    * @param[in] host_evec Array of eigenvectors we are taking the inner over
-   * @param[in] nEv Number of eigenvectors
+   * @param[in] n_evec Number of eigenvectors
+   * @param[in] tile_evec Tile size for eigenvectors (batch size)
    * @param[in] inv_param Meta-data structure
    * @param[in] X Lattice dimensions
    */
-  void laphSinkProject(double _Complex *host_sinks, void **host_quark, unsigned int nQuark, void **host_evec,
-                       unsigned int nEv, QudaInvertParam *inv_param, const int X[4]);
+  void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark,
+                       void **host_evec, int nevec, int tile_evec, QudaInvertParam *inv_param, const int X[4]);
 
 #ifdef __cplusplus
 }
