@@ -409,7 +409,7 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
  *
  * @return     rank
  */
-static int rankFromCoords(const int *coords, void *fdata)
+int rankFromCoords(const int *coords, void *fdata)
 {
   int *base = static_cast<int *>(fdata);
   int *NPROC = base + 1;
@@ -557,7 +557,6 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
 
 void openQCD_qudaFinalize(void)
 {
-
   for (int id = 0; id < OPENQCD_MAX_INVERTERS; ++id) {
     if (qudaState.inv_handles[id] != nullptr) { openQCD_qudaSolverDestroy(id); }
   }
@@ -1497,7 +1496,7 @@ void *openQCD_qudaSolverReadIn(int id)
    * instantiated until then.
    */
   openQCD_QudaSolver *additional_prop = new openQCD_QudaSolver();
-  strcpy(additional_prop->infile, qudaState.infile);
+  sprintf(additional_prop->infile, "%s", qudaState.infile);
   additional_prop->id = id;
   additional_prop->mg_param = multigrid_param;
   additional_prop->u1csw = qudaState.layout.dirac_parms().u1csw;
@@ -1846,13 +1845,6 @@ void openQCD_qudaEigensolverDestroy(int id)
 
   if (qudaState.eig_handles[id] != nullptr) {
     QudaEigParam *eig_param = static_cast<QudaEigParam *>(qudaState.eig_handles[id]);
-    openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(eig_param->invert_param->additional_prop);
-
-    if (additional_prop == nullptr) {
-      delete eig_param->invert_param;
-    } else {
-      openQCD_qudaSolverDestroy(additional_prop->id);
-    }
 
     delete eig_param;
     qudaState.eig_handles[id] = nullptr;
