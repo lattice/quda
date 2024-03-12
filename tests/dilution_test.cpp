@@ -81,7 +81,7 @@ TEST_P(DilutionTest, verify)
 
     param.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField sum(param);
-    blas::axpy(std::vector<double>(v.size(), 1.0), v, sum); // reassemble the vector
+    blas::block::axpy(std::vector<double>(v.size(), 1.0), v, sum); // reassemble the vector
 
     { // check its norm matches the original
       auto src2 = blas::norm2(src);

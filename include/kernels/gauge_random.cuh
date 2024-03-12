@@ -89,8 +89,7 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
       } else if (not arg.group and arg.sigma == 0.0) {
         // if sigma = 0 then we just set the output matrix to the zero and finish
-        Link O;
-        setZero(&O);
+        Link O = {};
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = O;
       } else {
         for (int mu = 0; mu < 4; mu++) {

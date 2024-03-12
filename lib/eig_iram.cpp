@@ -60,12 +60,12 @@ namespace quda
 
     // H_{j,i}_j = v_i^dag * r
     std::vector<Complex> tmp(j + 1);
-    blas::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
+    blas::block::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
 
     // Orthogonalise r_{j} against V_{j}.
     // r = r - H_{j,i} * v_j
     for (int i = 0; i < j + 1; i++) tmp[i] *= -1.0;
-    blas::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
+    blas::block::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
     for (int i = 0; i < j + 1; i++) upperHess[i][j] = -1.0 * tmp[i];
 
     // Re-orthogonalization / Iterative refinement phase
@@ -99,9 +99,9 @@ namespace quda
       // r_{j} = r_{j} - V_{j} * r_{j}
       // and adjust for the correction in the
       // upper Hessenberg matrix.
-      blas::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
+      blas::block::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
       for (int i = 0; i < j + 1; i++) tmp[i] *= -1.0;
-      blas::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
+      blas::block::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
       for (int i = 0; i < j + 1; i++) upperHess[i][j] -= tmp[i];
 
       beta = sqrt(blas::norm2(r[0]));

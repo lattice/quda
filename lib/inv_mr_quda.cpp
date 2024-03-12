@@ -109,7 +109,7 @@ namespace quda
           matSloppy(Ar, r_sloppy);
 
           if (param.global_reduction) {
-            auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
+            double4 Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
             Complex alpha = Complex(Ar4.x, Ar4.y) / Ar4.z;
             r2 = Ar4.w;
             PrintStats("MR (inner)", iter, r2, b2, 0.0);

@@ -1166,18 +1166,20 @@ namespace quda
       // do the pre smoothing
       if (debug) printfQuda("pre-smoothing b2=%e site subset %d\n", norm2(b), b.SiteSubset());
 
-      ColorSpinorField *out=nullptr, *in=nullptr;
-
-      diracSmoother->prepare(in, out, x, b, outer_solution_type);
+      ColorSpinorField out, in;
+      diracSmoother->prepare(out, in, x, b, outer_solution_type);
 
       ColorSpinorField b_tilde;
       // if we're using preconditioning then allocate storage for the preconditioned source vector
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
         b_tilde = getFieldTmp(r.Even());
-        b_tilde = *in; // b_tilde holds either a copy of preconditioned source or a pointer to original source
+        b_tilde = in; // b_tilde holds either a copy of preconditioned source or a pointer to original source
       }
 
-      if (presmoother) (*presmoother)(*out, *in); else zero(*out);
+      if (presmoother)
+        (*presmoother)(out, in);
+      else
+        zero(out);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       diracSmoother->reconstruct(solution, b, inner_solution_type);
@@ -1231,16 +1233,17 @@ namespace quda
       // do the post smoothing
       // residual = outer_solution_type == QUDA_MAT_SOLUTION ? r : r.Even(); // refine for outer solution type
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-        in = &b_tilde;
+        in = b_tilde.create_alias();
       } else { // this incurs unecessary copying
         r = b;
-        in = &r;
+        in = r.create_alias();
       }
 
       // we should keep a copy of the prepared right hand side as we've already destroyed it
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
 
-      if (postsmoother) (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
+      if (postsmoother)
+        (*postsmoother)(out, in); // for inner solve preconditioned, in the should be the original prepared rhs
 
       if (debug) printfQuda("exited postsmooth, about to reconstruct\n");
 
@@ -1250,9 +1253,9 @@ namespace quda
 
     } else { // do the coarse grid solve
 
-      ColorSpinorField *out=nullptr, *in=nullptr;
-      diracSmoother->prepare(in, out, x, b, outer_solution_type);
-      if (presmoother) (*presmoother)(*out, *in);
+      ColorSpinorField out, in;
+      diracSmoother->prepare(out, in, x, b, outer_solution_type);
+      if (presmoother) (*presmoother)(out, in);
       diracSmoother->reconstruct(x, b, outer_solution_type);
     }
 
@@ -1437,9 +1440,9 @@ namespace quda
         logQuda(QUDA_VERBOSE, "Initial guess = %g\n", norm2(x));
         logQuda(QUDA_VERBOSE, "Initial rhs = %g\n", norm2(b));
 
-        ColorSpinorField *out=nullptr, *in=nullptr;
-        diracSmoother->prepare(in, out, x, b, QUDA_MAT_SOLUTION);
-        (*solve)(*out, *in);
+        ColorSpinorField out, in;
+        diracSmoother->prepare(out, in, x, b, QUDA_MAT_SOLUTION);
+        (*solve)(out, in);
         diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
 
         logQuda(QUDA_VERBOSE, "Solution = %g\n", norm2(x));

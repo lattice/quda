@@ -49,7 +49,7 @@ namespace quda
     */
     void accumulate_x(ColorSpinorField &x)
     {
-      blas::axpy<double>({_alphas.begin(), _alphas.begin() + _j + 1}, {_ps.begin(), _ps.begin() + _j + 1}, x);
+      blas::block::axpy<double>({_alphas.begin(), _alphas.begin() + _j + 1}, {_ps.begin(), _ps.begin() + _j + 1}, x);
     }
 
     /**
