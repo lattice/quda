@@ -18,11 +18,10 @@
 #include <gauge_field.h>
 
 #include <assert.h>
-#include <gtest/gtest.h>
 
 #include <test.h>
 
-using test_t = ::testing::tuple<QudaSiteSubset, int>;//single parity or full spinor, or test type
+#include <covdev_test_gtest.hpp>
 
 using namespace quda;
 
@@ -172,15 +171,6 @@ void covdevRef(int mu)
   printfQuda("done.\n");
 }
 
-TEST(dslash, verify)
-{
-  double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol
-    = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-                                                      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-}
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -193,24 +183,12 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-struct covdev_test : quda_test {
-  void display_info() const override
-  {
-    quda_test::display_info();
-    printfQuda("prec    S_dimension T_dimension Ls_dimension\n");
-    printfQuda("%6s   %3d/%3d/%3d     %3d         %2d\n", get_prec_str(prec), xdim, ydim, zdim, tdim, Lsdim);
-  }
-
-  covdev_test(int argc, char **argv) : quda_test("Covariant Derivative Test", argc, argv) { }
-};
-
 
 int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  // return code for google test
-  int test_rc = 0;
+
   // command line options
   auto app = make_app();
   try {
@@ -229,16 +207,37 @@ int main(int argc, char **argv)
 
   init(argc, argv);
 
-  int attempts = 1;
+  int result = 0;
+
+  if (enable_testing) { // tests are defined in invert_test_gtest.hpp
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    result = RUN_ALL_TESTS();
+  } else {//
+    covdev_test(test_t {prec, dagger ? QUDA_DAG_YES : QUDA_DAG_NO});
+  }
+  
+  end();
+  finalizeComms();
+
+  return result;
+}
+
+
+std::array<double, 2> covdev_test(test_t param) {
+
+  //QudaPrecision    test_prec    = ::testing::get<0>(param);
+  QudaDagType      test_dagger  = ::testing::get<1>(param);
+
+  int attempts = 1;//?
+
   for (int i = 0; i < attempts; i++) {
 
     // Test forward directions, then backward
-    for (int dag = 0; dag < 2; dag++) {
-      dag == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
-
+    {
       for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
-        int muCuda = mu + (dagger ? 4 : 0);
-        int muCpu = mu * 2 + (dagger ? 1 : 0);
+        int muCuda = mu + (test_dagger ? 4 : 0);
+        int muCpu = mu * 2 + (test_dagger ? 1 : 0);
 
         // Reference computation
         covdevRef(muCpu);
@@ -248,10 +247,10 @@ int main(int argc, char **argv)
           printfQuda("Tuning...\n");
           dslashCUDA(1, muCuda);
         }
-
         printfQuda("Executing %d kernel loop(s)...", niter);
 
         double secs = dslashCUDA(niter, muCuda);
+
         *spinorOut = *cudaSpinorOut;
         printfQuda("\n%fms per loop\n", 1000 * secs);
 
@@ -266,19 +265,13 @@ int main(int argc, char **argv)
         printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
                    spinor_out_norm2);
 
-        if (verify_results) {
-          ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-          if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
-          test_rc = RUN_ALL_TESTS();
-          if (test_rc != 0) warningQuda("Tests failed");
-        }
       } // Directions
-    }   // Dagger
-  }
+    } 
+  }	
 
-  end();
+  double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol       = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
 
-  finalizeComms();
-  return test_rc;
+  return std::array<double, 2>{deviation, tol};
 }
+

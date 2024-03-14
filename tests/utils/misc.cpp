@@ -140,6 +140,19 @@ const char *get_contract_str(QudaContractType type)
   return ret;
 }
 
+const char *get_dag_str(QudaDagType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_DAG_YES: ret = "dag"; break;
+  case QUDA_DAG_NO : ret = "nodag"; break;  
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
 const char *get_eig_spectrum_str(QudaEigSpectrumType type)
 {
   const char *ret;
