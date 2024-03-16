@@ -48,11 +48,9 @@ void display_test_info()
 int main(int argc, char **argv)
 {
   // Start Google Test Suite
-  //-----------------------------------------------------------------------------
   ::testing::InitGoogleTest(&argc, argv);
 
   // QUDA initialise
-  //-----------------------------------------------------------------------------
   // command line options
   auto app = make_app();
   try {
@@ -76,7 +74,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
 
@@ -88,7 +85,6 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA contraction failed!");
   }
-  //-----------------------------------------------------------------------------
 
   // finalize the QUDA library
   endQuda();
@@ -100,11 +96,21 @@ int main(int argc, char **argv)
 }
 
 // Functions used for Google testing
-//-----------------------------------------------------------------------------
 
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
+  QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
+  int nSpin = 0;
+  switch (contractionType) {
+  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; nSpin = 4; break;
+  case 1: cType = QUDA_CONTRACT_TYPE_DR; nSpin = 4; break;
+  case 2: cType = QUDA_CONTRACT_TYPE_STAGGERED; nSpin = 1; break;
+  default: errorQuda("Undefined contraction type %d\n", contractionType);
+  }
+
+  long unsigned int my_spinor_site_size = nSpin * 3 * 2;
+
   int X[4] = {xdim, ydim, zdim, tdim};
 
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -115,17 +121,17 @@ int test(int contractionType, QudaPrecision test_prec)
   inv_param.cuda_prec_precondition = test_prec;
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = safe_malloc(V * spinor_site_size * data_size);
-  void *spinorY = safe_malloc(V * spinor_site_size * data_size);
+  void *spinorX = safe_malloc(V * my_spinor_site_size * data_size);
+  void *spinorY = safe_malloc(V * my_spinor_site_size * data_size);
   void *d_result = safe_malloc(2 * V * 16 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
-    for (auto i = 0lu; i < V * spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * my_spinor_site_size; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
     }
   } else {
-    for (auto i = 0lu; i < V * spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * my_spinor_site_size; i++) {
       ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
     }
@@ -135,15 +141,8 @@ int test(int contractionType, QudaPrecision test_prec)
   // QUDA will allocate GPU memory, transfer the data,
   // perform the requested contraction, and return the
   // result in the array 'result'
-  // We then compare the GPU result with a CPU refernce code
-
-  QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
-  switch (contractionType) {
-  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; break;
-  case 1: cType = QUDA_CONTRACT_TYPE_DR; break;
-  default: errorQuda("Undefined contraction type %d\n", contractionType);
-  }
-
+  // We then compare the GPU result with a CPU reference code.
+  
   // Perform GPU contraction.
   contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
 

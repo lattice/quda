@@ -138,6 +138,13 @@ void init()
   // Set QUDA internal parameters
   gauge_param = newQudaGaugeParam();
   setStaggeredGaugeParam(gauge_param);
+  QudaGaugeSmearParam smear_param;
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+  }
+
+  if (!inv_multigrid) setStaggeredInvertParam(inv_param);
 
   inv_param = newQudaInvertParam();
   mg_inv_param = newQudaInvertParam();

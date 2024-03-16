@@ -119,6 +119,18 @@ extern "C" {
   } QudaFatLinkArgs_t;
 
   /**
+   * Parameters for propagator contractions with FT
+   */
+  typedef struct {
+    int n_mom;  /* Number of sink momenta */
+    int *mom_modes;  /* List of 4-component momenta as integers. Dimension 4*n_mom */
+    QudaFFTSymmType *fft_type; /* The "parity" of the FT component */
+    int *source_position;  /* The coordinate origin for the Fourier phases */
+    double flops; /* Return value */
+    double dtime; /* Return value */
+  } QudaContractArgs_t;
+
+  /**
    * Parameters for two-link Gaussian quark smearing.
    */
   typedef struct {
@@ -129,6 +141,7 @@ extern "C" {
     int t0; /** Set if the input spinor is on a time slice **/
     int laplaceDim; /** Dimension of Laplacian **/
   } QudaTwoLinkQuarkSmearArgs_t;
+
   
   /**
    * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
@@ -230,16 +243,59 @@ extern "C" {
 
 
   /**
+   * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
+   * @param links              Gauge field on the host
+   * @param src                Input spinor field
+   * @param dst                Output spinor field
+   * @param dir                Direction of application of the spin-taste operator 
+   * @param sym                Kind of spin-taste operator (1 forward, 2 backward, 3 symmetric)
+   * @param reloadGaugeField   Should we transfer again the gauge field from the CPU to the GPU? (0 = false, anything else = true)
+   */
+  void qudaShift (int external_precision,
+		  int quda_precision,
+		  const void* const links,
+		  void* source,
+		  void* solution,
+		  int dir,
+		  int sym,
+                  int reloadGaugeField);
+
+  /**
+   * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
+   * @param links              Gauge field on the host
+   * @param src                Input spinor field
+   * @param dst                Output spinor field
+   * @param spin               Spin gamma structure using MILC numbering
+   * @param taste              Taste gamma structure using MILC numbering
+   * @param reloadGaugeField   Should we transfer again the gauge field from the CPU to the GPU? (0 = false, anything else = true)
+   */
+  void qudaSpinTaste (int external_precision,
+                      int quda_precision,
+                      const void *const links,
+                      void* src,
+                      void* dst,
+                      int spin,
+                      int taste,
+                      int reloadGaugeField);
+  /**
    * Apply the improved staggered operator to a field. All fields
    * passed and returned are host (CPU) field in MILC order.
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
-   * @param inv_args Struct setting some solver metadata
-   * @param milc_fatlink Fat-link field on the host
-   * @param milc_longlink Long-link field on the host
-   * @param source Right-hand side source field
-   * @param solution Solution spinor field
+   * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
+   * @param inv_args           Struct setting some solver metadata
+   * @param milc_fatlink       Fat-link field on the host
+   * @param milc_longlink      Long-link field on the host
+   * @param source             Right-hand side source field
+   * @param solution           Solution spinor field
    */
   void qudaDslash(int external_precision,
 		  int quda_precision,
@@ -1074,6 +1130,26 @@ extern "C" {
     );
 
   /**
+   * @brief Tie together two staggered propagators including spatial Fourier phases.
+   * The result is summed separately over each time slice and across all MPI ranks.
+   * The FT is defined by a list of momentum indices (three-component integer vectors)
+   * Included with the FT is a parity (symmetry) parameter for each momentum
+   * component that selects an exp, cos, or sin factor for each direction
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in,out] parameters for the contraction, including FT specification
+   * @param[in] local storage of color spinor field.  three complex values * number of sites on node
+   * @param[in] local storage of color spinor field.  three complex values * number of sites on node
+   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt][2] for 2 = re,im. 
+   */
+  void qudaContractFT(int external_precision,
+		      QudaContractArgs_t *cont_args,
+		      void *const quark1,
+		      void *const quark2,
+		      double *corr
+		      );
+
+  /**
    * @brief Perform two-link Gaussian smearing on a given spinor (for staggered fermions).
    * @param[in] external_precision  Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param[in] quda_precision  Precision for QUDA to use (2 - double, 1 - single)
@@ -1084,8 +1160,9 @@ extern "C" {
   void qudaTwoLinkGaussianSmear(int external_precision, int quda_precision, void * h_gauge, void * source,
                                 QudaTwoLinkQuarkSmearArgs_t qsmear_args);
   
+  
   /* The below declarations are for removed functions from prior versions of QUDA. */
-
+  
   /**
    * Note this interface function has been removed.  This stub remains
    * for compatibility only.

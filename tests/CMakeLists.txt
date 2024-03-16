@@ -123,6 +123,12 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  if(QUDA_CONTRACT)
+    add_executable(contractFT_test contractFT_test.cpp)
+    target_link_libraries(contractFT_test ${TEST_LIBS})
+    quda_checkbuildtest(contractFT_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS contractFT_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -205,6 +211,7 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  
 endif()
 
 if(QUDA_SMEAR_GAUSS_TWOLINK)
