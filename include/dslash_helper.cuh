@@ -11,6 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
+#include <domain_decomposition.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
@@ -286,6 +287,10 @@ namespace quda
     int exterior_dims; // dimension to run in the exterior Dslash
     int exterior_blocks;
 
+    DDParam<int_fastdiv> dd_out;
+    DDParam<int_fastdiv> dd_in;
+    DDParam<int_fastdiv> dd_x;
+
     // for shmem ...
     static constexpr bool packkernel = false;
     void *packBuffer[4 * QUDA_MAX_DIM];
@@ -337,6 +342,9 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
+      dd_out(out.dd),
+      dd_in(in.dd),
+      dd_x(x.dd),
 #ifndef NVSHMEM_COMMS
       counter(0)
 #else
@@ -353,6 +361,7 @@ namespace quda
       checkOrder(out, in, x);        // check all orders match
       checkPrecision(out, in, x, U); // check all precisions match
       checkLocation(out, in, x, U);  // check all locations match
+      checkDD(out, in, x);           // check all DD match
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
