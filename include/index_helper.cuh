@@ -236,6 +236,7 @@ namespace quda {
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
+    constexpr int size() const { return nDim; }
   };
 
   /**
