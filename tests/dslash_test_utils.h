@@ -62,6 +62,7 @@ struct DslashTestWrapper {
   // CUDA color spinor fields
   ColorSpinorField cudaSpinor;
   ColorSpinorField cudaSpinorOut;
+  ColorSpinorField cudaSpinorTmp;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -81,6 +82,7 @@ struct DslashTestWrapper {
   QudaParity parity = QUDA_EVEN_PARITY;
   static inline dslash_test_type dtest_type = dslash_test_type::Dslash;
   static inline bool test_split_grid = false;
+  static inline bool test_domain_decomposition = false;
   int num_src = 1;
 
   const bool transfer = false;
@@ -143,6 +145,8 @@ struct DslashTestWrapper {
     }
 
     if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
+
+    test_domain_decomposition = dd_red_black;
 
     for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
@@ -291,6 +295,7 @@ struct DslashTestWrapper {
       cudaSpinor = ColorSpinorField(csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
       cudaSpinorOut = ColorSpinorField(csParam);
+      if (test_domain_decomposition) { cudaSpinorTmp = ColorSpinorField(csParam); }
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
@@ -788,6 +793,41 @@ struct DslashTestWrapper {
                                  hostCloverInv);
       } else {
         dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, hostGauge, &gauge_param);
+      }
+
+    } else if (test_domain_decomposition) {
+
+      if (dd_red_black) {
+        for (auto i = 0u; i < 4; i++) {
+          cudaSpinor.dd.blockDim[i] = dd_block_size[i];
+          cudaSpinorTmp.dd.blockDim[i] = dd_block_size[i];
+        }
+
+        blas::zero(cudaSpinorOut);
+
+        // We test it applying all 4 possible operators Drr, Drb, Dbr, Dbb
+        for (int col = 0; col < 4; col++) {
+
+          cudaSpinor.dd.reset(col % 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp.dd.reset(col / 2 == 0 ? DD::red_active : DD::black_active);
+
+          switch (dtest_type) {
+          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp, cudaSpinor, parity); break;
+          case dslash_test_type::MatPC:
+          case dslash_test_type::Mat: dirac->M(cudaSpinorTmp, cudaSpinor); break;
+          case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorTmp, cudaSpinor); break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+
+          cudaSpinor.dd.reset();
+          cudaSpinorTmp.dd.reset();
+
+          blas::xpy(cudaSpinorTmp, cudaSpinorOut);
+        }
+      } else {
+        errorQuda("Test dd type not supported");
       }
 
     } else {
