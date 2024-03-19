@@ -74,6 +74,9 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
 
+std::array<int, 4> dd_block_size = {4, 4, 4, 4};
+bool dd_red_black = false;
+
 double madwf_diagonal_suppressor = 0.0;
 int madwf_ls = 4;
 int madwf_null_miniter = niter;
@@ -1029,7 +1032,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
+  auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameters");
 
   CLI::TransformPairs<int> eofa_pm_map {{"plus", 1}, {"minus", 0}};
   opgroup->add_option("--eofa-pm", eofa_pm, "Set to evalute \"plus\" or \"minus\" EOFA operator (default plus)")
@@ -1040,9 +1043,19 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
 }
 
+void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("DD", "Options controlling DD parameters");
+  opgroup
+    ->add_option("--dd-block-size", dd_block_size,
+                 "Set the domain decomposition block size in all four dimension (default 4 4 4 4)")
+    ->expected(4);
+  opgroup->add_option("--dd-red-black", dd_red_black, "Enable red-black domain decomposition (default false)");
+}
+
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameteres");
+  auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameters");
 
   opgroup->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor,
                       "Set the digonal suppressor for MADWF (default 0)");
@@ -1103,8 +1116,7 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup
-    = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
+  auto opgroup = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameters");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }
 

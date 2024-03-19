@@ -88,11 +88,24 @@ namespace quda
 
       int k = 0;
       double scale = 1.0;
-      if ((node_parity + step) % 2 == 0 && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+      if (!param.do_block_schwarz() && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ
+          && (node_parity + step) % 2 == 0) {
         // for multiplicative Schwarz we alternate updates depending on node parity
       } else {
 
         commGlobalReductionPush(param.global_reduction); // use local reductions for DD solver
+
+        if (param.do_block_schwarz()) {
+          if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+            // Red or black active
+            Ar.dd.reset(DD::mode_red_black, step % 2 == 0 ? DD::red_active : DD::black_active);
+            r_sloppy.dd.reset(DD::mode_red_black, step % 2 == 0 ? DD::red_active : DD::black_active);
+          } else {
+            // Both red and black active but no hopping
+            Ar.dd.reset(DD::mode_red_black, DD::red_active, DD::black_active);
+            r_sloppy.dd.reset(DD::mode_red_black, DD::red_active, DD::black_active);
+          }
+        }
 
         blas::zero(x_sloppy); // can get rid of this for a special first update kernel
         double c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
@@ -119,6 +132,7 @@ namespace quda
           } else {
             // doing local reductions so can make it asynchronous
             commAsyncReductionSet(true);
+            // TODO: make these block aware
             blas::cDotProductNormA(Ar, r_sloppy);
 
             // omega*alpha is done in the kernel
@@ -131,6 +145,12 @@ namespace quda
         }
 
         blas::axpy(scale, x_sloppy, x); // Scale and sum to accumulator
+
+        if (param.do_block_schwarz()) {
+          // Disable domain decomposition
+          Ar.dd.reset();
+          r_sloppy.dd.reset();
+        }
 
         commGlobalReductionPop(); // renable global reductions for outer solver
       }

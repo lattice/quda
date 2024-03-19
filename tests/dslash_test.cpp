@@ -89,6 +89,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   add_eofa_option_group(app);
+  add_dd_option_group(app);
   add_comms_option_group(app);
 
   try {

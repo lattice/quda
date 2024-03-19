@@ -73,7 +73,8 @@ namespace quda
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
-      {                           // Forward gather - compute fwd offset for vector fetch
+      // Forward gather - compute fwd offset for vector fetch
+      if (arg.dd_in.doHopping(coord, d, +1, arg.dc)) {
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -99,7 +100,8 @@ namespace quda
         }
       }
 
-      { // Backward gather - compute back offset for spinor and gauge fetch
+      // Backward gather - compute back offset for spinor and gauge fetch
+      if (arg.dd_in.doHopping(coord, d, -1, arg.dc)) {
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -148,15 +150,29 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
+      if (arg.dd_out.isZero(coord, arg.dc)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
+        return;
+      }
+
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(xs, my_spinor_parity);
-        out = x + arg.a * out;
+        if (arg.dd_x.isZero(coord, arg.dc)) {
+          out = arg.a * out;
+        } else {
+          Vector x = arg.x(xs, my_spinor_parity);
+          out = x + arg.a * out;
+        }
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out(xs, my_spinor_parity);
-        out = x + (xpay ? arg.a * out : out);
+        if (arg.dd_x.isZero(coord, arg.dc)) {
+          out = (xpay ? arg.a * out : out);
+        } else {
+          Vector x = arg.out(xs, my_spinor_parity);
+          out = x + (xpay ? arg.a * out : out);
+        }
       }
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
