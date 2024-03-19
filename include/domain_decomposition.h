@@ -42,20 +42,34 @@ namespace quda
       for (auto i = 0u; i < QUDA_MAX_DIM; i++) blockDim[i] = dd.blockDim[i];
     }
 
-    // sets the given flag to true
-    constexpr inline DDParam &operator&=(const DD &flag)
-    {
-      flags[(int)flag] = true;
-      return *this;
-    }
-
     // returns false if in use
     constexpr inline bool operator!() const { return not flags[(int)DD::in_use]; }
 
     // returns value of given flag
-    constexpr inline bool operator&&(const DD &flag) const { return flags[(int)flag]; }
+    constexpr inline bool operator&&(const DD &flag) const { return flags[(int)DD::in_use] && flags[(int)flag]; }
 
+    // returns value of given flag
     constexpr inline bool is(const DD &flag) const { return flags[(int)flag]; }
+
+    constexpr inline void set(const DD &flag) { flags[(int)flag] = true; }
+
+    template <typename... Args> constexpr inline void set(const DD &flag, Args... args)
+    {
+      set(flag);
+      set(args...);
+    }
+
+    constexpr inline void reset()
+    {
+#pragma unroll
+      for (auto i = 0u; i < (int)DD::size; i++) flags[i] = 0;
+    }
+
+    template <typename... Args> constexpr inline void reset(Args... args)
+    {
+      reset();
+      set(args...);
+    }
 
     // Pretty print the args struct
     void print()
