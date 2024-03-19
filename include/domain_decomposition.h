@@ -68,7 +68,7 @@ namespace quda
     template <typename... Args> constexpr inline void reset(Args... args)
     {
       reset();
-      set(args...);
+      set(DD::in_use, args...);
     }
 
     // Pretty print the args struct
