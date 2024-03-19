@@ -808,8 +808,8 @@ struct DslashTestWrapper {
         // We test it applying all 4 possible operators Drr, Drb, Dbr, Dbb
         for (int col = 0; col < 4; col++) {
 
-          cudaSpinor.dd.reset(col % 2 == 0 ? DD::red_active : DD::black_active);
-          cudaSpinorTmp.dd.reset(col / 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinor.dd.reset(DD::mode_red_black, col % 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp.dd.reset(DD::mode_red_black, col / 2 == 0 ? DD::red_active : DD::black_active);
 
           switch (dtest_type) {
           case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp, cudaSpinor, parity); break;
