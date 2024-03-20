@@ -294,6 +294,49 @@ namespace quda
       for (auto i = 0u; i < vector::size(); i++) odd.push_back(operator[](i).Odd());
       return odd;
     }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaPrecision> Precision() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Precision() != operator[](i).Precision())
+          errorQuda("Precisions %d %d do not match", operator[](i - 1).Precision(), operator[](i).Precision());
+      return operator[](0).Precision();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, int> Ncolor() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Ncolor() != operator[](i).Ncolor())
+          errorQuda("Ncolors do not match %d != %d", operator[](i - 1).Ncolor(), operator[](i).Ncolor());
+      return operator[](0).Ncolor();
+    }
+
+    template <class U = T> std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, int> Nspin() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Nspin() != operator[](i).Nspin())
+          errorQuda("Nspins do not match %d != %d", operator[](i - 1).Nspin(), operator[](i).Nspin());
+      return operator[](0).Nspin();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Volume() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Volume() != operator[](i).Volume())
+          errorQuda("Volumes do not match %lu != %lu", operator[](i - 1).Volume(), operator[](i).Volume());
+      return operator[](0).Volume();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Bytes() const
+    {
+      size_t bytes = 0;
+      for (auto i = 0u; i < vector::size(); i++) bytes += operator[](i).Bytes();
+      return bytes;
+    }
   };
 
   template <class T> using cvector_ref = const vector_ref<T>;
