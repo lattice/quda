@@ -112,6 +112,60 @@ namespace quda {
     }
   };
 
+  /** Transform from openqcd into non-relativistic basis (a.k.a UKQCD basis):
+   *    gamma_ukqcd = U gamma_openqcd U^dagger with
+   *     U = [-1  0  1  0]
+             [ 0 -1  0  1]
+             [ 1  0  1  0]
+             [ 0  1  0  1] / sqrt(2),
+   * see https://github.com/JeffersonLab/chroma/blob/master/docs/notes/gamma_conventions.tex
+   for further notes. */
+  template <int Ns, int Nc> struct ReverseOpenqcdBasis {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
+    {
+      int s1[4] = {0, 1, 0, 1};
+      int s2[4] = {2, 3, 2, 3};
+      FloatOut K1[4]
+        = {static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
+      FloatOut K2[4]
+        = {static_cast<FloatOut>(kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
+      for (int s = 0; s < Ns; s++) {
+        for (int c = 0; c < Nc; c++) {
+          out[s * Nc + c] = K1[s] * static_cast<complex<FloatOut>>(in[s1[s] * Nc + c])
+            + K2[s] * static_cast<complex<FloatOut>>(in[s2[s] * Nc + c]);
+        }
+      }
+    }
+  };
+
+  /** Transform from non-relativistic (aka ukqcd) into openqcd basis:
+   * gamma_ukqcd = U gamma_openqcd U^dagger with
+   * U = [-1  0 1 0]
+   *     [ 0 -1 0 1]
+   *     [ 1  0 1 0]
+   *     [ 0  1 0 1] / sqrt(2)
+   */
+  template <int Ns, int Nc> struct OpenqcdBasis {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
+    {
+      int s1[4] = {0, 1, 0, 1};
+      int s2[4] = {2, 3, 2, 3};
+
+      FloatOut K1[4]
+        = {static_cast<FloatOut>(-kU), static_cast<FloatOut>(-kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU)};
+      FloatOut K2[4]
+        = {static_cast<FloatOut>(kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU)};
+      for (int s = 0; s < Ns; s++) {
+        for (int c = 0; c < Nc; c++) {
+          out[s * Nc + c] = K1[s] * static_cast<complex<FloatOut>>(in[s1[s] * Nc + c])
+            + K2[s] * static_cast<complex<FloatOut>>(in[s2[s] * Nc + c]);
+        }
+      }
+    }
+  };
+
   template <typename Arg> struct CopyColorSpinor_ {
     const Arg &arg;
     constexpr CopyColorSpinor_(const Arg &arg): arg(arg) {}

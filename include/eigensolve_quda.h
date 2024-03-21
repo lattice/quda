@@ -254,10 +254,11 @@ namespace quda
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
-       @param[in] evecs Computed eigenvectors of NormOp
-       @param[in] evals Computed eigenvalues of NormOp
+       @param[in,out] evecs Computed eigenvectors of NormOp
+       @param[in,out] evals Computed eigenvalues of NormOp
+       @param[in] dagger Whether NormOp was MdagM (false) or MMdag (true)
     */
-    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals);
+    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, bool dagger = false);
 
     /**
        @brief Compute eigenvalues and their residiua

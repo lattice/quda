@@ -151,6 +151,25 @@ namespace quda {
         bytes = site_dim * (x[0] + 4) * (x[1] + 2) * (x[2] + 2) * (x[3] + 2) * nInternal * precision;
       } else if (order == QUDA_MILC_SITE_GAUGE_ORDER) {
         bytes = volume * site_size;
+      } else if (order == QUDA_OPENQCD_GAUGE_ORDER) {
+        /**
+         * With an openQCD gauge field, we need all the links of even lattice
+         * points in positive direction. These are links that lie in the buffer
+         * space that spans 7*BNDRY/4 gauge fields. These boundary fields are
+         * located at base_ptr + 4*VOLUME. Therefore, we need to transfer more
+         * than 4*VOLUME matrices.
+         */
+
+        /* analogue to BNDRY in openQCD:include/global.h */
+        long int bndry = 0;
+        bndry += (1 - (comm_dim(0) % 2)) * x[1] * x[2] * x[3];
+        bndry += (1 - (comm_dim(1) % 2)) * x[0] * x[2] * x[3];
+        bndry += (1 - (comm_dim(2) % 2)) * x[0] * x[1] * x[3];
+        bndry += (1 - (comm_dim(3) % 2)) * x[0] * x[1] * x[2];
+        bndry *= 2;
+
+        length += 18 * 7 * bndry / 4;
+        bytes = length * precision;
       } else {
         bytes = length * precision;
       }
@@ -190,7 +209,7 @@ namespace quda {
 
     } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER
                || order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_TIFR_PADDED_GAUGE_ORDER
-               || order == QUDA_MILC_SITE_GAUGE_ORDER) {
+               || order == QUDA_MILC_SITE_GAUGE_ORDER || order == QUDA_OPENQCD_GAUGE_ORDER) {
       // does not support device
 
       if (order == QUDA_MILC_SITE_GAUGE_ORDER && param.create != QUDA_REFERENCE_FIELD_CREATE) {
@@ -1361,7 +1380,8 @@ namespace quda {
         }
       } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
                  || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
-                 || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+                 || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER
+                 || Order() == QUDA_OPENQCD_GAUGE_ORDER) {
         std::memcpy(buffer, data(), Bytes());
       } else {
         errorQuda("Unsupported order = %d", Order());
@@ -1381,7 +1401,8 @@ namespace quda {
         }
       } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
                  || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
-                 || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+                 || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER
+                 || Order() == QUDA_OPENQCD_GAUGE_ORDER) {
         std::memcpy(data(), buffer, Bytes());
       } else {
         errorQuda("Unsupported order = %d", Order());

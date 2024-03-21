@@ -130,6 +130,12 @@ namespace quda {
 #else
         errorQuda("BQCD interface has not been built\n");
 #endif
+      } else if (in.Order() == QUDA_OPENQCD_CLOVER_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+        copyClover<OpenQCDOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
+#else
+        errorQuda("OpenQCD interface has not been built\n");
+#endif
       } else {
         errorQuda("Clover field %d order not supported", in.Order());
       }

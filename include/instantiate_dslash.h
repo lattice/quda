@@ -38,6 +38,20 @@ namespace quda
 #else
       errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
 #endif
+#ifdef BUILD_OPENQCD_INTERFACE
+    } else if (Recon::recon.size() > 3 && U.Reconstruct() == Recon::recon[3]) {
+#if QUDA_RECONSTRUCT & 2
+      Apply<Float, nColor, Recon::recon[3]>(out, in, U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
+#endif
+    } else if (Recon::recon.size() > 4 && U.Reconstruct() == Recon::recon[4]) {
+#if QUDA_RECONSTRUCT & 1
+      Apply<Float, nColor, Recon::recon[4]>(out, in, U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+#endif
+#endif /* BUILD_OPENQCD_INTERFACE */
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }

@@ -101,6 +101,13 @@ namespace quda
 #else
         errorQuda("TIFR interface has not been built\n");
 #endif
+      } else if (in.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+        using G = typename gauge_order_mapper<Float, QUDA_OPENQCD_GAUGE_ORDER, nColor>::type;
+        copy_gauge_offset<Field, Element, G>(out, in, offset);
+#else
+        errorQuda("OpenQCD interface has not been built\n");
+#endif
       } else {
         errorQuda("Gauge field %d order not supported", in.Order());
       }

@@ -513,7 +513,7 @@ namespace quda
         // Compute the eigen/singular values.
         getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
         computeEvals(kSpace, evals);
-        if (compute_svd) computeSVD(kSpace, evals);
+        if (compute_svd) computeSVD(kSpace, evals, eig_param->use_dagger);
         converged = true;
 
       } else {

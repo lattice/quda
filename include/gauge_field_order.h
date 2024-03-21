@@ -2347,6 +2347,118 @@ namespace quda {
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
     };
 
+    /**
+     * struct to define order of gauge fields in OpenQCD
+     */
+    template <typename Float, int length> struct OpenQCDOrder : LegacyOrder<Float, length> {
+
+      using Accessor = OpenQCDOrder<Float, length>;
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+
+      Float *gauge;
+      const int volumeCB;
+      static constexpr int Nc = 3;
+      const int dim[4]; // xyzt convention
+      const int L[4];   // txyz convention
+      const int nproc[4];
+
+      OpenQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        LegacyOrder<Float, length>(u, ghost_),
+        gauge(gauge_ ? gauge_ : (Float *)u.data()), // pointer to the gauge field on CPU
+        volumeCB(u.VolumeCB()), // Volume and VolumeCB refer to the global lattice, if VolumeLocal, then local lattice
+        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},              // *local* lattice dimensions, xyzt
+        L {u.X()[3], u.X()[0], u.X()[1], u.X()[2]},                // *local* lattice dimensions, txyz
+        nproc {comm_dim(3), comm_dim(0), comm_dim(1), comm_dim(2)} // txyz
+      {
+        if constexpr (length != 18) { errorQuda("Gauge field length %d not supported", length); }
+      }
+
+      /**
+       * @brief      Obtains the offset in Floats from the openQCD base pointer
+       *             to the gauge fields.  At this point, fields are already
+       *             reordered with a xyzt-lexicographical spacetime index, so
+       *             nothing special to do here.
+       *
+       * @param[in]  x       Checkerboard index coming from quda
+       * @param[in]  dir     The direction coming from quda
+       * @param[in]  parity  The parity coming from quda
+       *
+       * @return     The offset.
+       */
+      __device__ __host__ inline int getGaugeOffset_lexi(int x_cb, int dir, int parity) const
+      {
+        int x[4];
+        getCoords(x, x_cb, dim, parity);
+        return (4 * openqcd::lexi(x, dim, 4) + dir) * length;
+      }
+
+      /**
+       * @brief      Obtains the offset in Floats from the openQCD base pointer
+       *             to the gauge fields.
+       *
+       * @param[in]  x_cb    Checkerboard index coming from quda
+       * @param[in]  dir     The direction coming from quda
+       * @param[in]  parity  The parity coming from quda
+       *
+       * @return     The offset.
+       */
+      __device__ __host__ inline int getGaugeOffset(int x_cb, int dir, int parity) const
+      {
+        int quda_x[4], x[4];
+        getCoords(quda_x, x_cb, dim, parity); // x_quda = quda local lattice coordinates
+        openqcd::rotate_coords(quda_x, x);    // x = openQCD local lattice coordinates
+
+        int mu = (dir + 1) % 4; // mu = openQCD direction
+        int ix = openqcd::ipt(x, L);
+        int iz = openqcd::iup(x, mu, L, nproc);
+        int ofs = 0;
+        int volume = openqcd::vol(L);
+
+        if (ix < volume / 2) { // ix even -> iz odd
+          if (iz < volume) {   // iz in interior
+            ofs = 8 * (iz - volume / 2) + 2 * mu + 1;
+          } else {
+            int ib = iz - volume - openqcd::ifc(L, nproc, mu) - openqcd::bndry(L, nproc) / 2; // iz in exterior
+            ofs = 4 * volume + openqcd::face_offset(L, nproc, mu) + ib;
+          }
+        } else if (volume / 2 <= ix && ix < volume) { // ix odd
+          ofs = 8 * (ix - volume / 2) + 2 * mu;
+        }
+
+        return ofs * length;
+      }
+
+      __device__ __host__ inline void load(complex v[length / 2], int x_cb, int dir, int parity, Float = 1.0) const
+      {
+        auto in = &gauge[getGaugeOffset(x_cb, dir, parity)];
+        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+      }
+
+      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int dir, int parity) const
+      {
+        auto out = &gauge[getGaugeOffset_lexi(x_cb, dir, parity)];
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      }
+
+      /**
+         @brief This accessor routine returns a gauge_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] dim Which dimension are we requesting
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a gauge_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity) const
+      {
+        return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
+      }
+
+      size_t Bytes() const { return 2 * Nc * Nc * sizeof(Float); }
+    }; // class OpenQCDOrder
+
   } // namespace gauge
 
   template <typename real_out_t, typename store_out_t, typename real_in_t, typename store_in_t, bool block_float, typename norm_t>
@@ -2491,5 +2603,8 @@ namespace quda {
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_GAUGE_ORDER,Nc> { typedef gauge::TIFROrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> { typedef gauge::TIFRPaddedOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
+  template <typename T, int Nc> struct gauge_order_mapper<T, QUDA_OPENQCD_GAUGE_ORDER, Nc> {
+    typedef gauge::OpenQCDOrder<T, 2 * Nc * Nc> type;
+  };
 
 } // namespace quda

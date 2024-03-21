@@ -18,18 +18,18 @@ typedef enum QudaMemoryType_s {
   QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
 } QudaMemoryType;
 
-//
-// Types used in QudaGaugeParam
-//
+/**
+ * Types used in QudaGaugeParam
+ */
 
 typedef enum QudaLinkType_s {
   QUDA_SU3_LINKS,
   QUDA_GENERAL_LINKS,
   QUDA_THREE_LINKS,
   QUDA_MOMENTUM_LINKS,
-  QUDA_COARSE_LINKS,                  // used for coarse-gauge field with multigrid
-  QUDA_SMEARED_LINKS,                 // used for loading and saving gaugeSmeared in the interface
-  QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
+  QUDA_COARSE_LINKS,                  /* used for coarse-gauge field with multigrid */
+  QUDA_SMEARED_LINKS,                 /* used for loading and saving gaugeSmeared in the interface */
+  QUDA_WILSON_LINKS = QUDA_SU3_LINKS, /* used by wilson, clover, twisted mass, and domain wall */
   QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
   QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
   QUDA_ASQTAD_MOM_LINKS = QUDA_MOMENTUM_LINKS,
@@ -39,18 +39,19 @@ typedef enum QudaLinkType_s {
 
 typedef enum QudaGaugeFieldOrder_s {
   QUDA_FLOAT_GAUGE_ORDER = 1,
-  QUDA_FLOAT2_GAUGE_ORDER = 2,  // no reconstruct and double precision
-  QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 reconstruct single, and 12 reconstruct single, half, quarter
-  QUDA_FLOAT8_GAUGE_ORDER = 8,  // 8 reconstruct half and quarter
-  QUDA_NATIVE_GAUGE_ORDER,      // used to denote one of the above types in a trait, not used directly
-  QUDA_QDP_GAUGE_ORDER,         // expect *gauge[mu], even-odd, spacetime, row-column color
-  QUDA_QDPJIT_GAUGE_ORDER,      // expect *gauge[mu], even-odd, complex-column-row-spacetime
-  QUDA_CPS_WILSON_GAUGE_ORDER,  // expect *gauge, even-odd, mu, spacetime, column-row color
-  QUDA_MILC_GAUGE_ORDER,        // expect *gauge, even-odd, mu, spacetime, row-column order
-  QUDA_MILC_SITE_GAUGE_ORDER,   // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-  QUDA_BQCD_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime+halos, column-row order
-  QUDA_TIFR_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime, column-row order
-  QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
+  QUDA_FLOAT2_GAUGE_ORDER = 2,  /* no reconstruct and double precision */
+  QUDA_FLOAT4_GAUGE_ORDER = 4,  /* 8 reconstruct single, and 12 reconstruct single, half, quarter */
+  QUDA_FLOAT8_GAUGE_ORDER = 8,  /* 8 reconstruct half and quarter */
+  QUDA_NATIVE_GAUGE_ORDER,      /* used to denote one of the above types in a trait, not used directly */
+  QUDA_QDP_GAUGE_ORDER,         /* expect *gauge[mu], even-odd, spacetime, row-column color */
+  QUDA_QDPJIT_GAUGE_ORDER,      /* expect *gauge[mu], even-odd, complex-column-row-spacetime */
+  QUDA_CPS_WILSON_GAUGE_ORDER,  /* expect *gauge, even-odd, mu, spacetime, column-row color */
+  QUDA_MILC_GAUGE_ORDER,        /* expect *gauge, even-odd, mu, spacetime, row-column order */
+  QUDA_MILC_SITE_GAUGE_ORDER,   /* packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside */
+  QUDA_BQCD_GAUGE_ORDER,        /* expect *gauge, mu, even-odd, spacetime+halos, column-row order */
+  QUDA_TIFR_GAUGE_ORDER,        /* expect *gauge, mu, even-odd, spacetime, column-row order */
+  QUDA_TIFR_PADDED_GAUGE_ORDER, /* expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order */
+  QUDA_OPENQCD_GAUGE_ORDER, /* expect *gauge, spacetime, mu, parity row-column order -- links attached to odd points only */
   QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
 } QudaGaugeFieldOrder;
 
@@ -69,24 +70,24 @@ typedef enum QudaPrecision_s {
 } QudaPrecision;
 
 typedef enum QudaReconstructType_s {
-  QUDA_RECONSTRUCT_NO = 18, // store all 18 real numbers explicitly
-  QUDA_RECONSTRUCT_12 = 12, // reconstruct from 12 real numbers
-  QUDA_RECONSTRUCT_8 = 8,   // reconstruct from 8 real numbers
-  QUDA_RECONSTRUCT_9 = 9,   // used for storing HISQ long-link variables
-  QUDA_RECONSTRUCT_13 = 13, // used for storing HISQ long-link variables
-  QUDA_RECONSTRUCT_10 = 10, // 10-number parameterization used for storing the momentum field
+  QUDA_RECONSTRUCT_NO = 18, /* store all 18 real numbers explicitly */
+  QUDA_RECONSTRUCT_12 = 12, /* reconstruct from 12 real numbers */
+  QUDA_RECONSTRUCT_8 = 8,   /* reconstruct from 8 real numbers */
+  QUDA_RECONSTRUCT_9 = 9,   /* used for storing HISQ long-link variables */
+  QUDA_RECONSTRUCT_13 = 13, /* used for storing HISQ long-link variables */
+  QUDA_RECONSTRUCT_10 = 10, /* 10-number parameterization used for storing the momentum field */
   QUDA_RECONSTRUCT_INVALID = QUDA_INVALID_ENUM
 } QudaReconstructType;
 
 typedef enum QudaGaugeFixed_s {
-  QUDA_GAUGE_FIXED_NO,  // no gauge fixing
-  QUDA_GAUGE_FIXED_YES, // gauge field stored in temporal gauge
+  QUDA_GAUGE_FIXED_NO,  /* no gauge fixing */
+  QUDA_GAUGE_FIXED_YES, /* gauge field stored in temporal gauge */
   QUDA_GAUGE_FIXED_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeFixed;
 
-//
-// Types used in QudaInvertParam
-//
+/**
+ * Types used in QudaInvertParam
+ */
 
 typedef enum QudaDslashType_s {
   QUDA_WILSON_DSLASH,
@@ -133,10 +134,10 @@ typedef enum QudaInverterType_s {
 } QudaInverterType;
 
 typedef enum QudaEigType_s {
-  QUDA_EIG_TR_LANCZOS,     // Thick restarted lanczos solver
-  QUDA_EIG_BLK_TR_LANCZOS, // Block Thick restarted lanczos solver
-  QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver
-  QUDA_EIG_BLK_IR_ARNOLDI, // Block Implicitly Restarted Arnoldi solver
+  QUDA_EIG_TR_LANCZOS,     /* Thick restarted lanczos solver */
+  QUDA_EIG_BLK_TR_LANCZOS, /* Block Thick restarted lanczos solver */
+  QUDA_EIG_IR_ARNOLDI,     /* Implicitly Restarted Arnoldi solver */
+  QUDA_EIG_BLK_IR_ARNOLDI, /* Block Implicitly Restarted Arnoldi solver */
   QUDA_EIG_INVALID = QUDA_INVALID_ENUM
 } QudaEigType;
 
@@ -169,8 +170,8 @@ typedef enum QudaSolveType_s {
   QUDA_NORMOP_PC_SOLVE,
   QUDA_NORMERR_SOLVE,
   QUDA_NORMERR_PC_SOLVE,
-  QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE,       // deprecated
-  QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, // deprecated
+  QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE,       /* deprecated */
+  QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, /* deprecated */
   QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
 } QudaSolveType;
 
@@ -189,33 +190,34 @@ typedef enum QudaSchwarzType_s {
 } QudaSchwarzType;
 
 typedef enum QudaAcceleratorType_s {
-  QUDA_MADWF_ACCELERATOR = 0, // Use the MADWF accelerator
+  QUDA_MADWF_ACCELERATOR = 0, /* Use the MADWF accelerator */
   QUDA_INVALID_ACCELERATOR = QUDA_INVALID_ENUM
 } QudaAcceleratorType;
 
 typedef enum QudaResidualType_s {
-  QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
-  QUDA_L2_ABSOLUTE_RESIDUAL = 2, // L2 absolute residual
-  QUDA_HEAVY_QUARK_RESIDUAL = 4, // Fermilab heavy quark residual
+  QUDA_L2_RELATIVE_RESIDUAL = 1, /* L2 relative residual (default) */
+  QUDA_L2_ABSOLUTE_RESIDUAL = 2, /* L2 absolute residual */
+  QUDA_HEAVY_QUARK_RESIDUAL = 4, /* Fermilab heavy quark residual */
   QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
 } QudaResidualType;
 
-// Which basis to use for CA algorithms
+/* Which basis to use for CA algorithms */
 typedef enum QudaCABasis_s {
   QUDA_POWER_BASIS,
   QUDA_CHEBYSHEV_BASIS,
   QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
 } QudaCABasis;
 
-// Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
-//
-// For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN
-// defaults to the "symmetric" form, (1 - k^2 A_ee^-1 D_eo A_oo^-1 D_oe),
-// and likewise for QUDA_MATPC_ODD_ODD.
-//
-// For the "asymmetric" form, (A_ee - k^2 D_eo A_oo^-1 D_oe), select
-// QUDA_MATPC_EVEN_EVEN_ASYMMETRIC.
-//
+/**
+ * Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
+ *
+ * For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN
+ * defaults to the "symmetric" form, (1 - k^2 A_ee^-1 D_eo A_oo^-1 D_oe),
+ * and likewise for QUDA_MATPC_ODD_ODD.
+ *
+ * For the "asymmetric" form, (A_ee - k^2 D_eo A_oo^-1 D_oe), select
+ * QUDA_MATPC_EVEN_EVEN_ASYMMETRIC.
+ */
 typedef enum QudaMatPCType_s {
   QUDA_MATPC_EVEN_EVEN,
   QUDA_MATPC_ODD_ODD,
@@ -234,35 +236,37 @@ typedef enum QudaMassNormalization_s {
 } QudaMassNormalization;
 
 typedef enum QudaSolverNormalization_s {
-  QUDA_DEFAULT_NORMALIZATION, // leave source and solution untouched
-  QUDA_SOURCE_NORMALIZATION   // normalize such that || src || = 1
+  QUDA_DEFAULT_NORMALIZATION, /* leave source and solution untouched */
+  QUDA_SOURCE_NORMALIZATION   /* normalize such that || src || = 1 */
 } QudaSolverNormalization;
 
 typedef enum QudaPreserveSource_s {
-  QUDA_PRESERVE_SOURCE_NO,  // use the source for the residual
-  QUDA_PRESERVE_SOURCE_YES, // keep the source intact
+  QUDA_PRESERVE_SOURCE_NO,  /* use the source for the residual */
+  QUDA_PRESERVE_SOURCE_YES, /* keep the source intact */
   QUDA_PRESERVE_SOURCE_INVALID = QUDA_INVALID_ENUM
 } QudaPreserveSource;
 
 typedef enum QudaDiracFieldOrder_s {
-  QUDA_INTERNAL_DIRAC_ORDER,    // internal dirac order used, varies on precision and dslash type
-  QUDA_DIRAC_ORDER,             // even-odd, color inside spin
-  QUDA_QDP_DIRAC_ORDER,         // even-odd, spin inside color
-  QUDA_QDPJIT_DIRAC_ORDER,      // even-odd, complex-color-spin-spacetime
-  QUDA_CPS_WILSON_DIRAC_ORDER,  // odd-even, color inside spin
-  QUDA_LEX_DIRAC_ORDER,         // lexicographical order, color inside spin
-  QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
+  QUDA_INTERNAL_DIRAC_ORDER,    /* internal dirac order used, varies on precision and dslash type */
+  QUDA_DIRAC_ORDER,             /* even-odd, color inside spin */
+  QUDA_QDP_DIRAC_ORDER,         /* even-odd, spin inside color */
+  QUDA_QDPJIT_DIRAC_ORDER,      /* even-odd, complex-color-spin-spacetime */
+  QUDA_CPS_WILSON_DIRAC_ORDER,  /* odd-even, color inside spin */
+  QUDA_LEX_DIRAC_ORDER,         /* lexicographical order, color inside spin */
+  QUDA_TIFR_PADDED_DIRAC_ORDER, /* padded z dimension for TIFR RHMC code */
+  QUDA_OPENQCD_DIRAC_ORDER,     /* openqcd */
   QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
 } QudaDiracFieldOrder;
 
 typedef enum QudaCloverFieldOrder_s {
-  QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
-  QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
-  QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
-  QUDA_FLOAT8_CLOVER_ORDER = 8, // even-odd float8 ordering
-  QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
-  QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
-  QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
+  QUDA_FLOAT_CLOVER_ORDER = 1,  /* even-odd float ordering */
+  QUDA_FLOAT2_CLOVER_ORDER = 2, /* even-odd float2 ordering */
+  QUDA_FLOAT4_CLOVER_ORDER = 4, /* even-odd float4 ordering */
+  QUDA_FLOAT8_CLOVER_ORDER = 8, /* even-odd float8 ordering */
+  QUDA_PACKED_CLOVER_ORDER,     /* even-odd, QDP packed */
+  QUDA_QDPJIT_CLOVER_ORDER,     /* (diagonal / off-diagonal)-chirality-spacetime */
+  QUDA_BQCD_CLOVER_ORDER,       /* even-odd, super-diagonal packed and reordered */
+  QUDA_OPENQCD_CLOVER_ORDER,    /* openqcd */
   QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
 } QudaCloverFieldOrder;
 
@@ -282,15 +286,15 @@ typedef enum QudaPreserveDirac_s {
   QUDA_PRESERVE_DIRAC_INVALID = QUDA_INVALID_ENUM
 } QudaPreserveDirac;
 
-//
-// Type used for "parity" argument to dslashQuda()
-//
+/**
+ * Type used for "parity" argument to dslashQuda()
+ */
 
 typedef enum QudaParity_s { QUDA_EVEN_PARITY = 0, QUDA_ODD_PARITY, QUDA_INVALID_PARITY = QUDA_INVALID_ENUM } QudaParity;
 
-//
-// Types used only internally
-//
+/**
+ * Types used only internally
+ */
 
 typedef enum QudaDiracType_s {
   QUDA_WILSON_DIRAC,
@@ -325,48 +329,49 @@ typedef enum QudaDiracType_s {
   QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
 } QudaDiracType;
 
-// Where the field is stored
+/* Where the field is stored */
 typedef enum QudaFieldLocation_s {
   QUDA_CPU_FIELD_LOCATION = 1,
   QUDA_CUDA_FIELD_LOCATION = 2,
   QUDA_INVALID_FIELD_LOCATION = QUDA_INVALID_ENUM
 } QudaFieldLocation;
 
-// Which sites are included
+/* Which sites are included */
 typedef enum QudaSiteSubset_s {
   QUDA_PARITY_SITE_SUBSET = 1,
   QUDA_FULL_SITE_SUBSET = 2,
   QUDA_INVALID_SITE_SUBSET = QUDA_INVALID_ENUM
 } QudaSiteSubset;
 
-// Site ordering (always t-z-y-x, with rightmost varying fastest)
+/* Site ordering (always t-z-y-x, with rightmost varying fastest) */
 typedef enum QudaSiteOrder_s {
-  QUDA_LEXICOGRAPHIC_SITE_ORDER, // lexicographic ordering
-  QUDA_EVEN_ODD_SITE_ORDER,      // QUDA and QDP use this
-  QUDA_ODD_EVEN_SITE_ORDER,      // CPS uses this
+  QUDA_LEXICOGRAPHIC_SITE_ORDER, /* lexicographic ordering */
+  QUDA_EVEN_ODD_SITE_ORDER,      /* QUDA and QDP use this */
+  QUDA_ODD_EVEN_SITE_ORDER,      /* CPS uses this */
   QUDA_INVALID_SITE_ORDER = QUDA_INVALID_ENUM
 } QudaSiteOrder;
 
-// Degree of freedom ordering
+/* Degree of freedom ordering */
 typedef enum QudaFieldOrder_s {
-  QUDA_FLOAT_FIELD_ORDER = 1,               // spin-color-complex-space
-  QUDA_FLOAT2_FIELD_ORDER = 2,              // (spin-color-complex)/2-space-(spin-color-complex)%2
-  QUDA_FLOAT4_FIELD_ORDER = 4,              // (spin-color-complex)/4-space-(spin-color-complex)%4
-  QUDA_FLOAT8_FIELD_ORDER = 8,              // (spin-color-complex)/8-space-(spin-color-complex)%8
-  QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,        // CPS/QDP++ ordering
-  QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,        // QLA ordering (spin inside color)
-  QUDA_QDPJIT_FIELD_ORDER,                  // QDP field ordering (complex-color-spin-spacetime)
-  QUDA_QOP_DOMAIN_WALL_FIELD_ORDER,         // QOP domain-wall ordering
-  QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
+  QUDA_FLOAT_FIELD_ORDER = 1,               /* spin-color-complex-space */
+  QUDA_FLOAT2_FIELD_ORDER = 2,              /* (spin-color-complex)/2-space-(spin-color-complex)%2 */
+  QUDA_FLOAT4_FIELD_ORDER = 4,              /* (spin-color-complex)/4-space-(spin-color-complex)%4 */
+  QUDA_FLOAT8_FIELD_ORDER = 8,              /* (spin-color-complex)/8-space-(spin-color-complex)%8 */
+  QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,        /* CPS/QDP++ ordering */
+  QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,        /* QLA ordering (spin inside color) */
+  QUDA_QDPJIT_FIELD_ORDER,                  /* QDP field ordering (complex-color-spin-spacetime) */
+  QUDA_QOP_DOMAIN_WALL_FIELD_ORDER,         /* QOP domain-wall ordering */
+  QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, /* TIFR RHMC ordering */
+  QUDA_OPENQCD_FIELD_ORDER,                 /* OPENQCD ordering */
   QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
 } QudaFieldOrder;
 
 typedef enum QudaFieldCreate_s {
-  QUDA_NULL_FIELD_CREATE,      // new field
-  QUDA_ZERO_FIELD_CREATE,      // new field and zero it
-  QUDA_COPY_FIELD_CREATE,      // copy to field
-  QUDA_REFERENCE_FIELD_CREATE, // reference to field
-  QUDA_GHOST_FIELD_CREATE,     // dummy field used only for ghost storage
+  QUDA_NULL_FIELD_CREATE,      /* new field */
+  QUDA_ZERO_FIELD_CREATE,      /* new field and zero it */
+  QUDA_COPY_FIELD_CREATE,      /* copy to field */
+  QUDA_REFERENCE_FIELD_CREATE, /* reference to field */
+  QUDA_GHOST_FIELD_CREATE,     /* dummy field used only for ghost storage */
   QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
 } QudaFieldCreate;
 
@@ -374,6 +379,7 @@ typedef enum QudaGammaBasis_s {
   QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
   QUDA_UKQCD_GAMMA_BASIS,
   QUDA_CHIRAL_GAMMA_BASIS,
+  QUDA_OPENQCD_GAMMA_BASIS,
   QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM
 } QudaGammaBasis;
 
@@ -401,14 +407,14 @@ typedef enum QudaDilutionType_s {
   QUDA_DILUTION_INVALID = QUDA_INVALID_ENUM
 } QudaDilutionType;
 
-// used to select projection method for deflated solvers
+/* used to select projection method for deflated solvers */
 typedef enum QudaProjectionType_s {
   QUDA_MINRES_PROJECTION,
   QUDA_GALERKIN_PROJECTION,
   QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
 } QudaProjectionType;
 
-// used to select checkerboard preconditioning method
+/* used to select checkerboard preconditioning method */
 typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QUDA_INVALID_ENUM } QudaPCType;
 
 typedef enum QudaTwistFlavorType_s {
@@ -477,7 +483,7 @@ typedef enum QudaBoolean_s {
   QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
 } QudaBoolean;
 
-// define these for backwards compatibility
+/* define these for backwards compatibility */
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
@@ -488,17 +494,17 @@ typedef enum QudaBLASType_s {
 } QudaBLASType;
 
 typedef enum QudaBLASOperation_s {
-  QUDA_BLAS_OP_N = 0, // No transpose
-  QUDA_BLAS_OP_T = 1, // Transpose only
-  QUDA_BLAS_OP_C = 2, // Conjugate transpose
+  QUDA_BLAS_OP_N = 0, /* No transpose */
+  QUDA_BLAS_OP_T = 1, /* Transpose only */
+  QUDA_BLAS_OP_C = 2, /* Conjugate transpose */
   QUDA_BLAS_OP_INVALID = QUDA_INVALID_ENUM
 } QudaBLASOperation;
 
 typedef enum QudaBLASDataType_s {
-  QUDA_BLAS_DATATYPE_S = 0, // Single
-  QUDA_BLAS_DATATYPE_D = 1, // Double
-  QUDA_BLAS_DATATYPE_C = 2, // Complex(single)
-  QUDA_BLAS_DATATYPE_Z = 3, // Complex(double)
+  QUDA_BLAS_DATATYPE_S = 0, /* Single */
+  QUDA_BLAS_DATATYPE_D = 1, /* Double */
+  QUDA_BLAS_DATATYPE_C = 2, /* Complex(single) */
+  QUDA_BLAS_DATATYPE_Z = 3, /* Complex(double) */
   QUDA_BLAS_DATATYPE_INVALID = QUDA_INVALID_ENUM
 } QudaBLASDataType;
 
@@ -522,7 +528,7 @@ typedef enum QudaFieldGeometry_s {
   QUDA_VECTOR_GEOMETRY = 4,
   QUDA_TENSOR_GEOMETRY = 6,
   QUDA_COARSE_GEOMETRY = 8,
-  QUDA_KDINVERSE_GEOMETRY = 16, // Decomposition of Kahler-Dirac block
+  QUDA_KDINVERSE_GEOMETRY = 16, /* Decomposition of Kahler-Dirac block */
   QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
 } QudaFieldGeometry;
 
@@ -542,8 +548,8 @@ typedef enum QudaStaggeredPhase_s {
 } QudaStaggeredPhase;
 
 typedef enum QudaContractType_s {
-  QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
-  QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+  QUDA_CONTRACT_TYPE_OPEN, /* Open spin elementals */
+  QUDA_CONTRACT_TYPE_DR,   /* DegrandRossi */
   QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaContractType;
 
@@ -583,7 +589,7 @@ typedef enum QudaFermionSmearType_s {
   QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaFermionSmearType;
 
-// Allows to choose an appropriate external library
+/* Allows to choose an appropriate external library */
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
   QUDA_EIGEN_EXTLIB,
@@ -593,4 +599,3 @@ typedef enum QudaExtLibType_s {
 #ifdef __cplusplus
 }
 #endif
-
