@@ -1294,6 +1294,92 @@ namespace quda
       size_t Bytes() const { return bytes; }
     };
 
+    template <int N, bool spin_project, bool huge_alloc>
+    struct GhostNOrder<short, 1, 3, N, spin_project, huge_alloc, false> {
+      using Float = short;
+      static constexpr int Ns = 1;
+      static constexpr int Nc = 3;
+      static constexpr int length_ghost = 2 * Ns * Nc;
+      using GhostVector = int4; // 128-bit packed type
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+      using norm_type = float;
+      int nParity;
+      array<int, 4> faceVolumeCB = {};
+      mutable array<Float *, 8> ghost = {};
+      mutable array<norm_type *, 8> ghost_norm = {};
+
+      GhostNOrder() = default;
+      GhostNOrder(const GhostNOrder &) = default;
+
+      GhostNOrder(const ColorSpinorField &a, int nFace = 1, Float **ghost_ = 0) : nParity(a.SiteSubset())
+      {
+        for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
+        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+      }
+
+      GhostNOrder &operator=(const GhostNOrder &) = default;
+
+      void resetGhost(void *const *ghost_) const
+      {
+        for (int dim = 0; dim < 4; dim++) {
+          for (int dir = 0; dir < 2; dir++) {
+            ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
+          }
+        }
+      }
+
+      __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
+      {
+        real v[length_ghost];
+        GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
+
+        // extract the norm
+        norm_type nrm;
+        memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
+
+#pragma unroll
+        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+      }
+
+      __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
+                                                int parity = 0) const
+      {
+        real v[length_ghost];
+
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) {
+          v[2 * i + 0] = in[i].real();
+          v[2 * i + 1] = in[i].imag();
+        }
+
+        norm_type max_[length_ghost / 2];
+        // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++)
+          max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length_ghost / 2]));
+        norm_type scale = 0.0;
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
+        norm_type nrm = scale * fixedInvMaxValue<Float>::value;
+
+        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+#pragma unroll
+        for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
+
+        GhostVector vecTmp;
+        memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
+
+        // pack the spinor elements
+#pragma unroll
+        for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+        vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
+      }
+    };
+
     /**
        @brief Accessor routine for ColorSpinorFields in native field
        order.  Specialization for half-precision staggered QCD fields
@@ -1305,26 +1391,22 @@ namespace quda
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
     template <int N_, bool spin_project, bool huge_alloc, bool disable_ghost>
-    struct FloatNOrder<short, 1, 3, N_, spin_project, huge_alloc, disable_ghost> {
+    struct FloatNOrder<short, 1, 3, N_, spin_project, huge_alloc, disable_ghost>
+      : GhostNOrder<short, 1, 3, N_, spin_project, huge_alloc, disable_ghost> {
       using Float = short;
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
       static constexpr int length = 2 * Ns * Nc;
-      static constexpr int length_ghost = 2 * Ns * Nc;
       using Accessor = FloatNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using Vector = int4;      // 128-bit packed type
-      using GhostVector = int4; // 128-bit packed type
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
-      const AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      AllocInt offset = 0; // offset can be 32-bit or 64-bit
       int volumeCB = 0;
-      array<int, 4> faceVolumeCB = {};
-      mutable array<Float *, 8> ghost = {};
-      int nParity = 0;
       size_t bytes = 0;
 
       FloatNOrder() = default;
@@ -1335,23 +1417,11 @@ namespace quda
         field(buffer ? buffer : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Vector))),
         volumeCB(a.VolumeCB()),
-        nParity(a.SiteSubset()),
         bytes(a.Bytes())
       {
-        for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
-        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
       }
 
       FloatNOrder &operator=(const FloatNOrder &) = default;
-
-      void resetGhost(void *const *ghost_) const
-      {
-        for (int dim = 0; dim < 4; dim++) {
-          for (int dir = 0; dir < 2; dir++) {
-            ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
-          }
-        }
-      }
 
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
@@ -1416,56 +1486,6 @@ namespace quda
       __device__ __host__ inline auto operator()(int x_cb, int parity) const
       {
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-      }
-
-      __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
-      {
-        real v[length_ghost];
-        GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
-
-        // extract the norm
-        norm_type nrm;
-        memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
-
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
-
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
-      }
-
-      __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
-                                                int parity = 0) const
-      {
-        real v[length_ghost];
-
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) {
-          v[2 * i + 0] = in[i].real();
-          v[2 * i + 1] = in[i].imag();
-        }
-
-        norm_type max_[length_ghost / 2];
-        // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++)
-          max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length_ghost / 2]));
-        norm_type scale = 0.0;
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
-        norm_type nrm = scale * fixedInvMaxValue<Float>::value;
-
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
-
-        GhostVector vecTmp;
-        memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
-
-        // pack the spinor elements
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
-        vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
 
       /**
