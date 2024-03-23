@@ -11,10 +11,30 @@ using namespace quda;
 // Delclaration of function in interface_quda.cpp
 TimeProfile &getProfileSinkProject();
 
+static void check_param(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
+                        int n_evec, int tile_evec, QudaInvertParam *inv_param, const int X[4])
+{
+  if (host_sinks == nullptr) errorQuda("Invalid host_sink ptr");
+  if (host_quark == nullptr) errorQuda("Invalid host_quark ptr");
+  for (auto i = 0; i < n_quark; i++)
+    if (host_quark[i] == nullptr) errorQuda("Invalid host_quark[%d] ptr", i);
+  if (tile_quark < 1) errorQuda("Invalid tiling parameter %d (must be positive)", tile_quark);
+  if (host_evec == nullptr) errorQuda("Invalid host_evec ptr");
+  for (auto i = 0; i < n_evec; i++)
+    if (host_evec[i] == nullptr) errorQuda("Invalid host_evec[%d] ptr", i);
+  if (tile_evec < 1) errorQuda("Invalid tiling parameter %d (must be positive)", tile_evec);
+  if (inv_param == nullptr) errorQuda("Invalid QudaInvertParam ptr");
+  for (int i = 0; i < 4; i++)
+    if (X[i] < 1 || X[i] > 512) errorQuda("Invalid lattice dimension %d", i);
+}
+
 void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark,
                      void **host_evec, int n_evec, int tile_evec, QudaInvertParam *inv_param, const int X[4])
 {
   auto profile = pushProfile(getProfileSinkProject(), inv_param->secs, inv_param->gflops);
+
+  // check parameters are valid
+  check_param(host_sinks, host_quark, n_quark, tile_quark, host_evec, n_evec, tile_evec, inv_param, X);
 
   // Parameter object describing the sources and smeared quarks
   lat_dim_t x = {X[0], X[1], X[2], X[3]};
