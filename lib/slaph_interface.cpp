@@ -52,21 +52,27 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
   std::vector<Complex> hostSink(n_quark * n_evec * Lt * 4);
 
   for (auto i = 0; i < n_quark; i += tile_quark) { // iterate over all quarks
-    for (auto tq = 0; tq < tile_quark && i + tq < n_quark; tq++) quda_quark[tq] = quark[i + tq];
+    auto tile_i = std::min(tile_quark, n_quark - i);                     // handle remainder here
+    for (auto tq = 0; tq < tile_i; tq++) quda_quark[tq] = quark[i + tq]; // download quarks
 
     for (auto j = 0; j < n_evec; j += tile_evec) { // iterate over all EV
-      for (auto te = 0; te < tile_evec && j + te < n_evec; te++) quda_evec[te] = evec[j + te];
+      auto tile_j = std::min(tile_evec, n_evec - j);                     // handle remainder here
+      for (auto te = 0; te < tile_j; te++) quda_evec[te] = evec[j + te]; // download evecs
 
-      for (auto tq = 0; tq < tile_quark && i + tq < n_quark; tq++) {
-        for (auto te = 0; te < tile_evec && j + te < n_evec; te++) {
-          std::vector<Complex> tmp(Lt * 4);
+      std::vector<Complex> tmp(tile_i * tile_j * x[3] * 4);
 
-          // We now perform the projection onto the eigenspace. The data
-          // is placed in host_sinks in  T, spin order
-          evecProjectLaplace3D(tmp, quda_quark[tq], quda_evec[te]);
+      // We now perform the projection onto the eigenspace. The data
+      // is placed in host_sinks in  T, spin order
+      evecProjectLaplace3D(tmp, {quda_quark.begin(), quda_quark.begin() + tile_i},
+                           {quda_evec.begin(), quda_evec.begin() + tile_j});
 
-          for (auto k = 0u; k < tmp.size(); k++)
-            hostSink[((i + tq) * n_evec + (j + te)) * 4 * Lt + k] = tmp[k];
+      for (auto tq = 0; tq < tile_i; tq++) {
+        for (auto te = 0; te < tile_j; te++) {
+          for (auto t = 0; t < x[3]; t++) {
+            for (auto s = 0u; s < 4; s++) {
+              hostSink[(((i + tq) * n_evec + (j + te)) * Lt + t) * 4 + s] = tmp[((tq * tile_j + te) * x[3] + t) * 4 + s];
+            }
+          }
         }
       }
     }
