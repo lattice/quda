@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "instantiate.h"
 #include "test.h"
 
 /*
@@ -10,7 +11,7 @@
   focus is eigen-vector projection
  */
 
-using test_t = std::tuple<int, int, int, int>;
+using test_t = std::tuple<QudaPrecision, int, int, int, int>;
 
 using ::testing::Combine;
 using ::testing::get;
@@ -23,19 +24,20 @@ struct LaphTest : ::testing::TestWithParam<test_t> {
 
 auto laph_test(test_t param)
 {
-  int nSink = get<0>(param);
-  int nEv = get<1>(param);
-  int tileSink = get<2>(param);
-  int tileEv = get<3>(param);
-
   using namespace quda;
+
+  QudaPrecision precision = get<0>(param);
+  int nSink = get<1>(param);
+  int nEv = get<2>(param);
+  int tileSink = get<3>(param);
+  int tileEv = get<4>(param);
 
   constexpr int nSpin = 4;
   constexpr int nColor = 3;
 
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  invParam.cuda_prec = cuda_prec;
+  invParam.cuda_prec = precision;
   invParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invParam.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -129,9 +131,15 @@ auto laph_test(test_t param)
   return rtn;
 }
 
-TEST_P(LaphTest, verify) { laph_test(GetParam()); }
+TEST_P(LaphTest, verify)
+{
+  if (!quda::is_enabled(get<0>(GetParam()))) GTEST_SKIP();
+  laph_test(GetParam());
+}
 
-INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest, Combine(Values(1, 4, 64), Values(768), Values(4), Values(256)),
+INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(1, 4, 64), Values(768),
+                                 Values(4), Values(256)),
                          [](testing::TestParamInfo<test_t> param) {
                            return std::to_string(get<0>(param.param)) + "_" + std::to_string(get<1>(param.param)) + "_"
                              + std::to_string(get<2>(param.param)) + "_" + std::to_string(get<3>(param.param));
@@ -146,7 +154,7 @@ int main(int argc, char **argv)
   if (enable_testing) {
     result = test.execute();
   } else {
-    result = laph_test({Msrc, Nsrc, Msrc_tile, Nsrc_tile});
+    result = laph_test({cuda_prec, Msrc, Nsrc, Msrc_tile, Nsrc_tile});
   }
 
   return result;

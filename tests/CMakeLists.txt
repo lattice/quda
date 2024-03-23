@@ -1432,6 +1432,14 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 endforeach(prec)
 
+if (QUDA_LAPLACE AND QUDA_DIRAC_WILSON)
+  add_test(NAME laph_test
+           COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:laph_test> ${MPIEXEC_POSTFLAGS}
+           --dim 2 4 6 8
+           --enable-testing true
+           --gtest_output=xml:laph_test.xml)
+endif()
+
 
 if(QUDA_DIRAC_STAGGERED)
   add_test(NAME hisq_stencil
