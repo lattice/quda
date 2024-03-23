@@ -1058,6 +1058,7 @@ namespace quda
       GhostNOrder() = default;
       GhostNOrder(const GhostNOrder &) = default;
       GhostNOrder(const ColorSpinorField &, int = 1, Float ** = 0) { }
+      GhostNOrder &operator=(const GhostNOrder &) = default;
     };
 
     template <typename Float, int Ns, int Nc, int N, bool spin_project, bool huge_alloc>
@@ -1084,6 +1085,8 @@ namespace quda
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
         resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
       }
+
+      GhostNOrder &operator=(const GhostNOrder &) = default;
 
       void resetGhost(void *const *ghost_) const
       {

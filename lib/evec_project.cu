@@ -30,15 +30,15 @@ namespace quda
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       EvecProjectionArg<Float, nColor> arg(x, y);
       launch<EvecProjection>(result, tp, stream, arg);
     }
 
-    long long flops() const { return 8 * x.size() * y.size() * x.Nspin() * x.Ncolor() * x.Volume(); }
-    long long bytes() const { return x.Bytes() * y.size() + y.Bytes() * x.size(); }
+    long long flops() const override { return 8 * x.size() * y.size() * x.Nspin() * x.Ncolor() * x.Volume(); }
+    long long bytes() const override { return x.Bytes() * y.size() + y.Bytes() * x.size(); }
   };
 
   void evecProjectLaplace3D(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
