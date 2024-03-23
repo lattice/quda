@@ -3,13 +3,16 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <quda_matrix.h>
-#include <matrix_field.h>
-#include <kernel.h>
+#include <constant_kernel_arg.h>
+#include <reduce_helper.h>
+#include <reduction_kernel.h>
 
 namespace quda {
   
   using spinor_array = array<double, 8>;
+
+  constexpr unsigned long max_nx = 4;
+  constexpr unsigned long max_ny = 4;
 
   template <typename Float, int nColor_>
   struct EvecProjectionArg : public ReduceArg<spinor_array>
@@ -18,23 +21,28 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr int nSpinX = 4;
     static constexpr int nSpinY = 1;
-    static constexpr bool spin_project = true;
-    static constexpr bool spinor_direct_load = false; // false means texture load
 
-    typedef typename colorspinor_mapper<Float, nSpinX, nColor, spin_project, spinor_direct_load>::type F4;    
-    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, spinor_direct_load>::type F1;
+    typedef typename colorspinor_mapper<Float, nSpinX, nColor, false, false, true>::type F4;
+    typedef typename colorspinor_mapper<Float, nSpinY, nColor, false, false, true>::type F1;
     
-    F4 x;
-    F1 y;
+    static constexpr unsigned int max_n_batch_block = 8;
+    int_fastdiv nx;
+    int_fastdiv ny;
+    F4 x[max_nx];
+    F1 y[max_ny];
 
     int_fastdiv X[4]; // grid dimensions
     
-    EvecProjectionArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<spinor_array>(dim3(x.Volume()/x.X()[3], 1, x.X()[3]), x.X()[3]),
-      x(x),
-      y(y)
+    EvecProjectionArg(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y) :
+      ReduceArg<spinor_array>(dim3(x.Volume()/x[0].X()[3], 1, x.size() * y.size() * x[0].X()[3]),
+                              x.size() * y.size() * x[0].X()[3]),
+      nx(x.size()), ny(y.size())
     {
-      for (int i = 0 ; i < 4; i++) X[i] = x.X()[i];
+      if (x.size() > max_nx) errorQuda("Requested vector size %lu greater than max %lu", x.size(), max_nx);
+      if (y.size() > max_ny) errorQuda("Requested vector size %lu greater than max %lu", y.size(), max_ny);
+      for (int i = 0 ; i < 4; i++) X[i] = x[0].X()[i];
+      for (auto i = 0u; i < x.size(); i++) this->x[i] = x[i];
+      for (auto i = 0u; i < y.size(); i++) this->y[i] = y[i];
     }
     __device__ __host__ spinor_array init() const { return spinor_array(); }
   };
@@ -46,7 +54,7 @@ namespace quda {
     for (int d = 0; d < 4; d++) {
       if (d != reduction_dim) {
 	x[d] = xyz % X[d];
-	xyz /= X[d];
+	xyz = xyz / X[d];
       }
     }    
     x[reduction_dim] = t;    
@@ -65,8 +73,13 @@ namespace quda {
     template <typename U> static inline void comm_reduce(U &) { }
     
     // Final param is unused in the MultiReduce functor in this use case.
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int ijt)
     {
+      int i = ijt % arg.nx;
+      int jt = ijt / arg.nx;
+      int j = jt % arg.ny;
+      int t = jt / arg.ny;
+
       constexpr int nSpinX = Arg::nSpinX;
       constexpr int nSpinY = Arg::nSpinY;
       constexpr int nColor = Arg::nColor;
@@ -82,8 +95,8 @@ namespace quda {
       // This helper will change the value of 'parity' to the correct one, 
       // and return the checkerboard index.
       int idx_cb = getParityCBFromFull(parity, arg.X, idx);
-      Vector4 x = arg.x(idx_cb, parity);
-      Vector1 y = arg.y(idx_cb, parity);
+      Vector4 x = arg.x[i](idx_cb, parity);
+      Vector1 y = arg.y[j](idx_cb, parity);
 
       // Compute the inner product over colour
       reduce_t result_local;
