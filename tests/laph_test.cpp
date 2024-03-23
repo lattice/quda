@@ -12,22 +12,22 @@
 
 using test_t = std::tuple<int, int, int, int>;
 
-struct LaphTest : ::testing::TestWithParam<test_t> {
-  int nSink;
-  int nEv;
-  int tileSink;
-  int tileEv;
+using ::testing::Combine;
+using ::testing::get;
+using ::testing::Values;
 
-  LaphTest() :
-    nSink(std::get<0>(GetParam())),
-    nEv(std::get<1>(GetParam())),
-    tileSink(std::get<2>(GetParam())),
-    tileEv(std::get<3>(GetParam()))
-  { }
+struct LaphTest : ::testing::TestWithParam<test_t> {
+  test_t param;
+  LaphTest() : param(GetParam()) { }
 };
 
-TEST_P(LaphTest, verify)
+auto laph_test(test_t param)
 {
+  int nSink = get<0>(param);
+  int nEv = get<1>(param);
+  int tileSink = get<2>(param);
+  int tileEv = get<3>(param);
+
   using namespace quda;
 
   constexpr int nSpin = 4;
@@ -115,26 +115,39 @@ TEST_P(LaphTest, verify)
                   (void **)evPtr, nEv, tileEv, &invParam, X);
   printfQuda("laphSinkProject Done: %g secs, %g Gflops\n", invParam.secs, invParam.gflops / invParam.secs);
 
-  // check solutions
   auto tol = getTolerance(cuda_prec);
-  for (unsigned int iEl = 0; iEl < qudaRes.size(); ++iEl) {
-    auto deviation = abs(qudaRes[iEl] - hostRes[iEl]);
+  int rtn = 0;
+  for (unsigned int i = 0; i < qudaRes.size(); i++) {
+    auto deviation = abs(qudaRes[i] - hostRes[i]) / abs(hostRes[i]);
     if (deviation > tol) {
-      printfQuda("EV projection test failed at iEl=%d: (%f,%f) [QUDA], (%f,%f) [host]\n", iEl, qudaRes[iEl].real(),
-                 qudaRes[iEl].imag(), hostRes[iEl].real(), hostRes[iEl].imag());
+      printfQuda("EV projection test failed at iEl=%d: (%f,%f) [QUDA], (%f,%f) [host]\n", i, qudaRes[i].real(),
+                 qudaRes[i].imag(), hostRes[i].real(), hostRes[i].imag());
+      EXPECT_LE(deviation, tol);
+      rtn = 1;
     }
-    EXPECT_LE(deviation, tol);
   }
+  return rtn;
 }
 
-using ::testing::Combine;
-using ::testing::Values;
+TEST_P(LaphTest, verify) { laph_test(GetParam()); }
 
-INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest, Combine(Values(4), Values(768), Values(4), Values(768)));
+INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest, Combine(Values(1, 4, 64), Values(768), Values(4), Values(256)),
+                         [](testing::TestParamInfo<test_t> param) {
+                           return std::to_string(get<0>(param.param)) + "_" + std::to_string(get<1>(param.param)) + "_"
+                             + std::to_string(get<2>(param.param)) + "_" + std::to_string(get<3>(param.param));
+                         });
 
 int main(int argc, char **argv)
 {
   quda_test test("laph_test", argc, argv);
   test.init();
-  test.execute();
+
+  int result = 0;
+  if (enable_testing) {
+    result = test.execute();
+  } else {
+    result = laph_test({Msrc, Nsrc, Msrc_tile, Nsrc_tile});
+  }
+
+  return result;
 }
