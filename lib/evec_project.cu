@@ -11,15 +11,15 @@ namespace quda
   {
     cvector_ref<const ColorSpinorField> &x;
     cvector_ref<const ColorSpinorField> &y;
-    std::vector<Complex> &result;
+    std::vector<double> &result;
     bool tuneSharedBytes() const override { return false; }
 
   public:
     EvecProjectLaplace3D(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
-                         std::vector<Complex> &result) :
+                         std::vector<double> &result) :
       TunableMultiReduction(x[0], 1, x.size() * y.size() * x[0].X()[3], 8), x(x), y(y), result(result)
     {
-      assert(result.size() == x.Nspin() * x[0].X()[3] * x.size() * y.size());
+      assert(result.size() == 2 * x.Nspin() * x[0].X()[3] * x.size() * y.size());
       strcat(aux, ",nx=");
       char rhs_str[16];
       i32toa(rhs_str, x.size());
@@ -33,27 +33,8 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-      auto Lt = x[0].X()[3];
-      std::vector<double> result_local(2 * x.Nspin() * Lt * x.size() * y.size());
-
       EvecProjectionArg<Float, nColor> arg(x, y);
-      launch<EvecProjection>(result_local, tp, stream, arg);
-
-      // now reassemble global array
-      if (!activeTuning()) {
-        for (auto i = 0u; i < x.size(); i++) {
-          for (auto j = 0u; j < y.size(); j++) {
-            for (int t = 0; t < Lt; t++) {
-              for (int s = 0; s < 4; s++) {
-                result[((i * y.size() + j) * Lt + t) * 4 + s]
-                  = {result_local[(((t * y.size() + j) * x.size() + i) * 4 + s) * 2 + 0],
-                     result_local[(((t * y.size() + j) * x.size() + i) * 4 + s) * 2 + 1]};
-              }
-            }
-          }
-        }
-      }
+      launch<EvecProjection>(result, tp, stream, arg);
     }
 
     long long flops() const { return 8 * x.size() * y.size() * x.Nspin() * x.Ncolor() * x.Volume(); }
@@ -76,7 +57,7 @@ namespace quda
         // compute remainder here
         auto tile_x = std::min(max_nx, x.size() - tx);
         auto tile_y = std::min(max_ny, y.size() - ty);
-        std::vector<Complex> result_tile(x.Nspin() * Lt * tile_x * tile_y);
+        std::vector<double> result_tile(2 * x.Nspin() * Lt * tile_x * tile_y);
 
         instantiate<EvecProjectLaplace3D>(cvector_ref<const ColorSpinorField> {x.begin() + tx, x.begin() + tx + tile_x},
                                           cvector_ref<const ColorSpinorField> {y.begin() + ty, y.begin() + ty + tile_y},
@@ -87,7 +68,8 @@ namespace quda
             for (auto t = 0; t < Lt; t++) {
               for (auto s = 0u; s < 4; s++) {
                 result[(((tx + i) * y.size() + (ty + j)) * Lt + t) * 4 + s]
-                  = result_tile[((i * tile_y + j) * Lt + t) * 4 + s];
+                  = {result_tile[(((t * tile_y + j) * tile_x + i) * 4 + s) * 2 + 0],
+                     result_tile[(((t * tile_y + j) * tile_x + i) * 4 + s) * 2 + 1]};
               }
             }
           }
