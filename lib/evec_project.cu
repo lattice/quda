@@ -19,7 +19,6 @@ namespace quda
                          std::vector<double> &result) :
       TunableMultiReduction(x[0], 1, x.size() * y.size() * x[0].X()[3], 8), x(x), y(y), result(result)
     {
-      assert(result.size() == 2 * x.Nspin() * x[0].X()[3] * x.size() * y.size());
       strcat(aux, ",nx=");
       char rhs_str[16];
       i32toa(rhs_str, x.size());
