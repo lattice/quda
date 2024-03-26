@@ -36,6 +36,9 @@ namespace quda
       }
     }
 
+    virtual int blockStep() const override { return 8; }
+    virtual int blockMin() const override { return 8; }
+
   public:
     DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
       Dslash(arg, out, in, get_app_base())
@@ -64,7 +67,6 @@ namespace quda
     void initTuneParam(TuneParam &param) const
     {
       Dslash::initTuneParam(param);
-
       param.block.y = arg.Ls; // Ls must be contained in the block
       param.grid.y = 1;
       param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
