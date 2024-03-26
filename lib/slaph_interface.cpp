@@ -89,8 +89,10 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
       for (auto tq = 0; tq < tile_i; tq++) {
         for (auto te = 0; te < tile_j; te++) {
           for (auto t = 0; t < x[3]; t++) {
-            for (auto s = 0u; s < 4; s++) {
-              hostSink[(((i + tq) * n_evec + (j + te)) * Lt + t) * 4 + s] = tmp[((tq * tile_j + te) * x[3] + t) * 4 + s];
+            auto t_global = X[3] * comm_coord(3) + t;
+            for (auto s = 0; s < 4; s++) {
+              hostSink[(((i + tq) * n_evec + (j + te)) * Lt + t_global) * 4 + s] =
+                tmp[((tq * tile_j + te) * x[3] + t) * 4 + s];
             }
           }
         }
