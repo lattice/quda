@@ -90,6 +90,17 @@ namespace quda {
     constexpr MomUpdate(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
+#ifdef QUDA_TARGET_OMPTARGET
+    static reduce_t reduce_omp(const reduce_t &a, const reduce_t &b)
+    {
+      auto c = a;
+      if (b[0] > a[0]) c[0] = b[0];
+      if (b[1] > a[1]) c[1] = b[1];
+      return c;
+    }
+    static reduce_t init_omp() { return reduce_t(); }  // see UpdateMomArg::init().
+#endif
+
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in
     // order to increase stability

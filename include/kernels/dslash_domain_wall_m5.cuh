@@ -210,6 +210,7 @@ namespace quda
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
   __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s)
   {
+    QUDA_RT_CONSTS;
 
     using real = typename Arg::real;
     constexpr bool is_variable = true;
@@ -372,6 +373,7 @@ namespace quda
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
+    QUDA_RT_CONSTS;
     using real = typename Arg::real;
     const auto k = arg.kappa;
     const auto inv = arg.inv;
@@ -429,6 +431,7 @@ namespace quda
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
+    QUDA_RT_CONSTS;
     constexpr int nSpin = 4;
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;

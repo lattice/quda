@@ -1,3 +1,5 @@
+#include <array>
+
 #include <color_spinor_field.h>
 #include <uint_to_char.h>
 #include <vector>

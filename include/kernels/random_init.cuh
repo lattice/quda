@@ -9,6 +9,7 @@
 namespace quda {
 
   struct rngArg : kernel_param<> {
+    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncNo;
     int commCoord[QUDA_MAX_DIM];
     int X[QUDA_MAX_DIM];
     int X_global[QUDA_MAX_DIM];

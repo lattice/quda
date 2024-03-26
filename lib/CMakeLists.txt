@@ -288,6 +288,9 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "OMPTARGET")
+	include(targets/omptarget/target_omptarget.cmake)
+endif()
 
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
