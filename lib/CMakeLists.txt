@@ -36,7 +36,7 @@ set (QUDA_OBJS
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
-  slaph_interface.cpp evec_project.cu
+  evec_project.cu
   extract_gauge_ghost.cu
   gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
