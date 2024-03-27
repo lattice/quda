@@ -90,13 +90,14 @@ TEST_P(InvertTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
+  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-6 : 1e-12;
+  auto tol_hq = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-6 : 1e-12;
   inv_param.tol = 0.0;
   inv_param.tol_hq = 0.0;
   auto res_t = ::testing::get<8>(GetParam());
   if (res_t & QUDA_L2_RELATIVE_RESIDUAL) inv_param.tol = tol;
   if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) inv_param.tol_hq = tol_hq;
 
-  auto tol = inv_param.tol;
   if (is_chiral(inv_param.dslash_type)) { tol *= std::sqrt(static_cast<double>(inv_param.Ls)); }
   // FIXME eventually we should build in refinement to the *NR solvers to remove the need for this
   if (is_normal_residual(::testing::get<2>(GetParam()))) tol *= 50;
