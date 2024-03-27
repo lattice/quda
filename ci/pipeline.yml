@@ -13,6 +13,7 @@ build_job:
   extends: .container-builder
   variables:
     DOCKERFILE: ci/docker/Dockerfile.build
+    SLURM_NTASKS: 8
 
 test_job:
   stage: test
