@@ -2,6 +2,8 @@ FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+RUN echo "Running CSCS CI on $(nproc) processors"
+
 RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
     build-essential \
     cmake \
