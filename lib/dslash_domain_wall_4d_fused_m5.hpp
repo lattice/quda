@@ -36,6 +36,9 @@ namespace quda
       }
     }
 
+    int blockStep() const override { return 8; }
+    int blockMin() const override { return 8; }
+
   public:
     DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
       Dslash(arg, out, in, get_app_base())
@@ -44,14 +47,14 @@ namespace quda
       TunableKernel3D::resizeStep(in.X(4), 1);
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
 
-    unsigned int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const override
     {
       // spin components in shared depend on inversion algorithm
       if (mobius_m5::use_half_vector()) {
@@ -61,10 +64,9 @@ namespace quda
       }
     }
 
-    void initTuneParam(TuneParam &param) const
+    void initTuneParam(TuneParam &param) const override
     {
       Dslash::initTuneParam(param);
-
       param.block.y = arg.Ls; // Ls must be contained in the block
       param.grid.y = 1;
       param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
@@ -95,7 +97,7 @@ namespace quda
       return (12ll * n * Ls) * in.Volume();
     }
 
-    long long flops() const
+    long long flops() const override
     {
       long long flops_ = 0;
       switch (Arg::dslash5_type) {
@@ -112,7 +114,7 @@ namespace quda
       return flops_ + Dslash::flops();
     }
 
-    long long bytes() const
+    long long bytes() const override
     {
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
         return arg.y.Bytes() + Dslash::bytes();
@@ -121,7 +123,7 @@ namespace quda
       }
     }
 
-    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
+    void defaultTuneParam(TuneParam &param) const override { initTuneParam(param); }
   };
 
   template <Dslash5Type...> struct Dslash5TypeList {

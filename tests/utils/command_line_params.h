@@ -187,6 +187,8 @@ extern double gaussian_sigma;
 extern std::string gauge_outfile;
 extern int Nsrc;
 extern int Msrc;
+extern int Nsrc_tile;
+extern int Msrc_tile;
 extern int niter;
 extern int maxiter_precondition;
 extern QudaVerbosity verbosity_precondition;

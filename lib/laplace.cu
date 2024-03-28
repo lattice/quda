@@ -50,8 +50,7 @@ namespace quda
     long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
-      int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
-      int ghost_flops = (num_mv_multiply * mv_flops + 2 * in.Ncolor() * in.Nspin());
+      int ghost_flops = (in.Nspin() * mv_flops + 2 * in.Ncolor() * in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);      // 3D or 4D operator
 
@@ -73,8 +72,7 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
-        flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
-                  num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
+        flops_ = (num_dir * in.Nspin() * mv_flops +                  // SU(3) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
           * sites; // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites;
@@ -144,41 +142,20 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-#if (defined(GPU_STAGGERED_DIRAC) || defined(GPU_WILSON_DIRAC)) && defined(GPU_LAPLACE)
-    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
-                        double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                        TimeProfile &profile)
-#else
-    inline LaplaceApply(ColorSpinorField &, const ColorSpinorField &in, const GaugeField &, int,
-                        double, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-#endif
+    LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
+                 double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int * comm_override, TimeProfile &profile)
     {
-      if (in.Nspin() == 1) {
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
-        constexpr int nDim = 4;
-        constexpr int nSpin = 1;
-        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
-        Laplace<decltype(arg)> laplace(arg, out, in);
+      if constexpr (is_enabled_laplace()) {
+        if (in.Nspin() == 1) {
+          constexpr int nDim = 4;
+          constexpr int nSpin = 1;
+          LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+          Laplace<decltype(arg)> laplace(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(),
-          in.GhostFaceCB(), profile);
-#else
-        errorQuda("nSpin=%d Laplace operator required staggered dslash and laplace to be enabled", in.Nspin());
-#endif
-      } else if (in.Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) && defined(GPU_LAPLACE)
-        constexpr int nDim = 4;
-        constexpr int nSpin = 4;
-        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
-        Laplace<decltype(arg)> laplace(arg, out, in);
-
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(),
-          in.GhostFaceCB(), profile);
-#else
-        errorQuda("nSpin=%d Laplace operator required wilson dslash and laplace to be enabled", in.Nspin());
-#endif
-      } else {
-        errorQuda("Unsupported nSpin= %d", in.Nspin());
+          dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+        } else {
+          errorQuda("Unsupported nSpin= %d", in.Nspin());
+        }
       }
     }
   };

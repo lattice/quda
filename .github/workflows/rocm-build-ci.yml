@@ -28,6 +28,7 @@ jobs:
             -DQUDA_DIRAC_TWISTED_MASS=OFF \
             -DQUDA_DIRAC_TWISTED_CLOVER=OFF \
             -DQUDA_DIRAC_WILSON=ON \
+            -DQUDA_DIRAC_LAPLACE=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
             -DQUDA_QDPJIT=OFF \
             -DQUDA_INTERFACE_QDPJIT=OFF \
