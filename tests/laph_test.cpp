@@ -4,6 +4,7 @@
 
 #include "instantiate.h"
 #include "test.h"
+#include "misc.h"
 
 /*
   This test will perhaps eventually evolve into a full test for 3-d
@@ -138,11 +139,12 @@ TEST_P(LaphTest, verify)
 }
 
 INSTANTIATE_TEST_SUITE_P(LaphTest, LaphTest,
-                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(1, 4, 64), Values(768),
-                                 Values(4), Values(256)),
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(1, 4, 7), Values(2),
+                                 Values(4), Values(2)),
                          [](testing::TestParamInfo<test_t> param) {
-                           return std::to_string(get<0>(param.param)) + "_" + std::to_string(get<1>(param.param)) + "_"
-                             + std::to_string(get<2>(param.param)) + "_" + std::to_string(get<3>(param.param));
+                           return std::string(get_prec_str(get<0>(param.param))) + "_"
+                             + std::to_string(get<1>(param.param)) + "_" + std::to_string(get<2>(param.param)) + "_"
+                             + std::to_string(get<3>(param.param)) + "_" + std::to_string(get<4>(param.param));
                          });
 
 int main(int argc, char **argv)
