@@ -3901,8 +3901,8 @@ void createCloverQuda(QudaInvertParam* invertParam)
   // for clover we optimize to only send depth 1 halos in y/z/t (FIXME - make work for x, make robust in general)
   lat_dim_t R;
   for (int d=0; d<4; d++) R[d] = (d==0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
-  GaugeField *gauge = extendedGaugeResident ? extendedGaugeResident :
-                                              createExtendedGauge(*gaugePrecise, R, profileClover, false, recon);
+  GaugeField *gauge
+    = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, getProfile(), false, recon);
 
   GaugeField *ex = gauge;
   if (gauge->Precision() < cloverPrecise->Precision()) {
@@ -4445,7 +4445,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   // Make sure extendedGaugeResident has the correct R
   if (extendedGaugeResident) delete extendedGaugeResident;
-  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileCloverForce);
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, getProfile());
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
