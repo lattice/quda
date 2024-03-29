@@ -1505,6 +1505,7 @@ namespace quda {
       break;
     case QUDA_COVDEV_DSLASH:
       diracParam.type = QUDA_GAUGE_COVDEV_DIRAC;
+      diracParam.covdev_mu = inv_param->covdev_mu;
       break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
@@ -1823,8 +1824,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   } else if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH
              || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dirac->Dslash4(out, in, parity);
-  } else if (inv_param->dslash_type == QUDA_COVDEV_DSLASH) {
-    ((GaugeCovDev *)dirac)->DslashCD(out, in, parity, inv_param->covdev_mu);
   } else {
     dirac->Dslash(out, in, parity); // apply the operator
   }
@@ -1872,11 +1871,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   setDiracParam(diracParam, inv_param, pc);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-  if (inv_param->dslash_type == QUDA_COVDEV_DSLASH) {
-    ((GaugeCovDev *)dirac)->MCD(out, in, inv_param->covdev_mu);
-  } else {
-    dirac->M(out, in); // apply the operator
-  }
+  dirac->M(out, in); // apply the operator
   delete dirac; // clean up
 
   double kappa = inv_param->kappa;
