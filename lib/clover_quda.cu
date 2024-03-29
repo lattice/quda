@@ -34,19 +34,18 @@ namespace quda {
     long long bytes() const { return 2*arg.threads.x*(6*arg.f.Bytes() + arg.clover.Bytes()); }
   };
 
-#ifdef GPU_CLOVER_DIRAC
   void computeClover(CloverField &clover, const GaugeField& f, double coeff)
   {
-    if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
-    clover.Diagonal(0.5); // 0.5 comes from scaling used on native fields
-    instantiate<ComputeClover>(clover, f, coeff);
+    if constexpr (is_enabled_clover()) {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
+      clover.Diagonal(0.5); // 0.5 comes from scaling used on native fields
+      instantiate<ComputeClover>(clover, f, coeff);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Clover has not been built");
+    }
   }
-#else
-  void computeClover(CloverField &, const GaugeField &, double)
-  {
-    errorQuda("Clover has not been built");
-  }
-#endif
 
 } // namespace quda
 

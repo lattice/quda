@@ -42,11 +42,24 @@ TEST_P(DilutionTest, verify)
   ColorSpinorParam param;
   constructWilsonTestSpinorParam(&param, &inv_param, &gauge_param);
   param.siteSubset = site_subset;
+  if (site_subset == QUDA_PARITY_SITE_SUBSET) param.x[0] /= 2;
   param.nSpin = nSpin;
   param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true); // change order to native order
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField src(param);
+
+  // compute number of blocks when using block dilution
+  int block_volume = 1;
+  lat_dim_t block_size = {dilution_block_size[0], dilution_block_size[1], dilution_block_size[2], dilution_block_size[3]};
+  if (src.SiteSubset() == QUDA_PARITY_SITE_SUBSET) block_size[0] /= 2;
+  for (int i = 0; i < src.Ndim(); i++) block_volume *= block_size[i];
+  int n_blocks = comm_size() * src.Volume() / block_volume;
+  if (dilution_type == QUDA_DILUTION_BLOCK) {
+    logQuda(QUDA_VERBOSE, "Dilution block size = %d x %d x %d x %d\n", block_size[0], block_size[1], block_size[2],
+            block_size[3]);
+    logQuda(QUDA_VERBOSE, "Number of dilution blocks = %d\n", n_blocks);
+  }
 
   RNG rng(src, 1234);
 
@@ -59,15 +72,16 @@ TEST_P(DilutionTest, verify)
     case QUDA_DILUTION_COLOR: size = src.Ncolor(); break;
     case QUDA_DILUTION_SPIN_COLOR: size = src.Nspin() * src.Ncolor(); break;
     case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: size = src.Nspin() * src.Ncolor() * src.SiteSubset(); break;
+    case QUDA_DILUTION_BLOCK: size = n_blocks; break;
     default: errorQuda("Invalid dilution type %d", dilution_type);
     }
 
     std::vector<ColorSpinorField> v(size, param);
-    spinorDilute(v, src, dilution_type);
+    spinorDilute(v, src, dilution_type, block_size);
 
     param.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField sum(param);
-    blas::axpy(std::vector<double>(v.size(), 1.0), v, sum); // reassemble the vector
+    blas::block::axpy(std::vector<double>(v.size(), 1.0), v, sum); // reassemble the vector
 
     { // check its norm matches the original
       auto src2 = blas::norm2(src);
@@ -85,16 +99,31 @@ TEST_P(DilutionTest, verify)
 using ::testing::Combine;
 using ::testing::Values;
 
+INSTANTIATE_TEST_SUITE_P(WilsonFull, DilutionTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR,
+                                        QUDA_DILUTION_SPIN_COLOR_EVEN_ODD, QUDA_DILUTION_BLOCK),
+                                 Values(4)),
+                         [](testing::TestParamInfo<test_t> param) {
+                           return get_dilution_type_str(::testing::get<1>(param.param));
+                         });
+
 INSTANTIATE_TEST_SUITE_P(
-  WilsonFull, DilutionTest,
-  Combine(Values(QUDA_FULL_SITE_SUBSET),
-          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
-          Values(4)),
+  WilsonParity, DilutionTest,
+  Combine(Values(QUDA_PARITY_SITE_SUBSET),
+          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_BLOCK), Values(4)),
   [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
 
-INSTANTIATE_TEST_SUITE_P(WilsonParity, DilutionTest,
+INSTANTIATE_TEST_SUITE_P(
+  CoarseFull, DilutionTest,
+  Combine(Values(QUDA_FULL_SITE_SUBSET),
+          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
+          Values(2)),
+  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+
+INSTANTIATE_TEST_SUITE_P(CoarseParity, DilutionTest,
                          Combine(Values(QUDA_PARITY_SITE_SUBSET),
-                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR), Values(4)),
+                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR), Values(2)),
                          [](testing::TestParamInfo<test_t> param) {
                            return get_dilution_type_str(::testing::get<1>(param.param));
                          });

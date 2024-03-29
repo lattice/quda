@@ -35,8 +35,14 @@ namespace quda {
       launch<CloverApply>(tp, stream, CloverArg<Float, nColor>(out, in, clover, parity));
     }
 
-    void preTune() { if (out.V() == in.V()) out.backup(); }  // Backup if in and out fields alias
-    void postTune() { if (out.V() == in.V()) out.restore(); } // Restore if the in and out fields alias
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    } // Backup if in and out fields alias
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    } // Restore if the in and out fields alias
     long long flops() const { return in.Volume()*504ll; }
     long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
   };
@@ -70,7 +76,11 @@ namespace quda {
 
     unsigned int sharedBytesPerThread() const
     {
-      return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
+      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+        return 0;
+      } else {
+        return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
+      }
     }
 
   public:
@@ -115,8 +125,14 @@ namespace quda {
       }
     }
 
-    void preTune() { if (out.V() == in.V()) out.backup(); } // Restore if the in and out fields alias
-    void postTune() { if (out.V() == in.V()) out.restore(); } // Restore if the in and out fields alias
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    } // Restore if the in and out fields alias
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    } // Restore if the in and out fields alias
     long long flops() const { return (inverse ? 1056ll : 552ll) * in.Volume(); }
     long long bytes() const {
       long long rtn = out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset());

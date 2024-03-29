@@ -26,7 +26,6 @@ namespace quda {
     // only switch on comms needed for mu derivative (FIXME - only communicate in the given direction)
     comm_dim[mu % 4] = comm_dim_partitioned(mu % 4);
     ApplyCovDev(out, in, *gauge, mu, parity, dagger, comm_dim, profile);
-    flops += 1320ll*in.Volume(); // FIXME
   }
 
   void GaugeCovDev::MCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const
@@ -64,15 +63,17 @@ namespace quda {
     //do nothing
   }
 
-  void GaugeCovDev::prepare(ColorSpinorField *&, ColorSpinorField *&, ColorSpinorField &, ColorSpinorField &,
+  void GaugeCovDev::prepare(cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &,
+                            cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
                             const QudaSolutionType) const
   {
-    //do nothing
+    // do nothing
   }
 
-  void GaugeCovDev::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void GaugeCovDev::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                const QudaSolutionType) const
   {
-    //do nothing
+    // do nothing
   }
 
 } // namespace quda

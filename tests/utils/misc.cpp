@@ -96,23 +96,6 @@ const char *get_test_type(int t)
   return ret;
 }
 
-const char *get_staggered_test_type(int t)
-{
-  const char *ret;
-  switch (t) {
-  case 0: ret = "full"; break;
-  case 1: ret = "full_ee_prec"; break;
-  case 2: ret = "full_oo_prec"; break;
-  case 3: ret = "even"; break;
-  case 4: ret = "odd"; break;
-  case 5: ret = "mcg_even"; break;
-  case 6: ret = "mcg_odd"; break;
-  default: ret = "unknown"; break;
-  }
-
-  return ret;
-}
-
 const char *get_dslash_str(QudaDslashType type)
 {
   const char *ret;
@@ -189,6 +172,7 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   case QUDA_GAUGE_SMEAR_APE: ret = "APE"; break;
   case QUDA_GAUGE_SMEAR_STOUT: ret = "Stout"; break;
   case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over Improved"; break;
+  case QUDA_GAUGE_SMEAR_HYP: ret = "HYP"; break;
   case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson Flow"; break;
   case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik Flow"; break;
   default: ret = "unknown"; break;
@@ -352,7 +336,9 @@ const char *get_memory_type_str(QudaMemoryType type)
 
   switch (type) {
   case QUDA_MEMORY_DEVICE: s = "device"; break;
-  case QUDA_MEMORY_PINNED: s = "pinned"; break;
+  case QUDA_MEMORY_DEVICE_PINNED: s = "device_pinned"; break;
+  case QUDA_MEMORY_HOST: s = "host"; break;
+  case QUDA_MEMORY_HOST_PINNED: s = "host_pinned"; break;
   case QUDA_MEMORY_MAPPED: s = "mapped"; break;
   default: fprintf(stderr, "Error: invalid memory type\n"); exit(1);
   }
@@ -369,6 +355,7 @@ std::string get_dilution_type_str(QudaDilutionType type)
   case QUDA_DILUTION_COLOR: s = std::string("color"); break;
   case QUDA_DILUTION_SPIN_COLOR: s = std::string("spin_color"); break;
   case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
+  case QUDA_DILUTION_BLOCK: s = std::string("block"); break;
   default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
   }
   return s;

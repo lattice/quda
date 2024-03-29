@@ -20,6 +20,7 @@ QudaMultigridParam mg_param;
 QudaInvertParam mg_inv_param;
 QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
+bool use_split_grid = false;
 
 // if --enable-testing true is passed, we run the tests defined in here
 #include <invert_test_gtest.hpp>
@@ -206,7 +207,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // params corresponds to split grid
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
+  use_split_grid = num_sub_partition > 1;
 
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
@@ -214,6 +215,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
     if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
+
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.secs, mg_param.gflops / mg_param.secs);
   }
 
   // Vector construct START
@@ -260,7 +263,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
       // Allocate memory and set pointers
       for (int n = 0; n < Nsrc; n++) {
         out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
-        _hp_multi_x[n][i] = out_multishift[n * multishift + i].V();
+        _hp_multi_x[n][i] = out_multishift[n * multishift + i].data();
       }
     }
   }
@@ -285,9 +288,9 @@ std::vector<std::array<double, 2>> solve(test_t param)
       if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
       if (multishift > 1) {
-        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].V(), &inv_param);
+        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].data(), &inv_param);
       } else {
-        invertQuda(out[i].V(), in[i].V(), &inv_param);
+        invertQuda(out[i].data(), in[i].data(), &inv_param);
       }
 
       time[i] = inv_param.secs;
@@ -304,8 +307,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
     std::vector<void *> _hp_x(Nsrc);
     std::vector<void *> _hp_b(Nsrc);
     for (int i = 0; i < Nsrc; i++) {
-      _hp_x[i] = out[i].V();
-      _hp_b[i] = in[i].V();
+      _hp_x[i] = out[i].data();
+      _hp_b[i] = in[i].data();
     }
     // Run split grid
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
@@ -338,7 +341,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
-      res[i] = verifyInversion(out[i].V(), _hp_multi_x[i].data(), in[i].V(), check.V(), gauge_param, inv_param,
+      res[i] = verifyInversion(out[i].data(), _hp_multi_x[i].data(), in[i].data(), check.data(), gauge_param, inv_param,
                                gauge.data(), clover.data(), clover_inv.data());
     }
   }

@@ -140,6 +140,7 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -256,6 +257,7 @@ extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
+extern std::array<int, 4> dilution_block_size;
 
 extern int mg_levels;
 
@@ -427,3 +429,5 @@ extern bool   smear_delete_two_link;
 extern std::array<int, 4> grid_partition;
 
 extern bool enable_testing;
+
+extern bool detratio;

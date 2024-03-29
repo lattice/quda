@@ -40,10 +40,10 @@ namespace quda {
       } else {
         GaugeFieldParam param(X);
         param.order = order;
-        output = cudaGaugeField::Create(param);
+        output = new GaugeField(param);
         if (copy_content) output->copy(X);
       }
-      return static_cast<cudaGaugeField *>(output);
+      return output;
     };
 
     auto Y_order = create_gauge_copy(Y, gOrder, false);

@@ -179,7 +179,7 @@ std::vector<double> eigensolve(test_t test_param)
   // Allocate host side memory and pointers
   for (int i = 0; i < n_eig; i++) {
     evecs[i] = quda::ColorSpinorField(cs_param);
-    host_evecs_ptr[i] = evecs[i].V();
+    host_evecs_ptr[i] = evecs[i].data();
   }
 
   // Complex eigenvalues
@@ -208,12 +208,12 @@ std::vector<double> eigensolve(test_t test_param)
     for (int i = 0; i < eig_n_conv; i++) {
       if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
         double _Complex sigma = evals[i];
-        residua[i] = verifyWilsonTypeSingularVector(evecs[i].V(), evecs[i + eig_n_conv].V(), sigma, i, gauge_param,
+        residua[i] = verifyWilsonTypeSingularVector(evecs[i].data(), evecs[i + eig_n_conv].data(), sigma, i, gauge_param,
                                                     eig_param, gauge.data(), clover.data(), clover_inv.data());
 
       } else {
         double _Complex lambda = evals[i];
-        residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param, gauge.data(),
+        residua[i] = verifyWilsonTypeEigenvector(evecs[i].data(), lambda, i, gauge_param, eig_param, gauge.data(),
                                                  clover.data(), clover_inv.data());
       }
     }

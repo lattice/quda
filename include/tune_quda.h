@@ -17,33 +17,25 @@
 
 namespace quda {
 
-  class TuneParam {
-
-  public:
-    dim3 block;
+  struct TuneParam {
+    dim3 block = {1, 1, 1};
     dim3 grid;
-    unsigned int shared_bytes;
-    bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
-    int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    unsigned int shared_bytes = 0;
+    bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
+    int4 aux = {1, 1, 1, 1};           // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
-    float time;
-    long long n_calls;
+    float time = FLT_MAX;
+    long long n_calls = 0;
 
     TuneParam();
     TuneParam(const TuneParam &) = default;
     TuneParam(TuneParam &&) = default;
     TuneParam &operator=(const TuneParam &) = default;
     TuneParam &operator=(TuneParam &&) = default;
-
-    friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
-      output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-      output << "shared_bytes=" << param.shared_bytes;
-      output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
-      return output;
-    }
   };
+
+  std::ostream &operator<<(std::ostream &, const TuneParam &);
 
   /**
    * @brief Returns a reference to the tunecache map
@@ -52,6 +44,10 @@ namespace quda {
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
   class Tunable {
+
+    friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);
+    static inline uint64_t _flops_global = 0;
+    static inline uint64_t _bytes_global = 0;
 
   protected:
     virtual long long flops() const { return 0; }
@@ -68,20 +64,7 @@ namespace quda {
     virtual bool tuneGridDim() const { return true; }
     virtual bool tuneAuxDim() const { return false; }
 
-    virtual bool tuneSharedBytes() const
-    {
-      static bool tune_shared = true;
-      static bool init = false;
-
-      if (!init) {
-        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED");
-        if (enable_shared_env) {
-          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
-        }
-        init = true;
-      }
-      return tune_shared;
-    }
+    virtual bool tuneSharedBytes() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -150,6 +133,13 @@ namespace quda {
       }
     }
 
+    auto setSharedBytes(TuneParam &param) const
+    {
+      int nthreads = param.block.x * param.block.y * param.block.z;
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      return param.shared_bytes;
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
@@ -157,14 +147,12 @@ namespace quda {
       bool ret;
 
       param.block.x += blockStep();
-      int nthreads = param.block.x * param.block.y * param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
 
       if (param.block.x > max_threads || param.shared_bytes > max_shared
           || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
         resetBlockDim(param);
-        int nthreads = param.block.x * param.block.y * param.block.z;
-        param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+        setSharedBytes(param);
         ret = false;
       } else {
         ret = true;
@@ -214,8 +202,7 @@ namespace quda {
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
-	  int nthreads = next.block.x * next.block.y * next.block.z;
-          param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
+          param.shared_bytes = setSharedBytes(next);
           return false;
 	} else {
 	  return true;
@@ -239,16 +226,7 @@ namespace quda {
        @brief Whether the present instance has already been tuned or not
        @return True if tuned, false if not
     */
-    bool tuned()
-    {
-      // not tuning is equivalent to already tuned
-      if (!getTuning()) return true;
-
-      TuneKey key = tuneKey();
-      if (use_managed_memory()) strcat(key.aux, ",managed");
-      // if key is present in cache then already tuned
-      return getTuneCache().find(key) != getTuneCache().end();
-    }
+    bool tuned() const;
 
   public:
     Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
@@ -287,24 +265,9 @@ namespace quda {
      */
     virtual float min_tune_time() const { return 1e-3; }
 
-    virtual std::string paramString(const TuneParam &param) const
-    {
-      std::stringstream ps;
-      ps << param;
-      return ps.str();
-    }
-
-    virtual std::string perfString(float time) const
-    {
-      float gflops = flops() / (1e9 * time);
-      float gbytes = bytes() / (1e9 * time);
-      std::stringstream ss;
-      ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
-      ss << gbytes << " GB/s";
-      return ss.str();
-    }
-
-    virtual std::string miscString(const TuneParam &) const { return std::string(); }
+    virtual std::string paramString(const TuneParam &param) const;
+    virtual std::string perfString(float time) const;
+    virtual std::string miscString(const TuneParam &) const;
 
     virtual void initTuneParam(TuneParam &param) const
     {
@@ -325,8 +288,7 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
-      int nthreads = param.block.x*param.block.y*param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
     }
 
     /** sets default values for when tuning is disabled */
@@ -377,6 +339,23 @@ namespace quda {
     }
 
     /**
+     * @brief self-consistency check that the shared memory is set
+     * correctly (e.g., check that block size has been correctly
+     * factored in when set setting shared_bytes)
+     */
+    void checkSharedBytes(const TuneParam &tp) const
+    {
+      auto tp2 = TuneParam(tp);
+      auto expected = setSharedBytes(tp2);
+      if (tp.shared_bytes < expected)
+        errorQuda("Shared bytes %u insufficient (expected %u)", tp.shared_bytes, expected);
+
+      if (sharedBytesPerThread() && sharedBytesPerBlock(tp))
+        errorQuda("Not supported: non-zero shared bytes per thread (%u) and per block (%u)", sharedBytesPerThread(),
+                  sharedBytesPerBlock(tp));
+    }
+
+    /**
      * @brief Return the rank on which kernel tuning is performed.
      * This will default to 0, but can be globally overriden with the
      * QUDA_TUNING_RANK environment variable.
@@ -385,6 +364,12 @@ namespace quda {
 
     qudaError_t launchError() const { return launch_error; }
     qudaError_t &launchError() { return launch_error; }
+
+    static void flops_global(uint64_t value) { _flops_global = value; }
+    static uint64_t flops_global() { return _flops_global; }
+
+    static void bytes_global(uint64_t value) { _bytes_global = value; }
+    static uint64_t bytes_global() { return _bytes_global; }
   };
 
   /**

@@ -644,20 +644,64 @@ namespace quda
     }
   }
 
-  TuneParam::TuneParam() :
-    block(device::warp_size(), 1, 1),
-    grid(1, 1, 1),
-    shared_bytes(0),
-    set_max_shared_bytes(false),
-    aux(),
-    time(FLT_MAX),
-    n_calls(0)
+  TuneParam::TuneParam() : block(device::warp_size(), 1, 1) { }
+
+  std::ostream &operator<<(std::ostream &output, const TuneParam &param)
   {
-    aux = make_int4(1, 1, 1, 1);
+    output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+    output << "shared_bytes=" << param.shared_bytes;
+    output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
+    return output;
+  }
+
+  bool Tunable::tuneSharedBytes() const
+  {
+    static bool tune_shared = true;
+    static bool init = false;
+
+    if (!init) {
+      char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED");
+      if (enable_shared_env) {
+        if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
+      }
+      init = true;
+    }
+    return tune_shared;
   }
 
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }
+
+  bool Tunable::tuned() const
+  {
+    // not tuning is equivalent to already tuned
+    if (!getTuning()) return true;
+
+    TuneKey key = tuneKey();
+    if (use_managed_memory()) strcat(key.aux, ",managed");
+    // if key is present in cache then already tuned
+    return getTuneCache().find(key) != getTuneCache().end();
+  }
+
+  std::string Tunable::paramString(const TuneParam &param) const
+  {
+    std::stringstream ps;
+    ps << param;
+    return ps.str();
+  }
+
+  std::string Tunable::perfString(float time) const
+  {
+    float gflops = flops() / (1e9 * time);
+    float gbytes = bytes() / (1e9 * time);
+    std::stringstream ss;
+    ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
+    ss << gbytes << " GB/s";
+    return ss.str();
+  }
+
+  std::string Tunable::miscString(const TuneParam &) const { return std::string(); }
 
   int32_t Tunable::getTuneRank() const
   {
@@ -804,6 +848,7 @@ namespace quda
     TuneKey key = tunable.tuneKey();
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
+    bool is_policy = strncmp(key.aux, "policy,", 7) == 0 ? true : false;
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTOP(QUDA_PROFILE_INIT);
@@ -846,6 +891,10 @@ namespace quda
         trace_list.push_back(trace_entry);
       }
 
+      if (!is_policy) {
+        Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+        Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
+      }
       return param_tuned;
     }
 
@@ -864,6 +913,10 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
               tunable.paramString(param_default).c_str());
 
+      if (!is_policy) {
+        Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+        Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
+      }
       return param_default;
     } else if (!tuning) {
 
@@ -1077,6 +1130,10 @@ namespace quda
 
     param.n_calls = profile_count ? 1 : 0;
 
+    if (!is_policy) {
+      Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+      Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
+    }
     return param;
   }
 

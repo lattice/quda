@@ -38,7 +38,7 @@ namespace quda {
     auto r_vec = {r.begin(), r.begin() + n_krylov + 1};
 
     std::vector<Complex> r_dagger_dot_r((n_krylov + 1) * n_krylov);
-    blas::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec) ;
+    blas::block::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
 
     matrix R_dag_R(n_krylov, n_krylov);
     vector R_dag_r0(n_krylov);
@@ -49,9 +49,8 @@ namespace quda {
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     // Compute LDL decomposition, solve least squares problem for gamma
@@ -60,9 +59,8 @@ namespace quda {
     vector gamma = ldlt.solve(R_dag_r0);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
     // Update omega for the next BiCG iteration
@@ -76,7 +74,7 @@ namespace quda {
       {
         // u = u[0] - \sum_{j=1}^L \gamma_L u_L
         for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
-        blas::caxpy(gamma_, {u.begin() + 1, u.end()}, {u.begin(), u.begin() + 1});
+        blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, {u.begin(), u.begin() + 1});
       }
 
       // update x and r
@@ -93,12 +91,12 @@ namespace quda {
         gamma_for_r[0] = 0; // do not want to update with first r
         for (int i = 0; i < n_krylov; i++) gamma_for_r[i + 1] = -gamma(i);
 
-        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, r[0]);
+        blas::block::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, r[0]);
       }
     } else {
       // fixed iteration, only need to update x
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = gamma(i); }
-      blas::caxpy(gamma_, {r.begin(), r.end() - 1}, x_sloppy);
+      blas::block::axpy(gamma_, {r.begin(), r.end() - 1}, x_sloppy);
     }
   }
 
@@ -126,7 +124,7 @@ namespace quda {
   void BiCGstabL::computeTau(int begin, int size, int j)
   {
     std::vector<Complex> Tau(size);
-    blas::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
+    blas::block::cDotProduct(Tau, {r.begin() + begin, r.begin() + begin + size}, r[j]); // vectorized dot product
 
     for (int k = 0; k < size; k++) { tau[(begin + k) * (n_krylov + 1) + j] = Tau[k] / sigma[begin + k]; }
   }
@@ -139,7 +137,7 @@ namespace quda {
     auto r_ = {r.begin() + begin, r.begin() + begin + size};
     auto rj = {r.begin() + j, r.begin() + j + 1};
 
-    blas::caxpy(tau_, r_ , rj);
+    blas::block::caxpy(tau_, r_, rj);
   }
 
   /**
@@ -232,7 +230,7 @@ namespace quda {
     {
       std::vector<Complex> gamma_(n_krylov);
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
-      blas::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
+      blas::block::caxpy(gamma_, {u.begin() + 1, u.end()}, u[0]);
     }
 
     // Update X and R, which has opportunities for reuse
@@ -344,10 +342,8 @@ namespace quda {
   }
 
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig,
-                       SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matEig, param, profile),
-    matMdagM(matEig.Expose()),
-    n_krylov(param.Nkrylov)
+                       SolverParam &param) :
+    Solver(mat, matSloppy, matSloppy, matEig, param), matMdagM(matEig.Expose()), n_krylov(param.Nkrylov)
   {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
@@ -366,9 +362,9 @@ namespace quda {
 
   BiCGstabL::~BiCGstabL()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
@@ -393,7 +389,7 @@ namespace quda {
     Solver::create(x, b);
 
     if (!init) {
-      profile.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       // Initialize fields.
       ColorSpinorParam csParam(x);
@@ -433,7 +429,7 @@ namespace quda {
         u[i] = ColorSpinorField(csParam);
       }
 
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     }
   }
@@ -449,7 +445,7 @@ namespace quda {
     create(x, b);
 
     // Begin profiling preamble.
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
@@ -467,7 +463,7 @@ namespace quda {
       }
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
         if (param.deflate) {
           // double the size of the Krylov space
@@ -475,7 +471,7 @@ namespace quda {
           // populate extra memory with L/R singular vectors
           eig_solve->computeSVD(evecs, evals);
         }
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -524,7 +520,7 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         b2 = r2;
@@ -562,7 +558,6 @@ namespace quda {
     double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r_full).z) : 0.0;
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    blas::flops = 0;
     //bool l2_converge = false;
     //double r2_old = r2;
 
@@ -572,8 +567,8 @@ namespace quda {
     BiCGstabLUpdate bicgstabl_update(x_sloppy, r, u, alpha, beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps());
 
     // done with preamble, begin computing.
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // count iteration counts
     int total_iter = 0;
@@ -703,12 +698,9 @@ namespace quda {
     blas::xpy(y, x);
 
     // Done with compute, begin the epilogue.
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matEig.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += total_iter;
 
     if (total_iter >= param.maxiter) // >= if n_krylov doesn't divide max iter.
@@ -726,12 +718,7 @@ namespace quda {
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r[0]).z) : 0.0;
     }
 
-    // Reset flops counters.
-    blas::flops = 0;
-    mat.flops();
-
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    param.secs += profile.Last(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop, param.tol_hq);
   }

@@ -7,9 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    unsigned long long flops;
-    unsigned long long bytes;
-
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename coeff_t>
     class Blas : public TunableGridStrideKernel2D
@@ -56,9 +53,6 @@ namespace quda {
         }
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
       TuneKey tuneKey() const override { return TuneKey(vol, typeid(f).name(), aux); }
@@ -140,89 +134,128 @@ namespace quda {
       }
     };
 
-    void axpbyz(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z)
+    void axpbyz(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
+                cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z)
     {
-      instantiate<axpbyz_, Blas, true>(a, b, 0.0, x, y, x, x, z);
+      check_size(a, x, b, y, z);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<axpbyz_, Blas, true>(a[i], b[i], 0.0, x[i], y[i], x[i], x[i], z[i]);
     }
 
-    void axy(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    void axy(const cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
     {
-      instantiate<axy_, Blas, false>(a, 0.0, 0.0, x, y, y, y, y);
+      check_size(a, x, y);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<axy_, Blas, false>(a[i], Complex(0.0), Complex(0.0), x[i], y[i], y[i], y[i], y[i]);
     }
 
-    void caxpy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y)
+    void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
     {
-      instantiate<caxpy_, Blas, true>(a, Complex(0.0), Complex(0.0), x, y, x, x, y);
+      check_size(a, x, y);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpy_, Blas, true>(a[i], Complex(0.0), Complex(0.0), x[i], y[i], x[i], x[i], y[i]);
     }
 
-    void caxpby(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y)
+    void caxpby(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector<Complex> &b,
+                cvector_ref<ColorSpinorField> &y)
     {
-      instantiate<caxpby_, Blas, false>(a, b, Complex(0.0), x, y, x, x, y);
+      check_size(a, x, b, y);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpby_, Blas, false>(a[i], b[i], Complex(0.0), x[i], y[i], x[i], x[i], y[i]);
     }
 
-    void axpbypczw(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y,
-                   double c, const ColorSpinorField &z, ColorSpinorField &w)
+    void axpbypczw(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
+                   cvector_ref<const ColorSpinorField> &y, cvector<double> &c, cvector_ref<const ColorSpinorField> &z,
+                   cvector_ref<ColorSpinorField> &w)
     {
-      instantiate<axpbypczw_, Blas, false>(a, b, c, x, y, z, w, y);
+      check_size(a, x, b, y, c, z, w);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<axpbypczw_, Blas, false>(a[i], b[i], c[i], x[i], y[i], z[i], w[i], y[i]);
     }
 
-    void cxpaypbz(const ColorSpinorField &x, const Complex &a, const ColorSpinorField &y,
-                  const Complex &b, ColorSpinorField &z)
+    void cxpaypbz(cvector_ref<const ColorSpinorField> &x, cvector<Complex> &a, cvector_ref<const ColorSpinorField> &y,
+                  cvector<Complex> &b, cvector_ref<ColorSpinorField> &z)
     {
-      instantiate<cxpaypbz_, Blas, false>(a, b, Complex(0.0), x, y, z, x, y);
+      check_size(x, a, y, b, z);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<cxpaypbz_, Blas, false>(a[i], b[i], Complex(0.0), x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, const ColorSpinorField& z, double c)
+    void axpyBzpcx(cvector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<double> &b, cvector_ref<const ColorSpinorField> &z, cvector<double> &c)
     {
-      instantiate<axpyBzpcx_, Blas, true>(a, b, c, x, y, z, x, y);
+      check_size(a, x, y, b, z, c);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<axpyBzpcx_, Blas, true>(a[i], b[i], c[i], x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void axpyZpbx(double a, ColorSpinorField& x, ColorSpinorField& y, const ColorSpinorField& z, double b)
+    void axpyZpbx(cvector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                  cvector_ref<const ColorSpinorField> &z, cvector<double> &b)
     {
-      instantiate<axpyZpbx_, Blas, true>(a, b, 0.0, x, y, z, x, y);
+      check_size(a, x, y, z, b);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<axpyZpbx_, Blas, true>(a[i], b[i], 0.0, x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void caxpyBzpx(const Complex &a, ColorSpinorField &x, ColorSpinorField &y,
-                   const Complex &b, const ColorSpinorField &z)
+    void caxpyBzpx(cvector<Complex> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<Complex> &b, cvector_ref<const ColorSpinorField> &z)
     {
-      instantiate<caxpyBzpx_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
+      check_size(a, x, y, b, z);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpyBzpx_, Blas, true>(a[i], b[i], Complex(0.0), x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void caxpyBxpz(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y,
-                   const Complex &b, ColorSpinorField &z)
+    void caxpyBxpz(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector<Complex> &b, cvector_ref<ColorSpinorField> &z)
     {
-      instantiate<caxpyBxpz_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
+      check_size(a, x, y, b, z);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpyBxpz_, Blas, true>(a[i], b[i], Complex(0.0), x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void caxpbypzYmbw(const Complex &a, const ColorSpinorField &x, const Complex &b,
-                      ColorSpinorField &y, ColorSpinorField &z, const ColorSpinorField &w)
+    void caxpbypzYmbw(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector<Complex> &b,
+                      cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                      cvector_ref<const ColorSpinorField> &w)
     {
-      instantiate<caxpbypzYmbw_, Blas, false>(a, b, Complex(0.0), x, y, z, w, y);
+      check_size(a, x, b, y, z, w);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpbypzYmbw_, Blas, false>(a[i], b[i], Complex(0.0), x[i], y[i], z[i], w[i], y[i]);
     }
 
-    void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y)
+    void cabxpyAx(cvector<double> &a, cvector<Complex> &b, cvector_ref<ColorSpinorField> &x,
+                  cvector_ref<ColorSpinorField> &y)
     {
-      instantiate<cabxpyAx_, Blas, false>(Complex(a), b, Complex(0.0), x, y, x, x, y);
+      check_size(a, b, x, y);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<cabxpyAx_, Blas, false>(Complex(a[i]), b[i], Complex(0.0), x[i], y[i], x[i], x[i], y[i]);
     }
 
-    void caxpyXmaz(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
+    void caxpyXmaz(cvector<Complex> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                   cvector_ref<const ColorSpinorField> &z)
     {
-      instantiate<caxpyxmaz_, Blas, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, y);
+      check_size(a, x, y, z);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpyxmaz_, Blas, false>(a[i], Complex(0.0), Complex(0.0), x[i], y[i], z[i], x[i], y[i]);
     }
 
-    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
+    void caxpyXmazMR(cvector<double> &a, cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y,
+                     cvector_ref<const ColorSpinorField> &z)
     {
+      check_size(a, x, y, z);
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
-      if (x.Location() == QUDA_CPU_FIELD_LOCATION)
-	errorQuda("This kernel cannot be run on CPU fields");
-      instantiate<caxpyxmazMR_, Blas, false>(a, 0.0, 0.0, x, y, z, y, y);
+      if (x[0].Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("This kernel cannot be run on CPU fields");
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<caxpyxmazMR_, Blas, false>(a[i], 0.0, 0.0, x[i], y[i], z[i], y[i], y[i]);
     }
 
-    void tripleCGUpdate(double a, double b, const ColorSpinorField &x, ColorSpinorField &y,
-                        ColorSpinorField &z, ColorSpinorField &w)
+    void tripleCGUpdate(cvector<double> &a, cvector<double> &b, cvector_ref<const ColorSpinorField> &x,
+                        cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
+                        cvector_ref<ColorSpinorField> &w)
     {
-      instantiate<tripleCGUpdate_, Blas, true>(a, b, 0.0, x, y, z, w, y);
+      check_size(a, b, x, y, z, w);
+      for (auto i = 0u; i < x.size(); i++)
+        instantiate<tripleCGUpdate_, Blas, true>(a[i], b[i], 0.0, x[i], y[i], z[i], w[i], y[i]);
     }
 
   } // namespace blas

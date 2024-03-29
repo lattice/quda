@@ -11,7 +11,7 @@ namespace quda {
      @param u[in] The input gauge field
      @param coeff[in] Array of path coefficients
   */
-  void fatKSLink(GaugeField *fat, const GaugeField &u, const double *coeff);
+  void fatKSLink(GaugeField &fat, const GaugeField &u, const double *coeff);
 
   /**
      @brief Compute the long links for an improved staggered (Kogut-Susskind) fermions.
@@ -19,6 +19,6 @@ namespace quda {
      @param u[in] The input gauge field
      @param coeff[in] Array of path coefficients
   */
-  void longKSLink(GaugeField *lng, const GaugeField &u, const double *coeff);
+  void longKSLink(GaugeField &lng, const GaugeField &u, const double *coeff);
 
 } // namespace quda

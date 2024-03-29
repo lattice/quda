@@ -19,20 +19,20 @@ namespace quda
   using namespace blas;
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
+                     const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param), K(nullptr), Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
     // Preconditioners do not need a deflation space,
     // so we explicily set this here.
     Kparam.deflate = false;
 
-    K = createPreconditioner(matPrecon, matPrecon, matPrecon, matEig, param, Kparam, profile);
+    K = createPreconditioner(matPrecon, matPrecon, matPrecon, matEig, param, Kparam);
   }
 
   PreconCG::PreconCG(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
+                     const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param), K(nullptr), Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
 
@@ -41,12 +41,12 @@ namespace quda
 
   PreconCG::~PreconCG()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     extractInnerSolverParam(param, Kparam);
     destroyDeflationSpace();
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void PreconCG::create(ColorSpinorField &x, const ColorSpinorField &b)
@@ -54,7 +54,7 @@ namespace quda
     Solver::create(x, b);
 
     if (!init) {
-      profile.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       ColorSpinorParam csParam(b);
 
@@ -95,7 +95,7 @@ namespace quda
       csParam.setPrecision(param.precision_sloppy);
       x_update_batch = XUpdateBatch(Np, K ? minvr_sloppy : r_sloppy, csParam);
 
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     }
   }
@@ -108,7 +108,7 @@ namespace quda
 
     create(x, b);
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
@@ -117,7 +117,7 @@ namespace quda
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       warningQuda("Warning: inverting on zero-field source");
       x = b;
       param.true_res = 0.0;
@@ -183,8 +183,8 @@ namespace quda
       minvr_sloppy = minvr_pre;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0;                               // heavy quark residual
@@ -200,10 +200,8 @@ namespace quda
 
     if (K) rMinvr = reDotProduct(r_sloppy, minvr_sloppy);
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
-    blas::flops = 0;
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
     PrintStats("PCG", k, r2, b2, heavy_quark_res);
@@ -243,7 +241,7 @@ namespace quda
       }
 
       x_update_batch.get_current_alpha() = (K) ? rMinvr / pAp : r2 / pAp;
-      auto cg_norm = axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, r_sloppy);
+      double2 cg_norm = axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, r_sloppy);
       // r --> r - alpha*A*p
       r2_old = r2;
       r2 = cg_norm.x;
@@ -371,17 +369,13 @@ namespace quda
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     if (mixed()) copy(x, x_sloppy);
     xpy(y, x); // x += y
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
-    if (K) gflops += K->flops() * 1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -393,14 +387,7 @@ namespace quda
     double true_res = xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
 
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
-    matEig.flops();
-
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
 } // namespace quda

@@ -45,8 +45,7 @@ namespace quda
 
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0,
                        bool is_t0_kernel, int parity, int dir, bool dagger, const int *comm_override) :
-
-      DslashArg<Float, nDim>(in, U, parity, dagger, false, 3, false, comm_override),
+      DslashArg<Float, nDim>(out, in, U, in, parity, dagger, false, 3, false, comm_override),
       out(out, 3),
       in(in, 3),
       in_pack(in, 3),
@@ -56,12 +55,6 @@ namespace quda
       is_t0_kernel(is_t0_kernel),
       t0_offset(is_t0_kernel ? in.VolumeCB() / in.X(3) : 0)
     {
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      checkOrder(out, in);        // check all orders match
-      checkPrecision(out, in, U); // check all precisions match
-      checkLocation(out, in, U);  // check all locations match
-      if (!in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination", in.FieldOrder(), U.FieldOrder());
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
 
       for (int i = 0; i < 4; i++) {

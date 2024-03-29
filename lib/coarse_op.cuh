@@ -245,7 +245,7 @@ namespace quda {
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const override
     {
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV)
+      if (arg.shared_atomic && (type == COMPUTE_VUV || type == COMPUTE_VLV))
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
@@ -577,9 +577,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
       arg.kd_dagger = kd_dagger;
 
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
       Launch<location_template>(arg, tp, type, stream);
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
     /**
@@ -887,8 +885,8 @@ namespace quda {
 	X_atomic.backup();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.Gauge_p() == Y.Gauge_p()) Y.backup();
-	if (X_atomic.Gauge_p() == X.Gauge_p()) X.backup();
+        if (Y_atomic.data() == Y.data()) Y.backup();
+        if (X_atomic.data() == X.data()) X.backup();
         break;
       case COMPUTE_RESCALE:
         Y.backup();
@@ -921,8 +919,8 @@ namespace quda {
 	X_atomic.restore();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.Gauge_p() == Y.Gauge_p()) Y.restore();
-	if (X_atomic.Gauge_p() == X.Gauge_p()) X.restore();
+        if (Y_atomic.data() == Y.data()) Y.restore();
+        if (X_atomic.data() == X.data()) X.restore();
         break;
       case COMPUTE_RESCALE:
         Y.restore();

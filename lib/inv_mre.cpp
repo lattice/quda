@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  MinResExt::MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile) :
-    mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian), profile(profile)
+  MinResExt::MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian) :
+    mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian)
   {
   }
 
@@ -31,12 +31,12 @@ namespace quda
       // linear system is Hermitian, solve directly
       // compute rhs vector phi = P* b = (q_i, b) and construct the matrix
       // P* Q = P* A P = (p_i, q_j) = (p_i, A p_j)
-      blas::cDotProduct(A_, p, {q, b});
+      blas::block::cDotProduct(A_, p, {q, b});
     } else {
       // linear system is not Hermitian, solve the normal system
       // compute rhs vector phi = Q* b = (q_i, b) and construct the matrix
       // Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-      blas::cDotProduct(A_, q, {q, b});
+      blas::block::cDotProduct(A_, q, {q, b});
     }
 
     for (int i = 0; i < N; i++) {
@@ -44,14 +44,14 @@ namespace quda
       for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_CHRONO);
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
+    getProfile().TPSTART(QUDA_PROFILE_EIGEN);
 
     LDLT<matrix> cholesky(A);
     psi = cholesky.solve(phi);
 
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
-    profile.TPSTART(QUDA_PROFILE_CHRONO);
+    getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTART(QUDA_PROFILE_CHRONO);
 
     for (int i = 0; i < N; i++) psi_[i] = psi(i);
   }
@@ -70,8 +70,7 @@ namespace quda
   void MinResExt::operator()(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p,
                              std::vector<ColorSpinorField> &q)
   {
-    bool running = profile.isRunning(QUDA_PROFILE_CHRONO);
-    if (!running) profile.TPSTART(QUDA_PROFILE_CHRONO);
+    getProfile().TPSTART(QUDA_PROFILE_CHRONO);
 
     const int N = p.size();
     logQuda(QUDA_VERBOSE, "Constructing minimum residual extrapolation with basis size %d\n", N);
@@ -81,7 +80,7 @@ namespace quda
         blas::zero(x);
       else
         blas::copy(x, p[0]);
-      if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
+      getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
       return;
     }
 
@@ -94,13 +93,13 @@ namespace quda
 
         if (i + 1 < N) {
           std::vector<Complex> alpha(N - (i + 1));
-          blas::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
+          blas::block::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
           for (auto &a : alpha) a = -a;
-          blas::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
+          blas::block::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
 
           if (!apply_mat) {
             // if not applying the matrix below then orthogonalize q
-            blas::caxpy(alpha, {q[i]}, {q.begin() + i + 1, q.end()});
+            blas::block::caxpy(alpha, {q[i]}, {q.begin() + i + 1, q.end()});
           }
         }
       }
@@ -123,7 +122,7 @@ namespace quda
     }
 
     blas::zero(x);
-    blas::caxpy(alpha, p, x);
+    blas::block::caxpy(alpha, p, x);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       // compute the residual only if we're going to print it
@@ -133,7 +132,25 @@ namespace quda
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
-    if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
+    getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
+  }
+
+  void chronoExtrapolate(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &basis,
+                         DiracMatrix &m, bool hermitian)
+  {
+    getProfile().TPSTART(QUDA_PROFILE_CHRONO);
+
+    ColorSpinorParam cs_param(basis[0]);
+    std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
+
+    m(Ap, basis);
+
+    bool orthogonal = true;
+    bool apply_mat = false;
+    MinResExt mre(m, orthogonal, apply_mat, hermitian);
+    mre(x, b, basis, Ap);
+
+    getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
   }
 
 } // namespace quda

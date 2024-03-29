@@ -4,148 +4,157 @@
 #include <gauge_field_order.h>
 #include <clover_field_order.h>
 #include <kernel.h>
+#include <linalg.cuh>
 
 namespace quda {
 
-  template <typename Float, int nColor_>
-  struct CloverTraceArg : kernel_param<> {
+  template <typename Float, int nColor_, bool twist_> struct CloverTraceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
+    static constexpr bool twist = twist_;
     static constexpr int nColor = nColor_;
+    static constexpr int nSpin = 4;
+    static constexpr bool dynamic_clover = clover::dynamic_inverse();
     using C = typename clover_mapper<Float>::type;
     using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     G output;
-    const C clover1;
-    const C clover2;
+    const C clover;
+    const C clover_inv;
     real coeff;
+    real mu2_minus_epsilon2;
+    const int parity;
 
-    CloverTraceArg(GaugeField& output, const CloverField& clover, double coeff) :
-      kernel_param(dim3(clover.VolumeCB(), 1, 1)),
+    CloverTraceArg(GaugeField &output, const CloverField &clover, double coeff, int parity) :
+      kernel_param(dim3(output.VolumeCB(), 1, 1)),
       output(output),
-      clover1(clover, 0),
-      clover2(clover, 1),
-      coeff(coeff) {}
+      clover(clover, false),
+      clover_inv(clover, dynamic_clover ? false : true),
+      coeff(coeff),
+      mu2_minus_epsilon2(clover.Mu2() - clover.Epsilon2()),
+      parity(parity)
+    {
+    }
   };
 
-  template <typename Arg>
-  __device__ __host__ void cloverSigmaTraceCompute(const Arg &arg, const int x, int parity)
+  template <typename Arg> __device__ __host__ inline void cloverSigmaTraceCompute(const Arg &arg, const int x)
   {
+    using namespace linalg; // for Cholesky
     using real = typename Arg::real;
-    real A[72];
-    if (parity==0) arg.clover1.load(A,x,parity);
-    else arg.clover2.load(A,x,parity);
+    constexpr int N = Arg::nColor;
+    using Mat = HMatrix<real, N * Arg::nSpin / 2>;
+    Mat A[2];
 
     // load the clover term into memory
-    for (int mu=0; mu<4; mu++) {
-      for (int nu=0; nu<mu; nu++) {
+#pragma unroll
+    for (int ch = 0; ch < 2; ch++) {
+      A[ch] = arg.clover_inv(x, arg.parity, ch);
+      A[ch] *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
 
-        Matrix<complex<real>, Arg::nColor> mat;
-        setZero(&mat);
-
-        real diag[2][6];
-        complex<real> tri[2][15];
-        const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-        complex<real> ctmp;
-
-        for (int ch=0; ch<2; ++ch) {
-          // factor of two is inherent to QUDA clover storage
-          for (int i=0; i<6; i++) diag[ch][i] = 2.0*A[ch*36+i];
-          for (int i=0; i<15; i++) tri[ch][idtab[i]] = complex<real>(2.0*A[ch*36+6+2*i], 2.0*A[ch*36+6+2*i+1]);
+      if constexpr (Arg::dynamic_clover) {
+        if constexpr (Arg::twist) { // Compute (T^2 + mu2 - epsilon2) first, then invert
+          A[ch] = A[ch].square();
+          A[ch] += arg.mu2_minus_epsilon2;
         }
+
+        // compute the Cholesky decomposition
+        Cholesky<HMatrix, clover::cholesky_t<real>, N * Arg::nSpin / 2> cholesky(A[ch]);
+        A[ch] = cholesky.template invert<Mat>(); // return full inverse
+      }
+
+      if constexpr (Arg::twist) {
+        Mat A0 = arg.clover(x, arg.parity, ch);
+        A[ch] = static_cast<real>(0.5) * (A0 * A[ch]); // (1 + T + imu g_5)^{-1} = (1 + T - imu g_5)/((1 + T)^2 + mu^2)
+      }
+    }
+
+    const Mat &A0 = A[0];
+    const Mat &A1 = A[1];
+
+#pragma unroll
+    for (int mu = 0; mu < 4; mu++) {
+#pragma unroll
+      for (int nu = 0; nu < 4; nu++) {
+        if (nu >= mu) continue;
+        Matrix<complex<real>, Arg::nColor> mat = {};
 
         // X, Y
         if (nu == 0) {
           if (mu == 1) {
-            for (int j=0; j<3; ++j) {
-              mat(j,j).y = diag[0][j+3] + diag[1][j+3] - diag[0][j] - diag[1][j];
+#pragma unroll
+            for (int j = 0; j < N; ++j) {
+              mat(j, j).imag(A0(j + N, j + N).real() + A1(j + N, j + N).real() - A0(j, j).real() - A1(j, j).real());
             }
 
             // triangular part
-            int jk=0;
-            for (int j=1; j<3; ++j) {
-              int jk2 = (j+3)*(j+2)/2 + 3;
+#pragma unroll
+            for (int j = 1; j < N; ++j) {
+#pragma unroll
               for (int k=0; k<j; ++k) {
-                ctmp = tri[0][jk2] + tri[1][jk2] - tri[0][jk] - tri[1][jk];
-
-                mat(j,k).x = -ctmp.imag();
-                mat(j,k).y =  ctmp.real();
-                mat(k,j).x =  ctmp.imag();
-                mat(k,j).y =  ctmp.real();
-
-                jk++; jk2++;
+                auto ctmp = A0(j + N, k + N) + A1(j + N, k + N) - A0(j, k) - A1(j, k);
+                mat(j, k) = i_(ctmp);
+                mat(k, j) = i_(conj(ctmp));
               }
             } // X Y
 
           } else if (mu == 2) {
 
-            for (int j=0; j<3; ++j) {
-              int jk = (j+3)*(j+2)/2;
-              for (int k=0; k<3; ++k) {
-                int kj = (k+3)*(k+2)/2 + j;
-                mat(j,k) = conj(tri[0][kj]) - tri[0][jk] + conj(tri[1][kj]) - tri[1][jk];
-                jk++;
+#pragma unroll
+            for (int j = 0; j < N; ++j) {
+#pragma unroll
+              for (int k = 0; k < N; ++k) {
+                mat(j, k) = conj(A0(k + N, j)) - A0(j + N, k) + conj(A1(k + N, j)) - A1(j + N, k);
               }
             } // X Z
 
           } else if (mu == 3) {
-            for (int j=0; j<3; ++j) {
-              int jk = (j+3)*(j+2)/2;
-              for (int k=0; k<3; ++k) {
-                int kj = (k+3)*(k+2)/2 + j;
-                ctmp = conj(tri[0][kj]) + tri[0][jk] - conj(tri[1][kj]) - tri[1][jk];
-                mat(j,k).x = -ctmp.imag();
-                mat(j,k).y =  ctmp.real();
-                jk++;
+#pragma unroll
+            for (int j = 0; j < N; ++j) {
+#pragma unroll
+              for (int k = 0; k < N; ++k) {
+                mat(j, k) = i_(conj(A0(k + N, j)) + A0(j + N, k) - conj(A1(k + N, j)) - A1(j + N, k));
               }
             }
           } // mu == 3 // X T
+
         } else if (nu == 1) {
           if (mu == 2) { // Y Z
-            for (int j=0; j<3; ++j) {
-              int jk = (j+3)*(j+2)/2;
-              for (int k=0; k<3; ++k) {
-                int kj = (k+3)*(k+2)/2 + j;
-                ctmp = conj(tri[0][kj]) + tri[0][jk] + conj(tri[1][kj]) + tri[1][jk];
-                mat(j,k).x =  ctmp.imag();
-                mat(j,k).y = -ctmp.real();
-                jk++;
+#pragma unroll
+            for (int j = 0; j < N; ++j) {
+#pragma unroll
+              for (int k = 0; k < N; ++k) {
+                mat(j, k) = -i_(conj(A0(k + N, j)) + A0(j + N, k) + conj(A1(k + N, j)) + A1(j + N, k));
               }
             }
           } else if (mu == 3){ // Y T
-            for (int j=0; j<3; ++j) {
-              int jk = (j+3)*(j+2)/2;
-              for (int k=0; k<3; ++k) {
-                int kj = (k+3)*(k+2)/2 + j;
-                mat(j,k) = conj(tri[0][kj]) - tri[0][jk] - conj(tri[1][kj]) + tri[1][jk];
-                jk++;
+#pragma unroll
+            for (int j = 0; j < N; ++j) {
+#pragma unroll
+              for (int k = 0; k < N; ++k) {
+                mat(j, k) = conj(A0(k + N, j)) - A0(j + N, k) - conj(A1(k + N, j)) + A1(j + N, k);
               }
             }
           } // mu == 3
         } // nu == 1
         else if (nu == 2){
-          if (mu == 3) {
-            for (int j=0; j<3; ++j) {
-              mat(j,j).y = diag[0][j] - diag[0][j+3] - diag[1][j] + diag[1][j+3];
+          if (mu == N) {
+#pragma unroll
+            for (int j = 0; j < N; ++j) {
+              mat(j, j).imag(A0(j, j).real() - A0(j + N, j + N).real() - A1(j, j).real() + A1(j + N, j + N).real());
             }
-            int jk=0;
-            for (int j=1; j<3; ++j) {
-              int jk2 = (j+3)*(j+2)/2 + 3;
+#pragma unroll
+            for (int j = 1; j < N; ++j) {
+#pragma unroll
               for (int k=0; k<j; ++k) {
-                ctmp = tri[0][jk] - tri[0][jk2] - tri[1][jk] + tri[1][jk2];
-                mat(j,k).x = -ctmp.imag();
-                mat(j,k).y =  ctmp.real();
-
-                mat(k,j).x = ctmp.imag();
-                mat(k,j).y = ctmp.real();
-                jk++; jk2++;
+                auto ctmp = A0(j, k) - A0(j + N, k + N) - A1(j, k) + A1(j + N, k + N);
+                mat(j, k) = i_(ctmp);
+                mat(k, j) = i_(conj(ctmp));
               }
             }
           }
         }
 
-        mat *= arg.coeff;
-        arg.output((mu-1)*mu/2 + nu, x, parity) = mat;
+        arg.output((mu - 1) * mu / 2 + nu, x, arg.parity) = arg.coeff * mat;
       } // nu
-    } // mu
+    }   // mu
   }
 
   template <typename Arg> struct CloverSigmaTr
@@ -154,11 +163,7 @@ namespace quda {
     constexpr CloverSigmaTr(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
-    {
-      // odd parity
-      cloverSigmaTraceCompute<Arg>(arg, x_cb, 1);
-    }
+    __device__ __host__ inline void operator()(int x_cb) { cloverSigmaTraceCompute<Arg>(arg, x_cb); }
   };
 
 }

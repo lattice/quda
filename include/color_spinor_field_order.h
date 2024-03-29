@@ -306,7 +306,7 @@ namespace quda
       }
     };
 
-    // specialized varient for packed half precision staggered
+    // specialized variant for packed half precision staggered
     template <> struct AccessorCB<short, 1, 3, 1, QUDA_FLOAT2_FIELD_ORDER> {
       int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<short>)) { }
@@ -877,14 +877,13 @@ namespace quda
       FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *const v_ = 0, void *const *ghost_ = 0) :
         GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
       {
-        v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) :
-                   static_cast<complex<storeFloat> *>(const_cast<void *>(field.V()));
+        v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) : field.data<complex<storeFloat> *>();
         resetScale(field.Scale());
 
         if constexpr (fixed && block_float) {
           if constexpr (nColor == 3 && nSpin == 1 && nVec == 1 && order == 2)
             // special case where the norm is packed into the per site struct
-            v.norm = reinterpret_cast<norm_t *>(const_cast<void *>(field.V()));
+            v.norm = field.data<norm_t *>();
           else
             v.norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
           v.norm_offset = field.Bytes() / (2 * sizeof(norm_t));
@@ -915,24 +914,30 @@ namespace quda
        */
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], int parity, int x_cb,
-                                           int chi) const
+                                           int chi = 0) const
       {
         if (!fixed) {
           accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v.v, parity, x_cb, chi, volumeCB);
         } else {
           complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
-          accessor.template load<nSpinBlock>(tmp, v.v, parity, x_cb, chi, volumeCB);
-
           Float norm_ = 0.0;
-          if constexpr (fixed) {
-            if constexpr (block_float) {
-              if constexpr (nColor == 3 && nSpin == 1 && nVec == 1)
-                // special case where the norm is packed into the per site struct
-                norm_ = v.norm[parity * v.norm_offset + 4 * x_cb + 3];
-              else
+          if constexpr (fixed && block_float && nColor == 3 && nSpin == 1 && nVec == 1) {
+            // special case where the norm is packed into the per site struct
+            complex<storeFloat> tmp2[4];
+            AccessorCB<storeFloat, 1, 4, 1, QUDA_FLOAT8_FIELD_ORDER> accessor;
+            accessor.offset_cb = this->accessor.offset_cb;
+            accessor.template load<nSpinBlock>(tmp2, v.v, parity, x_cb, 0, volumeCB);
+            for (auto i = 0; i < 3; i++) tmp[i] = tmp2[i];
+            memcpy(&norm_, tmp2 + 3, sizeof(float));
+          } else {
+            accessor.template load<nSpinBlock>(tmp, v.v, parity, x_cb, chi, volumeCB);
+
+            if constexpr (fixed) {
+              if constexpr (block_float) {
                 norm_ = v.norm[parity * v.norm_offset + x_cb];
-            } else {
-              norm_ = v.scale_inv;
+              } else {
+                norm_ = v.scale_inv;
+              }
             }
           }
 #pragma unroll
@@ -1075,32 +1080,36 @@ namespace quda
       using GhostVector = typename VectorType<Float, N_ghost>::type;
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
-      Float *field;
-      norm_type *norm;
-      const AllocInt offset; // offset can be 32-bit or 64-bit
-      const AllocInt norm_offset;
-      int volumeCB;
-      int faceVolumeCB[4];
-      mutable Float *ghost[8];
-      mutable norm_type *ghost_norm[8];
-      int nParity;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+      Float *field = nullptr;
+      norm_type *norm = nullptr;
+      AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      AllocInt norm_offset = 0;
+      int volumeCB = 0;
+      array<int, 4> faceVolumeCB = {};
+      mutable array<Float *, 8> ghost = {};
+      mutable array<norm_type *, 8> ghost_norm = {};
+      int nParity = 0;
+      void *backup_h = nullptr; //! host memory for backing up the field when tuning
+      size_t bytes = 0;
+
+      FloatNOrder() = default;
+      FloatNOrder(const FloatNOrder &) = default;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
-        field(buffer ? buffer : (Float *)a.V()),
+        field(buffer ? buffer : a.data<Float *>()),
         norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
                       const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
         norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        backup_h(nullptr),
         bytes(a.Bytes())
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
         resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
       }
+
+      FloatNOrder &operator=(const FloatNOrder &) = default;
 
       void resetGhost(void *const *ghost_) const
       {
@@ -1306,26 +1315,30 @@ namespace quda
       using GhostVector = int4; // 128-bit packed type
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
-      Float *field;
-      const AllocInt offset; // offset can be 32-bit or 64-bit
-      int volumeCB;
-      int faceVolumeCB[4];
-      mutable Float *ghost[8];
-      int nParity;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+      Float *field = nullptr;
+      const AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      int volumeCB = 0;
+      array<int, 4> faceVolumeCB = {};
+      mutable array<Float *, 8> ghost = {};
+      int nParity = 0;
+      void *backup_h = nullptr; //! host memory for backing up the field when tuning
+      size_t bytes = 0;
+
+      FloatNOrder() = default;
+      FloatNOrder(const FloatNOrder &) = default;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
-        field(buffer ? buffer : (Float *)a.V()),
+        field(buffer ? buffer : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Vector))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        backup_h(nullptr),
         bytes(a.Bytes())
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
         resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
       }
+
+      FloatNOrder &operator=(const FloatNOrder &) = default;
 
       void resetGhost(void *const *ghost_) const
       {
@@ -1505,7 +1518,7 @@ namespace quda
       int faceVolumeCB[4];
       int nParity;
       SpaceColorSpinorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
+        field(field_ ? field_ : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset())
@@ -1589,7 +1602,7 @@ namespace quda
       int faceVolumeCB[4];
       int nParity;
       SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
+        field(field_ ? field_ : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset())
@@ -1668,7 +1681,7 @@ namespace quda
       int exDim[4]; // full field dimensions
       PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0,
                                   Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
+        field(field_ ? field_ : a.data<Float *>()),
         volumeCB(a.VolumeCB()),
         exVolumeCB(1),
         nParity(a.SiteSubset()),
@@ -1763,7 +1776,7 @@ namespace quda
       int volumeCB;
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
-        field(field_ ? field_ : (Float *)a.V()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
+        field(field_ ? field_ : a.data<Float *>()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
       {
       }
 

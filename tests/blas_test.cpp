@@ -9,6 +9,8 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
+#include <tune_quda.h>
+
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 
@@ -485,43 +487,43 @@ protected:
         break;
 
       case Kernel::axpy_block:
-        for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::axpy(Ar, xmD, ymoD);
         break;
 
       case Kernel::caxpy_block:
-        for (int i = 0; i < niter; ++i) blas::caxpy(A, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::caxpy(A, xmD, ymoD);
         break;
 
       case Kernel::axpyz_block:
-        for (int i = 0; i < niter; ++i) blas::axpyz(Ar, xmD, ymD, wmD);
+        for (int i = 0; i < niter; ++i) blas::block::axpyz(Ar, xmD, ymD, wmD);
         break;
 
       case Kernel::caxpyz_block:
-        for (int i = 0; i < niter; ++i) blas::caxpyz(A, xmD, ymD, wmD);
+        for (int i = 0; i < niter; ++i) blas::block::caxpyz(A, xmD, ymD, wmD);
         break;
 
       case Kernel::axpyBzpcx_block:
-        for (int i = 0; i < niter; ++i) blas::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
+        for (int i = 0; i < niter; ++i) blas::block::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
         break;
 
       case Kernel::reDotProductNorm_block:
-        for (int i = 0; i < niter; ++i) blas::reDotProduct(A2r, xmD, xmD);
+        for (int i = 0; i < niter; ++i) blas::block::reDotProduct(A2r, xmD, xmD);
         break;
 
       case Kernel::reDotProduct_block:
-        for (int i = 0; i < niter; ++i) blas::reDotProduct(A2r, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::reDotProduct(A2r, xmD, ymoD);
         break;
 
       case Kernel::cDotProductNorm_block:
-        for (int i = 0; i < niter; ++i) blas::cDotProduct(A2, xmD, xmD);
+        for (int i = 0; i < niter; ++i) blas::block::cDotProduct(A2, xmD, xmD);
         break;
 
       case Kernel::cDotProduct_block:
-        for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD, ymoD);
+        for (int i = 0; i < niter; ++i) blas::block::cDotProduct(A, xmD, ymoD);
         break;
 
       case Kernel::hDotProduct_block:
-        for (int i = 0; i < niter; ++i) blas::hDotProduct(A2, xmD, xmD);
+        for (int i = 0; i < niter; ++i) blas::block::hDotProduct(A2, xmD, xmD);
         break;
 
       case Kernel::caxpyXmazMR:
@@ -601,7 +603,8 @@ protected:
       xD = xH;
       yoD = yH;
       blas::axpbyz(a, xD, b, yoD, zoD);
-      blas::axpbyz(a, xH, b, yH, zH);
+      blas::axy(a, xH, zH);
+      blas::axpy(b, yH, zH);
       error = ERROR(zo);
       break;
 
@@ -611,22 +614,24 @@ protected:
       zD = zH;
       wD = wH;
       blas::axpbypczw(a, xD, b, yD, c, zD, wD);
-      blas::axpbypczw(a, xH, b, yH, c, zH, wH);
+      blas::axy(a, xH, wH);
+      blas::axpy(b, yH, wH);
+      blas::axpy(c, zH, wH);
       error = ERROR(w);
       break;
 
     case Kernel::ax:
       xD = xH;
       blas::ax(a, xD);
-      blas::ax(a, xH);
-      error = ERROR(x);
+      error = (blas::norm2(xD) - a * a * blas::norm2(xH)) / (a * a * blas::norm2(xH));
       break;
 
     case Kernel::caxpy:
       xD = xH;
       yoD = yH;
       blas::caxpy(a2, xD, yoD);
-      blas::caxpy(a2, xH, yH);
+      blas::axy(a2, xH, xH);
+      blas::xpy(xH, yH);
       error = ERROR(yo);
       break;
 
@@ -634,7 +639,9 @@ protected:
       xD = xH;
       yD = yH;
       blas::caxpby(a2, xD, b2, yD);
-      blas::caxpby(a2, xH, b2, yH);
+      blas::axy(a2, xH, xH);
+      blas::axy(b2, yH, yH);
+      blas::xpy(xH, yH);
       error = ERROR(y);
       break;
 
@@ -643,7 +650,8 @@ protected:
       yD = yH;
       zD = zH;
       blas::cxpaypbz(xD, a2, yD, b2, zD);
-      blas::cxpaypbz(xH, a2, yH, b2, zH);
+      blas::caxpby(1.0, xH, a2, yH);
+      blas::caxpby(1.0, yH, b2, zH);
       error = ERROR(z);
       break;
 
@@ -652,7 +660,8 @@ protected:
       yoD = yH;
       zD = zH;
       blas::axpyBzpcx(a, xD, yoD, b, zD, c);
-      blas::axpyBzpcx(a, xH, yH, b, zH, c);
+      blas::axpy(a, xH, yH);
+      blas::axpby(b, zH, c, xH);
       error = ERROR(x) + ERROR(yo);
       break;
 
@@ -661,7 +670,8 @@ protected:
       yoD = yH;
       zD = zH;
       blas::axpyZpbx(a, xD, yoD, zD, b);
-      blas::axpyZpbx(a, xH, yH, zH, b);
+      blas::axpy(a, xH, yH);
+      blas::xpay(zH, b, xH);
       error = ERROR(x) + ERROR(yo);
       break;
 
@@ -671,7 +681,9 @@ protected:
       zD = zH;
       wD = wH;
       blas::caxpbypzYmbw(a2, xD, b2, yD, zD, wD);
-      blas::caxpbypzYmbw(a2, xH, b2, yH, zH, wH);
+      blas::caxpy(a2, xH, zH);
+      blas::caxpy(b2, yH, zH);
+      blas::caxpy(-b2, wH, yH);
       error = ERROR(z) + ERROR(y);
       break;
 
@@ -679,7 +691,8 @@ protected:
       xD = xH;
       yD = yH;
       blas::cabxpyAx(a, b2, xD, yD);
-      blas::cabxpyAx(a, b2, xH, yH);
+      blas::caxpy(a * b2, xH, yH);
+      blas::ax(a, xH);
       error = ERROR(y) + ERROR(x);
       break;
 
@@ -688,8 +701,9 @@ protected:
       yD = yH;
       zD = zH;
       {
-        blas::caxpyXmaz(a, xD, yD, zD);
-        blas::caxpyXmaz(a, xH, yH, zH);
+        blas::caxpyXmaz(a2, xD, yD, zD);
+        blas::caxpy(a2, xH, yH);
+        blas::caxpy(-a2, zH, xH);
         error = ERROR(y) + ERROR(x);
       }
       break;
@@ -710,7 +724,8 @@ protected:
       yD = yH;
       {
         double d = blas::axpbyzNorm(a, xD, b, yD, zD);
-        double h = blas::axpbyzNorm(a, xH, b, yH, zH);
+        blas::axpbyz(a, xH, b, yH, zH);
+        double h = blas::norm2(zH);
         error = ERROR(z) + fabs(d - h) / fabs(h);
       }
       break;
@@ -720,7 +735,11 @@ protected:
       yoD = yH;
       {
         double2 d = blas::axpyCGNorm(a, xD, yoD);
-        double2 h = blas::axpyCGNorm(a, xH, yH);
+        ColorSpinorField yH_old(yH);
+        blas::axpy(a, xH, yH);
+        blas::axpy(-1.0, yH, yH_old);
+        blas::ax(-1.0, yH_old);
+        double2 h = {blas::norm2(yH), blas::reDotProduct(yH, yH_old)};
         error = ERROR(yo) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y);
       }
       break;
@@ -729,8 +748,9 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double d = blas::caxpyNorm(a, xD, yD);
-        double h = blas::caxpyNorm(a, xH, yH);
+        double d = blas::caxpyNorm(a2, xD, yD);
+        blas::caxpy(a2, xH, yH);
+        double h = blas::norm2(yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -740,7 +760,9 @@ protected:
       yD = yH;
       {
         double d = blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
-        double h = blas::cabxpyzAxNorm(a, b2, xH, yH, yH);
+        blas::ax(a, xH);
+        blas::caxpy(b2, xH, yH);
+        double h = blas::norm2(yH);
         error = ERROR(x) + ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -757,7 +779,8 @@ protected:
       zD = zH;
       {
         quda::Complex d = blas::caxpyDotzy(a, xD, yD, zD);
-        quda::Complex h = blas::caxpyDotzy(a, xH, yH, zH);
+        blas::caxpy(a, xH, yH);
+        quda::Complex h = blas::cDotProduct(zH, yH);
         error = ERROR(y) + abs(d - h) / abs(h);
       }
       break;
@@ -766,7 +789,7 @@ protected:
       xD = xH;
       yD = yH;
       {
-        auto d = blas::cDotProductNormAB(xD, yD);
+        double4 d = blas::cDotProductNormAB(xD, yD);
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
@@ -783,7 +806,10 @@ protected:
       vD = vH;
       {
         double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zD, wD, vD);
-        double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, xH, b2, yH, zH, wH, vH);
+        blas::caxpy(a2, xH, zH);
+        blas::caxpy(b2, yH, zH);
+        blas::caxpy(-b2, wH, yH);
+        double3 h = {blas::cDotProduct(vH, yH).real(), blas::cDotProduct(vH, yH).imag(), blas::norm2(yH)};
         error = ERROR(z) + ERROR(y) + abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y))
           + fabs(d.z - h.z) / fabs(h.z);
       }
@@ -805,8 +831,9 @@ protected:
       zD = zH;
       {
         double3 d = blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
-        double3 h = blas::xpyHeavyQuarkResidualNorm(xH, yH, zH);
-        error = ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
+        blas::xpy(xH, yH);
+        double3 h = blas::HeavyQuarkResidualNorm(yH, zH);
+        error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
       }
       break;
 
@@ -828,7 +855,9 @@ protected:
       wD = wH;
       {
         blas::tripleCGUpdate(a, b, xD, yD, zD, wD);
-        blas::tripleCGUpdate(a, b, xH, yH, zH, wH);
+        blas::axpy(a, wH, yH);
+        blas::axpy(-a, xH, zH);
+        blas::axpbyz(b, wH, 1.0, zH, wH);
         error = ERROR(y) + ERROR(z) + ERROR(w);
       }
       break;
@@ -838,7 +867,8 @@ protected:
       yD = yH;
       {
         double d = blas::axpyReDot(a, xD, yD);
-        double h = blas::axpyReDot(a, xH, yH);
+        blas::axpy(a, xH, yH);
+        double h = blas::reDotProduct(xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -849,7 +879,8 @@ protected:
       zD = zH;
       {
         blas::caxpyBxpz(a, xD, yD, b2, zD);
-        blas::caxpyBxpz(a, xH, yH, b2, zH);
+        blas::caxpy(a, xH, yH);
+        blas::caxpy(b2, xH, zH);
         error = ERROR(x) + ERROR(z);
       }
       break;
@@ -860,7 +891,8 @@ protected:
       zD = zH;
       {
         blas::caxpyBzpx(a, xD, yD, b2, zD);
-        blas::caxpyBzpx(a, xH, yH, b2, zH);
+        blas::caxpy(a, xH, yH);
+        blas::caxpy(b2, zH, xH);
         error = ERROR(x) + ERROR(z);
       }
       break;
@@ -869,7 +901,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
 
-      blas::axpy(Ar, xmD, ymoD);
+      blas::block::axpy(Ar, xmD, ymoD);
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) { blas::axpy(Ar[Msrc * i + j], xmH[i], ymH[j]); }
       }
@@ -885,7 +917,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
 
-      blas::caxpy(A, xmD, ymoD);
+      blas::block::caxpy(A, xmD, ymoD);
       for (int j = 0; j < Msrc; j++) {
         for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], xmH[i], ymH[j]); }
       }
@@ -900,7 +932,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
 
-      blas::axpyz(Ar, xmD, ymD, wmD);
+      blas::block::axpyz(Ar, xmD, ymD, wmD);
       for (int j = 0; j < Msrc; j++) {
         wmH[j] = ymH[j];
         for (int i = 0; i < Nsrc; i++) { blas::axpy(Ar[Msrc * i + j], xmH[i], wmH[j]); }
@@ -916,7 +948,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
 
-      blas::caxpyz(A, xmD, ymD, wmD);
+      blas::block::caxpyz(A, xmD, ymD, wmD);
       for (int j = 0; j < Msrc; j++) {
         wmH[j] = ymH[j];
         for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], xmH[i], wmH[j]); }
@@ -935,7 +967,7 @@ protected:
       }
       yD = yH;
 
-      blas::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
+      blas::block::axpyBzpcx(A1r, xmD, zmoD, B1r, yD, C1r);
 
       for (int i = 0; i < Nsrc; i++) blas::axpyBzpcx(A1r[i], xmH[i], zmH[i], B1r[i], yH, C1r[i]);
 
@@ -949,7 +981,7 @@ protected:
 
     case Kernel::reDotProductNorm_block:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
-      blas::reDotProduct(A2r, xmD, xmD);
+      blas::block::reDotProduct(A2r, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
@@ -964,7 +996,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
-      blas::reDotProduct(Ar, xmD, ymoD);
+      blas::block::reDotProduct(Ar, xmD, ymoD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) {
@@ -977,7 +1009,7 @@ protected:
 
     case Kernel::cDotProductNorm_block:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
-      blas::cDotProduct(A2, xmD, xmD);
+      blas::block::cDotProduct(A2, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
@@ -992,7 +1024,7 @@ protected:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
       for (int i = 0; i < Msrc; i++) ymoD[i] = ymH[i];
       for (int i = 0; i < Msrc; i++) ymD[i] = ymH[i];
-      blas::cDotProduct(A, xmD, ymoD);
+      blas::block::cDotProduct(A, xmD, ymoD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) {
@@ -1005,8 +1037,8 @@ protected:
 
     case Kernel::hDotProduct_block:
       for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
-      blas::hDotProduct(A2, xmD, xmD);
-      blas::cDotProduct(B2, xmD, xmD);
+      blas::block::hDotProduct(A2, xmD, xmD);
+      blas::block::cDotProduct(B2, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
@@ -1152,14 +1184,13 @@ TEST_P(BlasTest, benchmark)
   // do the initial tune
   benchmark(kernel, 1);
 
-  // now rerun with more iterations to get accurate speed measurements
-  quda::blas::flops = 0;
-  quda::blas::bytes = 0;
+  auto flops0 = quda::Tunable::flops_global();
+  auto bytes0 = quda::Tunable::bytes_global();
 
   double secs = benchmark(kernel, niter);
 
-  double gflops = (quda::blas::flops * 1e-9) / (secs);
-  double gbytes = quda::blas::bytes / (secs * 1e9);
+  double gflops = (quda::Tunable::flops_global() - flops0) * 1e-9 / secs;
+  double gbytes = (quda::Tunable::bytes_global() - bytes0) / (secs * 1e9);
   RecordProperty("Gflops", std::to_string(gflops));
   RecordProperty("GBs", std::to_string(gbytes));
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", kernel_map.at(kernel).c_str(), gflops, gbytes);

@@ -12,6 +12,7 @@ namespace quda {
     double epsilon;
     const paths<4> &p;
     unsigned int minThreads() const { return mom.VolumeCB(); }
+    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     ForceGauge(const GaugeField &u, GaugeField &mom, double epsilon, const paths<4> &p) :
@@ -48,6 +49,7 @@ namespace quda {
   void gaugeForce(GaugeField& mom, const GaugeField& u, double epsilon, std::vector<int**>& input_path,
                   std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(mom, u);
     checkLocation(mom, u);
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
@@ -57,11 +59,13 @@ namespace quda {
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugeForce_>(u, mom, epsilon, p);
     p.free();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
   
   void gaugePath(GaugeField& out, const GaugeField& u, double coeff, std::vector<int**>& input_path,
 		 std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(out, u);
     checkLocation(out, u);
     if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruction type %d not supported", out.Reconstruct());
@@ -71,6 +75,7 @@ namespace quda {
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugePath>(u, out, coeff, p);
     p.free();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

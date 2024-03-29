@@ -12,8 +12,8 @@
 namespace quda
 {
 
-  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile)
+  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param) :
+    Solver(mat, matSloppy, matSloppy, matSloppy, param)
   {
     if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ && param.Nsteps % 2 == 1) {
       errorQuda("For multiplicative Schwarz, number of solver steps %d must be even", param.Nsteps);
@@ -38,7 +38,7 @@ namespace quda
       bool mixed = param.precision != param.precision_sloppy;
 
       if (!mixed) csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      csParam.v = r.V();
+      csParam.v = r.data();
       r_sloppy = ColorSpinorField(csParam);
 
       init = true;
@@ -62,10 +62,7 @@ namespace quda
 
     create(x, b); // allocate fields
 
-    if (!param.is_preconditioner) {
-      blas::flops = 0;
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    }
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     double b2 = blas::norm2(b); // Save norm of b
     double r2 = 0.0;            // if zero source then we will exit immediately doing no work
@@ -112,7 +109,7 @@ namespace quda
           matSloppy(Ar, r_sloppy);
 
           if (param.global_reduction) {
-            auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
+            double4 Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
             Complex alpha = Complex(Ar4.x, Ar4.y) / Ar4.z;
             r2 = Ar4.w;
             PrintStats("MR (inner)", iter, r2, b2, 0.0);
@@ -159,18 +156,8 @@ namespace quda
     PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-
-      // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops()) * 1e-9;
-
-      param.gflops += gflops;
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += iter;
-      blas::flops = 0;
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
   }
 

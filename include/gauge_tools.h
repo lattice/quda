@@ -9,9 +9,8 @@ namespace quda
    * @param[in] Gauge field upon which we are measuring.
    * @param[in,out] param Parameter struct that defines which
    * observables we are making and the resulting observables.
-   * @param[in] profile TimeProfile instance used for profiling.
    */
-  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
+  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param);
 
   /**
    * @brief Project the input gauge field onto the SU(3) group.  This
@@ -96,8 +95,9 @@ namespace quda
      @param[out] dataDs Output smeared field
      @param[in] dataOr Input gauge field
      @param[in] alpha smearing parameter
+     @param[in] dir_ignore ignored direction
   */
-  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha);
+  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha, int dir_ignore);
 
   /**
      @brief Apply STOUT smearing to the gauge field
@@ -105,8 +105,9 @@ namespace quda
      @param[out] dataDs Output smeared field
      @param[in] dataOr Input gauge field
      @param[in] rho smearing parameter
+     @param[in] dir_ignore ignored direction
   */
-  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho);
+  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, int dir_ignore);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
@@ -115,8 +116,20 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] rho smearing parameter
      @param[in] epsilon smearing parameter
+     @param[in] dir_ignore ignored direction
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore);
+
+  /**
+     @brief Apply HYP smearing to the gauge field
+     @param[out] dataDs Output smeared field
+     @param[in] dataOr Input gauge field
+     @param[in] alpha1 smearing parameter
+     @param[in] alpha2 smearing parameter
+     @param[in] alpha3 smearing parameter
+     @param[in] dir_ignore ignored direction
+  */
+  void HYPStep(GaugeField &dataDs, GaugeField &dataOr, double alpha1, double alpha2, double alpha3, int dir_ignore);
 
   /**
      @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field.

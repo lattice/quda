@@ -57,31 +57,25 @@ namespace quda
     if (dagger == QUDA_DAG_NO) {
 
       if (mass == 0.) {
-        ApplyImprovedStaggered(tmp, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
+        ApplyImprovedStaggered(tmp, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data,
                                profile);
-        flops += 1146ll * in.Volume();
       } else {
-        ApplyImprovedStaggered(tmp, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
+        ApplyImprovedStaggered(tmp, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim.data,
                                profile);
-        flops += 1158ll * in.Volume();
       }
 
       ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
     } else { // QUDA_DAG_YES
 
       ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
       if (mass == 0.) {
-        ApplyImprovedStaggered(out, tmp, *fatGauge, *longGauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
+        ApplyImprovedStaggered(out, tmp, *fatGauge, *longGauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data,
                                profile);
-        flops += 1146ll * in.Volume();
       } else {
-        ApplyImprovedStaggered(out, tmp, *fatGauge, *longGauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger, commDim,
-                               profile);
-        flops += 1158ll * in.Volume();
+        ApplyImprovedStaggered(out, tmp, *fatGauge, *longGauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger,
+                               commDim.data, profile);
       }
     }
   }
@@ -98,8 +92,9 @@ namespace quda
     ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }
 
-  void DiracImprovedStaggeredKD::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-                                         ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracImprovedStaggeredKD::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                         const QudaSolutionType solType) const
   {
     // TODO: technically KD is a different type of preconditioning.
     // Should we support "preparing" and "reconstructing"?
@@ -107,37 +102,49 @@ namespace quda
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracImprovedStaggeredKD::prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-                                                  ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracImprovedStaggeredKD::prepareSpecialMG(cvector_ref<ColorSpinorField> &sol,
+                                                  cvector_ref<ColorSpinorField> &src, cvector_ref<ColorSpinorField> &x,
+                                                  cvector_ref<const ColorSpinorField> &b,
+                                                  const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    checkFullSpinor(x, b);
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
 
-    // need to modify rhs
-    auto tmp = getFieldTmp(b);
-    KahlerDiracInv(tmp, b);
+      src[i] = getFieldTmp(b[i]);
+      KahlerDiracInv(src[i], b[i]);
 
-    // if we're preconditioning the Schur op, we need to rescale by the mass
-    if (parent_dirac_type == QUDA_ASQTAD_DIRAC) {
-      b = tmp;
-    } else if (parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
-      b = tmp;
-      blas::ax(0.5 / mass, b);
-    } else
-      errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
+      // if we're preconditioning the Schur op, we need to rescale by the mass
+      // parent could be an ASQTAD operator if we've enabled dropping the long links
+      if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
+        // do nothing
+      } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
+        blas::ax(0.5 / mass, src[i]);
+      } else {
+        errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
+      }
 
-    sol = &x;
-    src = &b;
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracImprovedStaggeredKD::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracImprovedStaggeredKD::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                             const QudaSolutionType) const
+  {
+    // do nothing
+  }
+
+  void DiracImprovedStaggeredKD::reconstructSpecialMG(cvector_ref<ColorSpinorField> &,
+                                                      cvector_ref<const ColorSpinorField> &, const QudaSolutionType) const
   {
     // do nothing
 
@@ -145,17 +152,8 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracImprovedStaggeredKD::reconstructSpecialMG(ColorSpinorField &, const ColorSpinorField &,
-                                                      const QudaSolutionType) const
-  {
-    // do nothing
-
-    // TODO: technically KD is a different type of preconditioning.
-    // Should we support "preparing" and "reconstructing"?
-  }
-
-  void DiracImprovedStaggeredKD::updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in,
-                                              cudaGaugeField *long_gauge_in, CloverField *)
+  void DiracImprovedStaggeredKD::updateFields(GaugeField *, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
+                                              CloverField *)
   {
     Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
     fatGauge = fat_gauge_in;

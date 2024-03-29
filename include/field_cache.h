@@ -123,7 +123,7 @@ namespace quda {
      @param[in] a Vector of fields we wish to create a matching
      temporary for
    */
-  template <typename T> auto getFieldTmp(const vector_ref<T> &a)
+  template <typename T> auto getFieldTmp(cvector_ref<T> &a)
   {
     std::vector<FieldTmp<T>> tmp;
     tmp.reserve(a.size());

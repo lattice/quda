@@ -40,26 +40,37 @@ extern QudaPrecision &cuda_prec_eigensolver;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
+// Determine if the Laplace operator has been defined
+constexpr bool is_enabled_laplace()
+{
+#ifdef QUDA_LAPLACE
+  return true;
+#else
+  return false;
+#endif
+}
+
 // Set some basic parameters via command line or use defaults
 // Implemented in set_params.cpp
-void setQudaStaggeredEigTestParams();
-void setQudaStaggeredInvTestParams();
+void setQudaStaggeredDefaultInvTestParams();
 
 // Staggered gauge field utils
 //------------------------------------------------------
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
-                                            int argc, char **argv, bool &gauge_loaded);
+                                            int argc, char **argv);
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv);
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu);
 void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaPrecision precision, QudaGaugeParam *,
                                 QudaDslashType dslash_type);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
 void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
-                         void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik);
+                         void *qudaGaugeParamPtr, std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik);
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
-void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void** ghost_twolnk,  quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param, const int oddBit, const double width, const int t0, QudaPrecision prec);
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
+                                   quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,
+                                   const int oddBit, const double width, const int t0, QudaPrecision prec);
 template <typename Float>
 void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type);
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type,
@@ -90,6 +101,7 @@ void setQudaDefaultMgTestParams();
 //------------------------------------------------------
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
+void constructHostGaugeField(quda::GaugeField &gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);
@@ -109,11 +121,20 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 
 // Helper functions
 //------------------------------------------------------
-inline bool isPCSolution(QudaSolutionType solution_type)
-{
-  return (solution_type == QUDA_MATPC_SOLUTION || solution_type == QUDA_MATPC_DAG_SOLUTION
-          || solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-}
+bool is_pc_solution(QudaSolutionType solution_type);
+bool is_full_solution(QudaSolutionType type);
+
+bool is_preconditioned_solve(QudaSolveType type);
+bool is_normal_solve(QudaInverterType inv_type, QudaSolveType solve_type);
+
+bool is_hermitian_solver(QudaInverterType type);
+bool support_solution_accumulator_pipeline(QudaInverterType type);
+bool is_normal_residual(QudaInverterType type);
+
+bool is_staggered(QudaDslashType type);
+bool is_chiral(QudaDslashType type);
+bool is_laplace(QudaDslashType type);
+
 //------------------------------------------------------
 
 // Reports basic statistics of flops and solver iterations
@@ -168,7 +189,9 @@ enum {
    @param[in] precision Precision of field
    @param[in] phase Type of phase; 0 == no additional phase, 1 == MILC phases, 2 == U(1) phase
  */
-void createSiteLinkCPU(void **link, QudaPrecision precision, int phase);
+void createSiteLinkCPU(void *const *const link, QudaPrecision precision, int phase);
+void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase);
+
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
 void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,
                      QudaGaugeParam *param);
@@ -181,6 +204,8 @@ double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecisio
 void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
+int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, const quda::GaugeField &linkB,
+                      const std::string &msgB);
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
 
 /**
@@ -189,7 +214,7 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
  */
 double mom_action(void *mom, QudaPrecision prec, int len);
 
-void createMomCPU(void *mom, QudaPrecision precision);
+void createMomCPU(void *mom, QudaPrecision precision, double max_val = 1.0);
 
 /**
    @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations

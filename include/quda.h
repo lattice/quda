@@ -62,7 +62,7 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
+    int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
@@ -847,8 +847,15 @@ extern "C" {
                              Wilson/Symanzik flow */
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/
+    double alpha2;                 /**< The coefficient used in HYP smearing step 2*/
+    double alpha3;                 /**< The coefficient used in HYP smearing step 1*/
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+    QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
+    double t0;                     /**< Starting flow time for Wilson flow */
+    int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
+                                        A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
   } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
@@ -1498,7 +1505,7 @@ extern "C" {
   void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
-   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Reinterpret gauge as a pointer to a GaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
    */
@@ -1512,9 +1519,9 @@ extern "C" {
   void createCloverQuda(QudaInvertParam* param);
 
   /**
-   * Compute the clover force contributions in each dimension mu given
-   * the array of solution fields, and compute the resulting momentum
-   * field.
+   * Compute the clover force contributions from a set of partial
+   * fractions stemming from a rational approximation suitable for use
+   * within MILC.
    *
    * @param mom Force matrix
    * @param dt Integrating step size
@@ -1532,6 +1539,23 @@ extern "C" {
   void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
 			      int nvector, double multiplicity, void *gauge,
 			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+
+  /**
+   * Compute the force from a clover or twisted clover determinant or
+   * a set of partial fractions stemming from a rational approximation
+   * suitable for use from within tmLQCD.
+   *
+   * @param h_mom Host force matrix
+   * @param h_x Array of solution vectors x_i = ( Q^2 + s_i )^{-1} b
+   * @param h_x0 Array of source vector necessary to compute the force of a ratio of determinant
+   * @param coeff Array of coefficients for the rational approximation or {1.0} for the determinant.
+   * @param nvector Number of solution vectors and coefficients
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   * @param detratio if 0 compute the force of a determinant otherwise compute the force from a ratio of determinants
+   */
+  void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.
@@ -1683,12 +1707,10 @@ extern "C" {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
    */
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                                const unsigned int reunit_interval, const unsigned int stopWtheta,
-                                QudaGaugeParam *param, double *timeinfo);
+                                const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -1702,12 +1724,10 @@ extern "C" {
    * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
    */
   int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
-                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
-                                double *timeinfo);
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Strided Batched GEMM
@@ -1764,9 +1784,11 @@ extern "C" {
     int delete_2link;
     /** Set if the input spinor is on a time slice **/
     int t0;
+    /** Time taken for the smearing operations **/
+    double secs;
     /** Flops count for the smearing operations **/
-    int gflops;
-    
+    double gflops;
+
   } QudaQuarkSmearParam;
 
   /**

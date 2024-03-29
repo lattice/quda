@@ -29,17 +29,13 @@ namespace quda {
     volume(1),
     localVolume(1),
     pad(param.pad),
-    total_bytes(0),
     nDim(param.nDim),
     location(param.location),
     precision(param.Precision()),
     ghost_precision(param.GhostPrecision()),
-    ghost_precision_reset(false),
     scale(param.scale),
     siteSubset(param.siteSubset),
     ghostExchange(param.ghostExchange),
-    ghost_bytes(0),
-    ghost_bytes_old(0),
     ghost_face_bytes {},
     ghost_face_bytes_aligned {},
     ghost_offset(),
@@ -59,11 +55,7 @@ namespace quda {
     mh_send {},
     mh_recv_rdma {},
     mh_send_rdma {},
-    initComms(false),
-    mem_type(param.mem_type),
-    backup_h(nullptr),
-    backup_norm_h(nullptr),
-    backed_up(false)
+    mem_type(param.mem_type)
   {
     create(param);
   }
@@ -75,18 +67,14 @@ namespace quda {
     localVolumeCB(field.localVolumeCB),
     stride(field.stride),
     pad(field.pad),
-    total_bytes(0),
     nDim(field.nDim),
     location(field.location),
     precision(field.precision),
     ghost_precision(field.ghost_precision),
-    ghost_precision_reset(false),
     scale(field.scale),
     siteSubset(field.siteSubset),
     ghostExchange(field.ghostExchange),
     nDimComms(field.nDimComms),
-    ghost_bytes(0),
-    ghost_bytes_old(0),
     ghost_face_bytes {},
     ghost_face_bytes_aligned {},
     ghost_offset(),
@@ -106,11 +94,7 @@ namespace quda {
     mh_send {},
     mh_recv_rdma {},
     mh_send_rdma {},
-    initComms(false),
-    mem_type(field.mem_type),
-    backup_h(nullptr),
-    backup_norm_h(nullptr),
-    backed_up(false)
+    mem_type(field.mem_type)
   {
     LatticeFieldParam param;
     field.fill(param);
@@ -184,8 +168,16 @@ namespace quda {
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
 
+    // if the memory location isn't set, use field location to set it
     mem_type = param.mem_type;
-
+    if (mem_type == QUDA_MEMORY_INVALID) {
+      mem_type = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_HOST;
+      logQuda(QUDA_DEBUG_VERBOSE, "setting default memory type mem_type %d\n", mem_type);
+    } else if (mem_type == QUDA_MEMORY_DEVICE && location == QUDA_CPU_FIELD_LOCATION) {
+      mem_type = QUDA_MEMORY_HOST;
+    } else if (mem_type == QUDA_MEMORY_HOST && location == QUDA_CUDA_FIELD_LOCATION) {
+      mem_type = QUDA_MEMORY_DEVICE;
+    }
     setTuningString();
   }
 
@@ -239,9 +231,7 @@ namespace quda {
     vol_string = std::exchange(src.vol_string, {});
     aux_string = std::exchange(src.aux_string, {});
     mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
-    backup_h = std::exchange(src.backup_h, nullptr);
-    backup_norm_h = std::exchange(src.backup_norm_h, nullptr);
-    backed_up = std::exchange(src.backed_up, false);
+    backup_h = std::exchange(src.backup_h, {});
   }
 
   void LatticeField::fill(LatticeFieldParam &param) const
@@ -343,7 +333,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill)
+  void LatticeField::createComms(bool no_comms_fill) const
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -404,7 +394,7 @@ namespace quda {
     initComms = true;
   }
 
-  void LatticeField::destroyComms()
+  void LatticeField::destroyComms() const
   {
     if (Location() != QUDA_CUDA_FIELD_LOCATION) return;
 
@@ -454,7 +444,7 @@ namespace quda {
 
   }
 
-  void LatticeField::createIPCComms()
+  void LatticeField::createIPCComms() const
   {
     if ( initIPCComms && !ghost_field_reset ) return;
 
@@ -558,7 +548,9 @@ namespace quda {
     vol_ss << x[0];
     for (int d = 1; d < nDim; d++) vol_ss << "x" << x[d];
     vol_string = vol_ss.str();
-    if (vol_string.size() >= TuneKey::volume_n) errorQuda("Vol string too large %lu", vol_string.size());
+    if (vol_string.size() >= TuneKey::volume_n)
+      errorQuda("Vol string %s (size = %lu) larger than maximum %d", vol_string.c_str(), vol_string.size(),
+                TuneKey::volume_n);
   }
 
   void LatticeField::checkField(const LatticeField &a) const {
@@ -604,7 +596,7 @@ namespace quda {
       const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
       if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
 	return static_cast<int>(csField.FieldOrder());
-    } else if (typeid(*this) == typeid(const cudaGaugeField)) {
+    } else if (typeid(*this) == typeid(const GaugeField)) {
       const GaugeField &gField = static_cast<const GaugeField&>(*this);
       if (gField.Order() == 2 || gField.Order() == 4)
 	return static_cast<int>(gField.Order());
@@ -622,18 +614,68 @@ namespace quda {
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param)
   {
     output << "nDim = " << param.nDim << std::endl;
-    for (int i = 0; i < param.nDim; i++) { output << "x[" << i << "] = " << param.x[i] << std::endl; }
+    output << "x = " << param.x << std::endl;
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.Precision() << std::endl;
     output << "ghost_precision = " << param.GhostPrecision() << std::endl;
     output << "scale = " << param.scale << std::endl;
-
     output << "ghostExchange = " << param.ghostExchange << std::endl;
-    for (int i=0; i<param.nDim; i++) {
-      output << "r[" << i << "] = " << param.r[i] << std::endl;
-    }
-
+    output << "r = " << param.r << std::endl;
     return output;  // for multiple << operators.
+  }
+
+  std::ostream &operator<<(std::ostream &output, const LatticeField &field)
+  {
+    output << "volume = " << field.volume << std::endl;
+    output << "volumeCB = " << field.volumeCB << std::endl;
+    output << "localVolume = " << field.localVolume << std::endl;
+    output << "localVolumeCB = " << field.localVolumeCB << std::endl;
+    output << "stride = " << field.stride << std::endl;
+    output << "pad = " << field.stride << std::endl;
+    output << "total_bytes = " << field.total_bytes << std::endl;
+    output << "nDim = " << field.nDim << std::endl;
+    output << "x = " << field.x << std::endl;
+    output << "r = " << field.r << std::endl;
+    output << "local_x = " << field.local_x << std::endl;
+    output << "surface = " << field.surface << std::endl;
+    output << "surfaceCB = " << field.surfaceCB << std::endl;
+    output << "local_surface = " << field.local_surface << std::endl;
+    output << "local_surfaceCB = " << field.local_surfaceCB << std::endl;
+    output << "location = " << field.location << std::endl;
+    output << "precision = " << field.precision << std::endl;
+    output << "ghost_precision = " << field.ghost_precision_reset << std::endl;
+    output << "scale = " << field.scale << std::endl;
+    output << "siteSubset = " << field.siteSubset << std::endl;
+    output << "ghostExchange = " << field.ghostExchange << std::endl;
+    output << "nDimComms = " << field.nDimComms << std::endl;
+    output << "ghost_bytes = " << field.ghost_bytes_old << std::endl;
+    output << "ghost_bytes_old = " << field.ghost_bytes_old << std::endl;
+    output << "ghost_face_bytes = " << field.ghost_face_bytes << std::endl;
+    output << "ghost_face_bytes_aligned = " << field.ghost_face_bytes_aligned << std::endl;
+    output << "ghost_offset = " << field.ghost_offset << std::endl;
+    output << "my_face_h = " << field.my_face_h << std::endl;
+    output << "my_face_hd = " << field.my_face_hd << std::endl;
+    output << "my_face_d = " << field.my_face_d << std::endl;
+    output << "my_face_dim_dir_h = " << field.my_face_dim_dir_h << std::endl;
+    output << "my_face_dim_dir_hd = " << field.my_face_dim_dir_hd << std::endl;
+    output << "my_face_dim_dir_d = " << field.my_face_dim_dir_d << std::endl;
+    output << "from_face_h = " << field.from_face_h << std::endl;
+    output << "from_face_hd = " << field.from_face_hd << std::endl;
+    output << "from_face_d = " << field.from_face_d << std::endl;
+    output << "from_face_dim_dir_h = " << field.from_face_dim_dir_h << std::endl;
+    output << "from_face_dim_dir_hd = " << field.from_face_dim_dir_hd << std::endl;
+    output << "from_face_dim_dir_d = " << field.from_face_dim_dir_d << std::endl;
+    output << "mh_recv = " << field.mh_recv << std::endl;
+    output << "mh_send = " << field.mh_send << std::endl;
+    output << "mh_recv_rdma = " << field.mh_recv_rdma << std::endl;
+    output << "mh_send_rdma = " << field.mh_send_rdma << std::endl;
+    output << "initComms = " << field.initComms << std::endl;
+    output << "vol_string = " << field.vol_string << std::endl;
+    output << "aux_string = " << field.aux_string << std::endl;
+    output << "mem_type = " << field.mem_type << std::endl;
+    for (auto i = 0u; i < field.backup_h.size(); i++)
+      output << "backup_h[" << i << "] = " << field.backup_h[i] << std::endl;
+    return output;
   }
 
   static QudaFieldLocation reorder_location_ = QUDA_CUDA_FIELD_LOCATION;

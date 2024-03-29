@@ -130,7 +130,7 @@ namespace quda {
 
        std::vector<ColorSpinorField *> v_(v->Components().begin(), v->Components().begin() + 2 * k);
 
-       blas::cDotProduct(s.get(), w_, v_);
+       blas::legacy::cDotProduct(s.get(), w_, v_);
 
        Map<VectorXcd, Unaligned> s_(s.get(), 2 * k);
        s_ *= inv_sqrt_r2;
@@ -179,11 +179,7 @@ namespace quda {
     inner.delta = 1e-20; // no reliable updates within the inner solver
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
-
     inner.iter   = 0;
-    inner.gflops = 0;
-    inner.secs   = 0;
-
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
@@ -193,9 +189,6 @@ namespace quda {
   // set the required parameters for the initCG solver
   static void fillInitCGSolverParam(SolverParam &inner, const SolverParam &outer) {
     inner.iter   = 0;
-    inner.gflops = 0;
-    inner.secs   = 0;
-
     inner.tol              = outer.tol;
     inner.tol_restart      = outer.tol_restart;
     inner.maxiter          = outer.maxiter;
@@ -210,15 +203,14 @@ namespace quda {
   }
 
   IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile),
+                     SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matPrecon, param),
     K(nullptr),
     Kparam(param),
     Vm(nullptr),
     r_pre(nullptr),
     p_pre(nullptr),
-    eigcg_args(nullptr),
-    profile(profile)
+    eigcg_args(nullptr)
   {
 
     if (2 * param.n_ev >= param.m)
@@ -231,7 +223,7 @@ namespace quda {
     else {
       printfQuda("\nDeflation space is complete, running initCG solver.");
       fillInitCGSolverParam(Kparam, param);
-      //K = new CG(mat, matPrecon, Kparam, profile);//Preconditioned Mat has comms flag on
+      // K = new CG(mat, matPrecon, Kparam);//Preconditioned Mat has comms flag on
       return;
     }
 
@@ -244,11 +236,11 @@ namespace quda {
     }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = new CG(matPrecon, matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, matPrecon, Kparam);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
-      K = new MR(matPrecon, matPrecon, Kparam, profile);
+      K = new MR(matPrecon, matPrecon, Kparam);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
-      K = new SD(matPrecon, Kparam, profile);
+      K = new SD(matPrecon, Kparam);
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
@@ -298,7 +290,7 @@ namespace quda {
     std::vector<ColorSpinorField*> v2k(args.V2k->Components());
 
     RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
-    blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
+    blas::legacy::caxpy(static_cast<Complex *>(Alpha.data()), vm, v2k);
 
     for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
 
@@ -347,14 +339,12 @@ namespace quda {
 
     int k=0;
 
-    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
     if (b2 == 0) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -401,7 +391,7 @@ namespace quda {
     EigCGArgs &args = *eigcg_args;
 
     if(args.run_residual_correction && param.inv_type == QUDA_INC_EIGCG_INVERTER) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       (*K)(x, b);
       return Kparam.iter; 
     }
@@ -446,8 +436,8 @@ namespace quda {
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double heavy_quark_res = 0.0;  // heavy quark res idual
 
@@ -458,9 +448,8 @@ namespace quda {
 
     double lanczos_diag, lanczos_offdiag;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     double rMinvr = blas::reDotProduct(r,*z);
     //Begin EigCG iterations:
@@ -514,12 +503,9 @@ namespace quda {
 
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter)
@@ -532,14 +518,10 @@ namespace quda {
 
     PrintSummary("eigCG", k, r2, b2, args.global_stop, param.tol_hq);
 
-    // reset the flops counters
-    blas::flops = 0;
-    matSloppy.flops();
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
-
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
     return k;
   }
 
@@ -578,7 +560,7 @@ namespace quda {
       defl(xProj, rProj);
       x = xProj;
 
-      K = new CG(mat, matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(mat, matPrecon, matPrecon, matPrecon, Kparam);
       (*K)(x, b);
       delete K;
 
@@ -588,19 +570,10 @@ namespace quda {
       xProj = x;
       rProj = r; 
 
-      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-
       Kparam.tol *= param.inc_tol;
 
       if(restart_idx == (param.max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
-
-      param.secs   += Kparam.secs;
     }
-
-    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-    //
-    param.secs   += Kparam.secs;
-    param.gflops += Kparam.gflops;
 
     k   += Kparam.iter;
 
@@ -669,7 +642,7 @@ namespace quda {
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
-           K = new CG(matSloppy, matPrecon, matPrecon, matPrecon, Kparam, profile);
+           K = new CG(matSloppy, matPrecon, matPrecon, matPrecon, Kparam);
          }
 
          eigcg_args->run_residual_correction = true;      

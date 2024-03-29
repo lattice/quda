@@ -112,7 +112,7 @@ namespace quda {
     MG *fine;
 
     /** The null space vectors */
-    std::vector<ColorSpinorField*> &B;
+    std::vector<ColorSpinorField> &B;
 
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
@@ -172,7 +172,7 @@ namespace quda {
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
-    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual,
+    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField> &B, DiracMatrix *matResidual,
             DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(*(param.invert_param)),
       mg_global(param),
@@ -208,7 +208,7 @@ namespace quda {
       omega = param.omega[level];
     }
 
-    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
+    MGParam(const MGParam &param, std::vector<ColorSpinorField> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
             DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
@@ -257,19 +257,15 @@ namespace quda {
     MGParam &param;
 
     /** This is the transfer operator that defines the prolongation and restriction operators */
-    Transfer *transfer;
+    Transfer *transfer = nullptr;
 
     /** This tell to reset() if transfer needs to be rebuilt */
-    bool resetTransfer;
+    bool resetTransfer = false;
 
     /** This is the smoother used */
-    Solver *presmoother, *postsmoother;
+    Solver *presmoother = nullptr;
 
-    /** TimeProfile for all levels (refers to profile from parent solver) */
-    TimeProfile &profile_global;
-
-    /** TimeProfile for this level */
-    TimeProfile profile;
+    Solver *postsmoother = nullptr;
 
     /** Prefix label used for printf at this level */
     char prefix[128];
@@ -278,43 +274,34 @@ namespace quda {
     char coarse_prefix[128];
 
     /** This is the next lower level */
-    MG *coarse;
+    MG *coarse = nullptr;
 
     /** The coarse grid solver - this either points at "coarse" or a solver preconditioned by "coarse" */
-    Solver *coarse_solver;
+    Solver *coarse_solver = nullptr;
 
     /** Storage for the parameter struct for the coarse grid */
-    MGParam *param_coarse;
+    MGParam *param_coarse = nullptr;
 
     /** Storage for the parameter struct for the pre-smoother */
-    SolverParam *param_presmooth;
+    SolverParam *param_presmooth = nullptr;
 
     /** Storage for the parameter struct for the post-smoother */
-    SolverParam *param_postsmooth;
+    SolverParam *param_postsmooth = nullptr;
 
     /** Storage for the parameter struct for the coarse solver */
-    SolverParam *param_coarse_solver;
+    SolverParam *param_coarse_solver = nullptr;
 
     /** The coarse-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B_coarse;
+    std::vector<ColorSpinorField> B_coarse;
 
     /** Residual vector */
-    ColorSpinorField *r;
-
-    /** Projected source vector for preconditioned system, else just points to source */
-    ColorSpinorField *b_tilde;
+    ColorSpinorField r;
 
     /** Coarse residual vector */
-    ColorSpinorField *r_coarse;
+    ColorSpinorField r_coarse;
 
     /** Coarse solution vector */
-    ColorSpinorField *x_coarse;
-
-    /** Coarse temporary vector */
-    ColorSpinorField *tmp_coarse;
-
-    /** Sloppy coarse temporary vector */
-    ColorSpinorField *tmp_coarse_sloppy;
+    ColorSpinorField x_coarse;
 
     /** Kahler-Dirac Xinv */
     std::shared_ptr<GaugeField> xInvKD;
@@ -323,34 +310,34 @@ namespace quda {
     std::shared_ptr<GaugeField> xInvKD_sloppy;
 
     /** The fine operator used for computing inter-grid residuals */
-    const Dirac *diracResidual;
+    const Dirac *diracResidual = nullptr;
 
     /** The fine operator used for doing smoothing */
-    const Dirac *diracSmoother;
+    const Dirac *diracSmoother = nullptr;
 
     /** The fine operator used for doing sloppy smoothing */
-    const Dirac *diracSmootherSloppy;
+    const Dirac *diracSmootherSloppy = nullptr;
 
     /** The coarse operator used for computing inter-grid residuals */
-    Dirac *diracCoarseResidual;
+    Dirac *diracCoarseResidual = nullptr;
 
     /** The coarse operator used for doing smoothing */
-    Dirac *diracCoarseSmoother;
+    Dirac *diracCoarseSmoother = nullptr;
 
     /** The coarse operator used for doing sloppy smoothing */
-    Dirac *diracCoarseSmootherSloppy;
+    Dirac *diracCoarseSmootherSloppy = nullptr;
 
     /** Wrapper for the residual coarse grid operator */
-    DiracMatrix *matCoarseResidual;
+    DiracMatrix *matCoarseResidual = nullptr;
 
     /** Wrapper for the smoothing coarse grid operator */
-    DiracMatrix *matCoarseSmoother;
+    DiracMatrix *matCoarseSmoother = nullptr;
 
     /** Wrapper for the sloppy smoothing coarse grid operator */
-    DiracMatrix *matCoarseSmootherSloppy;
+    DiracMatrix *matCoarseSmootherSloppy = nullptr;
 
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
-    RNG *rng;
+    RNG *rng = nullptr;
 
     /**
        @brief Helper function called on entry to each MG function
@@ -367,9 +354,8 @@ namespace quda {
     /**
        Constructor for MG class
        @param param MGParam struct that defines all meta data
-       @param profile Timeprofile instance used to profile
     */
-    MG(MGParam &param, TimeProfile &profile);
+    MG(MGParam &param);
 
     /**
        Destructor for MG class. Frees any existing coarse grid MG
@@ -397,9 +383,9 @@ namespace quda {
        @brief This method only resets the KD operators with the updated fine links and rebuilds
               the KD inverse
      */
-    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
-                          cudaGaugeField *long_gauge_sloppy_in, double mass);
+    void resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
+                          GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
+                          GaugeField *long_gauge_sloppy_in, double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -460,20 +446,20 @@ namespace quda {
        @brief Load the null space vectors in from file
        @param B Loaded null-space vectors (pre-allocated)
     */
-    void loadVectors(std::vector<ColorSpinorField *> &B);
+    void loadVectors(cvector_ref<ColorSpinorField> &B);
 
     /**
        @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
-    void saveVectors(const std::vector<ColorSpinorField *> &B) const;
+    void saveVectors(cvector_ref<const ColorSpinorField> &B) const;
 
     /**
        @brief Generate the null-space vectors
        @param B Generated null-space vectors
        @param refresh Whether we refreshing pre-exising vectors or starting afresh
     */
-    void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
+    void generateNullVectors(std::vector<ColorSpinorField> &B, bool refresh = false);
 
     /**
        @brief Generate lowest eigenvectors
@@ -484,12 +470,7 @@ namespace quda {
        @brief Build free-field null-space vectors
        @param B Free-field null-space vectors
     */
-    void buildFreeVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Return the total flops done on this and all coarser levels.
-     */
-    double flops() const;
+    void buildFreeVectors(std::vector<ColorSpinorField> &B);
 
     /**
       @brief Return if we're on a fine grid right now
@@ -634,13 +615,13 @@ namespace quda {
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   template <int fineColor, int coarseColor>
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
@@ -736,23 +717,20 @@ namespace quda {
     DiracM *mSmooth;
     DiracM *mSmoothSloppy;
 
-    std::vector<ColorSpinorField*> B;
+    std::vector<ColorSpinorField> B;
 
     MGParam *mgParam;
 
     MG *mg;
-    TimeProfile &profile;
 
-    multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile);
+    multigrid_solver(QudaMultigridParam &mg_param);
 
     virtual ~multigrid_solver()
     {
-      profile.TPSTART(QUDA_PROFILE_FREE);
+      getProfile().TPSTART(QUDA_PROFILE_FREE);
       if (mg) delete mg;
 
       if (mgParam) delete mgParam;
-
-      for (unsigned int i=0; i<B.size(); i++) delete B[i];
 
       if (m) delete m;
       if (mSmooth) delete mSmooth;
@@ -761,7 +739,7 @@ namespace quda {
       if (d) delete d;
       if (dSmooth) delete dSmooth;
       if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
-      profile.TPSTOP(QUDA_PROFILE_FREE);
+      getProfile().TPSTOP(QUDA_PROFILE_FREE);
     }
   };
 

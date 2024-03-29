@@ -15,34 +15,34 @@
 
 using namespace quda;
 
-cpuGaugeField *cpuGauge = NULL;
-cudaGaugeField *cudaForce = NULL;
-cpuGaugeField *cpuForce = NULL;
-cpuGaugeField *hostVerifyForce = NULL;
+GaugeField *cpuGauge = NULL;
+GaugeField *cudaForce = NULL;
+GaugeField *cpuForce = NULL;
+GaugeField *hostVerifyForce = NULL;
 
-cudaGaugeField *cudaMom = NULL;
-cpuGaugeField *cpuMom = NULL;
-cpuGaugeField *refMom = NULL;
+GaugeField *cudaMom = NULL;
+GaugeField *cpuMom = NULL;
+GaugeField *refMom = NULL;
 
 QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
-cpuGaugeField *cpuOprod = NULL;
-cudaGaugeField *cudaOprod = NULL;
-cpuGaugeField *cpuLongLinkOprod = NULL;
-cudaGaugeField *cudaLongLinkOprod = NULL;
+GaugeField *cpuOprod = NULL;
+GaugeField *cudaOprod = NULL;
+GaugeField *cpuLongLinkOprod = NULL;
+GaugeField *cudaLongLinkOprod = NULL;
 
 int ODD_BIT = 1;
 
 QudaPrecision force_prec = QUDA_DOUBLE_PRECISION;
 
-cudaGaugeField *cudaGauge_ex = NULL;
-cpuGaugeField *cpuGauge_ex = NULL;
-cudaGaugeField *cudaForce_ex = NULL;
-cpuGaugeField *cpuForce_ex = NULL;
-cpuGaugeField *cpuOprod_ex = NULL;
-cudaGaugeField *cudaOprod_ex = NULL;
-cpuGaugeField *cpuLongLinkOprod_ex = NULL;
-cudaGaugeField *cudaLongLinkOprod_ex = NULL;
+GaugeField *cudaGauge_ex = NULL;
+GaugeField *cpuGauge_ex = NULL;
+GaugeField *cudaForce_ex = NULL;
+GaugeField *cpuForce_ex = NULL;
+GaugeField *cpuOprod_ex = NULL;
+GaugeField *cudaOprod_ex = NULL;
+GaugeField *cpuLongLinkOprod_ex = NULL;
+GaugeField *cudaLongLinkOprod_ex = NULL;
 
 static void setPrecision(QudaPrecision precision)
 {
@@ -227,7 +227,7 @@ static void hisq_force_startup()
     gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
     gParam_ex.x[d] = X[d] + 2 * gParam_ex.r[d];
   } // set halo region for GPU
-  cudaGauge_ex = new cudaGaugeField(gParam_ex);
+  cudaGauge_ex = new GaugeField(gParam_ex);
 
   // Create the host gauge field
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
@@ -238,7 +238,7 @@ static void hisq_force_startup()
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.order = gauge_order;
-  cpuGauge = new cpuGaugeField(gParam);
+  cpuGauge = new GaugeField(gParam);
 
   gParam_ex = GaugeFieldParam(qudaGaugeParam_ex);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -250,12 +250,12 @@ static void hisq_force_startup()
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   } // set halo region for CPU
-  cpuGauge_ex = new cpuGaugeField(gParam_ex);
+  cpuGauge_ex = new GaugeField(gParam_ex);
 
   auto generated_link_type = (link_recon == QUDA_RECONSTRUCT_NO ?
                                 SITELINK_PHASE_NO :
                                 (link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_MILC));
-  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, generated_link_type);
+  createSiteLinkCPU(*cpuGauge, qudaGaugeParam.cpu_prec, generated_link_type);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
   qudaGaugeParam.type = QUDA_GENERAL_LINKS;
@@ -279,8 +279,8 @@ static void hisq_force_startup()
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.order = gauge_order;
-  cpuForce = new cpuGaugeField(gParam);
-  hostVerifyForce = new cpuGaugeField(gParam);
+  cpuForce = new GaugeField(gParam);
+  hostVerifyForce = new GaugeField(gParam);
 
   gParam_ex.location = QUDA_CPU_FIELD_LOCATION;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -292,7 +292,7 @@ static void hisq_force_startup()
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   }
-  cpuForce_ex = new cpuGaugeField(gParam_ex);
+  cpuForce_ex = new GaugeField(gParam_ex);
 
   // create the momentum matrix
   gParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -302,8 +302,8 @@ static void hisq_force_startup()
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  cpuMom = new cpuGaugeField(gParam);
-  refMom = new cpuGaugeField(gParam);
+  cpuMom = new GaugeField(gParam);
+  refMom = new GaugeField(gParam);
 
   /**********************************
    * Create the outer product fields *
@@ -316,8 +316,8 @@ static void hisq_force_startup()
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.order = gauge_order;
-  cpuOprod = new cpuGaugeField(gParam);
-  cpuLongLinkOprod = new cpuGaugeField(gParam);
+  cpuOprod = new GaugeField(gParam);
+  cpuLongLinkOprod = new GaugeField(gParam);
 
   // Create extended outer product fields
   gParam_ex.location = QUDA_CPU_FIELD_LOCATION;
@@ -328,13 +328,13 @@ static void hisq_force_startup()
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   } // set halo region for CPU
-  cpuOprod_ex = new cpuGaugeField(gParam_ex);
-  cpuLongLinkOprod_ex = new cpuGaugeField(gParam_ex);
+  cpuOprod_ex = new GaugeField(gParam_ex);
+  cpuLongLinkOprod_ex = new GaugeField(gParam_ex);
 
   // initialize the CPU outer product fields and exchange once
   createStagForOprodCPU(stag_for_oprod, force_prec, qudaGaugeParam.X, *rng);
-  computeLinkOrderedOuterProduct(stag_for_oprod, cpuOprod->Gauge_p(), force_prec, 1);
-  computeLinkOrderedOuterProduct(stag_for_oprod, cpuLongLinkOprod->Gauge_p(), force_prec, 3);
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuOprod, force_prec, 1);
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuLongLinkOprod, force_prec, 3);
 
   copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
@@ -352,9 +352,9 @@ static void hisq_force_startup()
     gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   } // set halo region
-  cudaForce_ex = new cudaGaugeField(gParam_ex);
-  cudaOprod_ex = new cudaGaugeField(gParam_ex);
-  cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
+  cudaForce_ex = new GaugeField(gParam_ex);
+  cudaOprod_ex = new GaugeField(gParam_ex);
+  cudaLongLinkOprod_ex = new GaugeField(gParam_ex);
 
   // create a device force for verify
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -362,7 +362,7 @@ static void hisq_force_startup()
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.setPrecision(prec, true);
-  cudaForce = new cudaGaugeField(gParam);
+  cudaForce = new GaugeField(gParam);
 
   // create the device momentum field
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -370,21 +370,21 @@ static void hisq_force_startup()
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.setPrecision(prec, true);
-  cudaMom = new cudaGaugeField(gParam);
+  cudaMom = new GaugeField(gParam);
 
   /********************************************************************
    * Copy to and exchange gauge and outer product fields on the device *
    ********************************************************************/
   cpuGauge_ex->exchangeExtendedGhost(R, true);
-  cudaGauge_ex->loadCPUField(*cpuGauge);
+  cudaGauge_ex->copy(*cpuGauge);
   cudaGauge_ex->exchangeExtendedGhost(cudaGauge_ex->R());
 
   cpuOprod_ex->exchangeExtendedGhost(R, true);
-  cudaOprod_ex->loadCPUField(*cpuOprod);
+  cudaOprod_ex->copy(*cpuOprod);
   cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
 
   cpuLongLinkOprod_ex->exchangeExtendedGhost(R, true);
-  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
+  cudaLongLinkOprod_ex->copy(*cpuLongLinkOprod);
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
 
   /**********************
@@ -460,18 +460,15 @@ static int hisq_force_test(bool lepage)
 
     copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
     copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
-    cudaForce->saveCPUField(*hostVerifyForce);
+    hostVerifyForce->copy(*cudaForce);
 
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(reinterpret_cast<void **>(cpuForce->Gauge_p())[dir],
-                            reinterpret_cast<void **>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size,
+      res &= compare_floats(cpuForce->data<void *>(dir), hostVerifyForce->data<void *>(dir), V * gauge_site_size,
                             getTolerance(force_prec), force_prec);
     }
 
-    strong_check_link(reinterpret_cast<void **>(hostVerifyForce->Gauge_p()),
-                      "GPU results: ", reinterpret_cast<void **>(cpuForce->Gauge_p()), "CPU reference results:", V,
-                      force_prec);
+    strong_check_link(*hostVerifyForce, "GPU result:", *cpuForce, "CPU reference results:");
     logQuda(QUDA_SUMMARIZE, "Lepage %s staples force test %s\n\n", lepage ? "enabled" : "disabled",
             (1 == res) ? "PASSED" : "FAILED");
   }
@@ -497,18 +494,15 @@ static int hisq_force_test(bool lepage)
 
       copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
       copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
-      cudaForce->saveCPUField(*hostVerifyForce);
+      hostVerifyForce->copy(*cudaForce);
 
       int res = 1;
       for (int dir = 0; dir < 4; dir++) {
-        res &= compare_floats(reinterpret_cast<void **>(cpuForce->Gauge_p())[dir],
-                              reinterpret_cast<void **>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size,
+        res &= compare_floats(cpuForce->data(dir), hostVerifyForce->data(dir), V * gauge_site_size,
                               getTolerance(force_prec), force_prec);
       }
 
-      strong_check_link(reinterpret_cast<void **>(hostVerifyForce->Gauge_p()),
-                        "GPU results: ", reinterpret_cast<void **>(cpuForce->Gauge_p()), "CPU reference results:", V,
-                        force_prec);
+      strong_check_link(*hostVerifyForce, "GPU results: ", *cpuForce, "CPU reference results:");
       logQuda(QUDA_SUMMARIZE, "Long link force test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
     }
   }
@@ -526,14 +520,14 @@ static int hisq_force_test(bool lepage)
     host_timer.stop();
     host_time_sec += host_timer.last();
 
-    cudaMom->saveCPUField(*cpuMom);
+    cpuMom->copy(*cudaMom);
   }
 
   int accuracy_level = 3;
   if (verify_results) {
-    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size,
+    int res = compare_floats(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume() * mom_site_size,
                              getTolerance(force_prec), force_prec);
-    accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), force_prec);
+    accuracy_level = strong_check_mom(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume(), force_prec);
     logQuda(QUDA_SUMMARIZE, "Test (lepage coeff %e) %s\n", d_act_path_coeff[5], (1 == res) ? "PASSED" : "FAILED");
   }
   long long staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops;

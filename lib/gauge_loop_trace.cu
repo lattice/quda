@@ -13,6 +13,7 @@ namespace quda {
     std::vector<reduce_t>& loop_traces;
     double factor;
     const paths<1> p;
+    unsigned int sharedBytesPerThread() const override { return 4 * sizeof(int); } // for thread_array
 
   public:
     // max block size of 8 is arbitrary for now
@@ -31,14 +32,14 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugeLoopTraceArg<Float, nColor, recon> arg(u, factor, p);
       launch<GaugeLoop>(loop_traces, tp, stream, arg);
     }
 
-    long long flops() const
+    long long flops() const override
     {
       auto Nc = u.Ncolor();
       auto mat_mul_flops = 8ll * Nc * Nc * Nc - 2 * Nc * Nc;
@@ -46,7 +47,8 @@ namespace quda {
       return (p.count * mat_mul_flops + p.num_paths * (2 * Nc + 2)) * u.Volume();
     }
 
-    long long bytes() const {
+    long long bytes() const override
+    {
       // links * one LatticeColorMatrix worth of data
       return p.count * u.Bytes() / 4;
     }
@@ -55,6 +57,7 @@ namespace quda {
   void gaugeLoopTrace(const GaugeField& u, std::vector<Complex>& loop_traces, double factor, std::vector<int**>& input_path,
 		 std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     paths<1> p(input_path, length, path_coeff, num_paths, path_max_length);
 
     std::vector<array<double, 2>> tr_array(loop_traces.size());
@@ -65,6 +68,7 @@ namespace quda {
     for (auto i = 0u; i < tr_array.size(); i++) { loop_traces[i] = Complex(tr_array[i][0], tr_array[i][1]); }
 
     p.free();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda
