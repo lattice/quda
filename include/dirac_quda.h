@@ -56,6 +56,7 @@ namespace quda {
     GaugeField *fatGauge;  // used by staggered only
     GaugeField *longGauge; // used by staggered only
     int laplace3D;
+    int covdev_mu;
     CloverField *clover;
     GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
@@ -117,6 +118,7 @@ namespace quda {
       printfQuda("kappa = %g\n", kappa);
       printfQuda("mass = %g\n", mass);
       printfQuda("laplace3D = %d\n", laplace3D);
+      printfQuda("covdev_mu = %d\n", covdev_mu);
       printfQuda("m5 = %g\n", m5);
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
@@ -2213,6 +2215,9 @@ public:
      put in the Dirac operator abstraction.
   */
   class GaugeCovDev : public Dirac {
+
+  protected:
+    int covdev_mu;
 
   public:
     GaugeCovDev(const DiracParam &param);
