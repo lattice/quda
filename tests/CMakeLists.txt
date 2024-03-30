@@ -1465,11 +1465,6 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
   endif()
 
-  add_test(NAME gauge_alg_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 4 6 8 10 --prec ${prec}
-                   --gtest_output=xml:gauge_alg_test_${prec}.xml)
-
   if(QUDA_SMEAR_GAUSS_TWOLINK)
     set(KERNEL_TYPE TwoLink GaussianSmear)
     foreach(kerneltp IN LISTS KERNEL_TYPE)
@@ -1491,6 +1486,11 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 
 endforeach(prec)
+
+add_test(NAME gauge_alg
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
+  --dim 4 6 8 10
+  --gtest_output=xml:gauge_alg_test.xml)
 
 if (TARGET dilution_test)
   add_test(NAME dilution_test
