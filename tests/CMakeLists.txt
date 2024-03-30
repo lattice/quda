@@ -1430,35 +1430,23 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:hisq_stencil_test.xml)
 endif()
 
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+  add_test(NAME clover_force_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8
+    --compute-clover true
+    --solution-type mat-pc-dag-mat-pc
+    --matpc odd-odd-asym --dagger
+    --enable-testing true
+    --gtest_output=xml:clover_force_test.xml)
+endif()
+
 foreach(prec IN LISTS TEST_PRECS)
 
   add_test(NAME gauge_path_${prec}
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
                    --gtest_output=xml:gauge_path_test_${prec}.xml)
-
-
-  if(QUDA_DIRAC_CLOVER)
-    add_test(NAME clover_force_test_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8 --prec ${prec}
-                   --dslash-type clover --compute-clover true
-                   --solution-type mat-pc-dag-mat-pc
-                   --matpc odd-odd-asym --dagger
-                   --enable-testing true
-                   --gtest_output=xml:clover_force_test_${prec}.xml)
-   endif()
-
-  if(QUDA_DIRAC_TWISTED_CLOVER)
-    add_test(NAME tmc_clover_force_test_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8 --prec ${prec}
-                   --dslash-type twisted-clover --compute-clover true
-                   --solution-type mat-pc-dag-mat-pc
-                   --matpc odd-odd-asym --dagger
-                   --enable-testing true
-                   --gtest_output=xml:tmc_clover_force_test_${prec}.xml)
-   endif()
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
