@@ -246,15 +246,15 @@ namespace quda
       }
 
       if (blocks == 1)
-        blas::caxpy_L(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
+        blas::block::caxpy_L(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
       else
-        blas::caxpy(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
+        blas::block::caxpy(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
     }
 
     // a_j = v_j^dag * r
     // Block dot products stored in alpha_block.
     std::vector<Complex> block_alpha_(block_size);
-    blas::cDotProduct(block_alpha_, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
+    blas::block::cDotProduct(block_alpha_, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
     for (auto i = 0u; i < block_alpha_.size(); i++) block_alpha[arrow_offset + i] = block_alpha_[i];
 
     // Use jth_block to negate alpha data and apply block BLAS.
@@ -267,7 +267,7 @@ namespace quda
     }
 
     // r = r - a_j * v_j
-    blas::caxpy(jth_block, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
+    blas::block::caxpy(jth_block, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
     for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + block_size);

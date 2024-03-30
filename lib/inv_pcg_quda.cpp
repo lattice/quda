@@ -241,7 +241,7 @@ namespace quda
       }
 
       x_update_batch.get_current_alpha() = (K) ? rMinvr / pAp : r2 / pAp;
-      auto cg_norm = axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, r_sloppy);
+      double2 cg_norm = axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, r_sloppy);
       // r --> r - alpha*A*p
       r2_old = r2;
       r2 = cg_norm.x;

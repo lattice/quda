@@ -24,7 +24,7 @@ namespace quda {
   void GCR::computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k)
   {
     std::vector<Complex> Beta(N, 0.0);
-    blas::cDotProduct(Beta, {Ap.begin() + i, Ap.begin() + i + N}, Ap[k]); // vectorized dot product
+    blas::block::cDotProduct(Beta, {Ap.begin() + i, Ap.begin() + i + N}, Ap[k]); // vectorized dot product
 
 #if 0
     for (int j=0; j<N; j++) {
@@ -40,7 +40,7 @@ namespace quda {
   {
     std::vector<Complex> beta_(size);
     for (int i = 0; i < size; i++) beta_[i] = -beta[(i + begin) * n_krylov + k];
-    blas::caxpy(beta_, {Ap.begin() + begin, Ap.begin() + begin + size}, Ap[k]);
+    blas::block::caxpy(beta_, {Ap.begin() + begin, Ap.begin() + begin + size}, Ap[k]);
   }
 
   void GCR::orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int k, int pipeline)
@@ -100,7 +100,7 @@ namespace quda {
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
 
-    blas::caxpy(delta, {p.begin(), p.begin() + k}, x);
+    blas::block::caxpy(delta, {p.begin(), p.begin() + k}, x);
   }
 
   GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,

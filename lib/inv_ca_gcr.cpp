@@ -77,7 +77,7 @@ namespace quda
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<Complex> A_(N * (N + 1));
 
-    blas::cDotProduct(A_, q, {q, b});
+    blas::block::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
       phi(i) = A_[i * (N + 1) + N];
       for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }
@@ -86,12 +86,12 @@ namespace quda
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<Complex> phi_(N);
-    blas::cDotProduct(phi_, q, b);
+    blas::block::cDotProduct(phi_, q, b);
     for (int i = 0; i < N; i++) phi(i) = phi_[i];
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<Complex> A_(N * N);
-    blas::hDotProduct(A_, q, q);
+    blas::block::hDotProduct(A_, q, q);
     for (int i = 0; i < N; i++)
       for (int j = 0; j < N; j++) A(i, j) = A_[i * N + j];
 #endif
@@ -282,14 +282,14 @@ namespace quda
       solve(alpha, q, p[0]);
 
       // need to make sure P is only length n_krylov
-      blas::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
+      blas::block::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
 
       // no need to compute residual vector if not returning
       // residual vector and only doing a single fixed iteration
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
         for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
-        blas::caxpy(alpha, q, r);
+        blas::block::caxpy(alpha, q, r);
       }
 
       total_iter += n_krylov;
