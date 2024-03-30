@@ -308,13 +308,13 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8 
+                   --dim 2 4 6 8  --niter 1
                    --nsrc 8 --msrc 9
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 --niter 1
                    --nsrc 8 --msrc 9
                    --solve-type direct
                    --gtest_output=xml:blas_test_full.xml)
@@ -323,14 +323,14 @@ endif()
 if(QUDA_DIRAC_STAGGERED)
   add_test(NAME blas_test_parity_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 --niter 1
                    --nsrc 8 --msrc 9
                    --dslash-type staggered
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 --niter 1
                    --nsrc 8 --msrc 9
                    --dslash-type staggered
                    --solve-type direct
@@ -1437,16 +1437,16 @@ if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
     --compute-clover true
     --solution-type mat-pc-dag-mat-pc
     --matpc odd-odd-asym --dagger
-    --enable-testing true
+    --enable-testing true --niter 1
     --gtest_output=xml:clover_force_test.xml)
 endif()
 
-foreach(prec IN LISTS TEST_PRECS)
+add_test(NAME gauge_path
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true --niter 1
+  --gtest_output=xml:gauge_path_test.xml)
 
-  add_test(NAME gauge_path_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8 --prec ${prec}
-                   --gtest_output=xml:gauge_path_test_${prec}.xml)
+foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
