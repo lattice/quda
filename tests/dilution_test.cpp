@@ -33,7 +33,7 @@ TEST_P(DilutionTest, verify)
 {
   using namespace quda;
 
-  if (!is_enabled_spin(nSpin)) GTEST_SKIP();
+  if (!is_enabled_spin(nSpin) || !is_enabled(precision)) GTEST_SKIP();
 
   // Set some parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();

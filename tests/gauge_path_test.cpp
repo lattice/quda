@@ -420,9 +420,17 @@ TEST_P(GaugeLoopTest, verify)
 using ::testing::Combine;
 using ::testing::Values;
 
-INSTANTIATE_TEST_SUITE_P(GaugePathTest, GaugePathTest, Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                                                               Values(true, false)));
-INSTANTIATE_TEST_SUITE_P(GaugeLoopTest, GaugeLoopTest, Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)));
+INSTANTIATE_TEST_SUITE_P(GaugePathTest, GaugePathTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                 Values(true, false)),
+                         [](testing::TestParamInfo<force_test_t> param) {
+                           return std::string(get_prec_str(testing::get<0>(param.param))) +
+                             "_" + (::testing::get<1>(param.param) ? "force" : "path"); });
+
+INSTANTIATE_TEST_SUITE_P(GaugeLoopTest, GaugeLoopTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)),
+                         [](testing::TestParamInfo<loop_test_t> param)
+                         { return std::string(get_prec_str(testing::get<0>(param.param))); });
 
 static void display_test_info()
 {

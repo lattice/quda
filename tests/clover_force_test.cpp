@@ -10,6 +10,7 @@
 #include <gauge_field.h>
 #include <host_utils.h>
 #include <quda.h>
+#include <instantiate.h>
 #include <gtest/gtest.h>
 
 static int force_check;
@@ -203,7 +204,8 @@ public:
 
 TEST_P(CloverForceTest, verify)
 {
-  if ((::testing::get<1>(param) == QUDA_CLOVER_WILSON_DSLASH && !quda::is_enabled_clover())
+  if (!quda::is_enabled(::testing::get<0>(param))
+      || (::testing::get<1>(param) == QUDA_CLOVER_WILSON_DSLASH && !quda::is_enabled_clover())
       || (::testing::get<1>(param) == QUDA_TWISTED_CLOVER_DSLASH && !quda::is_enabled_twisted_clover()))
     GTEST_SKIP();
 
