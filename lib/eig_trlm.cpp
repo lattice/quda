@@ -209,7 +209,7 @@ namespace quda
       for (auto & bi : beta_) bi = -bi;
 
       // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
+      blas::block::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
     }
 
     // Orthogonalise r against the Krylov space
