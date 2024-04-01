@@ -15,7 +15,7 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
 
-    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
+    bool advanceSharedBytes(TuneParam &) const override { return false; } // Don't tune shared mem
     unsigned int minThreads() const override { return size; }
 
   public:
