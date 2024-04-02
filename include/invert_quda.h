@@ -1483,15 +1483,15 @@ public:
 
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
 
-      ColorSpinorField *out=nullptr;
-      ColorSpinorField *in=nullptr;
+      ColorSpinorField out;
+      ColorSpinorField in;
 
       if (dirac.hasSpecialMG()) {
-        dirac.prepareSpecialMG(in, out, x, b, solution_type);
+        dirac.prepareSpecialMG(out, in, x, b, solution_type);
       } else {
-        dirac.prepare(in, out, x, b, solution_type);
+        dirac.prepare(out, in, x, b, solution_type);
       }
-      (*solver)(*out, *in);
+      (*solver)(out, in);
       if (dirac.hasSpecialMG()) {
         dirac.reconstructSpecialMG(x, b, solution_type);
       } else {

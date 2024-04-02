@@ -626,8 +626,7 @@ namespace quda {
       }
       int e_cb = linkIndex(x, X);
 
-      Link staple;
-      setZero(&staple);
+      Link staple = {};
 
       Link U;
 #pragma unroll

@@ -163,9 +163,7 @@ namespace quda {
   void Transfer::createTmp() const
   {
     // The CPU temporaries are needed for creating geometry mappings.
-    if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG))
-      return;
+    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) return;
 
     if (!fine_tmp_h.empty()) return;
 

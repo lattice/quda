@@ -1510,6 +1510,7 @@ namespace quda {
       break;
     case QUDA_COVDEV_DSLASH:
       diracParam.type = QUDA_GAUGE_COVDEV_DIRAC;
+      diracParam.covdev_mu = inv_param->covdev_mu;
       break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
@@ -2656,9 +2657,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac &diracPre = *dPre;
   Dirac &diracEig = *dEig;
 
-  ColorSpinorField *in = nullptr;
-  ColorSpinorField *out = nullptr;
-
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, cudaGauge->X(), pc_solution, param->input_location);
   ColorSpinorField h_b(cpuParam);
@@ -2729,10 +2727,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(b, *param, false);
 
-  dirac.prepare(in, out, x, b, param->solution_type);
+  ColorSpinorField in;
+  ColorSpinorField out;
+  dirac.prepare(out, in, x, b, param->solution_type);
 
-  logQuda(QUDA_VERBOSE, "Prepared source = %g\n", blas::norm2(*in));
-  logQuda(QUDA_VERBOSE, "Prepared solution = %g\n", blas::norm2(*out));
+  logQuda(QUDA_VERBOSE, "Prepared source = %g\n", blas::norm2(in));
+  logQuda(QUDA_VERBOSE, "Prepared solution = %g\n", blas::norm2(out));
 
   // solution_type specifies *what* system is to be solved.
   // solve_type specifies *how* the system is to be solved.
@@ -2758,14 +2758,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-    ColorSpinorField tmp(*in);
-    dirac.Mdag(*in, tmp);
+    ColorSpinorField tmp(in);
+    dirac.Mdag(in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(*out, *in);
-    blas::copy(*in, *out);
+    (*solve)(out, in);
+    blas::copy(in, out);
     delete solve;
     solverParam.updateInvertParam(*param);
   }
@@ -2778,11 +2778,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
       bool hermitian = false;
       auto &mChrono = param->chrono_precision == param->cuda_prec ? m : mSloppy;
-      chronoExtrapolate(*out, *in, chronoResident[param->chrono_index], mChrono, hermitian);
+      chronoExtrapolate(out, in, chronoResident[param->chrono_index], mChrono, hermitian);
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(*out, *in);
+    (*solve)(out, in);
     delete solve;
     solverParam.updateInvertParam(*param);
   } else if (!norm_error_solve) {
@@ -2793,29 +2793,29 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
       bool hermitian = true;
       auto &mChrono = param->chrono_precision == param->cuda_prec ? m : mSloppy;
-      chronoExtrapolate(*out, *in, chronoResident[param->chrono_index], mChrono, hermitian);
+      chronoExtrapolate(out, in, chronoResident[param->chrono_index], mChrono, hermitian);
     }
 
     // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
     if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
       DiracMdagMLocal mPreLocal(diracPre);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, mEig);
-      (*solve)(*out, *in);
+      (*solve)(out, in);
       delete solve;
       solverParam.updateInvertParam(*param);
     } else {
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-      (*solve)(*out, *in);
+      (*solve)(out, in);
       delete solve;
       solverParam.updateInvertParam(*param);
     }
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-    ColorSpinorField tmp(*out);
+    ColorSpinorField tmp(out);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(tmp, *in); // y = (M M^\dag) b
-    dirac.Mdag(*out, tmp);  // x = M^dag y
+    (*solve)(tmp, in);    // y = (M M^\dag) b
+    dirac.Mdag(out, tmp); // x = M^dag y
     delete solve;
     solverParam.updateInvertParam(*param);
   }
@@ -2837,7 +2837,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if(not param->chrono_replace_last){
       // if we have not filled the space yet just augment
       if ((int)basis.size() < param->chrono_max_dim) {
-        ColorSpinorParam cs_param(*out);
+        ColorSpinorParam cs_param(out);
         cs_param.setPrecision(param->chrono_precision);
         basis.emplace_back(cs_param);
       }
@@ -2845,7 +2845,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       // shuffle every entry down one and bring the last to the front
       std::rotate(basis.begin(), basis.end() - 1, basis.end());
     }
-    basis[0] = *out; // set first entry to new solution
+    basis[0] = out; // set first entry to new solution
   }
   dirac.reconstruct(x, b, param->solution_type);
 
@@ -4903,7 +4903,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
   ColorSpinorField in(cudaParam);
   ColorSpinorField out(cudaParam);
-  ColorSpinorField temp1(cudaParam);
 
   // Create the smearing operator
   //------------------------------------------------------
@@ -4945,13 +4944,10 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   const QudaParity  parity   = QUDA_INVALID_PARITY;
   for (int i = 0; i < smear_param->n_steps; i++) {
     if (i > 0) std::swap(in, out);
-    blas::ax(ftmp, in);
-    blas::axpy(a, in, temp1);
 
     qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
     logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
-    blas::xpay(temp1, -1.0, out);
-    blas::zero(temp1);
+    blas::axpby(a * ftmp, in, -ftmp, out);
   }
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);

@@ -554,14 +554,14 @@ namespace quda
           // Compute the beta coefficients for updating Q, AQ
           // 1. compute matrix Q_AS = -Q^\dagger AS
           // 2. Solve Q_AQ beta = Q_AS
-          blas::reDotProduct(Q_AS, AQ, S);
+          blas::block::reDotProduct(Q_AS, AQ, S);
           compute_beta();
 
           // update direction vectors
-          blas::axpyz(beta, Q, S, Qtmp);
+          blas::block::axpyz(beta, Q, S, Qtmp);
           for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
-          blas::axpyz(beta, AQ, AS, Qtmp);
+          blas::block::axpyz(beta, AQ, AS, Qtmp);
           for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
         }
 
@@ -569,17 +569,17 @@ namespace quda
         // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
         // 2. Solve Q_AQ alpha = g
         {
-          blas::reDotProduct(Q_AQandg, Q, {AQ, S[0]});
+          blas::block::reDotProduct(Q_AQandg, Q, {AQ, S[0]});
           compute_alpha();
         }
 
         // update the solution vector
-        blas::axpy(alpha, Q, x);
+        blas::block::axpy(alpha, Q, x);
 
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
 
         // Can we fuse these? We don't need this reduce in all cases...
-        blas::axpy(alpha, AQ, S[0]);
+        blas::block::axpy(alpha, AQ, S[0]);
         // if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(S[0]);
         /*else*/ r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       } else {
@@ -591,11 +591,11 @@ namespace quda
         // We do compute the alpha coefficients: this is the same code as above
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
-        blas::reDotProduct(Q_AQandg, S, {AS, S[0]});
+        blas::block::reDotProduct(Q_AQandg, S, {AS, S[0]});
         compute_alpha();
 
         // update the solution vector
-        blas::axpy(alpha, S, x);
+        blas::block::axpy(alpha, S, x);
 
         // no need to update AS
         r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...

@@ -101,9 +101,10 @@ namespace quda {
       }
 
       if (n_upper > n_lower)
-        blas::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper}, {p.begin() + n_lower, p.begin() + n_upper},
-                        {x.begin() + n_lower, x.begin() + n_upper}, {zeta.begin() + n_lower, zeta.begin() + n_upper}, r,
-                        {beta.begin() + n_lower, beta.begin() + n_upper});
+        blas::block::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper},
+                               {p.begin() + n_lower, p.begin() + n_upper}, {x.begin() + n_lower, x.begin() + n_upper},
+                               {zeta.begin() + n_lower, zeta.begin() + n_upper}, r,
+                               {beta.begin() + n_lower, beta.begin() + n_upper});
 
       if (++count == n_update) count = 0;
     }
@@ -295,7 +296,7 @@ namespace quda {
       r2_old = r2[0];
       r2_old_array[0] = r2_old;
 
-      auto cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
+      double2 cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
       r2[0] = cg_norm.x;
       double zn = cg_norm.y;
 

@@ -55,7 +55,7 @@ namespace quda {
     int k = 0;
     while (k < param.maxiter) {
       mat(Ar, r);
-      auto rAr = blas::cDotProductNormA(r, Ar);
+      double3 rAr = blas::cDotProductNormA(r, Ar);
       auto alpha = rAr.z / rAr.x;
       r2 = rAr.z; // this is r2 from the prior iteration
 
