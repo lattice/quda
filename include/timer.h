@@ -215,6 +215,8 @@ namespace quda {
 
     TimeProfile(std::string fname, bool use_global) : fname(fname), switchOff(false), use_global(use_global) { ; }
 
+    auto Name() const { return fname; }
+
     /**< Print out the profile information */
     void Print();
 
@@ -245,6 +247,7 @@ namespace quda {
     double &secs;
     double &gflops;
     uint64_t flops;
+    bool active = false;
     pushProfile(TimeProfile &profile, double &secs = secs_dummy, double &gflops = gflops_dummy);
     virtual ~pushProfile();
   };

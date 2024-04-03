@@ -21,6 +21,12 @@ QudaGaugeParam gauge_param;
 QudaInvertParam eig_inv_param;
 QudaEigParam eig_param;
 
+std::vector<char> gauge_;
+std::array<void *, 4> gauge;
+std::vector<char> clover;
+std::vector<char> clover_inv;
+QudaPrecision last_prec = QUDA_INVALID_PRECISION;
+
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <eigensolve_test_gtest.hpp>
 
@@ -28,10 +34,9 @@ void display_test_info(QudaEigParam &param)
 {
   printfQuda("running the following test:\n");
 
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
-             tdim, Lsdim);
+  printfQuda("prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s      %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(param.cuda_prec_ritz),
+             get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));
@@ -64,11 +69,6 @@ void display_test_info(QudaEigParam &param)
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 }
-
-std::vector<char> gauge_;
-std::array<void *, 4> gauge;
-std::vector<char> clover;
-std::vector<char> clover_inv;
 
 void init(int argc, char **argv)
 {
@@ -116,16 +116,19 @@ void init(int argc, char **argv)
     // Load the clover terms to the device
     loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
   }
+  last_prec = gauge_param.cuda_prec;
 }
 
 std::vector<double> eigensolve(test_t test_param)
 {
   // Collect testing parameters from gtest
-  eig_param.eig_type = ::testing::get<0>(test_param);
-  eig_param.use_norm_op = ::testing::get<1>(test_param);
-  eig_param.use_pc = ::testing::get<2>(test_param);
-  eig_param.compute_svd = ::testing::get<3>(test_param);
-  eig_param.spectrum = ::testing::get<4>(test_param);
+  eig_inv_param.cuda_prec = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_eigensolver = ::testing::get<0>(test_param);
+  eig_param.eig_type = ::testing::get<1>(test_param);
+  eig_param.use_norm_op = ::testing::get<2>(test_param);
+  eig_param.use_pc = ::testing::get<3>(test_param);
+  eig_param.compute_svd = ::testing::get<4>(test_param);
+  eig_param.spectrum = ::testing::get<5>(test_param);
 
   // For preconditioned matrices, spinors are only half the normal length.
   // QUDA constructs spinors based on the "solution type" which is
@@ -198,6 +201,7 @@ std::vector<double> eigensolve(test_t test_param)
   if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
+
   eigensolveQuda(host_evecs_ptr.data(), evals.data(), &eig_param);
   host_timer.stop();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
@@ -249,8 +253,7 @@ int main(int argc, char **argv)
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
       && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
       && dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
+    errorQuda("dslash_type %d not supported", dslash_type);
   }
 
   // Initialize the QUDA library
@@ -270,16 +273,13 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    eigensolve(
-      test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
+    eigensolve(test_t {prec, eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd,
+                       eig_param.spectrum});
   }
 
   // Memory clean-up
   freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    freeCloverQuda();
-  }
-
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
   // Finalize the QUDA library
   endQuda();
   finalizeComms();
