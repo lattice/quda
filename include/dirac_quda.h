@@ -1067,7 +1067,7 @@ namespace quda {
   };
 
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
-
+  void ApplyTau(ColorSpinorField &out, const ColorSpinorField &in, int d);
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
 

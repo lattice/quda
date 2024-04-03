@@ -84,6 +84,17 @@ namespace quda {
       case 3: arg.out(x_cb, parity) = in.gamma(3); break;
       case 4: arg.out(x_cb, parity) = in.gamma(4); break;
       }
+      if (arg.doublet){
+        ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb+1*arg.volumeCB, parity);
+        switch(arg.d) {
+          case 0: arg.out(x_cb+1*arg.volumeCB, parity) = in.gamma(0); break;
+          case 1: arg.out(x_cb+1*arg.volumeCB, parity) = in.gamma(1); break;
+          case 2: arg.out(x_cb+1*arg.volumeCB, parity) = in.gamma(2); break;
+          case 3: arg.out(x_cb+1*arg.volumeCB, parity) = in.gamma(3); break;
+          case 4: arg.out(x_cb+1*arg.volumeCB, parity) = in.gamma(4); break;
+          }
+        
+      }
     }
   };
 
@@ -110,5 +121,72 @@ namespace quda {
       }
     }
   };
+
+
+  /**
+     @brief Parameter structure for driving the Tau operator
+   */
+   template <typename Float, int nColor_>
+   struct TauArg : kernel_param<> {
+     using real = typename mapper<Float>::type;
+     constexpr static int nColor = nColor_;
+     typedef typename colorspinor_mapper<Float,4,nColor>::type F;
+ 
+     F out;                // output vector field
+     const F in;           // input vector field
+     const int d;          // which gamma matrix are we applying
+     const int nParity;    // number of parities we're working on
+     bool doublet;         // whether we applying the operator to a doublet
+     const int volumeCB;   // checkerboarded volume
+     
+     TauArg(ColorSpinorField &out, const ColorSpinorField &in, int d) :
+       out(out), in(in), d(d), nParity(in.SiteSubset()),
+       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+       volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB())
+     {
+       checkPrecision(out, in);
+       checkLocation(out, in);
+       if (d < 1 || d > 3) errorQuda("Undefined tau matrix %d", d);
+       if (in.Nspin() != 4) errorQuda("Cannot apply tau to nSpin=%d field", in.Nspin());
+       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+       if (!doublet) errorQuda("tau matrix can be applyed only to spinor doublet");
+ 
+       this->threads = dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1);
+     }
+   };
+  /**
+     @brief Application of Gamma matrix to a color spinor field
+  */
+  template <typename Arg> struct Tau {
+    using fermion_t = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
+    const Arg &arg;
+    constexpr Tau(const Arg &arg) : arg(arg) {}
+    static constexpr const char* filename() { return KERNEL_FILE; }
+    
+    __device__ __host__ void operator()(int x_cb, int parity)
+    {
+      fermion_t in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
+      fermion_t in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
+      const complex<typename Arg::real> j(0.0,1.0);
+      const typename Arg::real m1(-1);
+
+      switch(arg.d) {
+      case 1: 
+          arg.out(x_cb, parity) = in_2;
+          arg.out(x_cb+1*arg.volumeCB, parity) = in_1;
+        break;
+      case 2: 
+        arg.out(x_cb, parity) = -j*in_2;
+        arg.out(x_cb+1*arg.volumeCB, parity) = j*in_1;
+        break;
+      case 3: 
+        arg.out(x_cb, parity) = in_1;
+        arg.out(x_cb+1*arg.volumeCB, parity) = m1*in_2;
+        break;  
+      }
+      
+    }
+  };
+
 
 }
