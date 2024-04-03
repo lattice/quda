@@ -160,12 +160,12 @@ namespace quda
         ApplyTau(p[i][other_parity],p[i][other_parity],1);
       }
     }
-    // computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
-    //                         epsilon);
+    computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
+                            epsilon);
 
     // oprod = (A12) of hep-lat/0112051
     // compute the insertion of oprod in Fig.27 of hep-lat/0112051
-    // cloverDerivative(force, gaugeEx, oprod, 1.0);
+    cloverDerivative(force, gaugeEx, oprod, 1.0);
 
     updateMomentum(mom, -1.0, force, "clover");
 

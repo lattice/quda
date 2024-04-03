@@ -21,13 +21,18 @@ namespace quda
     using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
 
     Oprod oprod;
+    const bool doublet;         // whether we applying the operator to a doublet
+    const size_t VolumeCB;
     F inA[nvector];
     F inB[nvector];
     array_2d<real, nvector, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                         cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :
-      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), oprod(oprod)
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
+      oprod(oprod), 
+      doublet(inA[0].TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      VolumeCB(inA[0].VolumeCB())
     {
       for (int i = 0; i < nvector; i++) {
         this->inA[i] = inA[i];
@@ -46,10 +51,13 @@ namespace quda
 
 #pragma unroll
     for (int i = 0; i < Arg::nvector; i++) {
-      const Spinor A = arg.inA[i](x_cb, parity);
-      const Spinor B = arg.inB[i](x_cb, parity);
-      Spinor C = A.sigma(nu, mu); // multiply by sigma_mu_nu
-      result += arg.coeff[i][parity] * outerProdSpinTrace(C, B);
+      for (int flavor=0; flavor<=arg.doublet; ++flavor){
+        const int flavor_offset_idx = flavor * (arg.VolumeCB/2);
+        const Spinor A = arg.inA[i](x_cb + flavor_offset_idx, parity);
+        const Spinor B = arg.inB[i](x_cb + flavor_offset_idx, parity);
+        Spinor C = A.sigma(nu, mu); // multiply by sigma_mu_nu
+        result += arg.coeff[i][parity] * outerProdSpinTrace(C, B);
+      }
     }
 
     result -= conj(result);
