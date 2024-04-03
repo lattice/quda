@@ -51,7 +51,7 @@ namespace quda
       }
 
       gamma5(x[i][other_parity], x[i][other_parity]);
-      if (detratio) blas::xpy(x0[i][parity], p[i][parity]);
+      if (detratio  && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0[i][parity], p[i][parity]);
       
       if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
         dirac->Dagger(QUDA_DAG_YES);
@@ -150,7 +150,7 @@ namespace quda
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
     computeCloverForce(force, gauge, x, p, coeff);
     // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-    // if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
+    if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
 
     // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
     // sw_spinor_eo(OO,..)  in tmLQCD
