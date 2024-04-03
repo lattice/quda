@@ -40,12 +40,30 @@ namespace quda
       dirac->M(p[i][parity], p[i][parity]); // this is the odd part of Y
       if (dagger) dirac->Dagger(QUDA_DAG_NO);
 
+      if(inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        // FIXME: here we used the already existing ca_lambda_max member of inv_param. Maybe it's better to create a new parameter for this purpose
+        blas::ax(1.0/inv_param.ca_lambda_max, p[i][parity]);
+        ApplyTau(x[i][other_parity], x[i][other_parity], 1);
+        ApplyTau(p[i][parity], p[i][parity], 1);
+        Complex a(0.0,-inv_param.offset[i] );
+        blas::caxpy( a, x[i][parity], p[i][parity]);
+
+      }
+
       gamma5(x[i][other_parity], x[i][other_parity]);
       if (detratio) blas::xpy(x0[i][parity], p[i][parity]);
-
-      if (not_dagger) dirac->Dagger(QUDA_DAG_YES);
+      
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        dirac->Dagger(QUDA_DAG_YES);
+        gamma5(p[i][parity], p[i][parity]);
+      }
       dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
-      if (not_dagger) dirac->Dagger(QUDA_DAG_NO);
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        dirac->Dagger(QUDA_DAG_NO);
+        gamma5(p[i][other_parity], p[i][other_parity]);
+        gamma5(p[i][parity], p[i][parity]);
+        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
+      }
       // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
       // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
 //////////////////////////////////////////////
@@ -67,10 +85,13 @@ namespace quda
   ColorSpinorField tmp_quark(pParam);
   double *h_tmp=(double*) malloc(sizeof(double)*(T*LX*LY*LZ*24*2));
   printf("quda  (%d %d %d %d)\n",T,LX,LY,LZ);
+  printf("MARCO: twist_flavor  %d\n", inv_param.twist_flavor);
   int Vh=LX*LY*LZ*T/2;
 
-  tmp_quark=x[i][parity];
-  // tmp_quark=x[i];
+  // tmp_quark=x[i][parity];
+  // tmp_quark=p[i][parity];
+  // tmp_quark=x[i][other_parity];
+  tmp_quark=p[i][other_parity];
   printf("quda copy end  (%d %d %d %d)\n",T,LX,LY,LZ);
   double kappa = inv_param.kappa;
   printf("check kappa = %g\n",kappa);
@@ -88,7 +109,7 @@ namespace quda
           const int oddBit = (x0 + x1 + x2 + x3) & 1;
           const int change_sign[4] = {-1, 1, 1, -1};
           const int change_spin[4] = {3, 2, 1, 0};
-          if (oddBit == 1) { 
+          if (oddBit == 0) {   // parity=1  other_parity=0
             double c=(oddBit==0) ?kappa: 1;
             
             for (int q_spin = 0; q_spin < 4; q_spin++) {
@@ -129,16 +150,22 @@ namespace quda
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
     computeCloverForce(force, gauge, x, p, coeff);
     // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-    if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
+    // if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
 
     // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
     // sw_spinor_eo(OO,..)  in tmLQCD
-    computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
-                            epsilon);
+    if ( inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+      for (auto i = 0u; i < x.size(); i++) {
+        ApplyTau(p[i][parity],p[i][parity],1);
+        ApplyTau(p[i][other_parity],p[i][other_parity],1);
+      }
+    }
+    // computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
+    //                         epsilon);
 
     // oprod = (A12) of hep-lat/0112051
     // compute the insertion of oprod in Fig.27 of hep-lat/0112051
-    cloverDerivative(force, gaugeEx, oprod, 1.0);
+    // cloverDerivative(force, gaugeEx, oprod, 1.0);
 
     updateMomentum(mom, -1.0, force, "clover");
 
