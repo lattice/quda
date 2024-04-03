@@ -66,71 +66,7 @@ namespace quda
       }
       // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
       // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
-//////////////////////////////////////////////
- /// print from QUDA
- //////////////////////////////////////////////
- csParam.x[0]/=2;
-  int T = csParam.x[3];
-  int LX = csParam.x[0]*2;
-  int LY = csParam.x[1];
-  int LZ = csParam.x[2];
-  
-  ColorSpinorParam pParam(csParam);
- csParam.x[0]*=2;
-  pParam.create = QUDA_NULL_FIELD_CREATE;
-  pParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  // QudaSiteSubset_s  save_site_sub = qParam.siteSubset;
-  pParam.siteSubset=QUDA_PARITY_SITE_SUBSET;
-  // qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  ColorSpinorField tmp_quark(pParam);
-  double *h_tmp=(double*) malloc(sizeof(double)*(T*LX*LY*LZ*24*2));
-  printf("quda  (%d %d %d %d)\n",T,LX,LY,LZ);
-  printf("MARCO: twist_flavor  %d\n", inv_param.twist_flavor);
-  int Vh=LX*LY*LZ*T/2;
-
-  // tmp_quark=x[i][parity];
-  // tmp_quark=p[i][parity];
-  // tmp_quark=x[i][other_parity];
-  tmp_quark=p[i][other_parity];
-  printf("quda copy end  (%d %d %d %d)\n",T,LX,LY,LZ);
-  double kappa = inv_param.kappa;
-  printf("check kappa = %g\n",kappa);
-  tmp_quark.copy_to_buffer(h_tmp);
-  // x[i][parity].copy_to_buffer(h_tmp);
-  for(int ud = 0; ud < 2; ud++){
-    // double *sp;
-    // if (ud==0) sp=h_tmp+24*Vh;
-    // if (ud==1) sp=h_tmp;
-  for (int x0 = 0; x0 < T; x0++){
-    for (int x1 = 0; x1 < LX; x1++){
-      for (int x2 = 0; x2 < LY; x2++){
-        for (int x3 = 0; x3 < LZ; x3++) {
-          const int q_eo_idx = (x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0) / 2;
-          const int oddBit = (x0 + x1 + x2 + x3) & 1;
-          const int change_sign[4] = {-1, 1, 1, -1};
-          const int change_spin[4] = {3, 2, 1, 0};
-          if (oddBit == 0) {   // parity=1  other_parity=0
-            double c=(oddBit==0) ?kappa: 1;
-            
-            for (int q_spin = 0; q_spin < 4; q_spin++) {
-              for (int col = 0; col < 3; col++) {
-                
-                printf("MARCOfrom QUDA (%-3d%-3d%-3d%-3d),  %-3d%-3d, %-3d%-3d  %-20g   %-20g\n", x0, x1, x2, x3, q_spin, col, i, ud,
-                       change_sign[q_spin]*h_tmp[0 + 2* (q_eo_idx + Vh*(ud+2 * ( col+3*change_spin[q_spin] )) )]*c,
-                       change_sign[q_spin]*h_tmp[1 + 2* (q_eo_idx + Vh*(ud+2 * ( col+3*change_spin[q_spin] )) )]*c
-                       );
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  }
-  free(h_tmp);
-  printf("end printing\n");
-//////////////////////////////////////
-
+      
       // the gamma5 application in tmLQCD is done inside deriv_Sb
       gamma5(p[i], p[i]);
     }
