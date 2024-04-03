@@ -94,8 +94,8 @@ namespace quda {
         for (int dim=0; dim<4; ++dim) {
           int shift[4] = {0, 0, 0, 0};
           shift[dim] = 1;
-          // const int nbr_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
           const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
+
           if (nbr_idx >= 0) {
             Spinor B_shift = arg.inB(nbr_idx + flavor_offset_idx, 0);
             Spinor D_shift = arg.inD(nbr_idx + flavor_offset_idx, 0);
@@ -108,10 +108,8 @@ namespace quda {
             
             Link temp = arg.force(dim, x_cb, arg.parity);
             Link U = arg.U(dim, x_cb, arg.parity);
-            // printf("Interion:   x_cb = %d  dim = %d nbr_idx = %d  result=%g   U=%g   temp =%g\n", x_cb, dim, nbr_idx,result(0,0).real(),U(0,0).real(),temp(0,0).real() );
             result = temp + U*result*arg.coeff;
             arg.force(dim, x_cb, arg.parity) = result;
-            // printf("Interion:   x_cb = %d  dim = %d nbr_idx = %d  result=%g   U=%g   temp =%g parity=%d\n", x_cb, dim, nbr_idx,result(0,0).real(),U(0,0).real(),temp(0,0).real() ,arg.parity);
           }
         } // dim
       } // flavor
