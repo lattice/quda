@@ -63,6 +63,8 @@ struct DslashTestWrapper {
   ColorSpinorField cudaSpinor;
   ColorSpinorField cudaSpinorOut;
   ColorSpinorField cudaSpinorTmp;
+  ColorSpinorField cudaSpinorTmp2;
+  ColorSpinorField cudaSpinorTmp3;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -295,7 +297,11 @@ struct DslashTestWrapper {
       cudaSpinor = ColorSpinorField(csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
       cudaSpinorOut = ColorSpinorField(csParam);
-      if (test_domain_decomposition) { cudaSpinorTmp = ColorSpinorField(csParam); }
+      if (test_domain_decomposition) {
+        cudaSpinorTmp = ColorSpinorField(csParam);
+        cudaSpinorTmp2 = ColorSpinorField(csParam);
+        cudaSpinorTmp3 = ColorSpinorField(csParam);
+      }
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
@@ -801,6 +807,8 @@ struct DslashTestWrapper {
         for (auto i = 0u; i < 4; i++) {
           cudaSpinor.dd.blockDim[i] = dd_block_size[i];
           cudaSpinorTmp.dd.blockDim[i] = dd_block_size[i];
+          cudaSpinorTmp2.dd.blockDim[i] = dd_block_size[i];
+          cudaSpinorTmp3.dd.blockDim[i] = dd_block_size[i];
         }
 
         blas::zero(cudaSpinorOut);
@@ -823,6 +831,33 @@ struct DslashTestWrapper {
 
           cudaSpinor.dd.reset();
           cudaSpinorTmp.dd.reset();
+
+          cudaSpinorTmp2 = spinor;
+          cudaSpinorTmp2.dd.reset(DD::mode_red_black, col % 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp2.projectDD();
+          cudaSpinorTmp2.dd.reset();
+
+          switch (dtest_type) {
+          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp3, cudaSpinorTmp2, parity); break;
+          case dslash_test_type::MatPC:
+          case dslash_test_type::Mat: dirac->M(cudaSpinorTmp3, cudaSpinorTmp2); break;
+          case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorTmp3, cudaSpinorTmp2); break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+
+          cudaSpinorTmp3.dd.reset(DD::mode_red_black, col / 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp3.projectDD();
+          cudaSpinorTmp3.dd.reset();
+
+          spinorTmp = cudaSpinorTmp;
+          spinorOut = cudaSpinorTmp3;
+
+          double deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorTmp, spinorOut)));
+          printfQuda("Deviaton source %d sink %d %e\n", col % 2, col / 2, deviation);
+
+          // here test cudaSpinorTmp==cudaSpinorTmp2
 
           blas::xpy(cudaSpinorTmp, cudaSpinorOut);
         }
@@ -1078,6 +1113,10 @@ struct DslashTestWrapper {
       ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
       size_t ghost_bytes = cudaSpinor.GhostBytes();
+
+      printfQuda("dslash time event time %e %e %e\n", dslash_time.event_time, dslash_time.cpu_time, dslash_time.cpu_max);
+      printfQuda("niter %d\n", niter);
+      printfQuda("ghost_bytes %e\n", ghost_bytes);
 
       printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
                  "aggregate message size %lu bytes\n",
