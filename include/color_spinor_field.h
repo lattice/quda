@@ -149,6 +149,7 @@ namespace quda
     int composite_dim = 0; // e.g., number of eigenvectors in the set
     bool is_component = false;
     int component_id = 0; // eigenvector index
+    DDParam<int> dd {};
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -437,6 +438,13 @@ namespace quda
        @param[in] src Source from which we are copying
      */
     void copy(const ColorSpinorField &src);
+
+    /**
+       @brief Project the field to a domain determined by
+       ddParam
+     */
+
+    void projectDD();
 
     /**
        @brief Zero all elements of this field
@@ -946,6 +954,8 @@ namespace quda
                               void *Dst = nullptr, const void *Src = nullptr);
 
   void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
+
+  void genericProjectDD(ColorSpinorField &a);
   int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol);
 
   /**

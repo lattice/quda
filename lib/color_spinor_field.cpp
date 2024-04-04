@@ -98,6 +98,7 @@ namespace quda
     nSpin = param.nSpin;
     nVec = param.nVec;
     twistFlavor = param.twistFlavor;
+    dd = param.dd;
 
     if (param.pc_type != QUDA_5D_PC && param.pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", param.pc_type);
     pc_type = param.pc_type;
@@ -527,6 +528,7 @@ namespace quda
     param.pc_type = pc_type;
     param.suggested_parity = suggested_parity;
     param.create = QUDA_NULL_FIELD_CREATE;
+    param.dd = dd;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const
@@ -1530,6 +1532,27 @@ namespace quda
   void ColorSpinorField::PrintVector(int parity, unsigned int x_cb, int rank) const
   {
     genericPrintVector(*this, parity, x_cb, rank);
+  }
+
+  void ColorSpinorField::projectDD()
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) {
+      genericProjectDD(*this);
+    } else {
+      ColorSpinorParam param(*this);
+      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      param.location = QUDA_CPU_FIELD_LOCATION;
+      param.setPrecision((param.Precision() == QUDA_HALF_PRECISION || param.Precision() == QUDA_QUARTER_PRECISION) ?
+                           QUDA_SINGLE_PRECISION :
+                           param.Precision());
+      param.create = QUDA_COPY_FIELD_CREATE;
+      // since CPU fields cannot be low precision, use single precision instead
+      if (precision < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION, false);
+
+      ColorSpinorField tmp(param);
+      tmp.projectDD();
+      *this = tmp;
+    }
   }
 
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)

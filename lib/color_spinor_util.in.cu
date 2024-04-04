@@ -423,4 +423,58 @@ namespace quda {
     resize(v, new_size, param);
   }
 
+  template <class P> void projectDD(P &p, const ColorSpinorField &meta)
+  {
+    Coord<4> coord;
+    int X[4] = {meta.X(0), meta.X(1), meta.X(2), meta.X(3)};
+    X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
+
+    for (int parity = 0; parity < p.Nparity(); parity++) {
+      for (int x_cb = 0; x_cb < p.VolumeCB(); x_cb++) {
+        getCoords(coord, x_cb, X, parity);
+
+        if (meta.dd.isZero(coord, meta.getDslashConstant())) {
+          //	  printfQuda("Should be zero %d\n",x_cb);
+          for (int s = 0; s < p.Nspin(); s++)
+            for (int c = 0; c < p.Ncolor(); c++) p(parity, x_cb, s, c) = 0;
+        } else {
+          //	  printfQuda("Should not be zero %d\n",x_cb);
+        }
+      }
+    }
+  }
+
+  template <typename Float, int nSpin, int nColor, QudaFieldOrder order> void genericProjectDD(ColorSpinorField &a)
+  {
+    FieldOrderCB<Float, nSpin, nColor, 1, order> A(a);
+    projectDD(A, a);
+  }
+
+  template <typename Float> void genericProjectDD(ColorSpinorField &a)
+  {
+
+    switch (a.Nspin()) {
+    case (1):
+      if constexpr (is_enabled_spin(1)) genericProjectDD<Float, 1, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
+      break;
+
+    case (2):
+      if constexpr (is_enabled_spin(2)) genericProjectDD<Float, 2, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
+      break;
+    case (4):
+      if constexpr (is_enabled_spin(4)) genericProjectDD<Float, 4, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
+      break;
+    default: errorQuda("Nspin %d not implemented", a.Nspin());
+    }
+  }
+
+  void genericProjectDD(ColorSpinorField &a)
+  {
+    switch (a.Precision()) {
+    case QUDA_DOUBLE_PRECISION: genericProjectDD<double>(a); break;
+    case QUDA_SINGLE_PRECISION: genericProjectDD<float>(a); break;
+    default: errorQuda("Precision %d not implemented", a.Precision());
+    }
+  }
+
 } // namespace quda
