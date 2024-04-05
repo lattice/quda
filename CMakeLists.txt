@@ -150,11 +150,11 @@ option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_D
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
+option(QUDA_DIRAC_LAPLACE "build laplace operator" ${QUDA_DIRAC_DEFAULT})
 
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 
-option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
