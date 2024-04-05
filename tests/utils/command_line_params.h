@@ -261,6 +261,7 @@ void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -582,3 +583,5 @@ extern QudaPrecision prop_save_prec;
 extern bool enable_testing;
 
 extern bool detratio;
+
+extern std::array<int, 4> covdev_mu;

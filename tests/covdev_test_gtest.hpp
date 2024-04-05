@@ -15,11 +15,11 @@ class CovDevTest : public ::testing::TestWithParam<test_t>
 
 bool skip_test(test_t param)
 {
-  //auto prec             = ::testing::get<0>(param);
+  auto prec             = ::testing::get<0>(param);
   //auto dag              = ::testing::get<1>(param);  
-
   //should we keep for all options?
-
+  if (!(QUDA_PRECISION & prec)) return true; // precision not enabled so skip i
+   
   return false;
 }
 

@@ -327,6 +327,7 @@ QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 //std::array<int, 4> grid_partition = {1, 1, 1, 1};
+std::array<int, 4> covdev_mu = {1, 1, 1, 1};
 
 // Parameters for the (gaussian) quark smearing operator
 int    smear_n_steps = 50;
@@ -1274,3 +1275,11 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
   opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
 }
+
+void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup
+    = quda_app->add_option_group("Covdev", "Options controlling  cov derivative parameteres");
+  opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction(s) (default 1 1 1 1 - all directions)")->expected(4);
+}
+

@@ -191,6 +191,8 @@ int main(int argc, char **argv)
 
   // command line options
   auto app = make_app();
+  add_covdev_option_group(app);
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -229,45 +231,40 @@ std::array<double, 2> covdev_test(test_t param) {
   //QudaPrecision    test_prec    = ::testing::get<0>(param);
   QudaDagType      test_dagger  = ::testing::get<1>(param);
 
-  int attempts = 1;//?
+  std::array<int, 4> mu_flags{covdev_mu};
+  // Test forward directions, then backward
+  for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
+    if (mu_flags[mu] == 0) continue; //skip direction
+    int muCuda = mu + (test_dagger ? 4 : 0);
+    int muCpu = mu * 2 + (test_dagger ? 1 : 0);
 
-  for (int i = 0; i < attempts; i++) {
+    // Reference computation
+    covdevRef(muCpu);
+    printfQuda("\n\nChecking muQuda = %d\n", muCuda);
 
-    // Test forward directions, then backward
-    {
-      for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
-        int muCuda = mu + (test_dagger ? 4 : 0);
-        int muCpu = mu * 2 + (test_dagger ? 1 : 0);
+    { // warm-up run
+      printfQuda("Tuning...\n");
+      dslashCUDA(1, muCuda);
+    }
+    printfQuda("Executing %d kernel loop(s)...", niter);
 
-        // Reference computation
-        covdevRef(muCpu);
-        printfQuda("\n\nChecking muQuda = %d\n", muCuda);
+    double secs = dslashCUDA(niter, muCuda);
 
-        { // warm-up run
-          printfQuda("Tuning...\n");
-          dslashCUDA(1, muCuda);
-        }
-        printfQuda("Executing %d kernel loop(s)...", niter);
+    *spinorOut = *cudaSpinorOut;
+    printfQuda("\n%fms per loop\n", 1000 * secs);
 
-        double secs = dslashCUDA(niter, muCuda);
-
-        *spinorOut = *cudaSpinorOut;
-        printfQuda("\n%fms per loop\n", 1000 * secs);
-
-        unsigned long long flops
+    unsigned long long flops
           = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
-        printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
+    printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
 
-        double spinor_ref_norm2 = blas::norm2(*spinorRef);
-        double spinor_out_norm2 = blas::norm2(*spinorOut);
+    double spinor_ref_norm2 = blas::norm2(*spinorRef);
+    double spinor_out_norm2 = blas::norm2(*spinorOut);
 
-        double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
+    double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
+    printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
                    spinor_out_norm2);
 
-      } // Directions
-    } 
-  }	
+  } // Directions
 
   double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol       = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
