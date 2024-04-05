@@ -266,6 +266,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Steven Gottlieb (Indiana University) 
 *  Anthony Grebe (Fermilab)
 *  Kyriakos Hadjiyiannakou (Cyprus)
+*  Ben Hoerz (Intel)
 *  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Hwancheol Jeong (Indiana University)
 *  Xiangyu Jiang (ITP, Chinese Academy of Sciences)

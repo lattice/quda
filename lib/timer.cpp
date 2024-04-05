@@ -245,20 +245,26 @@ namespace quda {
     profile(profile), secs(secs), gflops(gflops), flops(Tunable::flops_global())
 
   {
-    profile.TPSTART(QUDA_PROFILE_TOTAL);
-    tp_stack.push(&profile);
+    if (profile.Name() != getProfile().Name()) {
+      // only push to stack if this profile not already the active one
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      tp_stack.push(&profile);
+      active = true;
+    }
   }
 
   pushProfile::~pushProfile()
   {
-    if (tp_stack.empty()) errorQuda("popProfile() called with empty stack");
-    auto &profile = *(tp_stack.top());
-    if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
-    tp_stack.pop();
-    profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    secs = profile.Last(QUDA_PROFILE_TOTAL);
-    gflops = (Tunable::flops_global() - flops) * 1e-9;
-    if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
+    if (active == true) {
+      if (tp_stack.empty()) errorQuda("popProfile() called with empty stack");
+      auto &profile = *(tp_stack.top());
+      if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
+      tp_stack.pop();
+      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      secs = profile.Last(QUDA_PROFILE_TOTAL);
+      gflops = (Tunable::flops_global() - flops) * 1e-9;
+      if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
+    }
   }
 
   TimeProfile &getProfile()

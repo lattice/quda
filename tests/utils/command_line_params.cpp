@@ -50,6 +50,8 @@ double gaussian_sigma = 0.2;
 std::string gauge_outfile;
 int Nsrc = 1;
 int Msrc = 1;
+int Nsrc_tile = 1;
+int Msrc_tile = 1;
 int niter = 100;
 int maxiter_precondition = 10;
 QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
@@ -548,6 +550,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(matpc_type_map));
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
+  quda_app->add_option("--msrc-tile", Msrc_tile, "Set the Msrc tile size (where applicable)");
   quda_app->add_option("--mu", mu, "Twisted-Mass chiral twist of Dirac operator (default 0.1)");
   quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
   quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
@@ -585,6 +588,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
+  quda_app->add_option("--nsrc-tile", Nsrc_tile, "Set the Nsrc tile size (where applicable)");
 
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");

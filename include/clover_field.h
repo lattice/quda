@@ -20,6 +20,19 @@ namespace quda {
 #endif
   }
 
+  /**
+     @brief Helper function that returns whether we have enabled
+     clover fermions.
+   */
+  constexpr bool is_enabled_twisted_clover()
+  {
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+    return true;
+#else
+    return false;
+#endif
+  }
+
   namespace clover
   {
 
