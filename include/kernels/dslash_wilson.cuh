@@ -52,13 +52,8 @@ namespace quda
     }
   };
 
-  /**
-     @brief Parameter structure for driving the Wilson operator
-   */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct WilsonDistanceArg : WilsonArg<Float, nColor_, nDim, reconstruct_> {
-    static constexpr bool distance_pc = true;
-
+  template <typename Float>
+  struct DistanceArg {
     typedef typename mapper<Float>::type real;
 
     const real alpha0;
@@ -66,13 +61,23 @@ namespace quda
     const int t;
     const int nt;
 
+    DistanceArg(double alpha0, int t0, int dim_3) :
+      alpha0(alpha0), t0(t0), t(comm_coord(3) * dim_3), nt(comm_dim(3) * dim_3)
+    {
+    }
+  };
+
+  /**
+     @brief Parameter structure for driving the Wilson operator
+   */
+  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
+  struct WilsonDistanceArg : WilsonArg<Float, nColor_, nDim, reconstruct_>, DistanceArg<Float> {
+    static constexpr bool distance_pc = true;
+
     WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0,
                       int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor_, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-      alpha0(alpha0),
-      t0(t0),
-      t(comm_coord(3) * this->dim[3]),
-      nt(comm_dim(3) * this->dim[3])
+      DistanceArg<Float>(alpha0, t0, this->dim[3])
     {
     }
   };

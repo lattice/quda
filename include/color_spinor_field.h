@@ -1019,7 +1019,6 @@ namespace quda
      @param[out] src The colorspinorfield
      @param[in] alpha alpha parameter for distance preconditioning
      @param[in] t0 source time for distance preconditioning
-     @param[in] type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
   void spinorDistanceReweight(ColorSpinorField &src, double alpha, int t0);
 
