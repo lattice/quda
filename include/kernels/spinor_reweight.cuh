@@ -46,7 +46,7 @@ namespace quda
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       Vector tmp = arg.v(x_cb, parity);
-      tmp *= distanceWeight(arg.alpha0, arg.comms_coord[3] * arg.X[3] + x[3], arg.t0, arg.comms_dim[3] * arg.X[3]);
+      tmp *= distanceWeight(arg.alpha0, arg.t0, arg.comms_coord[3] * arg.X[3] + x[3], arg.comms_dim[3] * arg.X[3]);
       arg.v(x_cb, parity) = tmp;
     }
   };

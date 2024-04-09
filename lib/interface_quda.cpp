@@ -1779,11 +1779,15 @@ void distanceReweight(ColorSpinorField &b, QudaInvertParam *param, bool inverse)
   // seem to be good. Disable the negative situation as QUDA already has multigrid for light quarks.
   const double alpha0 = abs(param->distance_pc_alpha0);
   const int t0 = param->distance_pc_t0;
-  if (param->inv_type != QUDA_CG_INVERTER || param->inv_type != QUDA_BICGSTAB_INVERTER) {
+  bool distance_pc = (alpha0 != 0) && (t0 >= 0);
+  if (distance_pc && param->dslash_type != QUDA_WILSON_DSLASH && param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
+    errorQuda("Distance precontioning is not compatible with dslash type %d\n", param->dslash_type);
+  }
+  if (distance_pc && param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) {
     errorQuda("Distance precontioning is not compatible with inverter type %d\n", param->inv_type);
   }
 
-  if ((alpha0 != 0) && (t0 >= 0)) {
+  if (distance_pc) {
     if (inverse)
       spinorDistanceReweight(b, -alpha0, t0);
     else

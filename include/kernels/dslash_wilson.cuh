@@ -104,24 +104,18 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-    real coeff_fwd[4] = {1.0, 1.0, 1.0, 1.0};
-    real coeff_bwd[4] = {1.0, 1.0, 1.0, 1.0};
+    real fwd_coeff_3 = 1.0;
+    real bwd_coeff_3 = 1.0;
     if constexpr (Arg::distance_pc) {
       const int t = arg.t + coord[3];
-#pragma unroll
-      for (int d = 0; d < 4; d++) {
-        coeff_fwd[d] = (d < 3) ?
-          1.0 :
-          distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
-        coeff_bwd[d] = (d < 3) ?
-          1.0 :
-          distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
-      }
+      fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+      bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
     }
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
+        const real fwd_coeff = (d < 3) ? 1.0 : fwd_coeff_3;
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -137,17 +131,18 @@ namespace quda
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += coeff_fwd[d] * (U * in).reconstruct(d, proj_dir);
+          out += fwd_coeff * (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += coeff_fwd[d] * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += fwd_coeff * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
+        const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -163,13 +158,13 @@ namespace quda
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += coeff_bwd[d] * (conj(U) * in).reconstruct(d, proj_dir);
+          out += bwd_coeff * (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += coeff_bwd[d] * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
     } // nDim
