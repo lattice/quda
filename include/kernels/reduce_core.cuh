@@ -274,23 +274,25 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
-      caxpyNorm2(const complex<real> &a, const complex<real> &) : a(a) { ; }
+      const complex<real> b;
+      caxpyNorm2(const complex<real> &a, const complex<real> &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
+          y[i] *= b;
           y[i] = cmac(a, x[i], y[i]);
           norm2_<reduce_t, real>(sum, y[i]);
         }
       }
-      constexpr int flops() const { return 6; }   //! flops per element
+      constexpr int flops() const { return 8; } //! flops per element
     };
 
     /**
        double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
        First performs the operation z[i] = y[i] + a*b*x[i]
        Second performs x[i] *= a
-       Third returns the norm of x
+       Third returns the norm of z
     */
     template <typename reduce_t, typename real>
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {

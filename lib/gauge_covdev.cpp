@@ -6,15 +6,16 @@
 
 namespace quda {
 
-  GaugeCovDev::GaugeCovDev(const DiracParam &param) :  Dirac(param) { }
+  GaugeCovDev::GaugeCovDev(const DiracParam &param) :  Dirac(param), covdev_mu(param.covdev_mu) { }
 
-  GaugeCovDev::GaugeCovDev(const GaugeCovDev &covDev) :  Dirac(covDev) { }
+  GaugeCovDev::GaugeCovDev(const GaugeCovDev &covDev) :  Dirac(covDev), covdev_mu(covDev.covdev_mu) { }
 
   GaugeCovDev::~GaugeCovDev() { }
 
   GaugeCovDev& GaugeCovDev::operator=(const GaugeCovDev &covDev)
   {
     if (&covDev != this) Dirac::operator=(covDev);
+    covdev_mu = covDev.covdev_mu;
     return *this;
   }
 
@@ -42,9 +43,9 @@ namespace quda {
     MCD(out, tmp, (mu+4)%8);
   }
 
-  void GaugeCovDev::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+  void GaugeCovDev::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    //do nothing
+    DslashCD(out, in, parity, covdev_mu);
   }
 
   void GaugeCovDev::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity, const ColorSpinorField &,
@@ -53,25 +54,27 @@ namespace quda {
     //do nothing
   }
 
-  void GaugeCovDev::M(ColorSpinorField &, const ColorSpinorField &) const
+  void GaugeCovDev::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    //do nothing
+    MCD(out, in, covdev_mu);
   }
 
-  void GaugeCovDev::MdagM(ColorSpinorField &, const ColorSpinorField &) const
+  void GaugeCovDev::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    //do nothing
+    MdagMCD(out, in, covdev_mu);
   }
 
-  void GaugeCovDev::prepare(ColorSpinorField *&, ColorSpinorField *&, ColorSpinorField &, ColorSpinorField &,
+  void GaugeCovDev::prepare(cvector_ref<ColorSpinorField> &, cvector_ref<ColorSpinorField> &,
+                            cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
                             const QudaSolutionType) const
   {
-    //do nothing
+    // do nothing
   }
 
-  void GaugeCovDev::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void GaugeCovDev::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                const QudaSolutionType) const
   {
-    //do nothing
+    // do nothing
   }
 
 } // namespace quda

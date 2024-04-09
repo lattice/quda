@@ -13,13 +13,25 @@ namespace quda {
     mass(param.mass),
     laplace3D(param.laplace3D),
     matpcType(param.matpcType),
+    this_parity(QUDA_INVALID_PARITY),
+    other_parity(QUDA_INVALID_PARITY),
     dagger(param.dagger),
     type(param.type),
     halo_precision(param.halo_precision),
+    commDim(param.commDim),
     use_mobius_fused_kernel(param.use_mobius_fused_kernel),
     profile("Dirac", false)
   {
-    for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
+    if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      this_parity = QUDA_EVEN_PARITY;
+      other_parity = QUDA_ODD_PARITY;
+    } else if (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      this_parity = QUDA_ODD_PARITY;
+      other_parity = QUDA_EVEN_PARITY;
+    } else {
+      errorQuda("Invalid matpcType(%d) in function\n", matpcType);
+    }
+    symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD);
   }
 
   Dirac::Dirac(const Dirac &dirac) :
@@ -27,12 +39,15 @@ namespace quda {
     kappa(dirac.kappa),
     laplace3D(dirac.laplace3D),
     matpcType(dirac.matpcType),
+    this_parity(dirac.this_parity),
+    other_parity(dirac.other_parity),
+    symmetric(dirac.symmetric),
     dagger(dirac.dagger),
     type(dirac.type),
     halo_precision(dirac.halo_precision),
+    commDim(dirac.commDim),
     profile("Dirac", false)
   {
-    for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
 
   // Destroy
@@ -48,10 +63,11 @@ namespace quda {
       kappa = dirac.kappa;
       laplace3D = dirac.laplace3D;
       matpcType = dirac.matpcType;
+      this_parity = dirac.this_parity;
+      other_parity = dirac.other_parity;
+      symmetric = dirac.symmetric;
       dagger = dirac.dagger;
-
-      for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
-
+      commDim = dirac.commDim;
       profile = dirac.profile;
 
       if (type != dirac.type) errorQuda("Trying to copy between incompatible types %d %d", type, dirac.type);

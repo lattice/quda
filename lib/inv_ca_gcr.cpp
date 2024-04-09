@@ -7,8 +7,8 @@ namespace quda
 {
 
   CAGCR::CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-               const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+               const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param),
     matMdagM(matEig.Expose()),
     init(false),
     lambda_init(false),
@@ -18,9 +18,7 @@ namespace quda
 
   CAGCR::~CAGCR()
   {
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void CAGCR::create(ColorSpinorField &x, const ColorSpinorField &b)
@@ -28,7 +26,7 @@ namespace quda
     Solver::create(x, b);
 
     if (!init) {
-      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       alpha.resize(param.Nkrylov);
 
@@ -58,7 +56,7 @@ namespace quda
       csParam.setPrecision(param.precision);
       r = mixed ? ColorSpinorField(csParam) : p[0].create_alias(csParam);
 
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     } // init
   }
@@ -79,7 +77,7 @@ namespace quda
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<Complex> A_(N * (N + 1));
 
-    blas::cDotProduct(A_, q, {q, b});
+    blas::block::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
       phi(i) = A_[i * (N + 1) + N];
       for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }
@@ -88,19 +86,19 @@ namespace quda
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<Complex> phi_(N);
-    blas::cDotProduct(phi_, q, b);
+    blas::block::cDotProduct(phi_, q, b);
     for (int i = 0; i < N; i++) phi(i) = phi_[i];
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<Complex> A_(N * N);
-    blas::hDotProduct(A_, q, q);
+    blas::block::hDotProduct(A_, q, q);
     for (int i = 0; i < N; i++)
       for (int j = 0; j < N; j++) A(i, j) = A_[i * N + j];
 #endif
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     // use Cholesky LDL since this seems plenty stable
@@ -110,8 +108,8 @@ namespace quda
     for (int i = 0; i < N; i++) psi_[i] = psi(i);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
@@ -140,7 +138,8 @@ namespace quda
 
     create(x, b);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
@@ -158,7 +157,7 @@ namespace quda
       }
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
         if (param.deflate) {
           // double the size of the Krylov space
@@ -166,7 +165,7 @@ namespace quda
           // populate extra memory with L/R singular vectors
           eig_solve->computeSVD(evecs, evals);
         }
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -212,8 +211,8 @@ namespace quda
 
     if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTART(QUDA_PROFILE_INIT);
       }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
@@ -224,8 +223,8 @@ namespace quda
       lambda_init = true;
 
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
       }
     }
 
@@ -263,8 +262,8 @@ namespace quda
     int resIncreaseTotal = 0;
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
     int total_iter = 0;
     int restart = 0;
@@ -283,14 +282,14 @@ namespace quda
       solve(alpha, q, p[0]);
 
       // need to make sure P is only length n_krylov
-      blas::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
+      blas::block::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
 
       // no need to compute residual vector if not returning
       // residual vector and only doing a single fixed iteration
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
         for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
-        blas::caxpy(alpha, q, r);
+        blas::block::caxpy(alpha, q, r);
       }
 
       total_iter += n_krylov;
@@ -369,11 +368,13 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += total_iter;
     }
 
     PrintSummary("CA-GCR", total_iter, r2, b2, stop, param.tol_hq);
+
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 } // namespace quda

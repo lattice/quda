@@ -5,6 +5,7 @@
 #include <quda.h>
 #include <quda_internal.h>
 #include <gauge_field.h>
+#include <instantiate.h>
 
 #include <misc.h>
 #include <timer.h>
@@ -34,13 +35,16 @@ bool gauge_store;
 
 std::array<std::vector<char>, 4> host_gauge;
 
-class GaugeAlgTest : public ::testing::Test
-{
-protected:
+using test_t = ::testing::tuple<QudaPrecision>;
+
+struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
+  QudaPrecision precision;
   QudaGaugeParam param;
   Timer<false> a0, a1;
   GaugeField *U;
   double3 plaq;
+
+  GaugeAlgTest() : precision(::testing::get<0>(GetParam())) { }
 
   void SetReunitarizationConsts()
   {
@@ -59,14 +63,14 @@ protected:
     auto a1 = std::abs(a.y - b.y);
     auto a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
+    if (precision == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
   bool CheckDeterminant(double2 detu)
   {
     double prec_val = 5e-8;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
+    if (precision == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
     return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
   }
 
@@ -80,12 +84,18 @@ protected:
       GTEST_SKIP();
     }
 #endif
+    if (!is_enabled(precision)) {
+      execute = false;
+      GTEST_SKIP();
+    }
+
     if (execute) {
       setVerbosity(verbosity);
       param = newQudaGaugeParam();
 
       // Setup gauge container.
       setWilsonGaugeParam(param);
+      param.cuda_prec = precision;
       param.t_boundary = QUDA_PERIODIC_T;
 
       // Reunitarization setup
@@ -102,7 +112,7 @@ protected:
         gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
         gParam.create = QUDA_NULL_FIELD_CREATE;
         gParam.reconstruct = link_recon;
-        gParam.setPrecision(prec, true);
+        gParam.setPrecision(precision, true);
         for (int d = 0; d < 4; d++) {
           if (comm_dim_partitioned(d)) gParam.r[d] = 2;
           gParam.x[d] += 2 * gParam.r[d];
@@ -280,7 +290,7 @@ protected:
   }
 };
 
-TEST_F(GaugeAlgTest, Generation)
+TEST_P(GaugeAlgTest, Generation)
 {
   if (execute && !gauge_load) {
     auto detu = getLinkDeterminant(*U);
@@ -288,7 +298,7 @@ TEST_F(GaugeAlgTest, Generation)
   }
 }
 
-TEST_F(GaugeAlgTest, Landau_Overrelaxation)
+TEST_P(GaugeAlgTest, Landau_Overrelaxation)
 {
   if (execute) {
     printfQuda("Landau gauge fixing with overrelaxation\n");
@@ -301,7 +311,7 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
   }
 }
 
-TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
+TEST_P(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   if (execute) {
     printfQuda("Coulomb gauge fixing with overrelaxation\n");
@@ -314,7 +324,7 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
   }
 }
 
-TEST_F(GaugeAlgTest, Landau_FFT)
+TEST_P(GaugeAlgTest, Landau_FFT)
 {
   if (execute) {
     if (!comm_partitioned()) {
@@ -329,7 +339,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
   }
 }
 
-TEST_F(GaugeAlgTest, Coulomb_FFT)
+TEST_P(GaugeAlgTest, Coulomb_FFT)
 {
   if (execute) {
     if (!comm_partitioned()) {
@@ -376,6 +386,12 @@ struct gauge_alg_test : quda_test {
 
   gauge_alg_test(int argc, char **argv) : quda_test("Gauge Alg Test", argc, argv) { }
 };
+
+INSTANTIATE_TEST_SUITE_P(GaugeAlgTest, GaugeAlgTest,
+                         testing::Combine(testing::Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)),
+                         [](testing::TestParamInfo<test_t> param) {
+                           return std::string(get_prec_str(testing::get<0>(param.param)));
+                         });
 
 int main(int argc, char **argv)
 {

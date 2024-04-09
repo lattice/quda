@@ -246,7 +246,7 @@ namespace quda
     even = std::exchange(src.even, nullptr);
     odd = std::exchange(src.odd, nullptr);
     composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
-    components = std::move(src.components);
+    components = std::exchange(src.components, {});
   }
 
   void ColorSpinorField::destroy()
@@ -401,6 +401,12 @@ namespace quda
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
   {
+    // if these are the same field then return
+    if (data() == src.data()) {
+      if (are_compatible(*this, src)) return;
+      else errorQuda("Aliasing pointers with incompatible fields");
+    }
+
     test_compatible_weak(*this, src);
 
     if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
@@ -672,7 +678,7 @@ namespace quda
 
   bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
   {
-    return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && are_compatible_weak(a, b));
+    return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && a.GammaBasis() == b.GammaBasis() && are_compatible_weak(a, b));
   }
 
   void ColorSpinorField::test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
@@ -691,6 +697,7 @@ namespace quda
     test_compatible_weak(a, b);
     if (a.Precision() != b.Precision()) errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
     if (a.FieldOrder() != b.FieldOrder()) errorQuda("orders do not match: %d %d", a.FieldOrder(), b.FieldOrder());
+    if (a.GammaBasis() != b.GammaBasis()) errorQuda("basis does not match: %d %d", a.GammaBasis(), b.GammaBasis());
   }
 
   const ColorSpinorField &ColorSpinorField::Even() const
@@ -840,18 +847,7 @@ namespace quda
     return ColorSpinorField(param);
   }
 
-  ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
-  {
-    if (param_.Precision() > precision)
-      errorQuda("Cannot create an alias to source with lower precision than the alias");
-    ColorSpinorParam param(param_);
-    param.create = QUDA_REFERENCE_FIELD_CREATE;
-    param.v = data();
-
-    return new ColorSpinorField(param);
-  }
-
-  ColorSpinorField *ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+  ColorSpinorField ColorSpinorField::create_coarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
                                                    QudaMemoryType new_mem_type)
   {
@@ -889,10 +885,10 @@ namespace quda
     // set where we allocate the field
     coarseParam.mem_type = new_mem_type;
 
-    return new ColorSpinorField(coarseParam);
+    return ColorSpinorField(coarseParam);
   }
 
-  ColorSpinorField *ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
+  ColorSpinorField ColorSpinorField::create_fine(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                  QudaPrecision new_precision, QudaFieldLocation new_location,
                                                  QudaMemoryType new_mem_type)
   {
@@ -920,7 +916,7 @@ namespace quda
     // set where we allocate the field
     fineParam.mem_type = new_mem_type;
 
-    return new ColorSpinorField(fineParam);
+    return ColorSpinorField(fineParam);
   }
 
   // legacy CPU static ghost destructor

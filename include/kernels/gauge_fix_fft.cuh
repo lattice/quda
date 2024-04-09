@@ -193,8 +193,7 @@ namespace quda {
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
-      matrix delta;
-      setZero(&delta);
+      matrix delta = {};
 
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, x_cb, parity);
