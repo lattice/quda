@@ -110,6 +110,9 @@ namespace quda
       const int t = arg.t + coord[3];
       fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
       bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+    } else {
+      fwd_coeff_3 = 1.0;
+      bwd_coeff_3 = 1.0;
     }
 
 #pragma unroll
