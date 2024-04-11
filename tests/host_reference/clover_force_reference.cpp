@@ -225,6 +225,27 @@ void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, std::vector
                            std::vector<quda::ColorSpinorField> &p, std::vector<double> force_coeff)
 {
   int dag = 1;
+  // Get spinor ghost fields
+  // First wrap the input spinor into a ColorSpinorField
+  quda::ColorSpinorParam csParam[4];
+  for (int i = 0; i < 4;  ++i){
+    csParam[i].location = QUDA_CPU_FIELD_LOCATION;
+    // csParam[i].v = in;
+    csParam[i].nColor = 3;
+    csParam[i].nSpin = 4;
+    csParam[i].nDim = 4;
+    for (int d = 0; d < 4; d++) csParam[i].x[d] = Z[d];
+    csParam[i].setPrecision(QUDA_DOUBLE_PRECISION);
+    csParam[i].pad = 0;
+    csParam[i].siteSubset = QUDA_PARITY_SITE_SUBSET;
+    csParam[i].x[0] /= 2;
+    csParam[i].siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam[i].fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam[i].gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+    csParam[i].create = QUDA_REFERENCE_FIELD_CREATE;
+    csParam[i].pc_type = QUDA_4D_PC;
+  }
+  
   for (auto i = 0u; i < x.size(); i++) {
     for (int parity = 0; parity < 2; parity++) {
       quda::ColorSpinorField &inA = (parity & 1) ? x[i].Odd() : x[i].Even();
@@ -238,6 +259,26 @@ void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, std::vector
       CloverForce_kernel_host<double, double>(gauge, h_mom, inA, inB, 1, parity, force_coeff[i]);
       inD.exchangeGhost((QudaParity)(1 - parity), nFace, 1 - dag);
       CloverForce_kernel_host<double, double>(gauge, h_mom, inC, inD, -1, parity, force_coeff[i]);
+
+      if (x[0].TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET){
+        csParam[0].v = inA.data();
+        csParam[1].v = inB.data();
+        csParam[2].v = inC.data();
+        csParam[3].v = inD.data();
+        
+        for (int j = 0; j < 4;  ++j){
+          csParam[j].v = (char *) csParam[j].v +  Vh * spinor_site_size * sizeof(double);
+        }
+        quda::ColorSpinorField in2A(csParam[0]);
+        quda::ColorSpinorField in2B(csParam[1]);
+        quda::ColorSpinorField in2C(csParam[2]);
+        quda::ColorSpinorField in2D(csParam[3]);
+        
+        in2B.exchangeGhost((QudaParity)(1 - parity), nFace, dag);
+        CloverForce_kernel_host<double, double>(gauge, h_mom, in2A, in2B, 1, parity, force_coeff[i]);
+        in2D.exchangeGhost((QudaParity)(1 - parity), nFace, 1 - dag);
+        CloverForce_kernel_host<double, double>(gauge, h_mom, in2C, in2D, -1, parity, force_coeff[i]);
+      }
     }
   }
 }
@@ -825,41 +866,46 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
   gFloat *oprod = (gFloat *)oprod_;
   sFloat *x = (sFloat *)inx.data();
   sFloat *p = (sFloat *)inp.data();
+  
+  int flavors = 1;
+  if (inx.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) flavors= inx.TwistFlavor();
 
   for (int parity = 0; parity < 2; parity++) {
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       for (int mu = 1; mu < 4; mu++) {
         for (int nu = 0; nu < mu; nu++) {
+          for (int flavor = 0; flavor < flavors; ++flavor) {
 
-          sFloat temp[spinor_site_size], temp_munu[spinor_site_size], temp_numu[spinor_site_size];
-          multiplySpinorByDiracgamma(temp, nu, &p[spinor_site_size * (i + Vh * parity)]);
-          multiplySpinorByDiracgamma(temp_munu, mu, temp);
+            sFloat temp[spinor_site_size], temp_munu[spinor_site_size], temp_numu[spinor_site_size];
+            multiplySpinorByDiracgamma(temp, nu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
+            multiplySpinorByDiracgamma(temp_munu, mu, temp);
 
-          multiplySpinorByDiracgamma(temp, mu, &p[spinor_site_size * (i + Vh * parity)]);
-          multiplySpinorByDiracgamma(temp_numu, nu, temp);
-          for (int s = 0; s < 4; s++) {
-            for (int t = 0; t < 3; t++) {
-              temp[s * (3 * 2) + t * (2) + 0]
-                = -temp_munu[s * (3 * 2) + t * (2) + 0] + temp_numu[s * (3 * 2) + t * (2) + 0];
-              temp[s * (3 * 2) + t * (2) + 1]
-                = -temp_munu[s * (3 * 2) + t * (2) + 1] + temp_numu[s * (3 * 2) + t * (2) + 1];
+            multiplySpinorByDiracgamma(temp, mu, &p[spinor_site_size * (i +  Vh * flavor + Vh * flavors * parity)]);
+            multiplySpinorByDiracgamma(temp_numu, nu, temp);
+            for (int s = 0; s < 4; s++) {
+              for (int t = 0; t < 3; t++) {
+                temp[s * (3 * 2) + t * (2) + 0]
+                  = -temp_munu[s * (3 * 2) + t * (2) + 0] + temp_numu[s * (3 * 2) + t * (2) + 0];
+                temp[s * (3 * 2) + t * (2) + 1]
+                  = -temp_munu[s * (3 * 2) + t * (2) + 1] + temp_numu[s * (3 * 2) + t * (2) + 1];
+              }
             }
-          }
 
-          gFloat oprod_f[gauge_site_size];
-          gFloat oprod_imx2[gauge_site_size];
-          outerProdSpinTrace(oprod_f, temp, &x[spinor_site_size * (i + Vh * parity)]);
-          su3_imagx2(oprod_imx2, oprod_f);
+            gFloat oprod_f[gauge_site_size];
+            gFloat oprod_imx2[gauge_site_size];
+            outerProdSpinTrace(oprod_f, temp, &x[spinor_site_size * (i +  Vh * flavor + Vh * flavors * parity)]);
+            su3_imagx2(oprod_imx2, oprod_f);
 
-          int munu = (mu - 1) * mu / 2 + nu;
+            int munu = (mu - 1) * mu / 2 + nu;
 
-          for (int ci = 0; ci < nColor; ci++) {   // row
-            for (int cj = 0; cj < nColor; cj++) { // col
-              int color = ci * nColor + cj;
-              int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
-              oprod[id + 0] += coeff[parity] * oprod_imx2[color * 2 + 0] / 2.0;
-              oprod[id + 1] += coeff[parity] * oprod_imx2[color * 2 + 1] / 2.0;
+            for (int ci = 0; ci < nColor; ci++) {   // row
+              for (int cj = 0; cj < nColor; cj++) { // col
+                int color = ci * nColor + cj;
+                int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
+                oprod[id + 0] += coeff[parity] * oprod_imx2[color * 2 + 0] / 2.0;
+                oprod[id + 1] += coeff[parity] * oprod_imx2[color * 2 + 1] / 2.0;
+              }
             }
           }
         }
@@ -895,10 +941,34 @@ void Gamma5_host(double *out, double *in, const int V)
     }
   }
 }
+
+void tau1_host(double *out, double *in, const int V)
+{
+  int V2 = V * 24 / 2;
+#pragma omp parallel for
+  for (int i = 0; i < V2 ; i++) { 
+    double up = in[i];
+    double down = in[i + V2];
+    out[i] = down;
+    out[i + V2] = up; 
+  }
+}
+
 void axpbyz_host(double a, double *x, double b, double *y, double *z, const int V)
 {
 #pragma omp parallel for
   for (int i = 0; i < V * 24; i++) { z[i] = a * x[i] + b * y[i]; }
+}
+
+void caxpy_host(double a_re, double a_im, double *x, double *y, const int V)
+{
+#pragma omp parallel for
+  for (int i = 0; i < V * 12; i++) { 
+    double re = a_re * x[i * 2 + 0] - a_im * x[i * 2 + 1] + y[i * 2 + 0];
+    double im = a_re * x[i * 2 + 1] + a_im * x[i * 2 + 0] + y[i * 2 + 1];
+    y[i * 2 + 0] = re; 
+    y[i * 2 + 1] = im; 
+  }
 }
 
 void Gamma5_host_UKQCD(double *out, double *in, const int V)
@@ -968,20 +1038,30 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
     if (myMatPCType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || myMatPCType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        tmc_dslash(x[i].Even().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
-                   inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec,
-                   *gauge_param);
+        if (inv_param->twist_flavor == QUDA_TWIST_SINGLET){
+          tmc_dslash(x[i].Even().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+                    inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec,
+                    *gauge_param);
+        } else if  (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+          tmc_ndeg_dslash(x[i].Even().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+                    inv_param->mu, inv_param->epsilon, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec,
+                    *gauge_param);
+        }
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_dslash(x[i].Even().data(), gauge.data(), clover_inv.data(), tmp.data(), parity, QUDA_DAG_YES,
                       inv_param->cpu_prec, *gauge_param);
       } else {
         errorQuda("TMCloverForce_reference: dslash_type not supported\n");
       }
-      Gamma5_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
 
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        tmc_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
-                  inv_param->mu, inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+        if (inv_param->twist_flavor == QUDA_TWIST_SINGLET) {
+          tmc_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+                    inv_param->mu, inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+        } else if  (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+          tmc_ndeg_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+                    inv_param->mu, inv_param->epsilon, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+        }
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa,
                      myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
@@ -989,7 +1069,18 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
         errorQuda("TMCloverForce_reference: dslash_type not supported\n");
       }
 
-      if (detratio) {
+      if(inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        // FIXME: here we used the already existing ca_lambda_max member of inv_param. Maybe it's better to create a new parameter for this purpose
+        axpbyz_host(1.0/inv_param->ca_lambda_max, p[i].Odd().data<double *>(), 0, p[i].Odd().data<double *>(), p[i].Odd().data<double *>(),
+                    p[i].Odd().VolumeCB());
+        tau1_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
+        tau1_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
+        caxpy_host(0.0, -inv_param->offset[i], x[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
+      }
+
+      Gamma5_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
+
+      if (detratio && inv_param->twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) {
         qParam.v = h_x0[i];
         quda::ColorSpinorField load_half(qParam);
         x0[i].Odd() = load_half;
@@ -997,15 +1088,31 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
                     p[i].Odd().VolumeCB());
       }
 
+      if ( inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        Gamma5_host( p[i].Odd().data<double *>(),  p[i].Odd().data<double *>(),  p[i].Odd().VolumeCB());
+      }
+
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        tmc_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(),
-                   inv_param->kappa, inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO,
-                   inv_param->cpu_prec, *gauge_param);
+        if (inv_param->twist_flavor == QUDA_TWIST_SINGLET)
+          tmc_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(),
+                    inv_param->kappa, inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO,
+                    inv_param->cpu_prec, *gauge_param);
+        else if  (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)
+          tmc_ndeg_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(), inv_param->kappa,
+                    inv_param->mu, inv_param->epsilon, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec,
+                    *gauge_param);
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_dslash(p[i].Even().data(), gauge.data(), clover_inv.data(), p[i].Odd().data(), parity, QUDA_DAG_NO,
                       inv_param->cpu_prec, *gauge_param);
       } else {
         errorQuda("TMCloverForce_reference: dslash_type not supported\n");
+      }
+
+      if ( inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        Gamma5_host( p[i].Odd().data<double *>(),  p[i].Odd().data<double *>(),  p[i].Odd().VolumeCB());
+        Gamma5_host( p[i].Even().data<double *>(),  p[i].Even().data<double *>(),  p[i].Even().VolumeCB());
+        tau1_host(p[i].Even().data<double *>(), p[i].Even().data<double *>(), p[i].Even().VolumeCB());
+
       }
 
     } else {
@@ -1058,6 +1165,10 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
     ferm_epsilon[i].reserve(2);
     ferm_epsilon[i][0] = k_csw_ov_8 * coeff[i];
     ferm_epsilon[i][1] = k_csw_ov_8 * coeff[i] / (inv_param->kappa * inv_param->kappa);
+    if ( inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+        tau1_host(p[i].Even().data<double *>(), p[i].Even().data<double *>(), p[i].Even().VolumeCB());
+        tau1_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());
+    }
   }
   // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
   // sw_spinor_eo(OO,..)  in tmLQCD
