@@ -49,11 +49,11 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // this would really just be a Wilson dslash (not actually instantiated at present)
-      ApplyTwistedMass(out, in, *gauge, 0.0, 2 * mu * kappa, in, parity, dagger, commDim, profile);
+      ApplyTwistedMass(out, in, *gauge, 0.0, 2 * mu * kappa, in, parity, dagger, commDim.data, profile);
     } else {
       // this would really just be a 2-way vectorized Wilson dslash (not actually instantiated at present)
-      ApplyNdegTwistedMass(
-          out, in, *gauge, 0.0, 2 * mu * kappa, -2 * kappa * epsilon, in, parity, dagger, commDim, profile);
+      ApplyNdegTwistedMass(out, in, *gauge, 0.0, 2 * mu * kappa, -2 * kappa * epsilon, in, parity, dagger, commDim.data,
+                           profile);
     }
   }
 
@@ -63,10 +63,11 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
-      ApplyTwistedMass(out, in, *gauge, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
+      ApplyTwistedMass(out, in, *gauge, k, 2 * mu * kappa, x, parity, dagger, commDim.data, profile);
     } else {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * x
-      ApplyNdegTwistedMass(out, in, *gauge, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
+      ApplyNdegTwistedMass(out, in, *gauge, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim.data,
+                           profile);
     }
   }
 
@@ -82,10 +83,10 @@ namespace quda {
     }
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      ApplyTwistedMass(out, in, *gauge, -kappa, 2 * mu * kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      ApplyTwistedMass(out, in, *gauge, -kappa, 2 * mu * kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
     } else {
       ApplyNdegTwistedMass(out, in, *gauge, -kappa, 2 * mu * kappa, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY,
-          dagger, commDim, profile);
+                           dagger, commDim.data, profile);
     }
   }
 
@@ -98,18 +99,22 @@ namespace quda {
     Mdag(out, tmp);
   }
 
-  void DiracTwistedMass::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-      ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracTwistedMass::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                 cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                 const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracTwistedMass::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracTwistedMass::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                     const QudaSolutionType) const
   {
     // do nothing
   }
@@ -166,7 +171,7 @@ namespace quda {
 
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
-      ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, false, in, parity, dagger, asymmetric, commDim, profile);
+      ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, false, in, parity, dagger, asymmetric, commDim.data, profile);
     } else {//TWIST doublet :
       double a = 2.0 * kappa * mu;
       double b = 2.0 * kappa * epsilon;
@@ -175,7 +180,7 @@ namespace quda {
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyNdegTwistedMassPreconditioned(out, in, *gauge, c, -2.0 * mu * kappa, 2.0 * kappa * epsilon, false, in,
-          parity, dagger, asymmetric, commDim, profile);
+                                         parity, dagger, asymmetric, commDim.data, profile);
     }
   }
 
@@ -196,7 +201,7 @@ namespace quda {
       // asymmetric should never be true here since we never need to apply 1 + k * A^{-1} D^\dagger
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
-      ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, true, x, parity, dagger, asymmetric, commDim, profile);
+      ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, true, x, parity, dagger, asymmetric, commDim.data, profile);
     } else {//TWIST_DOUBLET:
       double a = 2.0 * kappa * mu;
       double b = 2.0 * kappa * epsilon;
@@ -205,7 +210,7 @@ namespace quda {
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyNdegTwistedMassPreconditioned(out, in, *gauge, k * c, -2 * mu * kappa, 2 * kappa * epsilon, true, x, parity,
-          dagger, asymmetric, commDim, profile);
+                                         dagger, asymmetric, commDim.data, profile);
     }
   }
 
@@ -214,16 +219,12 @@ namespace quda {
     double kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(in);
 
-    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
     if (symmetric) {
-      Dslash(tmp, in, parity[0]);
-      DslashXpay(out, tmp, parity[1], in, kappa2);
+      Dslash(tmp, in, other_parity);
+      DslashXpay(out, tmp, this_parity, in, kappa2);
     } else { // asymmetric preconditioning
-      Dslash(tmp, in, parity[0]);
-      DiracTwistedMass::DslashXpay(out, tmp, parity[1], in, kappa2);
+      Dslash(tmp, in, other_parity);
+      DiracTwistedMass::DslashXpay(out, tmp, this_parity, in, kappa2);
     }
   }
 
@@ -235,122 +236,92 @@ namespace quda {
     Mdag(out, tmp);
   }
 
-  void DiracTwistedMassPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-                                   ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracTwistedMassPC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                   cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                   const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
+      for (auto i = 0u; i < b.size(); i++) {
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
+      }
       return;
     }
 
-    auto tmp = getFieldTmp(b.Even());
-
-    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-
-    src = odd_bit ? &(x.Even()) : &(x.Odd());
-    sol = odd_bit ? &(x.Odd()) : &(x.Even());
-
-    TwistInv(symmetric ? *src : static_cast<ColorSpinorField &>(tmp), odd_bit ? b.Even() : b.Odd());
-
     // we desire solution to full system
-    if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
+    auto tmp = getFieldTmp(b[0].Even());
+    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
 
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
-        DiracWilson::DslashXpay(tmp, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-        // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
-        DiracWilson::DslashXpay(tmp, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // src = b_e + k D_eo A_oo^-1 b_o
-        DiracWilson::DslashXpay(*src, tmp, QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // src = b_o + k D_oe A_ee^-1 b_e
-        DiracWilson::DslashXpay(*src, tmp, QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
-      }
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = x[i][other_parity].create_alias();
+      sol[i] = x[i][this_parity].create_alias();
 
-    } else { // doublet:
+      TwistInv(symmetric ? src[i] : static_cast<ColorSpinorField &>(tmp), b[i][other_parity]);
 
-      // repurpose the preconditioned dslash as a vectorized operator: 1+kappa*D
-      double mu_ = mu;
-      mu = 0.0;
-      double epsilon_ = epsilon;
-      epsilon = 0.0;
+      if (b[0].TwistFlavor() == QUDA_TWIST_SINGLET) {
 
-      // we desire solution to full system
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        // src = A_ee^-1(b_e + k D_eo A_oo^-1 b_o)
-        DslashXpay(tmp, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-        // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
-        DslashXpay(tmp, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // src = b_e + k D_eo A_oo^-1 b_o
-        DslashXpay(*src, tmp, QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // src = b_o + k D_oe A_ee^-1 b_e
-        DslashXpay(*src, tmp, QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
-      }
+        if (symmetric) {
+          // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
+          DiracWilson::DslashXpay(tmp, src[i], this_parity, b[i][this_parity], kappa);
+        } else {
+          // src = b_e + k D_eo A_oo^-1 b_o
+          DiracWilson::DslashXpay(src[i], tmp, this_parity, b[i][this_parity], kappa);
+        }
 
-      mu = mu_;
-      epsilon = epsilon_;
+      } else { // doublet:
 
-    } // end of doublet
+        // repurpose the preconditioned dslash as a vectorized operator: 1+kappa*D
+        double mu_ = mu;
+        mu = 0.0;
+        double epsilon_ = epsilon;
+        epsilon = 0.0;
 
-    if (symmetric) TwistInv(*src, tmp);
+        if (symmetric) {
+          // src = A_ee^-1(b_e + k D_eo A_oo^-1 b_o)
+          DslashXpay(tmp, src[i], this_parity, b[i][this_parity], kappa);
+        } else {
+          // src = b_e + k D_eo A_oo^-1 b_o
+          DslashXpay(src[i], tmp, this_parity, b[i][this_parity], kappa);
+        }
 
-    // here we use final solution to store parity solution and parity source
-    // b is now up for grabs if we want
+        mu = mu_;
+        epsilon = epsilon_;
+
+      } // end of doublet
+
+      if (symmetric) TwistInv(src[i], tmp);
+    }
   }
 
-  void DiracTwistedMassPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				       const QudaSolutionType solType) const
+  void DiracTwistedMassPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                       const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    checkFullSpinor(x, b);
-    auto tmp = getFieldTmp(b.Even());
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    auto tmp = getFieldTmp(b[0].Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
 
-    // create full solution
-    if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      // create full solution
+      if (b[0].TwistFlavor() == QUDA_TWIST_SINGLET) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
-        DiracWilson::DslashXpay(tmp, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // x_e = A_ee^-1 (b_e + k D_eo x_o)
-        DiracWilson::DslashXpay(tmp, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
-      }
-    } else { // twist doublet:
-      double mu_ = mu;
-      mu = 0.0;
-      double epsilon_ = epsilon;
-      epsilon = 0.0;
+        DiracWilson::DslashXpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa);
+      } else { // twist doublet:
+        double mu_ = mu;
+        mu = 0.0;
+        double epsilon_ = epsilon;
+        epsilon = 0.0;
 
-      if (matpcType == QUDA_MATPC_EVEN_EVEN ||  matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
-        DslashXpay(tmp, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD ||  matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // x_e = A_ee^-1 (b_e + k D_eo x_o)
-        DslashXpay(tmp, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
+        DslashXpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa);
+
+        mu = mu_;
+        epsilon = epsilon_;
       }
 
-      mu = mu_;
-      epsilon = epsilon_;
-    } // end of twist doublet...
-
-    TwistInv(odd_bit ? x.Even() : x.Odd(), tmp);
+      TwistInv(x[i][other_parity], tmp);
+    }
   }
 
   void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,

@@ -324,9 +324,7 @@ namespace quda {
     arg.free();
     FFTDestroyPlan(plan_zt);
     FFTDestroyPlan(plan_xy);
-    qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
-
 
     double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);
     double fftflop = 5.0 * (log2((double)( data.X()[0] * data.X()[1]) ) + log2( (double)(data.X()[2] * data.X()[3] )));

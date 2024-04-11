@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <enum_quda.h>
 #include <util_quda.h>
+#include <quda_internal.h>
 
 namespace quda
 {
@@ -230,7 +231,7 @@ namespace quda
        Unary constructor
        @param[in] v Object to which we are constructing a vector_ref around
      */
-    template <class U> vector_ref(U &v)
+    template <class U> vector_ref(const U &v)
     {
       auto vset = make_set(v);
       vector::reserve(vset.size());
@@ -268,7 +269,7 @@ namespace quda
     /**
        @brief This overload allows us to directly access the
        underlying reference without needing to invoke get() like would
-       do for the parent method.  Moreover, we intentionally mark this
+       we do for the parent method.  Moreover, we intentionally mark this
        function as const, since it will allow us to return non-const
        references from a constant container if the underlying
        references are themselves non-const.
@@ -294,6 +295,49 @@ namespace quda
       for (auto i = 0u; i < vector::size(); i++) odd.push_back(operator[](i).Odd());
       return odd;
     }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaPrecision> Precision() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Precision() != operator[](i).Precision())
+          errorQuda("Precisions %d %d do not match", operator[](i - 1).Precision(), operator[](i).Precision());
+      return operator[](0).Precision();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, int> Ncolor() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Ncolor() != operator[](i).Ncolor())
+          errorQuda("Ncolors do not match %d != %d", operator[](i - 1).Ncolor(), operator[](i).Ncolor());
+      return operator[](0).Ncolor();
+    }
+
+    template <class U = T> std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, int> Nspin() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Nspin() != operator[](i).Nspin())
+          errorQuda("Nspins do not match %d != %d", operator[](i - 1).Nspin(), operator[](i).Nspin());
+      return operator[](0).Nspin();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Volume() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Volume() != operator[](i).Volume())
+          errorQuda("Volumes do not match %lu != %lu", operator[](i - 1).Volume(), operator[](i).Volume());
+      return operator[](0).Volume();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Bytes() const
+    {
+      size_t bytes = 0;
+      for (auto i = 0u; i < vector::size(); i++) bytes += operator[](i).Bytes();
+      return bytes;
+    }
   };
 
   template <class T> using cvector_ref = const vector_ref<T>;
@@ -311,5 +355,64 @@ namespace quda
     for (auto i = 0u; i < in.size(); i++) out.push_back(parity == QUDA_EVEN_PARITY ? in[i].Even() : in[i].Odd());
     return out;
   }
+
+  /**
+     Derived specializaton of std::vector<T>
+     which allows us to write generic multi-scalar functions.
+   */
+  template <class T> struct vector : public std::vector<T> {
+    using value_type = T;
+
+    vector() = default;
+    vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) { }
+
+    /**
+       @brief Constructor using std::vector initialization
+       @param[in] u Vector we are copying from
+    */
+    template <class U, std::enable_if_t<std::is_same_v<U, std::vector<typename U::value_type>>> * = nullptr>
+    vector(const U &u)
+    {
+      std::vector<T>::reserve(u.size());
+      for (auto &v : u) std::vector<T>::push_back(v);
+    }
+
+    /**
+       @brief Constructor using a real-valued vector to initialize a
+       complex-valued vector
+       @param[in] u Real-valued vector input
+    */
+    template <class U, std::enable_if_t<std::is_same_v<std::complex<U>, T>> * = nullptr> vector(const vector<U> &u)
+    {
+      std::vector<T>::reserve(u.size());
+      for (auto &v : u) std::vector<T>::push_back(v);
+    }
+
+    /**
+       @brief Constructor using std::vector initialization
+       @param[in] u Scalar we are wrapping a vector around
+    */
+    vector(const T &t) : std::vector<T>(1, t) { }
+
+    /**
+       @brief Constructor using std::vector initialization
+       @param[in] u Scalar we are wrapping a vector around
+    */
+    template <class U, std::enable_if_t<std::is_same_v<std::complex<U>, T>> * = nullptr>
+    vector(const U &u) : std::vector<T>(1, u)
+    {
+    }
+
+    /**
+       @brief Cast to scalar.  Only works if the vector size is 1.
+    */
+    operator T() const
+    {
+      if (std::vector<T>::size() != 1) errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
+      return std::vector<T>::operator[](0);
+    }
+  };
+
+  template <class T> using cvector = const vector<T>;
 
 } // namespace quda

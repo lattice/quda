@@ -22,6 +22,12 @@ QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
 bool use_split_grid = false;
 
+std::vector<char> gauge_;
+std::array<void *, 4> gauge;
+std::vector<char> clover;
+std::vector<char> clover_inv;
+QudaPrecision last_prec = QUDA_INVALID_PRECISION;
+
 // if --enable-testing true is passed, we run the tests defined in here
 #include <invert_test_gtest.hpp>
 
@@ -107,11 +113,6 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-std::vector<char> gauge_;
-std::array<void *, 4> gauge;
-std::vector<char> clover;
-std::vector<char> clover_inv;
-
 void init(int argc, char **argv)
 {
   // Set QUDA's internal parameters
@@ -163,8 +164,6 @@ void init(int argc, char **argv)
   gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
   for (int i = 0; i < 4; i++) gauge[i] = gauge_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
   constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
-  // Load the gauge field to the device
-  loadGaugeQuda(gauge.data(), &gauge_param);
 
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
@@ -173,36 +172,48 @@ void init(int argc, char **argv)
     clover.resize(V * clover_site_size * host_clover_data_type_size);
     clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
+  }
+
+  // Load the gauge field to the device
+  loadGaugeQuda(gauge.data(), &gauge_param);
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     // Load the clover terms to the device
     loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
   }
+  last_prec = gauge_param.cuda_prec;
 }
 
 std::vector<std::array<double, 2>> solve(test_t param)
 {
-  inv_param.inv_type = ::testing::get<0>(param);
-  inv_param.solution_type = ::testing::get<1>(param);
-  inv_param.solve_type = ::testing::get<2>(param);
-  inv_param.cuda_prec_sloppy = ::testing::get<3>(param);
-  inv_param.clover_cuda_prec_sloppy = ::testing::get<3>(param);
-  multishift = ::testing::get<4>(param);
-  inv_param.solution_accumulator_pipeline = ::testing::get<5>(param);
+  inv_param.cuda_prec = ::testing::get<0>(param);
+  inv_param.clover_cuda_prec = ::testing::get<0>(param);
+  inv_param.cuda_prec_sloppy = ::testing::get<1>(param);
+  inv_param.cuda_prec_refinement_sloppy = ::testing::get<1>(param);
+  inv_param.clover_cuda_prec_sloppy = ::testing::get<1>(param);
+  inv_param.clover_cuda_prec_refinement_sloppy = ::testing::get<1>(param);
+  inv_param.inv_type = ::testing::get<2>(param);
+  inv_param.solution_type = ::testing::get<3>(param);
+  inv_param.solve_type = ::testing::get<4>(param);
+  multishift = ::testing::get<5>(param);
+  inv_param.solution_accumulator_pipeline = ::testing::get<6>(param);
 
   // schwarz parameters
-  auto schwarz_param = ::testing::get<6>(param);
+  auto schwarz_param = ::testing::get<7>(param);
   inv_param.schwarz_type           = ::testing::get<0>(schwarz_param);
   inv_param.inv_type_precondition  = ::testing::get<1>(schwarz_param);
   inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
   inv_param.clover_cuda_prec_precondition = ::testing::get<2>(schwarz_param);
 
-  inv_param.residual_type = ::testing::get<7>(param);
+  inv_param.residual_type = ::testing::get<8>(param);
 
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
 
-  logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
+  logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Precision = %s, Sloppy precision = %s\n",
           get_solution_str(inv_param.solution_type), get_solve_str(inv_param.solve_type),
-          get_solver_str(inv_param.inv_type), get_prec_str(inv_param.cuda_prec_sloppy));
+          get_solver_str(inv_param.inv_type), get_prec_str(inv_param.cuda_prec),
+          get_prec_str(inv_param.cuda_prec_sloppy));
 
   // params corresponds to split grid
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
@@ -407,7 +418,6 @@ int main(int argc, char **argv)
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
-  // Initialize the QUDA library
   initQuda(device_ordinal);
 
   init(argc, argv);
@@ -423,7 +433,7 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
+    solve(test_t {prec, prec_sloppy, inv_type, solution_type, solve_type, multishift, solution_accumulator_pipeline,
                   schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
                   inv_param.residual_type});
   }

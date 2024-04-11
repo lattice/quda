@@ -91,7 +91,8 @@ namespace quda
         SpinorDilute<real, Ns, Nc>(src, v, type, local_block);
       } else {
         errorQuda(
-          "nColor = %d is too large to compile, see QUDA issue #1422 (https://github.com/lattice/quda/issues/1422)");
+          "nColor = %d is too large to compile, see QUDA issue #1422 (https://github.com/lattice/quda/issues/1422)",
+          src.Ncolor());
       }
     } else {
       if constexpr (sizeof...(N) > 0)

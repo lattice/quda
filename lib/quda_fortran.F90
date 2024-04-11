@@ -117,7 +117,8 @@ module quda_fortran
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
-     
+     integer(4) :: covdev_mu    ! Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3)
+
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm

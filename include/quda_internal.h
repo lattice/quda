@@ -30,7 +30,7 @@
 #define NSPIN2
 #endif
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_LAPLACE)
 #define NSPIN1
 #endif
 
