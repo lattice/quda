@@ -124,7 +124,9 @@ struct DslashTestWrapper {
     static bool first_time = true;
     if (first_time) {
       init_host(argc, argv);
-      first_time = false;
+      // init_host is changing inv_param.dagger which is set up from newQudaInvertParam()
+      // so it need to be called all the time
+      // first_time = false;
     }
     init();
   }
