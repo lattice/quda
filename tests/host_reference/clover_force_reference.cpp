@@ -1070,8 +1070,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
       }
 
       if(inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
-        // FIXME: here we used the already existing ca_lambda_max member of inv_param. Maybe it's better to create a new parameter for this purpose
-        axpbyz_host(1.0/inv_param->ca_lambda_max, p[i].Odd().data<double *>(), 0, p[i].Odd().data<double *>(), p[i].Odd().data<double *>(),
+        axpbyz_host(1.0/inv_param->evmax, p[i].Odd().data<double *>(), 0, p[i].Odd().data<double *>(), p[i].Odd().data<double *>(),
                     p[i].Odd().VolumeCB());
         tau1_host(x[i].Even().data<double *>(), x[i].Even().data<double *>(), x[i].Even().VolumeCB());
         tau1_host(p[i].Odd().data<double *>(), p[i].Odd().data<double *>(), p[i].Odd().VolumeCB());

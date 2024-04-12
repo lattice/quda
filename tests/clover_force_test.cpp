@@ -89,6 +89,7 @@ std::tuple<int, double> clover_force_test(test_t param)
     inv_param.twist_flavor = twist_flavor;
     inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
+    inv_param.evmax = evmax;
   }
   bool detratio = ::testing::get<2>(param);
   int nvector = ::testing::get<3>(param);
@@ -191,6 +192,7 @@ public:
       if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         inv_param.twist_flavor = twist_flavor;
         inv_param.epsilon = epsilon;
+        inv_param.evmax = evmax;
         inv_param.twist_flavor = twist_flavor;
       }
       constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
