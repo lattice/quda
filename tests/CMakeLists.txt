@@ -1441,6 +1441,19 @@ if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
     --gtest_output=xml:clover_force_test.xml)
 endif()
 
+if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  add_test(NAME clover_force_ndeg_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8
+    --compute-clover true
+    --dslash-type twisted-clover
+    --flavor nondeg-doublet
+    --solution-type mat-pc-dag-mat-pc
+    --matpc odd-odd-asym --dagger
+    --enable-testing true --niter 1
+    --gtest_output=xml:clover_force_test.xml)
+endif()
+
 add_test(NAME gauge_path
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
   --dim 2 4 6 8 --enable-testing true --niter 1
