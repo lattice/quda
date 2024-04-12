@@ -867,8 +867,7 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
   sFloat *x = (sFloat *)inx.data();
   sFloat *p = (sFloat *)inp.data();
   
-  int flavors = 1;
-  if (inx.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) flavors= inx.TwistFlavor();
+  int flavors = inx.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? inx.TwistFlavor() : 1;
 
   for (int parity = 0; parity < 2; parity++) {
 #pragma omp parallel for
