@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool distance_pc_ = false>
+  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_> {
+    using WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
 
@@ -21,25 +21,24 @@ namespace quda
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                     double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, reconstruct_, false>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a)
     {
       checkPrecision(U, A);
       checkLocation(U, A);
     }
-  };
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct WilsonCloverDistanceArg : WilsonCloverArg<Float, nColor, nDim, reconstruct_>, DistanceArg<Float> {
-    static constexpr bool distance_pc = true;
-
-    WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                            const CloverField &A, double a, double alpha0, int t0, const ColorSpinorField &x, int parity,
-                            bool dagger, const int *comm_override) :
-      WilsonCloverArg<Float, nColor, nDim, reconstruct_>(out, in, U, A, a, x, parity, dagger, comm_override),
-      DistanceArg<Float>(alpha0, t0, this->dim[3])
+    WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                    double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger,
+                    const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>(out, in, U, a, alpha0, t0, x, parity, dagger,
+                                                                 comm_override),
+      A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
+      a(a)
     {
+      checkPrecision(U, A);
+      checkLocation(U, A);
     }
   };
 

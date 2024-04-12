@@ -15,7 +15,7 @@ namespace quda
   /**
      @brief Parameter structure for driving the Wilson operator
    */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
+  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, bool distance_pc_ = false>
   struct WilsonArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
@@ -24,13 +24,12 @@ namespace quda
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
+    static constexpr bool distance_pc = distance_pc_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
 
     typedef typename mapper<Float>::type real;
-
-    static constexpr bool distance_pc = false;
 
     F out;        /** output vector field */
     const F in;   /** input vector field */
@@ -38,6 +37,12 @@ namespace quda
     const F x;    /** input vector when doing xpay */
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
+
+    /** parameters for distance preconditioning */
+    const real alpha0;
+    const int t0;
+    const int t;
+    const int nt;
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
@@ -47,37 +52,27 @@ namespace quda
       in_pack(in),
       x(x),
       U(U),
-      a(a)
+      a(a),
+      alpha0(0),
+      t0(-1),
+      t(0),
+      nt(0)
     {
     }
-  };
 
-  template <typename Float>
-  struct DistanceArg {
-    typedef typename mapper<Float>::type real;
-
-    const real alpha0;
-    const int t0;
-    const int t;
-    const int nt;
-
-    DistanceArg(double alpha0, int t0, int dim_3) :
-      alpha0(alpha0), t0(t0), t(comm_coord(3) * dim_3), nt(comm_dim(3) * dim_3)
-    {
-    }
-  };
-
-  /**
-     @brief Parameter structure for driving the Wilson operator
-   */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct WilsonDistanceArg : WilsonArg<Float, nColor_, nDim, reconstruct_>, DistanceArg<Float> {
-    static constexpr bool distance_pc = true;
-
-    WilsonDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0,
-                      int t0, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor_, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-      DistanceArg<Float>(alpha0, t0, this->dim[3])
+    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0, int t0,
+              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
+      out(out),
+      in(in),
+      in_pack(in),
+      x(x),
+      U(U),
+      a(a),
+      alpha0(alpha0),
+      t0(t0),
+      t(comm_coord(3) * this->dim[3]),
+      nt(comm_dim(3) * this->dim[3])
     {
     }
   };

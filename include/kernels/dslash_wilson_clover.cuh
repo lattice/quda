@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool twist_ = false>
-  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool twist_ = false, bool distance_pc_ = false>
+  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_> {
+    using WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool twist = twist_;
 
@@ -22,7 +22,7 @@ namespace quda
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                     double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, reconstruct_, false>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
@@ -30,18 +30,18 @@ namespace quda
       checkPrecision(U, A);
       checkLocation(U, A);
     }
-  };
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool twist_ = false>
-  struct WilsonCloverDistanceArg : WilsonCloverArg<Float, nColor, nDim, reconstruct_, twist_>, DistanceArg<Float> {
-    static constexpr bool distance_pc = true;
-
-    WilsonCloverDistanceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                            const CloverField &A, double a, double b, double alpha0, int t0, const ColorSpinorField &x,
-                            int parity, bool dagger, const int *comm_override) :
-      WilsonCloverArg<Float, nColor, nDim, reconstruct_, twist_>(out, in, U, A, a, b, x, parity, dagger, comm_override),
-      DistanceArg<Float>(alpha0, t0, this->dim[3])
+    WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                    double a, double b, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger,
+                    const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>(out, in, U, a, alpha0, t0, x, parity, dagger,
+                                                                 comm_override),
+      A(A, false),
+      a(a),
+      b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
     {
+      checkPrecision(U, A);
+      checkLocation(U, A);
     }
   };
 
