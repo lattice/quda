@@ -126,7 +126,6 @@ namespace quda {
 
     void preTune() { out.backup(); }
     void postTune() { out.restore(); }
-    long long flops() const { return 0; }
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 
