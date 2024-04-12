@@ -65,7 +65,7 @@ namespace quda {
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
 #endif
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) || defined(BUILD_OPENQCD_INTERFACE)
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
@@ -80,7 +80,7 @@ namespace quda {
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
 #endif
-#endif // GPU_STAGGERED_DIRAC
+#endif // defined(GPU_STAGGERED_DIRAC) || defined(BUILD_OPENQCD_INTERFACE)
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
@@ -111,10 +111,18 @@ namespace quda {
       errorQuda("TIFR interface has not been built\n");
 #endif
 
+    } else if (out.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+
+#ifdef BUILD_OPENQCD_INTERFACE
+      using G = OpenQCDOrder<FloatOut, length>;
+      CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, Out, In);
+#else
+      errorQuda("OPENQCD interface has not been built");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
-
   }
 
   template <typename FloatOut, typename FloatIn, int length>
@@ -139,7 +147,7 @@ namespace quda {
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
 #endif
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) || defined(BUILD_OPENQCD_INTERFACE)
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
@@ -154,7 +162,7 @@ namespace quda {
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
 #endif
-#endif // GPU_STAGGERED_DIRAC
+#endif // defined(GPU_STAGGERED_DIRAC) || defined(BUILD_OPENQCD_INTERFACE)
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
@@ -185,10 +193,17 @@ namespace quda {
       errorQuda("TIFR interface has not been built\n");
 #endif
 
+    } else if (in.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+      using G = OpenQCDOrder<FloatIn, length>;
+      copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, Out, In);
+#else
+      errorQuda("OpenQCD interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", in.Order());
     }
-
   }
 
   template <typename FloatOut, typename FloatIn>

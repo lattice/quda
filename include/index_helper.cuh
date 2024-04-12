@@ -1106,4 +1106,293 @@ namespace quda {
     return (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
   }
 
+  /**
+   * These are index helper functions used in the order classes of openQCD, i.e.
+   *
+   * - OpenQCDOrder       in quda:include/gauge_field_order.h
+   * - OpenQCDDiracOrder  in quda:include/color_spinor_field_order.h
+   * - OpenQCDOrder       in quda:include/clover_field_order.h.
+   *
+   * The main helper functions are ipt() and iup(), giving pure function
+   * implementations of the ipt[] and iup[][] arrays (see
+   * openqcd:include/global.h) that are needed to calculate the correct offsets
+   * of the fields base pointers.
+   */
+  namespace openqcd
+  {
+
+    /**
+     * @brief      Returns the surface in direction mu
+     *
+     * @param      X     Extent in all 4 directions
+     * @param[in]  mu    Direction
+     *
+     * @return     Surface
+     */
+    __device__ __host__ inline int surface(const int *X, const int mu)
+    {
+      if (mu == 0) {
+        return X[1] * X[2] * X[3];
+      } else if (mu == 1) {
+        return X[0] * X[2] * X[3];
+      } else if (mu == 2) {
+        return X[0] * X[1] * X[3];
+      }
+      return X[0] * X[1] * X[2];
+    }
+
+    /**
+     * @brief      Return BNDRY (see openqcd:include/global.h)
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     *
+     * @return     BNDRY
+     */
+    __device__ __host__ inline int bndry(const int *L, const int *nproc)
+    {
+      return 2
+        * (((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
+           + ((1 - (nproc[2] % 2)) * surface(L, 2)) + ((1 - (nproc[3] % 2)) * surface(L, 3)));
+    }
+
+    /**
+     * @brief      Calculate the offset needed for boundary points in openQCD.
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     * @param[in]  mu     Direction in txyz
+     *
+     * @return     The offset
+     */
+    __device__ __host__ inline int ifc(const int *L, const int *nproc, const int mu)
+    {
+      if (mu == 0) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2;
+      } else if (mu == 1) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) + (((1 - (nproc[1] % 2)) * surface(L, 1)) / 2);
+      } else if (mu == 2) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
+          + (((1 - (nproc[2] % 2)) * surface(L, 2)) / 2);
+      }
+      return ((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
+        + ((1 - (nproc[2] % 2)) * surface(L, 2)) + (((1 - (nproc[3] % 2)) * surface(L, 3)) / 2);
+    }
+
+    /**
+     * @brief      Calculate the offset of the faces in openQCD.
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     * @param[in]  mu     Direction in txyz
+     *
+     * @return     The offset
+     */
+    __device__ __host__ inline int face_offset(const int *L, const int *nproc, const int mu)
+    {
+      if (mu == 0) {
+        return 0;
+      } else if (mu == 1) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2;
+      } else if (mu == 2) {
+        return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2 + ((1 - (nproc[1] % 2)) * surface(L, 1)) / 2;
+      }
+      return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2 + ((1 - (nproc[1] % 2)) * surface(L, 1)) / 2
+        + ((1 - (nproc[2] % 2)) * surface(L, 2)) / 2;
+    }
+
+    /**
+     * @brief      Rotate coordinates (xyzt -> txyz)
+     *
+     * @param[in]  x_quda     Cartesian local lattice coordinates in quda
+     *                        convention (xyzt)
+     * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
+     *                        convention (txyz)
+     */
+    __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD)
+    {
+      x_openQCD[1] = x_quda[0];
+      x_openQCD[2] = x_quda[1];
+      x_openQCD[3] = x_quda[2];
+      x_openQCD[0] = x_quda[3];
+    }
+
+    /**
+     * @brief      Generate a lexicographical index with x[Ndims-1] running
+     *             fastest, for example if Ndims=4:
+     *             ix = X3*X2*X1*x0 + X3*X2*x1 + X3*x2 + x3.
+     *
+     * @param[in]  x      Integer array of dimension Ndims with coordinates
+     * @param[in]  X      Integer array of dimension Ndims with extents
+     * @param[in]  Ndims  The number of dimensions
+     *
+     * @return     Lexicographical index
+     */
+    __device__ __host__ inline int lexi(const int *x, const int *X, const int Ndims)
+    {
+      int i, ix = x[0];
+
+#pragma unroll
+      for (i = 1; i < Ndims; i++) { ix = (X[i] * ix + x[i]); }
+      return ix;
+    }
+
+    /**
+     * @brief      Return the volume
+     *
+     * @param[in]  X     Integer array of 4 dimensions
+     *
+     * @return     Volume
+     */
+    __device__ __host__ inline int vol(const int *X) { return X[0] * X[1] * X[2] * X[3]; }
+
+    /**
+     * @brief      Return cbs[]. This is the cache block size in openQCD, which
+     *             the local lattice is divided into.
+     *
+     * @param[in]  mu    Direction
+     * @param[in]  X     Extents
+     *
+     * @return     cbs
+     */
+    __device__ __host__ inline int setup_cbs(const int mu, const int *X)
+    {
+      if (mu == 0) {
+        return X[0];
+      } else if ((X[mu] % 4) == 0) {
+        return 4;
+      } else if ((X[mu] % 3) == 0) {
+        return 3;
+      } else if ((X[mu] % 2) == 0) {
+        return 2;
+      } else {
+        return 1;
+      }
+    }
+
+    /**
+     * @brief      Pure function to return ipt[iy], where
+     *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
+     *             ipt-array, but calculating the index on the fly. Notice that xi
+     *             and Li are in openQCD (txyz) convention. If they come from
+     *             QUDA, you have to rotate them first (see rotate_coords).
+     *
+     * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < L[i]
+     * @param[in]  L     Local lattice extents
+     *
+     * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
+     *             openQCD
+     */
+    __device__ __host__ inline int ipt(const int *x, const int *L)
+    {
+      int xb[4], xn[4];
+
+      // openQCDs cache block size in txyz convention
+      int cbs[4] = {setup_cbs(0, L), setup_cbs(1, L), setup_cbs(2, L), setup_cbs(3, L)};
+
+      // openQCDs cache block grid in txyz convention
+      int cbn[4] = {L[0] / cbs[0], L[1] / cbs[1], L[2] / cbs[2], L[3] / cbs[3]};
+
+      xb[0] = x[0] % cbs[0];
+      xb[1] = x[1] % cbs[1];
+      xb[2] = x[2] % cbs[2];
+      xb[3] = x[3] % cbs[3];
+
+      xn[0] = x[0] / cbs[0];
+      xn[1] = x[1] / cbs[1];
+      xn[2] = x[2] / cbs[2];
+      xn[3] = x[3] / cbs[3];
+
+      return (lexi(xb, cbs, 4) / 2 + vol(cbs) * lexi(xn, cbn, 4) / 2
+              + ((x[0] + x[1] + x[2] + x[3]) % 2 != 0) * (vol(L) / 2) // odd -> +VOLUME/2
+      );
+    }
+
+    /**
+     * @brief      Determines the number of boundary points in direction mu prior to
+     *             the Carthesian index x with dimensions X
+     *
+     * @param[in]  mu    Direction
+     * @param[in]  x     Lattice point
+     * @param[in]  X     Dimensions of the lattice/block
+     *
+     * @return     Number of prior boundary points
+     */
+    __device__ __host__ inline int boundary_pts(const int mu, const int *x, const int *X)
+    {
+      int ret = 0;
+
+      if (mu == 3) {
+        ret = lexi(x, X, 3); // lexi without x[3]
+      } else if (mu == 2) {
+        ret = X[3] * lexi(x, X, 2);
+        if (x[2] == (X[2] - 1)) {
+          ret += x[3]; // lexi without x[2]
+        }
+      } else if (mu == 1) {
+        if (x[1] == (X[1] - 1)) {
+          ret = X[2] * X[3] * x[0] + X[3] * x[2] + x[3]; // lexi without x[1]
+        } else {
+          ret = surface(X, 1);
+        }
+      } else if (mu == 0) {
+        if (x[0] == (X[0] - 1)) {
+          ret = lexi(x + 1, X + 1, 3); // lexi without x[0]
+        } else {
+          ret = surface(X, 0);
+        }
+      }
+
+      return ret;
+    }
+
+    /**
+     * @brief      Pure implementation of iup[ix][mu]. Returns neighbouring
+     *             point of ix in positive mu direction.
+     *
+     * @param[in]  x      Cartesian local lattice corrdinates, 0 <= x[i] < Li,
+     *                    length 4 in txyz convention
+     * @param[in]  mu     Direction in txyz convention
+     * @param[in]  L      Local lattice extents, length 4 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     *
+     * @return     iup[ix][mu]
+     */
+    __device__ __host__ inline int iup(const int *x, const int mu, const int *L, const int *nproc)
+    {
+      int i, ret, xb[4], xn[4];
+
+      if ((x[mu] == (L[mu] - 1)) && (nproc[mu] > 1)) {
+
+        int cbs[4] = {setup_cbs(0, L), setup_cbs(1, L), setup_cbs(2, L), setup_cbs(3, L)};
+        int cbn[4] = {L[0] / cbs[0], L[1] / cbs[1], L[2] / cbs[2], L[3] / cbs[3]};
+
+        xb[0] = x[0] % cbs[0];
+        xb[1] = x[1] % cbs[1];
+        xb[2] = x[2] % cbs[2];
+        xb[3] = x[3] % cbs[3];
+
+        xn[0] = x[0] / cbs[0];
+        xn[1] = x[1] / cbs[1];
+        xn[2] = x[2] / cbs[2];
+        xn[3] = x[3] / cbs[3];
+
+        ret = vol(L) + ifc(L, nproc, mu);
+        if ((x[0] + x[1] + x[2] + x[3]) % 2 == 0) { ret += bndry(L, nproc) / 2; }
+
+        ret += surface(cbs, mu) * boundary_pts(mu, xn, cbn) / 2;
+        ret += boundary_pts(mu, xb, cbs) / 2;
+        return ret;
+
+      } else {
+#pragma unroll
+        for (i = 0; i < 4; i++) { xb[i] = x[i]; }
+
+        xb[mu] = (xb[mu] + 1) % (L[mu] * nproc[mu]);
+        return ipt(xb, L);
+      }
+    }
+
+  } // namespace openqcd
+
 } // namespace quda

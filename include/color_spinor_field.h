@@ -230,6 +230,9 @@ namespace quda
       } else if (inv_param.dirac_order == QUDA_TIFR_PADDED_DIRAC_ORDER) {
         fieldOrder = QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER;
         siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+      } else if (inv_param.dirac_order == QUDA_OPENQCD_DIRAC_ORDER) {
+        fieldOrder = QUDA_OPENQCD_FIELD_ORDER;
+        siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
       } else {
         errorQuda("Dirac order %d not supported", inv_param.dirac_order);
       }

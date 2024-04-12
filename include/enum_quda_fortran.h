@@ -46,6 +46,7 @@
 #define QUDA_BQCD_GAUGE_ORDER 15 // expect *gauge mu even-odd spacetime+halos row-column order
 #define QUDA_TIFR_GAUGE_ORDER 16
 #define QUDA_TIFR_PADDED_GAUGE_ORDER 17
+#define QUDA_OPENQCD_GAUGE_ORDER 18
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -227,6 +228,7 @@
 #define QUDA_CPS_WILSON_DIRAC_ORDER 4  // odd-even color inside spin
 #define QUDA_LEX_DIRAC_ORDER 5         // lexicographical order color inside spin
 #define QUDA_TIFR_PADDED_DIRAC_ORDER 6
+#define QUDA_OPENQCD_DIRAC_ORDER 7 // openqcd
 #define QUDA_INVALID_DIRAC_ORDER QUDA_INVALID_ENUM
 
 #define QudaCloverFieldOrder integer(4)
@@ -237,6 +239,7 @@
 #define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
 #define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
 #define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
+#define QUDA_OPENQCD_CLOVER_ORDER 12 // openqcd
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)
@@ -327,6 +330,7 @@
 #define QUDA_QDPJIT_FIELD_ORDER 11                  // QDP field ordering (complex-color-spin-spacetime)
 #define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 12         // QOP domain-wall ordering
 #define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 13 // TIFR RHMC ordering
+#define QUDA_OPENQCD_FIELD_ORDER 14                 // openQCD ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)

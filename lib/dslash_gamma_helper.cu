@@ -103,4 +103,9 @@ namespace quda {
   // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
 
+  /* RG: I have added these */
+  void gamma0(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out, in, 0); }
+  void gamma1(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out, in, 1); }
+  void gamma2(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out, in, 2); }
+  void gamma3(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out, in, 3); }
 }

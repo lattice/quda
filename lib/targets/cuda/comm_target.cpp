@@ -75,8 +75,11 @@ namespace quda
     // TODO: We maybe can force loopback comms to use the IB path here
     if (comm_dim(dim) == 1) continue;
 #endif
-    // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
-    const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
+    // even if comm_dim(dim) == 2, we might not have p2p enabled in both directions, so check this
+    const int num_dir
+      = (!comm_dim_cstar(dim) && comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ?
+      1 :
+      2;
     for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
 #ifndef NVSHMEM_COMMS

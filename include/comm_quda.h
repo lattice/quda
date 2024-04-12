@@ -50,6 +50,13 @@ namespace quda
   int comm_dim(int dim);
 
   /**
+     Return whether the dimension dim is a C* dimension or not
+     @param dim Dimension which we are querying
+     @return C* dimension or nor
+  */
+  bool comm_dim_cstar(int dim);
+
+  /**
      Return the coording of this process in the dimension dim
      @param dim Dimension which we are querying
      @return Coordinate of this process

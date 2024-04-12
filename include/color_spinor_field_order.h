@@ -1818,6 +1818,85 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
+    /**
+     * struct to define order of spinor fields in OpenQCD
+     *
+     * @tparam     Float  Underlying type of data (precision)
+     * @tparam     Ns     Number of spin degrees of freedom
+     * @tparam     Nc     Number of color degrees of freedom
+     */
+    template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder {
+      using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+
+      static const int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
+      Float *field;
+      size_t offset;
+      Float *ghost[8];
+      int volumeCB;
+      int faceVolumeCB[4];
+      int nParity;
+      const int dim[4]; // xyzt convention
+      const int L[4];   // txyz convention
+
+      OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
+        field(field_ ? field_ : a.data<Float *>()),
+        offset(a.Bytes() / (2 * sizeof(Float))), // TODO: What's this for??
+        volumeCB(a.VolumeCB()),
+        nParity(a.SiteSubset()),
+        dim {a.X(0), a.X(1), a.X(2), a.X(3)}, // *local* lattice dimensions, xyzt
+        L {a.X(3), a.X(0), a.X(1), a.X(2)}    // *local* lattice dimensions, txyz
+      {
+        if constexpr (length != 24) { errorQuda("Spinor field length %d not supported", length); }
+      }
+
+      /**
+       * @brief      Gets the offset in Floats from the openQCD base pointer to
+       *             the spinor field.
+       *
+       * @param[in]  x       Checkerboard index coming from quda
+       * @param[in]  parity  The parity coming from quda
+       *
+       * @return     The offset.
+       */
+      __device__ __host__ inline int getSpinorOffset(int x_cb, int parity) const
+      {
+        int x_quda[4], x[4];
+        getCoords(x_quda, x_cb, dim, parity); // x_quda contains xyzt local Carthesian corrdinates
+        openqcd::rotate_coords(x_quda, x);    // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
+        return openqcd::ipt(x, L) * length;
+      }
+
+      __device__ __host__ inline void load(complex v[length / 2], int x_cb, int parity = 0) const
+      {
+        auto in = &field[getSpinorOffset(x_cb, parity)];
+        block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
+      }
+
+      __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int parity = 0) const
+      {
+        auto out = &field[getSpinorOffset(x_cb, parity)];
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      }
+
+      /**
+         @brief This accessor routine returns a colorspinor_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto operator()(int x_cb, int parity) const
+      {
+        return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
+
+      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+    }; // openQCDDiracOrder
+
   } // namespace colorspinor
 
   // Use traits to reduce the template explosion

@@ -159,6 +159,8 @@ namespace quda {
       inverse(param.inverse),
       clover(param.clover),
       cloverInv(param.cloverInv),
+      csw(param.csw),
+      coeff(param.coeff),
       twist_flavor(param.twist_flavor),
       mu2(param.mu2),
       epsilon2(param.epsilon2),

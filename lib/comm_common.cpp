@@ -102,6 +102,12 @@ namespace quda
 
     Topology *topo = new Topology;
 
+#ifdef BUILD_OPENQCD_INTERFACE
+    topo->cstar = (map_data == nullptr) ? 0 : static_cast<int *>(map_data)[0];
+#else
+    topo->cstar = 0;
+#endif
+
     topo->ndim = ndim;
 
     int nodes = 1;

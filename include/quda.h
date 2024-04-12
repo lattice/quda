@@ -16,7 +16,7 @@
 
 #ifndef __CUDACC_RTC__
 #define double_complex double _Complex
-#else // keep NVRTC happy since it can't handle C types
+#else /* keep NVRTC happy since it can't handle C types */
 #define double_complex double2
 #endif
 
@@ -448,15 +448,18 @@ extern "C" {
     /** Whether to use fused kernels for mobius */
     QudaBoolean use_mobius_fused_kernel;
 
+    /** Additional user-defined properties */
+    void *additional_prop;
+
   } QudaInvertParam;
 
-  // Parameter set for solving eigenvalue problems.
+  /* Parameter set for solving eigenvalue problems. */
   typedef struct QudaEigParam_s {
     /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     size_t struct_size;
 
-    // EIGENSOLVER PARAMS
-    //-------------------------------------------------
+    /* EIGENSOLVER PARAMS */
+    /*-------------------------------------------------*/
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
 
@@ -550,10 +553,9 @@ extern "C" {
     /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
     char QUDA_logfile[512];
 
-    //-------------------------------------------------
-
-    // EIG-CG PARAMS
-    //-------------------------------------------------
+    /*-------------------------------------------------*/
+    /* EIG-CG PARAMS */
+    /*-------------------------------------------------*/
     int nk;
     int np;
 
@@ -597,7 +599,7 @@ extern "C" {
 
     /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
-    //-------------------------------------------------
+    /*-------------------------------------------------*/
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
@@ -863,7 +865,7 @@ extern "C" {
 
     QudaBLASType blas_type; /**< Type of BLAS computation to perfrom */
 
-    // GEMM params
+    /* GEMM params */
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
     int m;                     /**< number of rows of matrix op(A) and C. */
@@ -881,10 +883,10 @@ extern "C" {
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
 
-    // LU inversion params
+    /* LU inversion params */
     int inv_mat_size; /**< The rank of the square matrix in the LU inversion */
 
-    // Common params
+    /* Common params */
     int batch_count;              /**< number of pointers contained in arrayA, arrayB and arrayC. */
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
@@ -988,7 +990,7 @@ extern "C" {
    * initQuda.  Calling initQudaMemory requires that the user has
    * previously called initQudaDevice.
    */
-  void initQudaMemory();
+  void initQudaMemory(void);
 
   /**
    * Initialize the library.  This function is actually a wrapper
@@ -1011,7 +1013,7 @@ extern "C" {
    * @details This should only be needed for automated testing when
    * different partitioning is applied within a single run.
    */
-  void updateR();
+  void updateR(void);
 
   /**
    * A new QudaGaugeParam should always be initialized immediately
@@ -1767,10 +1769,10 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
-  
-  // Parameter set for quark smearing operations
+
+  /* Parameter set for quark smearing operations */
   typedef struct QudaQuarkSmearParam_s {
-    //-------------------------------------------------
+    /*-------------------------------------------------*/
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *inv_param;
 
@@ -1820,7 +1822,7 @@ extern "C" {
 }
 #endif
 
-// remove NVRTC WAR
+/* remove NVRTC WAR */
 #undef double_complex
 
 /* #include <quda_new_interface.h> */
