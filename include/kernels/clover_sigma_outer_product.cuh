@@ -22,7 +22,7 @@ namespace quda
 
     Oprod oprod;
     const bool doublet;         // whether we applying the operator to a doublet
-    const size_t VolumeCB;
+    const int volume_4d_cb;
     F inA[nvector];
     F inB[nvector];
     array_2d<real, nvector, 2> coeff;
@@ -32,7 +32,7 @@ namespace quda
       kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
       oprod(oprod), 
       doublet(inA[0].TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      VolumeCB(inA[0].VolumeCB())
+      volume_4d_cb(inA[0].VolumeCB() / 2)
     {
       for (int i = 0; i < nvector; i++) {
         this->inA[i] = inA[i];
@@ -51,8 +51,8 @@ namespace quda
 
 #pragma unroll
     for (int i = 0; i < Arg::nvector; i++) {
-      for (int flavor=0; flavor<=arg.doublet; ++flavor){
-        const int flavor_offset_idx = flavor * (arg.VolumeCB/2);
+      for (int flavor=0; flavor <= arg.doublet; ++flavor){
+        const int flavor_offset_idx = flavor * (arg.volume_4d_cb);
         const Spinor A = arg.inA[i](x_cb + flavor_offset_idx, parity);
         const Spinor B = arg.inB[i](x_cb + flavor_offset_idx, parity);
         Spinor C = A.sigma(nu, mu); // multiply by sigma_mu_nu
