@@ -260,6 +260,8 @@ extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
 extern std::array<int, 4> dilution_block_size;
+extern double distance_pc_alpha0;
+extern int distance_pc_t0;
 
 extern int mg_levels;
 

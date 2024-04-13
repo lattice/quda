@@ -1775,21 +1775,20 @@ namespace quda {
 void distanceReweight(ColorSpinorField &b, QudaInvertParam *param, bool inverse)
 {
   // Force the alpha0 to be positive.
-  // A negative alpha0 matches something like Eq.(12) in arXiv:1006.4028, but the effect doesn't
-  // seem to be good. Disable the negative situation as QUDA already has multigrid for light quarks.
+  // A negative alpha0 matches something like Eq.(12) in arXiv:1006.4028.
+  // Disable the negative situation as QUDA already has multigrid for light quarks.
   const double alpha0 = abs(param->distance_pc_alpha0);
   const int t0 = param->distance_pc_t0;
-  bool distance_pc = (alpha0 != 0) && (t0 >= 0);
-  if (distance_pc) {
+  if (alpha0 != 0.0 && t0 >= 0) {
     if (param->dslash_type != QUDA_WILSON_DSLASH && param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-      errorQuda("Distance preconditioning only works with Wilson and Wilson-clover dslash, but get dslash_typ %d\n",
+      errorQuda("Only Wilson and Wilson-clover dslash support distance preconditioning, but get dslash_type %d\n",
                 param->dslash_type);
     }
     if (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) {
-      errorQuda("Distance preconditioning is not compatible with inv_type %d\n", param->inv_type);
+      errorQuda("Only CG and BiCGStab solver support distance preconditioning, but get inv_type %d\n", param->inv_type);
     }
     if (param->cuda_prec!=QUDA_DOUBLE_PRECISION || param->cuda_prec_sloppy != QUDA_DOUBLE_PRECISION){
-      warningQuda("Distance preconditioning with single or half (sloppy) precision offten diverges");
+      warningQuda("Using single or half (sloppy) precision in distance preconditioning often make the solver diverge");
     }
 
     if (inverse)
@@ -1849,6 +1848,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     blas::ax(gauge.Anisotropy(), in);
   }
 
+  distanceReweight(in, inv_param, true);
+
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -1862,6 +1863,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     dirac->Dslash(out, in, parity); // apply the operator
   }
   profileDslash.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  distanceReweight(out, inv_param, false);
 
   out_h = out;
 
@@ -1904,9 +1907,13 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
+  distanceReweight(in, inv_param, true);
+
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->M(out, in); // apply the operator
   delete dirac; // clean up
+
+  distanceReweight(out, inv_param, false);
 
   double kappa = inv_param->kappa;
   if (pc) {
@@ -1966,9 +1973,13 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
+  distanceReweight(in, inv_param, true);
+
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->MdagM(out, in); // apply the operator
   delete dirac; // clean up
+
+  distanceReweight(out, inv_param, false);
 
   double kappa = inv_param->kappa;
   if (pc) {
@@ -3316,7 +3327,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
       param->dslash_type == QUDA_STAGGERED_DSLASH) {
 
     if (param->solution_type != QUDA_MATPC_SOLUTION) {
-      errorQuda("For Staggered-type fermions, multi-shift solver only suports MATPC solution type");
+      errorQuda("For Staggered-type fermions, multi-shift solver only supports MATPC solution type");
     }
 
     if (param->solve_type != QUDA_DIRECT_PC_SOLVE) {
@@ -3346,6 +3357,10 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
       if (param->offset[i] > param->offset[j])
         errorQuda("Offsets must be ordered from smallest to largest");
     }
+  }
+
+  if (param->distance_pc_alpha0 != 0.0 || param->distance_pc_alpha0 > 0) {
+    errorQuda("Multi-shift solver does not support distance preconditioning");
   }
 
   // Create the matrix.

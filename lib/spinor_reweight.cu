@@ -58,7 +58,7 @@ namespace quda
     if (src_.Location() == QUDA_CPU_FIELD_LOCATION || src_.Precision() < QUDA_SINGLE_PRECISION) {
       QudaPrecision prec = std::max(src_.Precision(), QUDA_SINGLE_PRECISION);
       param.setPrecision(prec, prec, true); // change to native field order
-      param.create = QUDA_NULL_FIELD_CREATE;
+      param.create = QUDA_COPY_FIELD_CREATE;
       param.location = QUDA_CUDA_FIELD_LOCATION;
       src = ColorSpinorField(param);
       copy_back = true;
