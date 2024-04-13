@@ -12,21 +12,21 @@
 #include <sys/time.h>
 #include <gtest/gtest.h>
 
-quda::cudaGaugeField *cudaFatLink = NULL;
-quda::cpuGaugeField *cpuFatLink = NULL;
+quda::GaugeField *cudaFatLink = NULL;
+quda::GaugeField *cpuFatLink = NULL;
 
-quda::cudaGaugeField *cudaOprod = NULL;
-quda::cpuGaugeField *cpuOprod = NULL;
+quda::GaugeField *cudaOprod = NULL;
+quda::GaugeField *cpuOprod = NULL;
 
-quda::cudaGaugeField *cudaResult = NULL;
-quda::cpuGaugeField *cpuResult = NULL;
+quda::GaugeField *cudaResult = NULL;
+quda::GaugeField *cpuResult = NULL;
 
-quda::cpuGaugeField *cpuReference = NULL;
+quda::GaugeField *cpuReference = NULL;
 
 static QudaGaugeParam gaugeParam;
 
 // Create a field of links that are not su3_matrices
-void createNoisyLinkCPU(void **field, QudaPrecision prec, int seed)
+void createNoisyLinkCPU(quda::GaugeField &field, QudaPrecision prec, int seed)
 {
   createSiteLinkCPU(field, prec, 0);
 
@@ -34,10 +34,10 @@ void createNoisyLinkCPU(void **field, QudaPrecision prec, int seed)
   for (int dir = 0; dir < 4; ++dir) {
     for (int i = 0; i < V * 18; ++i) {
       if (prec == QUDA_DOUBLE_PRECISION) {
-        double *ptr = ((double **)field)[dir] + i;
+        double *ptr = field.data<double *>(dir) + i;
         *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
       } else if (prec == QUDA_SINGLE_PRECISION) {
-        float *ptr = ((float **)field)[dir] + i;
+        float *ptr = field.data<float *>(dir) + i;
         *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
       }
     }
@@ -66,10 +66,10 @@ static void hisq_force_init()
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.anisotropy = 1;
 
-  cpuFatLink = new quda::cpuGaugeField(gParam);
-  cpuOprod = new quda::cpuGaugeField(gParam);
-  cpuResult = new quda::cpuGaugeField(gParam);
-  cpuReference = new quda::cpuGaugeField(gParam);
+  cpuFatLink = new quda::GaugeField(gParam);
+  cpuOprod = new quda::GaugeField(gParam);
+  cpuResult = new quda::GaugeField(gParam);
+  cpuReference = new quda::GaugeField(gParam);
 
   // create "gauge fields"
   int seed = 0;
@@ -77,20 +77,20 @@ static void hisq_force_init()
   seed += quda::comm_rank();
 #endif
 
-  createNoisyLinkCPU((void **)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
-  createNoisyLinkCPU((void **)cpuOprod->Gauge_p(), gaugeParam.cpu_prec, seed + 1);
+  createNoisyLinkCPU(*cpuFatLink, gaugeParam.cpu_prec, seed);
+  createNoisyLinkCPU(*cpuOprod, gaugeParam.cpu_prec, seed + 1);
 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
 
-  cudaFatLink = new quda::cudaGaugeField(gParam);
-  cudaOprod = new quda::cudaGaugeField(gParam);
-  cudaResult = new quda::cudaGaugeField(gParam);
+  cudaFatLink = new quda::GaugeField(gParam);
+  cudaOprod = new quda::GaugeField(gParam);
+  cudaResult = new quda::GaugeField(gParam);
 
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
-  cudaFatLink->loadCPUField(*cpuFatLink);
-  cudaOprod->loadCPUField(*cpuOprod);
+  cudaFatLink->copy(*cpuFatLink);
+  cudaOprod->copy(*cpuOprod);
 }
 
 static void hisq_force_end()
@@ -135,14 +135,14 @@ TEST(hisq_force_unitarize, verify)
     quda::fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
   }
 
-  cudaResult->saveCPUField(*cpuReference);
+  cpuReference->copy(*cudaResult);
 
   printfQuda("Comparing CPU and GPU results\n");
   int res[4];
 
   double accuracy = prec == QUDA_DOUBLE_PRECISION ? 1e-10 : 1e-5;
   for (int dir = 0; dir < 4; ++dir) {
-    res[dir] = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
+    res[dir] = compare_floats(cpuReference->data<void *>(dir), cpuResult->data<void *>(dir),
                               cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 
     quda::comm_allreduce_int(res[dir]);

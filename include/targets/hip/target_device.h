@@ -175,12 +175,6 @@ namespace quda
     constexpr size_t max_kernel_arg_size() { return 4096; }
 
     /**
-       @brief Helper function that returns the bank width of the
-       shared memory bank width on the target architecture.
-    */
-    constexpr int shared_memory_bank_width() { return 32; }
-
-    /**
        @brief Helper function that returns true if we are to pass the
        kernel parameter struct to the kernel as an explicit kernel
        argument.  Otherwise the parameter struct is explicitly copied
@@ -188,7 +182,8 @@ namespace quda
     */
     template <typename Arg> constexpr bool use_kernel_arg()
     {
-      return sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg;
+      return Arg::always_use_kernel_arg() ||
+        (Arg::default_use_kernel_arg() && sizeof(Arg) <= device::max_kernel_arg_size());
     }
 
     /**

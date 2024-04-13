@@ -1,7 +1,7 @@
 #pragma once
 
-#include <array>
 #include <CLI11.hpp>
+#include <array>
 #include <quda.h>
 
 // for compatibility while porting - remove later
@@ -139,6 +139,8 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -201,6 +203,7 @@ extern int test_type;
 extern quda::mgarray<int> nvec;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
+extern quda::mgarray<bool> mg_vec_partfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
@@ -220,6 +223,10 @@ extern std::string madwf_param_outfile;
 
 extern int precon_schwarz_cycle;
 extern int multishift;
+extern std::vector<double> multishift_shifts;
+extern std::vector<double> multishift_masses;
+extern std::vector<double> multishift_tols;
+extern std::vector<double> multishift_tols_hq;
 extern bool verify_results;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
@@ -250,6 +257,7 @@ extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
+extern std::array<int, 4> dilution_block_size;
 
 extern int mg_levels;
 
@@ -264,6 +272,8 @@ extern quda::mgarray<int> n_block_ortho;
 extern quda::mgarray<bool> block_ortho_two_pass;
 extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
+extern quda::mgarray<bool> mg_setup_use_mma;
+extern quda::mgarray<bool> mg_dslash_use_mma;
 extern quda::mgarray<QudaInverterType> setup_inv;
 extern quda::mgarray<QudaSolveType> coarse_solve_type;
 extern quda::mgarray<QudaSolveType> smoother_solve_type;
@@ -300,7 +310,6 @@ extern bool mg_evolve_thin_updates;
 extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
-extern bool mg_use_mma;
 extern bool mg_allow_truncation;
 extern bool mg_staggered_kd_dagger_approximation;
 
@@ -322,6 +331,7 @@ extern QudaFieldLocation location_ritz;
 extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
+extern int eig_ortho_block_size;
 extern int eig_block_size;
 extern int eig_n_ev;
 extern int eig_n_kr;
@@ -331,6 +341,7 @@ extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
 extern int eig_max_restarts;
+extern int eig_max_ortho_attempts;
 extern double eig_tol;
 extern double eig_qr_tol;
 extern bool eig_use_eigen_qr;
@@ -351,11 +362,13 @@ extern std::string eig_vec_infile;
 extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
+extern bool eig_partfile;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
+extern quda::mgarray<int> mg_eig_ortho_block_size;
 extern quda::mgarray<int> mg_eig_block_size;
 extern quda::mgarray<int> mg_eig_n_ev_deflate;
 extern quda::mgarray<int> mg_eig_n_ev;
@@ -364,6 +377,7 @@ extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
 extern quda::mgarray<int> mg_eig_max_restarts;
+extern quda::mgarray<int> mg_eig_max_ortho_attempts;
 extern quda::mgarray<double> mg_eig_tol;
 extern quda::mgarray<double> mg_eig_qr_tol;
 extern quda::mgarray<bool> mg_eig_use_eigen_qr;
@@ -388,6 +402,16 @@ extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
 
+extern int gf_gauge_dir;
+extern int gf_maxiter;
+extern int gf_verbosity_interval;
+extern double gf_ovr_relaxation_boost;
+extern double gf_fft_alpha;
+extern int gf_reunit_interval;
+extern double gf_tolerance;
+extern bool gf_theta_condition;
+extern bool gf_fft_autotune;
+
 extern int eofa_pm;
 extern double eofa_shift;
 extern double eofa_mq1;
@@ -396,6 +420,14 @@ extern double eofa_mq3;
 
 extern QudaContractType contract_type;
 
+extern double smear_coeff;
+extern int    smear_n_steps;
+extern int    smear_t0;
+extern bool   smear_compute_two_link;
+extern bool   smear_delete_two_link;
+
 extern std::array<int, 4> grid_partition;
 
 extern bool enable_testing;
+
+extern bool detratio;

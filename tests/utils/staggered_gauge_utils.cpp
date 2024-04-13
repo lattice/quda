@@ -23,11 +23,15 @@ static double max_allowed_error = 1e-11;
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
-                         void **qdp_inlink, QudaGaugeParam &gauge_param_in, double **act_path_coeffs, double eps_naik,
-                         size_t gSize, int n_naiks)
+                         void **qdp_inlink, QudaGaugeParam &gauge_param_in,
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik, size_t gSize,
+                         int n_naiks)
 {
-  // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
+  // Intermediates can be general matrices, so override the reconstruct.
+  // Similarly, gauge links can only be built in single or double, so upscale the build precision
+  // if neccessary.
   auto gauge_param = gauge_param_in;
+  if (gauge_param.cuda_prec < QUDA_SINGLE_PRECISION) gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 
@@ -52,11 +56,11 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   }
 
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-  computeKSLinkQuda(milc_vlink, nullptr, milc_wlink, milc_inlink, act_path_coeffs[0], &gauge_param);
+  computeKSLinkQuda(milc_vlink, nullptr, milc_wlink, milc_inlink, act_path_coeffs[0].data(), &gauge_param);
 
   if (n_naiks > 1) {
     // Create Naiks, 3rd path table set
-    computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[2], &gauge_param);
+    computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[2].data(), &gauge_param);
 
     // Rescale+copy Naiks into Naik field
     cpu_axy(gauge_param.cpu_prec, eps_naik, milc_fatlink, milc_fatlink_eps, V * 4 * gauge_site_size);
@@ -67,7 +71,7 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   }
 
   // Create X and long links, 2nd path table set
-  computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[1], &gauge_param);
+  computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[1].data(), &gauge_param);
 
   if (n_naiks > 1) {
     // Add into Naik field
@@ -98,7 +102,7 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   }
 }
 
-void setActionPaths(double **act_paths)
+template <class T> void setActionPaths(T &act_paths)
 {
   ///////////////////////////
   // Set path coefficients //
@@ -160,8 +164,7 @@ void setActionPaths(double **act_paths)
 void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,
                        size_t gSize, int n_naiks, double eps_naik)
 {
-  double **act_paths = new double *[3];
-  for (int i = 0; i < 3; i++) act_paths[i] = new double[6];
+  std::array<std::array<double, 6>, 3> act_paths;
   setActionPaths(act_paths);
 
   ///////////////////////////////////////////////////////////////////////
@@ -196,17 +199,12 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
       host_free(qdp_longlink_naik_temp[dir]);
     }
   }
-
-  for (int i = 0; i < 3; i++) delete[] act_paths[i];
-  delete[] act_paths;
 }
 
-void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
-                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gSize,
-                             int n_naiks, double eps_naik)
+void computeFatLongCPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,
+                       size_t gSize, int n_naiks, double eps_naik)
 {
-  double **act_paths = new double *[3];
-  for (int i = 0; i < 3; i++) act_paths[i] = new double[6];
+  std::array<std::array<double, 6>, 3> act_paths;
   setActionPaths(act_paths);
 
   ///////////////////////////////////////////////////////////////////////
@@ -229,41 +227,26 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   //////////////////////////
 
   // defined in "llfat_reference.cpp"
-  computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+  computeHISQLinksCPU(qdp_fatlink, qdp_longlink, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
                       (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, &gauge_param, act_paths, eps_naik);
 
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
-      memcpy(qdp_longlink_cpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
-      memset(qdp_fatlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
-      memset(qdp_longlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
-    }
-  }
-
-  //////////////////////////
-  // Create the GPU links //
-  //////////////////////////
-
-  // Skip eps field for now
-  // Note: GPU link creation only works for single and double precision
-  computeHISQLinksGPU(qdp_fatlink_gpu, qdp_longlink_gpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-                      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, gauge_param, act_paths, eps_naik,
-                      gSize, n_naiks);
-
-  if (n_naiks == 2) {
-    // Override the naik fields into the fat/long link fields
-    for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
-      memcpy(qdp_longlink_gpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_fatlink[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_longlink[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
       host_free(qdp_fatlink_naik_temp[dir]);
       host_free(qdp_longlink_naik_temp[dir]);
     }
   }
+}
 
-  for (int i = 0; i < 3; i++) delete[] act_paths[i];
-  delete[] act_paths;
+void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
+                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gSize,
+                             int n_naiks, double eps_naik)
+{
+  computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
+  computeFatLongCPU(qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
 }
 
 // Routine that takes in a QDP-ordered field and outputs the plaquette.

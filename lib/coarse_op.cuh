@@ -7,11 +7,6 @@
 
 namespace quda {
 
-  // For coarsening un-preconditioned operators we use uni-directional
-  // coarsening to reduce the set up code.  For debugging we can force
-  // bi-directional coarsening.
-  static bool bidirectional_debug = false;
-
   enum ComputeType {
     COMPUTE_UV,
     COMPUTE_LV,
@@ -45,6 +40,8 @@ namespace quda {
   protected:
     Arg &arg;
     const ColorSpinorField &V;
+    const ColorSpinorField &UV;
+    const ColorSpinorField &AV;
     GaugeField &Y;
     GaugeField &X;
     GaugeField &Y_atomic;
@@ -159,23 +156,23 @@ namespace quda {
           bytes_ = 2 * ((type == COMPUTE_UV) ? arg.U.Bytes() : arg.L.Bytes()) * coarseColor;
 
           // Loading V/AV: this is only relevant for the KD op, otherwise these two have the same size
-          bytes_ += (dir == QUDA_BACKWARDS) ? arg.AV.Bytes() : arg.V.Bytes();
+          bytes_ += (dir == QUDA_BACKWARDS) ? AV.Bytes() : V.Bytes();
 
           // Storing to UV: only special for the KD op
-          bytes_ += compute_max * ((from_kd_op && dir == QUDA_FORWARDS) ? (arg.UV.Bytes() / 2) : arg.UV.Bytes());
+          bytes_ += compute_max * ((from_kd_op && dir == QUDA_FORWARDS) ? (UV.Bytes() / 2) : UV.Bytes());
         }
 	break;
       case COMPUTE_AV:
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
+	bytes_ = compute_max * AV.Bytes() + V.Bytes() + 2*arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_TMAV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
+	bytes_ = AV.Bytes() + V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + (2 + 2 * !clover::dynamic_inverse()) * arg.C.Bytes()*coarseColor;
+	bytes_ = compute_max * AV.Bytes() + V.Bytes() + (2 + 2 * !clover::dynamic_inverse()) * arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_KV:
-        bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.K.Bytes() * coarseColor;
+        bytes_ = AV.Bytes() + V.Bytes() + arg.K.Bytes() * coarseColor;
         break;
       case COMPUTE_VUV:
       case COMPUTE_VLV:
@@ -184,11 +181,11 @@ namespace quda {
           int writes = 4;
           // we use a (coarseColor * coarseColor) matrix of threads so each load is input element is loaded coarseColor times
           // we ignore the multiple loads of spin since these are per thread (and should be cached?)
-          bytes_ = 2*writes*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*writes*arg.X.Bytes() + coarseColor*(arg.UV.Bytes() + arg.V.Bytes());
+          bytes_ = 2*writes*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*writes*arg.X.Bytes() + coarseColor*(UV.Bytes() + V.Bytes());
           break;
         }
       case COMPUTE_COARSE_CLOVER:
-	bytes_ = 2 * arg.X.Bytes() + 2 * arg.C.Bytes() + (1 + coarseColor) * arg.V.Bytes(); // 2 from parity
+	bytes_ = 2 * arg.X.Bytes() + 2 * arg.C.Bytes() + (1 + coarseColor) * V.Bytes(); // 2 from parity
 	break;
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4 * 2 * 2 * arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
@@ -248,17 +245,19 @@ namespace quda {
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const override
     {
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV)
+      if (arg.shared_atomic && (type == COMPUTE_VUV || type == COMPUTE_VLV))
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
 
   public:
-    CalculateY(Arg &arg, const ColorSpinorField &V, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic,
-               GaugeField &X_atomic, int nFace) :
+    CalculateY(Arg &arg, const ColorSpinorField &V, const ColorSpinorField &UV, const ColorSpinorField &AV,
+               GaugeField &Y, GaugeField &X, GaugeField &Y_atomic, GaugeField &X_atomic, int nFace) :
       TunableKernel3D(V, 2, 1),
       arg(arg),
       V(V),
+      UV(UV),
+      AV(AV),
       Y(Y),
       X(X),
       Y_atomic(Y_atomic),
@@ -390,6 +389,7 @@ namespace quda {
     Launch(Arg &arg, TuneParam &tp, ComputeType type, const qudaStream_t &stream)
     {
       if (compute_max) {
+        memset(arg.max_h, 0, sizeof(typename Arg::Float));
         if (!activeTuning()) qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
         arg.max = arg.max_d;
       }
@@ -577,9 +577,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
       arg.kd_dagger = kd_dagger;
 
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
       Launch<location_template>(arg, tp, type, stream);
-      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
     /**
@@ -722,21 +720,23 @@ namespace quda {
 
     bool advanceTuneParam(TuneParam &param) const override
     {
-      // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
-      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV)) {
-        constexpr bool query_max = true;
-        int max = 0;
-        if (type == COMPUTE_UV) {
-          max = mma::launch_compute_uv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
-        } else if (type == COMPUTE_VUV) {
-          max = mma::launch_compute_vuv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
-        }
+      if constexpr (use_mma) {
+        // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
+        if (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV) {
+          constexpr bool query_max = true;
+          int max = 0;
+          if (type == COMPUTE_UV) {
+            max = mma::launch_compute_uv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
+          } else if (type == COMPUTE_VUV) {
+            max = mma::launch_compute_vuv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
+          }
 
-        if (param.aux.x < max) {
-          param.aux.x++;
-          return true;
-        } else {
-          return false;
+          if (param.aux.x < max) {
+            param.aux.x++;
+            return true;
+          } else {
+            return false;
+          }
         }
       }
 
@@ -784,7 +784,12 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) strcat(Aux, ",mma");
+        if constexpr (use_mma) {
+          strcat(Aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
       }
       else if (type == COMPUTE_LV) strcat(Aux, ",computeLV");
       else if (type == COMPUTE_AV)
@@ -794,7 +799,12 @@ namespace quda {
       else if (type == COMPUTE_KV)                 strcat(Aux, ",computeKV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if constexpr (use_mma) {
+          strcat(Aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
       }
       else if (type == COMPUTE_VLV) strcat(Aux, ",computeVLV");
       else if (type == COMPUTE_COARSE_CLOVER)
@@ -835,9 +845,7 @@ namespace quda {
 
         if (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV) {
           strcat(Aux, ",nFace=");
-          char nfc[2];
-          u32toa(nfc, nFace);
-          strcat(Aux, nfc);
+          u32toa(Aux + strlen(Aux), nFace);
         }
 
         // needed to break the degeneracy from staggered KD and non-KD
@@ -846,20 +854,20 @@ namespace quda {
         if (arg.bidirectional && (type == COMPUTE_VUV || type == COMPUTE_VLV)) strcat(Aux,",bidirectional");
       }
 
-      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
-                             type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString () : V.VolString();
+      auto vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
+                      type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString() : V.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_COARSE_CLOVER) {
 	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
 	strcat(Aux,"coarse_vol=");
-	strcat(Aux,X.VolString());
+	strcat(Aux, X.VolString().c_str());
       } else {
 	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped" :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device" : ",CPU");
       }
 
-      return TuneKey(vol_str, typeid(*this).name(), Aux);
+      return TuneKey(vol_str.c_str(), typeid(*this).name(), Aux);
     }
 
     void preTune() override
@@ -877,8 +885,8 @@ namespace quda {
 	X_atomic.backup();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.Gauge_p() == Y.Gauge_p()) Y.backup();
-	if (X_atomic.Gauge_p() == X.Gauge_p()) X.backup();
+        if (Y_atomic.data() == Y.data()) Y.backup();
+        if (X_atomic.data() == X.data()) X.backup();
         break;
       case COMPUTE_RESCALE:
         Y.backup();
@@ -911,8 +919,8 @@ namespace quda {
 	X_atomic.restore();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.Gauge_p() == Y.Gauge_p()) Y.restore();
-	if (X_atomic.Gauge_p() == X.Gauge_p()) X.restore();
+        if (Y_atomic.data() == Y.data()) Y.restore();
+        if (X_atomic.data() == X.data()) X.restore();
         break;
       case COMPUTE_RESCALE:
         Y.restore();
@@ -968,6 +976,10 @@ namespace quda {
                   double mu_factor, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine)
   {
+    // For coarsening un-preconditioned operators we use uni-directional
+    // coarsening to reduce the set up code.  For debugging we can force
+    // bi-directional coarsening.
+    static bool bidirectional_debug = false;
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -1026,15 +1038,15 @@ namespace quda {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
-    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, kappa, mass,
+    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, v, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 
-    CalculateY<use_mma, location, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_, nFace);
+    CalculateY<use_mma, location, Arg> y(arg, v, uv, av, Y_, X_, Y_atomic_, X_atomic_, nFace);
 
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+    logQuda(QUDA_VERBOSE, "Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // do exchange of null-space vectors; 3 for long-link operators
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
@@ -1042,13 +1054,13 @@ namespace quda {
     if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2());
+    logQuda(QUDA_VERBOSE, "V2 = %e\n", arg.V.norm2(v));
 
     // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing AV\n");
+      logQuda(QUDA_VERBOSE, "Computing AV\n");
       y.setComputeType(COMPUTE_AV);
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
@@ -1056,27 +1068,27 @@ namespace quda {
         y.apply(device::get_default_stream());
         y.setComputeMax(false);
         auto av_max = *arg.max_h;
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("av_max %e\n", av_max);
+        logQuda(QUDA_DEBUG_VERBOSE, "av_max %e\n", av_max);
 	av.Scale(av_max);
 	arg.AV.resetScale(av_max);
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+      logQuda(QUDA_VERBOSE, "AV2 = %e\n", arg.AV.norm2(av));
     }
 
     // If doing preconditioned twisted-mass then we first multiply the
     // null-space vectors by the inverse twist, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_TWISTED_MASSPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing TMAV\n");
+      logQuda(QUDA_VERBOSE, "Computing TMAV\n");
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 	// this is just a trivial rescaling kernel, find the maximum
 	complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
 	complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 	double max = std::max({abs(fp.real()), abs(fp.imag()), abs(fm.real()), abs(fm.imag())}) * v.Scale();
-	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("tm max %e\n", max);
+	logQuda(QUDA_DEBUG_VERBOSE, "tm max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);
       }
@@ -1084,7 +1096,7 @@ namespace quda {
       y.setComputeType(COMPUTE_TMAV);
       y.apply(device::get_default_stream());
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+      logQuda(QUDA_VERBOSE, "AV2 = %e\n", arg.AV.norm2(av));
     }
 
     // If doing preconditioned twisted-clover then we first multiply the
@@ -1092,7 +1104,7 @@ namespace quda {
     // mu^2, and then we multiply the result by the clover matrix. This is
     // needed for the coarse link computation
     if ( dirac == QUDA_TWISTED_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing TMCAV\n");
+      logQuda(QUDA_VERBOSE, "Computing TMCAV\n");
       y.setComputeType(COMPUTE_TMCAV);
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
@@ -1100,19 +1112,19 @@ namespace quda {
         y.apply(device::get_default_stream());
         y.setComputeMax(false);
         auto av_max = *arg.max_h;
-	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("av_max %e\n", av_max);
+	logQuda(QUDA_DEBUG_VERBOSE, "av_max %e\n", av_max);
 	av.Scale(av_max);
 	arg.AV.resetScale(av_max);
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+      logQuda(QUDA_VERBOSE, "AV2 = %e\n", arg.AV.norm2(av));
     }
 
     // If doing the staggered or ASQTAD KD op we first multiply the null-space vectors by
     // the dagger of the KD term. This is needed for the coarse link computation
     if ( dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KAV\n");
+      logQuda(QUDA_VERBOSE, "Computing KAV\n");
       y.setKDagger(true);
       y.setComputeType(COMPUTE_KV);
 
@@ -1122,16 +1134,14 @@ namespace quda {
         y.apply(device::get_default_stream());
         y.setComputeMax(false);
         auto kv_max = *arg.max_h;
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("kv_max %e\n", kv_max);
+        logQuda(QUDA_DEBUG_VERBOSE, "kv_max %e\n", kv_max);
         av.Scale(kv_max);
         arg.AV.resetScale(kv_max);
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("KV2 = %e\n", arg.AV.norm2());
+      logQuda(QUDA_VERBOSE, "KV2 = %e\n", arg.AV.norm2(av));
     }
-
-    saveTuneCache();
 
     // work out what to set the scales to
     if (coarseGaugeAtomic::fixedPoint()) {
@@ -1151,7 +1161,7 @@ namespace quda {
     // First compute the coarse forward links if needed
     if (bidirectional_links) {
       for (int d = 0; d < nDim; d++) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
+        logQuda(QUDA_VERBOSE, "Computing forward %d UV and VUV\n", d);
         y.setDimension(d);
       	y.setDirection(QUDA_FORWARDS);
         y.setComputeType(COMPUTE_UV);  // compute U*V product
@@ -1167,17 +1177,13 @@ namespace quda {
         }
 
         y.apply(device::get_default_stream());
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
-
-        saveTuneCache();
+        logQuda(QUDA_VERBOSE, "UV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
         y.apply(device::get_default_stream());
-
-        saveTuneCache();
 
         // long link coarsen, if necessary
         if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
@@ -1197,16 +1203,14 @@ namespace quda {
             }
 
             y.apply(device::get_default_stream());
-            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LV2[%d] = %e\n", d, arg.UV.norm2());
-            saveTuneCache();
+            logQuda(QUDA_VERBOSE, "LV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
             // *do not* zero out X and Y --- X;Y = VUV + VLV
             y.setComputeType(COMPUTE_VLV); // compute Y += VLV
             y.apply(device::get_default_stream());
-            saveTuneCache();
 
           } else if (allow_truncation) {
-            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+            logQuda(QUDA_VERBOSE, "Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
           } else {
             errorQuda("Aggregate size geo_bs[%d] == %d is too small for long link coarsening", d, geo_bs[d]);
           }
@@ -1239,14 +1243,14 @@ namespace quda {
               Y_.Scale(y_max);
               arg.Y.resetScale(Y_.Scale());
             }
-            if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
+            logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
           }
 
           y.setComputeType(COMPUTE_CONVERT);
           y.apply(device::get_default_stream());
         }
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
+        logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
       }
     }
 
@@ -1259,7 +1263,7 @@ namespace quda {
 
     // Now compute the backward links
     for (int d = 0; d < nDim; d++) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing backward %d UV and VUV\n", d);
+      logQuda(QUDA_VERBOSE, "Computing backward %d UV and VUV\n", d);
       y.setDimension(d);
       y.setDirection(QUDA_BACKWARDS);
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
@@ -1271,21 +1275,17 @@ namespace quda {
         auto uv_max = *arg.max_h;
         uv.Scale(uv_max);
         arg.UV.resetScale(uv_max);
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d uv_max = %e\n", d, uv_max);
+        logQuda(QUDA_DEBUG_VERBOSE, "%d uv_max = %e\n", d, uv_max);
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
-
-      saveTuneCache();
+      logQuda(QUDA_VERBOSE, "UAV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
       // if we are writing to a temporary, we need to zero it before each computation
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(device::get_default_stream());
-
-      saveTuneCache();
 
       // long link coarsen, if necessary
       if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
@@ -1305,16 +1305,14 @@ namespace quda {
           }
 
           y.apply(device::get_default_stream());
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LAV2[%d] = %e\n", d, arg.UV.norm2());
-          saveTuneCache();
+          logQuda(QUDA_VERBOSE, "LAV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
           // *do not* zero out X and Y --- X;Y = VUV + VLV
           y.setComputeType(COMPUTE_VLV); // compute Y += VLV
           y.apply(device::get_default_stream());
-          saveTuneCache();
 
         } else if (allow_truncation) {
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+          logQuda(QUDA_VERBOSE, "Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
         } else {
           errorQuda("Aggregate size geo_bs[%d] == %d is too small for long link coarsening", d, geo_bs[d]);
         }
@@ -1357,33 +1355,33 @@ namespace quda {
             Y_.Scale(y_max);
             arg.Y.resetScale(Y_.Scale());
           }
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, y_max, d, Y_.Scale());
+          logQuda(QUDA_DEBUG_VERBOSE, "Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, y_max, d, Y_.Scale());
         }
 
         y.setComputeType(COMPUTE_CONVERT);
         y.apply(device::get_default_stream());
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, Y_.norm2( d ));
+      logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", d, Y_.norm2( d ));
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
 
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
     if ( !bidirectional_links ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reversing links\n");
+      logQuda(QUDA_VERBOSE, "Reversing links\n");
       y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the forwards direction
       y.apply(device::get_default_stream());
     }
 
     // Check if we have a fine or coarse clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");
+      logQuda(QUDA_VERBOSE, "Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(device::get_default_stream());
     } else if (dirac == QUDA_COARSE_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing coarse CV and VCV via UV and VUV\n");
+      logQuda(QUDA_VERBOSE, "Computing coarse CV and VCV via UV and VUV\n");
 
       // We can write coarsening the coarse clover as a UV, VUV sequence where `U` is replaced with `C`
       y.setDimension(-1);
@@ -1397,11 +1395,11 @@ namespace quda {
         auto uv_max = *arg.max_h;
         uv.Scale(uv_max);
         arg.UV.resetScale(uv_max);
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("cv_max = %e\n", uv_max);
+        logQuda(QUDA_DEBUG_VERBOSE, "cv_max = %e\n", uv_max);
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CV2 = %e\n", arg.UV.norm2());
+      logQuda(QUDA_VERBOSE, "CV2 = %e\n", arg.UV.norm2(uv));
 
       y.setComputeType(COMPUTE_VUV); // compute X += VCV
       y.apply(device::get_default_stream());
@@ -1409,7 +1407,7 @@ namespace quda {
         printfQuda("X2 (atomic) = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
 
     } else if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing staggered mass contribution to coarse clover\n");
+      logQuda(QUDA_VERBOSE, "Summing staggered mass contribution to coarse clover\n");
       y.setComputeType(COMPUTE_STAGGEREDMASS);
       y.apply(device::get_default_stream());
     } else if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
@@ -1419,12 +1417,12 @@ namespace quda {
         y.setDimension(-1);
         y.setDirection(QUDA_IN_PLACE);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing staggered mass times KD inverse contribution to coarse clover\n");
+        logQuda(QUDA_VERBOSE, "Computing staggered mass times KD inverse contribution to coarse clover\n");
         y.setComputeType(COMPUTE_VUV);
         y.apply(device::get_default_stream());
       }
     } else {  //Otherwise, we just have to add the identity matrix
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");
+      logQuda(QUDA_VERBOSE, "Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(device::get_default_stream());
     }
@@ -1432,7 +1430,7 @@ namespace quda {
     if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC)
 	arg.mu_factor += 1.;
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding mu = %e\n",arg.mu*arg.mu_factor);
+      logQuda(QUDA_VERBOSE, "Adding mu = %e\n",arg.mu*arg.mu_factor);
       y.setComputeType(COMPUTE_TMDIAGONAL);
       y.apply(device::get_default_stream());
     }
@@ -1453,7 +1451,7 @@ namespace quda {
       y.apply(device::get_default_stream());
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", X_.norm2(0));
 
     pool_device_free(arg.max_d);
     pool_pinned_free(arg.max_h);

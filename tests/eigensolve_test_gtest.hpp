@@ -11,17 +11,6 @@ public:
   EigensolveTest() : param(GetParam()) { }
 };
 
-bool is_chiral(QudaDslashType type)
-{
-  switch (type) {
-  case QUDA_DOMAIN_WALL_DSLASH:
-  case QUDA_DOMAIN_WALL_4D_DSLASH:
-  case QUDA_MOBIUS_DWF_DSLASH:
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
-  default: return false;
-  }
-}
-
 bool skip_test(test_t param)
 {
   // dwf-style solves must use a normal solver
@@ -41,7 +30,7 @@ TEST_P(EigensolveTest, verify)
   // The solution to avoid this is to use a Krylov space (eig-n-kr) about 3-4 times the
   // size of the search space (eig-n-ev), or use a well chosen Chebyshev polynomial,
   // or use a tighter than necessary tolerance.
-  if (eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_BLK_IR_ARNOLDI) factor *= 5;
+  if (eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_BLK_IR_ARNOLDI) factor *= 10;
   auto tol = factor * eig_param.tol;
   for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
 }

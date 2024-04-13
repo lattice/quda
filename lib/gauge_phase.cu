@@ -25,14 +25,14 @@ namespace quda {
       if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_MILC> arg(u);
         launch<GaugePhase>(tp, stream, arg);
-      } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_CPS) {
-        GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CPS> arg(u);
+      } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_CHROMA) {
+        GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CHROMA> arg(u);
         launch<GaugePhase>(tp, stream, arg);
       } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_TIFR> arg(u);
         launch<GaugePhase>(tp, stream, arg);
       } else {
-        errorQuda("Undefined phase type");
+        errorQuda("Undefined phase type %d", u.StaggeredPhase());
       }
     }
 
@@ -45,9 +45,11 @@ namespace quda {
 
   void applyGaugePhase(GaugeField &u)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePhase_, ReconstructNone>(u);
     // ensure that ghosts are updated if needed
     if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) u.exchangeGhost();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

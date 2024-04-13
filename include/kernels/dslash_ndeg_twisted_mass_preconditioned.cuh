@@ -95,7 +95,7 @@ namespace quda
       }
       
       if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-        SharedMemoryCache<Vector> cache(target::block_dim());
+        SharedMemoryCache<Vector> cache;
         if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);

@@ -12,6 +12,9 @@
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 #include <dirac_quda.h>
+#include <tune_quda.h>
+#include <gauge_tools.h>
+#include <gtest/gtest.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -19,13 +22,10 @@ extern void usage(char **);
 
 using namespace quda;
 
-std::unique_ptr<ColorSpinorField> xH, yH;
-std::unique_ptr<ColorSpinorField> xD, yD;
+std::vector<ColorSpinorField> xD, yD;
 
-cpuGaugeField *Y_h, *X_h, *Xinv_h, *Yhat_h;
-cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
+std::shared_ptr<GaugeField> Y_d, X_d, Xinv_d, Yhat_d;
 
-int Nspin;
 int Ncolor;
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -33,8 +33,8 @@ int Ncolor;
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("S_dimension T_dimension Nspin Ncolor\n");
-  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
+  printfQuda("S_dimension T_dimension Ncolor Nsrc\n");
+  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Ncolor, Nsrc);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -44,8 +44,8 @@ void initFields(QudaPrecision prec)
 {
   ColorSpinorParam param;
   param.nColor = Ncolor;
-  param.nSpin = Nspin;
-  param.nDim = 5; // number of spacetime dimensions
+  param.nSpin = 2;
+  param.nDim = 4; // number of spacetime dimensions
 
   param.pad = 0; // padding must be zero for cpu fields
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -53,34 +53,17 @@ void initFields(QudaPrecision prec)
   param.x[1] = ydim;
   param.x[2] = zdim;
   param.x[3] = tdim;
-  param.x[4] = Nsrc;
+  param.x[4] = 1;
   param.pc_type = QUDA_4D_PC;
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  param.setPrecision(QUDA_DOUBLE_PRECISION);
-  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-
   param.create = QUDA_ZERO_FIELD_CREATE;
-  param.location = QUDA_CPU_FIELD_LOCATION;
-
-  xH = std::make_unique<ColorSpinorField>(param);
-  yH = std::make_unique<ColorSpinorField>(param);
-
-  // Now set the parameters for the cuda fields
-  // param.pad = xdim*ydim*zdim/2;
-
-  if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  param.create = QUDA_ZERO_FIELD_CREATE;
-  param.setPrecision(prec);
-  param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  param.setPrecision(prec, prec, true);
   param.location = QUDA_CUDA_FIELD_LOCATION;
 
-  xD = std::make_unique<ColorSpinorField>(param);
-  yD = std::make_unique<ColorSpinorField>(param);
-
-  //*xD = *xH;
-  //*yD = *yH;
+  resize(xD, Nsrc, param);
+  resize(yD, Nsrc, param);
 
   GaugeFieldParam gParam;
   gParam.x[0] = xdim;
@@ -96,19 +79,8 @@ void initFields(QudaPrecision prec)
   gParam.setPrecision(param.Precision());
   gParam.nDim = 4;
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 1;
-
-  gParam.geometry = QUDA_COARSE_GEOMETRY;
-  gParam.location = QUDA_CPU_FIELD_LOCATION;
-  Y_h = new cpuGaugeField(gParam);
-  Yhat_h = new cpuGaugeField(gParam);
-
-  gParam.geometry = QUDA_SCALAR_GEOMETRY;
-  gParam.nFace = 0;
-  X_h = new cpuGaugeField(gParam);
-  Xinv_h = new cpuGaugeField(gParam);
-
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.geometry = QUDA_COARSE_GEOMETRY;
   gParam.nFace = 1;
@@ -124,55 +96,126 @@ void initFields(QudaPrecision prec)
 
   gParam.setPrecision(prec_sloppy);
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
-
-  Y_d = new cudaGaugeField(gParam);
-  Yhat_d = new cudaGaugeField(gParam);
-  Y_d->copy(*Y_h);
-  Yhat_d->copy(*Yhat_h);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  Y_d = std::make_shared<GaugeField>(gParam);
+  Yhat_d = std::make_shared<GaugeField>(gParam);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;
-  X_d = new cudaGaugeField(gParam);
-  Xinv_d = new cudaGaugeField(gParam);
-  X_d->copy(*X_h);
-  Xinv_d->copy(*Xinv_h);
+  X_d = std::make_shared<GaugeField>(gParam);
+  Xinv_d = std::make_shared<GaugeField>(gParam);
+
+  // insert random noise into the gauge fields
+  {
+    quda::RNG rng(xD[0], 1234);
+    for (auto &yi : yD) spinorNoise(yi, rng, QUDA_NOISE_GAUSS);
+
+    gaugeNoise(*Y_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*Yhat_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*X_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*Xinv_d, rng, QUDA_NOISE_GAUSS);
+  }
 }
 
 void freeFields()
 {
-  xD.reset();
-  yD.reset();
-  xH.reset();
-  yH.reset();
+  xD.clear();
+  yD.clear();
 
-  delete Y_h;
-  delete X_h;
-  delete Xinv_h;
-  delete Yhat_h;
-
-  delete Y_d;
-  delete X_d;
-  delete Xinv_d;
-  delete Yhat_d;
+  Y_d.reset();
+  X_d.reset();
+  Xinv_d.reset();
+  Yhat_d.reset();
 }
 
 DiracCoarse *dirac;
+DiracCoarsePC *dirac_pc;
+
+TEST(multi_rhs_test, verify)
+{
+  printfQuda("\nTesting Multi-RHS correctness...\n\n");
+
+  blas::zero(xD);
+
+  auto xEven = make_parity_subset(xD, QUDA_EVEN_PARITY);
+  auto yEven = make_parity_subset(yD, QUDA_EVEN_PARITY);
+  auto yOdd = make_parity_subset(yD, QUDA_ODD_PARITY);
+
+  switch (test_type) {
+  case 0: dirac->Dslash(xEven, yOdd, QUDA_EVEN_PARITY); break;
+  case 1: dirac->M(xD, yD); break;
+  case 2: dirac->Clover(xEven, yEven, QUDA_EVEN_PARITY); break;
+  case 3: dirac->Mdag(xD, yD); break;
+  case 4: dirac->MdagM(xD, yD); break;
+  case 5: dirac_pc->M(xEven, yOdd); break;
+  case 6: dirac_pc->Mdag(xEven, yOdd); break;
+  case 7: dirac_pc->MdagM(xEven, yOdd); break;
+  default: errorQuda("Undefined test %d", test_type);
+  }
+
+  ColorSpinorField x_ref(yD[0]);
+  blas::zero(x_ref);
+
+  for (auto i = 0u; i < yD.size(); i++) {
+    switch (test_type) {
+    case 0: dirac->Dslash(x_ref.Even(), yD[i].Odd(), QUDA_EVEN_PARITY); break;
+    case 1: dirac->M(x_ref, yD[i]); break;
+    case 2: dirac->Clover(x_ref.Even(), yD[i].Even(), QUDA_EVEN_PARITY); break;
+    case 3: dirac->Mdag(x_ref, yD[i]); break;
+    case 4: dirac->MdagM(x_ref, yD[i]); break;
+    case 5: dirac_pc->M(x_ref.Even(), yD[i].Odd()); break;
+    case 6: dirac_pc->Mdag(x_ref.Even(), yD[i].Odd()); break;
+    case 7: dirac_pc->MdagM(x_ref.Even(), yD[i].Odd()); break;
+    default: errorQuda("Undefined test %d", test_type);
+    }
+
+    auto max_dev = blas::max_deviation(xD[i], x_ref);
+    auto x2 = blas::norm2(x_ref);
+    auto l2_dev = blas::xmyNorm(xD[i], x_ref);
+
+    // require that the relative L2 norm differs by no more than 2e-6/4e-5
+    EXPECT_LE(sqrt(l2_dev / x2), prec_sloppy == QUDA_SINGLE_PRECISION ? 2e-6 : 4e-5);
+    // require that each component differs by no more than 1e-3/4e-3
+    EXPECT_LE(max_dev[1], prec_sloppy == QUDA_SINGLE_PRECISION ? 1e-3 : 4e-3);
+  }
+}
 
 double benchmark(int test, const int niter)
 {
+  printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
+
   device_timer_t device_timer;
   device_timer.start();
 
+  auto xEven = make_parity_subset(xD, QUDA_EVEN_PARITY);
+  auto yEven = make_parity_subset(yD, QUDA_EVEN_PARITY);
+  auto yOdd = make_parity_subset(yD, QUDA_ODD_PARITY);
+
   switch (test) {
   case 0:
-    for (int i = 0; i < niter; ++i) dirac->Dslash(xD->Even(), yD->Odd(), QUDA_EVEN_PARITY);
+    for (int i = 0; i < niter; ++i) dirac->Dslash(xEven, yOdd, QUDA_EVEN_PARITY);
     break;
   case 1:
-    for (int i = 0; i < niter; ++i) dirac->M(*xD, *yD);
+    for (int i = 0; i < niter; ++i) dirac->M(xD, yD);
     break;
   case 2:
-    for (int i = 0; i < niter; ++i) dirac->Clover(xD->Even(), yD->Even(), QUDA_EVEN_PARITY);
+    for (int i = 0; i < niter; ++i) dirac->Clover(xEven, yEven, QUDA_EVEN_PARITY);
+    break;
+  case 3:
+    for (int i = 0; i < niter; ++i) dirac->Mdag(xD, yD);
+    break;
+  case 4:
+    for (int i = 0; i < niter; ++i) dirac->MdagM(xD, yD);
+    break;
+  case 5:
+    for (int i = 0; i < niter; ++i) dirac_pc->M(xEven, yOdd);
+    break;
+  case 6:
+    for (int i = 0; i < niter; ++i) dirac_pc->Mdag(xEven, yOdd);
+    break;
+  case 7:
+    for (int i = 0; i < niter; ++i) dirac_pc->MdagM(xEven, yOdd);
     break;
   default: errorQuda("Undefined test %d", test);
   }
@@ -181,20 +224,24 @@ double benchmark(int test, const int niter)
   return device_timer.last();
 }
 
-const char *names[] = {"Dslash", "Mat", "Clover"};
+const char *names[] = {"Dslash", "Mat", "Clover", "MatDag", "MatDagMat", "MatPC", "MatPCDag", "MatPCDagMatPC"};
 
 int main(int argc, char **argv)
 {
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
+  // return code for google test
+  int test_rc = 0;
+
   // Set some defaults that lets the benchmark fit in memory if you run it
   // with default parameters.
   xdim = ydim = zdim = tdim = 8;
 
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
   add_multigrid_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat", 1}, {"Clover", 2}};
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0},    {"Mat", 1},   {"Clover", 2},   {"MatDag", 3},
+                                          {"MatDagMat", 4}, {"MatPC", 5}, {"MatPCDag", 6}, {"MatPCDagMatPC", 7}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
   try {
@@ -203,6 +250,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  Ncolor = nvec[0] == 0 ? 24 : nvec[0];
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
@@ -210,34 +258,41 @@ int main(int argc, char **argv)
 
   setVerbosity(verbosity);
 
-  Nspin = 2;
+  initFields(prec);
 
-  printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
-  for (int c = 24; c <= 32; c += 8) {
-    Ncolor = c;
+  DiracParam param;
+  param.halo_precision = smoother_halo_prec;
+  param.kappa = 1.0;
+  param.dagger = QUDA_DAG_NO;
+  param.setup_use_mma = mg_setup_use_mma[0];
+  param.dslash_use_mma = mg_dslash_use_mma[0];
+  param.matpcType = QUDA_MATPC_EVEN_EVEN;
+  dirac = new DiracCoarse(param, nullptr, nullptr, nullptr, nullptr, Y_d, X_d, Xinv_d, Yhat_d);
+  dirac_pc = new DiracCoarsePC(param, nullptr, nullptr, nullptr, nullptr, Y_d, X_d, Xinv_d, Yhat_d);
 
-    initFields(prec);
+  if (verify_results) {
+    // Ensure gtest prints only from rank 0
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-    DiracParam param;
-    param.halo_precision = smoother_halo_prec;
-    dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d);
-
-    // do the initial tune
-    benchmark(test_type, 1);
-
-    // now rerun with more iterations to get accurate speed measurements
-    dirac->Flops(); // reset flops counter
-
-    double secs = benchmark(test_type, niter);
-    double gflops = (dirac->Flops() * 1e-9) / (secs);
-
-    printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
-
-    delete dirac;
-    freeFields();
+    test_rc = RUN_ALL_TESTS();
+    if (test_rc != 0) warningQuda("Tests failed");
   }
+
+  auto flops0 = quda::Tunable::flops_global();
+  double secs = benchmark(test_type, niter);
+  auto flops1 = quda::Tunable::flops_global();
+
+  double gflops = (flops1 - flops0) * 1e-9 / secs;
+
+  printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
+
+  delete dirac;
+  delete dirac_pc;
+  freeFields();
 
   endQuda();
 
   finalizeComms();
+  return test_rc;
 }

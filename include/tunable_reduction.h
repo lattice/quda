@@ -71,7 +71,7 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      if (tp.block.x * tp.block.y < device::warp_size())
+      if (tp.block.x * tp.block.y < static_cast<unsigned>(device::warp_size()))
         errorQuda("Reduction kernels must use at least a warp of threads per block (%u %u < %u)", tp.block.x,
                   tp.block.y, device::warp_size());
       if (arg.threads.y != block_size_y)
@@ -140,15 +140,11 @@ namespace quda
      */
     TunableReduction2D(const LatticeField &field, unsigned int block_size_y = 2,
                        QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+      TunableKernel(field, location),
       n_items(field.Volume()),
       block_size_y(block_size_y)
     {
-      strcpy(vol, field.VolString());
-      strcpy(aux, compile_type_str(field, location));
       if (commAsyncReduction()) strcat(aux, "async,");
-      strcat(aux, field.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "nParity=2," : "nParity=1,");
-      strcat(aux, field.AuxString());
     }
 
     /**
@@ -157,10 +153,8 @@ namespace quda
        @param[in] location Location where the calculation will take place
      */
     TunableReduction2D(size_t n_items, QudaFieldLocation location) :
-      TunableKernel(location), n_items(n_items), block_size_y(1)
+      TunableKernel(n_items, location), n_items(n_items), block_size_y(1)
     {
-      u64toa(vol, n_items);
-      strcpy(aux, compile_type_str(location));
       if (commAsyncReduction()) strcat(aux, "async,");
     }
 
@@ -172,6 +166,7 @@ namespace quda
     {
       TunableKernel::initTuneParam(param);
       param.block.y = block_size_y;
+      setSharedBytes(param);
     }
 
     /**
@@ -182,6 +177,7 @@ namespace quda
     {
       TunableKernel::defaultTuneParam(param);
       param.block.y = block_size_y;
+      setSharedBytes(param);
     }
   };
 
@@ -226,7 +222,7 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      if (tp.block.x * tp.block.y < device::warp_size())
+      if (tp.block.x * tp.block.y < static_cast<unsigned>(device::warp_size()))
         errorQuda("Reduction kernels must use at least a warp of threads per block (%u %u < %u)", tp.block.x,
                   tp.block.y, device::warp_size());
       if (n_batch_block_max > Arg::max_n_batch_block)
@@ -323,17 +319,23 @@ namespace quda
     {
       bool rtn;
       do {
-        rtn = Tunable::advanceBlockDim(param);
+        rtn = TunableReduction2D::advanceBlockDim(param);
       } while (rtn && !is_power2(param.block.x));
 
       if (rtn) {
         return true;
       } else {
+
+        auto next = param;
+        next.block.z++;
+        auto shared_bytes = setSharedBytes(next);
+
         if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
             && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
-            && param.block.z < n_batch_block_max) {
+            && param.block.z < n_batch_block_max && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.z++;
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
+          param.shared_bytes = shared_bytes;
           return true;
         } else { // we have run off the end so let's reset
           param.block.z = 1;
@@ -349,9 +351,10 @@ namespace quda
      */
     void initTuneParam(TuneParam &param) const
     {
-      Tunable::initTuneParam(param);
+      TunableReduction2D::initTuneParam(param);
       param.block = {param.block.x, param.block.y, 1};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
+      setSharedBytes(param);
     }
 
     /**
@@ -360,9 +363,10 @@ namespace quda
      */
     void defaultTuneParam(TuneParam &param) const
     {
-      Tunable::defaultTuneParam(param);
+      TunableReduction2D::defaultTuneParam(param);
       param.block = {param.block.x, param.block.y, 1};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
+      setSharedBytes(param);
     }
   };
 

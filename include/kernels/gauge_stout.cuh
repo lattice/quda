@@ -6,6 +6,7 @@
 #include <su3_project.cuh>
 #include <kernels/gauge_utils.cuh>
 #include <kernel.h>
+#include <thread_local_cache.h>
 
 namespace quda
 {
@@ -67,7 +68,7 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      Link U, Stap, Omega, Q;
+      Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
@@ -133,7 +134,9 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      Link U, UDag, Stap, Rect, Omega, ODT, Q;
+      Link U, Q;
+      ThreadLocalCache<Link, 0, computeStapleRectangleOps> Stap;
+      ThreadLocalCache<Link, 0, decltype(Stap)> Rect; // offset by Stap type to ensure non-overlapping allocations
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
@@ -146,7 +149,7 @@ namespace quda
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
       // Compute \rho * staple_coeff * S - \rho * rectangle_coeff * R
-      Q = ((arg.staple_coeff * Stap) - (arg.rectangle_coeff * Rect)) * conj(U);
+      Q = ((arg.staple_coeff * static_cast<const Link &>(Stap)) - (arg.rectangle_coeff * static_cast<const Link &>(Rect))) * conj(U);
       // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
       //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
       makeHerm(Q);

@@ -15,7 +15,7 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
 
-    unsigned int minThreads() const { return size; }
+    unsigned int minThreads() const override { return size; }
 
   public:
     CopyGauge(Arg &arg, GaugeField &out, const GaugeField &in, QudaFieldLocation location) :
@@ -28,7 +28,7 @@ namespace quda
     {
       set_ghost(is_ghost); // initial state is not ghost
       strcat(aux, ",");
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
       if (Arg::fine_grain) strcat(aux, ",fine-grained");
     }
 
@@ -48,7 +48,7 @@ namespace quda
       resizeVector(vector_length_y, (is_ghost ? in.Ndim() : in.Geometry()) * 2); // only resizing z component
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.threads.x = size;
@@ -59,16 +59,15 @@ namespace quda
         launch<CopyGhost_, enable_host>(tp, stream, arg);
     }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       char aux_[TuneKey::aux_n];
       strcpy(aux_, aux);
       if (is_ghost) strcat(aux_, ",ghost");
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
-    long long flops() const { return 0; }
-    long long bytes() const
+    long long bytes() const override
     {
       auto sites = 4 * in.VolumeCB();
       if (is_ghost) {

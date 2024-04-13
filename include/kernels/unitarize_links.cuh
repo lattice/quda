@@ -10,12 +10,12 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct UnitarizeArg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
     Gauge out;
     const Gauge in;
 
@@ -101,7 +101,7 @@ namespace quda {
     real s = c[1] * static_cast<real>(1.0 / 3.0) - c[0] * c[0] * static_cast<real>(1.0 / 18.0);
 
     real cosTheta;
-    if (fabs(s) >= arg.unitarize_eps) { // faster when this conditional is removed?
+    if (s >= arg.unitarize_eps) { // faster when this conditional is removed?
       const real rsqrt_s = quda::rsqrt(s);
       r = c[2]*0.5 - (c[0] * static_cast<real>(1.0 / 3.0)) * (c[1] - c[0] * c[0] * static_cast<real>(1.0 / 9.0));
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
@@ -224,12 +224,12 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct ProjectSU3Arg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
     Gauge u;
 
     real tol;

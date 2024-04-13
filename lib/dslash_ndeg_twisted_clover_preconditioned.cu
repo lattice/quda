@@ -22,7 +22,7 @@ namespace quda
 
       unsigned int sharedBytesPerThread() const
       {
-        return 2 * in.Ncolor() * 2 * sizeof(typename mapper<typename Arg::Float>::type);
+        return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<typename Arg::Float>::type);
       }
       
     public:

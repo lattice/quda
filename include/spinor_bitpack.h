@@ -193,7 +193,22 @@ namespace quda {
     unsigned int c_im : bitwidth;
     unsigned int dummy1: 2;
 
-    spinor_packed() = default;
+    // compiler generated constructor fails to zero-initialize, leading to warnings, so need to make one
+    constexpr spinor_packed() :
+      a_re(0),
+      exponent0(0),
+      a_im(0),
+      exponent1(0),
+      b_re(0),
+      exponent2(0),
+      b_im(0),
+      exponent3(0),
+      c_re(0),
+      dummy0(0),
+      c_im(0),
+      dummy1(0)
+    {
+    }
 
     template <typename spinor> __host__ __device__ spinor_packed(const spinor &in) { pack(in); }
 

@@ -22,25 +22,21 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilson::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			   const QudaParity parity) const
+  void DiracWilson::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
-    flops += 1320ll*in.Volume();
   }
 
-  void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
+  void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
-    flops += 1368ll*in.Volume();
   }
 
   void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -48,25 +44,18 @@ namespace quda {
     checkFullSpinor(out, in);
 
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1368ll * in.Volume();
   }
 
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-
-    bool reset = newTmp(&tmp1, in);
-    checkFullSpinor(*tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
-  void DiracWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
+  void DiracWilson::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                            const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
@@ -98,11 +87,7 @@ namespace quda {
 
   }
 
-  DiracWilsonPC::DiracWilsonPC(const DiracWilsonPC &dirac) 
-    : DiracWilson(dirac)
-  {
-
-  }
+  DiracWilsonPC::DiracWilsonPC(const DiracWilsonPC &dirac) : DiracWilson(dirac) { }
 
   DiracWilsonPC::~DiracWilsonPC()
   {
@@ -120,33 +105,28 @@ namespace quda {
   void DiracWilsonPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
-
-    bool reset = newTmp(&tmp1, in);
+    auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash(*tmp1, in, QUDA_ODD_PARITY);
-      DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_ODD_PARITY);
+      DslashXpay(out, tmp, QUDA_EVEN_PARITY, in, kappa2);
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-      DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_EVEN_PARITY);
+      DslashXpay(out, tmp, QUDA_ODD_PARITY, in, kappa2);
     } else {
       errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
     }
-
-    deleteTmp(&tmp1, reset);
   }
 
   void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
-    deleteTmp(&tmp2, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
-  void DiracWilsonPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			      ColorSpinorField &x, ColorSpinorField &b, 
-			      const QudaSolutionType solType) const
+  void DiracWilsonPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                              const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -176,9 +156,7 @@ namespace quda {
   void DiracWilsonPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				  const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }				
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
 
     // create full solution
 
