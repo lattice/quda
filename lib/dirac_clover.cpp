@@ -148,7 +148,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in,
+      ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in,
                                               parity, dagger, commDim.data, profile);
     } else {
       ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim.data, profile);
@@ -164,7 +164,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonCloverDistancePreconditioned(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x,
+      ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x,
                                               parity, dagger, commDim.data, profile);
     } else {
       ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);

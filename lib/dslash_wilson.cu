@@ -17,7 +17,7 @@ namespace quda
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     auto dummy = DistanceType<false>();
-    instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, 0, 0, x, parity, dagger, comm_override, dummy, profile);
+    instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, 0, -1, x, parity, dagger, comm_override, dummy, profile);
   }
 #else
   void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, const ColorSpinorField &,

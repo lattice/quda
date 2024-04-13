@@ -1017,10 +1017,10 @@ namespace quda
   /**
      @brief Reweight a color spinor for distance preconditioning
      @param[out] src The colorspinorfield
-     @param[in] alpha alpha parameter for distance preconditioning
-     @param[in] t0 source time for distance preconditioning
+     @param[in] alpha0 The parameter for distance preconditioning, negative value means a inversed reweighting
+     @param[in] t0 The parameter for distance preconditioning
   */
-  void spinorDistanceReweight(ColorSpinorField &src, double alpha, int t0);
+  void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0);
 
   /**
      @brief Helper function for determining if the preconditioning

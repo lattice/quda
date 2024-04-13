@@ -39,7 +39,8 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim.data, profile);
+      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim.data,
+                          profile);
     } else {
       ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim.data, profile);
     }
@@ -52,7 +53,8 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
-      ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim.data, profile);
+      ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim.data,
+                          profile);
     } else {
       ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim.data, profile);
     }

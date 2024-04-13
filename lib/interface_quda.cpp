@@ -1780,14 +1780,18 @@ void distanceReweight(ColorSpinorField &b, QudaInvertParam *param, bool inverse)
   const double alpha0 = abs(param->distance_pc_alpha0);
   const int t0 = param->distance_pc_t0;
   bool distance_pc = (alpha0 != 0) && (t0 >= 0);
-  if (distance_pc && param->dslash_type != QUDA_WILSON_DSLASH && param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-    errorQuda("Distance precontioning is not compatible with dslash type %d\n", param->dslash_type);
-  }
-  if (distance_pc && param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) {
-    errorQuda("Distance precontioning is not compatible with inverter type %d\n", param->inv_type);
-  }
-
   if (distance_pc) {
+    if (param->dslash_type != QUDA_WILSON_DSLASH && param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
+      errorQuda("Distance preconditioning only works with Wilson and Wilson-clover dslash, but get dslash_typ %d\n",
+                param->dslash_type);
+    }
+    if (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) {
+      errorQuda("Distance preconditioning is not compatible with inv_type %d\n", param->inv_type);
+    }
+    if (param->cuda_prec!=QUDA_DOUBLE_PRECISION || param->cuda_prec_sloppy != QUDA_DOUBLE_PRECISION){
+      warningQuda("Distance preconditioning with single or half (sloppy) precision offten diverges");
+    }
+
     if (inverse)
       spinorDistanceReweight(b, -alpha0, t0);
     else

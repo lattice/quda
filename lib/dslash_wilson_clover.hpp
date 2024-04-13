@@ -73,8 +73,8 @@ namespace quda
                              const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon, false, distance_pc> arg(out, in, U, A, a, 0.0, alpha0, t0, x, parity,
-                                                                          dagger, comm_override);
+      WilsonCloverArg<Float, nColor, nDim, recon, false, distance_pc> arg(out, in, U, A, a, 0.0, x, parity, dagger,
+                                                                          comm_override, alpha0, t0);
       WilsonClover<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);

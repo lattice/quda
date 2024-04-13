@@ -7,11 +7,13 @@
 namespace quda
 {
 
-  // Apply the preconditioned Wilson-clover operator
-  // out(x) = M*in = a * A(x)^{-1} (\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+  // Apply the distance and even-odd preconditioned Wilson-clover operator
+  // out(x) = M*in = a * A(x)^{-1} [ \sum_i U_i(x)in(x+\hat{i}) + U^\dagger_i(x-\hat{i})in(x-\hat{i})
+  //                               + fwd(x_4)*U_4(x)in(x+\hat{4}) + bwd(x_4)*U^\dagger_4(x-\hat{4})in(x-\hat{4}) ]
+  // with fwd(t)=\alpha(t+1)/\alpha(t), bwd(t)=\alpha(t+1)/\alpha(t), \alpha(t)=\cosh(\alpha_0*((t-t_0)%L_t-L_t/2))
   // Uses the kappa normalization for the Wilson operator.
-#ifdef GPU_CLOVER_DIRAC
-  void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+#if defined(GPU_CLOVER_DIRAC) && defined(GPU_WILSON_DISTANCE)
+  void ApplyWilsonCloverPreconditionedDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                                const CloverField &A, double a, double alpha0, int t0,
                                                const ColorSpinorField &x, int parity, bool dagger,
                                                const int *comm_override, TimeProfile &profile)
@@ -21,12 +23,12 @@ namespace quda
                                                  profile);
   }
 #else
-  void ApplyWilsonCloverDistancePreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+  void ApplyWilsonCloverPreconditionedDistance(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
                                                const CloverField &, double, double, int, const ColorSpinorField &, int,
                                                bool, const int *, TimeProfile &)
   {
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Distance preconditioned clover dslash has not been built");
   }
-#endif
+#endif // GPU_CLOVER_DIRAC && GPU_WILSON_DISTANCE
 
 } // namespace quda

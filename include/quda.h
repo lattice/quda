@@ -449,13 +449,14 @@ extern "C" {
     QudaBoolean use_mobius_fused_kernel;
 
     /**
-     * Parameters for distance preconditioning algorithm proposed in arXiv:1006.4028, which is useful to solve
-     * a precise heavy quark propagator. alpha0 and t0 follow Eq.(9) in the article. t0 instead of y0 is used
-     * here by convention. alpha0 is a paramater related to mass of the pseudoscalar meson. For bottom quark,
-     * alpha0 ~ (4.7 GeV in lattice unit) - 70 / Lt should be a proper value, here 4.7 GeV is half of m_{\eta_b}.
-     * t0 should be set to the timeslice where the source vector is located.
+     * Parameters for distance preconditioning algorithm proposed in arXiv:1006.4028,
+     * which is useful to solve a precise heavy quark propagator.
+     * alpha0 and t0 follow Eq.(9) in the article.
      */
+
+    /** The alpha0 parameter for distance preconditioning, related to the pseudoscalar meson mass */
     double distance_pc_alpha0;
+    /** The t0 parameter for distance preconditioning, the timeslice where the source is located */
     int distance_pc_t0;
 
   } QudaInvertParam;

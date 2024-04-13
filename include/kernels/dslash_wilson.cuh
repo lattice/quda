@@ -41,27 +41,11 @@ namespace quda
     /** parameters for distance preconditioning */
     const real alpha0;
     const int t0;
-    const int t;
-    const int nt;
+    const int comm_coord_dim_3;
+    const int comm_dim_dim_3;
 
-    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
-      out(out),
-      in(in),
-      in_pack(in),
-      x(x),
-      U(U),
-      a(a),
-      alpha0(0),
-      t0(-1),
-      t(0),
-      nt(0)
-    {
-    }
-
-    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double alpha0, int t0,
-              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, const ColorSpinorField &x,
+              int parity, bool dagger, const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
       DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
@@ -71,8 +55,8 @@ namespace quda
       a(a),
       alpha0(alpha0),
       t0(t0),
-      t(comm_coord(3) * this->dim[3]),
-      nt(comm_dim(3) * this->dim[3])
+      comm_coord_dim_3(comm_coord(3) * this->dim[3]),
+      comm_dim_dim_3(comm_dim(3) * this->dim[3])
     {
     }
   };
@@ -102,9 +86,10 @@ namespace quda
     real fwd_coeff_3 = 1.0;
     real bwd_coeff_3 = 1.0;
     if constexpr (Arg::distance_pc) {
-      const int t = arg.t + coord[3];
-      fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
-      bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, arg.nt) / distanceWeight(arg.alpha0, arg.t0, t, arg.nt);
+      const int t = arg.comm_coord_dim_3 + coord[3];
+      const int nt = arg.comm_dim_dim_3;
+      fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
+      bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
     } else {
       fwd_coeff_3 = 1.0;
       bwd_coeff_3 = 1.0;

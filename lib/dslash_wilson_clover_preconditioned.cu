@@ -16,7 +16,7 @@ namespace quda
                                        bool dagger, const int *comm_override, TimeProfile &profile)
   {
     auto dummy = DistanceType<false>();
-    instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, 0, 0, x, parity, dagger, comm_override, dummy,
+    instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, 0, -1, x, parity, dagger, comm_override, dummy,
                                                  profile);
   }
 #else
