@@ -944,8 +944,9 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
   for (auto parity = 0ul; parity < 2; parity++) {
     for (auto sid = 0ul; sid < Vh; sid++) {
       auto offset = (parity * Vh + sid) * spinor_site_size;
-      int t = (int)(sid / Vsh_t);
-      double weight = cosh(alpha0 * (double)((t - t0 + Z[3]) % Z[3] - Z[3] / 2));
+      int t = Z[3] * comm_coord(3) + (int)(sid / Vsh_t);
+      int nt = Z[3] * comm_dim(3);
+      double weight = cosh(alpha0 * (double)((t - t0 + nt) % nt - nt / 2));
       for (auto j = 0ul; j < spinor_site_size; j++) { out[offset + j] = in[offset + j] / weight; }
     }
   }
