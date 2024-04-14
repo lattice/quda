@@ -22,7 +22,7 @@ namespace quda
 
     Oprod oprod;
     const bool doublet;         // whether we applying the operator to a doublet
-    const int volume_4d_cb;
+    const unsigned int volume_4d_cb;
     F inA[nvector];
     F inB[nvector];
     array_2d<real, nvector, 2> coeff;
@@ -51,7 +51,7 @@ namespace quda
 
 #pragma unroll
     for (int i = 0; i < Arg::nvector; i++) {
-      for (int flavor=0; flavor <= arg.doublet; ++flavor){
+      for (int flavor = 0; flavor <= arg.doublet; ++flavor){
         const int flavor_offset_idx = flavor * (arg.volume_4d_cb);
         const Spinor A = arg.inA[i](x_cb + flavor_offset_idx, parity);
         const Spinor B = arg.inB[i](x_cb + flavor_offset_idx, parity);

@@ -5,7 +5,7 @@
 
 namespace quda {
 
-  enum OprodKernelType { INTERIOR, EXTERIOR };
+  enum OprodKernelType { INTERIOR, INTERIOR_DOUBLET, EXTERIOR, EXTERIOR_DOUBLET };
 
   template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel1D {
     using real = typename mapper<Float>::type;
@@ -18,9 +18,10 @@ namespace quda {
     const ColorSpinorField &inD;
     const int parity;
     const real coeff;
+    const bool doublet;         // whether we applying the operator to a doublet
     OprodKernelType kernel;
     int dir;
-    unsigned int minThreads() const override { return kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
+    unsigned int minThreads() const override { return kernel <= INTERIOR_DOUBLET ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
 
   public:
     CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
@@ -34,12 +35,15 @@ namespace quda {
       inC(inC),
       inD(inD),
       parity(parity),
-      coeff(static_cast<real>(coeff))
+      coeff(static_cast<real>(coeff)),
+      doublet(inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET)
     {
       char aux2[TuneKey::aux_n];
       strcpy(aux2, aux);
-      strcat(aux, ",interior");
-      kernel = INTERIOR;
+      strcat(aux, ",interior,doublet=");
+      strcat(aux, doublet == 0 ? "0" : "1");
+      if (doublet) kernel = INTERIOR_DOUBLET;
+      else kernel = INTERIOR;
       apply(device::get_default_stream());
 
       for (int i=3; i>=0; i--) {
@@ -48,7 +52,10 @@ namespace quda {
         strcpy(aux, aux2);
         strcat(aux, ",exterior,dir=");
         strcat(aux, dir == 0 ? "0" : dir == 1 ? "1" : dir == 2 ? "2" : "3");
-        kernel = EXTERIOR;
+        strcat(aux, ",doublet=");
+        strcat(aux, doublet == 0 ? "0" : "1");
+        if (doublet) kernel = EXTERIOR_DOUBLET;
+        else kernel = EXTERIOR;
         apply(device::get_default_stream());
       }
     }
@@ -59,12 +66,22 @@ namespace quda {
 
       if (kernel == INTERIOR) {
         launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
+      } else if (kernel == INTERIOR_DOUBLET) {
+        launch<InteriorDoublet>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
       } else if (kernel == EXTERIOR) {
         switch (dir) {
         case 0: launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff)); break;
         case 1: launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff)); break;
         case 2: launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff)); break;
         case 3: launch<Exterior>(tp, stream, Arg<3>(force, U, inA, inB, inC, inD, parity, coeff)); break;
+        default: errorQuda("Unexpected direction %d", dir);
+        }
+      } else if (kernel == EXTERIOR_DOUBLET) {
+        switch (dir) {
+        case 0: launch<ExteriorDoublet>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff)); break;
+        case 1: launch<ExteriorDoublet>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff)); break;
+        case 2: launch<ExteriorDoublet>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff)); break;
+        case 3: launch<ExteriorDoublet>(tp, stream, Arg<3>(force, U, inA, inB, inC, inD, parity, coeff)); break;
         default: errorQuda("Unexpected direction %d", dir);
         }
       }
@@ -74,11 +91,11 @@ namespace quda {
     void postTune() override { force.restore(); }
 
     // spin trace + multiply-add (ignore spin-project)
-    long long flops() const override { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
+    long long flops() const override { return minThreads() * (144 + 234) * (kernel <= INTERIOR_DOUBLET ? 4 : 1); }
 
     long long bytes() const override
     {
-      if (kernel == INTERIOR) {
+      if (kernel <= INTERIOR_DOUBLET) {
 	return inA.Bytes() + inC.Bytes() + 4*(inB.Bytes() + inD.Bytes()) + force.Bytes() + U.Bytes() / 2;
       } else {
 	return minThreads() * (nColor * (4 * 2 + 2 * 2) + 2 * force.Reconstruct() + U.Reconstruct())
