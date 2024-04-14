@@ -132,7 +132,7 @@ extern "C" {
     double mu;    /**< Twisted mass parameter */
     double tm_rho;  /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
     double epsilon; /**< Twisted mass parameter */
-    double evmax;  /** maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces  **/
+    double evmax;   /** maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces  **/
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 

@@ -50,24 +50,23 @@ namespace quda
       dirac->M(p[i][parity], p[i][parity]); // this is the odd part of Y
       if (dagger) dirac->Dagger(QUDA_DAG_NO);
 
-      if(inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
-        blas::ax(1.0/inv_param.evmax, p[i][parity]);
+      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+        blas::ax(1.0 / inv_param.evmax, p[i][parity]);
         ApplyTau(x[i][other_parity], x[i][other_parity], 1);
         ApplyTau(p[i][parity], p[i][parity], 1);
-        Complex a(0.0,-inv_param.offset[i] );
-        blas::caxpy( a, x[i][parity], p[i][parity]);
-
+        Complex a(0.0, -inv_param.offset[i]);
+        blas::caxpy(a, x[i][parity], p[i][parity]);
       }
 
       gamma5(x[i][other_parity], x[i][other_parity]);
-      if (detratio  && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0[i][parity], p[i][parity]);
-      
-      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+      if (detratio && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0[i][parity], p[i][parity]);
+
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
         dirac->Dagger(QUDA_DAG_YES);
         gamma5(p[i][parity], p[i][parity]);
       }
       dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
-      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
         dirac->Dagger(QUDA_DAG_NO);
         gamma5(p[i][other_parity], p[i][other_parity]);
         gamma5(p[i][parity], p[i][parity]);
@@ -75,7 +74,7 @@ namespace quda
       }
       // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
       // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
-      
+
       // the gamma5 application in tmLQCD is done inside deriv_Sb
       gamma5(p[i], p[i]);
     }
@@ -87,10 +86,10 @@ namespace quda
 
     // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
     // sw_spinor_eo(OO,..)  in tmLQCD
-    if ( inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
+    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
       for (auto i = 0u; i < x.size(); i++) {
-        ApplyTau(p[i][parity],p[i][parity],1);
-        ApplyTau(p[i][other_parity],p[i][other_parity],1);
+        ApplyTau(p[i][parity], p[i][parity], 1);
+        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
       }
     }
     computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
