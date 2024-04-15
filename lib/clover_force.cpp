@@ -61,22 +61,22 @@ namespace quda
       gamma5(x[i][other_parity], x[i][other_parity]);
       if (detratio && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0[i][parity], p[i][parity]);
 
-      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-        dirac->Dagger(QUDA_DAG_YES);
-        gamma5(p[i][parity], p[i][parity]);
-      }
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_YES);
+      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) gamma5(p[i][parity], p[i][parity]);
       dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
-      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-        dirac->Dagger(QUDA_DAG_NO);
-        gamma5(p[i][other_parity], p[i][other_parity]);
-        gamma5(p[i][parity], p[i][parity]);
-        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
-      }
-      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
-      // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_NO);
 
-      // the gamma5 application in tmLQCD is done inside deriv_Sb
-      gamma5(p[i], p[i]);
+      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
+        // up to here x.odd match X.odd in tmLQCD and p.odd=- gamma5 Y.odd of tmLQCD
+        // x.Even= X.Even.tmLQCD/kappa and p.Even=- gamma5 Y.Even.tmLQCD/kappa
+        // the gamma5 application in tmLQCD inside deriv_Sb is otimized away in here
+      } else {
+        // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
+        // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
+        // the gamma5 application in tmLQCD is done inside deriv_Sb
+        gamma5(p[i], p[i]);
+      }
     }
 
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
