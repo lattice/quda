@@ -8,13 +8,14 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, QudaReconstructType recon, int dim_ = -1>
+  template <typename Float, int nColor_, QudaReconstructType recon, int dim_ = -1, bool doublet_ = 0>
   struct CloverForceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr int dim = dim_;
     static constexpr int spin_project = true;
+    static constexpr bool doublet = doublet_;         // whether we applying the operator to a doublet
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type;
     using Gauge = typename gauge_mapper<Float, recon, 18>::type;
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
@@ -30,7 +31,6 @@ namespace quda {
     int displacement;
     bool partitioned[4];
     real coeff;
-    const bool doublet;         // whether we applying the operator to a doublet
     const unsigned int volume_4d_cb;
     const unsigned int GhostFace_4d_cb;
 
@@ -49,7 +49,6 @@ namespace quda {
       parity(parity),
       displacement(1),
       coeff(coeff),
-      doublet(inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volume_4d_cb(inA.VolumeCB()/2),
       GhostFace_4d_cb(inB.GhostFaceCB()[dim]/2)
     {
@@ -84,81 +83,8 @@ namespace quda {
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
       using Link = Matrix<Complex, Arg::nColor>;
 
-      Spinor A = arg.inA(x_cb, 0);
-      Spinor C = arg.inC(x_cb, 0);
-      
-#pragma unroll
-      for (int dim=0; dim<4; ++dim) {
-        int shift[4] = {0, 0, 0, 0};
-        shift[dim] = 1;
-        const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
-
-        if (nbr_idx >= 0) {
-          Spinor B_shift = arg.inB(nbr_idx, 0);
-          Spinor D_shift = arg.inD(nbr_idx, 0);
-          
-          B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
-          Link result = outerProdSpinTrace(B_shift,A);
-          
-          D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
-          result += outerProdSpinTrace(D_shift,C);
-          
-          Link temp = arg.force(dim, x_cb, arg.parity);
-          Link U = arg.U(dim, x_cb, arg.parity);
-          result = temp + U*result*arg.coeff;
-          arg.force(dim, x_cb, arg.parity) = result;
-        }
-      } // dim
-    }
-  };
-
-  template <typename Arg> struct Exterior {
-    const Arg &arg;
-    constexpr Exterior(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x_cb)
-    {
-      using Complex = complex<typename Arg::real>;
-      using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
-      using HalfSpinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
-      using Link = Matrix<Complex, Arg::nColor>;
-
-      int x[4];
-      coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
-      const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
-      Spinor A = arg.inA(bulk_cb_idx, 0);
-      Spinor C = arg.inC(bulk_cb_idx, 0);
-
-      HalfSpinor projected_tmp = arg.inB.Ghost(Arg::dim, 1, x_cb, 0);
-      Spinor B_shift = projected_tmp.reconstruct(Arg::dim, 1);
-      Link result = outerProdSpinTrace(B_shift,A);
-
-      projected_tmp = arg.inD.Ghost(Arg::dim, 1, x_cb, 0);
-      Spinor D_shift = projected_tmp.reconstruct(Arg::dim,-1);
-      result += outerProdSpinTrace(D_shift,C);
-
-      Link temp = arg.force(Arg::dim, bulk_cb_idx, arg.parity);
-      Link U = arg.U(Arg::dim, bulk_cb_idx, arg.parity);
-      result = temp + U*result*arg.coeff;
-      arg.force(Arg::dim, bulk_cb_idx, arg.parity) = result;
-      
-    }
-  };
-
-  template <typename Arg> struct InteriorDoublet {
-    const Arg &arg;
-    constexpr InteriorDoublet(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x_cb)
-    {
-      using Complex = complex<typename Arg::real>;
-      using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
-      using Link = Matrix<Complex, Arg::nColor>;
-
   #pragma unroll
-      for (int flavor=0; flavor<2; ++flavor){
+      for (int flavor=0; flavor<=Arg::doublet; ++flavor){
 
         const int flavor_offset_idx = flavor * arg.volume_4d_cb;
         Spinor A = arg.inA(x_cb + flavor_offset_idx, 0);
@@ -190,9 +116,9 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct ExteriorDoublet {
+  template <typename Arg> struct Exterior {
     const Arg &arg;
-    constexpr ExteriorDoublet(const Arg &arg) : arg(arg) {}
+    constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)
@@ -204,7 +130,7 @@ namespace quda {
 
       int x[4];
   #pragma unroll
-      for (int flavor=0; flavor<2; ++flavor){
+      for (int flavor=0; flavor<=Arg::doublet; ++flavor){
         const int flavor_offset_bulk_idx = flavor * arg.volume_4d_cb;
         const int flavor_offset_ghost_idx = flavor * arg.GhostFace_4d_cb;
         coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
