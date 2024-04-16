@@ -86,7 +86,7 @@ std::tuple<int, double> clover_force_test(test_t param)
   gauge_param.cuda_prec = ::testing::get<0>(param);
   inv_param.cuda_prec = ::testing::get<0>(param);
   inv_param.dslash_type = ::testing::get<1>(param);
-  inv_param.twist_flavor = ::testing::get<4>(param); 
+  inv_param.twist_flavor = ::testing::get<4>(param);
   if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.epsilon = epsilon;
     inv_param.evmax = evmax;
@@ -146,8 +146,8 @@ std::tuple<int, double> clover_force_test(test_t param)
     mom_ref.zero();
     TMCloverForce_reference(mom_ref.data(), in.data(), in0.data(), coeff.data(), nvector, u, clover, clover_inv,
                             &gauge_param, &inv_param, detratio);
-    *check_out
-      = compare_floats(mom.data(), mom_ref.data(), 4 * V * mom_site_size, getTolerance(gauge_param.cuda_prec), gauge_param.cpu_prec);
+    *check_out = compare_floats(mom.data(), mom_ref.data(), 4 * V * mom_site_size, getTolerance(gauge_param.cuda_prec),
+                                gauge_param.cpu_prec);
     printf("check_out =%d \n", *check_out);
     // if (compute_force)
     strong_check_mom(mom.data(), mom_ref.data(), 4 * V, gauge_param.cpu_prec);
@@ -185,7 +185,8 @@ public:
       loadGaugeQuda(gauge.raw_pointer(), &gauge_param);
     }
 
-    if (::testing::get<0>(param) != last_prec || ::testing::get<1>(param) != last_dslash || ::testing::get<4>(param) != last_twist_flavor) {
+    if (::testing::get<0>(param) != last_prec || ::testing::get<1>(param) != last_dslash
+        || ::testing::get<4>(param) != last_twist_flavor) {
       if (last_prec != QUDA_INVALID_PRECISION) freeCloverQuda();
       // Load the clover terms to the device
       inv_param.clover_cuda_prec = ::testing::get<0>(param);
@@ -237,7 +238,7 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
   std::string name;
   name += std::string(get_prec_str(::testing::get<0>(param.param))) + "_";
   name += std::string(get_dslash_str(::testing::get<1>(param.param))) + "_";
-  name += std::string(get_TwistFlavor_str(::testing::get<4>(param.param))) ;
+  name += std::string(get_TwistFlavor_str(::testing::get<4>(param.param)));
   if (::testing::get<2>(param.param)) name += std::string("ratio_");
   name += std::string("nvector_") + std::to_string(::testing::get<3>(param.param));
   return name;
@@ -289,14 +290,13 @@ using ::testing::Combine;
 using ::testing::Values;
 
 INSTANTIATE_TEST_SUITE_P(CloverForceTest, CloverForceTest,
-                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                                 Values(QUDA_CLOVER_WILSON_DSLASH), Values(false, true),
-                                 Values(1, 8), Values(QUDA_TWIST_NO)),
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_CLOVER_WILSON_DSLASH),
+                                 Values(false, true), Values(1, 8), Values(QUDA_TWIST_NO)),
                          gettestname);
 
 // // twisted clover (singlet and doublet)
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_twist_mass, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
-                                 Values(QUDA_TWISTED_CLOVER_DSLASH), Values(false, true),
-                                 Values(1, 8), Values(QUDA_TWIST_SINGLET, QUDA_TWIST_NONDEG_DOUBLET)),
+                                 Values(QUDA_TWISTED_CLOVER_DSLASH), Values(false, true), Values(1, 8),
+                                 Values(QUDA_TWIST_SINGLET, QUDA_TWIST_NONDEG_DOUBLET)),
                          gettestname);
