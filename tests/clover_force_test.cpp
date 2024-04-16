@@ -14,7 +14,6 @@
 #include <gtest/gtest.h>
 
 static int force_check;
-static int path_check;
 static double force_deviation;
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -277,7 +276,7 @@ int main(int argc, char **argv)
 
     test_rc = RUN_ALL_TESTS();
   } else {
-    clover_force_test({prec, dslash_type, detratio, Nsrc});
+    clover_force_test({prec, dslash_type, detratio, Nsrc, twist_flavor});
   }
 
   destroy();
