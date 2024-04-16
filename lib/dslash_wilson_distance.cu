@@ -14,7 +14,7 @@ namespace quda
   //                     + fwd(x_4)*U_4(x)in(x+\hat{4}) + bwd(x_4)*U^\dagger_4(x-\hat{4})in(x-\hat{4}) ]
   // with fwd(t)=\alpha(t+1)/\alpha(t), bwd(t)=\alpha(t+1)/\alpha(t), \alpha(t)=\cosh(\alpha_0*((t-t_0)%L_t-L_t/2))
   // Uses the a normalization for the Wilson operator.
-#if defined(GPU_WILSON_DIRAC) && defined(GPU_WILSON_DISTANCE)
+#if defined(GPU_WILSON_DIRAC) && defined(GPU_DIRAC_DISTANCE_PRECONDITIONING)
   void ApplyWilsonDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                            double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger,
                            const int *comm_override, TimeProfile &profile)
@@ -29,6 +29,6 @@ namespace quda
   {
     errorQuda("Distance preconditioned Wilson dslash has not been built");
   }
-#endif // GPU_WILSON_DIRAC && GPU_WILSON_DISTANCE
+#endif // GPU_WILSON_DIRAC && GPU_DIRAC_DISTANCE_PRECONDITIONING
 
 } // namespace quda

@@ -37,7 +37,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger,
                                 commDim.data, profile);
     } else {
@@ -55,7 +55,7 @@ namespace quda {
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_pc_alpha0, distance_pc_t0, in,
                                 QUDA_INVALID_PARITY, dagger, commDim.data, profile);
     } else {
@@ -147,7 +147,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in,
                                               parity, dagger, commDim.data, profile);
     } else {
@@ -163,7 +163,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x,
                                               parity, dagger, commDim.data, profile);
     } else {

@@ -5,31 +5,18 @@
 
 namespace quda {
 
-  DiracWilson::DiracWilson(const DiracParam &param) :
-    Dirac(param), distance_pc_alpha0(param.distance_pc_alpha0), distance_pc_t0(param.distance_pc_t0)
-  {
-  }
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) :
-    Dirac(dirac), distance_pc_alpha0(dirac.distance_pc_alpha0), distance_pc_t0(dirac.distance_pc_t0)
-  {
-  }
+  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
 
   // hack (for DW and TM operators)
-  DiracWilson::DiracWilson(const DiracParam &param, const int) :
-    Dirac(param), distance_pc_alpha0(0.0), distance_pc_t0(-1)
-  {
-  }
+  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { }
 
   DiracWilson::~DiracWilson() { }
 
   DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
   {
-    if (&dirac != this) {
-      Dirac::operator=(dirac);
-    }
-    distance_pc_alpha0 = dirac.distance_pc_alpha0;
-    distance_pc_t0 = dirac.distance_pc_t0;
+    if (&dirac != this) { Dirac::operator=(dirac); }
     return *this;
   }
 
@@ -38,7 +25,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim.data,
                           profile);
     } else {
@@ -52,7 +39,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim.data,
                           profile);
     } else {
@@ -64,7 +51,7 @@ namespace quda {
   {
     checkFullSpinor(out, in);
 
-    if (distance_pc_alpha0 != 0 && distance_pc_t0 >= 0) {
+    if (useDistancePC()) {
       ApplyWilsonDistance(out, in, *gauge, -kappa, distance_pc_alpha0, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger,
                           commDim.data, profile);
     } else {

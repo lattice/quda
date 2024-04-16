@@ -128,6 +128,16 @@
 #define GPU_LAPLACE
 #endif
 
+#cmakedefine QUDA_DIRAC_DISTANCE_PRECONDITIONING
+#ifdef QUDA_DIRAC_DISTANCE_PRECONDITIONING
+/**
+ * @def GPU_DIRAC_DISTANCE_PRECONDITIONING
+ * @brief This macro is set when we have distance preconditioned
+ * Wilson/clover dslash enabled
+ */
+#define GPU_DIRAC_DISTANCE_PRECONDITIONING
+#endif
+
 #cmakedefine QUDA_COVDEV
 #ifdef QUDA_COVDEV
 /**
@@ -144,16 +154,6 @@
  * @brief This macro is set when we have contractions enabled
  */
 #define GPU_CONTRACT
-#endif
-
-#cmakedefine QUDA_WILSON_DISTANCE
-#ifdef QUDA_WILSON_DISTANCE
-/**
- * @def GPU_WILSON_DISTANCE
- * @brief This macro is set when we have distance preconditioned
- * Wilson/clover dslash enabled
- */
-#define GPU_WILSON_DISTANCE
 #endif
 
 #cmakedefine QUDA_SMEAR_GAUSS_TWOLINK

@@ -20,6 +20,8 @@ namespace quda {
     halo_precision(param.halo_precision),
     commDim(param.commDim),
     use_mobius_fused_kernel(param.use_mobius_fused_kernel),
+    distance_pc_alpha0(param.distance_pc_alpha0),
+    distance_pc_t0(param.distance_pc_t0),
     profile("Dirac", false)
   {
     if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
@@ -46,6 +48,8 @@ namespace quda {
     type(dirac.type),
     halo_precision(dirac.halo_precision),
     commDim(dirac.commDim),
+    distance_pc_alpha0(dirac.distance_pc_alpha0),
+    distance_pc_t0(dirac.distance_pc_t0),
     profile("Dirac", false)
   {
   }
@@ -68,6 +72,8 @@ namespace quda {
       symmetric = dirac.symmetric;
       dagger = dirac.dagger;
       commDim = dirac.commDim;
+      distance_pc_alpha0 = dirac.distance_pc_alpha0;
+      distance_pc_t0 = dirac.distance_pc_t0;
       profile = dirac.profile;
 
       if (type != dirac.type) errorQuda("Trying to copy between incompatible types %d %d", type, dirac.type);
