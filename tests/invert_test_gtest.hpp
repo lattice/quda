@@ -80,6 +80,9 @@ bool skip_test(test_t param)
     return true;
   // split-grid doesn't support multishift at present
   if (use_split_grid && multishift > 1) return true;
+  if ((distance_pc_alpha0 != 0 && distance_pc_t0 >= 0)
+      && ((inverter_type != QUDA_CG_INVERTER && inverter_type != QUDA_BICGSTAB_INVERTER) || multishift > 1))
+    return true;
 
   return false;
 }

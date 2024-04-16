@@ -941,7 +941,7 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
   auto *in = spinor.data<double *>();
   auto *out = spinorTmp2.data<double *>();
 
-  for (auto parity = 0ul; parity < 2; parity++) {
+  for (auto parity = 0ul; parity < spinor.SiteSubset(); parity++) {
     for (auto sid = 0ul; sid < Vh; sid++) {
       auto offset = (parity * Vh + sid) * spinor_site_size;
       int t = Z[3] * comm_coord(3) + (int)(sid / Vsh_t);

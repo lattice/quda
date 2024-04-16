@@ -1772,22 +1772,22 @@ namespace quda {
   }
 }
 
-void distanceReweight(ColorSpinorField &b, QudaInvertParam *param, bool inverse)
+void distanceReweight(ColorSpinorField &b, QudaInvertParam &param, bool inverse)
 {
   // Force the alpha0 to be positive.
   // A negative alpha0 matches something like Eq.(12) in arXiv:1006.4028.
   // Disable the negative situation as QUDA already has multigrid for light quarks.
-  const double alpha0 = abs(param->distance_pc_alpha0);
-  const int t0 = param->distance_pc_t0;
+  const double alpha0 = abs(param.distance_pc_alpha0);
+  const int t0 = param.distance_pc_t0;
   if (alpha0 != 0.0 && t0 >= 0) {
-    if (param->dslash_type != QUDA_WILSON_DSLASH && param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
+    if (param.dslash_type != QUDA_WILSON_DSLASH && param.dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
       errorQuda("Only Wilson and Wilson-clover dslash support distance preconditioning, but get dslash_type %d\n",
-                param->dslash_type);
+                param.dslash_type);
     }
-    if (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) {
-      errorQuda("Only CG and BiCGStab solver support distance preconditioning, but get inv_type %d\n", param->inv_type);
+    if (param.inv_type != QUDA_CG_INVERTER && param.inv_type != QUDA_BICGSTAB_INVERTER) {
+      errorQuda("Only CG and BiCGStab solver support distance preconditioning, but get inv_type %d\n", param.inv_type);
     }
-    if (param->cuda_prec!=QUDA_DOUBLE_PRECISION || param->cuda_prec_sloppy != QUDA_DOUBLE_PRECISION){
+    if (param.cuda_prec != QUDA_DOUBLE_PRECISION || param.cuda_prec_sloppy != QUDA_DOUBLE_PRECISION) {
       warningQuda("Using single or half (sloppy) precision in distance preconditioning often make the solver diverge");
     }
 
@@ -1848,7 +1848,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     blas::ax(gauge.Anisotropy(), in);
   }
 
-  distanceReweight(in, inv_param, true);
+  distanceReweight(in, *inv_param, true);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
@@ -1864,7 +1864,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   }
   profileDslash.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  distanceReweight(out, inv_param, false);
+  distanceReweight(out, *inv_param, false);
 
   out_h = out;
 
@@ -1907,13 +1907,13 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  distanceReweight(in, inv_param, true);
+  distanceReweight(in, *inv_param, true);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->M(out, in); // apply the operator
   delete dirac; // clean up
 
-  distanceReweight(out, inv_param, false);
+  distanceReweight(out, *inv_param, false);
 
   double kappa = inv_param->kappa;
   if (pc) {
@@ -1973,13 +1973,13 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  distanceReweight(in, inv_param, true);
+  distanceReweight(in, *inv_param, true);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->MdagM(out, in); // apply the operator
   delete dirac; // clean up
 
-  distanceReweight(out, inv_param, false);
+  distanceReweight(out, *inv_param, false);
 
   double kappa = inv_param->kappa;
   if (pc) {
@@ -2766,8 +2766,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   massRescale(b, *param, false);
-
-  distanceReweight(b, param, true);
+  distanceReweight(b, *param, true);
 
   ColorSpinorField in;
   ColorSpinorField out;
@@ -2891,7 +2890,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(x, b, param->solution_type);
 
-  distanceReweight(x, param, false);
+  distanceReweight(x, *param, false);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
