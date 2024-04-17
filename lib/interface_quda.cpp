@@ -1784,11 +1784,12 @@ void distanceReweight(ColorSpinorField &b, QudaInvertParam &param, bool inverse)
       errorQuda("Only Wilson and Wilson-clover dslash support distance preconditioning, but get dslash_type %d\n",
                 param.dslash_type);
     }
-    if (param.inv_type != QUDA_CG_INVERTER && param.inv_type != QUDA_BICGSTAB_INVERTER) {
-      errorQuda("Only CG and BiCGStab solver support distance preconditioning, but get inv_type %d\n", param.inv_type);
+    if (param.inv_type == QUDA_MG_INVERTER) {
+      errorQuda("Multigrid solver doesn't support distance preconditioning\n", param.inv_type);
     }
     if (param.cuda_prec != QUDA_DOUBLE_PRECISION || param.cuda_prec_sloppy != QUDA_DOUBLE_PRECISION) {
-      warningQuda("Using single or half (sloppy) precision in distance preconditioning often make the solver diverge");
+      warningQuda(
+        "Using single or half (sloppy) precision in distance preconditioning sometimes makes the solver diverge");
     }
 
     if (inverse)
