@@ -288,10 +288,12 @@ int main(int argc, char **argv)
 using ::testing::Combine;
 using ::testing::Values;
 
+#ifdef GPU_CLOVER_DIRAC
 INSTANTIATE_TEST_SUITE_P(CloverForceTest, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_CLOVER_WILSON_DSLASH),
                                  Values(false, true), Values(1, 8), Values(QUDA_TWIST_NO)),
                          gettestname);
+#endif
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_TwistedClover, CloverForceTest,
@@ -303,7 +305,7 @@ INSTANTIATE_TEST_SUITE_P(CloverForceTest_TwistedClover, CloverForceTest,
 #endif
 
 #ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
-// // twisted clover non degenerate doublet
+// twisted clover non degenerate doublet
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_ndeg_TwistedClover, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                  Values(QUDA_TWISTED_CLOVER_DSLASH), Values(false, true), Values(1, 8),
