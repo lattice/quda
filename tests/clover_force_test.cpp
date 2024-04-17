@@ -293,9 +293,20 @@ INSTANTIATE_TEST_SUITE_P(CloverForceTest, CloverForceTest,
                                  Values(false, true), Values(1, 8), Values(QUDA_TWIST_NO)),
                          gettestname);
 
-// // twisted clover (singlet and doublet)
-INSTANTIATE_TEST_SUITE_P(CloverForceTest_twist_mass, CloverForceTest,
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+INSTANTIATE_TEST_SUITE_P(CloverForceTest_TwistedClover, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
                                  Values(QUDA_TWISTED_CLOVER_DSLASH), Values(false, true), Values(1, 8),
-                                 Values(QUDA_TWIST_SINGLET, QUDA_TWIST_NONDEG_DOUBLET)),
+                                 Values(QUDA_TWIST_SINGLET)),
                          gettestname);
+
+#endif
+
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
+// // twisted clover non degenerate doublet
+INSTANTIATE_TEST_SUITE_P(CloverForceTest_ndeg_TwistedClover, CloverForceTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                 Values(QUDA_TWISTED_CLOVER_DSLASH), Values(false, true), Values(1, 8),
+                                 Values(QUDA_TWIST_NONDEG_DOUBLET)),
+                         gettestname);
+#endif
