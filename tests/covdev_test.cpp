@@ -20,6 +20,7 @@
 #include <assert.h>
 
 #include <test.h>
+#include <algorithm>
 
 #include <covdev_test_gtest.hpp>
 
@@ -232,6 +233,11 @@ std::array<double, 2> covdev_test(test_t param) {
   QudaDagType      test_dagger  = ::testing::get<1>(param);
 
   std::array<int, 4> mu_flags{covdev_mu};
+  
+  if (std::all_of(mu_flags.begin(), mu_flags.end(), [](int x) { return x == 0; })) {
+    errorQuda("No direction was chosen, exiting...\n");	  
+  }
+
   // Test forward directions, then backward
   for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
     if (mu_flags[mu] == 0) continue; //skip direction
