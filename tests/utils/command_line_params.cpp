@@ -485,8 +485,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--distance-pc-alpha0", distance_pc_alpha0,
     "The alpha0 parameter for distance preconditioning, 0.0 means disabling the preconditioning (default 0.0)");
   quda_app->add_option(
-    "--distance-pc-t0", distance_pc_t0,
-    "The alpha0 parameter for distance preconditioning, negative value means disabling the preconditioning (default -1)");
+    "--distance-pc-t0",
+    distance_pc_t0, "The alpha0 parameter for distance preconditioning, negative value means disabling the preconditioning (default -1)");
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
   quda_app->add_option("--epsilon-naik", eps_naik, "Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)");

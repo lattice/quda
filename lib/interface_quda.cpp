@@ -3359,7 +3359,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
     }
   }
 
-  if (param->distance_pc_alpha0 != 0.0 || param->distance_pc_alpha0 > 0) {
+  if (param->distance_pc_alpha0 != 0.0 && param->distance_pc_t0 >= 0) {
     errorQuda("Multi-shift solver does not support distance preconditioning");
   }
 
