@@ -53,7 +53,6 @@ namespace quda {
                                cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff)
   {
     if constexpr (is_enabled_clover()) {
-      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       if (x.size() > MAX_NVECTOR) {
         // divide and conquer
         computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin(), x.begin() + x.size() / 2},
@@ -65,7 +64,8 @@ namespace quda {
                                 {coeff.begin() + coeff.size() / 2, coeff.end()});
         return;
       }
-
+      
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<CloverSigmaOprod>(oprod, x, p, coeff);
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
