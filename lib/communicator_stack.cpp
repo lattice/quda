@@ -177,10 +177,12 @@ namespace quda
 
   int comm_query(MsgHandle *mh) { CHECK_MH(mh); return get_current_communicator().comm_query(mh); }
 
+#if 0
   void comm_query(int n, MsgHandle *mh[], int *outcount, int array_of_indices[]) {
     for(int i=0; i<n; i++) CHECK_MH(mh[i]);
     get_current_communicator().comm_query(n, mh, outcount, array_of_indices);
   }
+#endif
 
 #undef CHECK_MH
 

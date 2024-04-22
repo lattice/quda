@@ -390,7 +390,7 @@ namespace quda
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);
-  void comm_query(int n, MsgHandle *mh[], int *outcount, int array_of_indices[]);
+  //void comm_query(int n, MsgHandle *mh[], int *outcount, int array_of_indices[]);
 
   template <typename T> void comm_allreduce_sum(T &v);
   template <typename T> void comm_allreduce_max(T &v);

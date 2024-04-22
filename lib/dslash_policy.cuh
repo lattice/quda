@@ -286,6 +286,7 @@ namespace quda
     return comms_test;
   }
 
+#if 0
   // checks complete on all communications
   inline void commsComplete(DslashCommsPattern &pattern, const ColorSpinorField &in, bool gdr_send, bool gdr_recv,
 			    bool zero_copy_recv, int scatterIndex = -1)
@@ -344,6 +345,7 @@ namespace quda
     }
 #endif
   }
+#endif
 
   /**
      @brief Ensure that the dslash is complete.  By construction, the
@@ -699,10 +701,10 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
-	commsComplete(pattern, in, true, true, false);
+	//commsComplete(pattern, in, true, true, false);
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
-#if 0
+#if 1
           for (int dir = 1; dir >= 0; dir--) {
 
             // Query if comms has finished
@@ -783,8 +785,8 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
-	commsComplete(pattern, in, true, true, false);
-#if 0
+	//commsComplete(pattern, in, true, true, false);
+#if 1
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
 

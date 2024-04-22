@@ -1199,6 +1199,7 @@ namespace quda
     }
   }
 
+#if 0
   void ColorSpinorField::commsQuery(int n, int d[], bool done[], bool gdr_send, bool gdr_recv) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
@@ -1279,6 +1280,7 @@ namespace quda
       }
     }
   }
+#endif
 
   void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv) const
   {
