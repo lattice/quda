@@ -33,12 +33,11 @@ namespace quda {
     bool partitioned[4];
     real coeff;
     const unsigned int volume_4d_cb;
-    const unsigned int GhostFace_4d_cb;
+    const unsigned int ghost_face_4d_cb;
 
     CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
                    const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity,
                    const double coeff) :
-      // kernel_param(dim3(dim == -1 ? inA.VolumeCB() : inB.GhostFaceCB()[dim])), // inB since it has a ghost allocated
       kernel_param(dim3(dim == -1 ? inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? inA.VolumeCB() / 2 : inA.VolumeCB() :
                           inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ?
                                     inB.GhostFaceCB()[dim] / 2 :
@@ -53,7 +52,7 @@ namespace quda {
       displacement(1),
       coeff(coeff),
       volume_4d_cb(inA.VolumeCB() / 2),
-      GhostFace_4d_cb(inB.GhostFaceCB()[dim] / 2)
+      ghost_face_4d_cb(inB.GhostFaceCB()[dim] / 2)
     {
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];
       for (int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
@@ -135,7 +134,7 @@ namespace quda {
 #pragma unroll
       for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
         const int flavor_offset_bulk_idx = flavor * arg.volume_4d_cb;
-        const int flavor_offset_ghost_idx = flavor * arg.GhostFace_4d_cb;
+        const int flavor_offset_ghost_idx = flavor * arg.ghost_face_4d_cb;
         coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
         const unsigned int bulk_cb_idx = ((((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0]) >> 1);
         Spinor A = arg.inA(bulk_cb_idx + flavor_offset_bulk_idx, 0);
