@@ -20,7 +20,8 @@ namespace quda {
     const F in;           // input vector field
     const int d;          // which gamma matrix are we applying
     const int nParity;    // number of parities we're working on
-    bool doublet;         // whether we applying the operator to a doublet
+    const bool doublet;   // whether we applying the operator to a doublet
+    const int n_flavor;   // number of flavors
     const int volumeCB;   // checkerboarded volume
     real a;               // scale factor
     real b;               // chiral twist
@@ -31,6 +32,7 @@ namespace quda {
 	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
       out(out), in(in), d(d), nParity(in.SiteSubset()),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      n_flavor(doublet ? 2 : 1),
       volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
       checkPrecision(out, in);
@@ -76,22 +78,14 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity)
     {
-      ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb, parity);
-      switch(arg.d) {
-      case 0: arg.out(x_cb, parity) = in.gamma(0); break;
-      case 1: arg.out(x_cb, parity) = in.gamma(1); break;
-      case 2: arg.out(x_cb, parity) = in.gamma(2); break;
-      case 3: arg.out(x_cb, parity) = in.gamma(3); break;
-      case 4: arg.out(x_cb, parity) = in.gamma(4); break;
-      }
-      if (arg.doublet) {
-        ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb + 1 * arg.volumeCB, parity);
-        switch (arg.d) {
-        case 0: arg.out(x_cb + 1 * arg.volumeCB, parity) = in.gamma(0); break;
-        case 1: arg.out(x_cb + 1 * arg.volumeCB, parity) = in.gamma(1); break;
-        case 2: arg.out(x_cb + 1 * arg.volumeCB, parity) = in.gamma(2); break;
-        case 3: arg.out(x_cb + 1 * arg.volumeCB, parity) = in.gamma(3); break;
-        case 4: arg.out(x_cb + 1 * arg.volumeCB, parity) = in.gamma(4); break;
+      for (int i = 0; i < arg.n_flavor; i++) {
+        ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb + i * arg.volumeCB, parity);
+        switch(arg.d) {
+        case 0: arg.out(x_cb + i * arg.volumeCB, parity) = in.gamma(0); break;
+        case 1: arg.out(x_cb + i * arg.volumeCB, parity) = in.gamma(1); break;
+        case 2: arg.out(x_cb + i * arg.volumeCB, parity) = in.gamma(2); break;
+        case 3: arg.out(x_cb + i * arg.volumeCB, parity) = in.gamma(3); break;
+        case 4: arg.out(x_cb + i * arg.volumeCB, parity) = in.gamma(4); break;
         }
       }
     }
@@ -113,8 +107,8 @@ namespace quda {
         fermion_t in = arg.in(x_cb, parity);
         arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(d));
       } else {
-        fermion_t in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
-        fermion_t in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
+        fermion_t in_1 = arg.in(x_cb + 0 * arg.volumeCB, parity);
+        fermion_t in_2 = arg.in(x_cb + 1 * arg.volumeCB, parity);
         arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(d) + arg.c * in_2);
         arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(d) + arg.c * in_1);
       }
@@ -173,15 +167,15 @@ namespace quda {
 
       switch (arg.d) {
       case 1:
-        arg.out(x_cb, parity) = in_2;
+        arg.out(x_cb + 0 * arg.volumeCB, parity) = in_2;
         arg.out(x_cb + 1 * arg.volumeCB, parity) = in_1;
         break;
       case 2:
-        arg.out(x_cb, parity) = -j * in_2;
+        arg.out(x_cb + 0 * arg.volumeCB, parity) = -j * in_2;
         arg.out(x_cb + 1 * arg.volumeCB, parity) = j * in_1;
         break;
       case 3:
-        arg.out(x_cb, parity) = in_1;
+        arg.out(x_cb + 0 * arg.volumeCB, parity) = in_1;
         arg.out(x_cb + 1 * arg.volumeCB, parity) = m1 * in_2;
         break;
       }

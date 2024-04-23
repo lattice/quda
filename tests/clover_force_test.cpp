@@ -174,7 +174,7 @@ protected:
 
   bool skip()
   {
-    if (!quda::is_enabled(::testing::get<0>(param))) return true; // skip if precision is not enbaled
+    if (!quda::is_enabled(::testing::get<0>(param))) return true; // skip if precision is not enabled
     // check requested dslash is enabled
     if ((::testing::get<1>(param) == QUDA_CLOVER_WILSON_DSLASH && !quda::is_enabled_clover())
         || (::testing::get<1>(param) == QUDA_TWISTED_CLOVER_DSLASH && !quda::is_enabled_twisted_clover()))

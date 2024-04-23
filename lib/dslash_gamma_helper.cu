@@ -10,7 +10,7 @@ namespace quda {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const int d;
-    unsigned int minThreads() const { return in.VolumeCB(); }
+    unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
     GammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d) :
@@ -108,7 +108,7 @@ namespace quda {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const int d;
-    unsigned int minThreads() const { return in.VolumeCB(); }
+    unsigned int minThreads() const { return in.VolumeCB() / 2; }
 
   public:
     TauApply(ColorSpinorField &out, const ColorSpinorField &in, int d) :
