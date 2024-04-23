@@ -43,12 +43,6 @@ void init(int argc, char **argv)
   param.order = QUDA_QDP_GAUGE_ORDER;
   gauge = quda::GaugeField(param);
 
-  printfQuda("Randomizing gauge fields... ");
-  constructHostGaugeField(gauge, gauge_param, argc, argv);
-
-  printfQuda("Sending gauge field to GPU\n");
-  loadGaugeQuda(gauge.raw_pointer(), &gauge_param);
-
   param.order = QUDA_MILC_GAUGE_ORDER;
   param.link_type = QUDA_ASQTAD_MOM_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_10;
@@ -56,19 +50,26 @@ void init(int argc, char **argv)
   mom = quda::GaugeField(param);
   mom_ref = quda::GaugeField(param);
 
-  // Allocate host side memory for clover terms if needed.
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover.resize(V * clover_site_size * host_clover_data_type_size);
-    clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
-    compute_clover = true;
-    constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
-    // Load the clover terms to the device
-    loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
-  } else {
-    errorQuda("dslash type ( dslash_type = %d ) must have the clover", dslash_type);
+  printfQuda("Randomizing gauge fields... ");
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+
+  clover.resize(V * clover_site_size * host_clover_data_type_size);
+  clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
+
+  if (!enable_testing) {
+    printfQuda("Sending gauge field to GPU\n");
+    loadGaugeQuda(gauge.raw_pointer(), &gauge_param);
+
+    // Allocate host side memory for clover terms if needed.
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      compute_clover = true;
+      constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
+      // Load the clover terms to the device
+      loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
+    } else {
+      errorQuda("dslash type ( dslash_type = %d ) must have the clover", dslash_type);
+    }
   }
-  last_prec = gauge_param.cuda_prec;
-  last_dslash = dslash_type;
 }
 
 void destroy()
@@ -171,11 +172,23 @@ class CloverForceTest : public ::testing::TestWithParam<test_t>
 protected:
   test_t param;
 
+  bool skip()
+  {
+    if (!quda::is_enabled(::testing::get<0>(param))) return true; // skip if precision is not enbaled
+    // check requested dslash is enabled
+    if ((::testing::get<1>(param) == QUDA_CLOVER_WILSON_DSLASH && !quda::is_enabled_clover())
+        || (::testing::get<1>(param) == QUDA_TWISTED_CLOVER_DSLASH && !quda::is_enabled_twisted_clover()))
+      return true;
+
+    return false;
+  }
+
 public:
   CloverForceTest() : param(GetParam()) { }
 
   virtual void SetUp()
   {
+    if (skip()) GTEST_SKIP();
     // check if precision has changed and update if it has
     if (::testing::get<0>(param) != last_prec) {
       if (last_prec != QUDA_INVALID_PRECISION) freeGaugeQuda();
@@ -206,10 +219,7 @@ public:
 
 TEST_P(CloverForceTest, verify)
 {
-  if (!quda::is_enabled(::testing::get<0>(param))
-      || (::testing::get<1>(param) == QUDA_CLOVER_WILSON_DSLASH && !quda::is_enabled_clover())
-      || (::testing::get<1>(param) == QUDA_TWISTED_CLOVER_DSLASH && !quda::is_enabled_twisted_clover()))
-    GTEST_SKIP();
+  if (skip()) GTEST_SKIP();
 
   auto deviation = clover_force_test(GetParam());
   ASSERT_EQ(std::get<0>(deviation), 1) << "CPU and QUDA force implementations do not agree";
