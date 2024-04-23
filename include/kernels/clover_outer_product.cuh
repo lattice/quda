@@ -15,7 +15,7 @@ namespace quda {
     static constexpr int nSpin = 4;
     static constexpr int dim = dim_;
     static constexpr int spin_project = true;
-    static constexpr bool doublet = doublet_;         // whether we applying the operator to a doublet
+    static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type;
     using Gauge = typename gauge_mapper<Float, recon, 18>::type;
@@ -39,8 +39,10 @@ namespace quda {
                    const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity,
                    const double coeff) :
       // kernel_param(dim3(dim == -1 ? inA.VolumeCB() : inB.GhostFaceCB()[dim])), // inB since it has a ghost allocated
-      kernel_param(dim3(dim == -1 ?  inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? inA.VolumeCB()/2 : inA.VolumeCB()  : 
-      inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? inB.GhostFaceCB()[dim]/2 : inB.GhostFaceCB()[dim])), // inB since it has a ghost allocated
+      kernel_param(dim3(dim == -1 ? inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? inA.VolumeCB() / 2 : inA.VolumeCB() :
+                          inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ?
+                                    inB.GhostFaceCB()[dim] / 2 :
+                                    inB.GhostFaceCB()[dim])), // inB since it has a ghost allocated
       force(force),
       inA(inA),
       inB(inB),
@@ -50,8 +52,8 @@ namespace quda {
       parity(parity),
       displacement(1),
       coeff(coeff),
-      volume_4d_cb(inA.VolumeCB()/2),
-      GhostFace_4d_cb(inB.GhostFaceCB()[dim]/2)
+      volume_4d_cb(inA.VolumeCB() / 2),
+      GhostFace_4d_cb(inB.GhostFaceCB()[dim] / 2)
     {
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];
       for (int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
@@ -84,15 +86,15 @@ namespace quda {
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
       using Link = Matrix<Complex, Arg::nColor>;
 
-  #pragma unroll
-      for (int flavor=0; flavor<Arg::n_flavor; ++flavor){
+#pragma unroll
+      for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
 
         const int flavor_offset_idx = flavor * arg.volume_4d_cb;
         Spinor A = arg.inA(x_cb + flavor_offset_idx, 0);
         Spinor C = arg.inC(x_cb + flavor_offset_idx, 0);
-        
-  #pragma unroll
-        for (int dim=0; dim<4; ++dim) {
+
+#pragma unroll
+        for (int dim = 0; dim < 4; ++dim) {
           int shift[4] = {0, 0, 0, 0};
           shift[dim] = 1;
           const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
@@ -100,20 +102,20 @@ namespace quda {
           if (nbr_idx >= 0) {
             Spinor B_shift = arg.inB(nbr_idx + flavor_offset_idx, 0);
             Spinor D_shift = arg.inD(nbr_idx + flavor_offset_idx, 0);
-            
-            B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
-            Link result = outerProdSpinTrace(B_shift,A);
-            
-            D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
-            result += outerProdSpinTrace(D_shift,C);
-            
+
+            B_shift = (B_shift.project(dim, 1)).reconstruct(dim, 1);
+            Link result = outerProdSpinTrace(B_shift, A);
+
+            D_shift = (D_shift.project(dim, -1)).reconstruct(dim, -1);
+            result += outerProdSpinTrace(D_shift, C);
+
             Link temp = arg.force(dim, x_cb, arg.parity);
             Link U = arg.U(dim, x_cb, arg.parity);
             result = temp + U * result * arg.coeff;
             arg.force(dim, x_cb, arg.parity) = result;
           }
         } // dim
-      } // flavor
+      }   // flavor
     }
   };
 
@@ -130,26 +132,26 @@ namespace quda {
       using Link = Matrix<Complex, Arg::nColor>;
 
       int x[4];
-  #pragma unroll
-      for (int flavor=0; flavor<Arg::n_flavor; ++flavor){
+#pragma unroll
+      for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
         const int flavor_offset_bulk_idx = flavor * arg.volume_4d_cb;
         const int flavor_offset_ghost_idx = flavor * arg.GhostFace_4d_cb;
         coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
-        const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
+        const unsigned int bulk_cb_idx = ((((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0]) >> 1);
         Spinor A = arg.inA(bulk_cb_idx + flavor_offset_bulk_idx, 0);
         Spinor C = arg.inC(bulk_cb_idx + flavor_offset_bulk_idx, 0);
 
         HalfSpinor projected_tmp = arg.inB.Ghost(Arg::dim, 1, x_cb + flavor_offset_ghost_idx, 0);
         Spinor B_shift = projected_tmp.reconstruct(Arg::dim, 1);
-        Link result = outerProdSpinTrace(B_shift,A);
+        Link result = outerProdSpinTrace(B_shift, A);
 
         projected_tmp = arg.inD.Ghost(Arg::dim, 1, x_cb + flavor_offset_ghost_idx, 0);
-        Spinor D_shift = projected_tmp.reconstruct(Arg::dim,-1);
-        result += outerProdSpinTrace(D_shift,C);
+        Spinor D_shift = projected_tmp.reconstruct(Arg::dim, -1);
+        result += outerProdSpinTrace(D_shift, C);
 
         Link temp = arg.force(Arg::dim, bulk_cb_idx, arg.parity);
         Link U = arg.U(Arg::dim, bulk_cb_idx, arg.parity);
-        result = temp + U*result*arg.coeff;
+        result = temp + U * result * arg.coeff;
         arg.force(Arg::dim, bulk_cb_idx, arg.parity) = result;
       }
     }

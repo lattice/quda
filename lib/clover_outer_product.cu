@@ -18,7 +18,7 @@ namespace quda {
     const ColorSpinorField &inD;
     const int parity;
     const real coeff;
-    const bool doublet;         // whether we applying the operator to a doublet
+    const bool doublet; // whether we applying the operator to a doublet
     const int n_flavor;
     OprodKernelType kernel;
     int dir;
@@ -67,28 +67,32 @@ namespace quda {
       if (kernel == INTERIOR) {
         if (doublet)
           launch<Interior>(tp, stream, Arg<-1, true>(force, U, inA, inB, inC, inD, parity, coeff));
-        else launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
+        else
+          launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
       } else if (kernel == EXTERIOR) {
         switch (dir) {
         case 0: {
           if (doublet)
             launch<Exterior>(tp, stream, Arg<0, true>(force, U, inA, inB, inC, inD, parity, coeff));
-          else launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff)); 
+          else
+            launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff));
           break;
         }
-        case 1:{
+        case 1: {
           if (doublet)
             launch<Exterior>(tp, stream, Arg<1, true>(force, U, inA, inB, inC, inD, parity, coeff));
-          else launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff)); 
+          else
+            launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff));
           break;
         }
-        case 2:{
+        case 2: {
           if (doublet)
             launch<Exterior>(tp, stream, Arg<2, true>(force, U, inA, inB, inC, inD, parity, coeff));
-          else launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff)); 
+          else
+            launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff));
           break;
         }
-        case 3:{
+        case 3: {
           if (doublet)
             launch<Exterior>(tp, stream, Arg<3, true>(force, U, inA, inB, inC, inD, parity, coeff));
           else

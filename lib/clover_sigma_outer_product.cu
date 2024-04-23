@@ -80,7 +80,7 @@ namespace quda {
                                 {coeff.begin() + coeff.size() / 2, coeff.end()});
         return;
       }
-      
+
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       instantiate<CloverSigmaOprod>(oprod, x, p, coeff);
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);

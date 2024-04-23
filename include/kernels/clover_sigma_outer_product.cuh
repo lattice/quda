@@ -11,13 +11,12 @@ namespace quda
   // FIXME - make this multi-RHS once we have the multi-RHS framework developed
 #define MAX_NVECTOR 1
 
-  template <typename Float, int nColor_, int nvector_, bool doublet_>
-  struct CloverSigmaOprodArg : kernel_param<> {
+  template <typename Float, int nColor_, int nvector_, bool doublet_> struct CloverSigmaOprodArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr int nvector = nvector_;
-    static constexpr bool doublet = doublet_;         // whether we applying the operator to a doublet
+    static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
     using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
@@ -30,9 +29,7 @@ namespace quda
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                         cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :
-      kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
-      oprod(oprod), 
-      volume_4d_cb(inA[0].VolumeCB() / 2)
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), oprod(oprod), volume_4d_cb(inA[0].VolumeCB() / 2)
     {
       for (int i = 0; i < nvector; i++) {
         this->inA[i] = inA[i];
@@ -52,7 +49,7 @@ namespace quda
 #pragma unroll
     for (int i = 0; i < Arg::nvector; i++) {
 #pragma unroll
-      for (int flavor = 0; flavor < Arg::n_flavor; flavor++){
+      for (int flavor = 0; flavor < Arg::n_flavor; flavor++) {
         const int flavor_offset_idx = flavor * (arg.volume_4d_cb);
         const Spinor A = arg.inA[i](x_cb + flavor_offset_idx, parity);
         const Spinor B = arg.inB[i](x_cb + flavor_offset_idx, parity);

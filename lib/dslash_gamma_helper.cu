@@ -103,7 +103,8 @@ namespace quda {
   // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
 
-  template <typename Float, int nColor> class TauApply : public TunableKernel2D {
+  template <typename Float, int nColor> class TauApply : public TunableKernel2D
+  {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const int d;
@@ -111,15 +112,13 @@ namespace quda {
 
   public:
     TauApply(ColorSpinorField &out, const ColorSpinorField &in, int d) :
-      TunableKernel2D(in, in.SiteSubset()),
-      out(out),
-      in(in),
-      d(d)
+      TunableKernel2D(in, in.SiteSubset()), out(out), in(in), d(d)
     {
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<Tau>(tp, stream, GammaArg<Float, nColor>(out, in, d));
     }
@@ -129,15 +128,12 @@ namespace quda {
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 
-  //Apply the tau1 matrix to a doublet colorspinor field
-  //out(x) = tau_1*in
+  // Apply the tau1 matrix to a doublet colorspinor field
+  // out(x) = tau_1*in
 #ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTau(ColorSpinorField &out, const ColorSpinorField &in, int d)
-  {
-    instantiate<TauApply>(out, in, d);
-  }
+  void ApplyTau(ColorSpinorField &out, const ColorSpinorField &in, int d) { instantiate<TauApply>(out, in, d); }
 #else
-  void ApplyTau(ColorSpinorField &, const ColorSpinorField &, int )
+  void ApplyTau(ColorSpinorField &, const ColorSpinorField &, int)
   {
     errorQuda("Twisted mass dslash has not been built");
   }
