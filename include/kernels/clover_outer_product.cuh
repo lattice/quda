@@ -8,7 +8,7 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, QudaReconstructType recon, int dim_ = -1, bool doublet_ = 0>
+  template <typename Float, int nColor_, QudaReconstructType recon, int dim_ = -1, bool doublet_ = false>
   struct CloverForceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
@@ -16,7 +16,7 @@ namespace quda {
     static constexpr int dim = dim_;
     static constexpr int spin_project = true;
     static constexpr bool doublet = doublet_;         // whether we applying the operator to a doublet
-    static constexpr int n_flavour = doublet ? 2 : 1;
+    static constexpr int n_flavor = doublet ? 2 : 1;
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type;
     using Gauge = typename gauge_mapper<Float, recon, 18>::type;
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
@@ -85,7 +85,7 @@ namespace quda {
       using Link = Matrix<Complex, Arg::nColor>;
 
   #pragma unroll
-      for (int flavor=0; flavor<Arg::n_flavour; ++flavor){
+      for (int flavor=0; flavor<Arg::n_flavor; ++flavor){
 
         const int flavor_offset_idx = flavor * arg.volume_4d_cb;
         Spinor A = arg.inA(x_cb + flavor_offset_idx, 0);
@@ -109,7 +109,7 @@ namespace quda {
             
             Link temp = arg.force(dim, x_cb, arg.parity);
             Link U = arg.U(dim, x_cb, arg.parity);
-            result = temp + U*result*arg.coeff;
+            result = temp + U * result * arg.coeff;
             arg.force(dim, x_cb, arg.parity) = result;
           }
         } // dim
@@ -131,7 +131,7 @@ namespace quda {
 
       int x[4];
   #pragma unroll
-      for (int flavor=0; flavor<Arg::n_flavour; ++flavor){
+      for (int flavor=0; flavor<Arg::n_flavor; ++flavor){
         const int flavor_offset_bulk_idx = flavor * arg.volume_4d_cb;
         const int flavor_offset_ghost_idx = flavor * arg.GhostFace_4d_cb;
         coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
