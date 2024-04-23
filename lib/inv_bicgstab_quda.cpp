@@ -12,25 +12,20 @@
 namespace quda {
 
   BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
-    matMdagM(matEig.Expose())
-
+                     const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param), matMdagM(matEig.Expose())
   {
   }
 
-  BiCGstab::~BiCGstab() {
-    profile.TPSTART(QUDA_PROFILE_FREE);
-    destroyDeflationSpace();
-    profile.TPSTOP(QUDA_PROFILE_FREE);
-  }
+  BiCGstab::~BiCGstab() { destroyDeflationSpace(); }
 
   void BiCGstab::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
     Solver::create(x, b);
 
     if (!init) {
-      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
+
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       y = ColorSpinorField(csParam);
@@ -40,7 +35,7 @@ namespace quda {
       v = ColorSpinorField(csParam);
       t = ColorSpinorField(csParam);
 
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     } // init
   }
@@ -70,7 +65,7 @@ namespace quda {
   {
     create(x, b);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b); // norm sq of source
     double r2 = 0.0;            // norm sq of residual
@@ -86,9 +81,7 @@ namespace quda {
       }
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
         if (param.deflate) {
           // double the size of the Krylov space
           extendSVDDeflationSpace();
@@ -131,7 +124,7 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         b2 = r2;
@@ -172,10 +165,8 @@ namespace quda {
       x_sloppy = ColorSpinorField(csParam);
     }
 
-    if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-    }
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
@@ -205,19 +196,16 @@ namespace quda {
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
 
-    if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    }
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
     blas::copy(p, r_sloppy);
 
     bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x), blas::norm2(r_sloppy),
-                 blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
+    logQuda(QUDA_DEBUG_VERBOSE, "BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x),
+            blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
 
     // track if we just performed an exact recalculation of y, r, r2
     bool just_updated = false;
@@ -317,9 +305,8 @@ namespace quda {
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x), blas::norm2(r_sloppy),
-                   blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
+      logQuda(QUDA_DEBUG_VERBOSE, "BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, r0=%e, t2=%e\n", blas::norm2(x),
+              blas::norm2(r_sloppy), blas::norm2(v), blas::norm2(p), blas::norm2(r0), blas::norm2(t));
 
       converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
@@ -372,16 +359,15 @@ namespace quda {
     // y has already been updated
     blas::copy(x, y);
 
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
+
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-
       param.iter += k;
-
       if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
+    logQuda(QUDA_VERBOSE, "BiCGstab: Reliable updates = %d\n", rUpdate);
 
     if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
       // r2 was freshly computed
@@ -389,10 +375,9 @@ namespace quda {
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
 
       PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
 } // namespace quda

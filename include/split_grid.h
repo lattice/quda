@@ -7,6 +7,7 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
+#include <reference_wrapper_helper.h>
 
 namespace quda
 {
@@ -14,7 +15,7 @@ namespace quda
   int comm_rank_from_coords(const int *coords);
 
   template <class Field>
-  void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key,
+  void inline split_field(Field &collect_field, cvector_ref<Field> &v_base_field, const CommKey &comm_key,
                           QudaPCType pc_type = QUDA_4D_PC)
   {
     CommKey comm_grid_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
@@ -47,7 +48,7 @@ namespace quda
     int n_fields = v_base_field.size();
     if (n_fields == 0) { errorQuda("split_field: input field vec has zero size."); }
 
-    const auto meta = v_base_field[0];
+    const auto &meta = v_base_field[0];
 
     // Send cycles
     for (int i = 0; i < n_replicates; i++) {
@@ -59,22 +60,21 @@ namespace quda
       int dst_rank = ::quda::comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
-      size_t bytes = meta->TotalBytes();
+      size_t bytes = meta.TotalBytes();
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
 
-      v_base_field[i % n_fields]->copy_to_buffer(v_send_buffer_h[i]);
+      v_base_field[i % n_fields].copy_to_buffer(v_send_buffer_h[i]);
 
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
       comm_start(v_mh_send[i]);
     }
 
     using param_type = typename Field::param_type;
+    param_type param(meta);
+    Field buffer_field(param);
 
-    param_type param(*meta);
-    Field *buffer_field = Field::Create(param);
-
-    CommKey field_dim = {meta->full_dim(0), meta->full_dim(1), meta->full_dim(2), meta->full_dim(3)};
+    CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
     // Receive cycles
     for (int i = 0; i < n_replicates; i++) {
@@ -86,7 +86,7 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      size_t bytes = buffer_field->TotalBytes();
+      size_t bytes = buffer_field.TotalBytes();
 
       void *recv_buffer_h = pinned_malloc(bytes);
 
@@ -95,17 +95,15 @@ namespace quda
       comm_start(mh_recv);
       comm_wait(mh_recv);
 
-      buffer_field->copy_from_buffer(recv_buffer_h);
+      buffer_field.copy_from_buffer(recv_buffer_h);
 
       comm_free(mh_recv);
       host_free(recv_buffer_h);
 
       auto offset = partition_idx * field_dim;
 
-      quda::copyFieldOffset(collect_field, *buffer_field, offset, pc_type);
+      quda::copyFieldOffset(collect_field, buffer_field, offset, pc_type);
     }
-
-    delete buffer_field;
 
     comm_barrier();
 
@@ -118,7 +116,7 @@ namespace quda
   }
 
   template <class Field>
-  void inline join_field(std::vector<Field *> &v_base_field, const Field &collect_field, const CommKey &comm_key,
+  void inline join_field(cvector_ref<Field> &v_base_field, const Field &collect_field, const CommKey &comm_key,
                          QudaPCType pc_type = QUDA_4D_PC)
   {
     CommKey comm_grid_dim = {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)};
@@ -138,12 +136,12 @@ namespace quda
     int n_fields = v_base_field.size();
     if (n_fields == 0) { errorQuda("join_field: output field vec has zero size."); }
 
-    const auto &meta = *(v_base_field[0]);
+    const auto &meta = v_base_field[0];
 
     using param_type = typename Field::param_type;
 
     param_type param(meta);
-    Field *buffer_field = Field::Create(param);
+    Field buffer_field(param);
 
     CommKey field_dim = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
 
@@ -159,10 +157,10 @@ namespace quda
       size_t bytes = meta.TotalBytes();
 
       auto offset = partition_idx * field_dim;
-      quda::copyFieldOffset(*buffer_field, collect_field, offset, pc_type);
+      quda::copyFieldOffset(buffer_field, collect_field, offset, pc_type);
 
       v_send_buffer_h[i] = pinned_malloc(bytes);
-      buffer_field->copy_to_buffer(v_send_buffer_h[i]);
+      buffer_field.copy_to_buffer(v_send_buffer_h[i]);
 
       v_mh_send[i] = comm_declare_send_rank(v_send_buffer_h[i], dst_rank, tag, bytes);
 
@@ -180,7 +178,7 @@ namespace quda
       int src_rank = comm_rank_from_coords(src_idx.data());
       int tag = src_rank * total_rank + rank;
 
-      size_t bytes = buffer_field->TotalBytes();
+      size_t bytes = buffer_field.TotalBytes();
 
       void *recv_buffer_h = pinned_malloc(bytes);
 
@@ -189,13 +187,11 @@ namespace quda
       comm_start(mh_recv);
       comm_wait(mh_recv);
 
-      v_base_field[i % n_fields]->copy_from_buffer(recv_buffer_h);
+      v_base_field[i % n_fields].copy_from_buffer(recv_buffer_h);
 
       comm_free(mh_recv);
       host_free(recv_buffer_h);
     }
-
-    delete buffer_field;
 
     comm_barrier();
 

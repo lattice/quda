@@ -96,7 +96,7 @@ namespace quda {
        by the autotuner.  This defaults to twice the number of
        processors on the GPU, since it's unlikely a large grid size
        will help (if a kernels needs more parallelism, the autotuner
-       will find this through increased block size.
+       will find this through increased block size).
      */
     virtual unsigned int maxGridSize() const { return 2 * device::processor_count(); }
 

@@ -52,7 +52,7 @@ namespace quda {
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    static constexpr unsigned int max_n_src = 64;
+    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
     F out[max_n_src];
     F inA[max_n_src];

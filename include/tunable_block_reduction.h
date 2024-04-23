@@ -12,7 +12,7 @@ namespace quda
      @brief This derived tunable class is for block reduction kernels,
      and partners the BlockReduction2D kernel.  Each reduction block
      is mapped to x grid, with each block mapping to a thread block.
-     Each thread block is potentially two dimensional, with the y
+     Each thread block is potentially two dimensional, with the z
      dimension can be mapped to vector of computations, similar to
      TunableKernel2D.  Due to the exact mapping of reduction block to
      the thread blocks, no block-size tuning is performed in the x

@@ -6,6 +6,7 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <gauge_field.h>
+#include <instantiate.h>
 #include "misc.h"
 #include "gauge_force_reference.h"
 #include <gauge_path_quda.h>
@@ -81,14 +82,19 @@ static double force_deviation;
 static double loop_deviation;
 static double plaq_deviation;
 
+using force_test_t = ::testing::tuple<QudaPrecision, bool>;
+
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
-void gauge_force_test(bool compute_force = true)
+void gauge_force_test(force_test_t test_param)
 {
   int max_length = 6;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
+
+  gauge_param.cuda_prec = ::testing::get<0>(test_param);
+  bool compute_force = ::testing::get<1>(test_param);
 
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
@@ -234,15 +240,26 @@ void gauge_force_test(bool compute_force = true)
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
     host_free(input_path_buf[dir]);
   }
+
+  if (compute_force) {
+    ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree";
+    ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
+  } else {
+    // path check
+    ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree";
+  }
 }
 
-void gauge_loop_test()
+using loop_test_t = ::testing::tuple<QudaPrecision>;
+
+void gauge_loop_test(loop_test_t loop_param)
 {
   int max_length = 6;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
+  gauge_param.cuda_prec = ::testing::get<0>(loop_param);
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
 
@@ -368,27 +385,52 @@ void gauge_loop_test()
 
   for (int i = 0; i < num_paths; i++) delete[] trace_path_p[i];
   delete[] trace_path_p;
-}
 
-TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }
-
-TEST(action, verify)
-{
-  ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
-}
-
-TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree"; }
-
-TEST(loop_traces, verify)
-{
   ASSERT_LE(loop_deviation, getTolerance(cuda_prec)) << "CPU and QUDA loop trace implementations do not agree";
-}
-
-TEST(plaquette, verify)
-{
   ASSERT_LE(plaq_deviation, getTolerance(cuda_prec))
     << "Plaquette from QUDA loop trace and QUDA dedicated plaquette function do not agree";
 }
+
+struct GaugePathTest : public ::testing::TestWithParam<force_test_t>
+{
+  force_test_t param;
+  GaugePathTest() : param(GetParam()) { }
+};
+
+TEST_P(GaugePathTest, verify)
+{
+  QudaPrecision prec= ::testing::get<0>(param);
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+  gauge_force_test(param);
+}
+
+struct GaugeLoopTest : public ::testing::TestWithParam<loop_test_t>
+{
+  loop_test_t param;
+  GaugeLoopTest() : param(GetParam()) { }
+};
+
+TEST_P(GaugeLoopTest, verify)
+{
+  QudaPrecision prec= ::testing::get<0>(param);
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+  gauge_loop_test(param);
+}
+
+using ::testing::Combine;
+using ::testing::Values;
+
+INSTANTIATE_TEST_SUITE_P(GaugePathTest, GaugePathTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION),
+                                 Values(true, false)),
+                         [](testing::TestParamInfo<force_test_t> param) {
+                           return std::string(get_prec_str(testing::get<0>(param.param))) +
+                             "_" + (::testing::get<1>(param.param) ? "force" : "path"); });
+
+INSTANTIATE_TEST_SUITE_P(GaugeLoopTest, GaugeLoopTest,
+                         Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)),
+                         [](testing::TestParamInfo<loop_test_t> param)
+                         { return std::string(get_prec_str(testing::get<0>(param.param))); });
 
 static void display_test_info()
 {
@@ -414,6 +456,7 @@ int main(int argc, char **argv)
   CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
                                                             {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -421,27 +464,23 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
   initQuda(device_ordinal);
 
   setVerbosity(verbosity);
 
   display_test_info();
 
-  gauge_force_test();
-
-  // The same test is also used for gauge path (compute_force=false)
-  gauge_force_test(false);
-
-  gauge_loop_test();
-
-  if (verify_results) {
+  if (enable_testing) {
     // Ensure gtest prints only from rank 0
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
     test_rc = RUN_ALL_TESTS();
     if (test_rc != 0) warningQuda("Tests failed");
+  } else {
+    gauge_force_test({prec, true});
+    gauge_force_test({prec, false});
+    gauge_loop_test({prec});
   }
 
   endQuda();

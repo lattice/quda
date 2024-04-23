@@ -150,11 +150,11 @@ option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_D
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
+option(QUDA_DIRAC_LAPLACE "build laplace operator" ${QUDA_DIRAC_DEFAULT})
 
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 
-option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
@@ -165,7 +165,7 @@ option(QUDA_MPI "build the MPI multi-GPU code" OFF)
 
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
-option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
+option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not available for NG)" OFF)
 
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
@@ -216,6 +216,9 @@ set(QUDA_MAX_MULTI_BLAS_N
 if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
   message(SEND_ERROR "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
+
+# Set the maximum multi-RHS per kernel
+set(QUDA_MAX_MULTI_RHS "32" CACHE STRING "maximum number of simultaneous RHS in a kernel")
 
 set(QUDA_PRECISION
   "14"
@@ -275,6 +278,7 @@ mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
+mark_as_advanced(QUDA_MAX_MULTI_RHS)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
@@ -352,7 +356,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
     "-g -fno-inline \"-fsanitize=address,undefined\""
-    CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
+    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 enable_language(CXX)
 

@@ -67,8 +67,7 @@ namespace quda {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
       }
-      Link delta;
-      setZero(&delta);
+      Link delta = {};
       //load upward links
 #pragma unroll
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {

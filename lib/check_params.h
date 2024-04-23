@@ -368,6 +368,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
+  P(covdev_mu, INVALID_INT);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
@@ -389,6 +390,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   }
   if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { P(tm_rho, INVALID_DOUBLE); }
   if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { P(epsilon, INVALID_DOUBLE); }
+  if (param->dslash_type == QUDA_COVDEV_DSLASH) { P(covdev_mu, INVALID_INT); }
 #endif
 
   P(tol, INVALID_DOUBLE);
@@ -729,6 +731,37 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #ifdef INIT_PARAM
   return ret;
+#endif
+
+#ifdef CHECK_PARAM
+  // additional sanity checks here
+  bool pc_solution
+    = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE)
+    || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  if (pc_solution && !pc_solve) { errorQuda("Preconditioned (PC) solution_type requires a PC solve_type"); }
+
+  if (!mat_solution && !pc_solution && pc_solve) {
+    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
+  }
+
+  if (!mat_solution && norm_error_solve) { errorQuda("Normal-error solve requires Mat solution"); }
+
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
+    errorQuda("Multigrid preconditioning only supported for direct solves");
+  }
+
+  if (param->chrono_use_resident && (norm_error_solve)) {
+    errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
+  }
+
+  if (param->chrono_make_resident && param->chrono_max_dim < 1) {
+    errorQuda("Cannot chrono_make_resident with chrono_max_dim %i", param->chrono_max_dim);
+  }
 #endif
 }
 
@@ -1100,12 +1133,24 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, 0.0);
   P(rho, 0.0);
   P(epsilon, 0.0);
+  P(restart, QUDA_BOOLEAN_FALSE);
+  P(t0, 0.0);
+  P(alpha1, 0.0);
+  P(alpha2, 0.0);
+  P(alpha3, 0.0);
+  P(dir_ignore, -1);
 #else
   P(n_steps, (unsigned int)INVALID_INT);
   P(meas_interval, (unsigned int)INVALID_INT);
   P(alpha, INVALID_DOUBLE);
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(restart, QUDA_BOOLEAN_INVALID);
+  P(t0, INVALID_DOUBLE);
+  P(alpha1, INVALID_DOUBLE);
+  P(alpha2, INVALID_DOUBLE);
+  P(alpha3, INVALID_DOUBLE);
+  P(dir_ignore, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

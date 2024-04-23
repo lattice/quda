@@ -20,43 +20,42 @@
 namespace quda {
 
   CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
-         SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
-    yp(nullptr),
-    rp(nullptr),
-    rnewp(nullptr),
-    pp(nullptr),
-    App(nullptr),
-    tmpp(nullptr),
-    rSloppyp(nullptr),
-    xSloppyp(nullptr)
+         SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param)
   {
   }
 
-  CG::~CG()
-  {
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
-    if ( init ) {
-      if (rp) delete rp;
-      if (pp) delete pp;
-      if (yp) delete yp;
-      if (App) delete App;
-      if (param.precision != param.precision_sloppy) {
-        if (rSloppyp) delete rSloppyp;
-        if (xSloppyp) delete xSloppyp;
-      }
-      if (tmpp) delete tmpp;
-      if (rnewp) delete rnewp;
-      init = false;
+  CG::~CG() { destroyDeflationSpace(); }
 
-      destroyDeflationSpace();
+  void CG::create(ColorSpinorField &x, const ColorSpinorField &b)
+  {
+    Solver::create(x, b);
+
+    if (!init) {
+      getProfile().TPSTART(QUDA_PROFILE_INIT);
+
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      r = ColorSpinorField(csParam);
+      y = ColorSpinorField(csParam);
+
+      // sloppy fields
+      csParam.setPrecision(param.precision_sloppy);
+      p = ColorSpinorField(csParam);
+      Ap = ColorSpinorField(csParam);
+
+      rSloppy = (r.Precision() != param.precision_sloppy) ? ColorSpinorField(csParam) : r.create_alias();
+      param.use_sloppy_partial_accumulator = false; // hard-code precise accumulation
+      xSloppy = (param.use_sloppy_partial_accumulator == true) ? ColorSpinorField(csParam) : x.create_alias();
+
+      init = true;
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
     }
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
+             const DiracMatrix &matEig, SolverParam &param) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
@@ -137,8 +136,8 @@ namespace quda {
   }
 
   CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
+             const DiracMatrix &matEig, SolverParam &param) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
@@ -211,11 +210,6 @@ namespace quda {
   {
     if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
-    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
-      errorQuda("Not supported");
-    if (checkPrecision(x, b) != param.precision)
-      errorQuda("Precision mismatch: expected=%d, received=%d", param.precision, x.Precision());
-
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
@@ -248,13 +242,13 @@ namespace quda {
     */
     bool advanced_feature = !(param.precondition_no_advanced_feature && param.is_preconditioner);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -262,34 +256,16 @@ namespace quda {
       return;
     }
 
-    if (!init) {
-      ColorSpinorParam csParam(x);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      rp = ColorSpinorField::Create(csParam);
-      yp = ColorSpinorField::Create(csParam);
-
-      // sloppy fields
-      csParam.setPrecision(param.precision_sloppy);
-      App = ColorSpinorField::Create(csParam);
-      if(param.precision != param.precision_sloppy) {
-        rSloppyp = ColorSpinorField::Create(csParam);
-        xSloppyp = ColorSpinorField::Create(csParam);
-      } else {
-        rSloppyp = rp;
-        param.use_sloppy_partial_accumulator = false;
-      }
-
-      init = true;
-    }
+    create(x, b);
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -297,12 +273,6 @@ namespace quda {
         recompute_evals = false;
       }
     }
-
-    ColorSpinorField &r = *rp;
-    ColorSpinorField &y = *yp;
-    ColorSpinorField &Ap = *App;
-    ColorSpinorField &rSloppy = *rSloppyp;
-    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
     const double u = precisionEpsilon(param.precision_sloppy);
     const double uhigh = precisionEpsilon(); // solver precision
@@ -357,8 +327,8 @@ namespace quda {
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
     }
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
@@ -367,8 +337,8 @@ namespace quda {
     double pAp;
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
     int k = 0;
@@ -433,7 +403,7 @@ namespace quda {
         x_update_batch.get_current_alpha() = r2 / pAp;
 
         // here we are deploying the alternative beta computation
-        auto cg_norm = blas::axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, rSloppy);
+        double2 cg_norm = blas::axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, rSloppy);
         r2 = cg_norm.x;  // (r_new, r_new)
         sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
@@ -540,15 +510,15 @@ namespace quda {
     blas::xpy(y, x);
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
       param.iter += k;
 
       if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CG: Reliable updates = %d\n", ru.rUpdate);
+    logQuda(QUDA_VERBOSE, "CG: Reliable updates = %d\n", ru.rUpdate);
 
     if (advanced_feature && param.compute_true_res) {
       // compute the true residuals
@@ -559,15 +529,20 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, 0.0);
 
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     if (param.is_preconditioner) commGlobalReductionPop();
+  }
+
+  ColorSpinorField &CG::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    return r;
   }
 
   // Separate HQ residual codepath
   void CG::hqsolve(ColorSpinorField &x, ColorSpinorField &b)
   {
-
     logQuda(QUDA_VERBOSE, "Performing a HQ CG solve\n");
 
     // Verbose errors: HQ solves won't support deflation, pipelining
@@ -580,7 +555,7 @@ namespace quda {
               "HQ solves don't support alternative reliable updates, reverting to traditional reliable updates\n");
     if (param.pipeline) logQuda(QUDA_SUMMARIZE, "HQ solves don't support pipelining, disabling...");
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     double b2 = blas::norm2(b);
 
@@ -591,7 +566,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -599,36 +574,7 @@ namespace quda {
       return;
     }
 
-    if (!init) {
-      ColorSpinorParam csParam(x);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      rp = ColorSpinorField::Create(csParam);
-      yp = ColorSpinorField::Create(csParam);
-
-      // sloppy fields
-      csParam.setPrecision(param.precision_sloppy);
-      pp = ColorSpinorField::Create(csParam);
-      App = ColorSpinorField::Create(csParam);
-      if (param.precision != param.precision_sloppy) {
-        rSloppyp = ColorSpinorField::Create(csParam);
-        xSloppyp = ColorSpinorField::Create(csParam);
-      } else {
-        rSloppyp = rp;
-        param.use_sloppy_partial_accumulator = false;
-      }
-
-      // temporary fields
-      tmpp = ColorSpinorField::Create(csParam);
-      init = true;
-    }
-
-    ColorSpinorField &r = *rp;
-    ColorSpinorField &y = *yp;
-    ColorSpinorField &p = *pp;
-    ColorSpinorField &Ap = *App;
-    ColorSpinorField &tmp = *tmpp;
-    ColorSpinorField &rSloppy = *rSloppyp;
-    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+    create(x, b);
 
     // for detecting HQ residual stalls
     // let |r2/b2| drop to epsilon tolerance * 1e-30, semi-arbitrarily, but
@@ -660,8 +606,8 @@ namespace quda {
 
     double r2_old = 0.0;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
@@ -678,8 +624,8 @@ namespace quda {
     bool L2breakdown = !L2_required;
     const double L2breakdown_eps = 100. * uhigh;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
 
@@ -745,7 +691,7 @@ namespace quda {
       alpha = r2 / pAp;
 
       // here we are deploying the alternative beta computation
-      auto cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
+      double2 cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
       r2 = cg_norm.x;                            // (r_new, r_new)
       sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
       rNorm = sqrt(r2);
@@ -802,12 +748,11 @@ namespace quda {
         blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
         if (k % param.heavy_quark_check == 0) {
-          if (&x != &xSloppy) {
-            blas::copy(tmp, y);
-            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
-          } else {
+          if (xSloppy.Precision() != rSloppy.Precision()) {
             blas::copy(r, rSloppy);
-            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, y, r).z);
+          } else {
+            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, y, rSloppy).z);
           }
         }
 
@@ -972,14 +917,14 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.iter += k;
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CG: Reliable updates = %d\n", rUpdate);
+    logQuda(QUDA_VERBOSE, "CG: Reliable updates = %d\n", rUpdate);
 
     if (param.compute_true_res) {
       // compute the true residuals
@@ -990,7 +935,7 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
@@ -1005,9 +950,7 @@ namespace quda {
 
   void CG::blocksolve(ColorSpinorField &x, ColorSpinorField &b)
   {
-    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     using Eigen::MatrixXcd;
 
@@ -1019,7 +962,7 @@ namespace quda {
       b2[i] = blas::norm2(b.Component(i));
       b2avg += b2[i];
       if (b2[i] == 0) {
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
         errorQuda("Warning: inverting on zero-field source - undefined for block solver\n");
         x = b;
         param.true_res = 0.0;
@@ -1030,44 +973,7 @@ namespace quda {
 
     b2avg = b2avg / param.num_src;
 
-    ColorSpinorParam csParam(x);
-    if (!init) {
-      csParam.setPrecision(param.precision);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      rp = ColorSpinorField::Create(csParam);
-      yp = ColorSpinorField::Create(csParam);
-
-      // sloppy fields
-      csParam.setPrecision(param.precision_sloppy);
-      pp = ColorSpinorField::Create(csParam);
-      App = ColorSpinorField::Create(csParam);
-      if (param.precision != param.precision_sloppy) {
-        rSloppyp = ColorSpinorField::Create(csParam);
-        xSloppyp = ColorSpinorField::Create(csParam);
-      } else {
-        rSloppyp = rp;
-        param.use_sloppy_partial_accumulator = false;
-      }
-
-      // temporary fields
-      tmpp = ColorSpinorField::Create(csParam);
-
-      init = true;
-    }
-
-    if (!rnewp) {
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-      // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
-    }
-
-    ColorSpinorField &r = *rp;
-    ColorSpinorField &y = *yp;
-    ColorSpinorField &p = *pp;
-    ColorSpinorField &Ap = *App;
-    ColorSpinorField &rnew = *rnewp;
-    ColorSpinorField &rSloppy = *rSloppyp;
-    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+    create(x, b);
 
     // calculate residuals for all vectors
     // and initialize r2 matrix
@@ -1100,8 +1006,8 @@ namespace quda {
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     if (use_heavy_quark_res) errorQuda("ERROR: heavy quark residual not supported in block solver");
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop[QUDA_MAX_MULTI_SHIFT];
 
@@ -1139,8 +1045,8 @@ namespace quda {
     nt steps_since_reliable = 1;
     */
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
 
@@ -1168,7 +1074,7 @@ namespace quda {
       blas::zero(p.Component(i));
       for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = Linv(i, j); }
     }
-    blas::caxpy(AC, r, p);
+    //blas::legacy::caxpy(AC, r, p);
 
     // set rsloppy to to QR decompoistion of r (p)
     for (int i = 0; i < param.num_src; i++) { blas::copy(rSloppy.Component(i), p.Component(i)); }
@@ -1202,7 +1108,7 @@ namespace quda {
       for (int i = 0; i < param.num_src; i++) {
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = alpha(i, j); }
       }
-      blas::caxpy(AC, p, xSloppy);
+      //blas::legacy::caxpy(AC, p, xSloppy);
 
       // update rSloppy
       beta = pAp.inverse();
@@ -1210,7 +1116,7 @@ namespace quda {
       for (int i = 0; i < param.num_src; i++) {
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = -beta(i, j); }
       }
-      blas::caxpy(AC, Ap, rSloppy);
+      //blas::legacy::caxpy(AC, Ap, rSloppy);
 
       // orthorgonalize R
       // copy rSloppy to rnew as temporary
@@ -1230,7 +1136,7 @@ namespace quda {
         blas::zero(rSloppy.Component(i));
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = Linv(i, j); }
       }
-      blas::caxpy(AC, rnew, rSloppy);
+      //blas::legacy::caxpy(AC, rnew, rSloppy);
 
 #ifdef MWVERBOSE
       for (int i = 0; i < param.num_src; i++) {
@@ -1250,7 +1156,7 @@ namespace quda {
       for (int i = 0; i < param.num_src; i++) {
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = std::conj(S(j, i)); }
       }
-      blas::caxpy(AC, p, rnew);
+      //blas::legacy::caxpy(AC, p, rnew);
       // set p = rnew
       for (int i = 0; i < param.num_src; i++) { blas::copy(p.Component(i), rnew.Component(i)); }
 
@@ -1285,15 +1191,14 @@ namespace quda {
 
     for (int i = 0; i < param.num_src; i++) { blas::xpy(y.Component(i), xSloppy.Component(i)); }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.iter += k;
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    // if (getVerbosity() >= QUDA_VERBOSE)
-    // printfQuda("CG: Reliable updates = %d\n", rUpdate);
+    // logQuda(QUDA_VERBOSE, "CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
     for (int i = 0; i < param.num_src; i++) {
@@ -1306,11 +1211,11 @@ namespace quda {
       PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i], 0.0);
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
 
     delete[] AC;
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }
@@ -1330,10 +1235,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   printfQuda("BCQ Solver\n");
   #endif
   const bool use_block = true;
-  if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
-  errorQuda("Not supported");
 
-  profile.TPSTART(QUDA_PROFILE_INIT);
+  getProfile().TPSTART(QUDA_PROFILE_INIT);
 
   using Eigen::MatrixXcd;
   MatrixXcd mPAP(param.num_src,param.num_src);
@@ -1349,7 +1252,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     b2[i]=blas::norm2(b.Component(i));
     b2avg += b2[i];
     if(b2[i] == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
       errorQuda("Warning: inverting on zero-field source\n");
       x=b;
       param.true_res = 0.0;
@@ -1369,44 +1272,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   std::cout << "b2m\n" <<  b2m << std::endl;
   #endif
 
-  ColorSpinorParam csParam(x);
-  if (!init) {
-    csParam.setPrecision(param.precision);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    rp = ColorSpinorField::Create(csParam);
-    yp = ColorSpinorField::Create(csParam);
-
-    // sloppy fields
-    csParam.setPrecision(param.precision_sloppy);
-    pp = ColorSpinorField::Create(csParam);
-    App = ColorSpinorField::Create(csParam);
-    if(param.precision != param.precision_sloppy) {
-      rSloppyp = ColorSpinorField::Create(csParam);
-      xSloppyp = ColorSpinorField::Create(csParam);
-    } else {
-      rSloppyp = rp;
-      param.use_sloppy_partial_accumulator = false;
-    }
-
-    // temporary fields
-    tmpp = ColorSpinorField::Create(csParam);
-    init = true;
-  }
-
-  if(!rnewp) {
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
-    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
-  }
-
-  ColorSpinorField &r = *rp;
-  ColorSpinorField &y = *yp;
-  ColorSpinorField &p = *pp;
-  ColorSpinorField &pnew = *rnewp;
-  ColorSpinorField &Ap = *App;
-  ColorSpinorField &tmp = *tmpp;
-  ColorSpinorField &rSloppy = *rSloppyp;
-  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+  create(x, b);
 
   //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 
@@ -1443,8 +1309,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
   bool heavy_quark_restart = false;
 
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-  profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+  getProfile().TPSTOP(QUDA_PROFILE_INIT);
+  getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
   MatrixXcd r2_old(param.num_src, param.num_src);
   double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
@@ -1500,8 +1366,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // only used if we use the heavy_quark_res
   bool L2breakdown = false;
 
-  profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profile.TPSTART(QUDA_PROFILE_COMPUTE);
+  getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
   int k = 0;
 
@@ -1844,8 +1710,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::xpy(y.Component(i), x.Component(i));
   }
 
-  profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+  getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
 
   param.iter += k;
 
@@ -1866,10 +1732,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
 
-  profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profile.TPSTART(QUDA_PROFILE_FREE);
+  getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
+  getProfile().TPSTART(QUDA_PROFILE_FREE);
 
-  profile.TPSTOP(QUDA_PROFILE_FREE);
+  getProfile().TPSTOP(QUDA_PROFILE_FREE);
 
   return;
 

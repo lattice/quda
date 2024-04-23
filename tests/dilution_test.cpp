@@ -9,20 +9,22 @@
 #include <misc.h>
 #include <dslash_reference.h>
 
-using test_t = ::testing::tuple<QudaSiteSubset, QudaDilutionType, int>;
+using test_t = ::testing::tuple<QudaPrecision, QudaSiteSubset, QudaDilutionType, int>;
 
 class DilutionTest : public ::testing::TestWithParam<test_t>
 {
 protected:
+  QudaPrecision precision;
   QudaSiteSubset site_subset;
   QudaDilutionType dilution_type;
   int nSpin;
 
 public:
   DilutionTest() :
-    site_subset(::testing::get<0>(GetParam())),
-    dilution_type(testing::get<1>(GetParam())),
-    nSpin(testing::get<2>(GetParam()))
+    precision(::testing::get<0>(GetParam())),
+    site_subset(::testing::get<1>(GetParam())),
+    dilution_type(testing::get<2>(GetParam())),
+    nSpin(testing::get<3>(GetParam()))
   {
   }
 };
@@ -31,7 +33,7 @@ TEST_P(DilutionTest, verify)
 {
   using namespace quda;
 
-  if (!is_enabled_spin(nSpin)) GTEST_SKIP();
+  if (!is_enabled_spin(nSpin) || !is_enabled(precision)) GTEST_SKIP();
 
   // Set some parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -44,7 +46,7 @@ TEST_P(DilutionTest, verify)
   param.siteSubset = site_subset;
   if (site_subset == QUDA_PARITY_SITE_SUBSET) param.x[0] /= 2;
   param.nSpin = nSpin;
-  param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true); // change order to native order
+  param.setPrecision(precision, precision, true); // change order to native order
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField src(param);
@@ -81,7 +83,7 @@ TEST_P(DilutionTest, verify)
 
     param.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField sum(param);
-    blas::axpy(std::vector<double>(v.size(), 1.0), v, sum); // reassemble the vector
+    blas::block::axpy(std::vector<double>(v.size(), 1.0), v, sum); // reassemble the vector
 
     { // check its norm matches the original
       auto src2 = blas::norm2(src);
@@ -97,57 +99,58 @@ TEST_P(DilutionTest, verify)
 }
 
 using ::testing::Combine;
+using ::testing::get;
 using ::testing::Values;
 
+auto test_str = [](testing::TestParamInfo<test_t> param) {
+  return std::string(get_prec_str(get<0>(param.param))) + "_" + get_dilution_type_str(get<2>(param.param));
+};
+
+auto precisions = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION);
+
 INSTANTIATE_TEST_SUITE_P(WilsonFull, DilutionTest,
-                         Combine(Values(QUDA_FULL_SITE_SUBSET),
+                         Combine(precisions, Values(QUDA_FULL_SITE_SUBSET),
                                  Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR,
                                         QUDA_DILUTION_SPIN_COLOR_EVEN_ODD, QUDA_DILUTION_BLOCK),
                                  Values(4)),
-                         [](testing::TestParamInfo<test_t> param) {
-                           return get_dilution_type_str(::testing::get<1>(param.param));
-                         });
+                         test_str);
 
 INSTANTIATE_TEST_SUITE_P(
   WilsonParity, DilutionTest,
-  Combine(Values(QUDA_PARITY_SITE_SUBSET),
+  Combine(precisions, Values(QUDA_PARITY_SITE_SUBSET),
           Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_BLOCK), Values(4)),
-  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+  test_str);
 
-INSTANTIATE_TEST_SUITE_P(
-  CoarseFull, DilutionTest,
-  Combine(Values(QUDA_FULL_SITE_SUBSET),
-          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
-          Values(2)),
-  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+INSTANTIATE_TEST_SUITE_P(CoarseFull, DilutionTest,
+                         Combine(precisions, Values(QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR,
+                                        QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
+                                 Values(2)),
+                         test_str);
 
 INSTANTIATE_TEST_SUITE_P(CoarseParity, DilutionTest,
-                         Combine(Values(QUDA_PARITY_SITE_SUBSET),
+                         Combine(precisions, Values(QUDA_PARITY_SITE_SUBSET),
                                  Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR), Values(2)),
-                         [](testing::TestParamInfo<test_t> param) {
-                           return get_dilution_type_str(::testing::get<1>(param.param));
-                         });
+                         test_str);
 
-INSTANTIATE_TEST_SUITE_P(
-  StaggeredFull, DilutionTest,
-  Combine(Values(QUDA_FULL_SITE_SUBSET),
-          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
-          Values(1)),
-  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+INSTANTIATE_TEST_SUITE_P(StaggeredFull, DilutionTest,
+                         Combine(precisions, Values(QUDA_FULL_SITE_SUBSET),
+                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR,
+                                        QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
+                                 Values(1)),
+                         test_str);
 
 INSTANTIATE_TEST_SUITE_P(StaggeredParity, DilutionTest,
-                         Combine(Values(QUDA_PARITY_SITE_SUBSET),
+                         Combine(precisions, Values(QUDA_PARITY_SITE_SUBSET),
                                  Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR), Values(1)),
-                         [](testing::TestParamInfo<test_t> param) {
-                           return get_dilution_type_str(::testing::get<1>(param.param));
-                         });
+                         test_str);
 
 struct dilution_test : quda_test {
   void display_info() const override
   {
     quda_test::display_info();
-    printfQuda("prec    S_dimension T_dimension Ls_dimension\n");
-    printfQuda("%6s   %3d/%3d/%3d     %3d         %2d\n", get_prec_str(prec), xdim, ydim, zdim, tdim, Lsdim);
+    printfQuda("S_dimension T_dimension Ls_dimension\n");
+    printfQuda("%3d/%3d/%3d     %3d         %2d\n", xdim, ydim, zdim, tdim, Lsdim);
   }
 
   dilution_test(int argc, char **argv) : quda_test("Dilution Test", argc, argv) { }

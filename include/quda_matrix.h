@@ -13,28 +13,6 @@ namespace quda {
   template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
   template<class T>
-    struct Zero
-    {
-      //static const T val;
-      __device__ __host__ inline
-        static T val();
-    };
-
-  template<>
-    __device__ __host__ inline
-    float2 Zero<float2>::val()
-    {
-      return make_float2(0.,0.);
-    }
-
-  template<>
-    __device__ __host__ inline
-    double2 Zero<double2>::val()
-    {
-      return make_double2(0.,0.);
-    }
-
-  template<class T>
     struct Identity
     {
       __device__  __host__ inline
@@ -677,15 +655,6 @@ namespace quda {
       }
     }
 
-    template <class T, int N> __device__ __host__ inline void setZero(Matrix<T, N> *m)
-    {
-#pragma unroll
-      for (int i = 0; i < N; ++i) {
-#pragma unroll
-        for (int j = 0; j < N; ++j) { (*m)(i, j) = {}; }
-      }
-    }
-
   template<typename Complex,int N>
     __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {
     typedef typename Complex::value_type real;
@@ -987,8 +956,7 @@ namespace quda {
       }
 
       //[19] Construct exp{iQ}
-      Matrix<T, 3> exp_iQ;
-      setZero(&exp_iQ);
+      Matrix<T, 3> exp_iQ = {};
       Matrix<T,3> UnitM;
       setIdentity(&UnitM);
       // +f0*I

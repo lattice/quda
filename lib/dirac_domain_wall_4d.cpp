@@ -25,7 +25,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim, profile);
+    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim.data, profile);
   }
 
   void DiracDomainWall4D::Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -45,7 +45,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim, profile);
+    ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim.data, profile);
   }
 
   void DiracDomainWall4D::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
@@ -62,7 +62,8 @@ namespace quda {
   {
     checkFullSpinor(out, in);
 
-    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
+                      profile);
     ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
     blas::xpay(in, -kappa5, out);
   }
@@ -76,18 +77,22 @@ namespace quda {
     Mdag(out, tmp);
   }
 
-  void DiracDomainWall4D::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-      ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracDomainWall4D::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                  cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracDomainWall4D::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracDomainWall4D::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                      const QudaSolutionType) const
   {
     // do nothing
   }
@@ -132,27 +137,23 @@ namespace quda {
     double kappa2 = kappa5*kappa5;
     auto tmp = getFieldTmp(in);
 
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
     if (symmetric && !dagger) {
       // 1 - k^2 M5^-1 D4 M5^-1 D4
-      Dslash4(tmp, in, parity[0]);
+      Dslash4(tmp, in, other_parity);
       M5inv(out, tmp);
-      Dslash4(tmp, out, parity[1]);
+      Dslash4(tmp, out, this_parity);
       M5invXpay(out, tmp, in, -kappa2);
     } else if (symmetric && dagger) {
       // 1 - k^2 D4 M5^-1 D4 M5^-1
       M5inv(tmp, in);
-      Dslash4(out, tmp, parity[0]);
+      Dslash4(out, tmp, other_parity);
       M5inv(tmp, out);
-      Dslash4Xpay(out, tmp, parity[1], in, -kappa2);
+      Dslash4Xpay(out, tmp, this_parity, in, -kappa2);
     } else {
       // 1 - k D5 - k^2 D4 M5^-1 D4_oe
-      Dslash4(tmp, in, parity[0]);
+      Dslash4(tmp, in, other_parity);
       M5inv(out, tmp);
-      Dslash4Xpay(tmp, out, parity[1], in, -kappa2);
+      Dslash4Xpay(tmp, out, this_parity, in, -kappa2);
       Dslash5Xpay(out, in, tmp, -kappa5);
     }
   }
@@ -164,74 +165,50 @@ namespace quda {
     Mdag(out, tmp);
   }
 
-  void DiracDomainWall4DPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-				    ColorSpinorField &x, ColorSpinorField &b, 
-				    const QudaSolutionType solType) const
+  void DiracDomainWall4DPC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                    cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                    const QudaSolutionType solType) const
   {
-    // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
-    } else {  // we desire solution to full system
-      auto tmp = getFieldTmp(b.Even());
-
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
-        src = &(x.Odd());
-        M5inv(*src, b.Odd());
-        Dslash4Xpay(tmp, *src, QUDA_EVEN_PARITY, b.Even(), kappa5);
-        M5inv(*src, tmp);
-        sol = &(x.Even());
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-        // src = M5^-1 (b_o + k D4_oe*M5^-1 b_e)
-        src = &(x.Even());
-        M5inv(*src, b.Even());
-        Dslash4Xpay(tmp, *src, QUDA_ODD_PARITY, b.Odd(), kappa5);
-        M5inv(*src, tmp);
-        sol = &(x.Odd());
-      } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // src = b_e + k D4_eo*M5^-1 b_o
-        src = &(x.Odd());
-        M5inv(tmp, b.Odd());
-        Dslash4Xpay(*src, tmp, QUDA_EVEN_PARITY, b.Even(), kappa5);
-        sol = &(x.Even());
-      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // src = b_o + k D4_oe*M5^-1 b_e
-        src = &(x.Even());
-        M5inv(tmp, b.Even());
-        Dslash4Xpay(*src, tmp, QUDA_ODD_PARITY, b.Odd(), kappa5);
-        sol = &(x.Odd());
-      } else {
-        errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
+      for (auto i = 0u; i < b.size(); i++) {
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
       }
-      // here we use final solution to store parity solution and parity source
-      // b is now up for grabs if we want
+      return;
+    }
+
+    // we desire solution to full system
+    auto tmp = getFieldTmp(b[0].Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      if (symmetric) {
+        // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
+        src[i] = x[i][other_parity].create_alias();
+        M5inv(src[i], b[i][other_parity]);
+        Dslash4Xpay(tmp, src[i], this_parity, b[i][this_parity], kappa5);
+        M5inv(src[i], tmp);
+        sol[i] = x[i][this_parity].create_alias();
+      } else {
+        // src = b_e + k D4_eo*M5^-1 b_o
+        src[i] = x[i][other_parity].create_alias();
+        M5inv(tmp, b[i][other_parity]);
+        Dslash4Xpay(src[i], tmp, this_parity, b[i][this_parity], kappa5);
+        sol[i] = x[i][this_parity].create_alias();
+      }
     }
   }
 
-  void DiracDomainWall4DPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-					const QudaSolutionType solType) const
+  void DiracDomainWall4DPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                        const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }				
-
-    checkFullSpinor(x, b);
-    auto tmp = getFieldTmp(b.Even());
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-    if (matpcType == QUDA_MATPC_EVEN_EVEN ||
-	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    auto tmp = getFieldTmp(b[0].Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
       // x_o = M5^-1 (b_o + k D4_oe x_e)
-      Dslash4Xpay(tmp, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa5);
-      M5inv(x.Odd(), tmp);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD ||
-	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // x_e = M5^-1 (b_e + k D4_eo x_o)
-      Dslash4Xpay(tmp, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa5);
-      M5inv(x.Even(), tmp);
-    } else {
-      errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
+      Dslash4Xpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa5);
+      M5inv(x[i][other_parity], tmp);
     }
   }
 

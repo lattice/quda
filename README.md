@@ -48,7 +48,7 @@ using releases 10.1 through 11.4 of the CUDA toolkit.  Earlier versions
 of the CUDA toolkit will not work, and we highly recommend the use of
 11.x.  QUDA has been tested in conjunction with x86-64, IBM
 POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
-supported, with the mininum recommended versions being 7.x and 6, respectively.
+supported, with the minimum recommended versions being 7.x and 6, respectively.
 CMake 3.15 or greater to required to build QUDA.
 
 See also Known Issues below.
@@ -266,6 +266,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Steven Gottlieb (Indiana University) 
 *  Anthony Grebe (Fermilab)
 *  Kyriakos Hadjiyiannakou (Cyprus)
+*  Ben Hoerz (Intel)
 *  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Hwancheol Jeong (Indiana University)
 *  Xiangyu Jiang (ITP, Chinese Academy of Sciences)
@@ -278,6 +279,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Eloy Romero (William and Mary)
 *  Hauke Sandmeyer (Bielefeld)
 *  Mario Schröck (INFN)
+*  Aniket Sen (HISKP, University of Bonn)
 *  Guochun Shi (NCSA)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
 *  Jiqun Tu (NVIDIA)

@@ -394,7 +394,7 @@ namespace quda
           param.shared_bytes = shared_bytes;
           return true;
         } else { // we have run off the end so let's reset
-          param.block.z = 1;
+          param.block.z = std::max(1u, (n_batch + device::max_grid_size(2) - 1) / device::max_grid_size(2));
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
           return false;
         }
@@ -408,7 +408,8 @@ namespace quda
     void initTuneParam(TuneParam &param) const
     {
       TunableReduction2D::initTuneParam(param);
-      param.block = {param.block.x, param.block.y, 1};
+      param.block = {param.block.x, param.block.y,
+                     std::max(1u, (n_batch + device::max_grid_size(2) - 1) / device::max_grid_size(2))};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
       setSharedBytes(param);
     }
@@ -420,7 +421,8 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const
     {
       TunableReduction2D::defaultTuneParam(param);
-      param.block = {param.block.x, param.block.y, 1};
+      param.block = {param.block.x, param.block.y,
+                     std::max(1u, (n_batch + device::max_grid_size(2) - 1) / device::max_grid_size(2))};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
       setSharedBytes(param);
     }

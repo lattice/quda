@@ -638,6 +638,19 @@ namespace quda {
      */
     static bool are_compatible_weak(const GaugeField &a, const GaugeField &b);
 
+    /**
+     * @brief Helper function that returns the default tolerance used by SU(3) projection
+     * @return The default tolerance, which is ~10x epsilon
+     */
+    double toleranceSU3() const
+    {
+      switch (precision) {
+      case QUDA_DOUBLE_PRECISION: return 2e-15;
+      case QUDA_SINGLE_PRECISION: return 1e-6;
+      default: return 1e-6;
+      }
+    }
+
     friend struct GaugeFieldParam;
   };
 
