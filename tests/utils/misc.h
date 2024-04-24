@@ -26,6 +26,7 @@ const char *get_dag_str(QudaDagType type);
 const char *get_gauge_smear_str(QudaGaugeSmearType type);
 std::string get_dilution_type_str(QudaDilutionType type);
 const char *get_blas_type_str(QudaBLASType type);
+const char *get_TwistFlavor_str(QudaTwistFlavorType type);
 
 #define XUP 0
 #define YUP 1

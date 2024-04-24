@@ -44,24 +44,39 @@ namespace quda
 
     for (auto i = 0u; i < x.size(); i++) {
       gamma5(p[i][parity], x[i][parity]);
-
       if (dagger) dirac->Dagger(QUDA_DAG_YES);
       dirac->Dslash(x[i][other_parity], p[i][parity], other_parity);
       // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
       dirac->M(p[i][parity], p[i][parity]); // this is the odd part of Y
       if (dagger) dirac->Dagger(QUDA_DAG_NO);
 
+      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+        blas::ax(1.0 / inv_param.evmax, p[i][parity]);
+        ApplyTau(x[i][other_parity], x[i][other_parity], 1);
+        ApplyTau(p[i][parity], p[i][parity], 1);
+        Complex a(0.0, -inv_param.offset[i]);
+        blas::caxpy(a, x[i][parity], p[i][parity]);
+      }
+
       gamma5(x[i][other_parity], x[i][other_parity]);
-      if (detratio) blas::xpy(x0[i][parity], p[i][parity]);
+      if (detratio && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0[i][parity], p[i][parity]);
 
-      if (not_dagger) dirac->Dagger(QUDA_DAG_YES);
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_YES);
+      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) gamma5(p[i][parity], p[i][parity]);
       dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
-      if (not_dagger) dirac->Dagger(QUDA_DAG_NO);
-      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
-      // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
+      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_NO);
 
-      // the gamma5 application in tmLQCD is done inside deriv_Sb
-      gamma5(p[i], p[i]);
+      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
+        // up to here x.odd match X.odd in tmLQCD and p.odd=- gamma5 Y.odd of tmLQCD
+        // x.Even= X.Even.tmLQCD/kappa and p.Even=- gamma5 Y.Even.tmLQCD/kappa
+        // the gamma5 application in tmLQCD inside deriv_Sb is otimized away in here
+      } else {
+        // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
+        // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
+        // the gamma5 application in tmLQCD is done inside deriv_Sb
+        gamma5(p[i], p[i]);
+      }
     }
 
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
@@ -71,6 +86,12 @@ namespace quda
 
     // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
     // sw_spinor_eo(OO,..)  in tmLQCD
+    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      for (auto i = 0u; i < x.size(); i++) {
+        ApplyTau(p[i][parity], p[i][parity], 1);
+        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
+      }
+    }
     computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
                             epsilon);
 

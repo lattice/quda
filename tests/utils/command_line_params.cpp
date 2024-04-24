@@ -102,6 +102,7 @@ quda::mass_array<double> kappa_array = {};
 quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
+double evmax = 0.1;
 double m5 = -1.5;
 double b5 = 1.5;
 double c5 = 0.5;
@@ -520,6 +521,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
+  quda_app->add_option(
+    "--evmax", evmax, "Twisted-Mass non-degenerate of Dirac operator max eigenvector to scale the force (default 0.01)");
   quda_app->add_option("--epsilon-naik", eps_naik, "Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)");
 
   quda_app->add_option("--flavor", twist_flavor, "Set the twisted mass flavor type (singlet (default), nondeg-doublet)")

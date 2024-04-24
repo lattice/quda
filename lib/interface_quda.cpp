@@ -4941,7 +4941,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
     ColorSpinorField cpuQuarkX(cpuParam);
     x[i][parity] = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
 
-    if (detratio) {
+    if (detratio && inv_param->twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) {
       x0[i] = ColorSpinorField(qParam);
       ColorSpinorParam cpuParam0(h_x0[i], *inv_param, gParamMom.x, true, inv_param->input_location);
       ColorSpinorField cpuQuarkX0(cpuParam0);

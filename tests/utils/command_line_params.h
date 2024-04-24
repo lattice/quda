@@ -360,6 +360,7 @@ extern double kappa;
 extern quda::mass_array<double> kappa_array;
 extern double mu;
 extern double epsilon;
+extern double evmax;
 extern double m5;
 extern double b5;
 extern double c5;

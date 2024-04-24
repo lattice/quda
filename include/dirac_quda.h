@@ -1100,6 +1100,14 @@ namespace quda {
 
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
+  /**
+     @brief Applies a pauli matrices to a spinor doublet
+     @param[out] out Output field
+     @param[in] in Input field
+     @param[d] d index of the pauli matrix
+  */
+  void ApplyTau(ColorSpinorField &out, const ColorSpinorField &in, int d);
+
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
 
