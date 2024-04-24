@@ -1311,7 +1311,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   invertParam.dslash_type = saveDslash;
 
   if ((sym < 1) || (sym > 3)) {
-    printfQuda("Wrong shift. Select forward (1), backward (2) or symmetric (3).\n");
+    errorQuda("Wrong shift. Select forward (1), backward (2) or symmetric (3).\n");
   } else {
     shiftQuda(dst, src, dir, sym, &invertParam);
   }
