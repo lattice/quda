@@ -1287,40 +1287,40 @@ extern "C" {
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] param  Contains all metadata regarding host and device
    *               storage
-   * @param parity The destination parity of the field
+   * @param[in] parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
    * Apply the covariant derivative.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param dir    Direction of application
-   * @param param  Metadata for host and device storage
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] dir    Direction of application
+   * @param[in] param  Metadata for host and device storage
    */
   void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param);
 
   /**
    * Apply the covariant derivative.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param dir    Direction of application
-   * @param sym    Apply forward=2, backward=2 or symmetric=3 shift
-   * @param param  Metadata for host and device storage
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] dir    Direction of application
+   * @param[in] sym    Apply forward=2, backward=2 or symmetric=3 shift
+   * @param[in] param  Metadata for host and device storage
    */
   void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param);
 
   /**
    * Apply the spin-taste operator.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param spin   Spin gamma structure
-   * @param taste  Taste gamma structure
-   * @param param  Metadata for host and device storage
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] spin   Spin gamma structure
+   * @param[in] taste  Taste gamma structure
+   * @param[in] param  Metadata for host and device storage
    */
   void spinTasteQuda(void *h_out, void *h_in, int spin, int taste, QudaInvertParam *param);
 
