@@ -83,7 +83,6 @@ template <bool start> void inline qudamilc_called(const char *func, QudaVerbosit
     } else {
       printfQuda("QUDA_MILC_INTERFACE: %s (return) \n", func);
     }
-    fflush(stdout);
   }
 #endif
 }
