@@ -26,7 +26,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if(proj == 0) launch<Gamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, 0));
+      if(proj == 0) launch<Gamma>(tp, stream, GammaArg<Float, nColor>(out, in, d));
       else launch<ChiralProject>(tp, stream, GammaArg<Float, nColor>(out, in, d, proj));
     }
 
@@ -40,7 +40,7 @@ namespace quda {
   //out(x) = gamma_d*in
   void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
   {
-    instantiate<GammaApply>(out, in, d, 0);
+    instantiate<GammaApply>(out, in, d);
   }
 
   // Applies out(x) = 1/2 * [(1 +/- gamma5) * in] + out
