@@ -109,6 +109,10 @@ struct DslashTestWrapper {
     gauge_param.reconstruct_sloppy = link_recon;
 
     inv_param.cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec;
+    inv_param.clover_cuda_prec_precondition = cuda_prec;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec;
 
     init();
   }
