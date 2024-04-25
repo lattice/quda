@@ -365,6 +365,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(evmax, INVALID_DOUBLE);
   P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);

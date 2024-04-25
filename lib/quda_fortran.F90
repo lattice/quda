@@ -114,6 +114,7 @@ module quda_fortran
      real(8) :: mu    ! Chiral twisted mass parameter
      real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
      real(8) :: epsilon ! Flavor twisted mass parameter
+     real(8) :: evmax ! Maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace

@@ -9,7 +9,7 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel1D {
     using real = typename mapper<Float>::type;
-    template <int dim = -1> using Arg = CloverForceArg<Float, nColor, recon, dim>;
+    template <int dim = -1, bool doublet = false> using Arg = CloverForceArg<Float, nColor, recon, dim, doublet>;
     GaugeField &force;
     const GaugeField &U;
     const ColorSpinorField &inA;
@@ -18,14 +18,18 @@ namespace quda {
     const ColorSpinorField &inD;
     const int parity;
     const real coeff;
+    const bool doublet; // whether we applying the operator to a doublet
+    const int n_flavor;
     OprodKernelType kernel;
     int dir;
-    unsigned int minThreads() const override { return kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
+    unsigned int minThreads() const override
+    {
+      return (kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]) / n_flavor;
+    }
 
   public:
-    CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
-                const ColorSpinorField& inB, const ColorSpinorField& inC, const ColorSpinorField& inD,
-                int parity, double coeff) :
+    CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField &inA, const ColorSpinorField &inB,
+                const ColorSpinorField &inC, const ColorSpinorField &inD, int parity, double coeff) :
       TunableKernel1D(force),
       force(force),
       U(U),
@@ -34,8 +38,11 @@ namespace quda {
       inC(inC),
       inD(inD),
       parity(parity),
-      coeff(static_cast<real>(coeff))
+      coeff(static_cast<real>(coeff)),
+      doublet(inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      n_flavor(doublet ? 2 : 1)
     {
+      if (doublet) strcat(aux, ",doublet");
       char aux2[TuneKey::aux_n];
       strcpy(aux2, aux);
       strcat(aux, ",interior");
@@ -58,13 +65,40 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (kernel == INTERIOR) {
-        launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
+        if (doublet)
+          launch<Interior>(tp, stream, Arg<-1, true>(force, U, inA, inB, inC, inD, parity, coeff));
+        else
+          launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
       } else if (kernel == EXTERIOR) {
         switch (dir) {
-        case 0: launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff)); break;
-        case 1: launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff)); break;
-        case 2: launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff)); break;
-        case 3: launch<Exterior>(tp, stream, Arg<3>(force, U, inA, inB, inC, inD, parity, coeff)); break;
+        case 0: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<0, true>(force, U, inA, inB, inC, inD, parity, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff));
+          break;
+        }
+        case 1: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<1, true>(force, U, inA, inB, inC, inD, parity, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff));
+          break;
+        }
+        case 2: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<2, true>(force, U, inA, inB, inC, inD, parity, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff));
+          break;
+        }
+        case 3: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<3, true>(force, U, inA, inB, inC, inD, parity, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<3>(force, U, inA, inB, inC, inD, parity, coeff));
+          break;
+        }
         default: errorQuda("Unexpected direction %d", dir);
         }
       }
@@ -74,14 +108,22 @@ namespace quda {
     void postTune() override { force.restore(); }
 
     // spin trace + multiply-add (ignore spin-project)
-    long long flops() const override { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
+    long long flops() const override
+    {
+      int oprod_flops = nColor * nColor * (8 * inA.Nspin() - 2);
+      int gemm_flops = nColor * nColor * (8 * nColor - 2);
+      int mat_size = 2 * nColor * nColor;
+
+      return minThreads() * n_flavor * (2 * oprod_flops + gemm_flops + 3 * mat_size) * (kernel == INTERIOR ? 4 : 1);
+    }
 
     long long bytes() const override
     {
       if (kernel == INTERIOR) {
-	return inA.Bytes() + inC.Bytes() + 4*(inB.Bytes() + inD.Bytes()) + force.Bytes() + U.Bytes() / 2;
+        return inA.Bytes() + inC.Bytes() + 4 * (inB.Bytes() + inD.Bytes()) + force.Bytes() + U.Bytes() / 2;
       } else {
-	return minThreads() * (nColor * (4 * 2 + 2 * 2) + 2 * force.Reconstruct() + U.Reconstruct())
+        return minThreads() * n_flavor
+          * (nColor * (4 * inA.Nspin() + 2 * inA.Nspin() / 2) * 2 + 2 * force.Reconstruct() + U.Reconstruct())
           * sizeof(Float);
       }
     }
