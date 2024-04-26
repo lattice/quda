@@ -11,23 +11,25 @@ namespace quda
   // FIXME - make this multi-RHS once we have the multi-RHS framework developed
 #define MAX_NVECTOR 1
 
-  template <typename Float, int nColor_, int nvector_>
-  struct CloverSigmaOprodArg : kernel_param<> {
+  template <typename Float, int nColor_, int nvector_, bool doublet_> struct CloverSigmaOprodArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr int nvector = nvector_;
+    static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
+    static constexpr int n_flavor = doublet ? 2 : 1;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
     using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
 
     Oprod oprod;
+    const unsigned int volume_4d_cb;
     F inA[nvector];
     F inB[nvector];
     array_2d<real, nvector, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                         cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :
-      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), oprod(oprod)
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), oprod(oprod), volume_4d_cb(inA[0].VolumeCB() / 2)
     {
       for (int i = 0; i < nvector; i++) {
         this->inA[i] = inA[i];
@@ -46,10 +48,14 @@ namespace quda
 
 #pragma unroll
     for (int i = 0; i < Arg::nvector; i++) {
-      const Spinor A = arg.inA[i](x_cb, parity);
-      const Spinor B = arg.inB[i](x_cb, parity);
-      Spinor C = A.sigma(nu, mu); // multiply by sigma_mu_nu
-      result += arg.coeff[i][parity] * outerProdSpinTrace(C, B);
+#pragma unroll
+      for (int flavor = 0; flavor < Arg::n_flavor; flavor++) {
+        const int flavor_offset_idx = flavor * (arg.volume_4d_cb);
+        const Spinor A = arg.inA[i](x_cb + flavor_offset_idx, parity);
+        const Spinor B = arg.inB[i](x_cb + flavor_offset_idx, parity);
+        Spinor C = A.sigma(nu, mu); // multiply by sigma_mu_nu
+        result += arg.coeff[i][parity] * outerProdSpinTrace(C, B);
+      }
     }
 
     result -= conj(result);

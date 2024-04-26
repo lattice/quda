@@ -1430,7 +1430,7 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:hisq_stencil_test.xml)
 endif()
 
-if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_test(NAME clover_force_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
