@@ -56,8 +56,8 @@ namespace quda
       }
 
       // if we're loading inflated vectors, we need to grab the spinor size from `tmp` instead of `v0`.
-      auto spinor_X = parity_inflate ? tmp[0].X() : v0.X();
-      auto spinor_site_subset = parity_inflate ? tmp[0].SiteSubset() : v0.SiteSubset();
+      auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
+      auto spinor_site_subset = (create_tmp && parity_inflate) ? tmp[0].SiteSubset() : v0.SiteSubset();
 
       // time loading
       quda::host_timer_t host_timer;
@@ -145,8 +145,8 @@ namespace quda
       }
 
       // if we performed parity inflation, we need to grab the spinor size from `tmp` instead of `v0`.
-      auto spinor_X = parity_inflate ? tmp[0].X() : v0.X();
-      auto spinor_site_subset = parity_inflate ? tmp[0].SiteSubset() : v0.SiteSubset();
+      auto spinor_X = (create_tmp && parity_inflate) ? tmp[0].X() : v0.X();
+      auto spinor_site_subset = (create_tmp && parity_inflate) ? tmp[0].SiteSubset() : v0.SiteSubset();
 
       // time saving
       quda::host_timer_t host_timer;
