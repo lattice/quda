@@ -15,7 +15,7 @@ namespace quda {
   class LongLink : public TunableKernel3D {
     LinkArg<Float, nColor, recon> arg;
     unsigned int minThreads() const { return arg.threads.x; }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
+    //unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     LongLink(const GaugeField &u, GaugeField &lng, double coeff) :
