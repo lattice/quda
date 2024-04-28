@@ -59,10 +59,10 @@ namespace quda
   template <typename Arg> struct computeStapleOpsWF {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using WilsonOps = computeStapleOps;
+    using WilsonOps = computeStapleOps;  // Ops for case of QUDA_GAUGE_SMEAR_WILSON_FLOW
     using StapOp = ThreadLocalCache<Link, 0, computeStapleRectangleOps>; // offset by computeStapleRectangleOps
     using RectOp = ThreadLocalCache<Link, 0, StapOp>;                    // offset by StapOp
-    using SymanzikOps = combineOps<computeStapleRectangleOps, KernelOps<StapOp, RectOp>>;
+    using SymanzikOps = combineOps<computeStapleRectangleOps, KernelOps<StapOp, RectOp>>; // GAUGE_SMEAR_SYMANZIK_FLOW
     using Ops = std::conditional_t<Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, SymanzikOps, WilsonOps>;
   };
 
@@ -80,7 +80,7 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim);
     }
-    if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
+    else if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165

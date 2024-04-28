@@ -678,9 +678,9 @@ namespace quda {
     };
 
     template <typename Param> struct AllFiveAllSevenLinkOps {
-      static constexpr int cacheLen = Param::sig_positive ? 3 : 2;
+      static constexpr int cache_len = Param::sig_positive ? 3 : 2;
       using Link = Matrix<complex<typename Param::Arg::real>, Param::Arg::nColor>;
-      using Ops = KernelOps<ThreadLocalCache<Link, cacheLen>>;
+      using Ops = KernelOps<ThreadLocalCache<Link, cache_len>>;
     };
 
     template <typename Param> struct AllFiveAllSevenLink : AllFiveAllSevenLinkOps<Param>::Ops {
@@ -980,8 +980,8 @@ namespace quda {
         int parity_a = parity;
 
         // calculate p5_sig
-        constexpr int cacheLen = sig_positive ? 3 : 2;
-        ThreadLocalCache<Link, cacheLen> Matrix_cache {*this};
+        constexpr int cache_len = sig_positive ? 3 : 2;
+        ThreadLocalCache<Link, cache_len> Matrix_cache {*this};
 
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);

@@ -1,5 +1,16 @@
 #pragma once
 
+/**
+   @file kernel_ops.h
+
+   @section This file contains the target-independent structs and
+   helpers in support of the KernelOps struct, which is used to tag
+   kernels that need special resources (like shared memory) or
+   operations (like synchronization).  The target-specific parts
+   (including the full definition of the KernelOps struct) are in
+   kernel_ops_target.h.
+ */
+
 namespace quda
 {
 
@@ -59,28 +70,26 @@ namespace quda
     static constexpr dim3 dims(dim3) { return dim3(x, y, z); }
   };
 
-  /**
-     @brief Uniform helper for exposing type T, whether we are dealing
-     with an instance of T or some wrapper of T
-   */
-  template <class T, class enable = void> struct get_type {
-    using type = T;
-  };
-
   // forward declare sharedMemSize
   template <typename T, typename... Arg> static constexpr unsigned int sharedMemSize(dim3 block, const Arg &...arg);
 
   /**
-     @brief KernelOps forward declaration and KernelOps_Base type,
-     which the target specific KernelOps should inherit from.  Kernels
-     can inherit from KernelOps to tag kernels with operations that
-     may need special resources like shared memory, or have other
-     special requirements (e.g. using block sync which may require
-     special handling for some targets).  The template arguments,
-     T..., specify the types of the operations the kernel uses.
+     @brief KernelOps forward declaration.  The full definition is
+     target specific and defined in kernel_ops_target.h.  Kernels can
+     inherit from KernelOps to tag kernels with operations that may
+     need special resources like shared memory, or have other special
+     requirements (e.g. using block sync which may require special
+     handling for some targets).  The template parameters, T...,
+     specify the types of the operations the kernel uses.
    */
   template <typename... T> struct KernelOps;
-  template <typename... T> struct KernelOps_Base {
+
+  /**
+     @brief KernelOpsBase type, which the target specific KernelOps
+     should inherit from.  This contains all the target-independent
+     routines used with KernelOps.
+  */
+  template <typename... T> struct KernelOpsBase {
     using KernelOpsT = KernelOps<T...>;
     template <typename... Arg> static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg)
     {
@@ -98,8 +107,8 @@ namespace quda
   };
 
   /**
-     @brief Used to get KernelOps from a kernel type.  Checks for the
-     existence of KernelOpsT.
+     @brief getKernelOps<T> is used to get the KernelOps type from a
+     kernel type T.  Checks for the existence of KernelOpsT.
    */
   template <typename T, typename U = void> struct getKernelOpsS {
     using type = NoKernelOps;
@@ -110,21 +119,23 @@ namespace quda
   template <typename T> using getKernelOps = typename getKernelOpsS<T>::type;
 
   /**
-     @brief Checks whether a kernel type is tagged with any KernelOps.
+     @brief hasKernelOps<T> checks whether a kernel type T is tagged with any KernelOps.
    */
   template <typename T> static constexpr bool hasKernelOps = !std::is_same_v<getKernelOps<T>, NoKernelOps>;
 
   /**
-     @brief Checks if first template type matches any of the ops in
-     the second template type, which is a KernelOps template type.
+     @brief hasKernelOp<T, KernelOps<U...>> checks if first template
+     type, T, matches any of the ops (U...) in the second template
+     type, which is a KernelOps type.
    */
   template <typename T, typename U> static constexpr bool hasKernelOp = false;
   template <typename T, typename... U>
   static constexpr bool hasKernelOp<T, KernelOps<U...>> = (std::is_same_v<T, U> || ...);
 
   /**
-     @brief Function to statically check if the passed kernel functor was tagged with all the
-     operations in the template parameters.
+     @brief Function to statically check if the kernel functor passed
+     in as an argument was tagged with all the operations in the
+     template parameters (T...).
    */
   template <typename... T, typename Ops> static constexpr void checkKernelOps(const Ops &)
   {
@@ -132,7 +143,17 @@ namespace quda
   }
 
   /**
-     @brief Helper to combine two KernelOps or NoKernelOps types.
+     @brief combineOps<T,U> is a helper to combine two KernelOps or
+     NoKernelOps types.  The template arguments T and U must either
+     either be a KernelOps or NoKernleOps type.  The returned type is
+     a single KernelOps type which combines the template parameters of
+     the individual KernelOps template parameters.  Specifically
+     \verbatim
+       combineOps<KernelOps<T...>,KernelOps<U...>> -> KernelOps<T...,U...>
+       combineOps<KernelOps<T...>,NoKernelOps> -> KernelOps<T...>
+       combineOps<NoKernelOps,KernelOps<U...>> -> KernelOps<U...>
+       combineOps<NoKernelOps,NoKernelOps> -> NoKernelOps
+     \endverbatim
    */
   template <typename... T> struct combineOpsS {
   };
@@ -148,9 +169,9 @@ namespace quda
   template <typename T, typename U> using combineOps = typename combineOpsS<T, U>::type;
 
   /**
-     @brief Gets the total shared memory size needed for a set of
-     kernel operations.  If any ops types have an offset for the
-     shared memory, then the offset is included in the size.
+     @brief sharedMemSize gets the total shared memory size needed for
+     a set of kernel operations.  If any ops types have an offset for
+     the shared memory, then the offset is included in the size.
    */
   template <typename T> struct sharedMemSizeS {
     template <typename... Arg> static constexpr unsigned int size(dim3 block, const Arg &...arg)
@@ -171,5 +192,13 @@ namespace quda
   {
     return sharedMemSizeS<T>::size(block, arg...);
   }
+
+  /**
+     @brief Uniform helper for exposing type T, whether we are dealing
+     with an instance of T or some wrapper of T
+   */
+  template <class T, class enable = void> struct get_type {
+    using type = T;
+  };
 
 } // namespace quda
