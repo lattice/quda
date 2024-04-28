@@ -91,7 +91,7 @@ namespace quda {
       return t;
     }
     unsigned int minThreads() const { return threads().x; }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
+    //unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     Staple(const GaugeField &u, GaugeField &fat, GaugeField &staple, const GaugeField &mulink,
