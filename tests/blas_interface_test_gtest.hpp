@@ -71,7 +71,7 @@ TEST_P(BLASTest, verify)
   switch (test_type) {
   case QUDA_BLAS_GEMM: {
     auto deviation_gemm = gemm_test(param);
-    decltype(deviation_gemm) tol_gemm;
+    decltype(deviation_gemm) tol_gemm = 0.0; // initialize to suppress warning
     switch (data_type) {
     case QUDA_BLAS_DATATYPE_S:
     case QUDA_BLAS_DATATYPE_C: tol_gemm = 10 * std::numeric_limits<float>::epsilon(); break;
@@ -84,7 +84,7 @@ TEST_P(BLASTest, verify)
   }
   case QUDA_BLAS_LU_INV: {
     auto deviation_lu_inv = lu_inv_test(param);
-    decltype(deviation_lu_inv) tol_lu_inv;
+    decltype(deviation_lu_inv) tol_lu_inv = 0.0; // initialize to suppress warning
     // We allow a factor of 5000 (500x more than the gemm tolerance factor)
     // due to variations in algorithmic implementation, order of arithmetic
     // operations, and possible near singular eigenvalues or degeneracies.
