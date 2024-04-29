@@ -80,7 +80,13 @@ namespace quda
      need special resources like shared memory, or have other special
      requirements (e.g. using block sync which may require special
      handling for some targets).  The template parameters, T...,
-     specify the types of the operations the kernel uses.
+     specify the types of the operations the kernel uses.  The
+     operations listed are assumed to be able to share resources
+     (e.g. they could reuse the same shared memory).  If any
+     operations are used concurrently, and thus cannot share the same
+     resources, then this needs to be encoded in the operation types
+     themselves (i.e. by having one operation type use the other
+     operation type as an offset parameter).
    */
   template <typename... T> struct KernelOps;
 
@@ -170,8 +176,14 @@ namespace quda
 
   /**
      @brief sharedMemSize gets the total shared memory size needed for
-     a set of kernel operations.  If any ops types have an offset for
-     the shared memory, then the offset is included in the size.
+     a set of kernel operations.  Since operations are assumed to be
+     able to share resources, we only need to find the largest shared
+     memory block needed by any of them.  Any case where operations
+     cannot share resources should have been encoded in the
+     corresponding operation types, so that an offset for the shared
+     memory is already include into operations that need it.  The
+     shared memory size for an operation type with an offset will
+     include the offset in the returned size.
    */
   template <typename T> struct sharedMemSizeS {
     template <typename... Arg> static constexpr unsigned int size(dim3 block, const Arg &...arg)
