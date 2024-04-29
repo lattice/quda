@@ -34,11 +34,11 @@ namespace quda
 
   public:
     AcceleratedSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-      Solver(mat, matSloppy, matPrecon, matEig, param, profile), matPrecon(matPrecon), transformer(param, profile)
+                      const DiracMatrix &matEig, SolverParam &param) :
+      Solver(mat, matSloppy, matPrecon, matEig, param), matPrecon(matPrecon), transformer(param)
     {
-      base_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param, profile);
-      ref_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param, profile);
+      base_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param);
+      ref_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param);
     }
 
     /**

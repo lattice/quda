@@ -15,21 +15,21 @@ namespace quda
 {
 
   CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), lambda_init(false), basis(param.ca_basis)
+             const DiracMatrix &matEig, SolverParam &param) :
+    Solver(mat, matSloppy, matPrecon, matEig, param), lambda_init(false), basis(param.ca_basis)
   {
   }
 
   CACG::~CACG()
   {
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
-    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
+                 const DiracMatrix &matEig, SolverParam &param) :
+    CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
@@ -110,8 +110,8 @@ namespace quda
   }
 
   CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
+                 const DiracMatrix &matEig, SolverParam &param) :
+    CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
@@ -184,7 +184,7 @@ namespace quda
   {
     Solver::create(x, b);
     if (!init) {
-      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       Q_AQandg.resize(param.Nkrylov * (param.Nkrylov + 1));
       Q_AS.resize(param.Nkrylov * param.Nkrylov);
@@ -215,7 +215,7 @@ namespace quda
 
       if (!mixed()) r = S[0].create_alias(csParam);
 
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
 
       init = true;
     } // init
@@ -244,8 +244,8 @@ namespace quda
   void CACG::compute_alpha()
   {
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     const int N = Q.size();
@@ -285,8 +285,8 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
@@ -312,8 +312,8 @@ namespace quda
   void CACG::compute_beta()
   {
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     }
 
     const int N = Q.size();
@@ -350,8 +350,8 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
 
@@ -410,7 +410,7 @@ namespace quda
 
     create(x, b);
 
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
@@ -422,9 +422,9 @@ namespace quda
       constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
-        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
-        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -468,8 +468,8 @@ namespace quda
 
     if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTART(QUDA_PROFILE_INIT);
       }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r as an initial seed
@@ -480,8 +480,8 @@ namespace quda
       lambda_init = true;
 
       if (!param.is_preconditioner) {
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        getProfile().TPSTOP(QUDA_PROFILE_INIT);
+        getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
       }
     }
 
@@ -515,8 +515,8 @@ namespace quda
     int resIncreaseTotal = 0;
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     }
     int total_iter = 0;
     double r2_old = r2;
@@ -554,14 +554,14 @@ namespace quda
           // Compute the beta coefficients for updating Q, AQ
           // 1. compute matrix Q_AS = -Q^\dagger AS
           // 2. Solve Q_AQ beta = Q_AS
-          blas::reDotProduct(Q_AS, AQ, S);
+          blas::block::reDotProduct(Q_AS, AQ, S);
           compute_beta();
 
           // update direction vectors
-          blas::axpyz(beta, Q, S, Qtmp);
+          blas::block::axpyz(beta, Q, S, Qtmp);
           for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
-          blas::axpyz(beta, AQ, AS, Qtmp);
+          blas::block::axpyz(beta, AQ, AS, Qtmp);
           for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
         }
 
@@ -569,17 +569,17 @@ namespace quda
         // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
         // 2. Solve Q_AQ alpha = g
         {
-          blas::reDotProduct(Q_AQandg, Q, {AQ, S[0]});
+          blas::block::reDotProduct(Q_AQandg, Q, {AQ, S[0]});
           compute_alpha();
         }
 
         // update the solution vector
-        blas::axpy(alpha, Q, x);
+        blas::block::axpy(alpha, Q, x);
 
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
 
         // Can we fuse these? We don't need this reduce in all cases...
-        blas::axpy(alpha, AQ, S[0]);
+        blas::block::axpy(alpha, AQ, S[0]);
         // if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(S[0]);
         /*else*/ r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       } else {
@@ -591,11 +591,11 @@ namespace quda
         // We do compute the alpha coefficients: this is the same code as above
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
-        blas::reDotProduct(Q_AQandg, S, {AS, S[0]});
+        blas::block::reDotProduct(Q_AQandg, S, {AS, S[0]});
         compute_alpha();
 
         // update the solution vector
-        blas::axpy(alpha, S, x);
+        blas::block::axpy(alpha, S, x);
 
         // no need to update AS
         r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
@@ -667,7 +667,7 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       param.iter += total_iter;
     }
 

@@ -50,6 +50,8 @@ double gaussian_sigma = 0.2;
 std::string gauge_outfile;
 int Nsrc = 1;
 int Msrc = 1;
+int Nsrc_tile = 1;
+int Msrc_tile = 1;
 int niter = 100;
 int maxiter_precondition = 10;
 QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
@@ -97,6 +99,7 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double epsilon = 0.01;
+double evmax = 0.1;
 double m5 = -1.5;
 double b5 = 1.5;
 double c5 = 0.5;
@@ -288,7 +291,7 @@ bool gf_fft_autotune = false;
 int eofa_pm = 1;
 double eofa_shift = -1.2345;
 double eofa_mq1 = 1.0;
-double eofa_mq2 = 0.085;
+double eofa_mq2 = 0.85;
 double eofa_mq3 = 1.0;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
@@ -474,10 +477,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
-  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
+  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type (default wilson or asqtad as appropriate)")
     ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
+  quda_app->add_option(
+    "--evmax", evmax, "Twisted-Mass non-degenerate of Dirac operator max eigenvector to scale the force (default 0.01)");
   quda_app->add_option("--epsilon-naik", eps_naik, "Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)");
 
   quda_app->add_option("--flavor", twist_flavor, "Set the twisted mass flavor type (singlet (default), nondeg-doublet)")
@@ -502,10 +507,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(mass_normalization_map));
 
   quda_app
-    ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym)")
+    ->add_option("--matpc", matpc_type,
+                 "Matrix preconditioning type (even-even (default), odd-odd, even-even-asym, odd-odd-asym)")
     ->transform(CLI::QUDACheckedTransformer(matpc_type_map));
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
+  quda_app->add_option("--msrc-tile", Msrc_tile, "Set the Msrc tile size (where applicable)");
   quda_app->add_option("--mu", mu, "Twisted-Mass chiral twist of Dirac operator (default 0.1)");
   quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
   quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
@@ -543,6 +550,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
+  quda_app->add_option("--nsrc-tile", Nsrc_tile, "Set the Nsrc tile size (where applicable)");
 
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
@@ -601,9 +609,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
 
   quda_app
-    ->add_option(
-      "--solution-type", solution_type,
-      "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
+    ->add_option("--solution-type", solution_type,
+                 "The solution we desire (mat (default for Wilson-type), mat-dag-mat, mat-pc (default for "
+                 "staggered-type), mat-pc-dag-mat-pc (default for Wilson-type multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
   quda_app
@@ -617,8 +625,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->expected(4);
 
   quda_app
-    ->add_option("--solve-type", solve_type,
-                 "The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc)")
+    ->add_option(
+      "--solve-type",
+      solve_type, "The type of solve to do (direct, direct-pc (default for staggered-type), normop, normop-pc (default for Wilson-type), normerr, normerr-pc)")
     ->transform(CLI::QUDACheckedTransformer(solve_type_map));
   quda_app
     ->add_option("--solver-ext-lib-type", solver_ext_lib, "Set external library for the solvers  (default Eigen library)")
@@ -759,9 +768,12 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--eig-use-dagger", eig_use_dagger,
                       "Solve the Mdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
-  opgroup->add_option("--eig-use-normop", eig_use_normop,
-                      "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
-  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false)");
+  opgroup->add_option(
+    "--eig-use-normop",
+    eig_use_normop, "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false for Wilson-type, true for staggered-type)");
+  opgroup->add_option(
+    "--eig-use-pc", eig_use_pc,
+    "Solve the Even-Odd preconditioned problem (default false for Wilson-type, true for staggered-type)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 }
 

@@ -2,6 +2,8 @@ FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+RUN echo "Running CSCS CI on $(nproc) processors"
+
 RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
     build-essential \
     cmake \
@@ -34,19 +36,19 @@ RUN  QUDA_TEST_GRID_SIZE="1 1 1 2" cmake -S /quda/src \
     -DQUDA_CTEST_LAUNCH="" \
     -DQUDA_GPU_ARCH=sm_60 \
     -DQUDA_MULTIGRID=ON \
-    -DQUDA_MULTIGRID_NVEC_LIST=24 \
+    -DQUDA_MULTIGRID_NVEC_LIST=6 \
     -DQUDA_MDW_FUSED_LS_LIST=4 \
     -DQUDA_MPI=ON  \
     -DQUDA_DIRAC_DEFAULT_OFF=ON \
     -DQUDA_DIRAC_WILSON=ON \
     -DQUDA_DIRAC_CLOVER=ON \
-    -DQUDA_DIRAC_TWISTED_MASS=ON \
     -DQUDA_DIRAC_TWISTED_CLOVER=ON \
     -DQUDA_DIRAC_STAGGERED=ON \
+    -DQUDA_DIRAC_LAPLACE=ON \
     -GNinja \
     -B /quda/build 
 
-RUN cmake --build /quda/build
+RUN cmake --build /quda/build -j $(nproc)
 
 RUN cmake --install /quda/build
 

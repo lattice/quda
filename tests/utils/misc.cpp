@@ -96,23 +96,6 @@ const char *get_test_type(int t)
   return ret;
 }
 
-const char *get_staggered_test_type(int t)
-{
-  const char *ret;
-  switch (t) {
-  case 0: ret = "full"; break;
-  case 1: ret = "full_ee_prec"; break;
-  case 2: ret = "full_oo_prec"; break;
-  case 3: ret = "even"; break;
-  case 4: ret = "odd"; break;
-  case 5: ret = "mcg_even"; break;
-  case 6: ret = "mcg_odd"; break;
-  default: ret = "unknown"; break;
-  }
-
-  return ret;
-}
-
 const char *get_dslash_str(QudaDslashType type)
 {
   const char *ret;
@@ -189,6 +172,7 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   case QUDA_GAUGE_SMEAR_APE: ret = "APE"; break;
   case QUDA_GAUGE_SMEAR_STOUT: ret = "Stout"; break;
   case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over Improved"; break;
+  case QUDA_GAUGE_SMEAR_HYP: ret = "HYP"; break;
   case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson Flow"; break;
   case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik Flow"; break;
   default: ret = "unknown"; break;
@@ -387,4 +371,18 @@ const char *get_blas_type_str(QudaBLASType type)
   default: fprintf(stderr, "Error: invalid BLAS type\n"); exit(1);
   }
   return s;
+}
+
+const char *get_TwistFlavor_str(QudaTwistFlavorType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_TWIST_SINGLET: ret = "singlet_"; break;
+  case QUDA_TWIST_NONDEG_DOUBLET: ret = "ndeg_doublet_"; break;
+  case QUDA_TWIST_NO: ret = ""; break;
+  default: ret = ""; break;
+  }
+
+  return ret;
 }

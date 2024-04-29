@@ -27,7 +27,7 @@ set (QUDA_OBJS
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
@@ -36,6 +36,7 @@ set (QUDA_OBJS
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
+  evec_project.cu
   extract_gauge_ghost.cu
   gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp

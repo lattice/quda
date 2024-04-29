@@ -243,9 +243,10 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   } else {
     cs_param->nDim = 4;
   }
+  cs_param->twistFlavor = inv_param->twist_flavor;
   cs_param->pc_type = inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = isPCSolution(inv_param->solution_type);
+  bool pc = is_pc_solution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
@@ -271,13 +272,129 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.nDim = nDim;
   param.pc_type = QUDA_4D_PC;
-  param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
+  param.siteSubset = is_pc_solution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < nDim; d++) param.x[d] = x[d];
-  if (isPCSolution(sol_type)) param.x[0] /= 2;
+  if (is_pc_solution(sol_type)) param.x[0] /= 2;
   quda::ColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
+}
+
+// Helper functions
+bool is_pc_solution(QudaSolutionType type)
+{
+  switch (type) {
+  case QUDA_MATPC_SOLUTION:
+  case QUDA_MATPC_DAG_SOLUTION:
+  case QUDA_MATPCDAG_MATPC_SOLUTION:
+  case QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION: return true;
+  default: return false;
+  }
+}
+
+bool is_full_solution(QudaSolutionType type)
+{
+  switch (type) {
+  case QUDA_MAT_SOLUTION:
+  case QUDA_MATDAG_MAT_SOLUTION: return true;
+  default: return false;
+  }
+}
+
+bool is_full_solve(QudaSolveType type)
+{
+  switch (type) {
+  case QUDA_DIRECT_SOLVE:
+  case QUDA_NORMOP_SOLVE:
+  case QUDA_NORMERR_SOLVE: return true;
+  default: return false;
+  }
+}
+
+bool is_preconditioned_solve(QudaSolveType type)
+{
+  switch (type) {
+  case QUDA_DIRECT_PC_SOLVE:
+  case QUDA_NORMOP_PC_SOLVE:
+  case QUDA_NORMERR_PC_SOLVE: return true;
+  default: return false;
+  }
+}
+
+bool is_normal_solve(QudaInverterType inv_type, QudaSolveType solve_type)
+{
+  switch (solve_type) {
+  case QUDA_NORMOP_SOLVE:
+  case QUDA_NORMOP_PC_SOLVE: return true;
+  default:
+    switch (inv_type) {
+    case QUDA_CGNR_INVERTER:
+    case QUDA_CGNE_INVERTER:
+    case QUDA_CA_CGNR_INVERTER:
+    case QUDA_CA_CGNE_INVERTER: return true;
+    default: return false;
+    }
+  }
+}
+
+bool is_hermitian_solver(QudaInverterType type)
+{
+  switch (type) {
+  case QUDA_CG_INVERTER:
+  case QUDA_CA_CG_INVERTER: return true;
+  default: return false;
+  }
+}
+
+bool support_solution_accumulator_pipeline(QudaInverterType type)
+{
+  switch (type) {
+  case QUDA_CG_INVERTER:
+  case QUDA_CA_CG_INVERTER:
+  case QUDA_CGNR_INVERTER:
+  case QUDA_CGNE_INVERTER:
+  case QUDA_PCG_INVERTER: return true;
+  default: return false;
+  }
+}
+
+bool is_normal_residual(QudaInverterType type)
+{
+  switch (type) {
+  case QUDA_CGNR_INVERTER:
+  case QUDA_CG3NR_INVERTER:
+  case QUDA_CA_CGNR_INVERTER: return true;
+  default: return false;
+  }
+}
+
+bool is_staggered(QudaDslashType type)
+{
+  switch (type) {
+  case QUDA_STAGGERED_DSLASH:
+  case QUDA_ASQTAD_DSLASH: return true;
+  default: return false;
+  }
+}
+
+bool is_chiral(QudaDslashType type)
+{
+  switch (type) {
+  case QUDA_DOMAIN_WALL_DSLASH:
+  case QUDA_DOMAIN_WALL_4D_DSLASH:
+  case QUDA_MOBIUS_DWF_DSLASH:
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
+  default: return false;
+  }
+}
+
+bool is_laplace(QudaDslashType type)
+{
+  switch (type) {
+  case QUDA_LAPLACE_DSLASH: return true;
+  default: return false;
+  }
 }
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
