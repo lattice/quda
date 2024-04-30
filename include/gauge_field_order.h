@@ -1478,9 +1478,9 @@ namespace quda {
             z *= scale;
 #pragma unroll
             for (int i = 0; i < 9; i++) out[i] = cmul(z, out[i]);
-          } else { // stagic phase
+          } else { // static phase
 #pragma unroll
-            for (int i = 0; i < 18; i++) { out[i] *= phase; }
+            for (int i = 0; i < 9; i++) { out[i] *= phase; }
           }
         }
       };
