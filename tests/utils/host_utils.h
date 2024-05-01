@@ -43,7 +43,7 @@ extern QudaPrecision &cuda_prec_ritz;
 // Determine if the Laplace operator has been defined
 constexpr bool is_enabled_laplace()
 {
-#ifdef QUDA_LAPLACE
+#ifdef QUDA_DIRAC_LAPLACE
   return true;
 #else
   return false;
