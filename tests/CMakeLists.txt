@@ -213,14 +213,6 @@ if(QUDA_COVDEV)
   install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_CONTRACT)
-  add_executable(contract_test contract_test.cpp)
-  target_link_libraries(contract_test ${TEST_LIBS})
-  quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  
-endif()
-
 if(QUDA_SMEAR_GAUSS_TWOLINK)
   add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
   target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
@@ -364,12 +356,14 @@ if(QUDA_BUILD_NATIVE_LAPACK)
 endif()
 
 #Contraction test
-if(QUDA_CONTRACT)
-  add_test(NAME contract_test
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
+if(QUDA_DIRAC_STAGGERED)
+  if(QUDA_CONTRACT)
+    add_test(NAME contractFT_test
+	    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contractFT_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
-    --gtest_output=xml:contract_test.xml)
-endif()  
+    --gtest_output=xml:contractFT_test.xml)
+  endif()  
+endif()
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
