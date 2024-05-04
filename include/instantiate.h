@@ -502,4 +502,46 @@ namespace quda
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
   };
 
+  /**
+     @brief Helper function for returning if a given dslash type is enabled
+     @tparam dslash_type The dslash_type requested
+     @return True if enabled, false if not
+  */
+  template <QudaDslashType dslash_type> constexpr bool is_enabled()
+  {
+    return false;
+  }
+#ifdef GPU_WILSON_DIRAC
+  template <> constexpr bool is_enabled<QUDA_WILSON_DSLASH>() { return true; }
+#endif
+#ifdef GPU_CLOVER_DIRAC
+  template <> constexpr bool is_enabled<QUDA_CLOVER_WILSON_DSLASH>() { return true; }
+#endif
+#ifdef GPU_CLOVER_HASENBUSCH_TWIST
+  template <> constexpr bool is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>() { return true; }
+#endif
+#ifdef GPU_DOMAIN_WALL_DIRAC
+  template <> constexpr bool is_enabled<QUDA_DOMAIN_WALL_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_MOBIUS_DWF_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_MOBIUS_DWF_EOFA_DSLASH>() { return true; }
+#endif
+#ifdef GPU_STAGGERED_DIRAC
+  template <> constexpr bool is_enabled<QUDA_STAGGERED_DSLASH>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_ASQTAD_DSLASH>() { return true; }
+#endif
+#ifdef GPU_TWISTED_MASS_DIRAC
+  template <> constexpr bool is_enabled<QUDA_TWISTED_MASS_DSLASH>() { return true; }
+#endif
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+  template <> constexpr bool is_enabled<QUDA_TWISTED_CLOVER_DSLASH>() { return true; }
+#endif
+#ifdef GPU_LAPLACE
+  template <> constexpr bool is_enabled<QUDA_LAPLACE_DSLASH>() { return true; }
+#endif
+#ifdef GPU_COVDEV
+  template <> constexpr bool is_enabled<QUDA_COVDEV_DSLASH>() { return true; }
+#endif
+
+
 } // namespace quda
