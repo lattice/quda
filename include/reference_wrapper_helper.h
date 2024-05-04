@@ -323,6 +323,23 @@ namespace quda
     }
 
     template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaTwistFlavorType> TwistFlavor() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).TwistFlavor() != operator[](i).TwistFlavor())
+          errorQuda("Nspins do not match %d != %d", operator[](i - 1).TwistFlavor(), operator[](i).TwistFlavor());
+      return operator[](0).TwistFlavor();
+    }
+
+    template <class U = T> std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, int> Ndim() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Ndim() != operator[](i).Ndim())
+          errorQuda("Ndims do not match %d != %d", operator[](i - 1).Ndim(), operator[](i).Ndim());
+      return operator[](0).Ndim();
+    }
+
+    template <class U = T>
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Volume() const
     {
       for (auto i = 1u; i < vector::size(); i++)
@@ -337,6 +354,62 @@ namespace quda
       size_t bytes = 0;
       for (auto i = 0u; i < vector::size(); i++) bytes += operator[](i).Bytes();
       return bytes;
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaSiteSubset> SiteSubset() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).SiteSubset() != operator[](i).SiteSubset())
+          errorQuda("Site subsets do not match %d != %d", operator[](i - 1).SiteSubset(), operator[](i).SiteSubset());
+      return operator[](0).SiteSubset();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaPCType> PCType() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).PCType() != operator[](i).PCType())
+          errorQuda("PC types do not match %d != %d", operator[](i - 1).PCType(), operator[](i).PCType());
+      return operator[](0).PCType();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaFieldOrder> FieldOrder() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).FieldOrder() != operator[](i).FieldOrder())
+          errorQuda("Orders do not match %d != %d", operator[](i - 1).FieldOrder(), operator[](i).FieldOrder());
+      return operator[](0).FieldOrder();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, QudaFieldLocation> Location() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Location() != operator[](i).Location())
+          errorQuda("Locations do not match %d != %d", operator[](i - 1).Location(), operator[](i).Location());
+      return operator[](0).Location();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, bool> isNative() const
+    {
+      for (auto i = 0u; i < vector::size(); i++)
+        if (!operator[](i).isNative()) errorQuda("Non-native field detected %u", i);
+      return operator[](0).isNative();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, void> backup() const
+    {
+      for (auto i = 0u; i < vector::size(); i++) operator[](i).backup();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, void> restore() const
+    {
+      for (auto i = 0u; i < vector::size(); i++) operator[](i).restore();
     }
   };
 
