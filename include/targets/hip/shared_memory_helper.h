@@ -89,7 +89,7 @@ namespace quda
        @param[in] i The index to use.
        @return Reference to value stored at that index.
      */
-    __device__ __host__ inline T &operator[](const int i) const { return data[i]; }
+    __device__ __host__ T &operator[](int i) const { return data[i]; }
   };
 
 } // namespace quda

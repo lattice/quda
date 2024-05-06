@@ -32,8 +32,8 @@ namespace quda
 
     constexpr thread_array(const thread_array<T, n, O> &) = delete;
 
-    __device__ __host__ inline T &operator[](const int i) { return array_[i]; }
-    __device__ __host__ inline const T &operator[](const int i) const { return array_[i]; }
+    __device__ __host__ T &operator[](int i) { return array_[i]; }
+    __device__ __host__ const T &operator[](int i) const { return array_[i]; }
   };
 
 } // namespace quda
