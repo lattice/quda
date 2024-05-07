@@ -14,8 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariant derivative operator
   */
-  template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct StaggeredQSmearArg : DslashArg<Float, nDim> {
+  template <typename Float, int nSpin_, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct StaggeredQSmearArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = 3;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
@@ -45,7 +45,7 @@ namespace quda
 
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0,
                        bool is_t0_kernel, int parity, int dir, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, in, parity, dagger, false, 3, false, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, U, in, parity, dagger, false, 3, false, comm_override),
       out(out, 3),
       in(in, 3),
       in_pack(in, 3),

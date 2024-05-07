@@ -92,7 +92,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct NdegTwistedMassPreconditionedApply {
 
     inline NdegTwistedMassPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
         double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
@@ -100,12 +101,14 @@ namespace quda
     {
       constexpr int nDim = 4;
       if (asymmetric) {
-        NdegTwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
+        NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger,
+                                                                        comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       } else {
-        NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
+        NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger,
+                                                                         comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);

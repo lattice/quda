@@ -107,14 +107,15 @@ namespace quda
 
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverPreconditionedApply {
 
     inline WilsonCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
         const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
         TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, x, parity, dagger, comm_override);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, U, A, a, x, parity, dagger, comm_override);
       WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);

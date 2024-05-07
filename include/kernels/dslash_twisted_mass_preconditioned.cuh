@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool asymmetric_>
-  struct TwistedMassArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool asymmetric_>
+  struct TwistedMassArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
     typedef typename mapper<Float>::type real;
     static constexpr bool asymmetric = asymmetric_; /** whether we are applying the asymmetric operator or not */
     real a;          /** this is the scaling factor */
@@ -15,9 +15,9 @@ namespace quda
     real a_inv;      /** inverse scaling factor - used to allow early xpay inclusion */
     real b_inv;      /** inverse twist factor - used to allow early xpay inclusion */
 
-    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b, bool xpay,
-                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+                   bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the twist
       c(0.0),
@@ -26,8 +26,8 @@ namespace quda
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
-        DslashArg<Float, nDim>::twist_a = this->a;
-        DslashArg<Float, nDim>::twist_b = this->b;
+        DslashArg<Float, nDim, DDArg>::twist_a = this->a;
+        DslashArg<Float, nDim, DDArg>::twist_b = this->b;
       }
     }
   };

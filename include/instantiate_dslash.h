@@ -5,6 +5,7 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <instantiate.h>
+#include <domain_decomposition_helper.cuh>
 
 namespace quda
 {
@@ -16,25 +17,25 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename DDArg, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
+            int nColor, typename DDArg, typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
 #if QUDA_RECONSTRUCT & 4
-      Apply<Float, nColor, Recon::recon[0]>(out, in, U, args...);
+      Apply<Float, nColor, DDArg, Recon::recon[0]>(out, in, U, args...);
 #else
       errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
 #endif
     } else if (U.Reconstruct() == Recon::recon[1]) {
 #if QUDA_RECONSTRUCT & 2
-      Apply<Float, nColor, Recon::recon[1]>(out, in, U, args...);
+      Apply<Float, nColor, DDArg, Recon::recon[1]>(out, in, U, args...);
 #else
       errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
 #endif
     } else if (U.Reconstruct() == Recon::recon[2]) {
 #if QUDA_RECONSTRUCT & 1
-      Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
+      Apply<Float, nColor, DDArg, Recon::recon[2]>(out, in, U, args...);
 #else
       errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
 #endif
@@ -50,15 +51,15 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
+            int nColor, typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (out.dd.type == QUDA_DD_NO) {
-      instantiate<Apply, Recon, Float, 3, DDNoArg>(out, in, U, args...);
+      instantiate<Apply, Recon, Float, 3, DDNo>(out, in, U, args...);
 #ifdef GPU_DD_DIRAC
     } else if (out.dd.type == QUDA_DD_RED_BLACK) {
-      instantiate<Apply, Recon, Float, 3, DDRedBlackArg>(out, in, U, args...);
+      instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, U, args...);
 #endif
     } else {
       errorQuda("Unsupported DD type %d\n", out.dd.type);
@@ -72,7 +73,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (in.Ncolor() == 3) {
@@ -89,7 +90,8 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct,
+            typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -132,7 +134,8 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
 #if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct,
+            typename... Args>
   inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                         Args &&...args)
   {
@@ -153,7 +156,8 @@ namespace quda
     }
   }
 #else
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct,
+            typename... Args>
   inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
   {
     if (U.Precision() == QUDA_HALF_PRECISION) {

@@ -94,23 +94,25 @@ namespace quda
         return bytes;
       }
     };
-  
-  template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedCloverPreconditionedApply {
-    
-    inline NdegTwistedCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in,
-                                                const GaugeField &U, const CloverField &A,
-                                                double a, double b, double c, bool xpay,
-                                                const ColorSpinorField &x, int parity, bool dagger,
-                                                const int *comm_override, TimeProfile &profile)
-    {
-      constexpr int nDim = 4;
-      NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, c, xpay, x, parity, dagger, comm_override);
-      NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
-        
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-    }
-  };
-  
+
+    template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+    struct NdegTwistedCloverPreconditionedApply {
+
+      inline NdegTwistedCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in,
+                                                  const GaugeField &U, const CloverField &A, double a, double b,
+                                                  double c, bool xpay, const ColorSpinorField &x, int parity,
+                                                  bool dagger, const int *comm_override, TimeProfile &profile)
+      {
+        constexpr int nDim = 4;
+        NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, DDArg, recon> arg(out, in, U, A, a, b, c, xpay, x,
+                                                                                  parity, dagger, comm_override);
+        NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb,
+                                                           in.getDslashConstant().ghostFaceCB, profile);
+      }
+    };
+
 #ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
   void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in,
                                             const GaugeField &U, const CloverField &A,

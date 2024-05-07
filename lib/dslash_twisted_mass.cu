@@ -47,14 +47,14 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedMassApply {
 
     inline TwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
                             const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                             TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
+      TwistedMassArg<Float, nColor, nDim, DDArg, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
       TwistedMass<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);

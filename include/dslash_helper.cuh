@@ -422,7 +422,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
+  template <typename Float, int nDim, typename DDArg>
+  std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim, DDArg> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;

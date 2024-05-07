@@ -14,8 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct LaplaceArg : DslashArg<Float, nDim> {
+  template <typename Float, int nSpin_, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct LaplaceArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
@@ -40,7 +40,7 @@ namespace quda
 
     LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
       in_pack(in),

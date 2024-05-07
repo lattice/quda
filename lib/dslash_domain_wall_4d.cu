@@ -36,15 +36,15 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall4DApply {
 
     inline DomainWall4DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity,
                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      DomainWall4DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger,
-                                                      comm_override);
+      DomainWall4DArg<Float, nColor, nDim, DDArg, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger,
+                                                             comm_override);
       DomainWall4D<decltype(arg)> dwf(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);

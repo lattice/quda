@@ -62,14 +62,14 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedCloverApply {
 
     inline TwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                               const CloverField &C, double a, double b, const ColorSpinorField &x, int parity,
                               bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
       TwistedClover<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);

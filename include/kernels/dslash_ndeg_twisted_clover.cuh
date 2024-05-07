@@ -6,11 +6,11 @@
 
 namespace quda
 {
-  
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-    struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     typedef typename clover_mapper<Float, length, true>::type C;
     typedef typename mapper<Float>::type real;
@@ -19,23 +19,23 @@ namespace quda
     real a; /** this is the Wilson-dslash scale factor */
     real b; /** this is the chiral twist factor */
     real c; /** this is the flavor twist factor */
-    
-  NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                       const CloverField &A, double a, double b,
-                       double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+
+    NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                         double a, double b, double c, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       // if dagger flip the chiral twist
-      // factor of 1/2 comes from clover normalization 
+      // factor of 1/2 comes from clover normalization
       b(dagger ? -0.5 * b : 0.5 * b),
       c(c)
-      {
-        checkPrecision(U, A);
-        checkLocation(U, A);
-      }
+    {
+      checkPrecision(U, A);
+      checkLocation(U, A);
+    }
   };
-  
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
     struct nDegTwistedClover : dslash_default {
     

@@ -129,7 +129,7 @@ namespace quda
   template <Dslash5Type...> struct Dslash5TypeList {
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
     inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
@@ -141,7 +141,7 @@ namespace quda
       errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
 #else
       constexpr int nDim = 4;
-      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
+      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, DDArg, recon, dslash5_type_impl>;
       Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in);
 

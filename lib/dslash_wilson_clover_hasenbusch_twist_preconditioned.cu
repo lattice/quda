@@ -114,7 +114,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
 
     inline WilsonCloverHasenbuschTwistPCNoClovInvApply(ColorSpinorField &out, const ColorSpinorField &in,
                                                        const GaugeField &U, const CloverField &A, double a, double b,
@@ -122,7 +123,7 @@ namespace quda
                                                        const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, false>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, false>;
 
       ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in);
@@ -261,7 +262,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistPCClovInvApply {
 
     inline WilsonCloverHasenbuschTwistPCClovInvApply(ColorSpinorField &out, const ColorSpinorField &in,
                                                      const GaugeField &U, const CloverField &A, double kappa, double mu,
@@ -269,7 +271,7 @@ namespace quda
                                                      const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, true>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, true>;
       ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in);
 

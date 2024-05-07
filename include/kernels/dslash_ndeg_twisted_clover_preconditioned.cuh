@@ -7,10 +7,10 @@
 
 namespace quda
 {
-  
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-    struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
     
@@ -23,22 +23,20 @@ namespace quda
     real c;          /** this is the flavor twist factor */
     real b2_minus_c2;
 
-  NdegTwistedCloverPreconditionedArg(ColorSpinorField &out, const ColorSpinorField &in,
-                                     const GaugeField &U, const CloverField &A,
-                                     double a, double b, double c, bool xpay,
-                                     const ColorSpinorField &x, int parity, bool dagger,
-                                     const int *comm_override) :
-    WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+    NdegTwistedCloverPreconditionedArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                       const CloverField &A, double a, double b, double c, bool xpay,
+                                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b), // if dagger flip the chiral twist
-      c(0.5*c),
+      c(0.5 * c),
       b2_minus_c2(0.25 * (b * b - c * c))
-      {
-        checkPrecision(U, A);
-        checkLocation(U, A);
-      }
+    {
+      checkPrecision(U, A);
+      checkLocation(U, A);
+    }
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>

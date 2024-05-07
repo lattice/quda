@@ -62,27 +62,27 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverApply {
 
     inline WilsonCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
         double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
       WilsonClover<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverWithTwistApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverWithTwistApply {
 
     inline WilsonCloverWithTwistApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                       const CloverField &A, double a, double b, const ColorSpinorField &x, int parity,
                                       bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
       WilsonClover<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);

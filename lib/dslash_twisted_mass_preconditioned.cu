@@ -68,7 +68,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct TwistedMassPreconditionedApply {
 
     inline TwistedMassPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
         double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
@@ -76,12 +77,14 @@ namespace quda
     {
       constexpr int nDim = 4;
       if (asymmetric) {
-        TwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, xpay, x, parity, dagger, comm_override);
+        TwistedMassArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, U, a, b, xpay, x, parity, dagger,
+                                                                    comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);
       } else {
-        TwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, xpay, x, parity, dagger, comm_override);
+        TwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, U, a, b, xpay, x, parity, dagger,
+                                                                     comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);

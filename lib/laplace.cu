@@ -140,7 +140,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct LaplaceApply {
 
     LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
                  double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int * comm_override, TimeProfile &profile)
@@ -149,7 +149,8 @@ namespace quda
         if (in.Nspin() == 1) {
           constexpr int nDim = 4;
           constexpr int nSpin = 1;
-          LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+          LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, U, dir, a, b, x, parity, dagger,
+                                                                   comm_override);
           Laplace<decltype(arg)> laplace(arg, out, in);
 
           dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(), in.GhostFaceCB(), profile);

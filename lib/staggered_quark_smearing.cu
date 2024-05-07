@@ -181,7 +181,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct StaggeredQSmearApply {
 
     inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0,
                                 bool is_tslice_kernel, int parity, int dir, bool dagger, const int *comm_override,
@@ -193,8 +193,8 @@ namespace quda
 
         const int volume = is_tslice_kernel ? in.VolumeCB() / in.X(3) : in.VolumeCB();
 
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, t0, is_tslice_kernel, parity, dir, dagger,
-                                                                  comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, U, t0, is_tslice_kernel, parity, dir,
+                                                                         dagger, comm_override);
 
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 

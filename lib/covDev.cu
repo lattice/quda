@@ -127,14 +127,14 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct CovDevApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct CovDevApply {
 
     inline CovDevApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                        bool dagger, const int *comm_override, TimeProfile &profile)
 
     {
       constexpr int nDim = 4;
-      CovDevArg<Float, nColor, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
+      CovDevArg<Float, nColor, DDArg, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
       CovDev<decltype(arg)> covDev(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, in.VolumeCB(), in.GhostFaceCB(), profile);
