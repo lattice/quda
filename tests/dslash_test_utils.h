@@ -74,8 +74,9 @@ struct DslashTestWrapper {
   static inline void *hostCloverInv = nullptr;
 
   // Parameters
-  QudaGaugeParam gauge_param;
-  QudaInvertParam inv_param;
+  static inline QudaGaugeParam gauge_param;
+  static inline QudaInvertParam inv_param;
+  static inline bool first_time = true;
 
   // Test options
   QudaParity parity = QUDA_EVEN_PARITY;
@@ -87,7 +88,6 @@ struct DslashTestWrapper {
 
   void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
   {
-    static bool first_time = true;
     if (first_time) {
       gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
@@ -119,7 +119,6 @@ struct DslashTestWrapper {
 
   void init_test(int argc, char **argv)
   {
-    static bool first_time = true;
     if (first_time) {
       gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
