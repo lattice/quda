@@ -14,8 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the Wilson operator
    */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct WilsonArg : DslashArg<Float, nDim> {
+  template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct WilsonArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
@@ -38,7 +38,8 @@ namespace quda
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
+                                    comm_override),
       out(out),
       in(in),
       in_pack(in),
@@ -74,8 +75,7 @@ namespace quda
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       // Forward gather - compute fwd offset for vector fetch
-      constexpr if (arg.dd_in.doHopping(coord, d, +1))
-      {
+      if (arg.dd_in.doHopping(coord, d, +1)) {
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -102,8 +102,7 @@ namespace quda
       }
 
       // Backward gather - compute back offset for spinor and gauge fetch
-      constexpr if (arg.dd_in.doHopping(coord, d, -1))
-      {
+      if (arg.dd_in.doHopping(coord, d, -1)) {
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -154,8 +153,7 @@ namespace quda
       Vector out;
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
-      constexpr if (arg.dd_out.isZero(coord))
-      {
+      if (arg.dd_out.isZero(coord)) {
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
         return;
       }
@@ -163,16 +161,16 @@ namespace quda
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        constexpr if (arg.dd_x.isZero(coord)) { out = arg.a * out; }
-        else
-        {
+        if (arg.dd_x.isZero(coord)) {
+          out = arg.a * out;
+        } else {
           Vector x = arg.x(xs, my_spinor_parity);
           out = x + arg.a * out;
         }
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        constexpr if (arg.dd_x.isZero(coord)) { out = (xpay ? arg.a * out : out); }
-        else
-        {
+        if (arg.dd_x.isZero(coord)) {
+          out = (xpay ? arg.a * out : out);
+        } else {
           Vector x = arg.out(xs, my_spinor_parity);
           out = x + (xpay ? arg.a * out : out);
         }
