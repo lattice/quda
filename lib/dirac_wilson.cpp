@@ -22,7 +22,8 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilson::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracWilson::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -30,8 +31,8 @@ namespace quda {
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim.data, profile);
   }
 
-  void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &k) const
+  void DiracWilson::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);

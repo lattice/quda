@@ -211,17 +211,17 @@ namespace quda {
     /**
         @brief Check parity spinors are usable (check geometry ?)
     */
-    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+    virtual void checkParitySpinor(cvector_ref<const ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const;
 
     /**
         @brief check full spinors are compatible (check geometry ?)
     */
-    virtual void checkFullSpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+    virtual void checkFullSpinor(cvector_ref<const ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const;
 
     /**
         @brief check spinors do not alias
     */
-    void checkSpinorAlias(const ColorSpinorField &, const ColorSpinorField &) const;
+    void checkSpinorAlias(cvector_ref<const ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const;
 
     /**
        @brief Whether or not the operator has a single-parity Dslash
@@ -231,38 +231,21 @@ namespace quda {
     /**
        @brief apply 'dslash' operator for the DiracOp. This may be e.g. AD
     */
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const = 0;
-
-    /**
-       @brief apply 'dslash' operator for the DiracOp. This may be e.g. AD
-    */
     virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const QudaParity parity) const
-    {
-      for (auto i = 0u; i < in.size(); i++) Dslash(out[i], in[i], parity);
-    }
-
-    /**
-       @brief Xpay version of Dslash
-    */
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const = 0;
+                        QudaParity parity) const = 0;
 
     /**
        @brief Xpay version of Dslash
     */
     virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
-    {
-      for (auto i = 0u; i < in.size(); i++) DslashXpay(out[i], in[i], parity, x[i], k);
-    }
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const = 0;
 
     /**
        @brief Similar to the Xpay version of Dslash, but used only by the Laplace op for 
        smearing.
-    */    
-    virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double, const double, const int, const QudaParity) const
+    */
+    virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, const double, const double, const int,
+                         QudaParity) const
     {
       errorQuda("Not implemented.");
     }
@@ -320,9 +303,9 @@ namespace quda {
               stencil steps of the fermion type, this may require additional effort
               to include the terms that hop out of the boundary and then hop back.
     */
-    virtual void Dslash4(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+    virtual void Dslash4(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity) const
     {
-      errorQuda("Not implemented!\n");
+      errorQuda("Not implemented!");
     }
 
     /**
@@ -531,9 +514,12 @@ namespace quda {
     virtual ~DiracWilson();
     DiracWilson& operator=(const DiracWilson &dirac);
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
+
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -594,7 +580,7 @@ namespace quda {
 
   protected:
     CloverField *clover;
-    void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+    void checkParitySpinor(cvector_ref<const ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const;
     void initConstants();
 
   public:
@@ -604,10 +590,10 @@ namespace quda {
     DiracClover& operator=(const DiracClover &dirac);
 
     // Apply clover
-    void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    const ColorSpinorField &x, const double &k) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -677,14 +663,15 @@ namespace quda {
     // Clover is inherited from parent
 
     // Clover Inv is new
-    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
     // Dslash is redefined as A_pp^{-1} D_p\bar{p}
-    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
 
     // out = x + k A_pp^{-1} D_p\bar{p}
-    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                    const ColorSpinorField &x, const double &k) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
 
     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
     //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
@@ -788,11 +775,11 @@ namespace quda {
     // DslashXPay is inherited (for reconstructs and such)
 
     // out = (1 +/- ig5 mu A)x  + k A^{-1} D in
-    void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+    void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
                                 const ColorSpinorField &x, const double &k, const double &b) const;
 
     // out = ( 1+/- i g5 mu A) x - D in
-    void DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+    void DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
                                   const ColorSpinorField &x, const double &k, const double &b) const;
 
     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
@@ -832,7 +819,7 @@ namespace quda {
     /**
       @brief Check whether the input and output are valid 5D fields.
      */
-    virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
   public:
     DiracDomainWall(const DiracParam &param);
@@ -840,9 +827,10 @@ namespace quda {
     virtual ~DiracDomainWall();
     DiracDomainWall& operator=(const DiracDomainWall &dirac);
 
-    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                    const ColorSpinorField &x, const double &k) const;
+    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
+
+    void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                    cvector_ref<const ColorSpinorField> &x, double k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -889,11 +877,12 @@ namespace quda {
     virtual ~DiracDomainWall4D();
     DiracDomainWall4D &operator=(const DiracDomainWall4D &dirac);
 
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
+    void Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
+    void Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -917,8 +906,9 @@ namespace quda {
     virtual ~DiracDomainWall4DPC();
     DiracDomainWall4DPC &operator=(const DiracDomainWall4DPC &dirac);
 
-    void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+    void M5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, double k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -955,7 +945,7 @@ namespace quda {
         @brief Check whether the input and output are valid 5D fields. If zMobius, we require that they
         have the same 5th dimension as the one in record.
        */
-      virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
+      virtual void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     public:
       DiracMobius(const DiracParam &param);
@@ -963,16 +953,16 @@ namespace quda {
       // virtual ~DiracMobius();
       // DiracMobius& operator=(const DiracMobius &dirac);
 
-      void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-      void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in) const;
-      void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
+      void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
+      void Dslash4pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+      void Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
-      void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                       const ColorSpinorField &x, const double &k) const;
-      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                          const double &k) const;
-      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                       const double &k) const;
+      void Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                       cvector_ref<const ColorSpinorField> &x, double k) const;
+      void Dslash4preXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          cvector_ref<const ColorSpinorField> &x, double k) const;
+      void Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                       cvector_ref<const ColorSpinorField> &x, double k) const;
 
       virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
       virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -999,21 +989,25 @@ namespace quda {
     virtual ~DiracMobiusPC();
     DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
-    void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+    void M5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, double k) const;
 
-    void Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &a) const;
-    void Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &a) const;
-    void Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &a) const;
-    void Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &a) const;
-    void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
+    void Dslash4M5invM5pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const;
+    void Dslash4M5preM5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const;
+    void Dslash4M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const;
+    void Dslash4M5preXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const;
+    void Dslash4XpayM5mob(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const;
+    void Dslash4M5preXpayM5mob(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a) const;
+    void Dslash4M5invXpayM5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double a,
+                               cvector_ref<ColorSpinorField> &y) const;
 
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1052,13 +1046,14 @@ namespace quda {
       @brief Check whether the input and output are valid 5D fields, and we require that they
       have the same 5th dimension as the one in record.
      */
-    virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
   public:
     DiracMobiusEofa(const DiracParam &param);
 
-    void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
+    void m5_eofa(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void m5_eofa_xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      cvector_ref<const ColorSpinorField> &x, double a = -1.) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1079,9 +1074,9 @@ namespace quda {
   public:
     DiracMobiusEofaPC(const DiracParam &param);
 
-    void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                         double a = -1.) const;
+    void m5inv_eofa(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void m5inv_eofa_xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                         cvector_ref<const ColorSpinorField> &x, double a = -1.) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1112,12 +1107,13 @@ namespace quda {
   class DiracTwistedMass : public DiracWilson {
 
   protected:
-      mutable double mu;
-      mutable double epsilon;
-      void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType) const;
-      virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
-      virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-          const ColorSpinorField &x, const double &k) const;
+    mutable double mu;
+    mutable double epsilon;
+    void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
 
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
@@ -1176,9 +1172,10 @@ namespace quda {
 
     void TwistInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1215,9 +1212,9 @@ namespace quda {
     double epsilon;
     double tm_rho;
     CloverField *clover;
-    void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
-    void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType,
-                            const int parity) const;
+    void checkParitySpinor(cvector_ref<const ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const;
+    void twistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaTwistGamma5Type twistType, QudaParity parity) const;
 
   public:
     DiracTwistedClover(const DiracTwistedClover &dirac);
@@ -1225,12 +1222,12 @@ namespace quda {
     virtual ~DiracTwistedClover();
     DiracTwistedClover& operator=(const DiracTwistedClover &dirac);
 
-    void TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
+    void TwistClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-        const ColorSpinorField &x, const double &k) const;
-
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1304,22 +1301,25 @@ public:
     virtual ~DiracTwistedCloverPC();
     DiracTwistedCloverPC& operator=(const DiracTwistedCloverPC &dirac);
 
-    void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
+    void TwistCloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
 
     /**
        @brief Convenience wrapper for single/doublet
      */
-    void WilsonDslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+    void WilsonDslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      QudaParity parity) const;
 
     /**
        @brief Convenience wrapper for single/doublet
      */
-    void WilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-                          const ColorSpinorField &x, double k) const;
+    void WilsonDslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-        const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1372,9 +1372,10 @@ public:
     virtual ~DiracStaggered();
     DiracStaggered& operator=(const DiracStaggered &dirac);
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1427,7 +1428,8 @@ public:
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0,
+                 QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1496,9 +1498,10 @@ public:
 
     virtual bool hasDslash() const { return false; }
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1578,9 +1581,10 @@ public:
     virtual ~DiracImprovedStaggered();
     DiracImprovedStaggered& operator=(const DiracImprovedStaggered &dirac);
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1665,8 +1669,9 @@ public:
      * @param     b (ignored)
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
-     */   
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
+     */
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0,
+                 QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1734,9 +1739,10 @@ public:
 
     virtual bool hasDslash() const { return false; }
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1931,11 +1937,6 @@ public:
     virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                         QudaParity parity) const;
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
-    {
-      Dslash(cvector_ref<ColorSpinorField> {out}, cvector_ref<const ColorSpinorField> {in}, parity);
-    }
-
     /**
        @brief Apply DslashXpay out = (D * in + A * x)
        @param[out] out Output field
@@ -1946,13 +1947,6 @@ public:
      */
     virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                             QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
-
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const
-    {
-      DslashXpay(cvector_ref<ColorSpinorField> {out}, cvector_ref<const ColorSpinorField> {in}, parity,
-                 cvector_ref<const ColorSpinorField> {x}, k);
-    }
 
     /**
        @brief Apply the full operator
@@ -2079,11 +2073,6 @@ public:
      */
     void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
-    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
-    {
-      Dslash(cvector_ref<ColorSpinorField> {out}, cvector_ref<const ColorSpinorField> {in}, parity);
-    }
-
     /**
        @brief Apply preconditioned DslashXpay out = (x + k * D * in)
        @param[out] out Output field
@@ -2094,13 +2083,6 @@ public:
      */
     void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
                     cvector_ref<const ColorSpinorField> &x, double k) const;
-
-    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                    const ColorSpinorField &x, const double &k) const
-    {
-      DslashXpay(cvector_ref<ColorSpinorField> {out}, cvector_ref<const ColorSpinorField> {in}, parity,
-                 cvector_ref<const ColorSpinorField> {x}, k);
-    }
 
     /**
        @brief Apply the preconditioned operator
@@ -2177,9 +2159,10 @@ public:
     virtual ~GaugeLaplace();
     GaugeLaplace& operator=(const GaugeLaplace &laplace);
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -2234,14 +2217,15 @@ public:
     virtual ~GaugeCovDev();
     GaugeCovDev& operator=(const GaugeCovDev &covDev);
 
-    virtual void DslashCD(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const int mu) const;
+    virtual void DslashCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          QudaParity parity, int mu) const;
     virtual void MCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
     virtual void MdagMCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
 
-
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 

@@ -19,17 +19,16 @@ namespace quda {
     return *this;
   }
 
-  void DiracStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			      const QudaParity parity) const
+  void DiracStaggered::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                              QudaParity parity) const
   {
     checkParitySpinor(in, out);
 
     ApplyStaggered(out, in, *gauge, 0., in, parity, dagger, commDim.data, profile);
   }
 
-  void DiracStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				  const QudaParity parity, const ColorSpinorField &x,
-				  const double &k) const
+  void DiracStaggered::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                  QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {    
     checkParitySpinor(in, out);
 

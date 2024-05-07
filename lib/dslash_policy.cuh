@@ -120,12 +120,12 @@ namespace quda
      @param[in] stream Stream were the receive is being posted (effectively ignored)
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
-    template <typename Dslash> inline void issueRecv(const ColorSpinorField &input, const Dslash &dslash, bool gdr)
+    template <typename Dslash> inline void issueRecv(const ColorSpinorField &halo, const Dslash &dslash, bool gdr)
     {
       for (int i = 3; i >= 0; i--) {
         if (!dslash.dslashParam.commDim[i]) continue;
         for (int dir = 1; dir >= 0; dir--) {
-          PROFILE(if (dslash_comms) input.recvStart(2 * i + dir, device::get_stream(2 * i + dir), gdr), profile,
+          PROFILE(if (dslash_comms) halo.recvStart(2 * i + dir, device::get_stream(2 * i + dir), gdr), profile,
                   QUDA_PROFILE_COMMS_START);
         }
       }
@@ -142,8 +142,8 @@ namespace quda
      @param[in] packIndex Stream index where the packing kernel will run
   */
   template <typename Dslash>
-  inline void issuePack(const ColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location,
-                        int packIndex, int shmem = 0)
+  inline void issuePack(const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in, const Dslash &dslash,
+                        int parity, MemoryLocation location, int packIndex, int shmem = 0)
   {
     auto &arg = dslash.dslashParam;
     if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
@@ -170,12 +170,14 @@ namespace quda
       }
     }
     if (pack) {
-      PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface() / 2, parity, dslash.Dagger(), device::get_stream(packIndex), pack_dest,
-                                               location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c, shmem),
+      PROFILE(if (dslash_pack_compute)
+                halo.pack(dslash.Nface() / 2, parity, dslash.Dagger(), device::get_stream(packIndex), pack_dest,
+                          location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c, shmem, in),
               profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
-      PROFILE(if (location != Host) qudaEventRecord(packEnd[in.bufferIndex], device::get_stream(packIndex)), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(if (location != Host) qudaEventRecord(packEnd[halo.bufferIndex], device::get_stream(packIndex)), profile,
+              QUDA_PROFILE_EVENT_RECORD);
     }
   }
 
@@ -185,19 +187,19 @@ namespace quda
      @param[out] in Field that whose halos we are communicating
      @param[in] dslash The dslash object
   */
-  template <typename Dslash> inline void issueGather(const ColorSpinorField &in, const Dslash &dslash)
+  template <typename Dslash> inline void issueGather(const ColorSpinorField &halo, const Dslash &dslash)
   {
 
     for (int i = 3; i >=0; i--) {
       if (!dslash.dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) { // forwards gather
-        auto &event = packEnd[in.bufferIndex];
+        auto &event = packEnd[halo.bufferIndex];
 
         PROFILE(qudaStreamWaitEvent(device::get_stream(2*i+dir), event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
         // Initialize host transfer from source spinor
-        PROFILE(if (dslash_copy) in.gather(2*i+dir, device::get_stream(2*i+dir)), profile, QUDA_PROFILE_GATHER);
+        PROFILE(if (dslash_copy) halo.gather(2 * i + dir, device::get_stream(2 * i + dir)), profile, QUDA_PROFILE_GATHER);
 
         // Record the end of the gathering if not peer-to-peer
 	if (!comm_peer2peer_enabled(dir,i)) {
@@ -255,17 +257,20 @@ namespace quda
      @param[in] scatterIndex The stream index used for posting the host-to-device memory copy in
    */
   template <typename Dslash>
-  inline bool commsComplete(const ColorSpinorField &in, const Dslash &, int dim, int dir, bool gdr_send, bool gdr_recv,
-                            bool zero_copy_recv, int scatterIndex = -1)
+  inline bool commsComplete(const ColorSpinorField &halo, const Dslash &, int dim, int dir, bool gdr_send,
+                            bool gdr_recv, bool zero_copy_recv, int scatterIndex = -1)
   {
-    PROFILE(int comms_test = dslash_comms ? in.commsQuery(2*dim+dir, device::get_stream(2*dim+dir), gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
+    PROFILE(int comms_test
+            = dslash_comms ? halo.commsQuery(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send, gdr_recv) : 1,
+            profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
       // now we are receive centric
       int dir2 = 1-dir;
 
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
       if (comm_peer2peer_enabled(dir2,dim)) {
-	PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+        PROFILE(qudaStreamWaitEvent(device::get_default_stream(), halo.getIPCRemoteCopyEvent(dir2, dim), 0), profile,
+                QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
 
         if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
@@ -274,8 +279,9 @@ namespace quda
           // note the ColorSpinorField::scatter transforms from
           // scatter centric to gather centric (e.g., flips
           // direction) so here just use dir not dir2
-          PROFILE(if (dslash_copy) in.scatter(2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
-	}
+          PROFILE(if (dslash_copy) halo.scatter(2 * dim + dir, device::get_stream(scatterIndex)), profile,
+                  QUDA_PROFILE_SCATTER);
+        }
 
       }
 
@@ -292,16 +298,17 @@ namespace quda
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-  template <typename T>
-  inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
+  template <typename T> inline void completeDslash(const ColorSpinorField &halo, const T &dslashParam)
+  {
     // this ensures that the p2p sending is completed before any
     // subsequent work is done on the compute stream
     for (int dim=3; dim>=0; dim--) {
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
 	if (comm_peer2peer_enabled(dir,dim)) {
-	  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-	}
+          PROFILE(qudaStreamWaitEvent(device::get_default_stream(), halo.getIPCCopyEvent(dir, dim), 0), profile,
+                  QUDA_PROFILE_STREAM_WAIT_EVENT);
+        }
       }
     }
   }
@@ -343,9 +350,7 @@ namespace quda
 
   template <typename Dslash> struct DslashPolicyImp {
 
-    virtual void operator()(Dslash &, const ColorSpinorField &, const int, const int *, TimeProfile &) { }
-
-    virtual ~DslashPolicyImp() { }
+    virtual void operator()(Dslash &, cvector_ref<const ColorSpinorField> &, const ColorSpinorField &, TimeProfile &) { }
   };
 
   /**
@@ -353,23 +358,23 @@ namespace quda
   */
   template <typename Dslash> struct DslashBasic : DslashPolicyImp<Dslash> {
 
-    void operator()(Dslash &dslash, const ColorSpinorField &in, const int volume, const int *faceVolumeCB,
+    void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
-      dslashParam.threads = volume;
+      dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(0);
 
-      issueRecv(in, dslash, false); // Prepost receives
+      issueRecv(halo, dslash, false); // Prepost receives
 
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
-      issuePack(in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+      issuePack(halo, in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
                 packIndex);
 
-      issueGather(in, dslash);
+      issueGather(halo, dslash);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
@@ -389,7 +394,7 @@ namespace quda
               if (event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
-                PROFILE(if (dslash_comms) in.sendStart(
+                PROFILE(if (dslash_comms) halo.sendStart(
                           2 * i + dir, device::get_stream(dslashParam.remote_write ? packIndex : 2 * i + dir), false,
                           dslashParam.remote_write),
                         profile, QUDA_PROFILE_COMMS_START);
@@ -398,7 +403,7 @@ namespace quda
 
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir] && pattern.gatherCompleted[2 * i + dir]) {
-              if (commsComplete(in, dslash, i, dir, false, false, false)) {
+              if (commsComplete(halo, dslash, i, dir, false, false, false)) {
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
               }
@@ -421,7 +426,7 @@ namespace quda
             }
 
             dslashParam.kernel_type = static_cast<KernelType>(i);
-            dslashParam.threads = dslash.Nface() * faceVolumeCB[i]; // updating 2 or 6 faces
+            dslashParam.threads = dslash.Nface() * halo.getDslashConstant().ghostFaceCB[i]; // updating 2 or 6 faces
 
             // all faces use this stream
             PROFILE(if (dslash_exterior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
@@ -431,12 +436,13 @@ namespace quda
         }
       }
 
-      completeDslash(in, dslashParam);
-      in.bufferIndex = (1 - in.bufferIndex);
+      completeDslash(halo, dslashParam);
+      halo.bufferIndex = (1 - halo.bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
   };
 
+#if 0
   /**
      Generic shmem dslash
       // shmem bitfield encodes
@@ -582,7 +588,7 @@ namespace quda
         PROFILE(if (dslash_exterior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       }
 
-      completeDslash(in, dslashParam);
+      completeDslash(i, dslashParam);
       in.bufferIndex = (1 - in.bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
@@ -1644,6 +1650,7 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
   };
+#endif
 
   // whether we have initialized the dslash policy tuner
   extern bool dslash_policy_init;
@@ -1717,6 +1724,7 @@ namespace quda
 
       switch (policy) {
       case QudaDslashPolicy::QUDA_DSLASH: return std::make_unique<DslashBasic<Dslash>>();
+#if 0
       case QudaDslashPolicy::QUDA_FUSED_DSLASH: return std::make_unique<DslashFusedExterior<Dslash>>();
       case QudaDslashPolicy::QUDA_GDR_DSLASH: return std::make_unique<DslashGDR<Dslash>>();
       case QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH: return std::make_unique<DslashFusedGDR<Dslash>>();
@@ -1734,6 +1742,7 @@ namespace quda
       case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH: return std::make_unique<DslashShmemUberPackFull<Dslash>>();
       case QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH: return std::make_unique<DslashShmemPackIntra<Dslash>>();
       case QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH: return std::make_unique<DslashShmemPackFull<Dslash>>();
+#endif
       default: errorQuda("Dslash policy %d not recognized", static_cast<int>(policy));
       }
 
@@ -1758,9 +1767,8 @@ namespace quda
     Dslash &dslash;
     using Arg = std::remove_reference_t<decltype(dslash.dslashParam)>;
     Arg &dslashParam;
-    const ColorSpinorField &in;
-    const int volume;
-    const int *ghostFace;
+    cvector_ref<const ColorSpinorField> &in;
+    const ColorSpinorField &halo;
     TimeProfile &profile;
 
     bool tuneGridDim() const override { return false; } // Don't tune the grid dimensions.
@@ -1769,9 +1777,9 @@ namespace quda
     unsigned int sharedBytesPerBlock(const TuneParam &) const override { return 0; }
 
   public:
-    DslashPolicyTune(Dslash &dslash, const ColorSpinorField &in, const int volume, const int *ghostFace,
+    DslashPolicyTune(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                      TimeProfile &profile) :
-      dslash(dslash), dslashParam(dslash.dslashParam), in(in), volume(volume), ghostFace(ghostFace), profile(profile)
+      dslash(dslash), dslashParam(dslash.dslashParam), in(in), halo(halo), profile(profile)
     {
       if (!dslash_policy_init) {
 
@@ -1929,7 +1937,7 @@ namespace quda
                 i == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH) {
 
               auto dslashImp = DslashFactory<Dslash>::create(i);
-              (*dslashImp)(dslash, this->in, volume, ghostFace, profile);
+              (*dslashImp)(dslash, in, halo, profile);
 
           } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
                      i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
@@ -1945,11 +1953,11 @@ namespace quda
               {
                 QudaDslashPolicy policy = DslashFactory<Dslash>::blacklist_map(i);
                 auto dslashImp = DslashFactory<Dslash>::create(policy);
-                (*dslashImp)(dslash, this->in, volume, ghostFace, profile);
+                (*dslashImp)(dslash, in, halo, profile);
               }
 
               auto dslashImp = DslashFactory<Dslash>::create(i);
-              (*dslashImp)(dslash, this->in, volume, ghostFace, profile);
+              (*dslashImp)(dslash, in, halo, profile);
 
             } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) {
               errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
@@ -1983,7 +1991,7 @@ namespace quda
      dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
      auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
-     (*dslashImp)(dslash, in, volume, ghostFace, profile);
+     (*dslashImp)(dslash, in, halo, profile);
 
      // restore p2p state
      comm_enable_peer2peer(p2p_enabled);

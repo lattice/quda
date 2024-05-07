@@ -20,19 +20,21 @@ namespace quda {
     return *this;
   }
 
-  void DiracClover::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracClover::checkParitySpinor(cvector_ref<const ColorSpinorField> &out,
+                                      cvector_ref<const ColorSpinorField> &in) const
   {
     Dirac::checkParitySpinor(out, in);
 
-    if (out.Volume() != clover->VolumeCB()) {
-      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+    for (auto i = 0u; i < out.size(); i++) {
+      if (out[i].Volume() != clover->VolumeCB())
+        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(),
+                  clover->VolumeCB());
     }
   }
 
   /** Applies the operator (A + k D) */
-  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
+  void DiracClover::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -41,10 +43,10 @@ namespace quda {
   }
 
   // Public method to apply the clover term only
-  void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracClover::Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     ApplyClover(out, in, *clover, false, parity);
   }
 
@@ -121,30 +123,27 @@ namespace quda {
   }
 
   // Public method
-  void DiracCloverPC::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, 
-				const QudaParity parity) const
+  void DiracCloverPC::CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     ApplyClover(out, in, *clover, true, parity);
   }
 
   // apply hopping term, then clover: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
   // and likewise for dagger: (A_ee^-1 D^dagger_eo) or (A_oo^-1 D^dagger_oe)
   // NOTE - this isn't Dslash dagger since order should be reversed!
-  void DiracCloverPC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			     const QudaParity parity) const
+  void DiracCloverPC::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                             QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
     ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim.data, profile);
   }
 
   // xpay version of the above
-  void DiracCloverPC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				 const QudaParity parity, const ColorSpinorField &x,
-				 const double &k) const
+  void DiracCloverPC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);

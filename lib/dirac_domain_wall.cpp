@@ -33,32 +33,29 @@ namespace quda {
     return *this;
   }
 
-  void DiracDomainWall::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall::checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    if (in.X(4) != out.X(4)) {
-      errorQuda("5th dimension size mismatch: in.X(4) = %d, out.X(4) = %d", in.X(4), out.X(4));
-    }
+    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions");
+    for (auto i = 0u; i < in.size(); i++)
+      if (in[i].X(4) != out[i].X(4))
+        errorQuda("5th dimension size mismatch: in = %d, out = %d", in[i].X(4), out[i].X(4));
   }
 
-  void DiracDomainWall::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity) const
+  void DiracDomainWall::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
     ApplyDomainWall5D(out, in, *gauge, 0.0, mass, in, parity, dagger, commDim.data, profile);
   }
 
-  void DiracDomainWall::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				   const QudaParity parity, const ColorSpinorField &x,
-				   const double &k) const
+  void DiracDomainWall::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                   QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
     ApplyDomainWall5D(out, in, *gauge, k, mass, x, parity, dagger, commDim.data, profile);
   }
 

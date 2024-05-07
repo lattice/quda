@@ -10,23 +10,18 @@ namespace quda
   // Apply the 4-d preconditioned domain-wall Dslash operator
   //   i.e. out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // ... and then m5pre
-#ifdef GPU_DOMAIN_WALL_DIRAC
-  void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
-                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
-                              TimeProfile &profile)
+  void ApplyDomainWall4DM5pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                              const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                              cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
+                              bool dagger, const int *comm_override, double m_f, TimeProfile &profile)
   {
-    auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE>();
-    instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
-                                          dummy_list, profile);
+    if constexpr (is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>()) {
+      auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE>();
+      instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
+                                            dummy_list, profile);
+    } else {
+      errorQuda("Domain-wall operator has not been built");
+    }
   }
-#else
-  void ApplyDomainWall4DM5pre(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
-                              double, const Complex *, const Complex *, const ColorSpinorField &,
-                              ColorSpinorField &, int, bool, const int *, double, TimeProfile &)
-  {
-    errorQuda("Domain-wall dslash has not been built");
-  }
-#endif // GPU_DOMAIN_WALL_DIRAC
 
 } // namespace quda

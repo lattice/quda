@@ -21,9 +21,10 @@ namespace quda
     using Dslash::in;
 
   public:
-    NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    NdegTwistedMass(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                    const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
     {
-      TunableKernel3D::resizeVector(2, arg.nParity);
     }
 
     void apply(const qudaStream_t &stream)
@@ -43,7 +44,7 @@ namespace quda
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += in.size() * 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
       default: break; // twisted-mass flops are in the interior kernel
       }
@@ -53,31 +54,27 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassApply {
 
-    inline NdegTwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                double b, double c, const ColorSpinorField &x, int parity, bool dagger,
-                                const int *comm_override, TimeProfile &profile)
+    NdegTwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                         const GaugeField &U, double a, double b, double c, cvector_ref<const ColorSpinorField> &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
-      NdegTwistedMass<decltype(arg)> twisted(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, b, c, x, parity, dagger, comm_override);
+      NdegTwistedMass<decltype(arg)> twisted(arg, out, in, halo);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
     }
   };
 
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-  void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                            double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                            TimeProfile &profile)
+  void ApplyNdegTwistedMass(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            const GaugeField &U, double a, double b, double c, cvector_ref<const ColorSpinorField> &x,
+                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<NdegTwistedMassApply>(out, in, U, a, b, c, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+      instantiate<NdegTwistedMassApply>(out, in, U, a, b, c, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Non-degenerate twisted-mass operator has not been built");
+    }
   }
-#else
-  void ApplyNdegTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
-                            double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-  {
-    errorQuda("Non-degenerate twisted-mass dslash has not been built");
-  }
-#endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
 } // namespace quda

@@ -19,9 +19,14 @@ namespace quda
     using Dslash = Dslash<wilsonCloverPreconditioned, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    using Dslash::halo;
+    const CloverField &A;
 
   public:
-    WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    WilsonCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out,
+                               cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+                               const CloverField &A) :
+      Dslash(arg, out, in, halo), A(A)
     {
     }
 
@@ -47,15 +52,18 @@ namespace quda
 
     long long flops() const
     {
-      int clover_flops = 504;
+      int n = (in.Nspin() / 2) * in.Ncolor();
+      int mv_flops = 8 * n * n - 2 * n;
+      int clover_flops = 2 * mv_flops; // 1 m-v product per chiral block
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: flops += clover_flops * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: flops += clover_flops * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL:
-        flops += clover_flops * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        flops
+          += clover_flops * 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
@@ -66,7 +74,7 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         flops -= clover_flops * ghost_sites;
 
         break;
@@ -76,16 +84,16 @@ namespace quda
 
     long long bytes() const
     {
-      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
-
+      int clover_bytes = A.Bytes() / A.Volume();
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: bytes += clover_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL:
-        bytes += clover_bytes * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        bytes
+          += clover_bytes * 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
@@ -96,7 +104,7 @@ namespace quda
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * in[0].GhostFace()[d];
         bytes -= clover_bytes * ghost_sites;
 
         break;
@@ -109,35 +117,30 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
 
-    inline WilsonCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-        TimeProfile &profile)
+    WilsonCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                    const GaugeField &U, const CloverField &A, double a,
+                                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                    const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, x, parity, dagger, comm_override);
-      WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, halo, U, A, a, x, parity, dagger, comm_override);
+      WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in, halo, A);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }
   };
 
   // Apply the preconditioned Wilson-clover operator
   // out(x) = M*in = a * A(x)^{-1} (\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
-#ifdef GPU_CLOVER_DIRAC
-  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-      TimeProfile &profile)
+  void ApplyWilsonCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                       const GaugeField &U, const CloverField &A, double a,
+                                       cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                       const int *comm_override, TimeProfile &profile)
   {
-    instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>())
+      instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
   }
-#else
-  void ApplyWilsonCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                       const CloverField &, double, const ColorSpinorField &, int, bool, const int *,
-                                       TimeProfile &)
-  {
-    errorQuda("Clover dslash has not been built");
-  }
-#endif
 
 } // namespace quda

@@ -18,7 +18,8 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
             typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
 #if QUDA_RECONSTRUCT & 4
@@ -51,7 +52,8 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          const GaugeField &U, Args &&...args)
   {
     if (in.Ncolor() == 3) {
       instantiate<Apply, Recon, Float, 3>(out, in, U, args...);
@@ -68,7 +70,8 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          const GaugeField &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8

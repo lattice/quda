@@ -182,11 +182,7 @@ namespace quda {
         strcat(aux,label);
       }
 
-      strcat(aux, ",n_rhs=");
-      char rhs_str[16];
-      i32toa(rhs_str, out.size());
-      strcat(aux, rhs_str);
-
+      setRHSstring(aux, in.size());
 #ifdef QUDA_FAST_COMPILE_DSLASH
       strcat(aux, ",fast_compile");
 #endif
@@ -274,11 +270,11 @@ namespace quda {
 
     void preTune()
     {
-      for (auto i = 0u; i < out.size(); i++) out[i].backup();
+      out.backup();
     }
     void postTune()
     {
-      for (auto i = 0u; i < out.size(); i++) out[i].restore();
+      out.restore();
     }
   };
 

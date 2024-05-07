@@ -20,7 +20,10 @@ namespace quda
     static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
+                                                    spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
@@ -29,27 +32,36 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    F out;        /** output vector field */
-    const F in;   /** input vector field */
-    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
-    const F x;    /** input vector field for xpay*/
+    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
+    const int_fastdiv n_src;
+
+    F out[max_n_src];        /** output vector field */
+    F in[max_n_src];   /** input vector field */
+    const Ghost halo_pack;   /** accessor used for writing the halo field */
+    const Ghost halo;        /** accessor used for reading the halo field */
+    F x[max_n_src];    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
-    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
-               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
-      out(out),
-      in(in),
-      in_pack(in),
-      x(x),
+    LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+               const GaugeField &U, int dir, double a, double b, cvector_ref<const ColorSpinorField> &x,
+               int parity, bool dagger, const int *comm_override) :
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
+      halo_pack(halo),
+      halo(halo),
       U(U),
       a(a),
       b(b),
       dir(dir)
     {
+      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->in[i] = in[i];
+        this->x[i] = x[i];
+      }
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
     }
   };
@@ -68,7 +80,7 @@ namespace quda
   */
   template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity,
-                                               int, int thread_dim, bool &active)
+                                               int, int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -86,14 +98,14 @@ namespace quda
             // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
-            const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+            const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
             out += U * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
             const int fwd_idx = linkIndexP1(coord, arg.dim, d);
             const Link U = arg.U(d, coord.x_cb, parity);
-            const Vector in = arg.in(fwd_idx, their_spinor_parity);
+            const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
 
             out += U * in;
           }
@@ -112,13 +124,13 @@ namespace quda
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
-            const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+            const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 	    
             out += conj(U) * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
             const Link U = arg.U(d, gauge_idx, 1 - parity);
-            const Vector in = arg.in(back_idx, their_spinor_parity);
+            const Vector in = arg.in[src_idx](back_idx, their_spinor_parity);
 
             out += conj(U) * in;
           }
@@ -135,7 +147,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
@@ -146,7 +158,7 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -155,22 +167,22 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3: applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 3: applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       case 4:
       default:
-        applyLaplace<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
+        applyLaplace<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
         break;
       }
 
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(coord.x_cb, my_spinor_parity);
+        Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         out = arg.a * out + arg.b * x;
       } else if (mykernel_type != INTERIOR_KERNEL) {
-        Vector x = arg.out(coord.x_cb, my_spinor_parity);
+        Vector x = arg.out[src_idx](coord.x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
     }
   };
 

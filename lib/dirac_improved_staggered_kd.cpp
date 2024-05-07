@@ -31,13 +31,14 @@ namespace quda
     return *this;
   }
 
-  void DiracImprovedStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+  void DiracImprovedStaggeredKD::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                        QudaParity) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracImprovedStaggeredKD::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity,
-                                            const ColorSpinorField &, const double &) const
+  void DiracImprovedStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                            QudaParity, cvector_ref<const ColorSpinorField> &, double) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }

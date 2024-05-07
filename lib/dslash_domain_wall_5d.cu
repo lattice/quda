@@ -20,9 +20,9 @@ namespace quda
     using Dslash::in;
 
   public:
-    DomainWall5D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    DomainWall5D(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 const ColorSpinorField &halo) : Dslash(arg, out, in, halo)
     {
-      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
     }
 
     void apply(const qudaStream_t &stream)
@@ -39,14 +39,14 @@ namespace quda
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        int Ls = in.X(4);
-        long long bulk = (Ls - 2) * (in.Volume() / Ls);
-        long long wall = 2 * (in.Volume() / Ls);
+        int Ls = in[0].X(4);
+        long long bulk = (Ls - 2) * (in[0].Volume() / Ls);
+        long long wall = 2 * (in[0].Volume() / Ls);
         flops += 96ll * bulk + 120ll * wall;
       } break;
       default: break; // 5-d flops are in the interior kernel
       }
-      return flops;
+      return in.size() * flops;
     }
 
     long long bytes() const
@@ -56,40 +56,38 @@ namespace quda
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
-      case KERNEL_POLICY: bytes += 2 * spinor_bytes * in.VolumeCB(); break;
+      case KERNEL_POLICY: bytes += 2 * spinor_bytes * in[0].VolumeCB(); break;
       default: break;
       }
-      return bytes;
+      return in.size() * bytes;
     }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall5DApply {
 
-    inline DomainWall5DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-        double m_f, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      const GaugeField &U, double a, double m_f, cvector_ref<const ColorSpinorField> &x,
+                      int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 5;
-      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
-      DomainWall5D<decltype(arg)> dwf(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall5D<decltype(arg)> dwf(arg, out, in, halo);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
     }
   };
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-#ifdef GPU_DOMAIN_WALL_DIRAC
-  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
-      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyDomainWall5D(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+                         double a, double m_f, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile)
   {
-    instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_DOMAIN_WALL_DSLASH>()) {
+      instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Domain-wall operator has not been built");
+    }
   }
-#else
-  void ApplyDomainWall5D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
-                         const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-  {
-    errorQuda("Domain-wall dslash has not been built");
-  }
-#endif // GPU_DOMAIN_WALL_DIRAC
 
 } // namespace quda

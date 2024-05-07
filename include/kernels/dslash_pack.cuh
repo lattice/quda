@@ -28,9 +28,14 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     static constexpr bool packkernel = true;
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
+                                                    spin_project, spinor_direct_load, false>;
 
-    const F in_pack; // field we are packing
+    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
+    const int_fastdiv n_src;
+    F in[max_n_src]; // field we are packing
+    Ghost halo_pack;
 
     const int nFace;
     const int parity;         // only use this for single parity fields
@@ -50,6 +55,8 @@ namespace quda
     int dim_map[4];
 
     int sites_per_block;
+
+    int_fastdiv Ls;
 
     char *packBuffer[4 * QUDA_MAX_DIM];
     int neighbor_ranks[2 * QUDA_MAX_DIM];
@@ -71,26 +78,29 @@ namespace quda
 #else
     static constexpr int shmem = 0;
 #endif
-    PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a, double b,
+    PackArg(void **ghost, const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in,
+            int nFace, int parity, int work_items, double a, double b,
             double c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
             int) :
 #endif
-      kernel_param(dim3(block * grid, in.getDslashConstant().Ls, in.SiteSubset())),
-      in_pack(in, nFace, nullptr, reinterpret_cast<Float **>(ghost)),
+  kernel_param(dim3(block * grid, halo.X(4), in.SiteSubset())),
+      n_src(in.size()),
+      halo_pack(halo, nFace, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       parity(parity),
       nParity(in.SiteSubset()),
-      dc(in.getDslashConstant()),
+      dc(halo.getDslashConstant()),
       twist_a(a),
       twist_b(b),
       twist_c(c),
       work_items(work_items),
       threadDimMapLower {},
       threadDimMapUpper {},
-      sites_per_block((work_items + grid - 1) / grid)
+      sites_per_block((work_items + grid - 1) / grid),
+      Ls(halo.X(4) / in.size())
 #ifdef NVSHMEM_COMMS
       ,
       counter(dslash::get_dslash_shmem_sync_counter()),
@@ -100,14 +110,16 @@ namespace quda
       retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
     {
+      for (auto i = 0u; i < in.size(); i++) this->in[i] = F(in[i]);
+
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           neighbor_ranks[2 * dim + dir] = comm_neighbor_rank(dir, dim);
-          bytes[2 * dim + dir] = in.GhostFaceBytes(dim);
+          bytes[2 * dim + dir] = halo.GhostFaceBytes(dim);
         }
       }
-      if (!in.isNative()) errorQuda("Unsupported field order colorspinor=%d\n", in.FieldOrder());
+      checkNative(in, halo);
 
       int d = 0;
       int prev = -1; // previous dimension that was partitioned
@@ -124,7 +136,7 @@ namespace quda
   };
 
   template <bool dagger, int twist, int dim, QudaPCType pc, typename Arg>
-  __device__ __host__ inline void pack(const Arg &arg, int ghost_idx, int s, int parity)
+  __device__ __host__ inline void pack(const Arg &arg, int ghost_idx, int s, int parity, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, Arg::nSpin> Vector;
@@ -136,7 +148,7 @@ namespace quda
     constexpr int nDim = pc;
 
     // for 5-d preconditioning the face_size includes the Ls dimension
-    const int face_size = nFace * arg.dc.ghostFaceCB[dim] * (pc == QUDA_5D_PC ? arg.dc.Ls : 1);
+    const int face_size = nFace * arg.dc.ghostFaceCB[dim] * (pc == QUDA_5D_PC ? (int)arg.Ls : 1);
 
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
@@ -152,45 +164,45 @@ namespace quda
 
       int idx = indexFromFaceIndex<nDim, pc, dim, nFace, 0>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? +1 : -1;
-      Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
+      Vector f = arg.in[src_idx](idx + s * arg.dc.volume_4d_cb, spinor_parity);
       if (twist == 1) {
         f = arg.twist_a * (f + arg.twist_b * f.igamma(4));
       } else if (twist == 2) {
-        Vector f1 = arg.in_pack(idx + (1 - s) * arg.dc.volume_4d_cb, spinor_parity); // load other flavor
+        Vector f1 = arg.in[src_idx](idx + (1 - s) * arg.dc.volume_4d_cb, spinor_parity); // load other flavor
         if (s == 0)
           f = arg.twist_a * (f + arg.twist_b * f.igamma(4) + arg.twist_c * f1);
         else
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.halo_pack.Ghost(dim, 0, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.halo_pack.Ghost(dim, 0, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     } else { // forwards
 
       int idx = indexFromFaceIndex<nDim, pc, dim, nFace, 1>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? -1 : +1;
-      Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
+      Vector f = arg.in[src_idx](idx + s * arg.dc.volume_4d_cb, spinor_parity);
       if (twist == 1) {
         f = arg.twist_a * (f + arg.twist_b * f.igamma(4));
       } else if (twist == 2) {
-        Vector f1 = arg.in_pack(idx + (1 - s) * arg.dc.volume_4d_cb, spinor_parity); // load other flavor
+        Vector f1 = arg.in[src_idx](idx + (1 - s) * arg.dc.volume_4d_cb, spinor_parity); // load other flavor
         if (s == 0)
           f = arg.twist_a * (f + arg.twist_b * f.igamma(4) + arg.twist_c * f1);
         else
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.halo_pack.Ghost(dim, 1, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.halo_pack.Ghost(dim, 1, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     }
   }
 
   template <int dim, int nFace = 1, typename Arg>
-  __device__ __host__ inline void packStaggered(const Arg &arg, int ghost_idx, int s, int parity)
+  __device__ __host__ inline void packStaggered(const Arg &arg, int ghost_idx, int parity, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, Arg::nSpin> Vector;
@@ -207,12 +219,12 @@ namespace quda
 
     if (face_num == 0) { // backwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 0>(ghost_idx, parity, arg);
-      Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      Vector f = arg.in[src_idx](idx, spinor_parity);
+      arg.halo_pack.Ghost(dim, 0, ghost_idx + src_idx * nFace * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
     } else { // forwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 1>(ghost_idx, parity, arg);
-      Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      Vector f = arg.in[src_idx](idx, spinor_parity);
+      arg.halo_pack.Ghost(dim, 1, ghost_idx + src_idx * nFace * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
     }
   }
 
@@ -221,10 +233,14 @@ namespace quda
     constexpr pack_wilson(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int, int s, int parity)
+    __device__ inline void operator()(int, int src_s, int parity)
     {
       int local_tid = target::thread_idx().x;
       int tid = arg.sites_per_block * target::block_idx().x + local_tid;
+
+      int src_idx = src_s / arg.Ls;
+      int s = src_s % arg.Ls;
+
       // this is the parity used for load/store, but we use arg.parity for index mapping
       if (arg.nParity == 1) parity = arg.parity;
 
@@ -235,17 +251,17 @@ namespace quda
 
         if (Arg::pc_type == QUDA_5D_PC) { // 5-d checkerboarded, include s (not ghostFaceCB since both faces)
           switch (dim) {
-          case 0: pack<Arg::dagger, Arg::twist, 0, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity); break;
-          case 1: pack<Arg::dagger, Arg::twist, 1, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity); break;
-          case 2: pack<Arg::dagger, Arg::twist, 2, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity); break;
-          case 3: pack<Arg::dagger, Arg::twist, 3, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity); break;
+          case 0: pack<Arg::dagger, Arg::twist, 0, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity, src_idx); break;
+          case 1: pack<Arg::dagger, Arg::twist, 1, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity, src_idx); break;
+          case 2: pack<Arg::dagger, Arg::twist, 2, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity, src_idx); break;
+          case 3: pack<Arg::dagger, Arg::twist, 3, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity, src_idx); break;
           }
         } else { // 4-d checkerboarding, keeping s separate (if it exists)
           switch (dim) {
-          case 0: pack<Arg::dagger, Arg::twist, 0, Arg::pc_type>(arg, ghost_idx, s, parity); break;
-          case 1: pack<Arg::dagger, Arg::twist, 1, Arg::pc_type>(arg, ghost_idx, s, parity); break;
-          case 2: pack<Arg::dagger, Arg::twist, 2, Arg::pc_type>(arg, ghost_idx, s, parity); break;
-          case 3: pack<Arg::dagger, Arg::twist, 3, Arg::pc_type>(arg, ghost_idx, s, parity); break;
+          case 0: pack<Arg::dagger, Arg::twist, 0, Arg::pc_type>(arg, ghost_idx, s, parity, src_idx); break;
+          case 1: pack<Arg::dagger, Arg::twist, 1, Arg::pc_type>(arg, ghost_idx, s, parity, src_idx); break;
+          case 2: pack<Arg::dagger, Arg::twist, 2, Arg::pc_type>(arg, ghost_idx, s, parity, src_idx); break;
+          case 3: pack<Arg::dagger, Arg::twist, 3, Arg::pc_type>(arg, ghost_idx, s, parity, src_idx); break;
           }
         }
 
@@ -266,7 +282,7 @@ namespace quda
   // 64 - use uber kernel (merge exterior)
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
-    template <int twist> __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity)
+    template <int twist> __device__ __forceinline__ void operator()(const Arg &arg, int src_s, int parity)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
@@ -280,6 +296,9 @@ namespace quda
       case 3: dim = arg.dim_map[3]; break;
       }
 
+      int src_idx = src_s / arg.Ls;
+      int s = src_s % arg.Ls;
+
       int local_tid = local_block_idx * target::block_dim().x + target::thread_idx().x;
 
 #ifdef NVSHMEM_COMMS
@@ -290,9 +309,9 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[0]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
+              pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity, src_idx);
             else
-              pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
+              pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -300,9 +319,9 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[1]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
+              pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity, src_idx);
             else
-              pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
+              pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -310,9 +329,9 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[2]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
+              pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity, src_idx);
             else
-              pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
+              pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -320,9 +339,9 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[3]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
+              pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity, src_idx);
             else
-              pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
+              pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -361,7 +380,7 @@ namespace quda
     constexpr pack_staggered(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int, int s, int parity)
+    __device__ inline void operator()(int, int src_idx, int parity)
     {
       int local_tid = target::thread_idx().x;
       int tid = arg.sites_per_block * target::block_idx().x + local_tid;
@@ -375,17 +394,17 @@ namespace quda
 
         if (arg.nFace == 1) {
           switch (dim) {
-          case 0: packStaggered<0, 1>(arg, ghost_idx, s, parity); break;
-          case 1: packStaggered<1, 1>(arg, ghost_idx, s, parity); break;
-          case 2: packStaggered<2, 1>(arg, ghost_idx, s, parity); break;
-          case 3: packStaggered<3, 1>(arg, ghost_idx, s, parity); break;
+          case 0: packStaggered<0, 1>(arg, ghost_idx, parity, src_idx); break;
+          case 1: packStaggered<1, 1>(arg, ghost_idx, parity, src_idx); break;
+          case 2: packStaggered<2, 1>(arg, ghost_idx, parity, src_idx); break;
+          case 3: packStaggered<3, 1>(arg, ghost_idx, parity, src_idx); break;
           }
         } else if (arg.nFace == 3) {
           switch (dim) {
-          case 0: packStaggered<0, 3>(arg, ghost_idx, s, parity); break;
-          case 1: packStaggered<1, 3>(arg, ghost_idx, s, parity); break;
-          case 2: packStaggered<2, 3>(arg, ghost_idx, s, parity); break;
-          case 3: packStaggered<3, 3>(arg, ghost_idx, s, parity); break;
+          case 0: packStaggered<0, 3>(arg, ghost_idx, parity, src_idx); break;
+          case 1: packStaggered<1, 3>(arg, ghost_idx, parity, src_idx); break;
+          case 2: packStaggered<2, 3>(arg, ghost_idx, parity, src_idx); break;
+          case 3: packStaggered<3, 3>(arg, ghost_idx, parity, src_idx); break;
           }
         }
 
@@ -397,7 +416,7 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity, int = 0)
+    __device__ __forceinline__ void operator()(const Arg &arg, int src_idx, int parity, int = 0)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
@@ -421,9 +440,9 @@ namespace quda
           while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
             int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
             if (arg.nFace == 1)
-              packStaggered<0, 1>(arg, ghost_idx, s, parity);
+              packStaggered<0, 1>(arg, ghost_idx, parity, src_idx);
             else
-              packStaggered<0, 3>(arg, ghost_idx, s, parity);
+              packStaggered<0, 3>(arg, ghost_idx, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -431,9 +450,9 @@ namespace quda
           while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
             int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
             if (arg.nFace == 1)
-              packStaggered<1, 1>(arg, ghost_idx, s, parity);
+              packStaggered<1, 1>(arg, ghost_idx, parity, src_idx);
             else
-              packStaggered<1, 3>(arg, ghost_idx, s, parity);
+              packStaggered<1, 3>(arg, ghost_idx, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -441,9 +460,9 @@ namespace quda
           while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
             int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
             if (arg.nFace == 1)
-              packStaggered<2, 1>(arg, ghost_idx, s, parity);
+              packStaggered<2, 1>(arg, ghost_idx, parity, src_idx);
             else
-              packStaggered<2, 3>(arg, ghost_idx, s, parity);
+              packStaggered<2, 3>(arg, ghost_idx, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;
@@ -451,9 +470,9 @@ namespace quda
           while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
             int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
             if (arg.nFace == 1)
-              packStaggered<3, 1>(arg, ghost_idx, s, parity);
+              packStaggered<3, 1>(arg, ghost_idx, parity, src_idx);
             else
-              packStaggered<3, 3>(arg, ghost_idx, s, parity);
+              packStaggered<3, 3>(arg, ghost_idx, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
           }
           break;

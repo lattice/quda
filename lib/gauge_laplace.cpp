@@ -18,7 +18,8 @@ namespace quda {
     return *this;
   }
 
-  void GaugeLaplace::Dslash(ColorSpinorField &out, const ColorSpinorField &in,  const QudaParity parity) const
+  void GaugeLaplace::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 
@@ -31,8 +32,8 @@ namespace quda {
     ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, dagger, comm_dim, profile);
   }
 
-  void GaugeLaplace::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                const ColorSpinorField &x, const double &k) const
+  void GaugeLaplace::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkSpinorAlias(in, out);
 

@@ -20,7 +20,11 @@ namespace quda
     using Dslash::in;
 
   public:
-    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    TwistedMass(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -39,7 +43,7 @@ namespace quda
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * in.Ncolor() * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += in.size() * 2 * in.Ncolor() * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
       default: break; // twisted-mass flops are in the interior kernel
       }
@@ -49,34 +53,30 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassApply {
 
-    inline TwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                            const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                            TimeProfile &profile)
+    TwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+                     double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                     const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
-      TwistedMass<decltype(arg)> twisted(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, b, x, parity, dagger, comm_override);
+      TwistedMass<decltype(arg)> twisted(arg, out, in, halo);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
     }
   };
 
   // Apply the twisted-mass Dslash operator
   // out(x) = M*in = (1 + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
-#ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                        TimeProfile &profile)
+  void ApplyTwistedMass(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        const GaugeField &U, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
+                        bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+      instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Twisted-mass operator has not been built");
+    }
   }
-#else
-  void ApplyTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
-                        const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-  {
-    errorQuda("Twisted-mass dslash has not been built");
-  }
-#endif // GPU_TWISTED_MASS_DIRAC
 
 } // namespace quda

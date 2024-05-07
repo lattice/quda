@@ -40,11 +40,11 @@ namespace quda
     int blockMin() const override { return 8; }
 
   public:
-    DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in, get_app_base())
+    DomainWall4DFusedM5(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo, get_app_base())
     {
-      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
-      TunableKernel3D::resizeStep(in.X(4), 1);
+      TunableKernel3D::resizeStep(in[0].X(4), 1); // keep Ls local to the thread block
     }
 
     void apply(const qudaStream_t &stream) override
@@ -74,7 +74,7 @@ namespace quda
 
     long long m5pre_flops() const
     {
-      long long Ls = in.X(4);
+      long long Ls = in[0].X(4);
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
@@ -83,7 +83,7 @@ namespace quda
 
     long long m5mob_flops() const
     {
-      long long Ls = in.X(4);
+      long long Ls = in[0].X(4);
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
@@ -92,7 +92,7 @@ namespace quda
 
     long long m5inv_flops() const
     {
-      long long Ls = in.X(4);
+      long long Ls = in[0].X(4);
       long long n = in.Ncolor() * in.Nspin();
       return (12ll * n * Ls) * in.Volume();
     }
@@ -111,13 +111,13 @@ namespace quda
       default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
       }
 
-      return flops_ + Dslash::flops();
+      return in.size() * flops_ + Dslash::flops();
     }
 
     long long bytes() const override
     {
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
-        return arg.y.Bytes() + Dslash::bytes();
+        return in.size() * arg.y[0].Bytes() + Dslash::bytes();
       } else {
         return Dslash::bytes();
       }
@@ -132,21 +132,21 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
-    inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                    double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
-                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
-                                    Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
+    DomainWall4DApplyFusedM5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                             const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
+                             cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
+                             bool dagger, const int *comm_override, double m_f,
+                             Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
 #ifdef NVSHMEM_COMMS
       errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
 #else
       constexpr int nDim = 4;
+      auto halo = ColorSpinorField::create_comms_batch(in);
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
-      Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
-      DomainWall4DFusedM5<Arg> dwf(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb,
-                                                     in.getDslashConstant().ghostFaceCB, profile);
+      Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
+      DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
 #endif
     }
   };
