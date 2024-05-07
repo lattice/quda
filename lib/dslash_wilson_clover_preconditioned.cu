@@ -68,7 +68,7 @@ namespace quda
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY:
-        flops += clover_flops * in.Volume();
+        flops += clover_flops * halo.Volume();
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for flops done by exterior kernel
@@ -98,7 +98,7 @@ namespace quda
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY:
-        bytes += clover_bytes * in.Volume();
+        bytes += clover_bytes * halo.Volume();
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for bytes done by exterior kernel
