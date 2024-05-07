@@ -20,7 +20,12 @@ namespace quda
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
       Ls(in[0].X(4)),
       a(a),
-      m_f(m_f) {}
+      m_f(m_f)
+    {
+      // FIXME this is a hack to use remove the batch dimension from the dslash constants
+      DslashArg<Float, nDim>::dc.X[4] = in[0].X(4);
+      DslashArg<Float, nDim>::dc.X5X4X3X2X1mX4X3X2X1 = (in[0].X(4) - 1) * DslashArg<Float, nDim>::dc.X4X3X2X1;
+    }
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -42,9 +47,9 @@ namespace quda
       int idx = s * (mykernel_type == EXTERIOR_KERNEL_ALL ? arg.exterior_threads : arg.threads) + x4; // 5-d checkerboard index
 
       bool active
-        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trivial for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      // we pass s=0, since x_cb is a 5-d index that includes s
+      // we pass s=0, since idx is a 5-d index that includes s
       auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;

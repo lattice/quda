@@ -105,7 +105,9 @@ namespace quda
 
     precision = param.Precision();
 
-    if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2) // two flavors
+    if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2 &&
+        !(param.create == QUDA_GHOST_FIELD_CREATE ||
+          (param.create == QUDA_REFERENCE_FIELD_CREATE && param.siteSubset == QUDA_PARITY_SITE_SUBSET))) // two flavors
       errorQuda(
         "Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)",
         x[4]);

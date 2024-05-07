@@ -97,7 +97,7 @@ namespace quda
         tmp.toNonRel();
         // tmp += (c * tau_1) * x
         cache.sync();
-        tmp += arg.c * cache.load_y(src_idx * 2 + 1 - flavor);
+        tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
         // add the Wilson part with normalisation
         out = tmp + arg.a * out;

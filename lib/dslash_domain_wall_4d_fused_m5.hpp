@@ -64,14 +64,6 @@ namespace quda
       }
     }
 
-    void initTuneParam(TuneParam &param) const override
-    {
-      Dslash::initTuneParam(param);
-      param.block.y = arg.Ls; // Ls must be contained in the block
-      param.grid.y = 1;
-      param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-    }
-
     long long m5pre_flops() const
     {
       long long Ls = in[0].X(4);
@@ -122,8 +114,6 @@ namespace quda
         return Dslash::bytes();
       }
     }
-
-    void defaultTuneParam(TuneParam &param) const override { initTuneParam(param); }
   };
 
   template <Dslash5Type...> struct Dslash5TypeList {
