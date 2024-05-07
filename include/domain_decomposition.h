@@ -25,9 +25,6 @@ namespace quda
     // Default constructor
     DDParam() : type(QUDA_DD_NO), flags {0}, blockDim {0} { }
 
-    // Default copy
-    DDParam(const DDParam &dd) = default;
-
     // returns false if in use
     constexpr inline bool operator!() const { return type == QUDA_DD_NO; }
 
