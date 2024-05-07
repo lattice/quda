@@ -11,7 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
-#include <domain_decomposition.h>
+#include <domain_decomposition_helper.cuh>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
@@ -342,9 +342,9 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
-      dd_out(out.dd),
-      dd_in(in.dd),
-      dd_x(x.dd),
+      dd_out(out),
+      dd_in(in),
+      dd_x(x),
 #ifndef NVSHMEM_COMMS
       counter(0)
 #else
