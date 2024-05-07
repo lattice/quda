@@ -132,10 +132,12 @@ extern "C" {
     double mu;    /**< Twisted mass parameter */
     double tm_rho;  /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
     double epsilon; /**< Twisted mass parameter */
+    double evmax;   /** maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces  **/
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
+    int covdev_mu; /**< Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3) */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -1796,6 +1798,24 @@ extern "C" {
    * @param[in] smear_param   Contains all metadata the operator which will be applied to the spinor
    */
   void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param);
+
+  /**
+   * @brief Performs contractions between a set of quark fields and
+   * eigenvectors of the 3-d Laplace operator.
+   * @param[in,out] host_sinks An array representing the inner
+   * products between the quark fields and the eigen-vector fields.
+   * Ordered as [nQuark][nEv][Lt][nSpin][complexity].
+   * @param[in] host_quark Array of quark fields we are taking the inner over
+   * @param[in] n_quark Number of quark fields
+   * @param[in] tile_quark Tile size for quark fields (batch size)
+   * @param[in] host_evec Array of eigenvectors we are taking the inner over
+   * @param[in] n_evec Number of eigenvectors
+   * @param[in] tile_evec Tile size for eigenvectors (batch size)
+   * @param[in] inv_param Meta-data structure
+   * @param[in] X Lattice dimensions
+   */
+  void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark,
+                       void **host_evec, int nevec, int tile_evec, QudaInvertParam *inv_param, const int X[4]);
 
 #ifdef __cplusplus
 }

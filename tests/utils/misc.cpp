@@ -372,3 +372,17 @@ const char *get_blas_type_str(QudaBLASType type)
   }
   return s;
 }
+
+const char *get_TwistFlavor_str(QudaTwistFlavorType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_TWIST_SINGLET: ret = "singlet_"; break;
+  case QUDA_TWIST_NONDEG_DOUBLET: ret = "ndeg_doublet_"; break;
+  case QUDA_TWIST_NO: ret = ""; break;
+  default: ret = ""; break;
+  }
+
+  return ret;
+}

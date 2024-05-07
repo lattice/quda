@@ -166,4 +166,13 @@ namespace quda
   }
 #endif
 
+  constexpr bool is_enabled_laplace()
+  {
+#ifdef GPU_LAPLACE
+    return true;
+#else
+    return false;
+#endif
+  }
+
 } // namespace quda

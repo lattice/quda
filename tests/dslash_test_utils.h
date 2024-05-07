@@ -91,13 +91,17 @@ struct DslashTestWrapper {
 
   void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
   {
+    static bool first_time = true;
+    if (first_time) {
+      gauge_param = newQudaGaugeParam();
+      setWilsonGaugeParam(gauge_param);
+      inv_param = newQudaInvertParam();
+      setInvertParam(inv_param);
+      init_host(argc, argv);
+      first_time = false;
+    }
+
     cuda_prec = getPrecision(precision);
-
-    gauge_param = newQudaGaugeParam();
-    inv_param = newQudaInvertParam();
-    setWilsonGaugeParam(gauge_param);
-    setInvertParam(inv_param);
-
     gauge_param.cuda_prec = cuda_prec;
     gauge_param.cuda_prec_sloppy = cuda_prec;
     gauge_param.cuda_prec_precondition = cuda_prec;
@@ -109,24 +113,22 @@ struct DslashTestWrapper {
     gauge_param.reconstruct_sloppy = link_recon;
 
     inv_param.cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec;
+    inv_param.clover_cuda_prec_precondition = cuda_prec;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec;
 
-    static bool first_time = true;
-    if (first_time) {
-      init_host(argc, argv);
-      first_time = false;
-    }
     init();
   }
 
   void init_test(int argc, char **argv)
   {
-    gauge_param = newQudaGaugeParam();
-    inv_param = newQudaInvertParam();
-    setWilsonGaugeParam(gauge_param);
-    setInvertParam(inv_param);
-
     static bool first_time = true;
     if (first_time) {
+      gauge_param = newQudaGaugeParam();
+      setWilsonGaugeParam(gauge_param);
+      inv_param = newQudaInvertParam();
+      setInvertParam(inv_param);
       init_host(argc, argv);
       first_time = false;
     }

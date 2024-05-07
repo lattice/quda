@@ -56,6 +56,7 @@ namespace quda {
     GaugeField *fatGauge;  // used by staggered only
     GaugeField *longGauge; // used by staggered only
     int laplace3D;
+    int covdev_mu;
     CloverField *clover;
     GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
@@ -117,6 +118,7 @@ namespace quda {
       printfQuda("kappa = %g\n", kappa);
       printfQuda("mass = %g\n", mass);
       printfQuda("laplace3D = %d\n", laplace3D);
+      printfQuda("covdev_mu = %d\n", covdev_mu);
       printfQuda("m5 = %g\n", m5);
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
@@ -1097,6 +1099,14 @@ namespace quda {
   };
 
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
+
+  /**
+     @brief Applies a pauli matrices to a spinor doublet
+     @param[out] out Output field
+     @param[in] in Input field
+     @param[d] d index of the pauli matrix
+  */
+  void ApplyTau(ColorSpinorField &out, const ColorSpinorField &in, int d);
 
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
@@ -2213,6 +2223,9 @@ public:
      put in the Dirac operator abstraction.
   */
   class GaugeCovDev : public Dirac {
+
+  protected:
+    int covdev_mu;
 
   public:
     GaugeCovDev(const DiracParam &param);

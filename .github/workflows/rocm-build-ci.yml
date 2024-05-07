@@ -5,7 +5,7 @@ jobs:
     runs-on: [self-hosted, amd]
     strategy:
       matrix:
-        rocm: [ 5.6.1, 5.7.2 ]
+        rocm: [ 5.6.1, 6.0.2 ]
     steps:
       - uses: actions/checkout@v3
       - run: |
@@ -22,12 +22,13 @@ jobs:
             -DROCM_PATH=${ROCM_PATH} \
             -DQUDA_DIRAC_CLOVER=ON \
             -DQUDA_DIRAC_CLOVER_HASENBUSCH=OFF \
-            -DQUDA_DIRAC_DOMAIN_WALL=OFF \
+            -DQUDA_DIRAC_DOMAIN_WALL=ON \
             -DQUDA_DIRAC_NDEG_TWISTED_MASS=OFF \
             -DQUDA_DIRAC_STAGGERED=ON \
             -DQUDA_DIRAC_TWISTED_MASS=OFF \
             -DQUDA_DIRAC_TWISTED_CLOVER=OFF \
             -DQUDA_DIRAC_WILSON=ON \
+            -DQUDA_DIRAC_LAPLACE=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
             -DQUDA_QDPJIT=OFF \
             -DQUDA_INTERFACE_QDPJIT=OFF \
