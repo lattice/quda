@@ -6,29 +6,27 @@
 namespace quda
 {
 
-  // Template structure
-  struct DDArg {
+  // No DD (use also as a template for required functions)
+  struct DDNo {
 
     // Initialization of input parameters from ColorSpinorField
-    virtual DDArg(const ColorSpinorField &in);
+    DDNo(const ColorSpinorField &in)
+    {
+      if (in.dd.type != QUDA_DD_NO) { errorQuda("Unsupported type %d\n", in.dd.type); }
+    }
 
     // Whether field at given coord is zero
-    template <typename Coord> virtual inline bool isZero(const Coord &x) const;
+    template <typename Coord> constexpr inline bool isZero(const Coord &) const { return false; }
 
     // Whether do hopping with field at neighboring coord
-    template <typename Coord> virtual inline bool doHopping(const Coord &x, const int &mu, const int &dir) const;
+    template <typename Coord> constexpr inline bool doHopping(const Coord &, const int &, const int &) const
+    {
+      return true;
+    }
   };
 
-  struct DDNo : public DDArg {
-
-    DDArg(const ColorSpinorField &in) { assert(in.dd.type == QUDA_DD_NO); }
-
-    constexpr inline bool isZero(const Coord &x) const { return false; }
-
-    constexpr inline bool doHopping(const Coord &x, const int &mu, const int &dir) const { return true; }
-  };
-
-  struct DDRedBlack : public DDArg {
+  // Red-black Block DD
+  struct DDRedBlack {
 
     const int_fastdiv blockDim[4]; // the size of the block per direction
     const bool red_active;         // if red blocks are active
@@ -36,30 +34,32 @@ namespace quda
     const bool block_hopping;      // if hopping between red and black is allowed
     const bool first_black;        // if the first block of the local lattice is black instead of red
 
-    DDArg(const ColorSpinorField &in) :
-      blockDim {in.dd.blockDim(0), in.dd.blockDim(1), in.dd.blockDim(2), in.dd.blockDim(3)},
+    DDRedBlack(const ColorSpinorField &in) :
+      blockDim {in.dd.blockDim[0], in.dd.blockDim[1], in.dd.blockDim[2], in.dd.blockDim[3]},
       red_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::red_active)),
       black_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::black_active)),
       block_hopping(in.dd.type == QUDA_DD_NO or in.dd.is(DD::block_hopping)),
       first_black(false) // TODO
     {
-      assert(in.dd.type == QUDA_DD_NO or in.dd.type == QUDA_DD_RED_BLACK);
+      if (in.dd.type != QUDA_DD_NO and in.dd.type != QUDA_DD_RED_BLACK) {
+        errorQuda("Unsupported type %d\n", in.dd.type);
+      }
     }
 
     // Computes block_parity: 0 = red, 1 = black
-    inline bool block_parity(const Coord &x) const
+    template <typename Coord> inline bool block_parity(const Coord &x) const
     {
       int block_parity = first_black;
       for (int i = 0; i < x.size(); i++) { block_parity += x[i] / blockDim[i]; }
       return block_parity % 2 == 0;
     }
 
-    inline bool on_border(const Coord &x, const int &mu, const int &dir) const
+    template <typename Coord> inline bool on_border(const Coord &x, const int &mu, const int &dir) const
     {
       return (dir > 0) ? ((x[mu] + 1) % blockDim[mu] == 0) : (x[mu] % blockDim[mu] == 0);
     }
 
-    inline bool isZero(const Coord &x) const
+    template <typename Coord> inline bool isZero(const Coord &x) const
     {
       if (red_active and black_active) return false;
       if (not red_active and not black_active) return true;
@@ -73,9 +73,9 @@ namespace quda
       return true;
     }
 
-    inline bool doHopping(const Coord &x, const int &mu, const int &dir) const
+    template <typename Coord> inline bool doHopping(const Coord &x, const int &mu, const int &dir) const
     {
-      if (red_active and black_active and blockhopping) return true;
+      if (red_active and black_active and block_hopping) return true;
       if (not red_active and not black_active) return false;
 
       bool swap = on_border(x, mu, dir);
