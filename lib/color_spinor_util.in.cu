@@ -5,6 +5,7 @@
 #include <index_helper.cuh>
 #include <blas_quda.h>
 #include <instantiate.h>
+#include <domain_decomposition_helper.cuh>
 
 namespace quda {
 
@@ -423,7 +424,7 @@ namespace quda {
     resize(v, new_size, param);
   }
 
-  template <class P> void projectDD(P &p, const ColorSpinorField &meta)
+  template <typename P, typename DDArg> void projectDD(P &p, DDArg &dd, const ColorSpinorField &meta)
   {
     Coord<4> coord;
     int X[4] = {meta.X(0), meta.X(1), meta.X(2), meta.X(3)};
@@ -433,38 +434,44 @@ namespace quda {
       for (int x_cb = 0; x_cb < p.VolumeCB(); x_cb++) {
         getCoords(coord, x_cb, X, parity);
 
-        if (meta.dd.isZero(coord, meta.getDslashConstant())) {
-          //	  printfQuda("Should be zero %d\n",x_cb);
+        if (dd.isZero(coord)) {
           for (int s = 0; s < p.Nspin(); s++)
             for (int c = 0; c < p.Ncolor(); c++) p(parity, x_cb, s, c) = 0;
-        } else {
-          //	  printfQuda("Should not be zero %d\n",x_cb);
         }
       }
     }
   }
 
-  template <typename Float, int nSpin, int nColor, QudaFieldOrder order> void genericProjectDD(ColorSpinorField &a)
+  template <typename Float, typename DDArg, int nSpin, int nColor, QudaFieldOrder order>
+  void genericProjectDD(ColorSpinorField &a)
   {
     FieldOrderCB<Float, nSpin, nColor, 1, order> A(a);
-    projectDD(A, a);
+    DDArg dd(a);
+    projectDD(A, dd, a);
+  }
+
+  template <typename Float, typename DDArg> void genericProjectDD(ColorSpinorField &a)
+  {
+    switch (a.Nspin()) {
+    case (1):
+      if constexpr (is_enabled_spin(1)) genericProjectDD<Float, DDArg, 1, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
+      break;
+    case (2):
+      if constexpr (is_enabled_spin(2)) genericProjectDD<Float, DDArg, 2, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
+      break;
+    case (4):
+      if constexpr (is_enabled_spin(4)) genericProjectDD<Float, DDArg, 4, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
+      break;
+    default: errorQuda("Nspin %d not implemented", a.Nspin());
+    }
   }
 
   template <typename Float> void genericProjectDD(ColorSpinorField &a)
   {
-
-    switch (a.Nspin()) {
-    case (1):
-      if constexpr (is_enabled_spin(1)) genericProjectDD<Float, 1, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
-      break;
-
-    case (2):
-      if constexpr (is_enabled_spin(2)) genericProjectDD<Float, 2, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
-      break;
-    case (4):
-      if constexpr (is_enabled_spin(4)) genericProjectDD<Float, 4, 3, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a);
-      break;
-    default: errorQuda("Nspin %d not implemented", a.Nspin());
+    switch (a.dd.type) {
+    case QUDA_DD_NO: genericProjectDD<Float, DDNo>(a); break;
+    case QUDA_DD_RED_BLACK: genericProjectDD<Float, DDRedBlack>(a); break;
+    default: errorQuda("DD type %d not implemented", a.dd.type);
     }
   }
 
