@@ -6,20 +6,20 @@
 namespace quda
 {
 
+  // Template structure
   struct DDArg {
 
     // Initialization of input parameters from ColorSpinorField
     virtual DDArg(const ColorSpinorField &in);
 
     // Whether field at given coord is zero
-    template <typename Coord> virtual constexpr inline bool isZero(const Coord &x) const;
+    template <typename Coord> virtual inline bool isZero(const Coord &x) const;
 
     // Whether do hopping with field at neighboring coord
-    template <typename Coord>
-    virtual constexpr inline bool doHopping(const Coord &x, const int &mu, const int &dir) const;
+    template <typename Coord> virtual inline bool doHopping(const Coord &x, const int &mu, const int &dir) const;
   };
 
-  struct DDNoArg : public DDArg {
+  struct DDNo : public DDArg {
 
     DDArg(const ColorSpinorField &in) { assert(in.dd.type == QUDA_DD_NO); }
 
@@ -28,7 +28,7 @@ namespace quda
     constexpr inline bool doHopping(const Coord &x, const int &mu, const int &dir) const { return true; }
   };
 
-  struct DDRedBlackArg : public DDArg {
+  struct DDRedBlack : public DDArg {
 
     const int_fastdiv blockDim[4]; // the size of the block per direction
     const bool red_active;         // if red blocks are active
@@ -59,7 +59,7 @@ namespace quda
       return (dir > 0) ? ((x[mu] + 1) % blockDim[mu] == 0) : (x[mu] % blockDim[mu] == 0);
     }
 
-    constexpr inline bool isZero(const Coord &x) const
+    inline bool isZero(const Coord &x) const
     {
       if (red_active and black_active) return false;
       if (not red_active and not black_active) return true;
@@ -73,7 +73,7 @@ namespace quda
       return true;
     }
 
-    constexpr inline bool doHopping(const Coord &x, const int &mu, const int &dir) const
+    inline bool doHopping(const Coord &x, const int &mu, const int &dir) const
     {
       if (red_active and black_active and blockhopping) return true;
       if (not red_active and not black_active) return false;
