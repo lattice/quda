@@ -149,7 +149,7 @@ namespace quda
     int composite_dim = 0; // e.g., number of eigenvectors in the set
     bool is_component = false;
     int component_id = 0; // eigenvector index
-    DDParam<int> dd {};
+    DDParam dd {};
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -384,6 +384,9 @@ namespace quda
     inline static int initGhostFaceBuffer = 0;
     inline static size_t ghostFaceBytes[QUDA_MAX_DIM] = {};
     static void freeGhostBuffer(void);
+
+    /** Domain decomposition options */
+    DDParam dd {};
 
     /**
        @brief Default constructor

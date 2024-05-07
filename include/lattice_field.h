@@ -479,9 +479,6 @@ namespace quda {
      */
     inline static int bufferIndex = 0;
 
-    /** Domain decomposition options */
-    DDParam<int> dd {};
-
     /**
        @brief Default constructor
     */
