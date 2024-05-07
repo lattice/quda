@@ -87,7 +87,7 @@ namespace quda {
   }
 
   // apply full operator
-  void DiracTwistedClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedClover::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     if (in.TwistFlavor() != out.TwistFlavor())
@@ -108,10 +108,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedClover::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -264,10 +264,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (!symmetric) { // asymmetric preconditioning
       Dslash(tmp, in, other_parity);
@@ -284,10 +284,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedCloverPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedCloverPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -306,7 +306,7 @@ namespace quda {
     }
 
     // we desire solution to full system
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       src[i] = x[i][other_parity].create_alias();
       sol[i] = x[i][this_parity].create_alias();
@@ -330,7 +330,7 @@ namespace quda {
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       checkFullSpinor(x[i], b[i]);
       // x_o = A_oo^-1 (b_o + k D_oe x_e)

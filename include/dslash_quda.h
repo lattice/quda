@@ -770,8 +770,8 @@ namespace quda
 
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.
-     @param[out] out Result color-spinor field
-     @param[in] in Input color-spinor field
+     @param[out] out Result color-spinor field set
+     @param[in] in Input color-spinor field set
      @param[in] d Which gamma matrix we are applying (C counting, so gamma_5 has d=4)
      @param[in] kappa kappa parameter
      @param[in] mu mu parameter
@@ -779,7 +779,7 @@ namespace quda
      @param[in] dagger Whether we are applying the dagger or not
      @param[in] twist The type of kernel we are doing
   */
-  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu,
+  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa, double mu,
 		       double epsilon, int dagger, QudaTwistGamma5Type type);
 
   /**

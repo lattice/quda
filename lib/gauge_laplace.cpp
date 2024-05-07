@@ -46,15 +46,15 @@ namespace quda {
     ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, dagger, comm_dim, profile);
   }
 
-  void GaugeLaplace::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplace::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     DslashXpay(out, in, QUDA_INVALID_PARITY, in, -kappa);
   }
 
-  void GaugeLaplace::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplace::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -91,10 +91,10 @@ namespace quda {
     return *this;
   }
 
-  void GaugeLaplacePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplacePC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
@@ -107,9 +107,9 @@ namespace quda {
     }
   }
 
-  void GaugeLaplacePC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeLaplacePC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }

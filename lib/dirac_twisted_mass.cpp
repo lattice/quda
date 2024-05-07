@@ -31,7 +31,7 @@ namespace quda {
   }
 
   // Protected method for applying twist
-  void DiracTwistedMass::twistedApply(ColorSpinorField &out, const ColorSpinorField &in,
+  void DiracTwistedMass::twistedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
 				      const QudaTwistGamma5Type twistType) const
   {
     checkParitySpinor(out, in);
@@ -39,7 +39,7 @@ namespace quda {
   }
 
   // Public method to apply the twist
-  void DiracTwistedMass::Twist(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedMass::Twist(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT);
   }
@@ -73,7 +73,7 @@ namespace quda {
   }
 
   // apply full operator  / (-kappa * D + (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1)) * in
-  void DiracTwistedMass::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedMass::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     if (in.TwistFlavor() != out.TwistFlavor())
@@ -91,10 +91,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedMass::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedMass::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -149,7 +149,7 @@ namespace quda {
   }
 
   // Public method to apply the inverse twist
-  void DiracTwistedMassPC::TwistInv(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedMassPC::TwistInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     twistedApply(out, in,  QUDA_TWIST_GAMMA5_INVERSE);
   }
@@ -216,10 +216,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedMassPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedMassPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (symmetric) {
       Dslash(tmp, in, other_parity);
@@ -230,10 +230,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedMassPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedMassPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -252,7 +252,7 @@ namespace quda {
     }
 
     // we desire solution to full system
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
 
     for (auto i = 0u; i < b.size(); i++) {
@@ -301,7 +301,7 @@ namespace quda {
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       checkFullSpinor(x[i], b[i]);
 

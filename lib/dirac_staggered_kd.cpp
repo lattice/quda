@@ -43,7 +43,7 @@ namespace quda
   }
 
   // Full staggered operator
-  void DiracStaggeredKD::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // Due to the staggered convention, the staggered part is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
@@ -52,7 +52,7 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (dagger == QUDA_DAG_NO) {
 
@@ -62,11 +62,11 @@ namespace quda
         ApplyStaggered(tmp, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
       }
 
-      ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
+      for (auto i = 0u; i < in.size(); i++) ApplyStaggeredKahlerDiracInverse(out[i], tmp[i], *Xinv, false);
 
     } else { // QUDA_DAG_YES
 
-      ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
+      for (auto i = 0u; i < in.size(); i++) ApplyStaggeredKahlerDiracInverse(tmp[i], in[i], *Xinv, true);
 
       if (mass == 0.) {
         ApplyStaggered(out, tmp, *gauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data, profile);
@@ -76,16 +76,16 @@ namespace quda
     }
   }
 
-  void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
 
-  void DiracStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
+    for (auto i = 0u; i < in.size(); i++) ApplyStaggeredKahlerDiracInverse(out[i], in[i], *Xinv, dagger == QUDA_DAG_YES);
   }
 
   void DiracStaggeredKD::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,

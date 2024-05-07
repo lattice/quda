@@ -50,15 +50,15 @@ namespace quda {
     ApplyClover(out, in, *clover, false, parity);
   }
 
-  void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracClover::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
   }
 
-  void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracClover::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -152,10 +152,10 @@ namespace quda {
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
-  void DiracCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (!symmetric) {
 
@@ -189,11 +189,11 @@ namespace quda {
     }
   }
 
-  void DiracCloverPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
     // and for multi-gpu the input and output fields cannot alias
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);

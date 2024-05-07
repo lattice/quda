@@ -59,17 +59,17 @@ namespace quda {
     ApplyDomainWall5D(out, in, *gauge, k, mass, x, parity, dagger, commDim.data, profile);
   }
 
-  void DiracDomainWall::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
 
     ApplyDomainWall5D(out, in, *gauge, -kappa5, mass, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
   }
 
-  void DiracDomainWall::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -122,11 +122,11 @@ namespace quda {
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
-  void DiracDomainWallPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWallPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkDWF(out, in);
     double kappa2 = -kappa5*kappa5;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
@@ -139,9 +139,9 @@ namespace quda {
     }
   }
 
-  void DiracDomainWallPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWallPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }

@@ -54,7 +54,7 @@ namespace quda {
   }
 
   // Full staggered operator
-  void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggered::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     // Need to flip sign via dagger convention if mass == 0.
@@ -72,9 +72,9 @@ namespace quda {
     }
   }
 
-  void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggered::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in.Even());
+    auto tmp = getFieldTmp(out.Even());
 
     //even
     Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
@@ -182,18 +182,18 @@ namespace quda {
   // NOT divide out the factor of "2m", i.e., for the even system we invert
   // (4m^2 - D_eo D_oe), not (1 - (1/(4m^2)) D_eo D_oe).
 
-  void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // Convention note: Dslash applies D_eo, DslashXpay applies 4m^2 - D_oe!
     // Note the minus sign convention in the Xpay version.
     // This applies equally for the e <-> o permutation.
 
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     Dslash(tmp, in, other_parity);
     DslashXpay(out, tmp, this_parity, in, 4 * mass * mass);
   }
 
-  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
+  void DiracImprovedStaggeredPC::MdagM(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const
   {
     errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead");
   }

@@ -40,17 +40,16 @@ namespace quda {
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim.data, profile);
   }
 
-  void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilson::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
   }
 
-  void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilson::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -107,10 +106,10 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilsonPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilsonPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
@@ -123,9 +122,9 @@ namespace quda {
     }
   }
 
-  void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilsonPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }

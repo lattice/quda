@@ -59,7 +59,7 @@ namespace quda {
     ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, Dslash5Type::DSLASH5_DWF);
   }
 
-  void DiracDomainWall4D::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4D::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
 
@@ -69,10 +69,10 @@ namespace quda {
     blas::xpay(in, -kappa5, out);
   }
 
-  void DiracDomainWall4D::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4D::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -132,11 +132,11 @@ namespace quda {
   }
 
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
-  void DiracDomainWall4DPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4DPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     double kappa2 = kappa5*kappa5;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (symmetric && !dagger) {
       // 1 - k^2 M5^-1 D4 M5^-1 D4
@@ -159,9 +159,9 @@ namespace quda {
     }
   }
 
-  void DiracDomainWall4DPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4DPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -179,7 +179,7 @@ namespace quda {
     }
 
     // we desire solution to full system
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       if (symmetric) {
         // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
@@ -204,7 +204,7 @@ namespace quda {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       checkFullSpinor(x[i], b[i]);
       // x_o = M5^-1 (b_o + k D4_oe x_e)
