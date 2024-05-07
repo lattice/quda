@@ -44,7 +44,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_u> struct StaggeredApply {
 
 #if defined(BUILD_MILC_INTERFACE) || defined(BUILD_TIFR_INTERFACE)
     StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
@@ -56,7 +56,7 @@ namespace quda
         constexpr int nDim = 4;
         constexpr bool improved = false;
 
-        StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
+        StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
@@ -69,7 +69,7 @@ namespace quda
         constexpr int nDim = 4;
         constexpr bool improved = false;
 
-        StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
+        StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
