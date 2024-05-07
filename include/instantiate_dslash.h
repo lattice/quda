@@ -17,7 +17,7 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename... Args>
+            typename DDArg, typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
@@ -40,6 +40,28 @@ namespace quda
 #endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the domain decomposition type
+     @param[out] out Output result field
+     @param[in] in Input field
+     @param[in] U Gauge field
+     @param[in] args Additional arguments for different dslash kernels
+  */
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
+            typename... Args>
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  {
+    if (out.dd.type == QUDA_DD_NO) {
+      instantiate<Apply, Recon, Float, 3, DDNoArg>(out, in, U, args...);
+#ifdef GPU_DD_DIRAC
+    } else if (out.dd.type == QUDA_DD_RED_BLACK) {
+      instantiate<Apply, Recon, Float, 3, DDRedBlackArg>(out, in, U, args...);
+#endif
+    } else {
+      errorQuda("Unsupported DD type %d\n", out.dd.type);
     }
   }
 

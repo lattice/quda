@@ -590,6 +590,8 @@ typedef enum QudaExtLibType_s {
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 
+typedef enum QudaDDType_s { QUDA_DD_NO, QUDA_DD_RED_BLACK, QUDA_DD_INVALID = QUDA_INVALID_ENUM } QudaDDType;
+
 #ifdef __cplusplus
 }
 #endif

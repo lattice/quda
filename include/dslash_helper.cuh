@@ -242,7 +242,7 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_> struct DslashArg {
+  template <typename Float_, int nDim_, typename DDArg> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
@@ -287,9 +287,9 @@ namespace quda
     int exterior_dims; // dimension to run in the exterior Dslash
     int exterior_blocks;
 
-    DDParam<int_fastdiv> dd_out;
-    DDParam<int_fastdiv> dd_in;
-    DDParam<int_fastdiv> dd_x;
+    DDArg dd_out;
+    DDArg dd_in;
+    DDArg dd_x;
 
     // for shmem ...
     static constexpr bool packkernel = false;
