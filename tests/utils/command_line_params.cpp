@@ -1151,9 +1151,6 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-
-  CLI::QUDACheckedTransformer fermion_smear_transform(fermion_smear_type_map);
-
   // Option group for propagator related options
   auto opgroup = quda_app->add_option_group("Propagator", "Options controlling propagator construction");
 
