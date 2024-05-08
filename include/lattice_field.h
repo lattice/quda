@@ -940,7 +940,7 @@ namespace quda {
   {
     const unwrap_t<T1> &a(a_);
     const unwrap_t<T2> &b(b_);
-    if (!a.dd.match(b.dd)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
+    if (!a.dd.match<true>(b.dd)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
     return true;
   }
 
@@ -955,7 +955,7 @@ namespace quda {
   inline bool DD_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
   {
     // checking all possible pairs
-    return (DD_(func, file, line, a, b) & DD_(func, file, line, a, args...) & DD_(func, file, line, b, args...));
+    return (DD_(func, file, line, a, b) && DD_(func, file, line, a, args...) && DD_(func, file, line, b, args...));
   }
 
 #define checkDD(...) DD_(__func__, __FILE__, __LINE__, __VA_ARGS__)

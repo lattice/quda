@@ -72,10 +72,9 @@ namespace quda
     }
 
     // Checks if this matches to given DDParam
-    // template <bool debug = false, typename T> // if true, prints debug information
+    template <bool debug = false> // if true, prints debug information
     inline bool match(const DDParam &dd) const
     {
-      bool debug = true;
       // if one of the two is not in use we return true, i.e. one of the two is a full field
       if (not *this or not dd) return true;
 
