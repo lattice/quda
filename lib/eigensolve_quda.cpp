@@ -143,9 +143,10 @@ namespace quda
     // Use 0th vector to extract meta data for the RNG.
     RNG rng(kSpace[0], 1234);
     for (int b = 0; b < block_size; b++) {
-      // If the spinor contains initial data from the user
-      // preserve it, else populate with rands.
-      if (sqrt(blas::norm2(kSpace[b])) == 0.0) { spinorNoise(kSpace[b], rng, QUDA_NOISE_UNIFORM); }
+      // If the spinor contains valid initial data from the user preserve it, else populate with rands.
+      // We use `!isfinite || norm == 0` instead of `isnormal` because subnormal vectors are still numerically legal
+      auto norm = blas::norm2(kSpace[b]);
+      if (!std::isfinite(norm) || norm == 0.0) { spinorNoise(kSpace[b], rng, QUDA_NOISE_UNIFORM); }
     }
 
     bool orthed = false;
