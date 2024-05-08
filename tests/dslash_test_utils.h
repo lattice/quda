@@ -815,7 +815,7 @@ struct DslashTestWrapper {
 
         blas::zero(cudaSpinorOut);
 
-        // We test it applying all 4 possible operators Drr, Drb, Dbr, Dbb
+        // We test that applying all 4 possible operators Drr, Drb, Dbr, Dbb gived D
         for (int col = 0; col < 4; col++) {
 
           cudaSpinor.dd.reset(DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
@@ -834,6 +834,9 @@ struct DslashTestWrapper {
           cudaSpinor.dd.reset();
           cudaSpinorTmp.dd.reset();
 
+          blas::xpy(cudaSpinorTmp, cudaSpinorOut);
+
+          // We also test that Dyx is same as D applied to projected in and out spinors
           cudaSpinorTmp2 = spinor;
           cudaSpinorTmp2.dd.reset(DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
           cudaSpinorTmp2.projectDD();
@@ -857,11 +860,7 @@ struct DslashTestWrapper {
           spinorOut = cudaSpinorTmp3;
 
           double deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorTmp, spinorOut)));
-          printfQuda("Deviaton source %d sink %d %e\n", col % 2, col / 2, deviation);
-
-          // here test cudaSpinorTmp==cudaSpinorTmp2
-
-          blas::xpy(cudaSpinorTmp, cudaSpinorOut);
+          printfQuda("Deviaton for (D-PDP)_{%d,%d}*spinor is %e\n", col % 2, col / 2, deviation);
         }
       } else {
         errorQuda("Test dd type not supported");
@@ -1115,10 +1114,6 @@ struct DslashTestWrapper {
       ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
       size_t ghost_bytes = cudaSpinor.GhostBytes();
-
-      printfQuda("dslash time event time %e %e %e\n", dslash_time.event_time, dslash_time.cpu_time, dslash_time.cpu_max);
-      printfQuda("niter %d\n", niter);
-      printfQuda("ghost_bytes %e\n", ghost_bytes);
 
       printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
                  "aggregate message size %lu bytes\n",

@@ -940,7 +940,7 @@ namespace quda {
   {
     const unwrap_t<T1> &a(a_);
     const unwrap_t<T2> &b(b_);
-    if (!a.dd.match<true>(b.dd)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
+    if (!a.dd.match(b.dd, true)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
     return true;
   }
 

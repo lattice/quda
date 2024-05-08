@@ -72,22 +72,21 @@ namespace quda
     }
 
     // Checks if this matches to given DDParam
-    template <bool debug = false> // if true, prints debug information
-    inline bool match(const DDParam &dd) const
+    inline bool match(const DDParam &dd, bool verbose = false) const
     {
       // if one of the two is not in use we return true, i.e. one of the two is a full field
       if (not *this or not dd) return true;
 
       // false if type does not match
       if (type != dd.type) {
-        if (debug) printfQuda("DD type do not match (%d != %d)\n", type, dd.type);
+        if (verbose) printfQuda("DD type do not match (%d != %d)\n", type, dd.type);
         return false;
       }
 
       if (type == QUDA_DD_RED_BLACK)
         for (int i = 0; i < QUDA_MAX_DIM; i++)
           if (blockDim[i] != dd.blockDim[i]) {
-            if (debug) printfQuda("blockDim[%d] = %d != %d \n", i, blockDim[i], dd.blockDim[i]);
+            if (verbose) printfQuda("blockDim[%d] = %d != %d \n", i, blockDim[i], dd.blockDim[i]);
             return false;
           }
 
