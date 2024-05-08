@@ -327,9 +327,7 @@ double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
 int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
-QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
-//std::array<int, 4> grid_partition = {1, 1, 1, 1};
 std::array<int, 4> covdev_mu = {1, 1, 1, 1};
 
 // Parameters for the (gaussian) quark smearing operator
@@ -457,9 +455,6 @@ namespace
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
                                                                 {"stout", QUDA_GAUGE_SMEAR_STOUT},
                                                                 {"ovr-imp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT}};
-  
-  CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
-                                                                    {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
 
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
@@ -1194,9 +1189,6 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
                       "Set the number of sink smearing steps (default 0)");
-
-  opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
-    ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
 
   quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
                          "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");

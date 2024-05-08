@@ -5214,14 +5214,6 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
-//void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double omega){
-//  performFermionSmearQuda(h_out, h_in, param, n_steps, omega, QUDA_FERMION_SMEAR_TYPE_GAUSSIAN);
-//}
-
-//void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha) {
-//  performFermionSmearQuda(h_out, h_in, param, n_steps, alpha, QUDA_FERMION_SMEAR_TYPE_WUPPERTAL);
-//}
-
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
 {
   auto profile = pushProfile(profileWuppertal);
