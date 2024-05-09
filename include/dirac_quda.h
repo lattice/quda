@@ -231,7 +231,8 @@ namespace quda {
        @brief Similar to the Xpay version of Dslash, but used only by the Laplace op for 
        smearing.
     */
-    virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, double, double, int, QudaParity) const
+    virtual void SmearOp(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                         double, double, int, QudaParity) const
     {
       errorQuda("Not implemented.");
     }
@@ -1374,7 +1375,8 @@ public:
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, double a, double b, int t0, QudaParity parity) const;
+    void SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 double a, double b, int t0, QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1615,7 +1617,8 @@ public:
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, double a, double b, int t0, QudaParity parity) const;
+    void SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 double a, double b, int t0, QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered

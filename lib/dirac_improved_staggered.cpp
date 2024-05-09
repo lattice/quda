@@ -104,21 +104,22 @@ namespace quda {
   {
     // do nothing
   }
-  
-  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double, const double,
-                             const int t0, const QudaParity parity) const
+
+  void DiracImprovedStaggered::SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                       double, double, int t0, QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 
-    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3)*in.X(3) ? true : false;
+    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3) * in[0].X(3) ? true : false;
     if( is_time_slice && laplace3D > 3 )
     {
-      if (getVerbosity() == QUDA_DEBUG_VERBOSE) warningQuda("t0 will be ignored for d>3 dimensional Laplacian.");
+      logQuda(QUDA_DEBUG_VERBOSE, "t0 will be ignored for d>3 dimensional Laplacian");
       is_time_slice = false;
     }
 
-    int t0_local = t0 - comm_coord(3)*in.X(3);
-    if( is_time_slice && ( t0_local < 0 || t0_local >= in.X(3) ) ) t0_local = -1; // when source is not in this local lattice
+    int t0_local = t0 - comm_coord(3) * in[0].X(3);
+    if (is_time_slice && (t0_local < 0 || t0_local >= in[0].X(3)))
+      t0_local = -1; // when source is not in this local lattice
 
     int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative
@@ -126,9 +127,9 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
- 
-    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET){
-      errorQuda( "Single parity site smearing is not supported yet." );
+
+    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+      errorQuda("Single parity site smearing not supported");
     } else {
       ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     }

@@ -16,11 +16,15 @@ namespace quda
   */
   template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
   struct StaggeredQSmearArg : DslashArg<Float, nDim> {
+    static constexpr bool improved = true;
     static constexpr int nColor = 3;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
+
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
+                                                    spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
@@ -29,9 +33,12 @@ namespace quda
 
     using real = typename mapper<Float>::type;
 
-    F out;           /** output vector field */
-    const F in;      /** input vector field */
-    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
+    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
+    const int_fastdiv n_src;
+    F out[max_n_src]; /** output vector field */
+    F in[max_n_src];  /** input vector field */
+    Ghost halo_pack;  /** input vector field used in packing to be able to independently resetGhost */
+    Ghost halo;       /** input vector field used in packing to be able to independently resetGhost */
     const G U;       /** the gauge field */
     int dir;         /** The direction from which to omit the derivative */
     int t0;
@@ -43,24 +50,29 @@ namespace quda
     int threadDimMapUpper_t0[4];
     int threadDimMapLower_t0[4];
 
-    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0,
-                       bool is_t0_kernel, int parity, int dir, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, in, parity, dagger, false, 3, false, comm_override),
-      out(out, 3),
-      in(in, 3),
-      in_pack(in, 3),
+    StaggeredQSmearArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                       const ColorSpinorField &halo, const GaugeField &U, int t0, bool is_t0_kernel, int parity,
+                       int dir, bool dagger, const int *comm_override) :
+      DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, improved ? 3 : 1, false, comm_override),
+      halo_pack(halo, improved ? 3 : 1),
+      halo(halo, improved ? 3 : 1),
       U(U),
       dir(dir),
       t0(t0),
       is_t0_kernel(is_t0_kernel),
-      t0_offset(is_t0_kernel ? in.VolumeCB() / in.X(3) : 0)
+      t0_offset(is_t0_kernel ? in[0].VolumeCB() / in[0].X(3) : 0)
     {
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->in[i] = in[i];
+      }
+
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
 
       for (int i = 0; i < 4; i++) {
         t0_face_offset[i] = is_t0_kernel ? (int)(this->dc.face_XYZ[i]) / 2 : 0;
         face_size[i] = 3 * this->dc.ghostFaceCB[i]; // 3=Nface
-        t0_face_size[i] = (is_t0_kernel && i < 3) ? face_size[i] / in.X(3) : face_size[i];
+        t0_face_size[i] = (is_t0_kernel && i < 3) ? face_size[i] / in[0].X(3) : face_size[i];
       }
 
       // partial replication of dslash::setFusedParam()
@@ -88,7 +100,7 @@ namespace quda
   */
   template <int nParity, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggeredQSmear(Vector &out, Arg &arg, Coord &coord, int parity, int,
-                                                       int thread_dim, bool &active)
+                                                       int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -107,13 +119,14 @@ namespace quda
             const int ghost_idx
               = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 2); // check nFace=2, requires improved staggered fields
             const Link U = arg.U(d, coord.x_cb, parity);
-            const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity); //?
+            const Vector in
+              = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity); //?
 
             out = mv_add(U, in, out);
 
           } else if (doBulk<kernel_type>() && !ghost) { // doBulk
             const int _2hop_fwd_idx = linkIndexP2(coord, arg.dim, d);
-            const Vector in_2hop = arg.in(_2hop_fwd_idx, their_spinor_parity);
+            const Vector in_2hop = arg.in[src_idx](_2hop_fwd_idx, their_spinor_parity);
             const Link U_2link = arg.U(d, coord.x_cb, parity);
             out = mv_add(U_2link, in_2hop, out);
           }
@@ -128,7 +141,8 @@ namespace quda
             const int ghost_idx
               = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 2); // check nFace=2, requires improved staggered field
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
-            const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+            const Vector in
+              = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
             out = mv_add(conj(U), in, out);
 
@@ -138,7 +152,7 @@ namespace quda
             const int _2hop_gauge_idx = _2hop_back_idx;
 
             const Link U_2link = arg.U(d, _2hop_gauge_idx, parity);
-            const Vector in_2hop = arg.in(_2hop_back_idx, their_spinor_parity);
+            const Vector in_2hop = arg.in[src_idx](_2hop_back_idx, their_spinor_parity);
             out = mv_add(conj(U_2link), in_2hop, out);
           }
         }
@@ -154,7 +168,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity) // Kernel3D_impl
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity) // Kernel3D_impl
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, 1>;
@@ -188,7 +202,7 @@ namespace quda
         }
       }
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -196,19 +210,21 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3: applyStaggeredQSmear<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 3:
+        applyStaggeredQSmear<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
       case 4:
       default:
-        applyStaggeredQSmear<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
+        applyStaggeredQSmear<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
         break;
       }
 
       if (mykernel_type != INTERIOR_KERNEL) {
-        Vector x = arg.out(coord.x_cb, my_spinor_parity);
+        Vector x = arg.out[src_idx](coord.x_cb, my_spinor_parity);
         out = x + out;
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
     }
   };
 

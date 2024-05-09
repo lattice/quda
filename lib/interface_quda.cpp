@@ -4852,10 +4852,10 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  checkInvertParam(inv_param);
 
-  if ( gaugeSmeared == nullptr || smear_param->compute_2link != 0 ) {
+  if (gaugeSmeared == nullptr || smear_param->compute_2link != 0) {
 
-    logQuda(QUDA_VERBOSE, "Gaussian smearing done with gaugeSmeared\n");
     freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
 
     GaugeFieldParam gParam(*gaugePrecise);
@@ -4880,10 +4880,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   }
 
   if (!initialized) errorQuda("QUDA not initialized");
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
-
-  checkInvertParam(inv_param);
 
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
@@ -4955,7 +4951,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   // Copy device data to host.
   in_h = out;
 
-  logQuda(QUDA_VERBOSE, "Finished 2link Gaussian smearing.\n");
   delete d;
 
   if (smear_param->delete_2link != 0) { freeUniqueGaugeQuda(QUDA_SMEARED_LINKS); }

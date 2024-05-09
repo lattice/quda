@@ -157,8 +157,6 @@ option(QUDA_COVDEV "build code for covariant derivative" OFF)
 
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
-option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
-
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
@@ -316,10 +314,6 @@ endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
-endif()
-
-if(QUDA_SMEAR_GAUSS_TWOLINK AND NOT QUDA_DIRAC_STAGGERED)
-  message(SEND_ERROR "Specifying QUDA_SMEAR_GAUSS_TWOLINK requires QUDA_DIRAC_STAGGERED.")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
