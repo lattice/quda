@@ -456,7 +456,7 @@ namespace quda
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int *X() const { return x.data; }
-    int X(int d) const { return x[d]; }
+    int X(int d) const { return d < nDim ? x[d] : 1; }
     size_t Length() const { return length; }
     size_t Bytes() const { return bytes; }
     size_t TotalBytes() const { return bytes; }
