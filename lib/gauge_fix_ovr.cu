@@ -68,6 +68,9 @@ namespace quda {
     unsigned long threads;
     bool halo;
 
+    virtual int blockStep() const { return 32; }
+    virtual int blockMin() const { return 32; }
+
     bool advanceAux(TuneParam &param) const
     {
       param.aux.x = (param.aux.x + 1) % 6;
