@@ -19,6 +19,7 @@ namespace quda {
       in(in),
       d(d)
     {
+      setRHSstring(aux, in.size());
       apply(device::get_default_stream());
     }
 
@@ -64,6 +65,7 @@ namespace quda {
       dagger(dagger),
       type(type)
     {
+      setRHSstring(aux, in.size());
       if (d != 4) errorQuda("Unexpected d=%d", d);
       apply(device::get_default_stream());
     }
