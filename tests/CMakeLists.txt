@@ -214,13 +214,6 @@ if(QUDA_CONTRACT)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_SMEAR_GAUSS_TWOLINK)
-  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
-  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
-  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
-endif()
-
 if(QUDA_DIRAC_STAGGERED)
   add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
@@ -251,6 +244,11 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 add_executable(gauge_path_test gauge_path_test.cpp)
@@ -1463,9 +1461,7 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
                      --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
-  endif()
 
-  if(QUDA_SMEAR_GAUSS_TWOLINK)
     set(KERNEL_TYPE TwoLink GaussianSmear)
     foreach(kerneltp IN LISTS KERNEL_TYPE)
       if(${kerneltp} STREQUAL "TwoLink")

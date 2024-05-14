@@ -146,15 +146,6 @@
 #define GPU_CONTRACT
 #endif
 
-#cmakedefine QUDA_SMEAR_GAUSS_TWOLINK
-#ifdef QUDA_SMEAR_GAUSS_TWOLINK
-/**
- * @def   GPU_TWOLINK_GSMEAR
- * @brief This macro is set when we have the two link smearing enabled
- */
-#define GPU_TWOLINK_GSMEAR
-#endif
-
 #cmakedefine QUDA_MULTIGRID
 #ifdef QUDA_MULTIGRID
 /**
