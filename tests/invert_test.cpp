@@ -166,22 +166,26 @@ void init(int argc, char **argv)
   constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
 
   // Allocate host side memory for clover terms if needed.
-  //----------------------------------------------------------------------------
-  // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     clover.resize(V * clover_site_size * host_clover_data_type_size);
     clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
   }
 
-  // Load the gauge field to the device
-  loadGaugeQuda(gauge.data(), &gauge_param);
+  if (!enable_testing) {
+    // Load the gauge field to the device
+    loadGaugeQuda(gauge.data(), &gauge_param);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    // Load the clover terms to the device
-    loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      // Load the clover terms to the device
+      loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
+    }
+
+    // Compute plaquette as a sanity check
+    double plaq[3];
+    plaqQuda(plaq);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
-  last_prec = gauge_param.cuda_prec;
 }
 
 std::vector<std::array<double, 2>> solve(test_t param)
@@ -190,8 +194,10 @@ std::vector<std::array<double, 2>> solve(test_t param)
   inv_param.clover_cuda_prec = ::testing::get<0>(param);
   inv_param.cuda_prec_sloppy = ::testing::get<1>(param);
   inv_param.cuda_prec_refinement_sloppy = ::testing::get<1>(param);
+  inv_param.cuda_prec_eigensolver = ::testing::get<1>(param);
   inv_param.clover_cuda_prec_sloppy = ::testing::get<1>(param);
   inv_param.clover_cuda_prec_refinement_sloppy = ::testing::get<1>(param);
+  inv_param.clover_cuda_prec_eigensolver = ::testing::get<1>(param);
   inv_param.inv_type = ::testing::get<2>(param);
   inv_param.solution_type = ::testing::get<3>(param);
   inv_param.solve_type = ::testing::get<4>(param);
@@ -421,11 +427,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
 
   init(argc, argv);
-
-  // Compute plaquette as a sanity check
-  double plaq[3];
-  plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   int result = 0;
   if (enable_testing) { // tests are defined in invert_test_gtest.hpp

@@ -103,20 +103,28 @@ void init(int argc, char **argv)
   gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
   for (int i = 0; i < 4; i++) gauge[i] = gauge_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
   constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
-  // Load the gauge field to the device
-  loadGaugeQuda(gauge.data(), &gauge_param);
 
   // Allocate host side memory for clover terms if needed.
-  //----------------------------------------------------------------------------
-  // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     clover.resize(V * clover_site_size * host_clover_data_type_size);
     clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover.data(), clover_inv.data(), eig_inv_param);
-    // Load the clover terms to the device
-    loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
   }
-  last_prec = gauge_param.cuda_prec;
+
+  if (!enable_testing) {
+    // Load the gauge field to the device
+    loadGaugeQuda(gauge.data(), &gauge_param);
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      // Load the clover terms to the device
+      loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
+    }
+
+    // Compute plaquette as a sanity check
+    double plaq[3];
+    plaqQuda(plaq);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
 }
 
 std::vector<double> eigensolve(test_t test_param)
@@ -124,6 +132,9 @@ std::vector<double> eigensolve(test_t test_param)
   // Collect testing parameters from gtest
   eig_inv_param.cuda_prec = ::testing::get<0>(test_param);
   eig_inv_param.cuda_prec_eigensolver = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_sloppy = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_precondition = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_refinement_sloppy = ::testing::get<0>(test_param);
   eig_param.eig_type = ::testing::get<1>(test_param);
   eig_param.use_norm_op = ::testing::get<2>(test_param);
   eig_param.use_pc = ::testing::get<3>(test_param);
@@ -177,6 +188,7 @@ std::vector<double> eigensolve(test_t test_param)
   std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
+
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
@@ -261,11 +273,6 @@ int main(int argc, char **argv)
 
   // Initialise this test (parameters, gauge, clover)
   init(argc, argv);
-
-  // Compute plaquette as a sanity check
-  double plaq[3];
-  plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   int result = 0;
   if (enable_testing) { // tests are defined in invert_test_gtest.hpp
