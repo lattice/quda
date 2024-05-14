@@ -114,6 +114,7 @@ namespace quda {
     TauApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d) :
       TunableKernel3D(in[0], in.size(), in.SiteSubset()), out(out), in(in), d(d)
     {
+      setRHSstring(aux, in.size());
       apply(device::get_default_stream());
     }
 
