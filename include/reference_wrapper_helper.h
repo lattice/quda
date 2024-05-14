@@ -167,8 +167,11 @@ namespace quda
    */
   template <class T>
   class vector_ref : public std::vector<std::reference_wrapper<T>> {
-    using vector = std::vector<std::reference_wrapper<T>>;
+  public:
     using value_type = T;
+
+  private:
+    using vector = std::vector<std::reference_wrapper<T>>;
 
     /**
        make_set is a helper function that creates a vector of
@@ -349,6 +352,15 @@ namespace quda
     }
 
     template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Length() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).Length() != operator[](i).Length())
+          errorQuda("Lengths do not match %lu != %lu", operator[](i - 1).Length(), operator[](i).Length());
+      return operator[](0).Length();
+    }
+
+    template <class U = T>
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Bytes() const
     {
       size_t bytes = 0;
@@ -425,7 +437,7 @@ namespace quda
     if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d requested", parity);
     vector_ref<typename T::value_type> out;
     out.reserve(in.size());
-    for (auto i = 0u; i < in.size(); i++) out.push_back(parity == QUDA_EVEN_PARITY ? in[i].Even() : in[i].Odd());
+    for (auto i = 0u; i < in.size(); i++) out.push_back(in[i][parity]);
     return out;
   }
 
