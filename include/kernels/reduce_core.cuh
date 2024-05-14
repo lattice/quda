@@ -23,7 +23,7 @@ namespace quda
        @tparam Reducer_ Functor used to operate on data
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
-    struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t, Reducer_::use_kernel_arg> {
+    struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using real = real_;
       static constexpr int n = n_;
       using Reducer = Reducer_;
@@ -41,7 +41,7 @@ namespace quda
       ReductionArg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                    cvector_ref<ColorSpinorField> &w, cvector_ref<ColorSpinorField> &v, Reducer r, int length,
                    int nParity) :
-        ReduceArg<reduce_t, Reducer_::use_kernel_arg>(dim3(length, 1, x.size()), x.size()),
+        ReduceArg<reduce_t>(dim3(length, 1, x.size()), x.size()),
         r(r),
         length_cb(length / nParity),
         nParity(nParity)
@@ -64,8 +64,6 @@ namespace quda
       Arg &arg;
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
-        // The safety of making the arg non-const (required for HQ residual) is guaranteed
-        // by setting `use_kernel_arg = use_kernel_arg_p::ALWAYS` inside the functors.
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -83,9 +81,7 @@ namespace quda
         if (arg.r.read.W) arg.W[src_idx].load(w, i, parity);
         if (arg.r.read.V) arg.V[src_idx].load(v, i, parity);
 
-        arg.r.pre();
         arg.r(sum, x, y, z, w, v, src_idx);
-        arg.r.post(sum);
 
         if (arg.r.write.X) arg.X[src_idx].save(x, i, parity);
         if (arg.r.write.Y) arg.Y[src_idx].save(y, i, parity);
@@ -105,16 +101,9 @@ namespace quda
     */
     template <typename reduce_t_, bool site_unroll_ = false>
     struct ReduceFunctor {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = reduce_t_;
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = site_unroll_;
-
-      //! pre-computation routine called before the "M-loop"
-      __device__ __host__ void pre() const { ; }
-
-      //! post-computation routine called after the "M-loop"
-      __device__ __host__ void post(reduce_t &) const { ; }
     };
 
     template <typename reduce_t, typename real>
@@ -123,7 +112,7 @@ namespace quda
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
       Max(cvector<double> &, cvector<double> &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &, T &, T &, T &, int) const
+      template <typename T> __device__ __host__ void operator()(reduce_t &max,  T &x, T &, T &, T &, T &, int) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -141,7 +130,7 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
       MaxDeviation(cvector<double> &, cvector<double> &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &y, T &, T &, T &, int) const
+      template <typename T> __device__ __host__ void operator()(reduce_t &max,  T &x, T &y, T &, T &, T &, int) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -494,34 +483,24 @@ namespace quda
     */
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       using reduce_t = array<real_reduce_t, 3>;
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-      reduce_t aux;
-      HeavyQuarkResidualNorm_(cvector<double> &, cvector<double> &) : aux {} { ; }
+      HeavyQuarkResidualNorm_(cvector<double> &, cvector<double> &) { }
 
-      __device__ __host__ void pre()
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &, int)
       {
-        aux[0] = 0;
-        aux[1] = 0;
-      }
+        reduce_t aux = {};
 
-      template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &, T &, T &, int)
-      {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           norm2_<real_reduce_t, real>(aux[0], x[i]);
           norm2_<real_reduce_t, real>(aux[1], y[i]);
         }
-      }
 
-      //! sum the solution and residual norms, and compute the heavy-quark norm
-      __device__ __host__ void post(reduce_t &sum)
-      {
         sum[0] += aux[0];
         sum[1] += aux[1];
         sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0);
@@ -541,34 +520,24 @@ namespace quda
     */
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       using reduce_t = array<real_reduce_t, 3>;
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
-      reduce_t aux;
-      xpyHeavyQuarkResidualNorm_(cvector<double> &, cvector<double> &) : aux {} { ; }
+      xpyHeavyQuarkResidualNorm_(cvector<double> &, cvector<double> &) { }
 
-      __device__ __host__ void pre()
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int)
       {
-        aux[0] = 0;
-        aux[1] = 0;
-      }
+        reduce_t aux = {};
 
-      template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &z, T &, T &, int)
-      {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           norm2_<real_reduce_t, real>(aux[0], x[i] + y[i]);
           norm2_<real_reduce_t, real>(aux[1], z[i]);
         }
-      }
 
-      //! sum the solution and residual norms, and compute the heavy-quark norm
-      __device__ __host__ void post(reduce_t &sum)
-      {
         sum[0] += aux[0];
         sum[1] += aux[1];
         sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0);
@@ -589,7 +558,7 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       tripleCGReduction_(cvector<double> &, cvector<double> &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int) const
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum,  T &x, T &y, T &z, T &, T &, int) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {

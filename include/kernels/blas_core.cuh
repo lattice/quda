@@ -22,7 +22,7 @@ namespace quda
        @tparam Functor_ Functor used to operate on data
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
-    struct BlasArg : kernel_param<Functor_::use_kernel_arg> {
+    struct BlasArg : kernel_param<> {
       using real = real_;
       using Functor = Functor_;
       static constexpr int n = n_;
@@ -37,7 +37,7 @@ namespace quda
       const int nParity;
       BlasArg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
               cvector_ref<ColorSpinorField> &w, cvector_ref<ColorSpinorField> &v, Functor f, int length, int nParity) :
-        kernel_param<Functor::use_kernel_arg>(dim3(length, x.size(), nParity)), f(f), nParity(nParity)
+        kernel_param(dim3(length, x.size(), nParity)), f(f), nParity(nParity)
       {
         for (auto i = 0u; i < x.size(); i++) {
           X[i] = x[i];
@@ -56,8 +56,6 @@ namespace quda
       Arg &arg;
       constexpr Blas_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
-        // The safety of making the arg non-const (required for caxpyxmazMR) is guaranteed
-        // by settting `use_kernel_arg = use_kernel_arg_p::ALWAYS` inside the functor.
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -88,9 +86,8 @@ namespace quda
        Base class from which all blas functors should derive
     */
     struct BlasFunctor {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       //! pre-computation routine before the main loop
-      __device__ __host__ void init(int) const { ; }
+      __device__ __host__ void init(int) const { }
     };
 
     /**
@@ -418,34 +415,26 @@ namespace quda
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
-    template <typename real> struct caxpyxmazMR_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
+    template <typename real> struct caxpyxmazMR_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a[MAX_MULTI_RHS];
       double3 *Ar3;
-      bool init_;
       caxpyxmazMR_(cvector<double> &a, cvector<double> &, cvector<double> &) :
-        Ar3(static_cast<double3 *>(reducer::get_device_buffer())), init_(false)
+        Ar3(static_cast<double3 *>(reducer::get_device_buffer()))
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
       }
 
-      __device__ __host__ void init(int j)
-      {
-        if (!init_) {
-          double3 result = Ar3[j];
-          a[j] = a[j].real() * complex<real>((real)result.x, (real)result.y) * ((real)1.0 / (real)result.z);
-          init_ = true;
-        }
-      }
-
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
+        auto ar3 = Ar3[j];
+        auto aj = a[j].real() * complex<real>((real)ar3.x, (real)ar3.y) * ((real)1.0 / (real)ar3.z);
+
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a[j], x[i], y[i]);
-          x[i] = cmac(-a[j], z[i], x[i]);
+          y[i] = cmac(aj, x[i], y[i]);
+          x[i] = cmac(-aj, z[i], x[i]);
         }
       }
 
