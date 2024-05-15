@@ -7,31 +7,29 @@
 namespace quda
 {
 
-  // This is the maximum number of color spinors we can process in a single kernel
-  // FIXME - make this multi-RHS once we have the multi-RHS framework developed
-#define MAX_NVECTOR 1
-
-  template <typename Float, int nColor_, int nvector_, bool doublet_> struct CloverSigmaOprodArg : kernel_param<> {
+  template <typename Float, int nColor_, bool doublet_> struct CloverSigmaOprodArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
-    static constexpr int nvector = nvector_;
     static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
-    using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type;
+
+    static constexpr int max_n_rhs = MAX_MULTI_RHS;
+    const unsigned int n_rhs;
 
     Oprod oprod;
     const unsigned int volume_4d_cb;
-    F inA[nvector];
-    F inB[nvector];
-    array_2d<real, nvector, 2> coeff;
+    F inA[max_n_rhs];
+    F inB[max_n_rhs];
+    array_2d<real, max_n_rhs, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                         cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :
-      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), oprod(oprod), volume_4d_cb(inA[0].VolumeCB() / 2)
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)), n_rhs(inA.size()), oprod(oprod), volume_4d_cb(inA[0].VolumeCB() / 2)
     {
-      for (int i = 0; i < nvector; i++) {
+      for (auto i = 0u; i < n_rhs; i++) {
         this->inA[i] = inA[i];
         this->inB[i] = inB[i];
         coeff[i] = {static_cast<real>(coeff_[i][0]), static_cast<real>(coeff_[i][1])};
@@ -44,10 +42,10 @@ namespace quda
   {
     using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-    Link result;
+    Link result = {};
 
 #pragma unroll
-    for (int i = 0; i < Arg::nvector; i++) {
+    for (int i = 0; i < arg.n_rhs; i++) {
 #pragma unroll
       for (int flavor = 0; flavor < Arg::n_flavor; flavor++) {
         const int flavor_offset_idx = flavor * (arg.volume_4d_cb);

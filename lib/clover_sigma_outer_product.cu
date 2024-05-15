@@ -12,7 +12,7 @@ namespace quda {
 
   template <typename Float, int nColor> class CloverSigmaOprod : public TunableKernel3D
   {
-    template <int nvector, bool doublet> using Arg = CloverSigmaOprodArg<Float, nColor, nvector, doublet>;
+    template <bool doublet> using Arg = CloverSigmaOprodArg<Float, nColor, doublet>;
     GaugeField &oprod;
     cvector_ref<const ColorSpinorField> &inA;
     cvector_ref<const ColorSpinorField> &inB;
@@ -31,24 +31,17 @@ namespace quda {
       doublet(inA[0].TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET)
     {
       if (doublet) strcat(aux, ",doublet");
-      char tmp[16];
-      sprintf(tmp, ",nvector=%lu", inA.size());
-      strcat(aux, tmp);
+      setRHSstring(aux, inA.size());
       apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      switch (inA.size()) {
-      case 1:
-        if (doublet)
-          launch<SigmaOprod>(tp, stream, Arg<1, true>(oprod, inA, inB, coeff));
-        else
-          launch<SigmaOprod>(tp, stream, Arg<1, false>(oprod, inA, inB, coeff));
-        break;
-      default: errorQuda("Unsupported nvector = %lu\n", inA.size());
-      }
+      if (doublet)
+        launch<SigmaOprod>(tp, stream, Arg<true>(oprod, inA, inB, coeff));
+      else
+        launch<SigmaOprod>(tp, stream, Arg<false>(oprod, inA, inB, coeff));
     } // apply
 
     void preTune() override { oprod.backup(); }
@@ -62,14 +55,14 @@ namespace quda {
       // ((spin trace + multiply-add) * n_flavor * n_vector + projection) * 6 dir * sites
       return ((oprod_flops + 2 * mat_size) * n_flavor * inA.size() + mat_size) * 6 * oprod.Volume();
     }
-    long long bytes() const override { return (inA[0].Bytes() + inB[0].Bytes()) * inA.size() * 6 + 2 * oprod.Bytes(); }
+    long long bytes() const override { return (inA.Bytes() + inB.Bytes()) * 6 + 2 * oprod.Bytes(); }
   }; // CloverSigmaOprod
 
   void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
                                cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff)
   {
     if constexpr (is_enabled_clover()) {
-      if (x.size() > MAX_NVECTOR) {
+      if (x.size() > MAX_MULTI_RHS) {
         // divide and conquer
         computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin(), x.begin() + x.size() / 2},
                                 cvector_ref<const ColorSpinorField> {p.begin(), p.begin() + p.size() / 2},
