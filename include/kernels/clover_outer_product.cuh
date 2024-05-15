@@ -37,7 +37,7 @@ namespace quda {
       kernel_param(dim3(
         dim == -1 ? (x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? x.VolumeCB() / 2 : x.VolumeCB()) :
                     (x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? x.GhostFaceCB()[dim] / 2 : x.GhostFaceCB()[dim]),
-        x.SiteSubset())),
+        x.SiteSubset(), dim == -1 ? 4 : 1)),
       force(force),
       x(x),
       p(p),
@@ -72,42 +72,48 @@ namespace quda {
     constexpr Interior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    template <int mu> __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       using Complex = complex<typename Arg::real>;
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
       using Link = Matrix<Complex, Arg::nColor>;
 
+      int shift[4] = {0, 0, 0, 0};
+      shift[mu] = 1;
+      const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, parity, arg.X);
+
+      if (nbr_idx >= 0) {
+        Link result = {};
 #pragma unroll
-      for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
+        for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
+          const int flavor_offset_idx = flavor * arg.volume_4d_cb;
+          Spinor A = arg.p(x_cb + flavor_offset_idx, parity);
+          Spinor C = arg.x(x_cb + flavor_offset_idx, parity);
+          Spinor B_shift = arg.x(nbr_idx + flavor_offset_idx, 1 - parity);
+          Spinor D_shift = arg.p(nbr_idx + flavor_offset_idx, 1 - parity);
 
-        const int flavor_offset_idx = flavor * arg.volume_4d_cb;
-        Spinor A = arg.p(x_cb + flavor_offset_idx, parity);
-        Spinor C = arg.x(x_cb + flavor_offset_idx, parity);
+          B_shift = (B_shift.project(mu, 1)).reconstruct(mu, 1);
+          result += outerProdSpinTrace(B_shift, A);
 
-#pragma unroll
-        for (int dim = 0; dim < 4; ++dim) {
-          int shift[4] = {0, 0, 0, 0};
-          shift[dim] = 1;
-          const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, parity, arg.X);
+          D_shift = (D_shift.project(mu, -1)).reconstruct(mu, -1);
+          result += outerProdSpinTrace(D_shift, C);
+        } // flavor
 
-          if (nbr_idx >= 0) {
-            Spinor B_shift = arg.x(nbr_idx + flavor_offset_idx, 1 - parity);
-            Spinor D_shift = arg.p(nbr_idx + flavor_offset_idx, 1 - parity);
+        Link force = arg.force(mu, x_cb, parity);
+        Link U = arg.U(mu, x_cb, parity);
+        force = force + U * result * arg.coeff;
+        arg.force(mu, x_cb, parity) = force;
+      }
+    }
 
-            B_shift = (B_shift.project(dim, 1)).reconstruct(dim, 1);
-            Link result = outerProdSpinTrace(B_shift, A);
-
-            D_shift = (D_shift.project(dim, -1)).reconstruct(dim, -1);
-            result += outerProdSpinTrace(D_shift, C);
-
-            Link temp = arg.force(dim, x_cb, parity);
-            Link U = arg.U(dim, x_cb, parity);
-            result = temp + U * result * arg.coeff;
-            arg.force(dim, x_cb, parity) = result;
-          }
-        } // dim
-      }   // flavor
+    __device__ __host__ inline void operator()(int x_cb, int parity, int mu)
+    {
+      switch (mu) {
+      case 0: this->operator()<0>(x_cb, parity); break;
+      case 1: this->operator()<1>(x_cb, parity); break;
+      case 2: this->operator()<2>(x_cb, parity); break;
+      case 3: this->operator()<3>(x_cb, parity); break;
+      }
     }
   };
 
@@ -116,7 +122,7 @@ namespace quda {
     constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int parity, int)
     {
       using Complex = complex<typename Arg::real>;
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;

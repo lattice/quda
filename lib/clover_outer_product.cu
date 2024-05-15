@@ -7,7 +7,7 @@ namespace quda {
 
   enum OprodKernelType { INTERIOR, EXTERIOR };
 
-  template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel2D
+  template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel3D
   {
     using real = typename mapper<Float>::type;
     template <int dim = -1, bool doublet = false> using Arg = CloverForceArg<Float, nColor, recon, dim, doublet>;
@@ -28,7 +28,7 @@ namespace quda {
   public:
     CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField &p, const ColorSpinorField &x,
                 double coeff) :
-      TunableKernel2D(force, x.SiteSubset()),
+      TunableKernel3D(force, x.SiteSubset(), 4),
       force(force),
       U(U),
       p(p),
@@ -44,7 +44,8 @@ namespace quda {
       kernel = INTERIOR;
       apply(device::get_default_stream());
 
-      for (int i=3; i>=0; i--) {
+      for (int i = 3; i >= 0; i--) {
+        resizeVector(x.SiteSubset(), 1);
         dir = i;
         if (!commDimPartitioned(i)) continue;
         strcpy(aux, aux2);
@@ -115,7 +116,7 @@ namespace quda {
     long long bytes() const override
     {
       if (kernel == INTERIOR) {
-        return x.Bytes() + p.Bytes() + 4 * (x.Bytes() + p.Bytes()) + 2 * force.Bytes() + U.Bytes();
+        return 8 * (x.Bytes() + p.Bytes()) + 2 * force.Bytes() + U.Bytes();
       } else {
         return minThreads() * n_flavor
           * (nColor * (2 * x.Nspin() + 2 * x.Nspin() / 2) * 2 + 2 * force.Reconstruct() + U.Reconstruct())
