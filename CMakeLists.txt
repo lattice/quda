@@ -216,7 +216,7 @@ if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
 endif()
 
 # Set the maximum multi-RHS per kernel
-set(QUDA_MAX_MULTI_RHS "32" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+set(QUDA_MAX_MULTI_RHS "12" CACHE STRING "maximum number of simultaneous RHS in a kernel")
 
 set(QUDA_PRECISION
   "14"
