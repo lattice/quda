@@ -182,7 +182,7 @@ namespace quda {
         strcat(aux,label);
       }
 
-      setRHSstring(aux, in.size());
+      setRHSstring(aux, inA.size());
 #ifdef QUDA_FAST_COMPILE_DSLASH
       strcat(aux, ",fast_compile");
 #endif
