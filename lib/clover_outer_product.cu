@@ -180,6 +180,18 @@ namespace quda {
                           cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff)
   {
     if constexpr (is_enabled_clover()) {
+      if (x.size() > MAX_MULTI_RHS) {
+        computeCloverOprod(force, U,
+                           {x.begin(), x.begin() + x.size() / 2},
+                           {p.begin(), p.begin() + p.size() / 2},
+                           {coeff.begin(), coeff.begin() + coeff.size() / 2});
+        computeCloverOprod(force, U,
+                           {x.begin() + x.size() / 2, x.end()},
+                           {p.begin() + p.size() / 2, p.end()},
+                           {coeff.begin() + coeff.size() / 2, coeff.end()});
+        return;
+      }
+
       checkNative(x, p, force, U);
       checkPrecision(x, p, force, U);
 
