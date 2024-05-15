@@ -22,37 +22,30 @@ namespace quda {
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
 
     Force force;
-    const F inA;
-    const F inB;
-    const F inC;
-    const F inD;
+    const F x;
+    const F p;
     const Gauge U;
     int X[4];
-    int parity;
     int displacement;
     bool partitioned[4];
     real coeff;
     const unsigned int volume_4d_cb;
     const unsigned int ghost_face_4d_cb;
 
-    CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                   const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity,
+    CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &p, const ColorSpinorField &x,
                    const double coeff) :
-      kernel_param(dim3(dim == -1 ? inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? inA.VolumeCB() / 2 : inA.VolumeCB() :
-                          inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ?
-                                    inB.GhostFaceCB()[dim] / 2 :
-                                    inB.GhostFaceCB()[dim])), // inB since it has a ghost allocated
+      kernel_param(dim3(
+        dim == -1 ? (x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? x.VolumeCB() / 2 : x.VolumeCB()) :
+                    (x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? x.GhostFaceCB()[dim] / 2 : x.GhostFaceCB()[dim]),
+        x.SiteSubset())),
       force(force),
-      inA(inA),
-      inB(inB),
-      inC(inC),
-      inD(inD),
+      x(x),
+      p(p),
       U(U),
-      parity(parity),
       displacement(1),
       coeff(coeff),
-      volume_4d_cb(inA.VolumeCB() / 2),
-      ghost_face_4d_cb(inB.GhostFaceCB()[dim] / 2)
+      volume_4d_cb(x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? x.VolumeCB() / 2 : x.VolumeCB()),
+      ghost_face_4d_cb(x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? x.GhostFaceCB()[dim] / 2 : x.GhostFaceCB()[dim])
     {
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];
       for (int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
@@ -61,16 +54,16 @@ namespace quda {
       // (Ghost() method) not set (this is temporary work around)
       void *ghost[8] = {};
       for (int dim = 0; dim < 4; dim++) {
-        for (int dir = 0; dir < 2; dir++) { ghost[2 * dim + dir] = (char *)inB.Ghost2() + inB.GhostOffset(dim, dir); }
+        for (int dir = 0; dir < 2; dir++) { ghost[2 * dim + dir] = (char *)x.Ghost2() + x.GhostOffset(dim, dir); }
       }
-      this->inB.resetGhost(ghost);
-      inD.bufferIndex = (1 - inD.bufferIndex);
+      this->x.resetGhost(ghost);
+      p.bufferIndex = (1 - p.bufferIndex);
 
       for (int dim = 0; dim < 4; dim++) {
-        for (int dir = 0; dir < 2; dir++) { ghost[2 * dim + dir] = (char *)inD.Ghost2() + inD.GhostOffset(dim, dir); }
+        for (int dir = 0; dir < 2; dir++) { ghost[2 * dim + dir] = (char *)p.Ghost2() + p.GhostOffset(dim, dir); }
       }
-      this->inD.resetGhost(ghost);
-      inD.bufferIndex = (1 - inD.bufferIndex);
+      this->p.resetGhost(ghost);
+      p.bufferIndex = (1 - p.bufferIndex);
     }
   };
 
@@ -79,7 +72,7 @@ namespace quda {
     constexpr Interior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
+    __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       using Complex = complex<typename Arg::real>;
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
@@ -89,18 +82,18 @@ namespace quda {
       for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
 
         const int flavor_offset_idx = flavor * arg.volume_4d_cb;
-        Spinor A = arg.inA(x_cb + flavor_offset_idx, 0);
-        Spinor C = arg.inC(x_cb + flavor_offset_idx, 0);
+        Spinor A = arg.p(x_cb + flavor_offset_idx, parity);
+        Spinor C = arg.x(x_cb + flavor_offset_idx, parity);
 
 #pragma unroll
         for (int dim = 0; dim < 4; ++dim) {
           int shift[4] = {0, 0, 0, 0};
           shift[dim] = 1;
-          const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
+          const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, parity, arg.X);
 
           if (nbr_idx >= 0) {
-            Spinor B_shift = arg.inB(nbr_idx + flavor_offset_idx, 0);
-            Spinor D_shift = arg.inD(nbr_idx + flavor_offset_idx, 0);
+            Spinor B_shift = arg.x(nbr_idx + flavor_offset_idx, 1 - parity);
+            Spinor D_shift = arg.p(nbr_idx + flavor_offset_idx, 1 - parity);
 
             B_shift = (B_shift.project(dim, 1)).reconstruct(dim, 1);
             Link result = outerProdSpinTrace(B_shift, A);
@@ -108,10 +101,10 @@ namespace quda {
             D_shift = (D_shift.project(dim, -1)).reconstruct(dim, -1);
             result += outerProdSpinTrace(D_shift, C);
 
-            Link temp = arg.force(dim, x_cb, arg.parity);
-            Link U = arg.U(dim, x_cb, arg.parity);
+            Link temp = arg.force(dim, x_cb, parity);
+            Link U = arg.U(dim, x_cb, parity);
             result = temp + U * result * arg.coeff;
-            arg.force(dim, x_cb, arg.parity) = result;
+            arg.force(dim, x_cb, parity) = result;
           }
         } // dim
       }   // flavor
@@ -123,7 +116,7 @@ namespace quda {
     constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
+    __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       using Complex = complex<typename Arg::real>;
       using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
@@ -135,23 +128,23 @@ namespace quda {
       for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
         const int flavor_offset_bulk_idx = flavor * arg.volume_4d_cb;
         const int flavor_offset_ghost_idx = flavor * arg.ghost_face_4d_cb;
-        coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
+        coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, parity);
         const unsigned int bulk_cb_idx = ((((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0]) >> 1);
-        Spinor A = arg.inA(bulk_cb_idx + flavor_offset_bulk_idx, 0);
-        Spinor C = arg.inC(bulk_cb_idx + flavor_offset_bulk_idx, 0);
+        Spinor A = arg.p(bulk_cb_idx + flavor_offset_bulk_idx, parity);
+        Spinor C = arg.x(bulk_cb_idx + flavor_offset_bulk_idx, parity);
 
-        HalfSpinor projected_tmp = arg.inB.Ghost(Arg::dim, 1, x_cb + flavor_offset_ghost_idx, 0);
+        HalfSpinor projected_tmp = arg.x.Ghost(Arg::dim, 1, x_cb + flavor_offset_ghost_idx, 1 - parity);
         Spinor B_shift = projected_tmp.reconstruct(Arg::dim, 1);
         Link result = outerProdSpinTrace(B_shift, A);
 
-        projected_tmp = arg.inD.Ghost(Arg::dim, 1, x_cb + flavor_offset_ghost_idx, 0);
+        projected_tmp = arg.p.Ghost(Arg::dim, 1, x_cb + flavor_offset_ghost_idx, 1 - parity);
         Spinor D_shift = projected_tmp.reconstruct(Arg::dim, -1);
         result += outerProdSpinTrace(D_shift, C);
 
-        Link temp = arg.force(Arg::dim, bulk_cb_idx, arg.parity);
-        Link U = arg.U(Arg::dim, bulk_cb_idx, arg.parity);
+        Link temp = arg.force(Arg::dim, bulk_cb_idx, parity);
+        Link U = arg.U(Arg::dim, bulk_cb_idx, parity);
         result = temp + U * result * arg.coeff;
-        arg.force(Arg::dim, bulk_cb_idx, arg.parity) = result;
+        arg.force(Arg::dim, bulk_cb_idx, parity) = result;
       }
     }
   };

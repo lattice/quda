@@ -7,16 +7,14 @@ namespace quda {
 
   enum OprodKernelType { INTERIOR, EXTERIOR };
 
-  template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel1D {
+  template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel2D
+  {
     using real = typename mapper<Float>::type;
     template <int dim = -1, bool doublet = false> using Arg = CloverForceArg<Float, nColor, recon, dim, doublet>;
     GaugeField &force;
     const GaugeField &U;
-    const ColorSpinorField &inA;
-    const ColorSpinorField &inB;
-    const ColorSpinorField &inC;
-    const ColorSpinorField &inD;
-    const int parity;
+    const ColorSpinorField &p;
+    const ColorSpinorField &x;
     const real coeff;
     const bool doublet; // whether we applying the operator to a doublet
     const int n_flavor;
@@ -24,22 +22,19 @@ namespace quda {
     int dir;
     unsigned int minThreads() const override
     {
-      return (kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]) / n_flavor;
+      return (kernel == INTERIOR ? x.VolumeCB() : x.GhostFaceCB()[dir]) / n_flavor;
     }
 
   public:
-    CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                const ColorSpinorField &inC, const ColorSpinorField &inD, int parity, double coeff) :
-      TunableKernel1D(force),
+    CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField &p, const ColorSpinorField &x,
+                double coeff) :
+      TunableKernel2D(force, x.SiteSubset()),
       force(force),
       U(U),
-      inA(inA),
-      inB(inB),
-      inC(inC),
-      inD(inD),
-      parity(parity),
+      p(p),
+      x(x),
       coeff(static_cast<real>(coeff)),
-      doublet(inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      doublet(x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       n_flavor(doublet ? 2 : 1)
     {
       if (doublet) strcat(aux, ",doublet");
@@ -66,37 +61,37 @@ namespace quda {
 
       if (kernel == INTERIOR) {
         if (doublet)
-          launch<Interior>(tp, stream, Arg<-1, true>(force, U, inA, inB, inC, inD, parity, coeff));
+          launch<Interior>(tp, stream, Arg<-1, true>(force, U, p, x, coeff));
         else
-          launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
+          launch<Interior>(tp, stream, Arg<>(force, U, p, x, coeff));
       } else if (kernel == EXTERIOR) {
         switch (dir) {
         case 0: {
           if (doublet)
-            launch<Exterior>(tp, stream, Arg<0, true>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<0, true>(force, U, p, x, coeff));
           else
-            launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<0>(force, U, p, x, coeff));
           break;
         }
         case 1: {
           if (doublet)
-            launch<Exterior>(tp, stream, Arg<1, true>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<1, true>(force, U, p, x, coeff));
           else
-            launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<1>(force, U, p, x, coeff));
           break;
         }
         case 2: {
           if (doublet)
-            launch<Exterior>(tp, stream, Arg<2, true>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<2, true>(force, U, p, x, coeff));
           else
-            launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<2>(force, U, p, x, coeff));
           break;
         }
         case 3: {
           if (doublet)
-            launch<Exterior>(tp, stream, Arg<3, true>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<3, true>(force, U, p, x, coeff));
           else
-            launch<Exterior>(tp, stream, Arg<3>(force, U, inA, inB, inC, inD, parity, coeff));
+            launch<Exterior>(tp, stream, Arg<3>(force, U, p, x, coeff));
           break;
         }
         default: errorQuda("Unexpected direction %d", dir);
@@ -110,26 +105,26 @@ namespace quda {
     // spin trace + multiply-add (ignore spin-project)
     long long flops() const override
     {
-      int oprod_flops = nColor * nColor * (8 * inA.Nspin() - 2);
+      int oprod_flops = nColor * nColor * (8 * x.Nspin() - 2);
       int gemm_flops = nColor * nColor * (8 * nColor - 2);
       int mat_size = 2 * nColor * nColor;
 
-      return minThreads() * n_flavor * (2 * oprod_flops + gemm_flops + 3 * mat_size) * (kernel == INTERIOR ? 4 : 1);
+      return 2 * minThreads() * n_flavor * (2 * oprod_flops + gemm_flops + 3 * mat_size) * (kernel == INTERIOR ? 4 : 1);
     }
 
     long long bytes() const override
     {
       if (kernel == INTERIOR) {
-        return inA.Bytes() + inC.Bytes() + 4 * (inB.Bytes() + inD.Bytes()) + force.Bytes() + U.Bytes() / 2;
+        return x.Bytes() + p.Bytes() + 4 * (x.Bytes() + p.Bytes()) + 2 * force.Bytes() + U.Bytes();
       } else {
         return minThreads() * n_flavor
-          * (nColor * (4 * inA.Nspin() + 2 * inA.Nspin() / 2) * 2 + 2 * force.Reconstruct() + U.Reconstruct())
+          * (nColor * (2 * x.Nspin() + 2 * x.Nspin() / 2) * 2 + 2 * force.Reconstruct() + U.Reconstruct())
           * sizeof(Float);
       }
     }
   }; // CloverForce
 
-  void exchangeGhost(const ColorSpinorField &a, int parity, int dag)
+  void exchangeGhost(const ColorSpinorField &a, int dag)
   {
     // this sets the communications pattern for the packing kernel
     int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1),
@@ -141,7 +136,7 @@ namespace quda {
     qudaDeviceSynchronize();
 
     MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
-    a.pack(1, 1-parity, dag, device::get_default_stream(), location, Device);
+    a.pack(1, 0, dag, device::get_default_stream(), location, Device);
 
     qudaDeviceSynchronize();
 
@@ -181,26 +176,18 @@ namespace quda {
       checkPrecision(x[0], p[0], force, U);
 
       int dag = 1;
-
       for (auto i = 0u; i < x.size(); i++) {
-        for (int parity = 0; parity < 2; parity++) {
-          const ColorSpinorField &inA = (parity & 1) ? p[i].Odd() : p[i].Even();
-          const ColorSpinorField &inB = (parity & 1) ? x[i].Even() : x[i].Odd();
-          const ColorSpinorField &inC = (parity & 1) ? x[i].Odd() : x[i].Even();
-          const ColorSpinorField &inD = (parity & 1) ? p[i].Even() : p[i].Odd();
+        getProfile().TPSTART(QUDA_PROFILE_COMMS);
+        exchangeGhost(x[i], dag);
+        exchangeGhost(p[i], 1 - dag);
+        getProfile().TPSTOP(QUDA_PROFILE_COMMS);
 
-          getProfile().TPSTART(QUDA_PROFILE_COMMS);
-          exchangeGhost(inB, parity, dag);
-          exchangeGhost(inD, parity, 1 - dag);
-          getProfile().TPSTOP(QUDA_PROFILE_COMMS);
-
-          getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-          instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
-          getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-        }
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+        instantiate<CloverForce, ReconstructNo12>(U, force, p[i], x[i], coeff[i]);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     } else {
-      errorQuda("Clover Dirac operator has not been built!");
+      errorQuda("Clover Dirac operator has not been built");
     }
   }
 
