@@ -352,6 +352,8 @@ namespace quda
   template <typename Dslash> struct DslashPolicyImp {
 
     virtual void operator()(Dslash &, cvector_ref<const ColorSpinorField> &, const ColorSpinorField &, TimeProfile &) { }
+
+    virtual ~DslashPolicyImp() = default;
   };
 
   /**

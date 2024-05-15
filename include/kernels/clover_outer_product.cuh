@@ -153,7 +153,7 @@ namespace quda {
       const unsigned int bulk_cb_idx = ((((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0]) >> 1);
 
       Link result = {};
-      for (int src = 0; src < arg.n_src; src++) {
+      for (unsigned int src = 0; src < arg.n_src; src++) {
 #pragma unroll
         for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
           const int flavor_offset_bulk_idx = flavor * arg.volume_4d_cb;
