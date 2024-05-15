@@ -41,10 +41,7 @@ namespace quda
       ReductionArg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                    cvector_ref<ColorSpinorField> &w, cvector_ref<ColorSpinorField> &v, Reducer r, int length,
                    int nParity) :
-        ReduceArg<reduce_t>(dim3(length, 1, x.size()), x.size()),
-        r(r),
-        length_cb(length / nParity),
-        nParity(nParity)
+        ReduceArg<reduce_t>(dim3(length, 1, x.size()), x.size()), r(r), length_cb(length / nParity), nParity(nParity)
       {
         for (auto i = 0u; i < x.size(); i++) X[i] = x[i];
         for (auto i = 0u; i < y.size(); i++) Y[i] = y[i];
@@ -112,7 +109,7 @@ namespace quda
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
       Max(cvector<double> &, cvector<double> &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &max,  T &x, T &, T &, T &, T &, int) const
+      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &, T &, T &, T &, int) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -130,7 +127,7 @@ namespace quda
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
       MaxDeviation(cvector<double> &, cvector<double> &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &max,  T &x, T &y, T &, T &, T &, int) const
+      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &y, T &, T &, T &, int) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
@@ -558,7 +555,7 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       tripleCGReduction_(cvector<double> &, cvector<double> &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum,  T &x, T &y, T &z, T &, T &, int) const
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &, int) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {

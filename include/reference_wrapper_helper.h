@@ -281,6 +281,15 @@ namespace quda
      */
     T& operator[](size_t idx) const { return vector::operator[](idx).get(); }
 
+    /**
+       @brief This is a convenience operator for constructing parity
+       subsets of the field.
+       @param[in] parity The parity subset we desire
+       @return A vector_ref instance that contains a vector of the
+       field subsets requested
+     */
+    vector_ref<T> operator()(QudaParity parity) const { return make_parity_subset(*this, parity); }
+
     template <class U = T>
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, vector_ref<T>> Even() const
     {
