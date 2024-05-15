@@ -576,7 +576,8 @@ namespace quda {
                           double sigma_coeff, bool detratio, QudaInvertParam &param);
 
   /**
-     @brief Compute the force contribution from the solver solution fields
+     @brief Compute outer product from the solver solution fields for
+     the force contribution from the solver solution fields
 
      Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
 
@@ -592,7 +593,7 @@ namespace quda {
      @param p Intermediate vectors (both parities)
      @param coeff Multiplicative coefficient (e.g., dt * residue)
    */
-  void computeCloverForce(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
+  void computeCloverOprod(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
                           cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
