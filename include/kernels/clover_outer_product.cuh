@@ -101,7 +101,7 @@ namespace quda {
 
       if (nbr_idx >= 0) {
         Link result = {};
-        for (int src = 0; src < arg.n_src; src++) {
+        for (unsigned int src = 0; src < arg.n_src; src++) {
 #pragma unroll
           for (int flavor = 0; flavor < Arg::n_flavor; ++flavor) {
             const int flavor_offset_idx = flavor * arg.volume_4d_cb;

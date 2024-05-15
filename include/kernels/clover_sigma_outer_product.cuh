@@ -44,8 +44,7 @@ namespace quda
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     Link result = {};
 
-#pragma unroll
-    for (int i = 0; i < arg.n_rhs; i++) {
+    for (unsigned int i = 0; i < arg.n_rhs; i++) {
 #pragma unroll
       for (int flavor = 0; flavor < Arg::n_flavor; flavor++) {
         const int flavor_offset_idx = flavor * (arg.volume_4d_cb);
