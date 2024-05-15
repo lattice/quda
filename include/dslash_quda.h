@@ -17,7 +17,6 @@ namespace quda
   struct DslashConstant {
     int Vh;
     int_fastdiv X[QUDA_MAX_DIM];
-    int_fastdiv Xh[QUDA_MAX_DIM];
     int Ls;
 
     int volume_4d;

@@ -350,8 +350,6 @@ namespace quda
       for (int dim = nDim; dim < QUDA_MAX_DIM; dim++) X[dim] = 1;
       if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2 * X[0];
 
-      for (int i = 0; i < nDim; i++) dc.Xh[i] = X[i] / 2;
-
       dc.Ls = X[4];
       dc.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
       dc.volume_4d = 2 * dc.volume_4d_cb;
