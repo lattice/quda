@@ -1785,7 +1785,7 @@ void distanceReweight(ColorSpinorField &b, QudaInvertParam &param, bool inverse)
                 param.dslash_type);
     }
     if (param.inv_type == QUDA_MG_INVERTER) {
-      errorQuda("Multigrid solver doesn't support distance preconditioning\n", param.inv_type);
+      errorQuda("Multigrid solver doesn't support distance preconditioning\n");
     }
     if (param.cuda_prec != QUDA_DOUBLE_PRECISION || param.cuda_prec_sloppy != QUDA_DOUBLE_PRECISION) {
       warningQuda(
