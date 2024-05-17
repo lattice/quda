@@ -1358,62 +1358,62 @@ if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
     --enable-testing true 
     --gtest_output=xml:eigensolve_test_ndeg_twisted_clover_asym.xml)
 endif()
-  
+
 if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME eigensolve_test_domain_wall
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type domain-wall --prec ${prec}
+    --dslash-type domain-wall
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even --enable-testing true 
+    --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_domain_wall.xml)
 
   add_test(NAME eigensolve_test_domain_wall_4d_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type domain-wall-4d --prec ${prec}
+    --dslash-type domain-wall-4d
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even --enable-testing true 
+    --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_domain_wall_4d_sym.xml)
 
   add_test(NAME eigensolve_test_domain_wall_4d_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type domain-wall-4d --prec ${prec}
+    --dslash-type domain-wall-4d
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even-asym --enable-testing true 
+    --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_domain_wall_4d_asym.xml)
 
   add_test(NAME eigensolve_test_mobius_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type mobius --prec ${prec}
+    --dslash-type mobius
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even --enable-testing true 
+    --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_sym.xml)
 
   add_test(NAME eigensolve_test_mobius_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type mobius --prec ${prec}
+    --dslash-type mobius
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even-asym --enable-testing true 
+    --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_asym.xml)
 
   add_test(NAME eigensolve_test_mobius_eofa_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type mobius-eofa --prec ${prec}
+    --dslash-type mobius-eofa
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even --enable-testing true 
+    --matpc even-even --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_eofa_sym.xml)
 
   add_test(NAME eigensolve_test_mobius_eofa_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type mobius-eofa --prec ${prec}
+    --dslash-type mobius-eofa
     --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
     --eig-tol ${tol} --eig-max-restarts 1000
-    --matpc even-even-asym --enable-testing true 
+    --matpc even-even-asym --enable-testing true
     --gtest_output=xml:eigensolve_test_mobius_eofa_asym.xml)
 endif()
 
@@ -1477,7 +1477,7 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:hisq_stencil_test.xml)
 endif()
 
-if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_test(NAME clover_force_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8

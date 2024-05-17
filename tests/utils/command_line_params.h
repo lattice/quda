@@ -236,6 +236,7 @@ extern double mass;
 extern double kappa;
 extern double mu;
 extern double epsilon;
+extern double evmax;
 extern double m5;
 extern double b5;
 extern double c5;

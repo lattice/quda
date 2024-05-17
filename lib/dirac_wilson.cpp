@@ -157,7 +157,7 @@ namespace quda {
     // we desire solution to full system
     for (auto i = 0u; i < b.size(); i++) {
       // src = b_e + k D_eo b_o
-      DslashXpay(x[i][other_parity], b[i][other_parity], this_parity, b[this_parity], kappa);
+      DslashXpay(x[i][other_parity], b[i][other_parity], this_parity, b[i][this_parity], kappa);
       src[i] = x[i][other_parity].create_alias();
       sol[i] = x[i][this_parity].create_alias();
     }
