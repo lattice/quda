@@ -385,8 +385,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
       _hp_b[n] = in[n].data();
     }
     // Run split grid
-    invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, cpuFatMILC.data(), cpuLongMILC.data(),
-                                &gauge_param);
+    invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
     quda::comm_allreduce_int(inv_param.iter);
     inv_param.iter /= comm_size() / num_sub_partition;

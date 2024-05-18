@@ -330,10 +330,10 @@ std::vector<std::array<double, 2>> solve(test_t param)
     // Run split grid
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, gauge.data(), &gauge_param, clover.data(),
+      invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, clover.data(),
                                clover_inv.data());
     } else {
-      invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, gauge.data(), &gauge_param);
+      invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
     }
 
     quda::comm_allreduce_int(inv_param.iter);

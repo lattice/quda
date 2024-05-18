@@ -2903,8 +2903,6 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
 
 template <class Interface, class... Args>
 void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
-                      void *h_gauge, void *milc_fatlinks, void *milc_longlinks,
-                      QudaGaugeParam *gauge_param_,    // gauge field pointers
                       void *h_clover, void *h_clovinv, // clover field pointers
                       Interface op, Args... args)
 {
@@ -2924,22 +2922,12 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     errorQuda("split_key = [%d,%d,%d,%d] is not valid", split_key[0], split_key[1], split_key[2], split_key[3]);
   }
 
-#if 1 // In principle we should not need this just now
-  // Create a local copy of gauge_param that we can modify without perturbing
-  // the original one
-  if (!gauge_param_) errorQuda("Input gauge_param is null");
-  QudaGaugeParam gauge_param = *gauge_param_;
-#endif
 
-#if 0 // For debugging we always split
   if (num_sub_partition == 1) { // In this case we don't split the grid.
 
     for (int n = 0; n < param->num_src; n++) { op(_hp_x[n], _hp_b[n], param, args...); }
 
-  } else
-#endif
-
-  {
+  } else {
 
     // Doing the sub-partition arithmatics
     if (param->num_src_per_sub_partition * num_sub_partition != param->num_src) {
@@ -2998,14 +2986,10 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       // as opposed to gauge_param
       gf_param = GaugeFieldParam(*gaugePrecise);
     } else { // staggered
-      milc_fatlink_param = GaugeFieldParam(gauge_param, milc_fatlinks);
-      milc_fatlink_param.order = QUDA_MILC_GAUGE_ORDER;
-      milc_fatlink_field = GaugeField(milc_fatlink_param);
+      milc_fatlink_param = GaugeFieldParam(*gaugeFatPrecise);
 
       if (is_asqtad) {
-        milc_longlink_param = GaugeFieldParam(gauge_param, milc_longlinks);
-        milc_longlink_param.order = QUDA_MILC_GAUGE_ORDER;
-        milc_longlink_field = GaugeField(milc_longlink_param);
+        milc_longlink_param = GaugeFieldParam(*gaugeLongPrecise);
       }
     }
 
@@ -3013,8 +2997,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     bool pc_solution
       = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-    // lat_dim_t X = {gauge_param.X[0], gauge_param.X[1], gauge_param.X[2], gauge_param.X[3]};
-    lat_dim_t X = is_staggered ? milc_fatlink_field.X() : (*gaugePrecise).X();
+    lat_dim_t X = is_staggered ? gaugeFatPrecise->X() : gaugePrecise->X();
 
     ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
     std::vector<ColorSpinorField> _h_b(param->num_src);
@@ -3045,8 +3028,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         milc_fatlink_param.x[d] *= split_key[d];
         if (is_asqtad) milc_longlink_param.x[d] *= split_key[d];
       }
-      gauge_param.X[d] *= split_key[d];
-      if (!is_staggered) gauge_param.ga_pad *= split_key[d];
     }
 
     // Deal with clover field. For Multi source computatons, clover field construction is done
@@ -3136,7 +3117,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // the split topology.
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading gauge field...\n");
     if (!is_staggered) {
-      // loadGaugeQuda(collected_gauge.raw_pointer(), &gauge_param);
       setupGaugeFields(collected_gauge, gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement,
                        gaugeEigensolver, gaugeExtended, thin_links_bkup, profile.profile);
 
@@ -3171,10 +3151,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     updateR();
     comm_barrier();
 
-    for (int d = 0; d < CommKey::n_dim; d++) {
-      gauge_param.X[d] /= split_key[d];
-      if (!is_staggered) gauge_param.ga_pad /= split_key[d];
-    }
 
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
       auto first = _h_x.begin() + n * num_sub_partition;
@@ -3226,46 +3202,42 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
   profilerStop(__func__);
 }
 
-void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param)
+void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op);
 }
 
-void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
-                                 void *milc_longlinks, QudaGaugeParam *gauge_param)
+void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op);
 }
 
-void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                              QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
+void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_clover, void *h_clovinv)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, h_clover, h_clovinv, op);
 }
 
-void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                        QudaGaugeParam *gauge_param)
+void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, nullptr, nullptr, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op, parity);
 }
 
-void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity,
-                                 void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param)
+void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity) 
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, milc_fatlinks, milc_longlinks, gauge_param, nullptr, nullptr, op,
+  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op,
                    parity);
 }
 
-void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                              QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv)
+void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_clover, 
+                              void *h_clovinv)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, h_gauge, nullptr, nullptr, gauge_param, h_clover, h_clovinv, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, h_clover, h_clovinv, op, parity);
 }
 
 /*!
