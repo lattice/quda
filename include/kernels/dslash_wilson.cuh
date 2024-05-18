@@ -94,17 +94,10 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-    real fwd_coeff_3 = 1.0;
-    real bwd_coeff_3 = 1.0;
-    if constexpr (Arg::distance_pc) {
-      const int t = arg.comm_coord_dim_3 + coord[3];
-      const int nt = arg.comm_dim_dim_3;
-      fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
-      bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
-    } else {
-      fwd_coeff_3 = 1.0;
-      bwd_coeff_3 = 1.0;
-    }
+    const int t = arg.comm_coord_dim_3 + coord[3];
+    const int nt = arg.comm_dim_dim_3;
+    real fwd_coeff_3 = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
+    real bwd_coeff_3 = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
