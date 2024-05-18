@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool twist_ = false>
-  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool twist_ = false, bool distance_pc_ = false>
+  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_> {
+    using WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool twist = twist_;
 
@@ -21,10 +21,11 @@ namespace quda
     const real b; /** chiral twist factor (twisted-clover only) */
 
     WilsonCloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo,  const GaugeField &U, const CloverField &A,
-                    double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-                    const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
+                    const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a, double b,
+                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
+                    double alpha0 = 0.0, int t0 = -1) :
+      WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>(out, in, halo, U, a, x, parity, dagger, comm_override,
+                                                                 alpha0, t0),
       A(A, false),
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for

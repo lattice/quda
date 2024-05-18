@@ -298,6 +298,12 @@ std::vector<std::array<double, 2>> solve(test_t param)
     out[i] = quda::ColorSpinorField(cs_param);
   }
 
+  if (distance_pc_alpha0 != 0.0 && distance_pc_t0 >= 0) {
+    inv_param.distance_pc_alpha0 = distance_pc_alpha0;
+    inv_param.distance_pc_t0 = distance_pc_t0;
+    verifySpinorDistanceReweight(in[0], distance_pc_alpha0, distance_pc_t0);
+  }
+
   if (!use_split_grid) {
 
     for (int i = 0; i < Nsrc; i++) {

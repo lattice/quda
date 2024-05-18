@@ -16,9 +16,7 @@ namespace quda {
 
   DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
   {
-    if (&dirac != this) {
-      Dirac::operator=(dirac);
-    }
+    if (&dirac != this) { Dirac::operator=(dirac); }
     return *this;
   }
 
@@ -28,7 +26,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim.data,
+                          profile);
+    } else {
+      ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim.data, profile);
+    }
   }
 
   void DiracWilson::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -37,13 +40,23 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim.data,
+                          profile);
+    } else {
+      ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim.data, profile);
+    }
   }
 
   void DiracWilson::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonDistance(out, in, *gauge, -kappa, distance_pc_alpha0, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger,
+                          commDim.data, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    }
   }
 
   void DiracWilson::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
@@ -71,7 +84,6 @@ namespace quda {
   void DiracWilson::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
                                 const QudaSolutionType) const
   {
-    // do nothing
   }
 
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -133,6 +145,7 @@ namespace quda {
                               cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                               const QudaSolutionType solType) const
   {
+
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       for (auto i = 0u; i < b.size(); i++) {
         src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();

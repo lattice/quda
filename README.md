@@ -273,6 +273,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartosz Kostrzewa (HPC/A-Lab, University of Bonn)
+*  Damon McDougall (AMD)
 *  James Osborn (Argonne National Laboratory)
 *  Ferenc Pittler (Cyprus)
 *  Claudio Rebbi (Boston University) 

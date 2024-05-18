@@ -85,6 +85,34 @@ namespace quda
                    const int *comm_override, TimeProfile &profile);
 
   /**
+     @brief Driver for applying the Wilson stencil with distance preconditioning
+
+     out = D' * in
+
+     where D' is the gauged Wilson linear operator with distance preconditioning.
+
+     If kappa is non-zero, the operation is given by out = x + kappa * D in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field set
+     @param[in] in The input field set
+     @param[in] U The gauge field used for the operator
+     @param[in] kappa Scale factor applied
+     @param[in] alpha0 Distance preconditioning parameter
+     @param[in] t0 Distance preconditioning parameter
+     @param[in] x Vector field set we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyWilsonDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           const GaugeField &U, double kappa, double alpha0, int t0,
+                           cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
+                           TimeProfile &profile);
+
+  /**
      @brief Driver for applying the Wilson-clover stencil
 
      out = A * x + kappa * D * in
@@ -109,6 +137,34 @@ namespace quda
   void ApplyWilsonClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                          const GaugeField &U, const CloverField &A, double kappa, cvector_ref<const ColorSpinorField> &x,
                          int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the Wilson-clover stencil with distance preconditioning
+
+     out = A * x + kappa * D' * in
+
+     where D' is the gauged Wilson linear operator with distance preconditioning.
+
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field set
+     @param[in] in Input field set that D is applied to
+     @param[in] U The gauge field used for the operator
+     @param[in] A The clover field used for the operator
+     @param[in] kappa Scale factor applied
+     @param[in] alpha0 Distance preconditioning parameter
+     @param[in] t0 Distance preconditioning parameter
+     @param[in] x Vector field set we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyWilsonCloverDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                 const GaugeField &U, const CloverField &A, double kappa, double alpha0, int t0,
+                                 cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                 const int *comm_override, TimeProfile &profile);
 
   /**
        @brief Driver for applying the Wilson-clover stencil
@@ -155,10 +211,10 @@ namespace quda
      of D and the subsequent application of A, e.g., in the symmetric
      dagger operator we need to apply
 
-     M = (1 - kappa^2 D^{\dagger} A^{-1} D{^\dagger} A^{-1} )
+     M = (1 - kappa^2 D^{\dagger} A^{-1} D^{\dagger} A^{-1} )
 
-     and since cannot fuse D{^\dagger} A^{-\dagger}, we instead fused
-     A^{-\dagger} D{^\dagger}.
+     and since cannot fuse D^{\dagger} A^{-\dagger}, we instead fused
+     A^{-\dagger} D^{\dagger}.
 
      If kappa is non-zero, the operation is given by out = x + kappa * A^{-1} D in.
      This operator can (at present) be applied to only single parity
@@ -237,6 +293,51 @@ namespace quda
                                                    const CloverField &A, double kappa, double mu,
                                                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                                    const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the preconditioned Wilson-clover stencil with distance preconditioning
+
+     out = A^{-1} * D' * in + x
+
+     where D' is the gauged Wilson linear operator with distance preconditioning and A is the clover
+     field.  This operator can (at present) be applied to only single
+     parity (checker-boarded) fields.  When the dagger operator is
+     requested, we do not transpose the order of operations, e.g.
+
+     out = A^{-\dagger} D^{\prime\dagger}  (no xpay term)
+
+     Although not a conjugate transpose of the regular operator, this
+     variant is used to enable kernel fusion between the application
+     of D and the subsequent application of A, e.g., in the symmetric
+     dagger operator we need to apply
+
+     M = (1 - kappa^2 D^{\prime\dagger} A^{-1} D^{\prime\dagger} A^{-1} )
+
+     and since cannot fuse D^{\prime\dagger} A^{-\dagger}, we instead fused
+     A^{-\dagger} D^{\prime\dagger}.
+
+     If kappa is non-zero, the operation is given by out = x + kappa * A^{-1} D' in.
+     This operator can (at present) be applied to only single parity
+     (checker-boarded) fields.
+
+     @param[out] out The output result field set
+     @param[in] in The input field set
+     @param[in] U The gauge field used for the operator
+     @param[in] A The clover field used for the operator
+     @param[in] kappa Scale factor applied
+     @param[in] alpha0 Distance preconditioning parameter
+     @param[in] t0 Distance preconditioning parameter
+     @param[in] x Vector field set we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyWilsonCloverPreconditionedDistance(cvector_ref<ColorSpinorField> &out,
+                                               cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+                                               const CloverField &A, double kappa, double alpha0, int t0,
+                                               cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                               const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the twisted-mass stencil

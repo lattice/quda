@@ -543,5 +543,10 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_COVDEV_DSLASH>() { return true; }
 #endif
 
+#ifdef GPU_DISTANCE_PRECONDITIONING
+  constexpr bool is_enabled_distance_precondition() { return true; }
+#else
+  constexpr bool is_enabled_distance_precondition() { return false; }
+#endif
 
 } // namespace quda

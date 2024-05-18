@@ -1016,6 +1016,14 @@ namespace quda
                     const lat_dim_t &local_block = {});
 
   /**
+     @brief Reweight a color spinor for distance preconditioning
+     @param[out] src The colorspinorfield
+     @param[in] alpha0 The parameter for distance preconditioning, negative value means a inversed reweighting
+     @param[in] t0 The parameter for distance preconditioning
+  */
+  void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0);
+
+  /**
      @brief Helper function for determining if the preconditioning
      type of the fields is the same.
      @param[in] a Input field

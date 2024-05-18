@@ -923,3 +923,49 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
 
   return l2r;
 }
+
+double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha0, int t0)
+{
+  if (spinor.Precision() != QUDA_DOUBLE_PRECISION) {
+    errorQuda("Spinor distance reweighting should only apply to double precision field");
+  }
+
+  alpha0 = abs(alpha0);
+
+  quda::ColorSpinorParam csParam(spinor);
+  csParam.create = QUDA_COPY_FIELD_CREATE;
+  quda::ColorSpinorField spinorTmp1(csParam);
+  csParam.create = QUDA_NULL_FIELD_CREATE;
+  quda::ColorSpinorField spinorTmp2(csParam);
+
+  auto *in = spinor.data<double *>();
+  auto *out = spinorTmp2.data<double *>();
+
+  for (int parity = 0; parity < spinor.SiteSubset(); parity++) {
+    for (int sid = 0; sid < Vh; sid++) {
+      auto offset = (parity * Vh + sid) * spinor_site_size;
+      int t = Z[3] * comm_coord(3) + (int)(sid / Vsh_t);
+      int nt = Z[3] * comm_dim(3);
+      double weight = cosh(alpha0 * (double)((t - t0 + nt) % nt - nt / 2));
+      for (auto j = 0ul; j < spinor_site_size; j++) { out[offset + j] = in[offset + j] / weight; }
+    }
+  }
+
+  spinorDistanceReweight(spinorTmp1, -alpha0, t0);
+
+  mxpy(spinorTmp1.data(), spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  double nrm2 = norm_2(spinorTmp2.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  double src2 = norm_2(spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  double l2r = sqrt(nrm2 / src2);
+  printfQuda("Apply distance reweighting: alpha0 = %.2e, t0 = %d, host residual = %.15e\n", -alpha0, t0, l2r);
+
+  spinorDistanceReweight(spinorTmp1, alpha0, t0);
+
+  mxpy(spinor.data(), spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  nrm2 = norm_2(spinorTmp1.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  src2 = norm_2(spinor.data(), spinor.Volume() * spinor_site_size, spinor.Precision());
+  l2r = sqrt(nrm2 / src2);
+  printfQuda("Remove distance reweighting: alpha0 = %.2e, t0 = %d, host residual = %.15e\n", alpha0, t0, l2r);
+
+  return l2r;
+}
