@@ -83,7 +83,8 @@ endif()
 include(CMakeDependentOption)
 
 # large arg support requires CUDA 12.1
-cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" OFF "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1" OFF )
+cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1" OFF )
+message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
 mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
 
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
