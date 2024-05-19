@@ -5,6 +5,7 @@
 #include <lattice_field.h>
 #include <kernel_helper.h>
 #include <kernel.h>
+#include <kernel_ops_target.h>
 #include <quda_hip_api.h>
 #include <kernel_ops_target.h>
 

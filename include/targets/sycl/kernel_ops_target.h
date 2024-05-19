@@ -40,7 +40,7 @@ namespace quda {
 
   // KernelOps
   template <typename ...T>
-  struct KernelOps : KernelOps_Base<T...> {
+  struct KernelOps : KernelOpsBase<T...> {
   //struct KernelOpsTarget<T...> {
     //using KernelOpsT = op_Sequential<T...>;
     //using KernelOpsT = KernelOps<T...>;

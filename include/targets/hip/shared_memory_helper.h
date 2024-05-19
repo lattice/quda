@@ -78,6 +78,11 @@ namespace quda
     template <typename ...U, typename ...Arg>
     HostDevice constexpr SharedMemory(const KernelOps<U...> &, Arg ...arg) : data(cache(get_offset(target::block_dim(), arg...))) { }
 
+    template <typename... U>
+    constexpr SharedMemory(const KernelOps<U...> &) : data(cache(get_offset(target::block_dim())))
+    {
+    }
+
     /**
        @brief Return this SharedMemory object.
     */
@@ -88,7 +93,7 @@ namespace quda
        @param[in] i The index to use.
        @return Reference to value stored at that index.
      */
-    HostDevice T &operator[](const int i) const { return data[i]; }
+    __device__ __host__ T &operator[](int i) const { return data[i]; }
   };
 
 } // namespace quda

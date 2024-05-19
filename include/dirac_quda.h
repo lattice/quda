@@ -80,6 +80,9 @@ namespace quda {
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
 
+    double distance_pc_alpha0; // used by distance preconditioning
+    int distance_pc_t0;        // used by distance preconditioning
+
     // Default constructor
     DiracParam() :
       type(QUDA_INVALID_DIRAC),
@@ -103,10 +106,12 @@ namespace quda {
       dslash_use_mma(false),
       allow_truncation(false),
 #ifdef NVSHMEM_COMMS
-      use_mobius_fused_kernel(false)
+      use_mobius_fused_kernel(false),
 #else
-      use_mobius_fused_kernel(true)
+      use_mobius_fused_kernel(true),
 #endif
+      distance_pc_alpha0(0.0),
+      distance_pc_t0(-1)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -135,6 +140,8 @@ namespace quda {
       printfQuda("dslash_use_mma = %d\n", dslash_use_mma);
       printfQuda("allow_truncation = %d\n", allow_truncation);
       printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
+      printfQuda("distance_pc_alpha0 = %g\n", distance_pc_alpha0);
+      printfQuda("distance_pc_t0 = %d\n", distance_pc_t0);
     }
   };
 
@@ -185,6 +192,9 @@ namespace quda {
     mutable array<int, QUDA_MAX_DIM> commDim; // whether do comms or not
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
+
+    double distance_pc_alpha0; // Used by distance preconditioning
+    int distance_pc_t0;        // Used by distance preconditioning
 
     mutable TimeProfile profile;
 
@@ -506,6 +516,8 @@ namespace quda {
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
     void setHaloPrecision(QudaPrecision halo_precision_) const { halo_precision = halo_precision_; }
+
+    bool useDistancePC() const { return ((distance_pc_alpha0 != 0) && (distance_pc_t0 >= 0)); }
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch

@@ -64,22 +64,15 @@ namespace quda
     /**
        @brief Constructor for ThreadLocalCache.
     */
-#if 0
-    constexpr ThreadLocalCache() : stride(target::block_size<3>()) {
-      static_assert(shared_mem_size(dim3{32,16,8})==Smem::get_offset(dim3{32,16,8})+SizePerThread<len>::size(dim3{32,16,8})*sizeof(T));
-    }
-#endif
-
-    template <typename ...U>
+    template <typename... U>
     constexpr ThreadLocalCache(const KernelOps<U...> &ops) : Smem(ops), stride(target::block_size<3>())
     {
-      //checkKernelOp<ThreadLocalCache<T,N,O>,U...>();
-      checkKernelOps<ThreadLocalCache<T,N,O>>(ops);
-      static_assert(shared_mem_size(dim3{32,16,8})==
-		    Smem::get_offset(dim3{32,16,8})+SizePerThread<len>::size(dim3{32,16,8})*sizeof(T));
+      checkKernelOps<ThreadLocalCache<T, N, O>>(ops);
+      static_assert(shared_mem_size(dim3 {32, 16, 8})
+                    == Smem::get_offset(dim3 {32, 16, 8}) + SizePerThread<len>::size(dim3 {32, 16, 8}) * sizeof(T));
     }
 
-    constexpr ThreadLocalCache(const ThreadLocalCache<T,N,O> &) = delete;
+    constexpr ThreadLocalCache(const ThreadLocalCache<T, N, O> &) = delete;
 
     /**
        @brief Save the value into the thread local cache.  Used when N==0 so cache acts like single object.
@@ -147,7 +140,7 @@ namespace quda
        @param[in] i The index to use
        @return The value stored in the thread local cache at that index
      */
-    __device__ __host__ T operator[](int i)
+    __device__ __host__ T operator[](int i) const
     {
       static_assert(N > 0);
       return load(i);
