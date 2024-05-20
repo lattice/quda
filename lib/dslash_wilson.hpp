@@ -44,7 +44,8 @@ namespace quda
                        DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, U, a, x, parity, dagger, comm_override, alpha0, t0);
+      WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, U, a, x, parity, dagger, comm_override,
+                                                                    alpha0, t0);
       Wilson<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);

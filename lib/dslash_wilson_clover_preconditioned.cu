@@ -7,7 +7,6 @@
 namespace quda
 {
 
-
   // Apply the preconditioned Wilson-clover operator
   // out(x) = M*in = a * A(x)^{-1} (\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.

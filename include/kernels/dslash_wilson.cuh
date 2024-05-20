@@ -46,7 +46,8 @@ namespace quda
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, const ColorSpinorField &x,
               int parity, bool dagger, const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
-      DslashArg<Float, nDim, DDArg>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
+                                    comm_override),
       out(out),
       in(in),
       in_pack(in),

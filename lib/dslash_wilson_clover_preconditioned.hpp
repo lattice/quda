@@ -109,7 +109,8 @@ namespace quda
   template <bool distance_pc> struct DistanceType {
   };
 
-  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverPreconditionedApply {
 
     template <bool distance_pc>
     inline WilsonCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
@@ -118,8 +119,8 @@ namespace quda
                                            DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, U, A, a, x, parity, dagger, comm_override,
-                                                                   alpha0, t0);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, U, A, a, x, parity, dagger,
+                                                                          comm_override, alpha0, t0);
       WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);

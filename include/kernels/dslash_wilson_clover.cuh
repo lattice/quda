@@ -7,7 +7,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool twist_ = false, bool distance_pc_ = false>
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool twist_ = false,
+            bool distance_pc_ = false>
   struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_> {
     using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
@@ -24,7 +25,7 @@ namespace quda
                     double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                     double alpha0 = 0.0, int t0 = -1) :
       WilsonArg<Float, nColor, DDArg, nDim, reconstruct_, distance_pc_>(out, in, U, a, x, parity, dagger, comm_override,
-                                                                 alpha0, t0),
+                                                                        alpha0, t0),
       A(A, false),
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for

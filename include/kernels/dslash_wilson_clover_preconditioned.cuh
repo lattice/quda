@@ -23,7 +23,7 @@ namespace quda
                     double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                     double alpha0 = 0.0, int t0 = -1) :
       WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>(out, in, U, a, x, parity, dagger, comm_override,
-                                                                 alpha0, t0),
+                                                                        alpha0, t0),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a)
     {
