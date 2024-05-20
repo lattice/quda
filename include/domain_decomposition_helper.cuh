@@ -51,7 +51,7 @@ namespace quda
     {
       int block_parity = first_black;
       for (int i = 0; i < x.size(); i++) { block_parity += x[i] / blockDim[i]; }
-      return block_parity % 2 == 0;
+      return block_parity % 2 == 1;
     }
 
     template <typename Coord> constexpr inline bool on_border(const Coord &x, const int &mu, const int &dir) const
