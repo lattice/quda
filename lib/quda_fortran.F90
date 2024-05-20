@@ -361,6 +361,11 @@ module quda_fortran
      ! Whether to use the fused kernels for Mobius/DWF-4D dslash
      QudaBoolean :: use_mobius_fused_kernel
 
+     ! The alpha0 parameter for distance preconditioning, related to the pseudoscalar meson mass
+     real(8) distance_pc_alpha0
+     ! The t0 parameter for distance preconditioning, the timeslice where the source is located
+     integer(4) distance_pc_t0
+
   end type quda_invert_param
 
 end module quda_fortran

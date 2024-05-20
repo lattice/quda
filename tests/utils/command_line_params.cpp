@@ -128,6 +128,8 @@ QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 std::array<int, 4> dilution_block_size = {8, 8, 8, 8};
+double distance_pc_alpha0 = 0.0;
+int distance_pc_t0 = -1;
 
 int mg_levels = 2;
 
@@ -482,6 +484,13 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type (default wilson or asqtad as appropriate)")
     ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
+
+  quda_app->add_option(
+    "--distance-pc-alpha0", distance_pc_alpha0,
+    "The alpha0 parameter for distance preconditioning, 0.0 means disabling the preconditioning (default 0.0)");
+  quda_app->add_option(
+    "--distance-pc-t0",
+    distance_pc_t0, "The alpha0 parameter for distance preconditioning, negative value means disabling the preconditioning (default -1)");
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
   quda_app->add_option(
