@@ -73,9 +73,8 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {
 
     TwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   const GaugeField &U, double a, double b, bool xpay,
-                                   cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool asymmetric,
-                                   const int *comm_override, TimeProfile &profile)
+                                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, bool xpay,
+                                   int parity, bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
@@ -106,7 +105,7 @@ namespace quda
                                       const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      instantiate<TwistedMassPreconditionedApply>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override,
+      instantiate<TwistedMassPreconditionedApply>(out, in, x, U, a, b, xpay, parity, dagger, asymmetric, comm_override,
                                                   profile);
     } else {
       errorQuda("Twisted-mass operator has not been built");

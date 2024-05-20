@@ -40,9 +40,9 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
 
     template <bool distance_pc>
-    WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                double a, double alpha0, int t0, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-                const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
+    WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double alpha0, int t0,
+                int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);

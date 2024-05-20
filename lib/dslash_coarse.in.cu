@@ -14,6 +14,16 @@ namespace quda {
                                         cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                                         double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
   {
+    if (in.size() > MAX_MULTI_RHS) {
+      ApplyCoarse<dagger, coarseColor>(
+        {out.begin(), out.begin() + out.size() / 2}, {inA.begin(), inA.begin() + inA.size() / 2},
+        {inB.begin(), inB.begin() + inB.size() / 2}, Y, X, kappa, parity, dslash, clover, commDum, halo_precision);
+      ApplyCoarse<dagger, coarseColor>(
+        {out.begin() + out.size() / 2, out.end()}, {inA.begin() + inA.size() / 2, inA.end()},
+        {inB.begin() + inB.size() / 2, inB.end()}, Y, X, kappa, parity, dslash, clover, commDum, halo_precision);
+      return;
+    }
+
     if constexpr (is_enabled_multigrid()) {
       // create a halo ndim+1 field for batched comms
       auto halo = ColorSpinorField::create_comms_batch(inA);

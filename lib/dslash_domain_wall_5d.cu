@@ -66,7 +66,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall5DApply {
 
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      const GaugeField &U, double a, double m_f, cvector_ref<const ColorSpinorField> &x,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f,
                       int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 5;
@@ -84,7 +84,7 @@ namespace quda
                          const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_DOMAIN_WALL_DSLASH>()) {
-      instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
+      instantiate<DomainWall5DApply>(out, in, x, U, a, m_f, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Domain-wall operator has not been built");
     }

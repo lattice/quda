@@ -17,7 +17,7 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>()) {
       auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE>();
-      instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
+      instantiate<DomainWall4DApplyFusedM5>(out, in, x, y, U, b_5, c_5, a, m_5, parity, dagger, comm_override, m_f,
                                             dummy_list, profile);
     } else {
       errorQuda("Domain-wall operator has not been built");

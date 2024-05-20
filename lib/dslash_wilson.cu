@@ -13,7 +13,7 @@ namespace quda
     if (in[0].Ndim() == 5) errorQuda("Unexpected nDim = 5");
     if constexpr (is_enabled<QUDA_WILSON_DSLASH>()) {
       auto dummy = DistanceType<false>();
-      instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, 0, -1, x, parity, dagger, comm_override, dummy, profile);
+      instantiate<WilsonApply, WilsonReconstruct>(out, in, x, U, a, 0, -1, parity, dagger, comm_override, dummy, profile);
     } else {
       errorQuda("Wilson operator has not been built");
     }

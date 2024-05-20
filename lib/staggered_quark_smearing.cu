@@ -193,9 +193,9 @@ namespace quda
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
-    StaggeredQSmearApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U, int t0,
-                         bool is_tslice_kernel, int parity, int dir, bool dagger, const int *comm_override,
-                         TimeProfile &profile)
+    StaggeredQSmearApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                         cvector_ref<const ColorSpinorField> &, const GaugeField &U, int t0, bool is_tslice_kernel,
+                         int parity, int dir, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
         constexpr int nDim = 4;
@@ -223,7 +223,8 @@ namespace quda
           errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in two-link Gaussian smearing");
         }
       }
-      instantiate<StaggeredQSmearApply>(out, in, U, t0, is_tslice_kernel, parity, dir, dagger, comm_override, profile);
+      instantiate<StaggeredQSmearApply>(out, in, in, U, t0, is_tslice_kernel, parity, dir, dagger, comm_override,
+                                        profile);
     } else {
       errorQuda("StaggeredQSmear operator requires the staggered operator to be enabled");
     }

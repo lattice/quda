@@ -93,6 +93,14 @@ namespace quda {
   void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                        int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
+    if (in.size() > MAX_MULTI_RHS) {
+      ApplyTwistGamma({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                      d, kappa, mu, epsilon, dagger, type);
+      ApplyTwistGamma({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                      d, kappa, mu, epsilon, dagger, type);
+      return;
+    }
+
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
       instantiate<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else {
@@ -133,6 +141,12 @@ namespace quda {
   // out(x) = tau_1*in
   void ApplyTau(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
+    if (in.size() > MAX_MULTI_RHS) {
+      ApplyTau({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2}, d);
+      ApplyTau({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()}, d);
+      return;
+    }
+
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
       instantiate<TauApply>(out, in, d);
     } else {

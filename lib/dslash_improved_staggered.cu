@@ -149,8 +149,8 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
-    ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &L,
-                           const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+    ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
+                           const GaugeField &L, const GaugeField &U, double a, int parity, bool dagger,
                            const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -176,7 +176,7 @@ namespace quda
       }
 
       // L must be first gauge field argument since we template on long reconstruct
-      instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override,
+      instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, x, L, U, a, parity, dagger, comm_override,
                                                                 profile);
     } else {
       errorQuda("Improved staggered operator has not been built");

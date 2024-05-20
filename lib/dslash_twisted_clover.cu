@@ -69,8 +69,8 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverApply {
 
-    TwistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                       const CloverField &C, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
+    TwistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
+                       const GaugeField &U, const CloverField &C, double a, double b, int parity,
                        bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -90,7 +90,7 @@ namespace quda
                           TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
-      instantiate<TwistedCloverApply>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
+      instantiate<TwistedCloverApply>(out, in, x, U, C, a, b, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }

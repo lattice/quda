@@ -123,8 +123,8 @@ namespace quda
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
     DomainWall4DApplyFusedM5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                             const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5,
-                             cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, int parity,
+                             cvector_ref<const ColorSpinorField> &x, const GaugeField &U, cvector_ref<ColorSpinorField> &y,
+                             const Complex *b_5, const Complex *c_5, double a, double m_5, int parity,
                              bool dagger, const int *comm_override, double m_f,
                              Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
@@ -140,5 +140,24 @@ namespace quda
 #endif
     }
   };
+
+  // use custom instantiate to deal with field splitting if needed
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U, Args ...args)
+  {
+    if (in.size() > MAX_MULTI_RHS) {
+      instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2},
+                                {in.begin(), in.begin() + in.size() / 2},
+                                {x.begin(), x.begin() + x.size() / 2},
+                                U, cvector_ref<ColorSpinorField>{y.begin(), y.begin() + y.size() / 2}, args...);
+      instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()},
+                                {in.begin() + in.size() / 2, in.end()},
+                                {x.begin() + x.size() / 2, x.end()},
+                                U, cvector_ref<ColorSpinorField>{y.begin() + y.size() / 2, y.end()}, args...);
+      return;
+    }
+    instantiate<Apply, Recon>(out, in, x, U, y, args...);
+  }
 
 } // namespace quda

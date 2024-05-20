@@ -19,7 +19,7 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>() && is_enabled_distance_precondition()) {
       auto dummy = DistanceType<true>();
-      instantiate<WilsonCloverApply>(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override, dummy, profile);
+      instantiate<WilsonCloverApply>(out, in, x, U, A, a, alpha0, t0, parity, dagger, comm_override, dummy, profile);
     } else {
       errorQuda("Wilson-clover operator with distance preconditioning has not been built");
     }

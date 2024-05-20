@@ -49,9 +49,8 @@ namespace quda
   };
 
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
-    StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                   double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
-                   TimeProfile &profile)
+    StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
+                   const GaugeField &U, double a, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       constexpr bool improved = false;
@@ -87,7 +86,7 @@ namespace quda
                       const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
-      instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+      instantiate<StaggeredApply, StaggeredReconstruct>(out, in, x, U, a, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Staggered operator has not been built");
     }

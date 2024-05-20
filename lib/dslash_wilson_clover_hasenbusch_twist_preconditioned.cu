@@ -120,9 +120,9 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
 
     WilsonCloverHasenbuschTwistPCNoClovInvApply(cvector_ref<ColorSpinorField> &out,
-                                                cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                                                const CloverField &A, double a, double b,
-                                                cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                                cvector_ref<const ColorSpinorField> &in,
+                                                cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
+                                                const CloverField &A, double a, double b, int parity, bool dagger,
                                                 const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -145,7 +145,7 @@ namespace quda
                                                    const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>()) {
-      instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
+      instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, x, U, A, a, b, parity, dagger, comm_override,
                                                                profile);
     } else {
       errorQuda("Clover Hasenbusch Twist operator has not been built");
@@ -268,8 +268,8 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
 
     WilsonCloverHasenbuschTwistPCClovInvApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                              const GaugeField &U, const CloverField &A, double kappa, double mu,
-                                              cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                              cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
+                                              const CloverField &A, double kappa, double mu, int parity, bool dagger,
                                               const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -291,7 +291,7 @@ namespace quda
                                                  const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>()) {
-      instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
+      instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, x, U, A, a, b, parity, dagger, comm_override,
                                                              profile);
     } else {
       errorQuda("Clover Hasenbusch Twist operator has not been built");

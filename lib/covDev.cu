@@ -134,7 +134,8 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct CovDevApply {
 
-    CovDevApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+    CovDevApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                cvector_ref<const ColorSpinorField> &,  const GaugeField &U,
                 int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
 
     {
@@ -153,7 +154,7 @@ namespace quda
                    int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_COVDEV_DSLASH>()) {
-      instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
+      instantiate<CovDevApply>(out, in, in, U, mu, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Covariant derivative kernels have not been built");
     }

@@ -17,7 +17,7 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
       auto dummy = DistanceType<false>();
-      instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, 0.0, -1, x, parity, dagger, comm_override, dummy,
+      instantiate<WilsonCloverPreconditionedApply>(out, in, x, U, A, a, 0.0, -1, parity, dagger, comm_override, dummy,
                                                    profile);
     } else {
       errorQuda("Wilson-clover operator has not been built");

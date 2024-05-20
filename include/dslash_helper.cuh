@@ -354,7 +354,6 @@ namespace quda
       for (auto i = 0u; i < in.size(); i++)
         if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match
-      checkPrecision(out, in, x, U); // check all precisions match
       checkLocation(out, in, x, U);  // check all locations match
       checkNative(in, U);
 

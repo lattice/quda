@@ -15,7 +15,7 @@ namespace quda
     if (in[0].Ndim() == 5) errorQuda("Unexpected nDim = 5");
     if constexpr (is_enabled<QUDA_WILSON_DSLASH>() && is_enabled_distance_precondition()) {
       auto dummy = DistanceType<true>();
-      instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, alpha0, t0, x, parity, dagger, comm_override, dummy,
+      instantiate<WilsonApply, WilsonReconstruct>(out, in, x, U, a, alpha0, t0, parity, dagger, comm_override, dummy,
                                                   profile);
     } else {
       errorQuda("Wilson operator with distance preconditioning has not been built");

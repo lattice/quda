@@ -149,8 +149,8 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-    LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                 int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+    LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
+                 const GaugeField &U, int dir, double a, double b, int parity, bool dagger,
                  const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -174,7 +174,7 @@ namespace quda
                     const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_LAPLACE_DSLASH>()) {
-      instantiate<LaplaceApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
+      instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Laplace operator has not been enabled");
     }
