@@ -2905,7 +2905,6 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
 
 template <class Interface, class... Args>
 void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
-                      void *h_clover, void *h_clovinv, // clover field pointers
                       Interface op, Args... args)
 {
   /**
@@ -3121,19 +3120,9 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     }
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
 
-    if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-        || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    if (is_clover) { 
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading clover field...\n");
-
-#if 0
-      if (!collected_clover.empty()) {
-        loadCloverQuda(collected_clover.data(false), collected_clover.data(true), param);
-      } else {
-        loadCloverQuda(nullptr, nullptr, param);
-      }
-#endif
       setupCloverFields(collected_clover, cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement, cloverEigensolver, clov_bkup);
-
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded clover field...\n");
     }
 
@@ -3189,7 +3178,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       }
     }
 
-    if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (is_clover) {
       freeCloverQuda();
       cloverPrecise = clov_bkup.precise;
       cloverSloppy = clov_bkup.sloppy;
@@ -3205,39 +3194,38 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
 void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
-void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_clover, void *h_clovinv)
+void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, h_clover, h_clovinv, op);
+  callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
 void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
 }
 
 void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity) 
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, nullptr, nullptr, op,
+  callMultiSrcQuda(_hp_x, _hp_b, param, op,
                    parity);
 }
 
-void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_clover, 
-                              void *h_clovinv)
+void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, h_clover, h_clovinv, op, parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
 }
 
 /*!

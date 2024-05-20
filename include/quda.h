@@ -1232,10 +1232,8 @@ extern "C" {
    * @param _hp_x       Array of solution spinor fields
    * @param _hp_b       Array of source spinor fields
    * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param h_clover    Base pointer to the direct clover field
-   * @param h_clovinv   Base pointer to the inverse clover field
    */
-  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_clover, void *h_clovinv);
+  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1324,8 +1322,7 @@ extern "C" {
    * @param h_clover    Base pointer to the direct clover field
    * @param h_clovinv   Base pointer to the inverse clover field
    */
-  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, 
-                              void *h_clover, void *h_clovinv);
+  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.
