@@ -24,7 +24,7 @@ namespace quda
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                     double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                     double alpha0 = 0.0, int t0 = -1) :
-      WilsonArg<Float, nColor, DDArg, nDim, reconstruct_, distance_pc_>(out, in, U, a, x, parity, dagger, comm_override,
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_, distance_pc_>(out, in, U, a, x, parity, dagger, comm_override,
                                                                         alpha0, t0),
       A(A, false),
       a(a),
