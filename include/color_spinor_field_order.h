@@ -1201,9 +1201,13 @@ namespace quda
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
+#if 0
       norm_type *norm = nullptr;
+#endif
       AllocInt offset = 0; // offset can be 32-bit or 64-bit
+#if 0
       AllocInt norm_offset = 0;
+#endif
       int volumeCB = 0;
 
       FloatNOrder() = default;
@@ -1212,10 +1216,14 @@ namespace quda
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         GhostNOrder(a, nFace, ghost_),
         field(buffer ? buffer : a.data<Float *>()),
+#if 0
         norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
                       const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
+#endif
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
+#if 0
         norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
+#endif
         volumeCB(a.VolumeCB())
       {
       }
@@ -1224,6 +1232,8 @@ namespace quda
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
         real v[length];
+        auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
+        auto norm = reinterpret_cast<float*>(field + volumeCB * (2 * Nc * Ns));
         norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
 #pragma unroll
@@ -1242,6 +1252,8 @@ namespace quda
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];
+        auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
+        auto norm = reinterpret_cast<float*>(field + volumeCB * (2 * Nc * Ns));
 
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {
