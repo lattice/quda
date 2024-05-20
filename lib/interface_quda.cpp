@@ -33,6 +33,8 @@
 #include <deflation.h>
 
 #include <gauge_backup.h>
+#include <clover_backup.h>
+
 #include <split_grid.h>
 
 #include <ks_force_quda.h>
@@ -3032,7 +3034,9 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Deal with clover field. For Multi source computatons, clover field construction is done
     // exclusively on the GPU.
-    quda::CloverField collected_clover;
+    quda::CloverField* collected_clover=nullptr;
+
+    CloverBundleBackup clov_bkup;
     bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
       || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
 
@@ -3041,30 +3045,16 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
       if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
 
-      if (h_clover || h_clovinv) {
-        CloverFieldParam clover_param(*param, X);
-        clover_param.create = QUDA_REFERENCE_FIELD_CREATE;
-        clover_param.setPrecision(param->clover_cpu_prec);
-        clover_param.inverse = h_clovinv ? true : false;
-        clover_param.clover = h_clover;
-        clover_param.cloverInv = h_clovinv;
-        clover_param.order = param->clover_order;
-        clover_param.location = param->clover_location;
-        clover_param.reconstruct = false;
 
-        // Adjust inv_param->clover_coeff: if a user has set kappa and Csw,
-        // populate inv_param->clover_coeff for them as the computeClover
-        // routines uses that value
-        param->clover_coeff = (param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff);
+      clov_bkup.backup(cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement, cloverEigensolver);
 
-        CloverField input_clover(clover_param);
+      CloverFieldParam clover_param(*clov_bkup.precise);
 
-        for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
-        clover_param.create = QUDA_NULL_FIELD_CREATE;
-        collected_clover = CloverField(clover_param);
+      for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
+      clover_param.create = QUDA_NULL_FIELD_CREATE;
+      collected_clover = new CloverField(clover_param);
 
-        quda::split_field(collected_clover, {input_clover}, split_key); // Clover uses 4d even-odd preconditioning.
-      }
+      quda::split_field(*collected_clover, {*clov_bkup.precise}, split_key); // Clover uses 4d even-odd preconditioning.
     }
 
     quda::GaugeField* collected_gauge;
@@ -3134,11 +3124,16 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading clover field...\n");
+
+#if 0
       if (!collected_clover.empty()) {
         loadCloverQuda(collected_clover.data(false), collected_clover.data(true), param);
       } else {
         loadCloverQuda(nullptr, nullptr, param);
       }
+#endif
+      setupCloverFields(collected_clover, cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement, cloverEigensolver, clov_bkup);
+
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded clover field...\n");
     }
 
@@ -3195,7 +3190,12 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     }
 
     if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      loadCloverQuda(h_clover, h_clovinv, param);
+      freeCloverQuda();
+      cloverPrecise = clov_bkup.precise;
+      cloverSloppy = clov_bkup.sloppy;
+      cloverPrecondition = clov_bkup.precondition;
+      cloverRefinement = clov_bkup.refinement;
+      cloverEigensolver = clov_bkup.eigensolver;
     }
   }
 
