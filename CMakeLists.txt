@@ -217,9 +217,6 @@ if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
   message(SEND_ERROR "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
 
-# Set the maximum multi-RHS per kernel
-set(QUDA_MAX_MULTI_RHS "12" CACHE STRING "maximum number of simultaneous RHS in a kernel")
-
 set(QUDA_PRECISION
   "14"
   CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
