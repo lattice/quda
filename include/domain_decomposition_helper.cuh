@@ -36,14 +36,12 @@ namespace quda
     const bool red_active;         // if red blocks are active
     const bool black_active;       // if black blocks are active
     const bool block_hopping;      // if hopping between red and black is allowed
-    const bool first_black;        // if the first block of the local lattice is black instead of red
 
     DDRedBlack(const ColorSpinorField &in) :
       blockDim {in.dd.blockDim[0], in.dd.blockDim[1], in.dd.blockDim[2], in.dd.blockDim[3]},
       red_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::red_active)),
       black_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::black_active)),
-      block_hopping(in.dd.type == QUDA_DD_NO or not in.dd.is(DD::no_block_hopping)),
-      first_black(false) // TODO
+      block_hopping(in.dd.type == QUDA_DD_NO or not in.dd.is(DD::no_block_hopping))
     {
       if (in.dd.type != QUDA_DD_NO and in.dd.type != QUDA_DD_RED_BLACK) {
         errorQuda("Unsupported type %d\n", in.dd.type);
@@ -53,15 +51,15 @@ namespace quda
     // Computes block_parity: 0 = red, 1 = black
     template <typename Coord> __forceinline__ __device__ __host__ bool block_parity(const Coord &x) const
     {
-      int block_parity = first_black;
-      for (int i = 0; i < x.size(); i++) { block_parity += x[i] / blockDim[i]; }
+      int block_parity = 0;
+      for (int i = 0; i < x.size(); i++) { block_parity += x.gx[i] / blockDim[i]; }
       return block_parity % 2 == 1;
     }
 
     template <typename Coord>
     __forceinline__ __device__ __host__ bool on_border(const Coord &x, const int &mu, const int &dir) const
     {
-      return (dir > 0) ? ((x[mu] + 1) % blockDim[mu] == 0) : (x[mu] % blockDim[mu] == 0);
+      return (dir > 0) ? ((x.gx[mu] + 1) % blockDim[mu] == 0) : (x.gx[mu] % blockDim[mu] == 0);
     }
 
     template <typename Coord> __forceinline__ __device__ __host__ bool isZero(const Coord &x) const

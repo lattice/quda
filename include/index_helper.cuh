@@ -231,6 +231,7 @@ namespace quda {
   template <int nDim>
   struct Coord {
     int x[nDim]; // nDim lattice coordinates
+    int gx[nDim]; // nDim global lattice coordinates
     int x_cb;    // checkerboard lattice site index
     int s;       // fifth dimension coord
     int X;       // full lattice site index

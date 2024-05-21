@@ -41,8 +41,6 @@ namespace quda
     /** parameters for distance preconditioning */
     const real alpha0;
     const int t0;
-    const int comm_coord_dim_3;
-    const int comm_dim_dim_3;
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, const ColorSpinorField &x,
               int parity, bool dagger, const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
@@ -55,9 +53,7 @@ namespace quda
       U(U),
       a(a),
       alpha0(alpha0),
-      t0(t0),
-      comm_coord_dim_3(comm_coord(3) * this->dim[3]),
-      comm_dim_dim_3(comm_dim(3) * this->dim[3])
+      t0(t0)
     {
     }
   };
@@ -87,8 +83,8 @@ namespace quda
     real fwd_coeff_3 = 1.0;
     real bwd_coeff_3 = 1.0;
     if constexpr (Arg::distance_pc) {
-      const int t = arg.comm_coord_dim_3 + coord[3];
-      const int nt = arg.comm_dim_dim_3;
+      const int t = coord.gx[3];
+      const int nt = arg.globalDim3;
       fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
       bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
     } else {

@@ -50,10 +50,12 @@ namespace quda
     Coord<4> coord;
     int X[4] = {meta.X(0), meta.X(1), meta.X(2), meta.X(3)};
     X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
+    int commCoord[4] = {comm_coord(0) * X[0], comm_coord(1) * X[1], comm_coord(2) * X[2], comm_coord(3) * X[3]};
 
     for (int parity = 0; parity < p.Nparity(); parity++) {
       for (int x_cb = 0; x_cb < p.VolumeCB(); x_cb++) {
         getCoords(coord, x_cb, X, parity);
+        for (int i = 0; i < coord.size(); i++) { coord.gx[i] = commCoord[i] + coord.x[i]; }
 
         if (dd.isZero(coord)) {
           for (int s = 0; s < p.Nspin(); s++)
