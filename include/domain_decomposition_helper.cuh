@@ -38,7 +38,7 @@ namespace quda
       blockDim {in.dd.blockDim[0], in.dd.blockDim[1], in.dd.blockDim[2], in.dd.blockDim[3]},
       red_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::red_active)),
       black_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::black_active)),
-      block_hopping(in.dd.type == QUDA_DD_NO or in.dd.is(DD::block_hopping)),
+      block_hopping(in.dd.type == QUDA_DD_NO or not in.dd.is(DD::no_block_hopping)),
       first_black(false) // TODO
     {
       if (in.dd.type != QUDA_DD_NO and in.dd.type != QUDA_DD_RED_BLACK) {

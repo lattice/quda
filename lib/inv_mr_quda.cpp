@@ -102,8 +102,8 @@ namespace quda
             r_sloppy.dd.reset(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
           } else {
             // Both red and black active but no hopping
-            Ar.dd.reset(DD::red_black_type, DD::red_active, DD::black_active);
-            r_sloppy.dd.reset(DD::red_black_type, DD::red_active, DD::black_active);
+            Ar.dd.reset(DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+            r_sloppy.dd.reset(DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
           }
         }
 

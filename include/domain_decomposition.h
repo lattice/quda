@@ -9,10 +9,10 @@ namespace quda
 
   DECLARE_ENUM(DD, // name of the enum class
 
-               red_black_type, // Flags used by red_black
-               red_active,     // if red blocks are active
-               black_active,   // if black blocks are active
-               block_hopping,  // if hopping between red and black is allowed
+               red_black_type,   // Flags used by red_black
+               red_active,       // if red blocks are active
+               black_active,     // if black blocks are active
+               no_block_hopping, // if hopping between red and black is allowed
   );
 
   // Params for domain decompation
