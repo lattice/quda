@@ -32,7 +32,7 @@ set (QUDA_OBJS
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu
+  color_spinor_field.cpp color_spinor_util.cu color_spinor_project_dd.cu
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp

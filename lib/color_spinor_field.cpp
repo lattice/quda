@@ -1534,26 +1534,7 @@ namespace quda
     genericPrintVector(*this, parity, x_cb, rank);
   }
 
-  void ColorSpinorField::projectDD()
-  {
-    if (Location() == QUDA_CPU_FIELD_LOCATION) {
-      genericProjectDD(*this);
-    } else {
-      ColorSpinorParam param(*this);
-      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      param.location = QUDA_CPU_FIELD_LOCATION;
-      param.setPrecision((param.Precision() == QUDA_HALF_PRECISION || param.Precision() == QUDA_QUARTER_PRECISION) ?
-                           QUDA_SINGLE_PRECISION :
-                           param.Precision());
-      param.create = QUDA_COPY_FIELD_CREATE;
-      // since CPU fields cannot be low precision, use single precision instead
-      if (precision < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION, false);
-
-      ColorSpinorField tmp(param);
-      tmp.projectDD();
-      *this = tmp;
-    }
-  }
+  void ColorSpinorField::projectDD() { genericProjectDD(*this); }
 
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {
