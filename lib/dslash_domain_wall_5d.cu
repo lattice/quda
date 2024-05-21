@@ -40,8 +40,8 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         int Ls = in[0].X(4);
-        long long bulk = (Ls - 2) * (in[0].Volume() / Ls);
-        long long wall = 2 * (in[0].Volume() / Ls);
+        long long bulk = (Ls - 2) * (in.Volume() / Ls);
+        long long wall = 2 * (in.Volume() / Ls);
         flops += 96ll * bulk + 120ll * wall;
       } break;
       default: break; // 5-d flops are in the interior kernel
@@ -56,7 +56,7 @@ namespace quda
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
-      case KERNEL_POLICY: bytes += 2 * spinor_bytes * in[0].VolumeCB(); break;
+      case KERNEL_POLICY: bytes += 2 * spinor_bytes * in.VolumeCB(); break;
       default: break;
       }
       return in.size() * bytes;

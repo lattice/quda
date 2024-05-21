@@ -66,16 +66,16 @@ namespace quda {
 
     RestrictArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
 		const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      kernel_param(dim3(in[0].Volume() / out[0].Volume(), 1, out.size() * (coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()))),
+      kernel_param(dim3(in.Volume() / out.Volume(), 1, out.size() * (coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()))),
       n_src(out.size()),
       v(v),
-      aggregate_size(in[0].Volume() / out[0].Volume()),
-      aggregate_size_cb(in[0].VolumeCB() / out[0].Volume()),
+      aggregate_size(in.Volume() / out.Volume()),
+      aggregate_size_cb(in.VolumeCB() / out.Volume()),
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
       spin_map(),
       parity(parity),
-      nParity(in[0].SiteSubset()),
+      nParity(in.SiteSubset()),
       swizzle_factor(1)
     {
       if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);

@@ -57,15 +57,14 @@ namespace quda
         switch (type) {
         case Dslash5Type::M5_EOFA:
         case Dslash5Type::M5INV_EOFA:
-          bytes = in.size() * (out[0].Bytes() + 2 * in[0].Bytes() + (xpay ? x[0].Bytes() : 0));
+          bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
           break;
         default: errorQuda("Unknown Dslash5Type %d for EOFA", static_cast<int>(type));
         }
-        return in.size() * bytes;
-        ;
+        return bytes;
       }
 
-      unsigned int minThreads() const { return in[0].VolumeCB() / in[0].X(4); }
+      unsigned int minThreads() const { return in.VolumeCB() / in[0].X(4); }
       int blockStep() const { return 4; }
       int blockMin() const { return 4; }
       unsigned int sharedBytesPerThread() const

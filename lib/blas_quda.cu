@@ -79,7 +79,7 @@ namespace quda {
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int threads = x[0].Length() / (nParity * M);
+          const int threads = x.Length() / (nParity * M);
 
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           BlasArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
@@ -98,7 +98,7 @@ namespace quda {
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
-          const int threads = x[0].Length() / (nParity * M);
+          const int threads = x.Length() / (nParity * M);
 
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           BlasArg<host_real_t, M, host_store_t, N, host_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
@@ -130,7 +130,7 @@ namespace quda {
         return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
       }
 
-      long long flops() const override { return f.flops() * x[0].Length(); }
+      long long flops() const override { return f.flops() * x.Length(); }
       long long bytes() const override
       {
         return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +
@@ -223,7 +223,7 @@ namespace quda {
     {
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
-      if (x[0].Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("This kernel cannot be run on CPU fields");
+      if (x.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("This kernel cannot be run on CPU fields");
       instantiate<caxpyxmazMR_, Blas, false>(a, cvector<double>(), cvector<double>(), x, y, z, y, y);
     }
 

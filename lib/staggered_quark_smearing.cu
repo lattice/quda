@@ -50,7 +50,7 @@ namespace quda
           break;
         case INTERIOR_KERNEL:
         case UBER_KERNEL:
-          arg.threads = in[0].VolumeCB() / in[0].X(3);
+          arg.threads = in.VolumeCB() / in[0].X(3);
           break;
          default:
            errorQuda("Unexpected kernel type %d", arg.kernel_type);

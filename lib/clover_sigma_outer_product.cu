@@ -28,7 +28,7 @@ namespace quda {
       inA(inA),
       inB(inB),
       coeff(coeff),
-      doublet(inA[0].TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET)
+      doublet(inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET)
     {
       if (doublet) strcat(aux, ",doublet");
       setRHSstring(aux, inA.size());

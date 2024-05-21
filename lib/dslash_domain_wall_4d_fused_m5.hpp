@@ -109,7 +109,7 @@ namespace quda
     long long bytes() const override
     {
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
-        return in.size() * arg.y[0].Bytes() + Dslash::bytes();
+        return arg.y.Bytes() + Dslash::bytes();
       } else {
         return Dslash::bytes();
       }

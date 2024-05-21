@@ -13,7 +13,7 @@ namespace quda {
     const CloverField &clover;
     bool inverse;
     int parity;
-    unsigned int minThreads() const { return in[0].VolumeCB(); }
+    unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
     Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const CloverField &clover,
@@ -72,7 +72,7 @@ namespace quda {
     bool inverse;
     int dagger;
     QudaTwistGamma5Type twist;
-    unsigned int minThreads() const { return in[0].VolumeCB(); }
+    unsigned int minThreads() const { return in.VolumeCB(); }
 
     unsigned int sharedBytesPerThread() const
     {

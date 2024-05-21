@@ -361,6 +361,15 @@ namespace quda
     }
 
     template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> VolumeCB() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).VolumeCB() != operator[](i).VolumeCB())
+          errorQuda("VolumeCBs do not match %lu != %lu", operator[](i - 1).VolumeCB(), operator[](i).VolumeCB());
+      return operator[](0).VolumeCB();
+    }
+
+    template <class U = T>
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Length() const
     {
       for (auto i = 1u; i < vector::size(); i++)

@@ -12,7 +12,7 @@ namespace quda
                            const GaugeField &U, double a, double alpha0, int t0, cvector_ref<const ColorSpinorField> &x,
                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if (in[0].Ndim() == 5) errorQuda("Unexpected nDim = 5");
+    if (in.Ndim() == 5) errorQuda("Unexpected nDim = 5");
     if constexpr (is_enabled<QUDA_WILSON_DSLASH>() && is_enabled_distance_precondition()) {
       auto dummy = DistanceType<true>();
       instantiate<WilsonApply, WilsonReconstruct>(out, in, x, U, a, alpha0, t0, parity, dagger, comm_override, dummy,

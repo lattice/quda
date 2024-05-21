@@ -27,7 +27,7 @@ namespace quda {
 
     bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
-    unsigned int minThreads() const { return in[0].Volume(); } // fine parity is the block y dimension
+    unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
   public:
     RestrictLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
@@ -94,7 +94,7 @@ namespace quda {
      */
     unsigned int blockMapper() const
     {
-      auto aggregate_size = in[0].Volume() / out[0].Volume();
+      auto aggregate_size = in.Volume() / out.Volume();
       // for multi-RHS use minimum block size to allow more srcs per block
       auto max_block = in.size() > 1 ? blockMin() : 64u;
       for (uint32_t b = blockMin(); b < max_block; b += blockStep()) if (aggregate_size <= b) return b;
@@ -105,7 +105,7 @@ namespace quda {
     {
       TunableBlock2D::initTuneParam(param);
       param.block.x = blockMapper();
-      param.grid.x = out[0].Volume();
+      param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
     }
@@ -114,17 +114,17 @@ namespace quda {
     {
       TunableBlock2D::defaultTuneParam(param);
       param.block.x = blockMapper();
-      param.grid.x = out[0].Volume();
+      param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
     }
 
-    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in[0].SiteSubset() * in[0].VolumeCB(); }
+    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB(); }
 
     long long bytes() const
     {
-      size_t v_bytes = v.Bytes() / (v.SiteSubset() == in[0].SiteSubset() ? 1 : 2);
-      return out.size() * (in[0].Bytes() + out[0].Bytes() + v_bytes + in[0].SiteSubset() * in[0].VolumeCB() * sizeof(int));
+      size_t v_bytes = v.Bytes() / (v.SiteSubset() == in.SiteSubset() ? 1 : 2);
+      return out.size() * (in[0].Bytes() + out[0].Bytes() + v_bytes + in.SiteSubset() * in.VolumeCB() * sizeof(int));
     }
   };
 

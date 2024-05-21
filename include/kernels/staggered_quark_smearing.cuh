@@ -60,7 +60,7 @@ namespace quda
       dir(dir),
       t0(t0),
       is_t0_kernel(is_t0_kernel),
-      t0_offset(is_t0_kernel ? in[0].VolumeCB() / in[0].X(3) : 0)
+      t0_offset(is_t0_kernel ? in.VolumeCB() / in[0].X(3) : 0)
     {
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];

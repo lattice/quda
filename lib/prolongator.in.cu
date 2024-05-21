@@ -17,12 +17,12 @@ namespace quda {
     int parity;
     QudaFieldLocation location;
 
-    unsigned int minThreads() const { return out[0].VolumeCB(); } // fine parity is the block y dimension
+    unsigned int minThreads() const { return out.VolumeCB(); } // fine parity is the block y dimension
 
   public:
     ProlongateLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &V,
                      const int *fine_to_coarse, int parity)
-      : TunableKernel3D(in[0], out[0].SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>()),
+      : TunableKernel3D(in[0], out.SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>()),
         out(out),
         in(in),
         V(V),
@@ -61,12 +61,12 @@ namespace quda {
 
     long long flops() const
     {
-      return out.size() * 8 * fineSpin * fineColor * coarseColor * out[0].SiteSubset() * out[0].VolumeCB();
+      return out.size() * 8 * fineSpin * fineColor * coarseColor * out.SiteSubset() * out.VolumeCB();
     }
 
     long long bytes() const {
-      size_t v_bytes = V.Bytes() / (V.SiteSubset() == out[0].SiteSubset() ? 1 : 2);
-      return out.size() * (in[0].Bytes() + out[0].Bytes() + v_bytes + out[0].SiteSubset() * out[0].VolumeCB() * sizeof(int));
+      size_t v_bytes = V.Bytes() / (V.SiteSubset() == out.SiteSubset() ? 1 : 2);
+      return in.Bytes() + out.Bytes() + out.size() * (v_bytes + out.SiteSubset() * out.VolumeCB() * sizeof(int));
     }
 
   };
@@ -75,7 +75,7 @@ namespace quda {
   void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-    if (in[0].Nspin() != 2) errorQuda("Coarse spin %d is not supported", in[0].Nspin());
+    if (in.Nspin() != 2) errorQuda("Coarse spin %d is not supported", in.Nspin());
     constexpr int coarseSpin = 2;
 
     // first check that the spin_map matches the spin_mapper
@@ -92,7 +92,7 @@ namespace quda {
       } else {
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
-    } else if (v.Precision() == in[0].Precision()) {
+    } else if (v.Precision() == in.Precision()) {
       ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
         prolongator(out, in, v, fine_to_coarse, parity);
     } else {
@@ -104,22 +104,22 @@ namespace quda {
   void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-    if (!is_enabled_spin(out[0].Nspin())) errorQuda("nSpin %d has not been built", in[0].Nspin());
+    if (!is_enabled_spin(out.Nspin())) errorQuda("nSpin %d has not been built", in.Nspin());
 
-    if (out[0].Nspin() == 2) {
+    if (out.Nspin() == 2) {
       Prolongate<Float, 2, fineColor, coarseColor>(out, in, v, fine_to_coarse, spin_map, parity);
     } else if constexpr (fineColor == 3) {
-      if (out[0].Nspin() == 4) {
+      if (out.Nspin() == 4) {
         if constexpr (is_enabled_spin(4))
           Prolongate<Float, 4, fineColor, coarseColor>(out, in, v, fine_to_coarse, spin_map, parity);
-      } else if (out[0].Nspin() == 1) {
+      } else if (out.Nspin() == 1) {
         if constexpr (is_enabled_spin(1))
           Prolongate<Float, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, spin_map, parity);
       } else {
-        errorQuda("Unsupported nSpin %d", out[0].Nspin());
+        errorQuda("Unsupported nSpin %d", out.Nspin());
       }
     } else {
-      errorQuda("Unexpected spin %d and color %d combination", out[0].Nspin(), out[0].Ncolor());
+      errorQuda("Unexpected spin %d and color %d combination", out.Nspin(), out.Ncolor());
     }
   }
 
@@ -141,7 +141,7 @@ namespace quda {
       } else if (precision == QUDA_SINGLE_PRECISION) {
         Prolongate<float, fineColor, coarseColor>(out, in, v, fine_to_coarse, spin_map, parity);
       } else {
-        errorQuda("Unsupported precision %d", out[0].Precision());
+        errorQuda("Unsupported precision %d", out.Precision());
       }
     } else {
       errorQuda("Multigrid has not been built");

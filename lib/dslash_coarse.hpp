@@ -25,7 +25,6 @@ namespace quda {
     const double kappa;
     const int parity;
     const int nParity;
-    const int nSrc;
     const ColorSpinorField &halo;
 
     const int max_color_col_stride = 8;
@@ -35,13 +34,12 @@ namespace quda {
     long long flops() const
     {
       return ((dslash * 2 * nDim + clover * 1) * (8 * Ns * Nc * Ns * Nc) - 2 * Ns * Nc) * nParity
-        * (long long)out[0].VolumeCB() * out.size();
+        * (long long)out.VolumeCB() * out.size();
     }
     long long bytes() const
     {
-      return ((dslash || clover) * out[0].Bytes() + dslash * 8 * inA[0].Bytes() + clover * inB[0].Bytes()
-              + nSrc * nParity * (dslash * Y.Bytes() * Y.VolumeCB() / (2 * Y.Stride()) + clover * X.Bytes() / 2))
-        * out.size();
+      return (dslash || clover) * out.Bytes() + dslash * 8 * inA.Bytes() + clover * inB.Bytes()
+        + (nParity * (dslash * Y.Bytes() * Y.VolumeCB() / (2 * Y.Stride()) + clover * X.Bytes() / 2)) * out.size();
     }
 
     unsigned int sharedBytesPerThread() const
@@ -144,7 +142,7 @@ namespace quda {
     DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
                  int parity, MemoryLocation *halo_location, const ColorSpinorField &halo) :
-      TunableKernel3D(out[0], out[0].SiteSubset() * out.size(), 1),
+      TunableKernel3D(out[0], out.SiteSubset() * out.size(), 1),
       out(out),
       inA(inA),
       inB(inB),
@@ -152,8 +150,7 @@ namespace quda {
       X(X),
       kappa(kappa),
       parity(parity),
-      nParity(out[0].SiteSubset()),
-      nSrc(out[0].Ndim() == 5 ? out[0].X(4) : 1),
+      nParity(out.SiteSubset()),
       halo(halo),
       color_col_stride(-1)
     {
@@ -202,7 +199,7 @@ namespace quda {
       resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       if (!checkParam(tp)) errorQuda("Invalid launch param");
 
-      if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
+      if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not enabled");
       } else {
         checkNative(out[0], inA[0], inB[0], Y, X);
@@ -288,10 +285,10 @@ namespace quda {
     if (Y.FieldOrder() != X.FieldOrder())
       errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
 
-    if (inA[0].FieldOrder() != out[0].FieldOrder())
-      errorQuda("Field order mismatch inA = %d, out = %d", inA[0].FieldOrder(), out[0].FieldOrder());
+    if (inA.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch inA = %d, out = %d", inA.FieldOrder(), out.FieldOrder());
 
-    if (inA[0].Nspin() != 2) errorQuda("Unsupported number of coarse spins %d", inA[0].Nspin());
+    if (inA.Nspin() != 2) errorQuda("Unsupported number of coarse spins %d", inA.Nspin());
 
     constexpr int coarseSpin = 2;
 
@@ -476,7 +473,7 @@ namespace quda {
 
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
-          halo.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
+          halo.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
                              dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
 
@@ -537,7 +534,7 @@ namespace quda {
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
           shmem += 2;
-          halo.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
+          halo.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
                              dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
         // INTERIOR
@@ -810,21 +807,21 @@ namespace quda {
 
    long long flops() const {
      int nDim = 4;
-     int Ns = dslash.inA[0].Nspin();
-     int Nc = dslash.inA[0].Ncolor() / dslash.inA[0].Nvec();
-     int nParity = dslash.inA[0].SiteSubset();
-     long long volumeCB = dslash.inA[0].VolumeCB();
+     int Ns = dslash.inA.Nspin();
+     int Nc = dslash.inA.Ncolor() / dslash.inA[0].Nvec();
+     int nParity = dslash.inA.SiteSubset();
+     long long volumeCB = dslash.inA.VolumeCB();
      return ((dslash.dslash * 2 * nDim + dslash.clover * 1) * (8 * Ns * Nc * Ns * Nc) - 2 * Ns * Nc) * nParity
        * volumeCB * dslash.out.size() * dslash.out[0].Nvec();
    }
 
    long long bytes() const {
-     int nParity = dslash.inA[0].SiteSubset();
-     return ((dslash.dslash || dslash.clover) * dslash.out[0].Bytes() + dslash.dslash * 8 * dslash.inA[0].Bytes()
-             + dslash.clover * dslash.inB[0].Bytes()
-             + nParity
-               * (dslash.dslash * dslash.Y.Bytes() * dslash.Y.VolumeCB() / (2 * dslash.Y.Stride())
-                  + dslash.clover * dslash.X.Bytes() / 2))
+     int nParity = dslash.inA.SiteSubset();
+     return (dslash.dslash || dslash.clover) * dslash.out.Bytes() + dslash.dslash * 8 * dslash.inA.Bytes()
+             + dslash.clover * dslash.inB.Bytes()
+       + (nParity
+          * (dslash.dslash * dslash.Y.Bytes() * dslash.Y.VolumeCB() / (2 * dslash.Y.Stride())
+             + dslash.clover * dslash.X.Bytes() / 2))
        * dslash.out.size() * dslash.out[0].Nvec();
      // multiply Y by volume / stride to correct for pad
    }

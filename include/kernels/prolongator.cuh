@@ -41,13 +41,13 @@ namespace quda {
     
     ProlongateArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *geo_map,  const int parity) :
-      kernel_param(dim3(out[0].VolumeCB(), out[0].SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>())),
+      kernel_param(dim3(out.VolumeCB(), out.SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>())),
       n_src(out.size()),
       v(v),
       geo_map(geo_map),
       spin_map(),
       parity(parity),
-      nParity(out[0].SiteSubset())
+      nParity(out.SiteSubset())
     {
       if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {

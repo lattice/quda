@@ -62,7 +62,6 @@ namespace quda
       comm_coord_dim_3(comm_coord(3) * this->dim[3]),
       comm_dim_dim_3(comm_dim(3) * this->dim[3])
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];

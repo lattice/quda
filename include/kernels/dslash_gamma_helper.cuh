@@ -34,7 +34,7 @@ namespace quda {
       d(d), nParity(in.SiteSubset()),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       n_flavor(doublet ? 2 : 1),
-      volumeCB(doublet ? in[0].VolumeCB()/2 : in[0].VolumeCB()), a(0.0), b(0.0), c(0.0)
+      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
       if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < in.size(); i++) {
@@ -71,7 +71,7 @@ namespace quda {
         }
         if (dagger) b *= -1.0;
       }
-      this->threads = dim3(doublet ? in[0].VolumeCB()/2 : in[0].VolumeCB(), in.SiteSubset(), 1);
+      this->threads = dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1);
     }
   };
 
@@ -142,7 +142,7 @@ namespace quda {
       d(d),
       nParity(in.SiteSubset()),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      volumeCB(doublet ? in[0].VolumeCB() / 2 : in[0].VolumeCB())
+      volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB())
     {
       if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < in.size(); i++) {
@@ -158,7 +158,7 @@ namespace quda {
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
       if (!doublet) errorQuda("tau matrix can be applyed only to spinor doublet");
 
-      this->threads = dim3(doublet ? in[0].VolumeCB() / 2 : in[0].VolumeCB(), in.SiteSubset(), 1);
+      this->threads = dim3(doublet ? in.VolumeCB() / 2 : in.VolumeCB(), in.SiteSubset(), 1);
     }
   };
   /**

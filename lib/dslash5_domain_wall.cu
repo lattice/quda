@@ -53,20 +53,20 @@ namespace quda
       long long Ls = in[0].X(4);
       size_t bytes = 0u;
       switch (type) {
-      case Dslash5Type::DSLASH5_DWF: bytes = out[0].Bytes() + 2 * in[0].Bytes() + (xpay ? x[0].Bytes() : 0); break;
+      case Dslash5Type::DSLASH5_DWF: bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
       case Dslash5Type::DSLASH5_MOBIUS_PRE:
-        bytes = out[0].Bytes() + 3 * in[0].Bytes() + (xpay ? x[0].Bytes() : 0);
+        bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
         break;
-      case Dslash5Type::DSLASH5_MOBIUS: bytes = out[0].Bytes() + 3 * in[0].Bytes() + (xpay ? x[0].Bytes() : 0); break;
-      case Dslash5Type::M5_INV_DWF: bytes = out[0].Bytes() + Ls * in[0].Bytes() + (xpay ? x[0].Bytes() : 0); break;
-      case Dslash5Type::M5_INV_MOBIUS: bytes = out[0].Bytes() + Ls * in[0].Bytes() + (xpay ? x[0].Bytes() : 0); break;
-      case Dslash5Type::M5_INV_ZMOBIUS: bytes = out[0].Bytes() + Ls * in[0].Bytes() + (xpay ? x[0].Bytes() : 0); break;
+      case Dslash5Type::DSLASH5_MOBIUS: bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::M5_INV_DWF: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::M5_INV_MOBIUS: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
+      case Dslash5Type::M5_INV_ZMOBIUS: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
       default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
-      return in.size() * bytes;
+      return bytes;
     }
 
-    unsigned int minThreads() const { return in[0].VolumeCB() / in[0].X(4); }
+    unsigned int minThreads() const { return in.VolumeCB() / in[0].X(4); }
     int blockStep() const { return 4; }
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const

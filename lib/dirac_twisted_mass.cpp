@@ -261,7 +261,7 @@ namespace quda {
 
       TwistInv(symmetric ? src[i] : static_cast<ColorSpinorField &>(tmp), b[i][other_parity]);
 
-      if (b[0].TwistFlavor() == QUDA_TWIST_SINGLET) {
+      if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
 
         if (symmetric) {
           // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
@@ -306,7 +306,7 @@ namespace quda {
       checkFullSpinor(x[i], b[i]);
 
       // create full solution
-      if (b[0].TwistFlavor() == QUDA_TWIST_SINGLET) {
+      if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
         DiracWilson::DslashXpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa);
       } else { // twist doublet:

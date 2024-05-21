@@ -46,13 +46,13 @@ namespace quda {
     CloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const CloverField &clover,
 	      int parity, real kappa = 0.0, real mu = 0.0, real epsilon = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in[0].VolumeCB() / 2 : in[0].VolumeCB(),
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(),
                         in.size() * (in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? 2 : 1), in.SiteSubset())),
       clover(clover, inverse && !dynamic_clover && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
       cloverInv(clover, !dynamic_clover), // only inverse if !dynamic
       nParity(in.SiteSubset()), parity(parity),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      volumeCB(doublet ? in[0].VolumeCB() / 2 : in[0].VolumeCB()), a(0.0), b(0.0), twist(twist)
+      volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()), a(0.0), b(0.0), twist(twist)
     {
       if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {

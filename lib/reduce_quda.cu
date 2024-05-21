@@ -267,10 +267,10 @@ namespace quda {
                                             cvector_ref<const ColorSpinorField> &r)
     {
       vector<double3> norm(x.size(), {});
-      if (x[0].Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
+      if (x.Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
         auto n = instantiateReduce<HeavyQuarkResidualNorm_, false>(cvector<double>(0.0), cvector<double>(0.0),
                                                                    cvector<double>(0.0), x, r, x, x, x);
-        for (auto i = 0u; i < x.size(); i++) norm[i] = {n[i][0], n[i][1], n[i][2] / (x[0].Volume() * comm_size())};
+        for (auto i = 0u; i < x.size(); i++) norm[i] = {n[i][0], n[i][1], n[i][2] / (x.Volume() * comm_size())};
       }
       return norm;
     }
@@ -280,10 +280,10 @@ namespace quda {
                                                cvector_ref<const ColorSpinorField> &r)
     {
       vector<double3> norm(x.size(), {});
-      if (x[0].Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
+      if (x.Ncolor() == 3) { // Nc != 3 (MG mainly) not suppored
         auto n = instantiateReduce<xpyHeavyQuarkResidualNorm_, true>(cvector<double>(0.0), cvector<double>(0.0),
                                                                      cvector<double>(0.0), x, y, r, r, r);
-        for (auto i = 0u; i < x.size(); i++) norm[i] = {n[i][0], n[i][1], n[i][2] / (x[0].Volume() * comm_size())};
+        for (auto i = 0u; i < x.size(); i++) norm[i] = {n[i][0], n[i][1], n[i][2] / (x.Volume() * comm_size())};
       }
       return norm;
     }

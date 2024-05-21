@@ -103,7 +103,7 @@ namespace quda
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in[0].GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         bytes -= clover_bytes * ghost_sites;
 
         break;

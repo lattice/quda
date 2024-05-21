@@ -72,7 +72,7 @@ namespace quda {
     DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                     cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                     real kappa, int parity, const ColorSpinorField &halo) :
-      kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset() * out.size(),
                         2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       n_src(out.size()),
       halo(halo, nFace),
@@ -80,11 +80,11 @@ namespace quda {
       X(const_cast<GaugeField &>(X)),
       kappa(kappa),
       parity(parity),
-      nParity(out[0].SiteSubset()),
+      nParity(out.SiteSubset()),
       X0h(((3 - nParity) * out[0].X(0)) / 2),
       dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out[0].VolumeCB() / dim[4])
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {
       if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {

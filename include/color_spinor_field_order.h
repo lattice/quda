@@ -1166,7 +1166,7 @@ namespace quda
          @param[in] dim Dimensions of the ghost we are requesting
          @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
          @param[in] parity Parity we are requesting
-         @return Instance of a colorspinor_ghost+wrapper that curries in access to
+         @return Instance of a colorspinor_ghost_wrapper that curries in access to
          this field at the above coordinates.
       */
       __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
@@ -1399,7 +1399,7 @@ namespace quda
          @param[in] dim Dimensions of the ghost we are requesting
          @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
          @param[in] parity Parity we are requesting
-         @return Instance of a colorspinor_ghost+wrapper that curries in access to
+         @return Instance of a colorspinor_ghost_wrapper that curries in access to
          this field at the above coordinates.
       */
       __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
