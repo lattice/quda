@@ -167,11 +167,11 @@ namespace quda
 
     Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
                double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a_) :
-      kernel_param(dim3(in.VolumeCB() / in[0].X(4), in.size() * in[0].X(4), in.SiteSubset())),
+      kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
       nParity(in.SiteSubset()),
       volume_cb(in.VolumeCB()),
-      volume_4d_cb(volume_cb / in[0].X(4)),
-      Ls(in[0].X(4)),
+      volume_4d_cb(volume_cb / in.X(4)),
+      Ls(in.X(4)),
       m_f(m_f),
       m_5(m_5),
       a(a_)

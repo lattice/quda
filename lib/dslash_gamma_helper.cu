@@ -10,7 +10,7 @@ namespace quda {
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     const int d;
-    unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in[0].X(4) : 1); }
+    unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
     GammaApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d) :
@@ -50,7 +50,7 @@ namespace quda {
     double epsilon;
     int dagger;
     QudaTwistGamma5Type type;
-    unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in[0].X(4) : 1); }
+    unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
     TwistGammaApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d,

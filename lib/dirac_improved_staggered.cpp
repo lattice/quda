@@ -110,15 +110,15 @@ namespace quda {
   {
     checkSpinorAlias(in, out);
 
-    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3) * in[0].X(3) ? true : false;
+    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3) * in.X(3) ? true : false;
     if( is_time_slice && laplace3D > 3 )
     {
       logQuda(QUDA_DEBUG_VERBOSE, "t0 will be ignored for d>3 dimensional Laplacian");
       is_time_slice = false;
     }
 
-    int t0_local = t0 - comm_coord(3) * in[0].X(3);
-    if (is_time_slice && (t0_local < 0 || t0_local >= in[0].X(3)))
+    int t0_local = t0 - comm_coord(3) * in.X(3);
+    if (is_time_slice && (t0_local < 0 || t0_local >= in.X(3)))
       t0_local = -1; // when source is not in this local lattice
 
     int comm_dim[4] = {};

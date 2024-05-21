@@ -34,13 +34,13 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     EvecProjectionArg(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y) :
-      ReduceArg<spinor_array>(dim3(x.Volume()/x[0].X()[3], 1, x.size() * y.size() * x[0].X()[3]),
-                              x.size() * y.size() * x[0].X()[3]),
+      ReduceArg<spinor_array>(dim3(x.Volume()/x.X(3), 1, x.size() * y.size() * x.X(3)),
+                              x.size() * y.size() * x.X(3)),
       nx(x.size()), ny(y.size())
     {
       if (x.size() > max_nx) errorQuda("Requested vector size %lu greater than max %lu", x.size(), max_nx);
       if (y.size() > max_ny) errorQuda("Requested vector size %lu greater than max %lu", y.size(), max_ny);
-      for (int i = 0 ; i < 4; i++) X[i] = x[0].X()[i];
+      for (int i = 0 ; i < 4; i++) X[i] = x.X(i);
       for (auto i = 0u; i < x.size(); i++) this->x[i] = x[i];
       for (auto i = 0u; i < y.size(); i++) this->y[i] = y[i];
     }

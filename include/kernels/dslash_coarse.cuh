@@ -81,8 +81,8 @@ namespace quda {
       kappa(kappa),
       parity(parity),
       nParity(out.SiteSubset()),
-      X0h(((3 - nParity) * out[0].X(0)) / 2),
-      dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
+      X0h(((3 - nParity) * out.X(0)) / 2),
+      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out[0].Ndim() == 5 ? out.X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {

@@ -44,7 +44,7 @@ namespace quda
                         const ColorSpinorField &halo) :
       Dslash(arg, out, in, halo, get_app_base())
     {
-      TunableKernel3D::resizeStep(in[0].X(4), 1); // keep Ls local to the thread block
+      TunableKernel3D::resizeStep(in.X(4), 1); // keep Ls local to the thread block
     }
 
     void apply(const qudaStream_t &stream) override
@@ -66,7 +66,7 @@ namespace quda
 
     long long m5pre_flops() const
     {
-      long long Ls = in[0].X(4);
+      long long Ls = in.X(4);
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
@@ -75,7 +75,7 @@ namespace quda
 
     long long m5mob_flops() const
     {
-      long long Ls = in[0].X(4);
+      long long Ls = in.X(4);
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
@@ -84,7 +84,7 @@ namespace quda
 
     long long m5inv_flops() const
     {
-      long long Ls = in[0].X(4);
+      long long Ls = in.X(4);
       long long n = in.Ncolor() * in.Nspin();
       return (12ll * n * Ls) * in.Volume();
     }
@@ -109,7 +109,7 @@ namespace quda
     long long bytes() const override
     {
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
-        return arg.y.Bytes() + Dslash::bytes();
+        return in.size() * arg.y[0].Bytes() + Dslash::bytes();
       } else {
         return Dslash::bytes();
       }

@@ -36,7 +36,7 @@ namespace quda
       long long flops() const
       {
         // FIXME: Fix the flop count
-        long long Ls = in[0].X(4);
+        long long Ls = in.X(4);
         long long bulk = (Ls - 2) * (in.Volume() / Ls);
         long long wall = 2 * in.Volume() / Ls;
         long long n = in.Ncolor() * in.Nspin();
@@ -64,7 +64,7 @@ namespace quda
         return bytes;
       }
 
-      unsigned int minThreads() const { return in.VolumeCB() / in[0].X(4); }
+      unsigned int minThreads() const { return in.VolumeCB() / in.X(4); }
       int blockStep() const { return 4; }
       int blockMin() const { return 4; }
       unsigned int sharedBytesPerThread() const
@@ -90,7 +90,7 @@ namespace quda
               cvector_ref<const ColorSpinorField> &x, const double m_f, const double m_5, const Complex *b_5,
               const Complex *c_5, double a, bool eofa_pm, double inv, double kappa, const double *eofa_u,
               const double *eofa_x, const double *eofa_y, double sherman_morrison, bool dagger, Dslash5Type type) :
-        TunableKernel3D(in[0], in.size() * in[0].X(4), in.SiteSubset()),
+        TunableKernel3D(in[0], in.size() * in.X(4), in.SiteSubset()),
         out(out),
         in(in),
         x(x),
@@ -111,7 +111,7 @@ namespace quda
         sherman_morrison(sherman_morrison)
       {
         // Ls must be contained in the block and different fields on different blocks
-        resizeStep(in[0].X(4), 1);
+        resizeStep(in.X(4), 1);
         tune_block_y = false;
 
         if (dagger) strcat(aux, ",Dagger");

@@ -18,13 +18,13 @@ namespace quda
                     const GaugeField &U, double a, double m_f, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity,
                     bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
-      Ls(in[0].X(4)),
+      Ls(in.X(4)),
       a(a),
       m_f(m_f)
     {
       // FIXME this is a hack to use remove the batch dimension from the dslash constants
-      DslashArg<Float, nDim>::dc.X[4] = in[0].X(4);
-      DslashArg<Float, nDim>::dc.X5X4X3X2X1mX4X3X2X1 = (in[0].X(4) - 1) * DslashArg<Float, nDim>::dc.X4X3X2X1;
+      DslashArg<Float, nDim>::dc.X[4] = in.X(4);
+      DslashArg<Float, nDim>::dc.X5X4X3X2X1mX4X3X2X1 = (in.X(4) - 1) * DslashArg<Float, nDim>::dc.X4X3X2X1;
     }
   };
 

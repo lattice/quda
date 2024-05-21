@@ -60,7 +60,7 @@ namespace quda
       dir(dir),
       t0(t0),
       is_t0_kernel(is_t0_kernel),
-      t0_offset(is_t0_kernel ? in.VolumeCB() / in[0].X(3) : 0)
+      t0_offset(is_t0_kernel ? in.VolumeCB() / in.X(3) : 0)
     {
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
@@ -72,7 +72,7 @@ namespace quda
       for (int i = 0; i < 4; i++) {
         t0_face_offset[i] = is_t0_kernel ? (int)(this->dc.face_XYZ[i]) / 2 : 0;
         face_size[i] = 3 * this->dc.ghostFaceCB[i]; // 3=Nface
-        t0_face_size[i] = (is_t0_kernel && i < 3) ? face_size[i] / in[0].X(3) : face_size[i];
+        t0_face_size[i] = (is_t0_kernel && i < 3) ? face_size[i] / in.X(3) : face_size[i];
       }
 
       // partial replication of dslash::setFusedParam()

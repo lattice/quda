@@ -145,7 +145,7 @@ namespace quda
                   const GaugeField &U, cvector_ref<ColorSpinorField> &y,
                   cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                   bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) :
-        TunableGridStrideKernel2D(in[0], x[0].X(4)),
+        TunableGridStrideKernel2D(in[0], x.X(4)),
         out(out[0]),
         in(in[0]),
         U(U),
@@ -160,8 +160,8 @@ namespace quda
         halo_shift(halo_shift),
         type(type)
       {
-        resizeStep(in[0].X(4)); // Ls must be contained in the block
-        for (int i = 0; i < 4; i++) dim[i] = in.Volume() > out.Volume() ? in[0].X(i) : out[0].X(i);
+        resizeStep(in.X(4)); // Ls must be contained in the block
+        for (int i = 0; i < 4; i++) dim[i] = in.Volume() > out.Volume() ? in.X(i) : out.X(i);
         dim[0] *= 3 - in.SiteSubset(); // make full lattice dim
         volume_4d_cb_active = (dim[0] - 2 * shift[0]) * (dim[1] - 2 * shift[1]) * (dim[2] - 2 * shift[2]) * (dim[3] - 2 * shift[3]) / 2;
 

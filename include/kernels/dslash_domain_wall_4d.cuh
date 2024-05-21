@@ -16,7 +16,7 @@ namespace quda
                     const Complex *b_5, const Complex *c_5, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity,
                     bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
-      Ls(in[0].X(4))
+      Ls(in.X(4))
     {
       if (b_5 == nullptr || c_5 == nullptr)
         for (int s = 0; s < Ls; s++) a_5[s] = a; // 4-d Shamir

@@ -17,7 +17,7 @@ namespace quda
   public:
     EvecProjectLaplace3D(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
                          std::vector<double> &result) :
-      TunableMultiReduction(x[0], 1, x.size() * y.size() * x[0].X()[3], 8), x(x), y(y), result(result)
+      TunableMultiReduction(x[0], 1, x.size() * y.size() * x.X(3), 8), x(x), y(y), result(result)
     {
       strcat(aux, ",nx=");
       char rhs_str[16];
@@ -49,7 +49,7 @@ namespace quda
     if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
 
     // deploy as a tile computation
-    auto Lt = x[0].X()[3];
+    auto Lt = x.X(3);
 
     for (auto tx = 0u; tx < x.size(); tx += max_nx) {
       for (auto ty = 0u; ty < y.size(); ty += max_ny) {

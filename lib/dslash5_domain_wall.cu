@@ -23,7 +23,7 @@ namespace quda
 
     long long flops() const
     {
-      long long Ls = in[0].X(4);
+      long long Ls = in.X(4);
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
@@ -50,7 +50,7 @@ namespace quda
 
     long long bytes() const
     {
-      long long Ls = in[0].X(4);
+      long long Ls = in.X(4);
       size_t bytes = 0u;
       switch (type) {
       case Dslash5Type::DSLASH5_DWF: bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
@@ -66,7 +66,7 @@ namespace quda
       return bytes;
     }
 
-    unsigned int minThreads() const { return in.VolumeCB() / in[0].X(4); }
+    unsigned int minThreads() const { return in.VolumeCB() / in.X(4); }
     int blockStep() const { return 4; }
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const
@@ -101,7 +101,7 @@ namespace quda
     Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
             cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
             double a, bool dagger, Dslash5Type type) :
-      TunableKernel3D(in[0], in.size() * in[0].X(4), in.SiteSubset()),
+      TunableKernel3D(in[0], in.size() * in.X(4), in.SiteSubset()),
       out(out),
       in(in),
       x(x),
@@ -118,7 +118,7 @@ namespace quda
           && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
               || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         // Ls must be contained in the block and different fields on different blocks
-        resizeStep(in[0].X(4), 1);
+        resizeStep(in.X(4), 1);
         tune_block_y = false;
       }
 

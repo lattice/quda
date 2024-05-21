@@ -37,20 +37,20 @@ namespace quda
       if (arg.is_t0_kernel) {
         arg.exterior_threads = 2 * (halo.GhostFaceCB()[0] + halo.GhostFaceCB()[1] +
                                     halo.GhostFaceCB()[2] + halo.GhostFaceCB()[3])
-          / (in[0].X(3) * in.size());
+          / (in.X(3) * in.size());
         switch (arg.kernel_type) {
         case EXTERIOR_KERNEL_X:
         case EXTERIOR_KERNEL_Y:
         case EXTERIOR_KERNEL_Z:
         case EXTERIOR_KERNEL_T:
-          arg.threads = 2 * halo.GhostFaceCB()[arg.kernel_type] / (in[0].X(3) * in.size());
+          arg.threads = 2 * halo.GhostFaceCB()[arg.kernel_type] / (in.X(3) * in.size());
           break;
         case EXTERIOR_KERNEL_ALL:
           arg.threads = arg.exterior_threads;
           break;
         case INTERIOR_KERNEL:
         case UBER_KERNEL:
-          arg.threads = in.VolumeCB() / in[0].X(3);
+          arg.threads = in.VolumeCB() / in.X(3);
           break;
          default:
            errorQuda("Unexpected kernel type %d", arg.kernel_type);
@@ -80,19 +80,19 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = ghost_flops * 2 * (halo.GhostFace()[arg.kernel_type] / (arg.is_t0_kernel ? in[0].X(3) : 1));
+        flops_ = ghost_flops * 2 * (halo.GhostFace()[arg.kernel_type] / (arg.is_t0_kernel ? in.X(3) : 1));
         break;
       case EXTERIOR_KERNEL_ALL: {
         long long ghost_sites = 2
           * ((halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3])
-             / (arg.is_t0_kernel ? in[0].X(3) : 1));
+             / (arg.is_t0_kernel ? in.X(3) : 1));
         flops_ = ghost_flops * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = halo.Volume() / (arg.is_t0_kernel ? in[0].X(3) : 1);
+        long long sites = halo.Volume() / (arg.is_t0_kernel ? in.X(3) : 1);
         // mv products + accumulation
         flops_ = (num_dir * mv_flops + (num_dir - 1) * 2 * in.Ncolor()) * sites;
 
@@ -100,7 +100,7 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * (halo.GhostFace()[d] / (arg.is_t0_kernel ? in[0].X(3) : 1));
+          if (arg.commDim[d]) ghost_sites += 2 * (halo.GhostFace()[d] / (arg.is_t0_kernel ? in.X(3) : 1));
         flops_ -= ghost_flops * ghost_sites;
 
         break;
@@ -126,12 +126,12 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        bytes_ = ghost_bytes * 2 * (halo.GhostFace()[arg.kernel_type] / (arg.is_t0_kernel ? in[0].X(3) : 1));
+        bytes_ = ghost_bytes * 2 * (halo.GhostFace()[arg.kernel_type] / (arg.is_t0_kernel ? in.X(3) : 1));
         break;
       case EXTERIOR_KERNEL_ALL: {
         long long ghost_sites = 2
           * ((halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3])
-             / (arg.is_t0_kernel ? in[0].X(3) : 1));
+             / (arg.is_t0_kernel ? in.X(3) : 1));
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
@@ -140,14 +140,14 @@ namespace quda
       case KERNEL_POLICY: {
         if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
           bytes_ += pack_bytes * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
-        long long sites = halo.Volume() / (arg.is_t0_kernel ? in[0].X(3) : 1);
+        long long sites = halo.Volume() / (arg.is_t0_kernel ? in.X(3) : 1);
         bytes_ = (num_dir * (gauge_bytes + spinor_bytes) + spinor_bytes) * sites;
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * (halo.GhostFace()[d] / (arg.is_t0_kernel ? in[0].X(3) : 1));
+          if (arg.commDim[d]) ghost_sites += 2 * (halo.GhostFace()[d] / (arg.is_t0_kernel ? in.X(3) : 1));
         bytes_ -= ghost_bytes * ghost_sites;
 
         break;
