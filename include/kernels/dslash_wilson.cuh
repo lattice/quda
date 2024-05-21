@@ -194,7 +194,7 @@ namespace quda
           out = x + arg.a * out;
         }
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        if (arg.dd_x.isZero(coord)) {
+        if (arg.dd_out.isZero(coord)) {
           out = (xpay ? arg.a * out : out);
         } else {
           Vector x = arg.out(xs, my_spinor_parity);
