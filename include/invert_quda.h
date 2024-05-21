@@ -405,7 +405,7 @@ namespace quda {
     // for incremental eigCG:
     void updateRhsIndex(QudaInvertParam &param) { rhs_idx = param.rhs_idx; }
 
-    constexpr inline bool do_block_schwarz() const
+    inline bool do_block_schwarz() const
     {
       if (schwarz_type == QUDA_INVALID_SCHWARZ) return false;
       for (int i = 0; i < QUDA_MAX_DIM; i++)
