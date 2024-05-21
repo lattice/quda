@@ -26,33 +26,33 @@ namespace quda
     DDParam() : type(QUDA_DD_NO), flags {0}, blockDim {0} { }
 
     // returns false if in use
-    inline bool operator!() const { return type == QUDA_DD_NO; }
+    constexpr bool operator!() const { return type == QUDA_DD_NO; }
 
     // returns value of given flag
-    inline bool is(const DD &flag) const { return flags[(int)flag]; }
+    constexpr bool is(const DD &flag) const { return flags[(int)flag]; }
 
     // sets given flag to true
-    inline void set(const DD &flag)
+    constexpr void set(const DD &flag)
     {
       flags[(int)flag] = true;
 
       if ((int)flag >= (int)DD::red_black_type) type = QUDA_DD_RED_BLACK;
     }
 
-    template <typename... Args> inline void set(const DD &flag, Args... args)
+    template <typename... Args> constexpr void set(const DD &flag, Args... args)
     {
       set(flag);
       set(args...);
     }
 
-    inline void reset()
+    constexpr void reset()
     {
       type = QUDA_DD_NO;
 #pragma unroll
       for (auto i = 0u; i < (int)DD::size; i++) flags[i] = 0;
     }
 
-    template <typename... Args> inline void reset(Args... args)
+    template <typename... Args> constexpr void reset(Args... args)
     {
       reset();
       set(args...);

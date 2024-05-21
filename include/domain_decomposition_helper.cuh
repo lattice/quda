@@ -16,17 +16,10 @@ namespace quda
     }
 
     // Whether field at given coord is zero
-    template <typename Coord> constexpr __forceinline__ __device__ __host__ bool isZero(const Coord &) const
-    {
-      return false;
-    }
+    template <typename Coord> constexpr bool isZero(const Coord &) const { return false; }
 
     // Whether do hopping with field at neighboring coord
-    template <typename Coord>
-    constexpr __forceinline__ __device__ __host__ bool doHopping(const Coord &, const int &, const int &) const
-    {
-      return true;
-    }
+    template <typename Coord> constexpr bool doHopping(const Coord &, const int &, const int &) const { return true; }
   };
 
   // Red-black Block DD
@@ -49,20 +42,19 @@ namespace quda
     }
 
     // Computes block_parity: 0 = red, 1 = black
-    template <typename Coord> __forceinline__ __device__ __host__ bool block_parity(const Coord &x) const
+    template <typename Coord> constexpr bool block_parity(const Coord &x) const
     {
       int block_parity = 0;
       for (int i = 0; i < x.size(); i++) { block_parity += x.gx[i] / blockDim[i]; }
       return block_parity % 2 == 1;
     }
 
-    template <typename Coord>
-    __forceinline__ __device__ __host__ bool on_border(const Coord &x, const int &mu, const int &dir) const
+    template <typename Coord> constexpr bool on_border(const Coord &x, const int &mu, const int &dir) const
     {
       return (dir > 0) ? ((x.gx[mu] + 1) % blockDim[mu] == 0) : (x.gx[mu] % blockDim[mu] == 0);
     }
 
-    template <typename Coord> __forceinline__ __device__ __host__ bool isZero(const Coord &x) const
+    template <typename Coord> constexpr bool isZero(const Coord &x) const
     {
       if (red_active and black_active) return false;
       if (not red_active and not black_active) return true;
@@ -76,8 +68,7 @@ namespace quda
       return true;
     }
 
-    template <typename Coord>
-    __forceinline__ __device__ __host__ bool doHopping(const Coord &x, const int &mu, const int &dir) const
+    template <typename Coord> constexpr bool doHopping(const Coord &x, const int &mu, const int &dir) const
     {
       if (red_active and black_active and block_hopping) return true;
       if (not red_active and not black_active) return false;
