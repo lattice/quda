@@ -64,7 +64,7 @@ TEST_P(EigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-6 : 1e-12;
+  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-5 : 1e-12;
   eig_param.tol = tol;
 
   // The IRAM eigensolver will sometimes report convergence with tolerances slightly

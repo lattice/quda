@@ -93,7 +93,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_WILSON
-#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWSITED_MASS)
+#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_MASS)
 /**
  * @def   GPU_WILSON_DIRAC
  * @brief This macro is set when we kave Wilson fermions enabled
