@@ -1061,7 +1061,7 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("DD", "Options controlling DD parameters");
+  auto opgroup = quda_app->add_option_group("DD", "Options controlling Domain Decomposition parameters");
   opgroup
     ->add_option("--dd-block-size", dd_block_size,
                  "Set the domain decomposition block size in all four dimension (default 4 4 4 4)")
