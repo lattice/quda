@@ -836,7 +836,7 @@ struct DslashTestWrapper {
           blas::xpy(cudaSpinorTmp, cudaSpinorOut);
 
           // We also test that Dyx is same as D applied to projected in and out spinors
-          cudaSpinorTmp2 = spinor;
+          cudaSpinorTmp2 = cudaSpinor;
           cudaSpinorTmp2.dd.reset(DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
           cudaSpinorTmp2.projectDD();
           cudaSpinorTmp2.dd.reset();
@@ -860,6 +860,8 @@ struct DslashTestWrapper {
 
           double deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorTmp, spinorOut)));
           printfQuda("Deviaton for (D-PDP)_{%d,%d}*spinor is %e\n", col % 2, col / 2, deviation);
+          double tol = getTolerance(cuda_prec);
+          EXPECT_LE(deviation, tol) << "Projected Dirac and project spinors do not agree";
         }
       } else {
         errorQuda("Test dd type not supported");
