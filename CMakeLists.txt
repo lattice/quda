@@ -151,7 +151,7 @@ option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_LAPLACE "build laplace operator" ${QUDA_DIRAC_DEFAULT})
-option(QUDA_DIRAC_DD "build code for domain decomposition of the Dirac operator" OFF)
+option(QUDA_DIRAC_DOMAIN_DECOMPOSITION "build code for domain decomposition of the Dirac operator" OFF)
 option(QUDA_DIRAC_DISTANCE_PRECONDITIONING "build code for distance preconditioned Wilson/clover Dirac operators" OFF)
 
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
