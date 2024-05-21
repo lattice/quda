@@ -72,6 +72,33 @@ namespace quda
     }
 
     // Checks if this matches to given DDParam
+    template <typename F> inline bool check(const F &field, bool verbose = false) const
+    {
+      if (not *this) return true;
+
+      if (type == QUDA_DD_RED_BLACK) {
+        for (int i = 0; i < field.Ndim(); i++) {
+          if (blockDim[i] <= 0) {
+            if (verbose) printfQuda("blockDim[%d] = %d is not positive \n", i, blockDim[i]);
+            return false;
+          }
+          int globalDim = comm_dim(i) * field.X(i);
+          if (i == 0) globalDim *= (3 - field.SiteSubset());
+          if (globalDim % blockDim[i] != 0) {
+            if (verbose) printfQuda("blockDim[%d] = %d does not divide %d \n", i, blockDim[i], globalDim);
+            return false;
+          }
+          if ((globalDim / blockDim[i]) % 2 != 0) {
+            if (verbose) printfQuda("blockDim[%d] = %d does not divide %d **evenly** \n", i, blockDim[i], globalDim);
+            return false;
+          }
+        }
+      }
+
+      return true;
+    }
+
+    // Checks if this matches to given DDParam
     inline bool match(const DDParam &dd, bool verbose = false) const
     {
       // if one of the two is not in use we return true, i.e. one of the two is a full field
@@ -83,12 +110,13 @@ namespace quda
         return false;
       }
 
-      if (type == QUDA_DD_RED_BLACK)
+      if (type == QUDA_DD_RED_BLACK) {
         for (int i = 0; i < QUDA_MAX_DIM; i++)
           if (blockDim[i] != dd.blockDim[i]) {
             if (verbose) printfQuda("blockDim[%d] = %d != %d \n", i, blockDim[i], dd.blockDim[i]);
             return false;
           }
+      }
 
       return true;
     }
