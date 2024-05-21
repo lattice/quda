@@ -32,7 +32,7 @@ namespace quda
   // Red-black Block DD
   struct DDRedBlack {
 
-    const int_fastdiv blockDim[4]; // the size of the block per direction
+    const int_fastdiv blockDim[QUDA_MAX_DIM]; // the size of the block per direction
     const bool red_active;         // if red blocks are active
     const bool black_active;       // if black blocks are active
     const bool block_hopping;      // if hopping between red and black is allowed

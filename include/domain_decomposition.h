@@ -20,7 +20,7 @@ namespace quda
 
     QudaDDType type;
     bool flags[(int)DD::size];  // the default value of all flags is 0
-    int blockDim[4];            // the size of the block per direction
+    int blockDim[QUDA_MAX_DIM]; // the size of the block per direction
 
     // Default constructor
     DDParam() : type(QUDA_DD_NO), flags {0}, blockDim {0} { }
