@@ -839,8 +839,8 @@ namespace quda
 
     // we use a custom cache key for ghost-only fields
     FieldKey<ColorSpinorField> key;
-    key.volume = v[0].VolString();
-    key.aux = v[0].AuxString();
+    key.volume = v.VolString();
+    key.aux = v.AuxString();
     char aux[32];
     strcpy(aux, ",ghost_batch=");
     u32toa(aux + 13, v.size());

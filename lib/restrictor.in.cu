@@ -37,9 +37,9 @@ namespace quda {
       parity(parity)
     {
       strcat(vol, ",");
-      strcat(vol, out[0].VolString().c_str());
+      strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
-      strcat(aux, out[0].AuxString().c_str());
+      strcat(aux, out.AuxString().c_str());
       strcat(aux, ",n_rhs=");
       char rhs_str[16];
       i32toa(rhs_str, out.size());

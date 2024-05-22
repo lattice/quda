@@ -131,7 +131,7 @@ namespace quda
       halo(halo),
       color_col_stride(-1)
     {
-      strcpy(vol, out[0].VolString().c_str());
+      strcpy(vol, out.VolString().c_str());
       strcpy(aux, (std::string("policy_kernel,") + vol).c_str());
       strcat(aux, comm_dim_partitioned_string());
 

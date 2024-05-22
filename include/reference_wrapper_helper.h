@@ -450,6 +450,18 @@ namespace quda
     {
       for (auto i = 0u; i < vector::size(); i++) operator[](i).restore();
     }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, std::string> VolString() const
+    {
+      return operator[](0).VolString();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, std::string> AuxString() const
+    {
+      return operator[](0).AuxString();
+    }
   };
 
   template <class T> using cvector_ref = const vector_ref<T>;

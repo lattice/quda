@@ -139,7 +139,7 @@ protected:
     void fillAux()
     {
       strcpy(aux, "policy_kernel,");
-      strcat(aux, in[0].AuxString().c_str());
+      strcat(aux, in.AuxString().c_str());
       setRHSstring(aux, in.size());
       char comm[5];
       for (int i = 0; i < 4; i++) comm[i] = (comm_dim_pack[i] ? '1' : '0');

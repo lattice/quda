@@ -52,7 +52,7 @@ namespace quda {
 
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y[0].AuxString().c_str());
+          strcat(aux, y.AuxString().c_str());
         }
         setRHSstring(aux, x.size());
 
