@@ -293,6 +293,12 @@ if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
 
+# Set the maximum multi-RHS per kernel if not already set by the target
+if(NOT DEFINED QUDA_MAX_MULTI_RHS)
+  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+  message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+endif()
+
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
