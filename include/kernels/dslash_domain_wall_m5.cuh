@@ -182,8 +182,7 @@ namespace quda
         this->x[i] = x[i];
       }
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
-      if (!in.isNative() || !out.isNative())
-        errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+      checkNative(in, out, x);
 
       switch (type) {
       case Dslash5Type::DSLASH5_DWF: break;

@@ -68,15 +68,13 @@ namespace quda
         inv(inv_),
         sherman_morrison(sherman_morrison_)
       {
-        if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
         for (auto i = 0u; i < out.size(); i++) {
           this->out[i] = out[i];
           this->in[i] = in[i];
           this->x[i] = x[i];
         }
         if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
-        if (!in.isNative() || !out.isNative())
-          errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        checkNative(in, out, x);
 
         switch (type) {
         case Dslash5Type::M5_EOFA:
