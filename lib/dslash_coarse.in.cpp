@@ -103,19 +103,8 @@ namespace quda
   {
     if constexpr (is_enabled_multigrid()) {
       if (!DiracCoarse::apply_mma(out, use_mma) || checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
-
-        for (auto i = 0u; i < inA.size(); i += MAX_MULTI_RHS) { // batching if needed
-          auto inA_begin = inA.begin() + i;
-          auto inA_end = std::min(inA.begin() + (i + MAX_MULTI_RHS), inA.end());
-          auto inB_begin = inB.begin() + i;
-          auto inB_end = std::min(inB.begin() + (i + MAX_MULTI_RHS), inB.end());
-          auto out_begin = out.begin() + i;
-          auto out_end = std::min(out.begin() + (i + MAX_MULTI_RHS), out.end());
-
-          ApplyCoarse<false>({out_begin, out_end}, {inA_begin, inA_end}, {inB_begin, inB_end},
-                             Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision,
-                             IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
-        }
+        ApplyCoarse<false>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision,
+                           IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
       } else {
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         ColorSpinorField v_inA = create_color_spinor_copy(inA, csOrder);
