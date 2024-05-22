@@ -116,6 +116,10 @@ namespace quda
             if (verbose) printfQuda("blockDim[%d] = %d != %d \n", i, blockDim[i], dd.blockDim[i]);
             return false;
           }
+        if (is(DD::no_block_hopping) != dd.is(DD::no_block_hopping)) {
+          if (verbose) printfQuda("no_block_hopping do not match.\n");
+          return false;
+        }
       }
 
       return true;
