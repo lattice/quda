@@ -864,8 +864,6 @@ struct DslashTestWrapper {
           cudaSpinor.dd.reset();
           cudaSpinorTmp.dd.reset();
 
-          blas::xpy(cudaSpinorTmp, cudaSpinorOut);
-
           // We also test that Dyx is same as D applied to projected in and out spinors
           cudaSpinorTmp2 = cudaSpinor;
           cudaSpinorTmp2.dd.reset(DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
@@ -885,6 +883,11 @@ struct DslashTestWrapper {
           cudaSpinorTmp3.dd.reset(DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
           cudaSpinorTmp3.projectDD();
           cudaSpinorTmp3.dd.reset();
+
+          if (dd_test_projection)
+            blas::xpy(cudaSpinorTmp3, cudaSpinorOut);
+          else
+            blas::xpy(cudaSpinorTmp, cudaSpinorOut);
 
           spinorTmp = cudaSpinorTmp;
           spinorOut = cudaSpinorTmp3;

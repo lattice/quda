@@ -216,6 +216,7 @@ extern QudaAcceleratorType precon_accelerator_type;
 
 extern std::array<int, 4> dd_block_size;
 extern bool dd_red_black;
+extern bool dd_test_projection;
 
 extern double madwf_diagonal_suppressor;
 extern int madwf_ls;

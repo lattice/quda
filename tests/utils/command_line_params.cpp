@@ -78,6 +78,7 @@ QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
 
 std::array<int, 4> dd_block_size = {4, 4, 4, 4};
 bool dd_red_black = false;
+bool dd_test_projection = false;
 
 double madwf_diagonal_suppressor = 0.0;
 int madwf_ls = 4;
@@ -1067,6 +1068,7 @@ void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "Set the domain decomposition block size in all four dimension (default 4 4 4 4)")
     ->expected(4);
   opgroup->add_option("--dd-red-black", dd_red_black, "Enable red-black domain decomposition (default false)");
+  opgroup->add_option("--dd-test-projection", dd_red_black, "Compare against the projected result (default false)");
 }
 
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
