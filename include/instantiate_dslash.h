@@ -106,15 +106,15 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
   void instantiatePreconditioner(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                 const GaugeField &U, Args &&...args)
+                                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
     if (!is_enabled(U.Precision()))
       errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, U.Precision());
 
     if (U.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled(QUDA_HALF_PRECISION)) instantiate<Apply, Recon, short>(out, in, U, args...);
+      if constexpr (is_enabled(QUDA_HALF_PRECISION)) instantiate<Apply, Recon, short>(out, in, x, U, args...);
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiate<Apply, Recon, int8_t>(out, in, U, args...);
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiate<Apply, Recon, int8_t>(out, in, x, U, args...);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
