@@ -27,7 +27,7 @@ namespace quda
       parity(out.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
       nParity(out.SiteSubset()),
       X0h(nParity == 2 ? out.X(0) / 2 : out.X(0)),
-      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
+      dim {out.full_dim(0), out.full_dim(1), out.full_dim(2), out.full_dim(3), out.Ndim() == 5 ? out.full_dim(4) : 1},
       commCoord {comm_coord(0) * dim[0], comm_coord(1) * dim[1], comm_coord(2) * dim[2], comm_coord(3) * dim[3],
                  comm_coord(4) * dim[4]}
 

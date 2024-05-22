@@ -48,8 +48,7 @@ namespace quda
   template <typename P, typename DDArg> void projectDD(P &p, DDArg &dd, const ColorSpinorField &meta)
   {
     Coord<4> coord;
-    int X[4] = {meta.X(0), meta.X(1), meta.X(2), meta.X(3)};
-    X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
+    int X[4] = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
     int commCoord[4] = {comm_coord(0) * X[0], comm_coord(1) * X[1], comm_coord(2) * X[2], comm_coord(3) * X[3]};
 
     for (int parity = 0; parity < p.Nparity(); parity++) {

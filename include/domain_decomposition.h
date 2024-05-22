@@ -82,8 +82,7 @@ namespace quda
             if (verbose) printfQuda("blockDim[%d] = %d is not positive \n", i, blockDim[i]);
             return false;
           }
-          int globalDim = comm_dim(i) * field.X(i);
-          if (i == 0) globalDim *= (3 - field.SiteSubset());
+          int globalDim = comm_dim(i) * field.full_dim(i);
           if (globalDim % blockDim[i] != 0) {
             if (verbose) printfQuda("blockDim[%d] = %d does not divide %d \n", i, blockDim[i], globalDim);
             return false;
