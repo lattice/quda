@@ -42,11 +42,11 @@ namespace quda
         int Ls = in.X(4);
         long long bulk = (Ls - 2) * (in.Volume() / Ls);
         long long wall = 2 * (in.Volume() / Ls);
-        flops += 96ll * bulk + 120ll * wall;
+        flops += in.size() * 96ll * bulk + 120ll * wall;
       } break;
       default: break; // 5-d flops are in the interior kernel
       }
-      return in.size() * flops;
+      return flops;
     }
 
     long long bytes() const
@@ -56,10 +56,10 @@ namespace quda
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
-      case KERNEL_POLICY: bytes += 2 * spinor_bytes * in.VolumeCB(); break;
+      case KERNEL_POLICY: bytes += in.size() * 2 * spinor_bytes * in.VolumeCB(); break;
       default: break;
       }
-      return in.size() * bytes;
+      return bytes;
     }
   };
 
