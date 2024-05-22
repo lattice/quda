@@ -182,20 +182,14 @@ namespace quda
 
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        if (arg.dd_x.isZero(coord)) {
-          out = arg.a * out;
-        } else {
-          Vector x = arg.x(xs, my_spinor_parity);
-          out = x + arg.a * out;
-        }
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
+        Vector x = arg.x(xs, my_spinor_parity);
+        out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        if (arg.dd_out.isZero(coord)) {
-          out = (xpay ? arg.a * out : out);
-        } else {
-          Vector x = arg.out(xs, my_spinor_parity);
-          out = x + (xpay ? arg.a * out : out);
-        }
+        Vector x = arg.out(xs, my_spinor_parity);
+        out = x + (xpay ? arg.a * out : out);
       }
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;

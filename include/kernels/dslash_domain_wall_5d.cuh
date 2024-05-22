@@ -46,13 +46,18 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
+
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (mykernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
         const int s = coord[4];
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
-        {
+        if (arg.dd_in.doHopping(coord, d, +1)) {
           const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
           constexpr int proj_dir = dagger ? +1 : -1;
           Vector in = arg.in(fwd_idx, their_spinor_parity);
@@ -63,7 +68,7 @@ namespace quda
           }
         }
 
-        {
+        if (arg.dd_in.doHopping(coord, d, -1)) {
           const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
           constexpr int proj_dir = dagger ? -1 : +1;
           Vector in = arg.in(back_idx, their_spinor_parity);
@@ -75,7 +80,9 @@ namespace quda
         }
       }
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL and arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {

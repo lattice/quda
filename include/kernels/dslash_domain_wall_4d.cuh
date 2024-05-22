@@ -44,10 +44,18 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
+        return;
+      }
+
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a_5[s] * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(xs, my_spinor_parity);
         out = x + arg.a_5[s] * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
