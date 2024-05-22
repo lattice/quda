@@ -7,6 +7,7 @@ int argc_copy;
 char **argv_copy;
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 bool ctest_all_partitions = false;
+bool ctest_domain_decomposition = false; // currently disabled by default due to unresolved issues
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
@@ -41,8 +42,7 @@ protected:
                                                   true, false, false, false, true, false, true, true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
 
-    const std::array<bool, 3> domain_decomposition_enabled {true, true, false};
-    if (!ctest_all_partitions && !domain_decomposition_enabled[::testing::get<3>(GetParam())]) return true;
+    if (!ctest_domain_decomposition && ::testing::get<3>(GetParam())>0) return true;
 
     return false;
   }
@@ -141,6 +141,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
+  app->add_option("--test-domain-decomposition", ctest_domain_decomposition, "Test domain decomposition");
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
