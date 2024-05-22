@@ -15,6 +15,15 @@ namespace quda
       if (in.dd.type != QUDA_DD_NO) { errorQuda("Unsupported type %d\n", in.dd.type); }
     }
 
+    // Only DDNo returns true. All others return false
+    constexpr bool operator!() const { return true; }
+
+    // Whether comms are required along given direction
+    template <typename DDArg, typename Arg> constexpr bool commDim(const int &, const DDArg &, const Arg &) const
+    {
+      return true;
+    }
+
     // Whether field at given coord is zero
     template <typename Coord> constexpr bool isZero(const Coord &) const { return false; }
 
@@ -39,6 +48,21 @@ namespace quda
       if (in.dd.type != QUDA_DD_NO and in.dd.type != QUDA_DD_RED_BLACK) {
         errorQuda("Unsupported type %d\n", in.dd.type);
       }
+    }
+
+    constexpr bool operator!() const { return false; }
+
+    // Whether comms are required along given direction
+    template <typename DDArg, typename Arg> constexpr bool commDim(const int &d, const DDArg &dd, const Arg &arg) const
+    {
+      if (not red_active and not black_active) return false;
+      if (not dd.red_active and not dd.black_active) return false;
+      if (arg.dim[d] % blockDim[d] == 0) {
+        if (not red_active and not dd.red_active) return false;
+        if (not black_active and not dd.black_active) return false;
+        if (not block_hopping and not dd.block_hopping) return false;
+      }
+      return true;
     }
 
     // Computes block_parity: 0 = red, 1 = black

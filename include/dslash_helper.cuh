@@ -373,7 +373,7 @@ namespace quda
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
       for (int d = 0; d < 4; d++) {
-        commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
+        commDim[d] = (comm_override[d] == 0) ? 0 : (comm_dim_partitioned(d) * dd_out.commDim(d, dd_in, *this));
       }
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
