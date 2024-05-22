@@ -54,14 +54,7 @@ namespace quda
       // clang-format off
       IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
       // clang-format on
-
-      for (auto i = 0u; i < in.size(); i += MAX_MULTI_RHS) { // batching if needed
-        auto in_begin = in.begin() + i;
-        auto in_end = std::min(in.begin() + (i + MAX_MULTI_RHS), in.end());
-        auto out_begin = out.begin() + i;
-        auto out_end = std::min(out.begin() + (i + MAX_MULTI_RHS), out.end());
-        Prolongate({out_begin, out_end}, {in_begin, in_end}, v, fine_to_coarse, spin_map, parity, fineColors);
-      }
+      Prolongate(out, in, v, fine_to_coarse, spin_map, parity, fineColors);
     } else {
       errorQuda("Multigrid has not been built");
     }

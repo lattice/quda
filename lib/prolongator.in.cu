@@ -131,7 +131,15 @@ namespace quda {
                                           const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
     if constexpr (is_enabled_multigrid()) {
-      QudaPrecision precision = checkPrecision(out[0], in[0]);
+      if (in.size() > MAX_MULTI_RHS) {
+        Prolongate<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                                           v, fine_to_coarse, spin_map, parity);
+        Prolongate<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                                           v, fine_to_coarse, spin_map, parity);
+        return;
+      }
+
+      QudaPrecision precision = checkPrecision(out, in);
 
       if (precision == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())

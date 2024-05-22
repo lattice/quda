@@ -212,11 +212,19 @@ namespace quda {
   void Restrict<fineColor, coarseColor>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                                         const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
-    checkLocation(out[0], in[0], v);
-    if (in[0].Nspin() == 2) checkPrecision(in[0], out[0]);
-    QudaPrecision precision = out[0].Precision();
-
     if constexpr (is_enabled_multigrid()) {
+      if (in.size() > MAX_MULTI_RHS) {
+        Restrict<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                                         v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        Restrict<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                                         v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        return;
+      }
+
+      checkLocation(out, in, v);
+      if (in[0].Nspin() == 2) checkPrecision(in, out);
+      QudaPrecision precision = out.Precision();
+
       if (precision == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())
           Restrict<double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
@@ -224,7 +232,7 @@ namespace quda {
       } else if (precision == QUDA_SINGLE_PRECISION) {
         Restrict<float, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
       } else {
-        errorQuda("Unsupported precision %d", out[0].Precision());
+        errorQuda("Unsupported precision %d", precision);
       }
     } else {
       errorQuda("Multigrid has not been built");
