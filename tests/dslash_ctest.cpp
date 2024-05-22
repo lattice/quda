@@ -17,10 +17,10 @@ using ::testing::Range;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, int>>
 {
 protected:
-  ::testing::tuple<int, int, int> param;
+  ::testing::tuple<int, int, int, int> param;
 
   bool skip()
   {
@@ -40,6 +40,9 @@ protected:
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
+
+    const std::array<bool, 3> domain_decomposition_enabled {true, true, false};
+    if (!ctest_all_partitions && !domain_decomposition_enabled[::testing::get<3>(GetParam())]) return true;
 
     return false;
   }
@@ -61,6 +64,12 @@ protected:
       printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
                  grid_partition[3]);
     }
+
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
@@ -77,7 +86,8 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon);
+    int dd_value = ::testing::get<3>(GetParam());
+    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon, dd_value);
     display_test_info(prec, recon);
   }
 
@@ -157,30 +167,39 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, int>> param)
 {
   const int prec = ::testing::get<0>(param.param);
   const int recon = ::testing::get<1>(param.param);
   const int part = ::testing::get<2>(param.param);
+  const int dd = ::testing::get<3>(param.param);
   std::stringstream ss;
   // std::cout << "getdslashtestname" << get_dslash_str(dslash_type) << "_" << prec_str[prec] << "_r" << recon <<
   // "_partition" << part << std::endl; ss << get_dslash_str(dslash_type) << "_";
   ss << get_prec_str(getPrecision(prec));
   ss << "_r" << recon;
   ss << "_partition" << part;
+  ss << "_domain_decomposition" << dd;
   return ss.str();
 }
 
 #ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
-                         Combine(Range(0, 4),
-                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, 16)),
-                         getdslashtestname);
+#define N_PARTITIONS 16
 #else
+#define N_PARTITIONS 1
+#endif
+
+#ifdef GPU_DD_DIRAC
+#define N_DD_TESTS 3
+#else
+#define N_DD_TESTS 1
+#endif
+
 INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 ::testing::Values(0)),
+                                 Range(0, N_PARTITIONS), Range(0, N_DD_TESTS)),
                          getdslashtestname);
-#endif
+
+#undef N_PARTITIONS
+#undef N_DD_TESTS

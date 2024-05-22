@@ -90,7 +90,7 @@ struct DslashTestWrapper {
 
   const bool transfer = false;
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon, int dd_value)
   {
     if (first_time) {
       gauge_param = newQudaGaugeParam();
@@ -117,6 +117,8 @@ struct DslashTestWrapper {
     inv_param.clover_cuda_prec_sloppy = cuda_prec;
     inv_param.clover_cuda_prec_precondition = cuda_prec;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec;
+
+    init_domain_decomposition(dd_value);
 
     init();
   }
@@ -271,6 +273,35 @@ struct DslashTestWrapper {
     // set verbosity prior to loadGaugeQuda
     setVerbosity(verbosity);
     inv_param.verbosity = verbosity;
+  }
+
+  void init_domain_decomposition(int value)
+  {
+    if (value == 0) {
+      test_domain_decomposition = false;
+      return;
+    }
+    test_domain_decomposition = true;
+
+    if (value < 3) {
+      dd_red_black = true;
+
+      // dd_block_size is half of the local lattice
+      if (value == 1) {
+        for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
+        return;
+      }
+
+      // dd_block_size is half of the global lattice
+      if (value == 2) {
+        for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
+        return;
+      }
+
+    } else {
+      dd_red_black = false;
+    }
+    errorQuda("Unexpected value for domain decomposition (%d)", value);
   }
 
   void init()
