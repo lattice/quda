@@ -55,10 +55,10 @@ namespace quda
             int nColor, typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
-    if (out.dd.type == QUDA_DD_NO) {
+    if (out.dd.type == QUDA_DD_NO and in.dd.type == QUDA_DD_NO) {
       instantiate<Apply, Recon, Float, 3, DDNo>(out, in, U, args...);
 #ifdef GPU_DD_DIRAC
-    } else if (out.dd.type == QUDA_DD_RED_BLACK) {
+    } else if (out.dd.type == QUDA_DD_RED_BLACK or in.dd.type == QUDA_DD_RED_BLACK) {
       instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, U, args...);
 #endif
     } else {
