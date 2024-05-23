@@ -861,13 +861,13 @@ namespace quda
 
   /**
      @brief Apply the (improved) staggered Kahler-Dirac inverse block to a color-spinor field.
-     @param[out] out Result color-spinor field
-     @param[in] in Input color-spinor field
+     @param[out] out Result color-spinor field set
+     @param[in] in Input color-spinor field set
      @param[in] Xinv Kahler-Dirac inverse field
      @param[in] dagger Whether we are applying the dagger or not
   */
-  void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv,
-                                        bool dagger);
+  void ApplyStaggeredKahlerDiracInverse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                        const GaugeField &Xinv, bool dagger);
 
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.

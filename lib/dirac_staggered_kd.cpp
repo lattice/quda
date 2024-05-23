@@ -62,11 +62,11 @@ namespace quda
         ApplyStaggered(tmp, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
       }
 
-      for (auto i = 0u; i < in.size(); i++) ApplyStaggeredKahlerDiracInverse(out[i], tmp[i], *Xinv, false);
+      ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
 
     } else { // QUDA_DAG_YES
 
-      for (auto i = 0u; i < in.size(); i++) ApplyStaggeredKahlerDiracInverse(tmp[i], in[i], *Xinv, true);
+      ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
 
       if (mass == 0.) {
         ApplyStaggered(out, tmp, *gauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data, profile);
@@ -85,7 +85,7 @@ namespace quda
 
   void DiracStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    for (auto i = 0u; i < in.size(); i++) ApplyStaggeredKahlerDiracInverse(out[i], in[i], *Xinv, dagger == QUDA_DAG_YES);
+    ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }
 
   void DiracStaggeredKD::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
