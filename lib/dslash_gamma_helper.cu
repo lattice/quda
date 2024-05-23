@@ -38,6 +38,12 @@ namespace quda {
   //out(x) = gamma_d*in
   void ApplyGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
+    if (in.size() > MAX_MULTI_RHS) {
+      ApplyGamma({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2}, d);
+      ApplyGamma({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()}, d);
+      return;
+    }
+
     instantiate<GammaApply>(out, in, d);
   }
 
