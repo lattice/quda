@@ -197,9 +197,11 @@ namespace quda
     }
   }
 
-  template <typename Arg> struct HYP {
+  template <typename Arg> struct HYP : KernelOps<thread_array<int, 4>> {
     const Arg &arg;
-    constexpr HYP(const Arg &arg) : arg(arg) { }
+    template <typename... OpsArgs> constexpr HYP(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -213,7 +215,7 @@ namespace quda
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx = {0, 0, 0, 0};
+      thread_array<int, 4> dx {*this};
 
       Link U, Stap[3], TestU, I;
 
@@ -300,9 +302,11 @@ namespace quda
     }
   }
 
-  template <typename Arg> struct HYP3D {
+  template <typename Arg> struct HYP3D : KernelOps<thread_array<int, 4>> {
     const Arg &arg;
-    constexpr HYP3D(const Arg &arg) : arg(arg) { }
+    template <typename... OpsArgs> constexpr HYP3D(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -316,7 +320,7 @@ namespace quda
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx = {0, 0, 0, 0};
+      thread_array<int, 4> dx {*this};
 
       int dir_ = dir;
       dir = dir + (dir >= arg.dir_ignore);

@@ -169,6 +169,15 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
                                          double _Complex sigma, int i, QudaEigParam &eig_param,
                                          quda::GaugeField &fat_link, quda::GaugeField &long_link);
 
+/**
+ * @brief Verify the spinor distance reweighting
+ *
+ * @param spinor The spinor used to check the distance reweighting subroutine
+ * @param alpha0 The parameter for the distance preconditioning, should always be positive
+ * @param t0 The parameter for the distance preconditioning
+ */
+double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha0, int t0);
+
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
 //

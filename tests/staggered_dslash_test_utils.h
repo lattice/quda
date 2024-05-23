@@ -47,8 +47,9 @@ struct DslashTime {
 
 struct StaggeredDslashTestWrapper {
 
-  QudaGaugeParam gauge_param;
-  QudaInvertParam inv_param;
+  static inline QudaGaugeParam gauge_param;
+  static inline QudaInvertParam inv_param;
+  static inline bool first_time = true;
 
   static inline ColorSpinorField spinor;
   static inline ColorSpinorField spinorOut;
@@ -110,7 +111,6 @@ struct StaggeredDslashTestWrapper {
 
     link_recon = link_recon_;
 
-    static bool first_time = true;
     if (first_time) {
       init_host();
       first_time = false;
@@ -126,7 +126,6 @@ struct StaggeredDslashTestWrapper {
     setStaggeredGaugeParam(gauge_param);
     setStaggeredInvertParam(inv_param);
 
-    static bool first_time = true;
     if (first_time) {
       init_host();
       first_time = false;

@@ -20,6 +20,8 @@ namespace quda {
     halo_precision(param.halo_precision),
     commDim(param.commDim),
     use_mobius_fused_kernel(param.use_mobius_fused_kernel),
+    distance_pc_alpha0(param.distance_pc_alpha0),
+    distance_pc_t0(param.distance_pc_t0),
     profile("Dirac", false)
   {
     if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
@@ -46,6 +48,8 @@ namespace quda {
     type(dirac.type),
     halo_precision(dirac.halo_precision),
     commDim(dirac.commDim),
+    distance_pc_alpha0(dirac.distance_pc_alpha0),
+    distance_pc_t0(dirac.distance_pc_t0),
     profile("Dirac", false)
   {
   }
@@ -68,6 +72,8 @@ namespace quda {
       symmetric = dirac.symmetric;
       dagger = dirac.dagger;
       commDim = dirac.commDim;
+      distance_pc_alpha0 = dirac.distance_pc_alpha0;
+      distance_pc_t0 = dirac.distance_pc_t0;
       profile = dirac.profile;
 
       if (type != dirac.type) errorQuda("Trying to copy between incompatible types %d %d", type, dirac.type);
@@ -143,15 +149,15 @@ namespace quda {
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
+    } else if (param.type == QUDA_CLOVERPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
+      return new DiracCloverPC(param);
     } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
       return new DiracCloverHasenbuschTwist(param);
     } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwistPC operator\n");
       return new DiracCloverHasenbuschTwistPC(param);
-    } else if (param.type == QUDA_CLOVERPC_DIRAC) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
-      return new DiracCloverPC(param);
     } else if (param.type == QUDA_DOMAIN_WALL_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall operator\n");
       return new DiracDomainWall(param);

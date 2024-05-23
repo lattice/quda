@@ -37,7 +37,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger,
+                                commDim.data, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);
+    }
   }
 
   // Public method to apply the clover term only
@@ -50,7 +55,12 @@ namespace quda {
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_pc_alpha0, distance_pc_t0, in,
+                                QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    }
   }
 
   void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -79,7 +89,6 @@ namespace quda {
   void DiracClover::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
                                 const QudaSolutionType) const
   {
-    // do nothing
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -138,7 +147,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in,
+                                              parity, dagger, commDim.data, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim.data, profile);
+    }
   }
 
   // xpay version of the above
@@ -149,7 +163,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);
+    if (useDistancePC()) {
+      ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x,
+                                              parity, dagger, commDim.data, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);
+    }
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator

@@ -15,12 +15,12 @@ namespace quda
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int apeDim = apeDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
 
-    int X[4];    // grid dimensions
+    int X[4]; // grid dimensions
     int border[4];
     const Float alpha;
     const int dir_ignore;
@@ -40,11 +40,13 @@ namespace quda
       }
     }
   };
-  
-  template <typename Arg> struct APE {
+
+  template <typename Arg> struct APE : computeStapleOps {
     const Arg &arg;
-    constexpr APE(const Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; }
+    template <typename... OpsArgs> constexpr APE(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
@@ -65,7 +67,7 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
@@ -76,7 +78,7 @@ namespace quda
       TestU = I * (static_cast<real>(1.0) - arg.alpha) + Stap * conj(U);
       polarSu3<real>(TestU, arg.tolerance);
       U = TestU * U;
-    
+
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   };

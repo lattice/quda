@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <shared_memory_cache_helper.h>
+#include <thread_local_cache.h>
 #include <thread_array.h>
 
 namespace quda
@@ -20,14 +20,16 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (2*18 + 4*198) = dims*828
-  using computeStapleOps = thread_array<int, 4>;
-  template <typename Arg, typename Staple, typename Int>
-  __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Staple &staple, const int dir_ignore)
+  using computeStapleOps = KernelOps<thread_array<int, 4>>;
+  template <typename Ftor, typename Staple, typename Int>
+  __host__ __device__ inline void computeStaple(const Ftor &ftor, const int *x, const Int *X, const int parity,
+                                                const int nu, Staple &staple, const int dir_ignore)
   {
+    const auto &arg = ftor.arg;
     using Link = typename get_type<Staple>::type;
     staple = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx {ftor};
 #pragma unroll
     for (int mu = 0; mu < 4 ; mu++) {
       // Identify directions orthogonal to the link and
@@ -96,16 +98,18 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
-  using computeStapleRectangleOps = thread_array<int, 4>;
-  template <typename Arg, typename Staple, typename Rectangle, typename Int>
-  __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity, const int nu,
-                                                         Staple &staple, Rectangle &rectangle, const int dir_ignore)
+  using computeStapleRectangleOps = KernelOps<thread_array<int, 4>>;
+  template <typename Ftor, typename Staple, typename Rectangle, typename Int>
+  __host__ __device__ inline void computeStapleRectangle(const Ftor &ftor, const int *x, const Int *X, const int parity,
+                                                         const int nu, Staple &staple, Rectangle &rectangle,
+                                                         const int dir_ignore)
   {
+    const auto &arg = ftor.arg;
     using Link = typename get_type<Staple>::type;
     staple = Link();
     rectangle = Link();
 
-    thread_array<int, 4> dx = { };
+    thread_array<int, 4> dx {ftor};
     for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological

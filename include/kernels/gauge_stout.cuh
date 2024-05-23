@@ -11,19 +11,18 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int stoutDim_>
-  struct STOUTArg : kernel_param<> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int stoutDim_> struct STOUTArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int stoutDim = stoutDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
 
-    int X[4];    // grid dimensions
+    int X[4]; // grid dimensions
     int border[4];
     const Float rho;
     const Float staple_coeff;
@@ -48,14 +47,15 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct STOUT
-  {
+  template <typename Arg> struct STOUT : computeStapleOps {
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
 
     const Arg &arg;
-    constexpr STOUT(const Arg &arg) : arg(arg) {}
+    template <typename... OpsArgs> constexpr STOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -74,7 +74,7 @@ namespace quda
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore);
+      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -115,14 +115,26 @@ namespace quda
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-  template <typename Arg> struct OvrImpSTOUT
-  {
+  template <typename Arg> struct OvrImpSTOUTOps {
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
+    using StapCacheT = ThreadLocalCache<Link, 0, computeStapleRectangleOps>; // offset by computeStapleRectangleOps
+    using RectCacheT = ThreadLocalCache<Link, 0, StapCacheT>;                // offset by StapCacheT
+    using Ops = combineOps<computeStapleRectangleOps, KernelOps<StapCacheT, RectCacheT>>;
+  };
+
+  template <typename Arg> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg>::Ops {
+    using real = typename Arg::Float;
+    using Complex = complex<real>;
+    using Link = Matrix<complex<real>, Arg::nColor>;
+    using typename OvrImpSTOUTOps<Arg>::Ops::KernelOpsT;
 
     const Arg &arg;
-    constexpr OvrImpSTOUT(const Arg &arg) : arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr OvrImpSTOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -139,18 +151,13 @@ namespace quda
       dir = dir + (dir >= arg.dir_ignore);
 
       Link U, Q;
-#ifdef QUDA_OMPTARGET_THREAD_ARRAY_SIMPLE
-      Link Stap;
-      Link Rect;
-#else
-      ThreadLocalCache<Link, 0, computeStapleRectangleOps> Stap;
-      ThreadLocalCache<Link, 0, decltype(Stap)> Rect; // offset by Stap type to ensure non-overlapping allocations
-#endif
+      typename OvrImpSTOUTOps<Arg>::StapCacheT Stap {*this};
+      typename OvrImpSTOUTOps<Arg>::RectCacheT Rect {*this};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, arg.dir_ignore);
+      computeStapleRectangle(*this, x, X, parity, dir, Stap, Rect, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -158,7 +165,8 @@ namespace quda
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
       // Compute \rho * staple_coeff * S - \rho * rectangle_coeff * R
-      Q = ((arg.staple_coeff * static_cast<const Link &>(Stap)) - (arg.rectangle_coeff * static_cast<const Link &>(Rect))) * conj(U);
+      Q = ((arg.staple_coeff * static_cast<const Link &>(Stap)) - (arg.rectangle_coeff * static_cast<const Link &>(Rect)))
+        * conj(U);
       // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
       //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
       makeHerm(Q);
