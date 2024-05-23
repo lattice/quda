@@ -144,13 +144,28 @@ namespace quda {
       }
     };
 
-    template <template <typename reduce_t, typename real> class Functor, bool mixed, typename coeff_t, typename T,
-              typename... Args>
-    auto instantiateReduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, T &x, Args &&...args)
+    // split the fields and recurse if needed
+    template <template <typename reduce_t, typename real> class Functor, bool mixed, typename coeff_t, typename X,
+              typename Y, typename Z, typename W, typename V>
+    auto instantiateReduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w, V &v)
+      -> vector<typename Functor<double, double>::reduce_t>
     {
+      if (x.size() > MAX_MULTI_RHS) {
+        auto value0 = instantiateReduce<Functor, mixed, coeff_t, X, Y, Z, W, V>(
+          a, b, c, {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2},
+          {z.begin(), z.begin() + z.size() / 2}, {w.begin(), w.begin() + w.size() / 2},
+          {v.begin(), v.begin() + v.size() / 2});
+        auto value1 = instantiateReduce<Functor, mixed, coeff_t, X, Y, Z, W, V>(
+          a, b, c, {x.begin() + x.size() / 2, x.end()}, {y.begin() + y.size() / 2, y.end()},
+          {z.begin() + z.size() / 2, z.end()}, {w.begin() + w.size() / 2, w.end()}, {v.begin() + v.size() / 2, v.end()});
+        value0.reserve(value0.size() + value1.size());
+        value0.insert(value0.end(), value1.begin(), value1.end());
+        return value0;
+      }
+
       using host_reduce_t = typename Functor<double, double>::reduce_t;
       vector<host_reduce_t> value(x.size());
-      instantiate<Functor, Reduce, mixed>(a, b, c, x, args..., value);
+      instantiate<Functor, Reduce, mixed>(a, b, c, x, y, z, w, v, value);
       return value;
     }
 
