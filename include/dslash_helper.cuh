@@ -351,7 +351,7 @@ namespace quda
       retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
     {
-      if (out.size() > MAX_MULTI_RHS) errorQuda("vector set size %lu greater than max size %d", out.size(), MAX_MULTI_RHS);
+      if (out.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < in.size(); i++)
         if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match

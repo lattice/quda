@@ -38,13 +38,7 @@ namespace quda {
   //out(x) = gamma_d*in
   void ApplyGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyGamma({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2}, d);
-      ApplyGamma({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()}, d);
-      return;
-    }
-
-    instantiate<GammaApply>(out, in, d);
+    instantiate_recurse<GammaApply>(out, in, d);
   }
 
   template <typename Float, int nColor> class TwistGammaApply : public TunableKernel3D {
@@ -99,16 +93,8 @@ namespace quda {
   void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                        int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyTwistGamma({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                      d, kappa, mu, epsilon, dagger, type);
-      ApplyTwistGamma({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                      d, kappa, mu, epsilon, dagger, type);
-      return;
-    }
-
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      instantiate<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
+      instantiate_recurse<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else {
       errorQuda("Twisted mass operator has not been built");
     }
@@ -147,14 +133,8 @@ namespace quda {
   // out(x) = tau_1*in
   void ApplyTau(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyTau({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2}, d);
-      ApplyTau({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()}, d);
-      return;
-    }
-
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      instantiate<TauApply>(out, in, d);
+      instantiate_recurse<TauApply>(out, in, d);
     } else {
       errorQuda("Twisted mass operator has not been built");
     }

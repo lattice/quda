@@ -3,7 +3,6 @@
 #include <index_helper.cuh>
 #include <instantiate.h>
 #include <tunable_nd.h>
-#include <instantiate_dslash.h>
 #include <kernels/dslash_mobius_eofa.cuh>
 
 namespace quda
@@ -180,20 +179,10 @@ namespace quda
                        const Complex *c_5, double a, int eofa_pm, double inv, double kappa, const double *eofa_u,
                        const double *eofa_x, const double *eofa_y, double sherman_morrison, bool dagger, Dslash5Type type)
     {
-      if (in.size() > MAX_MULTI_RHS) {
-        apply_dslash5({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                      {x.begin(), x.begin() + x.size() / 2}, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa,
-                      eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type);
-        apply_dslash5({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                      {x.begin() + x.size() / 2, x.end()}, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa,
-                      eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type);
-        return;
-      }
-
       if constexpr (is_enabled<QUDA_MOBIUS_DWF_EOFA_DSLASH>()) {
         checkLocation(out, in, x); // check all locations match
-        instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                             sherman_morrison, dagger, type);
+        instantiate_recurse3<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
+                                      sherman_morrison, dagger, type);
       } else {
         errorQuda("Mobius EOFA operator has not been built");
       }

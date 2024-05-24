@@ -26,12 +26,11 @@ namespace quda
       using real = real_;
       using Functor = Functor_;
       static constexpr int n = n_;
-      static constexpr unsigned int max_n_rhs = MAX_MULTI_RHS;
-      Spinor<store_t, N> X[max_n_rhs];
-      Spinor<y_store_t, Ny> Y[max_n_rhs];
-      Spinor<store_t, N> Z[max_n_rhs];
-      Spinor<store_t, N> W[max_n_rhs];
-      Spinor<y_store_t, Ny> V[max_n_rhs];
+      Spinor<store_t, N> X[MAX_MULTI_RHS];
+      Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS];
+      Spinor<store_t, N> Z[MAX_MULTI_RHS];
+      Spinor<store_t, N> W[MAX_MULTI_RHS];
+      Spinor<y_store_t, Ny> V[MAX_MULTI_RHS];
       Functor f;
 
       const int nParity;

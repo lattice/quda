@@ -23,18 +23,17 @@ namespace quda {
     using Gauge = typename gauge_mapper<Float, recon, 18>::type;
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const unsigned int n_src;
     Force force;
-    F x[max_n_src];
+    F x[MAX_MULTI_RHS];
     Ghost x_halo;
-    F p[max_n_src];
+    F p[MAX_MULTI_RHS];
     Ghost p_halo;
     const Gauge U;
     int X[4];
     int displacement;
     bool partitioned[4];
-    real coeff[max_n_src];
+    real coeff[MAX_MULTI_RHS];
     const unsigned int volume_4d_cb;
     const unsigned int ghost_face_4d_cb;
 
@@ -53,7 +52,7 @@ namespace quda {
       volume_4d_cb(x_halo.getDslashConstant().volume_4d_cb),
       ghost_face_4d_cb(x_halo.getDslashConstant().ghostFaceCB[dim > 0 ? dim : 0])
     {
-      if (p.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", p.size(), max_n_src);
+      if (p.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", p.size(), get_max_multi_rhs());
       for (auto i = 0u; i < p.size(); i++) {
         this->p[i] = p[i];
         this->x[i] = x[i];

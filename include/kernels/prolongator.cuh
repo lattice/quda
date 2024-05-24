@@ -29,10 +29,9 @@ namespace quda {
     using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, colorspinor::getNative<Float>(coarseSpin), Float, Float, true>;
     using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat, vFloat>;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-    F out[max_n_src];
-    C in[max_n_src];
+    F out[MAX_MULTI_RHS];
+    C in[MAX_MULTI_RHS];
     const V v;
     const int *geo_map;  // need to make a device copy of this
     const spin_mapper<fineSpin,coarseSpin> spin_map;
@@ -49,7 +48,7 @@ namespace quda {
       parity(parity),
       nParity(out.SiteSubset())
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
+      if (out.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];

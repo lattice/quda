@@ -90,10 +90,9 @@ namespace quda
     static constexpr Dslash5Type type = type_;
     using F = typename colorspinor_mapper<Float, 4, nColor, false, false, true>::type;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    F out[max_n_src];                  // output vector field
-    F in[max_n_src];             // input vector field
-    F x[max_n_src];              // auxiliary input vector field
+    F out[MAX_MULTI_RHS];                  // output vector field
+    F in[MAX_MULTI_RHS];             // input vector field
+    F x[MAX_MULTI_RHS];              // auxiliary input vector field
     const int nParity;      // number of parities we're working on
     const int volume_cb;    // checkerboarded volume
     const int volume_4d_cb; // 4-d checkerboarded volume

@@ -29,9 +29,8 @@ namespace quda {
     typedef typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type F;
     typedef typename clover_mapper<Float, length>::type C;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    F out[max_n_src];                // output vector field
-    F in[max_n_src];           // input vector field
+    F out[MAX_MULTI_RHS];                // output vector field
+    F in[MAX_MULTI_RHS];           // input vector field
     const C clover;       // clover field
     const C cloverInv;    // inverse clover field (only set if not dynamic clover and doing twisted clover)
     const int nParity;    // number of parities we're working on
@@ -54,7 +53,6 @@ namespace quda {
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()), a(0.0), b(0.0), twist(twist)
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];

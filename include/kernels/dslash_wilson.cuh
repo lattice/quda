@@ -34,11 +34,10 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-    F out[max_n_src];     /** output vector field set */
-    F in[max_n_src];      /** input vector field set */
-    F x[max_n_src];       /** input vector set when doing xpay */
+    F out[MAX_MULTI_RHS];     /** output vector field set */
+    F in[MAX_MULTI_RHS];      /** input vector field set */
+    F x[MAX_MULTI_RHS];       /** input vector set when doing xpay */
     Ghost halo_pack;
     Ghost halo;
     const G U;    /** the gauge field */

@@ -52,11 +52,10 @@ namespace quda {
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-    F out[max_n_src];
-    F inA[max_n_src];
-    F inB[max_n_src];
+    F out[MAX_MULTI_RHS];
+    F inA[MAX_MULTI_RHS];
+    F inB[MAX_MULTI_RHS];
     G halo;
     const GY Y;
     const GY X;
@@ -86,7 +85,6 @@ namespace quda {
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->inA[i] = inA[i];

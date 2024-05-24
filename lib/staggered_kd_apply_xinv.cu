@@ -65,17 +65,9 @@ namespace quda {
   void ApplyStaggeredKahlerDiracInverse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                         const GaugeField &Xinv, bool dagger)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyStaggeredKahlerDiracInverse({out.begin(), out.begin() + out.size() / 2},
-                                       {in.begin(), in.begin() + in.size() / 2}, Xinv, dagger);
-      ApplyStaggeredKahlerDiracInverse({out.begin() + out.size() / 2, out.end()},
-                                       {in.begin() + in.size() / 2, in.end()}, Xinv, dagger);
-      return;
-    }
-
     if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>() && is_enabled_multigrid()) {
       // Instantiate based on precision, number of colors
-      instantiate<StaggeredKDBlock>(out, in, Xinv, dagger);
+      instantiate_recurse<StaggeredKDBlock>(out, in, Xinv, dagger);
     } else {
       errorQuda("Staggered fermion multigrid support has not been built");
     }

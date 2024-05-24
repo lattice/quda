@@ -16,14 +16,13 @@ namespace quda
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
     using F = typename colorspinor_mapper<Float, nSpin, nColor, false, false, true>::type;
 
-    static constexpr int max_n_rhs = MAX_MULTI_RHS;
     const unsigned int n_rhs;
 
     Oprod oprod;
     const unsigned int volume_4d_cb;
-    F inA[max_n_rhs];
-    F inB[max_n_rhs];
-    array_2d<real, max_n_rhs, 2> coeff;
+    F inA[MAX_MULTI_RHS];
+    F inB[MAX_MULTI_RHS];
+    array_2d<real, MAX_MULTI_RHS, 2> coeff;
 
     CloverSigmaOprodArg(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
                         cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff_) :

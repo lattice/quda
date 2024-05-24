@@ -32,9 +32,7 @@ namespace quda
     using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
                                                     spin_project, spinor_direct_load, false>;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    const int_fastdiv n_src;
-    F in[max_n_src]; // field we are packing
+    F in[MAX_MULTI_RHS]; // field we are packing
     Ghost halo_pack;
 
     const int nFace;
@@ -87,7 +85,6 @@ namespace quda
             int) :
 #endif
   kernel_param(dim3(block * grid, halo.X(4), in.SiteSubset())),
-      n_src(in.size()),
       halo_pack(halo, nFace, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       parity(parity),

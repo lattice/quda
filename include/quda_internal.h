@@ -66,6 +66,12 @@ namespace quda {
    */
   bool canReuseResidentGauge(QudaInvertParam *inv_param);
 
+  /**
+     Runtime query of what the maximum number of RHS per kernel is
+     @return Maximum number of RHS per kernel
+   */
+  unsigned int get_max_multi_rhs();
+
   class TimeProfile;
 
 } // namespace quda

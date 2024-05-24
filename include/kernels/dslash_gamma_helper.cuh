@@ -16,9 +16,8 @@ namespace quda {
     constexpr static int nColor = nColor_;
     using F = typename colorspinor_mapper<Float, 4, nColor, false, false, true>::type;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    F out[max_n_src];      // output vector field
-    F in[max_n_src];      // input vector field
+    F out[MAX_MULTI_RHS];      // output vector field
+    F in[MAX_MULTI_RHS];      // input vector field
     const int d;          // which gamma matrix are we applying
     const int nParity;    // number of parities we're working on
     const bool doublet;   // whether we applying the operator to a doublet
@@ -36,7 +35,6 @@ namespace quda {
       n_flavor(doublet ? 2 : 1),
       volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < in.size(); i++) {
         this->in[i] = in[i];
         this->out[i] = out[i];
@@ -130,9 +128,8 @@ namespace quda {
     constexpr static int nColor = nColor_;
     typedef typename colorspinor_mapper<Float, 4, nColor>::type F;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    F out[max_n_src];      // output vector field
-    F in[max_n_src];      // input vector field
+    F out[MAX_MULTI_RHS];      // output vector field
+    F in[MAX_MULTI_RHS];      // input vector field
     const int d;        // which gamma matrix are we applying
     const int nParity;  // number of parities we're working on
     bool doublet;       // whether we applying the operator to a doublet
@@ -144,7 +141,6 @@ namespace quda {
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB())
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < in.size(); i++) {
         this->in[i] = in[i];
         this->out[i] = out[i];

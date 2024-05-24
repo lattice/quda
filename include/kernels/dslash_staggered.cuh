@@ -37,13 +37,12 @@ namespace quda
     using GL =
         typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-    F out[max_n_src];      /** output vector field */
-    F in[max_n_src]; /** input vector field */
+    F out[MAX_MULTI_RHS];      /** output vector field */
+    F in[MAX_MULTI_RHS]; /** input vector field */
     const Ghost halo_pack; /** accessor for writing the halo */
     const Ghost halo;       /** accessor for reading the halo */
-    F x[max_n_src];  /** input vector when doing xpay */
+    F x[MAX_MULTI_RHS];  /** input vector when doing xpay */
     const GU U; /** the gauge field */
     const GL L; /** the long gauge field */
 

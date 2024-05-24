@@ -62,7 +62,7 @@ namespace quda {
                                cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff)
   {
     if constexpr (is_enabled_clover()) {
-      if (x.size() > MAX_MULTI_RHS) {
+      if (x.size() > get_max_multi_rhs()) {
         // divide and conquer
         computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin(), x.begin() + x.size() / 2},
                                 cvector_ref<const ColorSpinorField> {p.begin(), p.begin() + p.size() / 2},

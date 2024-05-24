@@ -46,16 +46,8 @@ namespace quda {
   void ApplyClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    const CloverField &clover, bool inverse, int parity)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyClover({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                  clover, inverse, parity);
-      ApplyClover({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                  clover, inverse, parity);
-      return;
-    }
-
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
-      instantiate<Clover>(out, in, clover, inverse, parity);
+      instantiate_recurse<Clover>(out, in, clover, inverse, parity);
     } else {
       errorQuda("Clover dslash has not been built");
     }
@@ -143,16 +135,8 @@ namespace quda {
                         const CloverField &clover, double kappa, double mu, double epsilon, int parity, int dagger,
                         QudaTwistGamma5Type twist)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyTwistClover({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                       clover, kappa, mu, epsilon, parity, dagger, twist);
-      ApplyTwistClover({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                       clover, kappa, mu, epsilon, parity, dagger, twist);
-      return;
-    }
-
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
-      instantiate<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+      instantiate_recurse<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }

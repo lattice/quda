@@ -32,9 +32,8 @@ namespace quda
 
     using real = typename mapper<Float>::type;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    F out[max_n_src]; /** output vector field */
-    F in[max_n_src];  /** input vector field */
+    F out[MAX_MULTI_RHS]; /** output vector field */
+    F in[MAX_MULTI_RHS];  /** input vector field */
     Ghost halo_pack;  /** input vector field used in packing to be able to independently resetGhost */
     Ghost halo;       /** input vector field used in packing to be able to independently resetGhost */
     const G U;       /** the gauge field */

@@ -14,7 +14,7 @@ namespace quda {
                                         cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                                         double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
   {
-    if (inA.size() > MAX_MULTI_RHS) {
+    if (inA.size() > get_max_multi_rhs()) {
       ApplyCoarse<dagger, coarseColor>(
         {out.begin(), out.begin() + out.size() / 2}, {inA.begin(), inA.begin() + inA.size() / 2},
         {inB.begin(), inB.begin() + inB.size() / 2}, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);

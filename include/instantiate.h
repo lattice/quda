@@ -4,6 +4,7 @@
 #include <enum_quda.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include "reference_wrapper_helper.h"
 
 namespace quda
 {
@@ -284,6 +285,55 @@ namespace quda
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
     }
+  }
+
+  /**
+     @brief instantiate_recurse function is used to instantiate the
+     precision and number of colors for a class that operates on
+     batches.  If necessary the batches are split up if the set size
+     exceeds the maximum.  This specific variant is for when we have
+     two vector sets.
+     @param[out] out Output ColorSpinorField set
+     @param[in] in Input ColorSpinorField set
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int> class Apply, typename O, typename I, typename... Args>
+  constexpr void instantiate_recurse(cvector_ref<O> &out, cvector_ref<I> &in, Args &&... args)
+  {
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate_recurse<Apply>(cvector_ref<O>{out.begin(), out.begin() + out.size() / 2},
+                                 cvector_ref<I>{in.begin(), in.begin() + in.size() / 2}, args...);
+      instantiate_recurse<Apply>(cvector_ref<O>{out.begin() + out.size() / 2, out.end()},
+                                 cvector_ref<I>{in.begin() + in.size() / 2, in.end()}, args...);
+      return;
+    }
+    instantiate<Apply>(out, in, args...);
+  }
+
+  /**
+     @brief instantiate_recurse3 function is used to instantiate the
+     precision and number of colors for a class that operates on
+     batches.  If necessary the batches are split up if the set size
+     exceeds the maximum.  This specific variant is for when we have
+     three vector sets.
+     @param[out] out Output set
+     @param[in] in Input set
+     @param[in] x Auxiliary set
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int> class Apply, typename O, typename I, typename X, typename... Args>
+  constexpr void instantiate_recurse3(cvector_ref<O> &out, cvector_ref<I> &in, cvector_ref<X> &x, Args &&... args)
+  {
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate_recurse3<Apply>(cvector_ref<O>{out.begin(), out.begin() + out.size() / 2},
+                                  cvector_ref<I>{in.begin(), in.begin() + in.size() / 2},
+                                  cvector_ref<X>{x.begin(), x.begin() + x.size() / 2}, args...);
+      instantiate_recurse3<Apply>(cvector_ref<O>{out.begin() + out.size() / 2, out.end()},
+                                  cvector_ref<I>{in.begin() + in.size() / 2, in.end()},
+                                  cvector_ref<X>{x.begin() + x.size() / 2, x.end()}, args...);
+      return;
+    }
+    instantiate<Apply>(out, in, x, args...);
   }
 
   /**

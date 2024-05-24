@@ -27,8 +27,7 @@ namespace quda
 
     using F = typename DomainWall4DArg::F;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
-    F y[max_n_src]; // The additional output field accessor
+    F y[MAX_MULTI_RHS]; // The additional output field accessor
 
     static constexpr Dslash5Type dslash5_type = dslash5_type_;
 

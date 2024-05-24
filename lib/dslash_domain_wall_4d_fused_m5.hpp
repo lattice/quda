@@ -147,15 +147,17 @@ namespace quda
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U, Args ...args)
   {
-    if (in.size() > MAX_MULTI_RHS) {
+    if (in.size() > get_max_multi_rhs()) {
       instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2},
                                 {in.begin(), in.begin() + in.size() / 2},
                                 {x.begin(), x.begin() + x.size() / 2},
-                                U, cvector_ref<ColorSpinorField>{y.begin(), y.begin() + y.size() / 2}, args...);
+                                {y.begin(), y.begin() + y.size() / 2},
+                                U, args...);
       instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()},
                                 {in.begin() + in.size() / 2, in.end()},
                                 {x.begin() + x.size() / 2, x.end()},
-                                U, cvector_ref<ColorSpinorField>{y.begin() + y.size() / 2, y.end()}, args...);
+                                {y.begin() + y.size() / 2, y.end()},
+                                U, args...);
       return;
     }
     instantiate<Apply, Recon>(out, in, x, U, y, args...);

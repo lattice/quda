@@ -181,18 +181,10 @@ namespace quda
                     cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5,
                     const Complex *c_5, double a, bool dagger, Dslash5Type type)
   {
-    if (in.size() > MAX_MULTI_RHS) {
-      ApplyDslash5({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                   {x.begin(), x.begin() + x.size() / 2}, m_f, m_5, b_5, c_5, a, dagger, type);
-      ApplyDslash5({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                   {x.begin() + x.size() / 2, x.end()}, m_f, m_5, b_5, c_5, a, dagger, type);
-      return;
-    }
-
     if (is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>()) {
       if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
       checkLocation(out, in, x); // check all locations match
-      instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+      instantiate_recurse3<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
     } else {
       errorQuda("Domain wall operator has not been built");
     }

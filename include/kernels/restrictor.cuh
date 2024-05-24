@@ -38,11 +38,9 @@ namespace quda {
       = FieldOrderCB<real, coarseSpin, coarseColor, 1, colorspinor::getNative<out_t>(coarseSpin), out_t, out_t, true>;
     using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, colorspinor::getNative<v_t>(fineSpin), v_t>;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-
-    C out[max_n_src];
-    F in[max_n_src];
+    C out[MAX_MULTI_RHS];
+    F in[MAX_MULTI_RHS];
     const V v;
     const int aggregate_size;    // number of sites that form a single aggregate
     const int_fastdiv aggregate_size_cb; // number of checkerboard sites that form a single aggregate
@@ -78,7 +76,7 @@ namespace quda {
       nParity(in.SiteSubset()),
       swizzle_factor(1)
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
+      if (out.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];

@@ -150,7 +150,7 @@ namespace quda {
     auto instantiateReduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w, V &v)
       -> vector<typename Functor<double, double>::reduce_t>
     {
-      if (x.size() > MAX_MULTI_RHS) {
+      if (x.size() > get_max_multi_rhs()) {
         auto value0 = instantiateReduce<Functor, mixed, coeff_t, X, Y, Z, W, V>(
           a, b, c, {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2},
           {z.begin(), z.begin() + z.size() / 2}, {w.begin(), w.begin() + w.size() / 2},
