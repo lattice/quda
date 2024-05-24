@@ -9,8 +9,8 @@
 #include <gauge_field.h>
 #include <uint_to_char.h>
 
-#include <dslash_policy.cuh>
-#include <kernels/covDev.cuh>
+#include <dslash_policy.hpp>
+#include <kernels/covariant_derivative.cuh>
 
 /**
    This is the covariant derivative based on the basic gauged Laplace operator

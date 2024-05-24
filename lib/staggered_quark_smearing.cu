@@ -9,7 +9,7 @@
 #include <gauge_field.h>
 #include <uint_to_char.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/staggered_quark_smearing.cuh>
 
 /**

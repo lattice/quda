@@ -4,7 +4,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/dslash_twisted_clover_preconditioned.cuh>
 
 /**

@@ -7,7 +7,7 @@
 #include <index_helper.cuh>
 #include <gauge_field.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/dslash_staggered.cuh>
 
 /**

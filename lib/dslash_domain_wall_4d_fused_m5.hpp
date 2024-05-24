@@ -2,7 +2,7 @@
 #include <color_spinor_field.h>
 #include <worker.h>
 #include <kernels/dslash_domain_wall_4d_fused_m5.cuh>
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <dslash.h>
 
 /**
