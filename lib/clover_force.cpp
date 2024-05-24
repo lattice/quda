@@ -92,6 +92,7 @@ namespace quda
     }
     computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
                             epsilon);
+    p_.clear(); // deallocate the p vectors prior to cloverDerivative to reduce footprint
 
     // oprod = (A12) of hep-lat/0112051
     // compute the insertion of oprod in Fig.27 of hep-lat/0112051
