@@ -19,6 +19,7 @@ namespace quda
     using Dslash::arg;
     using Dslash::aux_base;
     using Dslash::in;
+    cvector_ref<ColorSpinorField> &y;
 
     inline std::string get_app_base()
     {
@@ -41,8 +42,8 @@ namespace quda
 
   public:
     DomainWall4DFusedM5(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                        const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo, get_app_base())
+                        const ColorSpinorField &halo, cvector_ref<ColorSpinorField> &y) :
+      Dslash(arg, out, in, halo, get_app_base()), y(y)
     {
       TunableKernel3D::resizeStep(in.X(4), 1); // keep Ls local to the thread block
     }
@@ -109,7 +110,7 @@ namespace quda
     long long bytes() const override
     {
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
-        return in.size() * arg.y[0].Bytes() + Dslash::bytes();
+        return y.Bytes() + Dslash::bytes();
       } else {
         return Dslash::bytes();
       }
@@ -135,7 +136,7 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in);
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
       Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
-      DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo);
+      DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
 #endif
     }
