@@ -192,9 +192,7 @@ namespace quda {
       DiracWilson::DslashXpay(out, in, parity, in, 0.0);
     } else {
       // we need an Ls=plain 2 Wilson dslash, which is exactly what the 4-d preconditioned DWF operator is
-      for (auto i = 0u; i < in.size(); i++)
-        ApplyDomainWall4D(out[i], in[i], *gauge, 0.0, 0.0, nullptr, nullptr, in[i], parity, dagger, commDim.data,
-                          profile);
+      ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim.data, profile);
     }
   }
 
@@ -205,8 +203,7 @@ namespace quda {
       DiracWilson::DslashXpay(out, in, parity, x, k);
     } else {
       // we need an Ls=plain 2 Wilson dslash, which is exactly what the 4-d preconditioned DWF operator is
-      for (auto i = 0u; i < in.size(); i++)
-        ApplyDomainWall4D(out[i], in[i], *gauge, k, 0.0, nullptr, nullptr, x[i], parity, dagger, commDim.data, profile);
+      ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim.data, profile);
     }
   }
 
