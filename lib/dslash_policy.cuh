@@ -460,7 +460,7 @@ namespace quda
   template <typename Dslash, int shmem> struct DslashShmemGeneric : DslashPolicyImp<Dslash> {
 
 #ifdef NVSHMEM_COMMS
-    void operator()(Dslash &dslash, const ColorSpinorField &in, const ColorspinorField &halo, TimeProfile &profile)
+    void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo, TimeProfile &profile)
     {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -469,7 +469,7 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim);
       dslashParam.kernel_type = (shmem & 64) ? UBER_KERNEL : INTERIOR_KERNEL;
-      dslashParam.threads = halo.getDslashConstant.volume_4d_cb;
+      dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
       dslash.setShmem(shmem);
       dslashParam.setExteriorDims(shmem & 64);
 
@@ -477,7 +477,7 @@ namespace quda
       const int packIndex = device::get_default_stream_idx();
       constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
 
-      if (!((shmem & 2) and (shmem & 1))) { issuePack(in, dslash, 1 - dslashParam.parity, location, packIndex, shmem); }
+      if (!((shmem & 2) and (shmem & 1))) { issuePack(halo, in, dslash, 1 - dslashParam.parity, location, packIndex, shmem); }
 
       dslash.setPack(((shmem & 2) or (shmem & 1)), location); // enable fused kernel packing
 
@@ -500,8 +500,9 @@ namespace quda
 #else
     void operator()(Dslash &, cvector_ref<const ColorSpinorField> &, const ColorSpinorField &, TimeProfile &)
     {
-      errorQuda("NVSHMEM Dslash policies not built.");
+      errorQuda("NVSHMEM Dslash policies not built");
     }
+#endif
   };
 
   template <typename Dslash> using DslashShmemUberPackIntra = DslashShmemGeneric<Dslash, 64 + 16 + 8 + 1>;
@@ -1649,7 +1650,6 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
   };
-#endif
 
   // whether we have initialized the dslash policy tuner
   extern bool dslash_policy_init;
