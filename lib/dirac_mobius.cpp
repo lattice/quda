@@ -35,21 +35,6 @@ namespace quda {
     if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA"); }
   }
 
-  void DiracMobius::checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    for (auto i = 0u; i < in.size(); i++) {
-      if (zMobius) {
-        if (in[i].X(4) != Ls) errorQuda("Expected Ls = %d, not %d", Ls, in[i].X(4));
-        if (out[i].X(4) != Ls) errorQuda("Expected Ls = %d, not %d", Ls, out[i].X(4));
-      } else {
-        if (in[i].X(4) != out[i].X(4)) {
-          errorQuda("5th dimension size mismatch: in.X(4) = %d, out.X(4) = %d", in[i].X(4), out[i].X(4));
-        }
-      }
-    }
-  }
-
   // Modification for the 4D preconditioned Mobius domain wall operator
   void DiracMobius::Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                             QudaParity parity) const
@@ -486,7 +471,7 @@ namespace quda {
   {
     // Initiaize the EOFA parameters here: u, x, y
 
-    if (zMobius) { errorQuda("DiracMobiusEofa doesn't currently support zMobius.\n"); }
+    if (zMobius) { errorQuda("DiracMobiusEofa doesn't currently support zMobius"); }
 
     double b = b_5[0].real();
     double c = c_5[0].real();
@@ -540,15 +525,6 @@ namespace quda {
     }
     m5inv_fac = 0.5 / (1. + factor);                           // 0.5 for the spin project factor
     sherman_morrison_fac = -0.5 / (1. + sherman_morrison_fac); // 0.5 for the spin project factor
-  }
-
-  void DiracMobiusEofa::checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions");
-    for (auto i = 0u; i < in.size(); i++) {
-      if (in[i].X(4) != Ls) errorQuda("Expected Ls = %d, not %d", Ls, in[i].X(4));
-      if (out[i].X(4) != Ls) errorQuda("Expected Ls = %d, not %d", Ls, out[i].X(4));
-    }
   }
 
   void DiracMobiusEofa::m5_eofa(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const

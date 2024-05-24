@@ -36,9 +36,10 @@ namespace quda {
   void DiracDomainWall::checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions");
-    for (auto i = 0u; i < in.size(); i++)
-      if (in[i].X(4) != out[i].X(4))
-        errorQuda("5th dimension size mismatch: in = %d, out = %d", in[i].X(4), out[i].X(4));
+    for (auto i = 0u; i < in.size(); i++) {
+      if (in[i].X(4) != Ls) errorQuda("Expected Ls = %d, not %d", Ls, in[i].X(4));
+      if (out[i].X(4) != Ls) errorQuda("Expected Ls = %d, not %d", Ls, out[i].X(4));
+    }
   }
 
   void DiracDomainWall::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
