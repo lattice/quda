@@ -775,9 +775,11 @@ namespace quda {
     int Ls; // length of the fifth dimension
 
     /**
-      @brief Check whether the input and output are valid 5D fields.
+      @brief Check whether the input and output are valid 5-d fields
+      @param[in] out Output field set we checking
+      @param[in] in Input field set we checking
      */
-    virtual void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
   public:
     DiracDomainWall(const DiracParam &param);
@@ -899,12 +901,6 @@ namespace quda {
       double mobius_kappa_c;
       double mobius_kappa;
 
-      /**
-        @brief Check whether the input and output are valid 5D fields. If zMobius, we require that they
-        have the same 5th dimension as the one in record.
-       */
-      virtual void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
-
     public:
       DiracMobius(const DiracParam &param);
       // DiracMobius(const DiracMobius &dirac);
@@ -999,12 +995,6 @@ namespace quda {
     double eofa_u[QUDA_MAX_DWF_LS];
     double eofa_x[QUDA_MAX_DWF_LS];
     double eofa_y[QUDA_MAX_DWF_LS];
-
-    /**
-      @brief Check whether the input and output are valid 5D fields, and we require that they
-      have the same 5th dimension as the one in record.
-     */
-    virtual void checkDWF(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
   public:
     DiracMobiusEofa(const DiracParam &param);
