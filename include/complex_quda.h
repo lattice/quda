@@ -425,8 +425,8 @@ public:
   __host__ __device__
     inline complex<ValueType>& operator*=(const ValueType z)
     {
-      this->x *= z;
-      this->y *= z;
+      real(real() * z);
+      imag(imag() * z);
       return *this;
     }
 
