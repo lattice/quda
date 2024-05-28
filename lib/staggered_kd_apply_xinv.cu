@@ -67,7 +67,7 @@ namespace quda {
   {
     if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>() && is_enabled_multigrid()) {
       // Instantiate based on precision, number of colors
-      instantiate_recurse<StaggeredKDBlock>(out, in, Xinv, dagger);
+      instantiate_recurse2<StaggeredKDBlock>(out, in, Xinv, dagger);
     } else {
       errorQuda("Staggered fermion multigrid support has not been built");
     }

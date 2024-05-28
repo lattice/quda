@@ -288,7 +288,7 @@ namespace quda
   }
 
   /**
-     @brief instantiate_recurse function is used to instantiate the
+     @brief instantiate_recurse2 function is used to instantiate the
      precision and number of colors for a class that operates on
      batches.  If necessary the batches are split up if the set size
      exceeds the maximum.  This specific variant is for when we have
@@ -298,13 +298,13 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int> class Apply, typename O, typename I, typename... Args>
-  constexpr void instantiate_recurse(cvector_ref<O> &out, cvector_ref<I> &in, Args &&... args)
+  constexpr void instantiate_recurse2(cvector_ref<O> &out, cvector_ref<I> &in, Args &&... args)
   {
     if (in.size() > get_max_multi_rhs()) {
-      instantiate_recurse<Apply>(cvector_ref<O>{out.begin(), out.begin() + out.size() / 2},
-                                 cvector_ref<I>{in.begin(), in.begin() + in.size() / 2}, args...);
-      instantiate_recurse<Apply>(cvector_ref<O>{out.begin() + out.size() / 2, out.end()},
-                                 cvector_ref<I>{in.begin() + in.size() / 2, in.end()}, args...);
+      instantiate_recurse2<Apply>(cvector_ref<O>{out.begin(), out.begin() + out.size() / 2},
+                                  cvector_ref<I>{in.begin(), in.begin() + in.size() / 2}, args...);
+      instantiate_recurse2<Apply>(cvector_ref<O>{out.begin() + out.size() / 2, out.end()},
+                                  cvector_ref<I>{in.begin() + in.size() / 2, in.end()}, args...);
       return;
     }
     instantiate<Apply>(out, in, args...);

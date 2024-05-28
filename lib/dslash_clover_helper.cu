@@ -47,7 +47,7 @@ namespace quda {
                    const CloverField &clover, bool inverse, int parity)
   {
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
-      instantiate_recurse<Clover>(out, in, clover, inverse, parity);
+      instantiate_recurse2<Clover>(out, in, clover, inverse, parity);
     } else {
       errorQuda("Clover dslash has not been built");
     }
@@ -136,7 +136,7 @@ namespace quda {
                         QudaTwistGamma5Type twist)
   {
     if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
-      instantiate_recurse<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+      instantiate_recurse2<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }

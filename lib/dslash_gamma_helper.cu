@@ -38,7 +38,7 @@ namespace quda {
   //out(x) = gamma_d*in
   void ApplyGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
-    instantiate_recurse<GammaApply>(out, in, d);
+    instantiate_recurse2<GammaApply>(out, in, d);
   }
 
   template <typename Float, int nColor> class TwistGammaApply : public TunableKernel3D {
@@ -94,7 +94,7 @@ namespace quda {
                        int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      instantiate_recurse<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
+      instantiate_recurse2<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else {
       errorQuda("Twisted mass operator has not been built");
     }
@@ -134,7 +134,7 @@ namespace quda {
   void ApplyTau(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      instantiate_recurse<TauApply>(out, in, d);
+      instantiate_recurse2<TauApply>(out, in, d);
     } else {
       errorQuda("Twisted mass operator has not been built");
     }
