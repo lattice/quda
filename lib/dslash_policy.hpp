@@ -317,7 +317,7 @@ namespace quda
   /**
      @brief Set the ghosts to the mapped CPU ghost buffer, or unsets
      if already set.  Note this must not be called until after the
-     interior dslash has been called, since sets the peer-to-peer
+     interior dslash has been called, since it sets the peer-to-peer
      ghost pointers, and this need to be done without the mapped ghost
      enabled.
 
@@ -1847,20 +1847,23 @@ namespace quda
             enable_policy(QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH);
           }
 
-          enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH);
-          enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH);
+          if (comm_zero_copy_enabled()) {
+            enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH);
+          }
 
           if (comm_gdr_enabled()) {
             enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
           }
 
-          // pure zero-copy policies require texture objects
-          enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
-          enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
+          if (comm_zero_copy_enabled()) {
+            enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
+            enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
+          }
 
-          enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
-          enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
           if (comm_nvshmem_enabled()) {
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
