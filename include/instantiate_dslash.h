@@ -37,7 +37,7 @@ namespace quda
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
     } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      errorQuda("Unsupported reconstruct type %d", U.Reconstruct());
     }
   }
 
@@ -55,7 +55,7 @@ namespace quda
     if (in.Ncolor() == 3) {
       instantiate<Apply, Recon, Float, 3>(out, in, x, U, args...);
     } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+      errorQuda("Unsupported number of colors %d", U.Ncolor());
     }
   }
 
@@ -66,7 +66,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
@@ -90,7 +90,7 @@ namespace quda
     } else if (precision == QUDA_QUARTER_PRECISION) {
       if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiate<Apply, Recon, int8_t>(out, in, x, U, args...);
     } else {
-      errorQuda("Unsupported precision %d\n", precision);
+      errorQuda("Unsupported precision %d", precision);
     }
   }
 
@@ -104,7 +104,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
   void instantiatePreconditioner(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
@@ -116,7 +116,7 @@ namespace quda
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
       if constexpr (is_enabled(QUDA_QUARTER_PRECISION)) instantiate<Apply, Recon, int8_t>(out, in, x, U, args...);
     } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
+      errorQuda("Unsupported precision %d", U.Precision());
     }
   }
 

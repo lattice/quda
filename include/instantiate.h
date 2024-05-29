@@ -540,18 +540,6 @@ namespace quda
     }
   }
 
-  // these are used in dslash.h
-
-  struct WilsonReconstruct {
-    static constexpr std::array<QudaReconstructType, 3> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
-  };
-
-  struct StaggeredReconstruct {
-    static constexpr std::array<QudaReconstructType, 3> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
-  };
-
   /**
      @brief Helper function for returning if a given dslash type is enabled
      @tparam dslash_type The dslash_type requested

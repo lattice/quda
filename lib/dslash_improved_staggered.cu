@@ -176,7 +176,7 @@ namespace quda
       }
 
       // L must be first gauge field argument since we template on long reconstruct
-      instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, x, L, U, a, parity, dagger, comm_override,
+      instantiate<ImprovedStaggeredApply, ReconstructStaggered>(out, in, x, L, U, a, parity, dagger, comm_override,
                                                                 profile);
     } else {
       errorQuda("Improved staggered operator has not been built");

@@ -86,7 +86,7 @@ namespace quda
                       const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
-      instantiate<StaggeredApply, StaggeredReconstruct>(out, in, x, U, a, parity, dagger, comm_override, profile);
+      instantiate<StaggeredApply, ReconstructStaggered>(out, in, x, U, a, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Staggered operator has not been built");
     }
