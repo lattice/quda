@@ -2922,15 +2922,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     errorQuda("split_key = [%d,%d,%d,%d] is not valid", split_key[0], split_key[1], split_key[2], split_key[3]);
   }
 
-#if 0
-
   if (num_sub_partition == 1) { // In this case we don't split the grid.
 
     for (int n = 0; n < param->num_src; n++) { op(_hp_x[n], _hp_b[n], param, args...); }
 
-  } else
-#endif
-  {
+  } else {
 
     // Doing the sub-partition arithmatics
     if (param->num_src_per_sub_partition * num_sub_partition != param->num_src) {
