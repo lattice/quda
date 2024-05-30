@@ -48,7 +48,7 @@ namespace quda
     int n_fields = v_base_field.size();
     if (n_fields == 0) { errorQuda("split_field: input field vec has zero size."); }
 
-    const auto &meta = v_base_field[0];
+    const auto &meta = v_base_field[0]; //meta is QDPJIT Field order 
 
     // Send cycles
     for (int i = 0; i < n_replicates; i++) {
