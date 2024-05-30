@@ -7,17 +7,14 @@ namespace quda
 {
 
   struct GaugeBundleBackup {
-    GaugeField *precise;
-    GaugeField *sloppy;
-    GaugeField *precondition;
-    GaugeField *refinement;
-    GaugeField *eigensolver;
-    GaugeField *extended;
+    GaugeField *precise=nullptr;
+    GaugeField *sloppy=nullptr;
+    GaugeField *precondition=nullptr;
+    GaugeField *refinement=nullptr;
+    GaugeField *eigensolver=nullptr;
+    GaugeField *extended=nullptr;
 
-    GaugeBundleBackup() :
-      precise(nullptr), sloppy(nullptr), precondition(nullptr), refinement(nullptr), eigensolver(nullptr), extended(nullptr)
-    {
-    }
+    GaugeBundleBackup() = default;
 
     void backup(GaugeField *precise_, GaugeField *sloppy_, GaugeField *precondition_, GaugeField *refinement_,
                 GaugeField *eigensolver_, GaugeField *extended_)

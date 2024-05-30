@@ -3213,31 +3213,8 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
-void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
-{
-  auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, op);
-}
-
-void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
-{
-  auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, op);
-}
 
 void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
-{
-  auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
-}
-
-void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
-{
-  auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
-}
-
-void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
   callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);

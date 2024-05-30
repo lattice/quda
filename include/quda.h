@@ -1217,6 +1217,7 @@ extern "C" {
    */
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
+#if 0
   /**
    * @brief Really the same with @invertMultiSrcQuda but for staggered-style fermions, by accepting pointers
    * to fat links and long links.
@@ -1234,7 +1235,7 @@ extern "C" {
    * @param param       Contains all metadata regarding host and device storage and solver parameters
    */
   void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
-
+#endif 
   /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
@@ -1301,6 +1302,7 @@ extern "C" {
    * @param parity      Parity to apply dslash on
    */
   void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity);
+#if 0
   /**
    * @brief Really the same with @dslashMultiSrcQuda but for staggered-style fermions, by accepting pointers
    * to fat links and long links.
@@ -1323,6 +1325,7 @@ extern "C" {
    * @param h_clovinv   Base pointer to the inverse clover field
    */
   void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity);
+#endif
 
   /**
    * Apply the clover operator or its inverse.

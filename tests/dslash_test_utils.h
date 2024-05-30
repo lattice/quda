@@ -783,12 +783,7 @@ struct DslashTestWrapper {
         _hp_b[i] = vp_spinor[i].data();
       }
 
-      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
-          || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        dslashMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity);
-      } else {
-        dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity);
-      }
+      dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity);
 
     } else {
 

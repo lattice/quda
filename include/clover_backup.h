@@ -8,16 +8,13 @@ namespace quda
 {
 
   struct CloverBundleBackup {
-    CloverField *precise;
-    CloverField *sloppy;
-    CloverField *precondition;
-    CloverField *refinement;
-    CloverField *eigensolver;
+    CloverField *precise = nullptr;
+    CloverField *sloppy = nullptr;
+    CloverField *precondition = nullptr;
+    CloverField *refinement = nullptr;
+    CloverField *eigensolver = nullptr;
 
-    CloverBundleBackup() :
-      precise(nullptr), sloppy(nullptr), precondition(nullptr), refinement(nullptr), eigensolver(nullptr)
-    {
-    }
+    CloverBundleBackup() = default;
 
     void backup(CloverField *precise_, CloverField *sloppy_, CloverField *precondition_, CloverField *refinement_,
                 CloverField *eigensolver_)
