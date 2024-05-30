@@ -2585,7 +2585,6 @@ void *newDeflationQuda(QudaEigParam *eig_param)
 
 void destroyDeflationQuda(void *df) { delete static_cast<deflated_solver *>(df); }
 
-
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   auto profile = pushProfile(profileInvert, param->secs, param->gflops);
@@ -2929,7 +2928,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     for (int n = 0; n < param->num_src; n++) { op(_hp_x[n], _hp_b[n], param, args...); }
 
-  } else 
+  } else
 #endif
   {
 
@@ -2948,7 +2947,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (param->inv_type_precondition == QUDA_MG_INVERTER) errorQuda("Split Grid does NOT work with MG yet");
 
     checkInvertParam(param, _hp_x[0], _hp_b[0]);
-    
+
     bool is_staggered = false;
     bool is_asqtad = false;
 
@@ -2975,27 +2974,26 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       errorQuda("Both h_gauge and milc_fatlinks are null.");
     }
 
-
-   	// Deal with Spinors 
+    // Deal with Spinors
     bool pc_solution
-     = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+      = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
     lat_dim_t X = is_staggered ? gaugeFatPrecise->X() : gaugePrecise->X();
 
-   	ColorSpinorParam spinorParam(_hp_b[0], *param, X, pc_solution, param->input_location);
+    ColorSpinorParam spinorParam(_hp_b[0], *param, X, pc_solution, param->input_location);
     std::vector<ColorSpinorField> _h_b(param->num_src);
-		std::vector<ColorSpinorField> _h_x( param->num_src ); // wrappers -- for output
-    
- 	  	// Create Aliases
-    for (int i = 0; i < param->num_src; i++) {
-			spinorParam.v = _hp_b[i];
-			_h_b[i] = ColorSpinorField(spinorParam);
-		}
+    std::vector<ColorSpinorField> _h_x(param->num_src); // wrappers -- for output
 
-		for (int i = 0; i < param->num_src; i++) {
-			 spinorParam.v = _hp_x[i];
-			_h_x[i] = ColorSpinorField(spinorParam);
-		}
+    // Create Aliases
+    for (int i = 0; i < param->num_src; i++) {
+      spinorParam.v = _hp_b[i];
+      _h_b[i] = ColorSpinorField(spinorParam);
+    }
+
+    for (int i = 0; i < param->num_src; i++) {
+      spinorParam.v = _hp_x[i];
+      _h_x[i] = ColorSpinorField(spinorParam);
+    }
 
     // Gauge fields/params
     GaugeFieldParam gf_param;
@@ -3005,12 +3003,13 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     logQuda(QUDA_DEBUG_VERBOSE, "Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d)\n",
             comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
 
-		if( !is_staggered ) gf_param = GaugeFieldParam( *(thin_links_bkup.precise) );
-	  else { 
-			milc_fatlink_param = GaugeFieldParam( *(fat_links_bkup.precise) );
-			if( is_asqtad ) milc_longlink_param = GaugeFieldParam( *(long_links_bkup.precise) );
-		}
-	
+    if (!is_staggered)
+      gf_param = GaugeFieldParam(*(thin_links_bkup.precise));
+    else {
+      milc_fatlink_param = GaugeFieldParam(*(fat_links_bkup.precise));
+      if (is_asqtad) milc_longlink_param = GaugeFieldParam(*(long_links_bkup.precise));
+    }
+
     for (int d = 0; d < CommKey::n_dim; d++) {
       if (comm_dim(d) % split_key[d] != 0) {
         errorQuda("Split not possible: %2d %% %2d != 0", comm_dim(d), split_key[d]);
@@ -3024,19 +3023,13 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       }
     }
 
-    quda::GaugeField* collected_gauge = nullptr;
-    quda::GaugeField* collected_milc_fatlink_field = nullptr;
-    quda::GaugeField* collected_milc_longlink_field = nullptr; 
+    quda::GaugeField *collected_gauge = nullptr;
+    quda::GaugeField *collected_milc_fatlink_field = nullptr;
+    quda::GaugeField *collected_milc_longlink_field = nullptr;
 
     if (!is_staggered) {
       gf_param.create = QUDA_NULL_FIELD_CREATE;
       collected_gauge = new quda::GaugeField(gf_param);
-		  printfQuda("thin_links_bkup gauge order=%d is_native=%d\n", 
-										thin_links_bkup.precise->Order(), thin_links_bkup.precise->isNative());
-
-			printfQuda("collected_gauge order=%d is_native=%d\n", 
-									collected_gauge->Order(), collected_gauge->isNative());
-
       quda::split_field(*collected_gauge, {*(thin_links_bkup.precise)}, split_key);
     } else {
       std::vector<quda::GaugeField *> v_g(1);
@@ -3053,9 +3046,9 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       }
     }
 
-    //  ------ Clover field 
+    //  ------ Clover field
     //
-    quda::CloverField* collected_clover=nullptr;
+    quda::CloverField *collected_clover = nullptr;
 
     CloverBundleBackup clov_bkup;
     bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
@@ -3066,7 +3059,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
       if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
 
-
       clov_bkup.backup(cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement, cloverEigensolver);
 
       CloverFieldParam clover_param(*clov_bkup.precise);
@@ -3074,43 +3066,40 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
       clover_param.create = QUDA_NULL_FIELD_CREATE;
       collected_clover = new CloverField(clover_param);
-			printfQuda("clover_bkup.precise order = %d is_native = %d\n", clov_bkup.precise->Order(), clov_bkup.precise->isNative());
-			printfQuda("collected_clover order = %d is_native = %d\n", collected_clover->Order(), collected_clover->isNative());
       quda::split_field(*collected_clover, {*clov_bkup.precise}, split_key); // Clover uses 4d even-odd preconditioning.
     }
-
 
     profileInvertMultiSrc.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     comm_barrier();
 
     // Split input fermion field
-		// we will convert the host fields with external layout to device fields with 
-	  // native layout for the split. We will do the splitting with the collected fields
-		// on the device already
+    // we will convert the host fields with external layout to device fields with
+    // native layout for the split. We will do the splitting with the collected fields
+    // on the device already
     quda::ColorSpinorParam cs_param_split(_h_b[0]);
-		cs_param_split.setPrecision( param->cuda_prec, param->cuda_prec, true); 	// Native format
-		cs_param_split.location = QUDA_CUDA_FIELD_LOCATION;												// Device side
-	
-		// Expand the geometry for the collected fields	
-		for (int d = 0; d < CommKey::n_dim; d++) { cs_param_split.x[d] *= split_key[d]; }
+    cs_param_split.setPrecision(param->cuda_prec, param->cuda_prec, true); // Native format
+    cs_param_split.location = QUDA_CUDA_FIELD_LOCATION;                    // Device side
+
+    // Expand the geometry for the collected fields
+    for (int d = 0; d < CommKey::n_dim; d++) { cs_param_split.x[d] *= split_key[d]; }
     std::vector<quda::ColorSpinorField> _collect_b(param->num_src_per_sub_partition, cs_param_split);
     std::vector<quda::ColorSpinorField> _collect_x(param->num_src_per_sub_partition, cs_param_split);
 
-		// We will use these dev_buf fields to download (if needed) and convert 
-		// external fields into internal foramt 
-		quda::ColorSpinorParam devbuf_param(_h_b[0]);
-		devbuf_param.location = cs_param_split.location; // same location as collected (for copyOffset)
-		devbuf_param.setPrecision( param->cuda_prec, param->cuda_prec, true);  	 // Native format
-	  std::vector<quda::ColorSpinorField> dev_buf(num_sub_partition, devbuf_param);
+    // We will use these dev_buf fields to download (if needed) and convert
+    // external fields into internal foramt
+    quda::ColorSpinorParam devbuf_param(_h_b[0]);
+    devbuf_param.location = cs_param_split.location;                     // same location as collected (for copyOffset)
+    devbuf_param.setPrecision(param->cuda_prec, param->cuda_prec, true); // Native format
+    std::vector<quda::ColorSpinorField> dev_buf(num_sub_partition, devbuf_param);
 
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-			// Download and change to Native Order and split
-			for(int j=0; j < num_sub_partition; j++) dev_buf[j].copy(_h_b[ n*num_sub_partition + j ] );
-      split_field(_collect_b[n], { dev_buf.begin(), dev_buf.end()}, split_key, pc_type); 
+      // Download and change to Native Order and split
+      for (int j = 0; j < num_sub_partition; j++) dev_buf[j].copy(_h_b[n * num_sub_partition + j]);
+      split_field(_collect_b[n], {dev_buf.begin(), dev_buf.end()}, split_key, pc_type);
     }
 
-		// Switch communicator 
+    // Switch communicator
     comm_barrier();
 
     push_communicator(split_key);
@@ -3118,44 +3107,45 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     comm_barrier();
 
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_PREAMBLE);
-	
-		// Load 'collected gauge field'
+
+    // Load 'collected gauge field'
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading gauge field...\n");
     if (!is_staggered) {
-      setupGaugeFields(collected_gauge, gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement,
-                       gaugeEigensolver, gaugeExtended, thin_links_bkup, profile.profile);
+      setupGaugeFields(collected_gauge, gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
+                       gaugeExtended, thin_links_bkup, profile.profile);
 
     } else {
-      setupGaugeFields(collected_milc_fatlink_field, gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition, gaugeFatRefinement, 
-                       gaugeFatEigensolver, gaugeFatExtended, fat_links_bkup, profile.profile);
+      setupGaugeFields(collected_milc_fatlink_field, gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition,
+                       gaugeFatRefinement, gaugeFatEigensolver, gaugeFatExtended, fat_links_bkup, profile.profile);
 
-      if( is_asqtad ) {
-        setupGaugeFields(collected_milc_longlink_field, gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition, gaugeLongRefinement, 
-                        gaugeLongEigensolver, gaugeLongExtended, long_links_bkup, profile.profile);
+      if (is_asqtad) {
+        setupGaugeFields(collected_milc_longlink_field, gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition,
+                         gaugeLongRefinement, gaugeLongEigensolver, gaugeLongExtended, long_links_bkup, profile.profile);
       }
     }
     logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
 
-		// Load 'collected clover field'
-    if (is_clover) { 
+    // Load 'collected clover field'
+    if (is_clover) {
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading clover field...\n");
-      setupCloverFields(collected_clover, cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement, cloverEigensolver, clov_bkup);
+      setupCloverFields(collected_clover, cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement,
+                        cloverEigensolver, clov_bkup);
       logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded clover field...\n");
     }
 
-		// Make a copy of the params we can mess with
-		auto param_copy = *param;
+    // Make a copy of the params we can mess with
+    auto param_copy = *param;
 
-		// Set solver input/output param location
- 		param_copy.input_location = cs_param_split.location;
-		param_copy.output_location = cs_param_split.location;
-		
-		// Important: Don't use accessors for external formats any more
-		// Since input fields are in Native order now	
-  	param_copy.dirac_order = QUDA_INTERNAL_DIRAC_ORDER;
+    // Set solver input/output param location
+    param_copy.input_location = cs_param_split.location;
+    param_copy.output_location = cs_param_split.location;
 
-		// Do the solves 
-		for (int n = 0; n < param->num_src_per_sub_partition; n++) {
+    // Important: Don't use accessors for external formats any more
+    // Since input fields are in Native order now
+    param_copy.dirac_order = QUDA_INTERNAL_DIRAC_ORDER;
+
+    // Do the solves
+    for (int n = 0; n < param->num_src_per_sub_partition; n++) {
       op(_collect_x[n].data(), _collect_b[n].data(), &param_copy, args...);
     }
 
@@ -3164,23 +3154,23 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     updateR();
     comm_barrier();
 
-		// Join spinors: _h_x are aliases to host pointers in 'external order: QDP++, QDP-JIT, etc'
+    // Join spinors: _h_x are aliases to host pointers in 'external order: QDP++, QDP-JIT, etc'
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-			// join fields
-      join_field({ dev_buf.begin(), dev_buf.end()} , _collect_x[n], split_key, pc_type);
+      // join fields
+      join_field({dev_buf.begin(), dev_buf.end()}, _collect_x[n], split_key, pc_type);
 
-			// export to desired location and layout
-			for(int j=0; j < num_sub_partition; j++) _h_x[n*num_sub_partition + j].copy(dev_buf[j]);	
+      // export to desired location and layout
+      for (int j = 0; j < num_sub_partition; j++) _h_x[n * num_sub_partition + j].copy(dev_buf[j]);
     }
 
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_EPILOGUE);
-	
+
     // Restore the gauge field
     if (!is_staggered) {
 
       freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
       gaugePrecise = thin_links_bkup.precise;
-      gaugeSloppy  = thin_links_bkup.sloppy;
+      gaugeSloppy = thin_links_bkup.sloppy;
       gaugePrecondition = thin_links_bkup.precondition;
       gaugeRefinement = thin_links_bkup.refinement;
       gaugeEigensolver = thin_links_bkup.eigensolver;
@@ -3191,7 +3181,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
       freeUniqueGaugeQuda(QUDA_ASQTAD_FAT_LINKS);
       gaugeFatPrecise = fat_links_bkup.precise;
-      gaugeFatSloppy  = fat_links_bkup.sloppy;
+      gaugeFatSloppy = fat_links_bkup.sloppy;
       gaugeFatPrecondition = fat_links_bkup.precondition;
       gaugeFatRefinement = fat_links_bkup.refinement;
       gaugeFatEigensolver = fat_links_bkup.eigensolver;
@@ -3200,12 +3190,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
         freeUniqueGaugeQuda(QUDA_ASQTAD_LONG_LINKS);
         gaugeLongPrecise = long_links_bkup.precise;
-        gaugeLongSloppy  = long_links_bkup.sloppy;
+        gaugeLongSloppy = long_links_bkup.sloppy;
         gaugeLongPrecondition = long_links_bkup.precondition;
         gaugeLongRefinement = long_links_bkup.refinement;
         gaugeLongEigensolver = long_links_bkup.eigensolver;
         gaugeLongExtended = long_links_bkup.extended;
-
       }
     }
 
@@ -3246,11 +3235,10 @@ void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Quda
   callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
 }
 
-void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity) 
+void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
   auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
-  callMultiSrcQuda(_hp_x, _hp_b, param, op,
-                   parity);
+  callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
 }
 
 void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
