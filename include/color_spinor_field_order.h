@@ -476,12 +476,12 @@ namespace quda
       complex<storeFloat> *v;        /**< Field memory address this wrapper encompasses */
       const int idx;                 /**< Index into field */
     private:
-      const Float scale;             /**< Float to fixed-point scale factor */
-      const Float scale_inv;         /**< Fixed-point to float scale factor */
+      const Float scale;     /**< Float to fixed-point scale factor */
+      const Float scale_inv; /**< Fixed-point to float scale factor */
     public:
-      norm_t *norm;                  /**< Address of norm field (if it exists) */
-      const int norm_idx;            /**< Index into norm field */
-      const bool norm_write;         /**< Whether we need to write to the norm field */
+      norm_t *norm;                                                   /**< Address of norm field (if it exists) */
+      const int norm_idx;                                             /**< Index into norm field */
+      const bool norm_write;                                          /**< Whether we need to write to the norm field */
       static constexpr bool fixed = fixed_point<Float, storeFloat>(); /**< Whether this is a fixed point field */
       static constexpr bool block_float = block_float_;               /**< Whether this is a block float field */
 
@@ -1401,7 +1401,7 @@ namespace quda
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      using Vector = int4;      // 128-bit packed type
+      using Vector = int4; // 128-bit packed type
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
@@ -1892,62 +1892,30 @@ namespace quda
   struct colorspinor_mapper<int8_t, 2, Nc, false, huge_alloc, disable_ghost> {
     typedef colorspinor::FloatNOrder<int8_t, 2, Nc, colorspinor::getNative<int8_t>(2), false, huge_alloc, disable_ghost> type;
   };
-
   template <int Nc, bool huge_alloc, bool disable_ghost>
   struct colorspinor_mapper<int8_t, 1, Nc, false, huge_alloc, disable_ghost> {
     typedef colorspinor::FloatNOrder<int8_t, 1, Nc, 2, false, huge_alloc, disable_ghost> type;
   };
-
   template <typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper {
   };
-
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::SpaceColorSpinorOrder<T, Ns, Nc> type;
   };
-
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::SpaceSpinorColorOrder<T, Ns, Nc> type;
   };
 
-	template<typename T>
-  struct colorspinor_order_mapper<T, QUDA_FLOAT_FIELD_ORDER, 4, 3>  {
-		typedef colorspinor::FloatNOrder<T, 4, 3, 1> type;
+  // specializations for native orderings
+  template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT_FIELD_ORDER, Ns, Nc> {
+    typedef colorspinor::FloatNOrder<T, Ns, Nc, 1> type;
   };
-
-	template<typename T>
-  struct colorspinor_order_mapper<T, QUDA_FLOAT2_FIELD_ORDER, 4, 3>  {
-		typedef colorspinor::FloatNOrder<T, 4, 3, 2> type;
+  template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT2_FIELD_ORDER, Ns, Nc> {
+    typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type;
   };
-
-	template<typename T>
-  struct colorspinor_order_mapper<T, QUDA_FLOAT4_FIELD_ORDER, 4, 3>  {
-		typedef colorspinor::FloatNOrder<T, 4, 3, 4> type;
+  template <typename T, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT4_FIELD_ORDER, 4, Nc> {
+    typedef colorspinor::FloatNOrder<T, 4, Nc, 4> type;
   };
-
-	template<typename T>
-  struct colorspinor_order_mapper<T, QUDA_FLOAT8_FIELD_ORDER, 4, 3>  {
-		typedef colorspinor::FloatNOrder<T, 4, 3, 8> type;
+  template <typename T, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT8_FIELD_ORDER, 4, Nc> {
+    typedef colorspinor::FloatNOrder<T, 4, Nc, 8> type;
   };
-
-#if 0
-  template <int Nc> struct colorspinor_order_mapper<double, QUDA_FLOAT_FIELD_ORDER, 1, Nc> {
-    typedef colorspinor::FloatNOrder<double, 1, Nc, 1> type;
-  };
-
-	template <int Nc> struct colorspinor_order_mapper<double, QUDA_FLOAT2_FIELD_ORDER, 1, Nc> {
-		typedef colorspinor::FloatNOrder<double, 1, Nc, 1> type;
-	};
-
-  template <int Nc> struct colorspinor_order_mapper<double, QUDA_FLOAT2_FIELD_ORDER, 4, Nc> {
-    typedef colorspinor::FloatNOrder<double, 4, Nc, 2> type;
-  };
-  
-	template <int Nc> struct colorspinor_order_mapper<float, QUDA_FLOAT2_FIELD_ORDER, 4, Nc> {
-    typedef colorspinor::FloatNOrder<float, 4, Nc, 2> type;
-  };
-  template <int Nc> struct colorspinor_order_mapper<short, QUDA_FLOAT2_FIELD_ORDER, 4, Nc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, 2> type;
-  };
-#endif
-
 } // namespace quda
