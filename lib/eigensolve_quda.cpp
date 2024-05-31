@@ -104,6 +104,10 @@ namespace quda
       logQuda(QUDA_VERBOSE, "Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param);
       break;
+    case QUDA_EIG_TR_LANCZOS_3D:
+      logQuda(QUDA_VERBOSE, "Creating TR Lanczos 3-d eigensolver\n");
+      eig_solver = new TRLM3D(mat, eig_param);
+      break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       logQuda(QUDA_VERBOSE, "Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param);
@@ -665,7 +669,7 @@ namespace quda
       case QUDA_SPECTRUM_SR_EIG: printfQuda("'SR' -> sort with real(x) in increasing algebraic order, smallest first.\n"); break;
       case QUDA_SPECTRUM_LI_EIG: printfQuda("'LI' -> sort with imag(x) in decreasing algebraic order, largest first.\n"); break;
       case QUDA_SPECTRUM_SI_EIG: printfQuda("'SI' -> sort with imag(x) in increasing algebraic order, smallest first\n"); break;
-      default: errorQuda("Unkown spectrum type requested: %d", spec_type);
+      default: errorQuda("Unknown spectrum type requested: %d", spec_type);
       }
     }
 

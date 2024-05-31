@@ -280,6 +280,8 @@ namespace quda
       //! for deflation etc.
       if (is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
+
+    void change_dim(int D, int d) { x[D] = d; }
   };
 
   struct DslashConstant;

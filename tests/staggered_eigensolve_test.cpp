@@ -159,10 +159,13 @@ std::vector<double> eigensolve(test_t test_param)
   eig_param.compute_svd = ::testing::get<3>(test_param);
   eig_param.spectrum = ::testing::get<4>(test_param);
 
-  if (eig_param.use_pc)
-    eig_inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  else
-    eig_inv_param.solution_type = QUDA_MAT_SOLUTION;
+  eig_inv_param.solution_type = eig_param.use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+
+  if (laplace3D == 3) {
+    eig_inv_param.laplace3D = laplace3D;
+    eig_param.ortho_dim = laplace3D;
+    eig_param.ortho_dim_size_local = tdim;
+  }
 
   // For gtest testing, we prohibit the use of polynomial acceleration as
   // the fine tuning required can inhibit convergence of an otherwise
@@ -277,7 +280,7 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_DIRAC_LAPLACE=ON");
     if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 

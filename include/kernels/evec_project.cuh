@@ -64,7 +64,7 @@ namespace quda {
   template <typename Arg> struct EvecProjection : plus<spinor_array> {
     using reduce_t = spinor_array;
     using plus<reduce_t>::operator();    
-    static constexpr int reduce_block_dim = 1; // only doing a reduct in the x thread dimension
+    static constexpr int reduce_block_dim = 1; // only doing a reduce in the x thread dimension
     
     const Arg &arg;
     constexpr EvecProjection(const Arg &arg) : arg(arg) {}

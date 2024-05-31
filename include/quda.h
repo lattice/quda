@@ -562,6 +562,12 @@ extern "C" {
     /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
     char QUDA_logfile[512];
 
+    /** The orthogonal direction in the 3D eigensolver **/
+    int ortho_dim;
+
+    /** The size of the orthogonal direction in the 3D eigensolver, local **/
+    int ortho_dim_size_local;
+
     //-------------------------------------------------
 
     // EIG-CG PARAMS
