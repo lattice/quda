@@ -183,7 +183,7 @@ namespace quda
               1 :
               4),
       twistFlavor(inv_param.twist_flavor),
-      gammaBasis(inv_param.gamma_basis),
+      gammaBasis(nSpin == 4 ? inv_param.gamma_basis : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
       create(QUDA_REFERENCE_FIELD_CREATE),
       pc_type(inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
       v(V)
