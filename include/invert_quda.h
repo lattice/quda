@@ -432,7 +432,7 @@ namespace quda {
     /**
        @brief Naive loop over RHS, for solvers that are not yet multi-RHS aware
      */
-    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in)
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in)
     {
       for (auto i = 0u; i < in.size(); i++) { this->operator()(out[i], in[i]); }
     }

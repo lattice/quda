@@ -88,7 +88,7 @@ namespace quda
     param.nVec = nVec;
     param.create = QUDA_NULL_FIELD_CREATE;
     param.fieldOrder = order;
-    return std::move(ColorSpinorField(param));
+    return ColorSpinorField(param);
   }
 
   // Apply the coarse Dirac matrix to a coarse grid vector
