@@ -1,4 +1,4 @@
-name: cuda_ghactions_build
+name: cuda_ghactions_build_beta
 
 on:
   pull_request:
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Ccache for gh actions
-        uses: hendrikmuhs/ccache-action@v1.2.9
+        uses: hendrikmuhs/ccache-action@latest
         with:
           key: ${{ github.job }}-${{ matrix.compiler }}
           max-size: 2000M
