@@ -25,12 +25,12 @@ jobs:
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran
+          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
      
-      - uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
-          execute_install_scripts: true
+      # - uses: awalsh128/cache-apt-pkgs-action@latest
+      #   with:
+      #     packages: cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
+      #     execute_install_scripts: true
 
       - uses: actions/checkout@v3
 
