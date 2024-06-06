@@ -11,7 +11,17 @@
 namespace quda
 {
 
-  template <typename Float, int nColor_> struct copy3dArg : kernel_param<> {
+  struct baseArg : kernel_param<> {
+    int_fastdiv X[4]; // grid dimensions
+
+    baseArg(dim3 threads, const ColorSpinorField &x) : kernel_param(threads)
+    {
+      for (int i = 0; i < 4; i++) { X[i] = x.X()[i]; }
+      if (x.SiteSubset() == 1) X[0] = 2 * X[0];
+    }
+  };
+
+  template <typename Float, int nColor_> struct copy3dArg : baseArg {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -24,13 +34,10 @@ namespace quda
     F y;
     F x;
     const int slice;
-    int_fastdiv X[4]; // grid dimensions
 
     copy3dArg(ColorSpinorField &y, ColorSpinorField &x, const int slice) :
-      kernel_param(dim3(y.VolumeCB(), 2, 1)), y(y), x(x), slice(slice)
-    {
-      for (int i = 0; i < 4; i++) { X[i] = y.X()[i]; }
-    }
+      baseArg(dim3(y.VolumeCB(), x.SiteSubset(), 1), x), y(y), x(x), slice(slice) { }
+
     __device__ __host__ double init() const { return double(); }
   };
 
@@ -83,7 +90,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor_> struct axpby3dArg : kernel_param<> {
+  template <typename Float, int nColor_> struct axpby3dArg : baseArg {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -98,13 +105,8 @@ namespace quda
     const Float *b;
     F y;
 
-    int_fastdiv X[4]; // grid dimensions
-
     axpby3dArg(const Float *a, ColorSpinorField &x, const Float *b, ColorSpinorField &y) :
-      kernel_param(dim3(x.VolumeCB(), 2, 1)), a(a), x(x), b(b), y(y)
-    {
-      for (int i = 0; i < 4; i++) { X[i] = x.X()[i]; }
-    }
+      baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), a(a), x(x), b(b), y(y) {}
   };
 
   template <typename Arg> struct axpby3d {
@@ -117,10 +119,8 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
       int idx[4];
-      getCoords(idx, x_cb, X, parity);
+      getCoords(idx, x_cb, arg.X, parity);
 
       Vector x = arg.x(x_cb, parity);
       Vector y = arg.y(x_cb, parity);
@@ -137,7 +137,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor_> struct caxpby3dArg : kernel_param<> {
+  template <typename Float, int nColor_> struct caxpby3dArg : baseArg {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -152,13 +152,8 @@ namespace quda
     const complex<Float> *b;
     F y;
 
-    int_fastdiv X[4]; // grid dimensions
-
     caxpby3dArg(const complex<Float> *a, ColorSpinorField &x, const complex<Float> *b, ColorSpinorField &y) :
-      kernel_param(dim3(x.VolumeCB(), 2, 1)), a(a), x(x), b(b), y(y)
-    {
-      for (int i = 0; i < 4; i++) { X[i] = x.X()[i]; }
-    }
+      baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), a(a), x(x), b(b), y(y) {}
   };
 
   template <typename Arg> struct caxpby3d {
@@ -202,14 +197,15 @@ namespace quda
 
     F x;
     F y;
-    int_fastdiv X[4]; // grid dimensions
+    int_fastdiv Xh[4]; // checkerboard grid dimensions
 
     reDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double>(dim3(x.Volume() / x.X()[reduction_dim], 1, x.X()[reduction_dim]), x.X()[reduction_dim]),
+      ReduceArg<double>(dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]),
+                        x.X()[reduction_dim]),
       x(x),
       y(y)
     {
-      for (int i = 0; i < 4; i++) X[i] = x.X()[i];
+      for (int i = 0; i < 4; i++) Xh[i] = x.SiteSubset() == 2 && i == 0 ? x.X()[i] / 2 : x.X()[i];
     }
 
     __device__ __host__ double init() const { return double(); }
@@ -232,21 +228,19 @@ namespace quda
   template <typename Arg> struct reDotProduct3d : plus<double> {
     using reduce_t = double;
     using plus<reduce_t>::operator();
-    static constexpr int reduce_block_dim = 1; // only doing a reduce in the x thread dimension
+    static constexpr int reduce_block_dim = 2; // only doing a reduce in the x thread dimension
     const Arg &arg;
     constexpr reDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
     template <typename U> static inline void comm_reduce(U &) { }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // Collect vector data
-      int parity = 0;
-      int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
-      int idx_cb = getParityCBFromFull(parity, arg.X, idx);
+      int idx_cb = idx_from_t_xyz<3>(t, xyz, arg.Xh);
 
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
@@ -273,13 +267,14 @@ namespace quda
     F x;
     F y;
     int_fastdiv X[4]; // grid dimensions
+    int_fastdiv Xh[4]; // checkerboard grid dimensions
 
     cDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<array<double, 2>>(dim3(x.Volume() / x.X()[reduction_dim], 1, x.X()[reduction_dim]), x.X()[reduction_dim]),
+      ReduceArg<array<double, 2>>(dim3(x.VolumeCB() / x.X()[reduction_dim], x.SiteSubset(), x.X()[reduction_dim]), x.X()[reduction_dim]),
       x(x),
       y(y)
     {
-      for (int i = 0; i < 4; i++) X[i] = x.X()[i];
+      for (int i = 0; i < 4; i++) Xh[i] = x.SiteSubset() == 2 && i == 0 ? x.X()[i] / 2 : x.X()[i];
     }
 
     __device__ __host__ auto init() const { return {0.0, 0.0}; }
@@ -288,22 +283,20 @@ namespace quda
   template <typename Arg> struct cDotProduct3d : plus<array<double, 2>> {
     using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
-    static constexpr int reduce_block_dim = 1; // only doing a reduce in the x thread dimension
+    static constexpr int reduce_block_dim = 2; // only doing a reduce in the x thread dimension
 
     const Arg &arg;
     constexpr cDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
     template <typename U> static inline void comm_reduce(U &) { }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // Collect vector data
-      int parity = 0;
-      int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
-      int idx_cb = getParityCBFromFull(parity, arg.X, idx);
+      int idx_cb = idx_from_t_xyz<3>(t, xyz, arg.Xh);
 
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);

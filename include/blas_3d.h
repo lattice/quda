@@ -17,6 +17,9 @@ namespace quda
     void reDotProduct(std::vector<double> &result, const ColorSpinorField &a, const ColorSpinorField &b);
     void cDotProduct(std::vector<Complex> &result, const ColorSpinorField &a, const ColorSpinorField &b);
 
+    // scaling
+    void ax(std::vector<double> &result, ColorSpinorField &x);
+
     // (c)axpby
     void axpby(std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y);
     void caxpby(std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y);
