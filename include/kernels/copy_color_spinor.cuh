@@ -44,7 +44,7 @@ namespace quda {
     }
   };
 
-  /** Transform from relativistic into non-relavisitic basis */
+  /** Transform from relativistic Degrand-Rossi into non-relativistic UKQCD basis */
   template <int Ns, int Nc>
   struct NonRelBasis {
     template <typename FloatOut, typename FloatIn>
@@ -61,7 +61,7 @@ namespace quda {
     }
   };
 
-  /** Transform from non-relativistic into relavisitic basis */
+  /** Transform from non-relativistic UKQCD into relativistic Degrand-Rossi basis */
   template <int Ns, int Nc>
   struct RelBasis {
     template <typename FloatOut, typename FloatIn>
@@ -78,7 +78,41 @@ namespace quda {
     }
   };
 
-  /** Transform from chiral into non-relavisitic basis */
+  /** Transform from non-relativistic Dirac-Pauli into relativistic Degrand-Rossi basis */
+  template <int Ns, int Nc>
+  struct DegrandRossiToDiracPaulBasis {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
+      int s1[4] = {1, 2, 1, 0};
+      int s2[4] = {3, 0, 3, 2};
+      FloatOut K1[4] = {static_cast<FloatOut>(-kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(-kU)};
+      FloatOut K2[4] = {static_cast<FloatOut>(-kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(-kU),  static_cast<FloatOut>(kU)};
+      for (int s=0; s<Ns; s++) {
+	for (int c=0; c<Nc; c++) {
+	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
+	}
+      }
+    }
+  };
+
+  /** Transform from relativistic Degrand-Rossi into non-relativistic Dirac-Pauli basis */
+  template <int Ns, int Nc>
+  struct DiracPaulToDegrandRossiBasis {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
+      int s1[4] = {1, 2, 1, 0};
+      int s2[4] = {3, 0, 3, 2};
+      FloatOut K1[4] = {static_cast<FloatOut>(kP),  static_cast<FloatOut>(kP),  static_cast<FloatOut>(kP), static_cast<FloatOut>(-kP)};
+      FloatOut K2[4] = {static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(-kP)};
+      for (int s=0; s<Ns; s++) {
+	for (int c=0; c<Nc; c++) {
+	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
+	}
+      }
+    }
+  };
+
+  /** Transform from chiral into UKQCD non-relativistic basis */
   template <int Ns, int Nc>
   struct ChiralToNonRelBasis {
     template <typename FloatOut, typename FloatIn>
@@ -95,7 +129,7 @@ namespace quda {
     }
   };
 
-  /** Transform from non-relativistic into chiral basis */
+  /** Transform from UKQCD non-relativistic into chiral basis */
   template <int Ns, int Nc>
   struct NonRelToChiralBasis {
     template <typename FloatOut, typename FloatIn>
@@ -107,6 +141,21 @@ namespace quda {
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
 	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
+	}
+      }
+    }
+  };
+
+  /** Transform from chiral into DeGrand-Rossi basis or from DeGrand-Rossi into chiral basis */
+  template <int Ns, int Nc>
+  struct ChiralToFromDegrandRossiBasis {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
+      int s1[4] = {3, 2, 1, 0};
+      FloatOut K1[4] = {static_cast<FloatOut>(-1.0), static_cast<FloatOut>(1.0), static_cast<FloatOut>(1.0), static_cast<FloatOut>(-1.0)};
+      for (int s=0; s<Ns; s++) {
+	for (int c=0; c<Nc; c++) {
+	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]);
 	}
       }
     }
