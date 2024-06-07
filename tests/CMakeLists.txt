@@ -360,7 +360,7 @@ if(QUDA_DIRAC_STAGGERED)
   if(QUDA_CONTRACT)
     add_test(NAME contractFT_test
 	    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contractFT_test> ${MPIEXEC_POSTFLAGS}
-    --dim 2 4 6 8
+    --dim 2 4 6 8 --enable-testing true
     --gtest_output=xml:contractFT_test.xml)
   endif()  
 endif()
