@@ -76,14 +76,8 @@ namespace quda {
       launch<TwistGamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, kappa, mu, epsilon, dagger, type));
     }
 
-    void preTune()
-    {
-      out.backup();
-    }
-    void postTune()
-    {
-      out.restore();
-    }
+    void preTune() { out.backup(); }
+    void postTune() { out.restore(); }
     long long flops() const { return 0; }
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };

@@ -34,10 +34,7 @@ namespace quda {
       strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
-      strcat(aux, ",n_rhs=");
-      char rhs_str[16];
-      i32toa(rhs_str, out.size());
-      strcat(aux, rhs_str);
+      setRHSstring(aux, in.size());
       if (out[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",to_non_rel");
 
       apply(device::get_default_stream());
