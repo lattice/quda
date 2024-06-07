@@ -544,13 +544,16 @@ namespace quda {
                          void *Out = 0, const void *In = 0);
 
   /**
-     @brief This function compute the Cholesky decomposition of each clover
-     matrix and stores the clover inverse field.
-
-     @param clover The clover field (contains both the field itself and its inverse)
-     @param computeTraceLog Whether to compute the trace logarithm of the clover term
+     @brief This function computes the Cholesky decomposition of each
+     clover matrix and stores the clover inverse field.  The lattice
+     sum of the trace log is computed here, and if the trace log
+     reports as Nan as error is thrown.
+     @param[in,out] clover The clover field (contains both the field
+     itself and its inverse)
+     @param[in] compute_tr_log Whether to only compute the trace log
+     (and not compute the inverse)
   */
-  void cloverInvert(CloverField &clover, bool computeTraceLog);
+  void cloverInvert(CloverField &clover, bool compute_tr_log);
 
   /**
      @brief Driver for the clover force computation.  Eventually the
