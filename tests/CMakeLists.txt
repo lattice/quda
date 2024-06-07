@@ -365,6 +365,7 @@ endif()
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
   set(DSLASH_POLICIES 0 1 6 7 8 9 12 13 -1)
+
   if(DEFINED ENV{QUDA_ENABLE_GDR})
     if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
       set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 12 13 -1)
@@ -579,7 +580,7 @@ endif()
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -608,7 +609,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -621,7 +622,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -654,7 +655,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -668,7 +669,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -729,9 +730,9 @@ endif()
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric 4-d preconditioning
@@ -742,7 +743,7 @@ endif()
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
