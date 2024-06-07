@@ -6,11 +6,10 @@ using test_t = ::testing::tuple<QudaContractType, QudaPrecision>;
 
 class ContractFTTest : public ::testing::TestWithParam<test_t>
 {
-  protected:
-    test_t param;
+  test_t param;
 
-  public:
-    ContractFTTest() : param(GetParam()) { }
+public:
+  ContractFTTest() : param(GetParam()) { }
 };
 
 bool skip_test(test_t param)
@@ -18,10 +17,9 @@ bool skip_test(test_t param)
   auto contract_type = ::testing::get<0>(param);
   auto prec          = ::testing::get<1>(param);
 
-  //FIXME : remove for spin 4
-  if(contract_type == QUDA_CONTRACT_TYPE_DR_FT_T or contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) return true; //skip spin 4 cases
-
-  if (prec == QUDA_HALF_PRECISION) return true; // outer precision >= sloppy precision
+  // skip spin 4 cases
+  if (contract_type == QUDA_CONTRACT_TYPE_DR_FT_T or contract_type == QUDA_CONTRACT_TYPE_DR_FT_Z) return true;
+  if (prec < QUDA_SINGLE_PRECISION) return true; // outer precision >= sloppy precision
   if (!(QUDA_PRECISION & prec))    return true; // precision not enabled so skip it
 
   return false;

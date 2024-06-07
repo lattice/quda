@@ -44,7 +44,8 @@ int main(int argc, char **argv)
   auto app = make_app();
 
   add_propagator_option_group(app);  
-  add_contraction_option_group(app);  
+  add_contraction_option_group(app);
+  add_testing_option_group(app);
 
   try {
     app->parse(argc, argv);
@@ -74,8 +75,6 @@ int main(int argc, char **argv)
   std::array<int, 4> X = {xdim, ydim, zdim, tdim}; // local dims
 
   setDims(X.data());
-
-  //prec = QUDA_INVALID_PRECISION;
 
   // Check for correctness:
   int result = 0;
@@ -185,7 +184,10 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
 }
 
 template <typename Float, int src_colors, int n_mom>
-inline int launch_contract_test(const QudaContractType cType, const std::array<int, 4> &X, const int nspin, const int red_size, const std::array<int, 4> &source_position, const std::array<int, n_mom*4> &mom, const std::array<QudaFFTSymmType, n_mom*4> &fft_type ) {
+int launch_contract_test(const QudaContractType cType, const std::array<int, 4> &X, const int nspin, const int red_size,
+                         const std::array<int, 4> &source_position, const std::array<int, n_mom * 4> &mom,
+                         const std::array<QudaFFTSymmType, n_mom * 4> &fft_type)
+{
   int faults = 0;	
 
   if ( nspin == 1 ) {
@@ -254,12 +256,12 @@ int contract(test_t param)
 
   constexpr int src_colors = 1;
 
-  if        ( test_prec == QUDA_SINGLE_PRECISION ) {
-    faults = launch_contract_test<float, src_colors, n_mom>( cType, X, nSpin, red_size, source_position, mom, fft_type );  	  
-  } else if ( test_prec == QUDA_DOUBLE_PRECISION ) {
-    faults = launch_contract_test<double, src_colors, n_mom>( cType, X, nSpin, red_size, source_position, mom, fft_type );	  
+  if (test_prec == QUDA_SINGLE_PRECISION) {
+    faults = launch_contract_test<float, src_colors, n_mom>(cType, X, nSpin, red_size, source_position, mom, fft_type);
+  } else if (test_prec == QUDA_DOUBLE_PRECISION) {
+    faults = launch_contract_test<double, src_colors, n_mom>(cType, X, nSpin, red_size, source_position, mom, fft_type);
   } else {
-    errorQuda("Unsupported precision.\n"); 	  
+    errorQuda("Unsupported precision.\n");
   }
 
   const int n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
