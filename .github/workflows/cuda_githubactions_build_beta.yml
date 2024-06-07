@@ -1,4 +1,4 @@
-name: cuda_ghactions_build_beta
+name: cuda_ghactions_build_ubuntu24.04
 
 on:
   pull_request:
@@ -25,6 +25,7 @@ jobs:
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update -y
+          # Note CUDA 12.5 does not officially support Ubnutu 24.04
           sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
       
       # currently deactivated as it cuased build errors - maybe put in again later
