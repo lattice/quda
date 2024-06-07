@@ -1,7 +1,8 @@
 #pragma once
 #include <color_spinor_field.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Compute the outer-product field between the staggered quark

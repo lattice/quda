@@ -64,8 +64,8 @@ void init(int argc, char **argv)
 
   ColorSpinorParam csParam;
   csParam.nColor = nColor;
-  csParam.nSpin  = test_type == 0 ? 4 : 1;//use --test 1 for staggered case
-  csParam.nDim   = 4;
+  csParam.nSpin = test_type == 0 ? 4 : 1; // use --test 1 for staggered case
+  csParam.nDim = 4;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
   //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
@@ -184,7 +184,6 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-
 int main(int argc, char **argv)
 {
   // initalize google test
@@ -216,31 +215,31 @@ int main(int argc, char **argv)
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
-  } else {//
+  } else { //
     covdev_test(test_t {prec, dagger ? QUDA_DAG_YES : QUDA_DAG_NO});
   }
-  
+
   end();
   finalizeComms();
 
   return result;
 }
 
+std::array<double, 2> covdev_test(test_t param)
+{
 
-std::array<double, 2> covdev_test(test_t param) {
+  // QudaPrecision    test_prec    = ::testing::get<0>(param);
+  QudaDagType test_dagger = ::testing::get<1>(param);
 
-  //QudaPrecision    test_prec    = ::testing::get<0>(param);
-  QudaDagType      test_dagger  = ::testing::get<1>(param);
+  std::array<int, 4> mu_flags {covdev_mu};
 
-  std::array<int, 4> mu_flags{covdev_mu};
-  
   if (std::all_of(mu_flags.begin(), mu_flags.end(), [](int x) { return x == 0; })) {
-    errorQuda("No direction was chosen, exiting...\n");	  
+    errorQuda("No direction was chosen, exiting...\n");
   }
 
   // Test forward directions, then backward
-  for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
-    if (mu_flags[mu] == 0) continue; //skip direction
+  for (int mu = 0; mu < 4; mu++) {   // We test all directions in one go
+    if (mu_flags[mu] == 0) continue; // skip direction
     int muCuda = mu + (test_dagger ? 4 : 0);
     int muCpu = mu * 2 + (test_dagger ? 1 : 0);
 
@@ -259,8 +258,7 @@ std::array<double, 2> covdev_test(test_t param) {
     *spinorOut = *cudaSpinorOut;
     printfQuda("\n%fms per loop\n", 1000 * secs);
 
-    unsigned long long flops
-          = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
+    unsigned long long flops = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
     printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
@@ -268,13 +266,14 @@ std::array<double, 2> covdev_test(test_t param) {
 
     double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
     printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
-                   spinor_out_norm2);
+               spinor_out_norm2);
 
   } // Directions
 
   double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol       = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 : (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  double tol
+    = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+                                                      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
 
-  return std::array<double, 2>{deviation, tol};
+  return std::array<double, 2> {deviation, tol};
 }
-

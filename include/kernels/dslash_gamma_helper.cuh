@@ -28,13 +28,19 @@ namespace quda {
     real b;               // chiral twist
     real c;               // flavor twist
 
-    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0,
-	     real kappa=0.0, real mu=0.0, real epsilon=0.0,
-	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
-      out(out), in(in), d(d), proj(proj), nParity(in.SiteSubset()),
+    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0, real kappa = 0.0, real mu = 0.0,
+             real epsilon = 0.0, bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
+      out(out),
+      in(in),
+      d(d),
+      proj(proj),
+      nParity(in.SiteSubset()),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       n_flavor(doublet ? 2 : 1),
-      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
+      volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()),
+      a(0.0),
+      b(0.0),
+      c(0.0)
     {
       checkPrecision(out, in);
       checkLocation(out, in);
@@ -98,8 +104,8 @@ namespace quda {
   */
   template <typename Arg> struct ChiralProject {
     const Arg &arg;
-    constexpr ChiralProject(const Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; }
+    constexpr ChiralProject(const Arg &arg) : arg(arg) { }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
     {
@@ -110,21 +116,21 @@ namespace quda {
       // chiral_project/reconstruct(int p) expects 0 (+ve proj) or 1 (-ve proj)
       // chiral_reconstruct(int p) returns the projected spinor with the
       // opposite projection zerod out.
-      switch(arg.proj) {
+      switch (arg.proj) {
       case -1:
-	chi = in.chiral_project(1);
-	arg.out(x_cb, parity) = chi.chiral_reconstruct(1);
-	break;
+        chi = in.chiral_project(1);
+        arg.out(x_cb, parity) = chi.chiral_reconstruct(1);
+        break;
 
       case 1:
-	chi = in.chiral_project(0);
-	arg.out(x_cb, parity) = chi.chiral_reconstruct(0);
-	break;
-      case 0: break; 
+        chi = in.chiral_project(0);
+        arg.out(x_cb, parity) = chi.chiral_reconstruct(0);
+        break;
+      case 0: break;
       }
     }
   };
-  
+
   /**
      @brief Application of twist to a color spinor field
   */

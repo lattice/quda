@@ -308,7 +308,7 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 
 // contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
-std::array<int,4> momentum     = {0, 0, 0, 0};
+std::array<int, 4> momentum = {0, 0, 0, 0};
 char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
@@ -451,18 +451,17 @@ namespace
 
   CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
                                                      {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-  
-  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
-                                                                {"stout", QUDA_GAUGE_SMEAR_STOUT},
-                                                                {"ovr-imp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT}};
+
+  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {
+    {"ape", QUDA_GAUGE_SMEAR_APE}, {"stout", QUDA_GAUGE_SMEAR_STOUT}, {"ovr-imp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT}};
 
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
- 	                                                   {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
-							   {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}};
+                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
+                                                           {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}};
 
 } // namespace
 
@@ -494,7 +493,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "preconditioner (default 0)");
 
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-  quda_app->add_option("--clover-coeff", clover_coeff,
+  quda_app
+    ->add_option("--clover-coeff", clover_coeff,
                  "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default "
                  "1.0) and kappa. "
                  "If the user populates this value with anything other than 0.0, the passed value will override the "
@@ -530,7 +530,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver (default false)");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid (default false)");
-  quda_app->add_option("--gauge-smear", gauge_smear, "Smear the gauge prior to dirac operator construction (default false)");
+  quda_app->add_option("--gauge-smear", gauge_smear,
+                       "Smear the gauge prior to dirac operator construction (default false)");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
@@ -1093,17 +1094,18 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
                       "rho coefficient for Stout and Over-Improved Stout smearing (default 0.1)");
 
-  opgroup->add_option("--su3-smear-epsilon", gauge_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing and step size for Wilson flow (default 1.0)");
-  
+  opgroup->add_option(
+    "--su3-smear-epsilon", gauge_smear_epsilon,
+    "epsilon coefficient for Over-Improved Stout smearing and step size for Wilson flow (default 1.0)");
+
   opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 10)");
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));  
-  
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+
   opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
     ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-  
+
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
 }
@@ -1142,12 +1144,11 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
                       "Number of measurement steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
-                       "Number of warmup steps in heatbath test (default 10)");
+                      "Number of warmup steps in heatbath test (default 10)");
   // DMH
-  //opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
+  // opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
   //"Number of measurement steps in heatbath before checkpointing (default 5)");
 }
-
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
@@ -1195,28 +1196,28 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(prec_transform);
 }
 
-
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-    // Option group for contraction related options
-    auto opgroup = quda_app->add_option_group("Contraction", "Options controlling contraction");
+  // Option group for contraction related options
+  auto opgroup = quda_app->add_option_group("Contraction", "Options controlling contraction");
 
-    opgroup->add_option("--contraction-type", contract_type,
-                    "Whether to leave spin elemental open or insert a gamma basis, "
-                        "and whether to sum in t,z, or not at all (default stag-ft-t)")
-            ->transform(CLI::QUDACheckedTransformer(contract_type_map));
+  opgroup
+    ->add_option("--contraction-type", contract_type,
+                 "Whether to leave spin elemental open or insert a gamma basis, "
+                 "and whether to sum in t,z, or not at all (default stag-ft-t)")
+    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
 
-    opgroup->add_option("--correlator-save-dir", correlator_save_dir,"Save propagators in directory <dir>");
-    opgroup->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
-    opgroup->add_option("--open-flavor", open_flavor,
-                         "Compute the open flavor correlators (default false)");
-    opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
+  opgroup->add_option("--correlator-save-dir", correlator_save_dir, "Save propagators in directory <dir>");
+  opgroup->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
+  opgroup->add_option("--open-flavor", open_flavor, "Compute the open flavor correlators (default false)");
+  opgroup->add_option("--correlator-file-affix", correlator_file_affix,
+                      "Additional string to put into the correlator file name");
 
-    quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
-			     "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
-    
-    quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
-			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
+  quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
+                           "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
+
+  quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
+                           "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
 }
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
@@ -1274,8 +1275,6 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup
-    = quda_app->add_option_group("Covdev", "Options controlling  cov derivative parameteres");
+  auto opgroup = quda_app->add_option_group("Covdev", "Options controlling  cov derivative parameteres");
   opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction(s) (default 1 1 1 1 - all directions)")->expected(4);
 }
-

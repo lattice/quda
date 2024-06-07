@@ -173,7 +173,7 @@ public:
     group->add_option(opt);
     return opt;
   }
-  
+
   // Add option to parse multiple files.
   template <typename T>
   CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
@@ -212,7 +212,7 @@ public:
 
   template <typename T>
   CLI::Option *add_massoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MASSES> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool = false)
+                              CLI::Validator trans, std::string option_description = "", bool = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -566,14 +566,14 @@ extern std::array<int, 4> grid_partition;
 extern QudaContractType contract_type;
 extern char correlator_save_dir[256];
 extern char correlator_file_affix[256];
-extern std::array<int,4> momentum;
+extern std::array<int, 4> momentum;
 extern bool open_flavor;
 
 extern quda::file_array<char[256]> prop_source_infile;
 extern quda::file_array<char[256]> prop_source_outfile;
 extern quda::file_array<char[256]> prop_sink_infile;
 extern quda::file_array<char[256]> prop_sink_outfile;
-extern quda::source_array<std::array<int, 4>> prop_source_position; 
+extern quda::source_array<std::array<int, 4>> prop_source_position;
 extern int prop_source_smear_steps;
 extern int prop_sink_smear_steps;
 extern double prop_source_smear_coeff;

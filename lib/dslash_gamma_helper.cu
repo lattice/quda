@@ -15,19 +15,17 @@ namespace quda {
 
   public:
     GammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0) :
-      TunableKernel2D(in, in.SiteSubset()),
-      out(out),
-      in(in),
-      d(d),
-      proj(proj)
+      TunableKernel2D(in, in.SiteSubset()), out(out), in(in), d(d), proj(proj)
     {
       apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if(proj == 0) launch<Gamma>(tp, stream, GammaArg<Float, nColor>(out, in, d));
-      else launch<ChiralProject>(tp, stream, GammaArg<Float, nColor>(out, in, d, proj));
+      if (proj == 0)
+        launch<Gamma>(tp, stream, GammaArg<Float, nColor>(out, in, d));
+      else
+        launch<ChiralProject>(tp, stream, GammaArg<Float, nColor>(out, in, d, proj));
     }
 
     void preTune() { out.backup(); }
@@ -52,7 +50,7 @@ namespace quda {
     // but this parameter is not used for chiral projection.
     instantiate<GammaApply>(out, in, 4, proj);
   }
-  
+
   template <typename Float, int nColor> class TwistGammaApply : public TunableKernel2D {
     ColorSpinorField &out;
     const ColorSpinorField &in;

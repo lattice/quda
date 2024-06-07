@@ -81,13 +81,13 @@ void init(int argc, char **argv)
     smear_param = newQudaGaugeSmearParam();
     setGaugeSmearParam(smear_param);
   }
-  
+
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator.
   eig_inv_param = newQudaInvertParam();
-  setInvertParam(eig_inv_param);  
-  
+  setInvertParam(eig_inv_param);
+
   eig_param = newQudaEigParam();
   // We encapsualte the inv_param structure inside the
   // eig_param structure

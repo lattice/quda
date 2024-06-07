@@ -3,7 +3,8 @@
 #include <host_utils.h>
 #include "misc.h"
 
-void setGaugeSmearParam(QudaGaugeSmearParam &smear_param) {
+void setGaugeSmearParam(QudaGaugeSmearParam &smear_param)
+{
   smear_param.alpha = gauge_smear_alpha;
   smear_param.rho = gauge_smear_rho;
   smear_param.epsilon = gauge_smear_epsilon;
@@ -40,7 +41,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.ga_pad = 0;
   gauge_param.mom_ga_pad = 0;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  
+
   gauge_param.struct_size = sizeof(gauge_param);
 }
 
@@ -72,7 +73,7 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
-  
+
   gauge_param.struct_size = sizeof(gauge_param);
 }
 
@@ -116,7 +117,7 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
-  
+
   gauge_param.struct_size = sizeof(gauge_param);
 }
 
@@ -291,7 +292,7 @@ void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
 {
   // Construct a copy of the current invert parameters
   setInvertParam(smear_param);
-  
+
   // Construct 4D smearing parameters.
   smear_param.dslash_type = QUDA_LAPLACE_DSLASH;
   double smear_coeff = -1.0 * omega * omega / (4 * steps);
@@ -1004,8 +1005,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   // Gauge smear param
-  //setGaugeSmearParam(*inv_param.smear_param);
-  
+  // setGaugeSmearParam(*inv_param.smear_param);
+
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 

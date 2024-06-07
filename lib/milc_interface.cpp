@@ -1259,17 +1259,16 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   int src_offset = getColorVectorOffset(other_parity, false, localDim);
   int dst_offset = getColorVectorOffset(local_parity, false, localDim);
 
-  dslashQuda(static_cast<char*>(dst) + dst_offset*host_precision,
-             static_cast<char*>(src) + src_offset*host_precision,
-             &invertParam, local_parity);
+  dslashQuda(static_cast<char *>(dst) + dst_offset * host_precision,
+             static_cast<char *>(src) + src_offset * host_precision, &invertParam, local_parity);
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaDslash
 
-void qudaShift(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int dir, int sym, int reloadGaugeField)
+void qudaShift(int external_precision, int quda_precision, const void *const links, void *src, void *dst, int dir,
+               int sym, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1282,8 +1281,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
 
-  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision,
-                 device_precision_sloppy, 1.0, 0.0);
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, 1.0, 0.0);
   gparam.type = QUDA_WILSON_LINKS;
   gparam.make_resident_gauge = true;
   QudaInvertParam invertParam = newQudaInvertParam();
@@ -1299,8 +1297,8 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   invertParam.dslash_type = QUDA_COVDEV_DSLASH;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)){
-    if(links == nullptr) {
+  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)) {
+    if (links == nullptr) {
       errorQuda("Can't offload a null gauge field\n");
       exit(1);
     }
@@ -1319,8 +1317,8 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   qudamilc_called<false>(__func__, verbosity);
 } // qudaShift
 
-void qudaSpinTaste(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int spin, int taste, int reloadGaugeField)
+void qudaSpinTaste(int external_precision, int quda_precision, const void *const links, void *src, void *dst, int spin,
+                   int taste, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1333,8 +1331,7 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
 
-  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision,
-                 device_precision_sloppy, 1.0, 0.0);
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, 1.0, 0.0);
   gparam.type = QUDA_WILSON_LINKS;
   gparam.make_resident_gauge = true;
   QudaInvertParam invertParam = newQudaInvertParam();
@@ -1350,8 +1347,8 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   invertParam.dslash_type = QUDA_COVDEV_DSLASH;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)){
-    if(links == nullptr) {
+  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)) {
+    if (links == nullptr) {
       errorQuda("Can't offload a null gauge field\n");
       exit(1);
     }
@@ -2074,12 +2071,8 @@ struct mgInputStruct {
   }
 };
 
-void qudaContractFT(int external_precision,
-		    QudaContractArgs_t *cont_args,
-		    void *const quark1, 
-		    void *const quark2, 
-		    double *corr
-		    )
+void qudaContractFT(int external_precision, QudaContractArgs_t *cont_args, void *const quark1, void *const quark2,
+                    double *corr)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -2087,7 +2080,7 @@ void qudaContractFT(int external_precision,
   ColorSpinorParam csParam;
   { // set ColorSpinorParam block
     csParam.nColor = 3;
-    csParam.nSpin  = 1; // Support only staggered color fields for now
+    csParam.nSpin = 1; // Support only staggered color fields for now
     for (int dir = 0; dir < 4; ++dir) csParam.x[dir] = localDim[dir];
     csParam.x[4] = 1;
     csParam.setPrecision(host_precision);
@@ -2102,10 +2095,10 @@ void qudaContractFT(int external_precision,
   }
 
   int const n_mom = cont_args->n_mom;
-  int * const mom_modes = cont_args->mom_modes;
+  int *const mom_modes = cont_args->mom_modes;
   const QudaFFTSymmType *const fft_type = cont_args->fft_type;
   int const *source_position = cont_args->source_position;
-  
+
   QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
   int const src_colors = 1;
   // Only one pair of color fields and one result, so only one element in the arrays
@@ -2113,9 +2106,8 @@ void qudaContractFT(int external_precision,
   void *prop_array_flavor_2[1] = {quark2};
   void *result[1] = {corr};
 
-
-  contractFTQuda(prop_array_flavor_1, prop_array_flavor_2, result, cType, &csParam, 
-		 src_colors, localDim, source_position, n_mom, mom_modes, fft_type);
+  contractFTQuda(prop_array_flavor_1, prop_array_flavor_2, result, cType, &csParam, src_colors, localDim,
+                 source_position, n_mom, mom_modes, fft_type);
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaContractFT

@@ -122,12 +122,12 @@ extern "C" {
    * Parameters for propagator contractions with FT
    */
   typedef struct {
-    int n_mom;  /* Number of sink momenta */
-    int *mom_modes;  /* List of 4-component momenta as integers. Dimension 4*n_mom */
+    int n_mom;                 /* Number of sink momenta */
+    int *mom_modes;            /* List of 4-component momenta as integers. Dimension 4*n_mom */
     QudaFFTSymmType *fft_type; /* The "parity" of the FT component */
-    int *source_position;  /* The coordinate origin for the Fourier phases */
-    double flops; /* Return value */
-    double dtime; /* Return value */
+    int *source_position;      /* The coordinate origin for the Fourier phases */
+    double flops;              /* Return value */
+    double dtime;              /* Return value */
   } QudaContractArgs_t;
 
   /**
@@ -142,7 +142,6 @@ extern "C" {
     int laplaceDim; /** Dimension of Laplacian **/
   } QudaTwoLinkQuarkSmearArgs_t;
 
-  
   /**
    * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
    *
@@ -173,7 +172,7 @@ extern "C" {
    * Allocate pinned memory suitable for CPU-GPU transfers
    * @param[in] bytes The size of the requested allocation
    * @return Pointer to allocated memory
-  */
+   */
   void* qudaAllocatePinned(size_t bytes);
 
   /**
@@ -241,7 +240,6 @@ extern "C" {
 			      void* fatlink,
 			      void* ulink);
 
-
   /**
    * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
    * passed and returned are host (CPU) field in MILC order.
@@ -251,18 +249,12 @@ extern "C" {
    * @param[in] links              Gauge field on the host
    * @param[in] src                Input spinor field
    * @param[out] dst                Output spinor field
-   * @param[in] dir                Direction of application of the spin-taste operator 
+   * @param[in] dir                Direction of application of the spin-taste operator
    * @param[in] sym                Kind of spin-taste operator (1 forward, 2 backward, 3 symmetric)
    * @param[in] reloadGaugeField   Should we transfer again the gauge field from the CPU to the GPU? (0 = false, anything else = true)
    */
-  void qudaShift (int external_precision,
-		  int quda_precision,
-		  const void* const links,
-		  void* source,
-		  void* solution,
-		  int dir,
-		  int sym,
-                  int reloadGaugeField);
+  void qudaShift(int external_precision, int quda_precision, const void *const links, void *source, void *solution,
+                 int dir, int sym, int reloadGaugeField);
 
   /**
    * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
@@ -277,14 +269,8 @@ extern "C" {
    * @param[in] taste              Taste gamma structure using MILC numbering
    * @param[in] reloadGaugeField   Should we transfer again the gauge field from the CPU to the GPU? (0 = false, anything else = true)
    */
-  void qudaSpinTaste (int external_precision,
-                      int quda_precision,
-                      const void *const links,
-                      void* src,
-                      void* dst,
-                      int spin,
-                      int taste,
-                      int reloadGaugeField);
+  void qudaSpinTaste(int external_precision, int quda_precision, const void *const links, void *src, void *dst,
+                     int spin, int taste, int reloadGaugeField);
   /**
    * Apply the improved staggered operator to a field. All fields
    * passed and returned are host (CPU) field in MILC order.
@@ -342,8 +328,6 @@ extern "C" {
 		    double* const final_residual,
 		    double* const final_fermilab_residual,
 		    int* num_iters);
-
-
 
   /**
    * Solve Ax=b for an improved staggered operator. All fields are fields
@@ -436,7 +420,7 @@ extern "C" {
   void qudaMultigridDestroy(void *mg_pack_ptr);
 
   /**
-   * Solve Ax=b for an improved staggered operator with many right hand sides. 
+   * Solve Ax=b for an improved staggered operator with many right hand sides.
    * All fields are fields passed and returned are host (CPU) field in MILC order.
    * This function requires that persistent gauge and clover fields have
    * been created prior.  This interface is experimental.
@@ -511,7 +495,7 @@ extern "C" {
       double* const final_fermilab_residual,
       int* num_iters);
 
- /**
+  /**
    * Solve for a system with many RHS using an improved
    * staggered operator.
    * The solving procedure consists of two computation phases :
@@ -643,7 +627,6 @@ extern "C" {
       double* const final_fermilab_residual,
       int *num_iters);
 
-
   /**
    * Load the gauge field from the host.
    *
@@ -667,7 +650,7 @@ extern "C" {
      Free the two-link field allocated in QUDA.
    */
   void qudaFreeTwoLink();
-  
+
   /**
    * Load the clover field and its inverse from the host.  If null
    * pointers are passed, the clover field and / or its inverse will
@@ -752,7 +735,8 @@ extern "C" {
    * @param[in] quark_field The input fermion field.
    * @param[in] level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param[in] fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
-   * @param[in] w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
+   * @param[in] w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the
+   * original links.
    * @param[in] v_link          Fat7 link variables.
    * @param[in] u_link          SU(3) think link variables.
    * @param[in] milc_momentum        The momentum contribution from the quark action.
@@ -942,7 +926,7 @@ extern "C" {
    * direction.
    *
    * @param[in] prec Precision of the gauge field
-   * @param[in/out] gauge_h The gauge field 
+   * @param[in/out] gauge_h The gauge field
    * @param[in] flag Whether to apply to remove the staggered phase
    * @param[in] i_mu Imaginary chemical potential
    */
@@ -1007,7 +991,6 @@ extern "C" {
 		       int mu,
 		       int nu);
 
-
   /**
    * Compute the derivative of the clover term (part of clover force
    * computation).  All the pointers here are for QUDA native device
@@ -1032,7 +1015,6 @@ extern "C" {
 			    int precision,
 			    int parity,
 			    int conjugate);
-
 
   /**
    * Take a gauge field on the host, load it onto the device and extend it.
@@ -1140,14 +1122,10 @@ extern "C" {
    * @param[in,out] parameters for the contraction, including FT specification
    * @param[in] local storage of color spinor field.  three complex values * number of sites on node
    * @param[in] local storage of color spinor field.  three complex values * number of sites on node
-   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt][2] for 2 = re,im. 
+   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt][2] for 2 = re,im.
    */
-  void qudaContractFT(int external_precision,
-		      QudaContractArgs_t *cont_args,
-		      void *const quark1,
-		      void *const quark2,
-		      double *corr
-		      );
+  void qudaContractFT(int external_precision, QudaContractArgs_t *cont_args, void *const quark1, void *const quark2,
+                      double *corr);
 
   /**
    * @brief Perform two-link Gaussian smearing on a given spinor (for staggered fermions).
@@ -1159,10 +1137,9 @@ extern "C" {
    */
   void qudaTwoLinkGaussianSmear(int external_precision, int quda_precision, void * h_gauge, void * source,
                                 QudaTwoLinkQuarkSmearArgs_t qsmear_args);
-  
-  
+
   /* The below declarations are for removed functions from prior versions of QUDA. */
-  
+
   /**
    * Note this interface function has been removed.  This stub remains
    * for compatibility only.

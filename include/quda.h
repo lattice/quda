@@ -23,7 +23,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
+
   /**
    * Parameters having to do with the gauge field or the
    * interpretation of the gauge field by various Dirac operators
@@ -1141,7 +1141,7 @@ extern "C" {
    * Free QUDA's internal two-link gauge field.
    */
   void freeGaugeTwoLinkQuda(void);
-  
+
   /**
    * Save the gauge field to the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1692,7 +1692,8 @@ extern "C" {
    * @param coeff  Width of the Gaussian distribution
    * @param smear_type Gaussian/Wuppertal smearing
    */
-  void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double coeff, const QudaFermionSmearType smear_type);
+  void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double coeff,
+                               const QudaFermionSmearType smear_type);
 
   /**
    * LEGACY
@@ -1719,7 +1720,7 @@ extern "C" {
    * @param omega  Width of the Gaussian distribution
    */
   void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
-  
+
   /**
    * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param[in] smear_param Parameter struct that defines the computation parameters
@@ -1761,7 +1762,7 @@ extern "C" {
   /**
    * @param[in] x pointer to host data array
    * @param[in] y pointer to host data array
-   * @param[out] result pointer to the spin*spin projections per lattice slice site 
+   * @param[out] result pointer to the spin*spin projections per lattice slice site
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
    * @param[in] src_colors color dilution parameter
@@ -1771,11 +1772,10 @@ extern "C" {
    * @param[in] mom_modes momentum modes
    * @param[in] fft_type Fourier phase factor type (cos, sin or exp{ikx})
    */
-  void contractFTQuda(void **x, void **y, void **result,
-		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
-		      const int *X, const int *const source_position,
-		      const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type);
-  
+  void contractFTQuda(void **x, void **y, void **result, const QudaContractType cType, void *cs_param_ptr,
+                      const int src_colors, const int *X, const int *const source_position, const int n_mom,
+                      const int *const mom_modes, const QudaFFTSymmType *const fft_type);
+
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
