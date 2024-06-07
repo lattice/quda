@@ -118,41 +118,19 @@ namespace quda
       constexpr array<array<int, nSpin>, nSpin*nSpin>           gm_i   = get_dr_gm_i();
       constexpr array<array<complex<real>, nSpin>, nSpin*nSpin> g5gm_z = get_dr_g5gm_z<real>();     
 
-      reduce_t result_all_channels = zero<reduce_t>();
       int s1 = arg.s1;
       int b1 = arg.b1;
-      int mom_mode[4];
-      //QudaFFTSymmType fft_type[4]; DMH: to suppress warnings
-      int source_position[4];
-      int offsets[4];
-      int NxNyNzNt[4];
-      for(int i=0; i<4; i++) {
-	source_position[i] = arg.source_position[i];
-	offsets[i] = arg.offsets[i];
-	mom_mode[i] = arg.mom_mode[i];
-	//fft_type[i] = arg.fft_type[i]; DMH: to suppress warnings
-	NxNyNzNt[i] = arg.NxNyNzNt[i];
-      }
-      
-      complex<real> propagator_product;
       
       //The coordinate of the sink
       int sink[4];
-      
-      double phase_real;
-      double phase_imag;
-      double Sum_dXi_dot_Pi;
-      
       sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
       
       // Calculate exp(-i * [x dot p])
-      Sum_dXi_dot_Pi = (double)((source_position[0]-sink[0]-offsets[0])*mom_mode[0]*1./NxNyNzNt[0]+
-				(source_position[1]-sink[1]-offsets[1])*mom_mode[1]*1./NxNyNzNt[1]+
-				(source_position[2]-sink[2]-offsets[2])*mom_mode[2]*1./NxNyNzNt[2]+
-				(source_position[3]-sink[3]-offsets[3])*mom_mode[3]*1./NxNyNzNt[3]);
-      
-      phase_real =  cos(Sum_dXi_dot_Pi*2.*M_PI);
-      phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
+      double Sum_dXi_dot_Pi = 0.0;
+      for (int i = 0; i < 4; i++)
+        Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
+
+      complex<double> phase = {cos(Sum_dXi_dot_Pi*2.*M_PI), -sin(Sum_dXi_dot_Pi*2.*M_PI)};
       
       // Collect vector data
       int parity = 0;
@@ -162,6 +140,7 @@ namespace quda
       Vector y = arg.y(idx_cb, parity);
       
       // loop over channels
+      reduce_t result_all_channels = {};
       for (int G_idx = 0; G_idx < 16; G_idx++) {
 	for (int s2 = 0; s2 < nSpin; s2++) {
 
@@ -174,9 +153,9 @@ namespace quda
 	  if (b1_tmp == b1) {
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
-	    propagator_product = g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * g5gm_z[G_idx][b1];
-	    result_all_channels[G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
-	    result_all_channels[G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    auto prop_product = g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * g5gm_z[G_idx][b1];
+            result_all_channels[G_idx][0] += prop_product.real()*phase.real() - prop_product.imag() * phase.imag();
+	    result_all_channels[G_idx][1] += prop_product.imag()*phase.real() + prop_product.real() * phase.imag();
 	  }
 	}
       }
@@ -189,7 +168,7 @@ namespace quda
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();    
 
-    static constexpr int reduce_block_dim = 1; //
+    static constexpr int reduce_block_dim = 1;
 
     const Arg &arg;
     constexpr StaggeredContractFT(const Arg &arg) : arg(arg) {}
@@ -198,29 +177,12 @@ namespace quda
     // overload comm_reduce to defer until the entire "tile" is complete
     template <typename U> static inline void comm_reduce(U &) { }
 
-    // Final param is unused in the MultiReduce functor in this use case.
+    // y index param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
     {
-      constexpr int nSpin  = Arg::nSpin;
-      constexpr int nColor = Arg::nColor;
       using real   = typename Arg::real;
-      using Vector = ColorSpinor<real, nColor, nSpin>;
-      //reduce_t result_all_channels = staggered_spinor_array();
-      reduce_t result_all_channels = zero<reduce_t>();
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
-      int mom_mode[4];
-      QudaFFTSymmType fft_type[4];
-      int source_position[4];
-      int offsets[4];
-      int NxNyNzNt[4];
-      for(int i=0; i<4; i++) {
-	source_position[i] = arg.source_position[i];
-	mom_mode[i] = arg.mom_mode[i];
-	fft_type[i] = arg.fft_type[i];
-	offsets[i] = arg.offsets[i];
-	NxNyNzNt[i] = arg.NxNyNzNt[i];
-      }
-      
       //The coordinate of the sink
       int sink[4];
       sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
@@ -236,39 +198,27 @@ namespace quda
       complex<real> prop_prod = innerProduct(x, y);	
 
       // Fourier phase
-      double dXi_dot_Pi, ph_real, ph_imag, tmp_real, tmp_imag;
-      double phase_real = 1.0;
-      double phase_imag = 0.0;
+      complex<double> ph;
+      complex<double> phase(1.0, 0.0);
       // Phase factor for each direction is either the cos, sin, or exp Fourier phase
-      for(int dir=0; dir<4; ++dir)
-	{
-	  dXi_dot_Pi = 2.*M_PI / NxNyNzNt[dir];
-	  dXi_dot_Pi *= (sink[dir]+offsets[dir] - source_position[dir])*mom_mode[dir];
-	  if(fft_type[dir] == QUDA_FFT_SYMM_EO) {
-	    // exp(+i k.x) case
-	    ph_real = cos(dXi_dot_Pi);
-	    ph_imag = sin(dXi_dot_Pi);
-	  } else if(fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
-	    // cos(k.x) case
-	    ph_real = cos(dXi_dot_Pi);
-	    ph_imag = 0.0;
-	  } else if(fft_type[dir] == QUDA_FFT_SYMM_ODD) {
-	    // sin(k.x) case
-	    ph_real = 0.0;
-	    ph_imag = sin(dXi_dot_Pi);
-	  }
-	  // phase *= ph
-	  tmp_real = phase_real;
-	  tmp_imag = phase_imag;
-	  phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
-	  phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
-	}
-      
-      // Staggered uses only the first complex element of result_all_channels
-      result_all_channels[0] += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
-      result_all_channels[1] += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
+#pragma unroll
+      for (int dir = 0; dir < 4; dir++) {
+        auto dXi_dot_Pi = 2.0 * M_PI * (sink[dir] + arg.offsets[dir] - arg.source_position[dir]) * arg.mom_mode[dir] / arg.NxNyNzNt[dir];
+        if (arg.fft_type[dir] == QUDA_FFT_SYMM_EO) {
+          // exp(+i k.x) case
+          ph = {cos(dXi_dot_Pi), sin(dXi_dot_Pi)};
+        } else if (arg.fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
+          // cos(k.x) case
+          ph = {cos(dXi_dot_Pi), 0.0};
+        } else if (arg.fft_type[dir] == QUDA_FFT_SYMM_ODD) {
+          // sin(k.x) case
+          ph = {0.0, sin(dXi_dot_Pi)};
+        }
+        phase *= ph;
+      }
 
-      return operator()(result_all_channels, result);
+      complex<double> result_all_channels = phase * complex<double>{prop_prod.real(), prop_prod.imag()};
+      return operator()({result_all_channels.real(), result_all_channels.imag()}, result);
     }
   };
   
