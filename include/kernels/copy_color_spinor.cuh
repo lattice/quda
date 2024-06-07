@@ -161,6 +161,21 @@ namespace quda {
     }
   };
 
+   /** Transform from UKQCD to Dirac-Pauli and from Dirac-Pauli into UKQCD basis */
+  template <int Ns, int Nc>
+  struct UKQCDToFromDiracPauliBasis {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
+      int s1[4] = {0, 1, 2, 3};
+      FloatOut K1[4] = {static_cast<FloatOut>(-1.0), static_cast<FloatOut>(-1.0), static_cast<FloatOut>(1.0), static_cast<FloatOut>(1.0)};
+      for (int s=0; s<Ns; s++) {
+	for (int c=0; c<Nc; c++) {
+	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]);
+	}
+      }
+    }
+  };
+
   template <typename Arg> struct CopyColorSpinor_ {
     const Arg &arg;
     constexpr CopyColorSpinor_(const Arg &arg): arg(arg) {}

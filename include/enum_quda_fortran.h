@@ -41,8 +41,9 @@
 #define QUDA_QDPJIT_GAUGE_ORDER 11     // expect *gauge[4] even-odd spacetime row-column color
 #define QUDA_CPS_WILSON_GAUGE_ORDER 12 // expect *gauge even-odd spacetime column-row color
 #define QUDA_MILC_GAUGE_ORDER 13       // expect *gauge even-odd mu spacetime row-column order
-#define QUDA_MILC_SITE_GAUGE_ORDER  14 // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-#define QUDA_BQCD_GAUGE_ORDER 15       // expect *gauge mu even-odd spacetime+halos row-column order
+#define QUDA_MILC_SITE_GAUGE_ORDER                                                                                     \
+  14                             // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+#define QUDA_BQCD_GAUGE_ORDER 15 // expect *gauge mu even-odd spacetime+halos row-column order
 #define QUDA_TIFR_GAUGE_ORDER 16
 #define QUDA_TIFR_PADDED_GAUGE_ORDER 17
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
