@@ -364,11 +364,22 @@ endif()
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
-  set(DSLASH_POLICIES 0 1 6 7 8 9 12 13 -1)
+  set(DSLASH_POLICIES 0 1)
+
+  if(DEFINED ENV{QUDA_ENABLE_ZERO_COPY})
+    if($ENV{QUDA_ENABLE_ZERO_COPY} EQUAL 1)
+      set(DSLASH_POLICIES 6 7 8 9 12 13 ${DSLASH_POLICIES})
+      message(STATUS "QUDA_ENABLE_ZERO_COPY=1: enabling zero-copy dslash policies in ctest")
+    else()
+      message(STATUS "QUDA_ENABLE_ZERO_COPY!=1: disabling zero-copy dslash policies in ctest")
+    endif()
+  else()
+    message(STATUS "QUDA_ENABLE_ZERO_COPY not set: disabling zero-copy dslash policies in ctest")
+  endif()
 
   if(DEFINED ENV{QUDA_ENABLE_GDR})
     if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
-      set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 12 13 -1)
+      set(DSLASH_POLICIES 2 3 4 5 10 11 ${DSLASH_POLICIES})
       message(STATUS "QUDA_ENABLE_GDR=1: enabling GDR-enabled dslash policies in ctest")
     else()
       message(STATUS "QUDA_ENABLE_GDR!=1: disabling GDR-enabled dslash policies in ctest")
@@ -376,9 +387,21 @@ if(QUDA_CTEST_SEP_DSLASH_POLICIES)
   else()
     message(STATUS "QUDA_ENABLE_GDR not set: disabling GDR-enabled dslash policies in ctest")
   endif()
-else()
-  set(DSLASH_POLICIES -1)
+
+  if(QUDA_NVSHMEM)
+    if(NOT DEFINED $ENV{QUDA_ENABLE_NVSHMEM} OR $ENV{QUDA_ENABLE_NVSHMEM} EQUAL 1)
+      set(DSLASH_POLICIES 14 15 16 17 ${DSLASH_POLICIES})
+      message(STATUS "QUDA_ENABLE_NVSHMEM=1: enabling NVSHMEM dslash policies in ctest")
+    elseif()
+      message(STATUS "QUDA_ENABLE_NVSHMEM!=1: disabling NVSHMEM dslash policies in ctest")
+    endif()
+  endif()
+
+  list(SORT DSLASH_POLICIES COMPARE NATURAL)
+  message(STATUS "Enabled dslash policies are ${DSLASH_POLICIES}")
 endif()
+
+set(DSLASH_POLICIES ${DSLASH_POLICIES} -1)
 
 foreach(pol IN LISTS DSLASH_POLICIES)
 
