@@ -121,6 +121,7 @@ if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM" OR "x${CMAKE_SYCL_COMPILER
   endif()
   set(SYCL_LINK_FLAGS -fsycl-device-code-split=per_kernel)
   list(APPEND SYCL_LINK_FLAGS -fsycl-max-parallel-link-jobs=8)
+  list(APPEND SYCL_LINK_FLAGS -flink-huge-device-code)
 
   target_compile_options(quda PRIVATE "SHELL:-mllvm -pragma-unroll-threshold=16")
   #target_compile_options(quda PUBLIC -fno-fast-math)
