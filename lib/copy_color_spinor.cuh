@@ -26,6 +26,7 @@ namespace quda {
       case QUDA_DEGRAND_ROSSI_GAMMA_BASIS: return "degrand_rossi";
       case QUDA_UKQCD_GAMMA_BASIS: return "ukqcd";
       case QUDA_CHIRAL_GAMMA_BASIS: return "chiral";
+      case QUDA_DIRAC_PAULI_GAMMA_BASIS: return "dirac_pauli";
       default: errorQuda("Unknown gamma basis %d", basis);
       }
       return "unknown";
@@ -65,6 +66,18 @@ namespace quda {
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToNonRelBasis>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToChiralBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<DegrandRossiToDiracPaulBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<DiracPaulToDegrandRossiBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToFromDegrandRossiBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToFromDegrandRossiBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<UKQCDToFromDiracPauliBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<UKQCDToFromDiracPauliBasis>(out, in, Out_, In_));
         } else {
           errorQuda("Unexpected basis change from %d to %d", in.GammaBasis(), out.GammaBasis());
         }
