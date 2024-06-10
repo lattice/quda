@@ -5300,6 +5300,7 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
   ColorSpinorParam cpu_evec_param(host_evec, *inv_param, x, false, QUDA_CPU_FIELD_LOCATION);
   // Switch to spin 1
   cpu_evec_param.nSpin = 1;
+  cpu_evec_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   // QUDA style wrapper around the host data
   std::vector<ColorSpinorField> evec(n_evec);
   for (auto i = 0; i < n_evec; i++) {
