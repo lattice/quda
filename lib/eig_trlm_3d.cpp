@@ -162,7 +162,7 @@ namespace quda
             if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i,
                       residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
-              iter_converged = i;
+              iter_converged_3D[t] = i;
             } else {
               // Unlikely to find new converged pairs
               break;
@@ -527,6 +527,8 @@ namespace quda
         // Create 3D arrays
         for (int i = vecs_t.size(); i < dim; i++) vecs_t.push_back(csParamClone);
         for (int i = kSpace_t.size(); i < keep; i++) kSpace_t.push_back(csParamClone);
+
+	blas::zero(kSpace_t);
 
         // Copy to data to 3D array, zero out workspace, make pointers
         for (int i = 0; i < dim; i++) blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[i], vecs_locked[i]);
