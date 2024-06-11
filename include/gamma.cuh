@@ -292,9 +292,8 @@ namespace quda {
   };
 
   // list of specialized structures used in the contraction kernels:
-  static constexpr int nspin = 4;
 
-  constexpr array<array<int, nspin>, nspin * nspin> get_dr_gm_i()
+  constexpr array<array<int, 4>, 16> get_dr_gm_i()
   {
     return {{// VECTORS
              // G_idx = 1: \gamma_1
@@ -350,7 +349,7 @@ namespace quda {
              {0, 1, 2, 3}}};
   }
 
-  template <typename T> constexpr array<array<complex<T>, nspin>, nspin * nspin> get_dr_g5gm_z()
+  template <typename T> constexpr array<array<complex<T>, 4>, 16> get_dr_g5gm_z()
   {
 
     constexpr complex<T> p_i = complex<T>(0., +1.);
