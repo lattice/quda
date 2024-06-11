@@ -355,7 +355,6 @@ extern bool verify_results;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
 extern double mass;
-extern quda::mass_array<double> mass_array;
 extern double kappa;
 extern quda::mass_array<double> kappa_array;
 extern double mu;

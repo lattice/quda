@@ -99,7 +99,6 @@ bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
 quda::mass_array<double> kappa_array = {};
-quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double evmax = 0.1;
