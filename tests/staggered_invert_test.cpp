@@ -144,8 +144,6 @@ void init()
     setGaugeSmearParam(smear_param);
   }
 
-  if (!inv_multigrid) setStaggeredInvertParam(inv_param);
-
   inv_param = newQudaInvertParam();
   mg_inv_param = newQudaInvertParam();
   mg_param = newQudaMultigridParam();
