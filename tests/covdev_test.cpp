@@ -46,6 +46,8 @@ const int nColor = 3;
 
 void init(int argc, char **argv)
 {
+  if(test_type != 0 and test_type != 1)	errorQuda("Test type %d is not supported", test_type);
+
   initQuda(device_ordinal);
 
   setVerbosity(QUDA_VERBOSE);
@@ -67,7 +69,6 @@ void init(int argc, char **argv)
   csParam.nSpin = test_type == 0 ? 4 : 1; // use --test 1 for staggered case
   csParam.nDim = 4;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-  //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
