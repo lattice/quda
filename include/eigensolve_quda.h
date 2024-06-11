@@ -13,6 +13,9 @@ namespace quda
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
+  // Local enum for the TRLM3D array min/mx sum
+  enum arrayExtremumType { MIN, MAX };
+  
   class EigenSolver
   {
     using range = std::pair<int, int>;
@@ -596,7 +599,8 @@ namespace quda
     */
     void loadFromFile3D(const DiracMatrix &mat, std::vector<ColorSpinorField> &eig_vecs, std::vector<Complex> &evals);
 
-    int getArrayMinMax3D(const std::vector<int> &array, const int limit, const bool min);
+    template <typename T>
+    T getArrayMinMax3D(const std::vector<T> &array, const T limit, const arrayExtremumType min_max);
   };
 
   /**

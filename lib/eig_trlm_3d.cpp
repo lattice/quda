@@ -117,8 +117,7 @@ namespace quda
     while (restart_iter < max_restarts && !converged) {
 
       // Get min step
-
-      int step_min = getArrayMinMax3D(num_locked_3D, n_kr, true);
+      int step_min = getArrayMinMax3D(num_locked_3D, n_kr, MIN);
       printfQuda("step min = %d\n", step_min);
       for (int step = step_min; step < n_kr; step++) lanczosStep3D(kSpace, step);
       iter += (n_kr - step_min);
@@ -193,6 +192,7 @@ namespace quda
           num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
           num_locked_3D[t] += iter_locked_3D[t];
 
+	  // Use printf to get data from t dim only
           if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
             printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t],
                    t_offset + t, restart_iter + 1);
@@ -216,15 +216,14 @@ namespace quda
       bool all_converged = true;
       for (int t = 0; t < ortho_dim_size; t++) {
         if (num_converged_3D[t] >= n_conv) {
-          converged_3D[t] = true;
-          printf("t=%d converged = %s from rank %d\n", t, converged_3D[t] ? "true" : "false", comm_rank());
+          converged_3D[t] = true;          
         } else {
           all_converged = false;
-          printf("t=%d converged = %s from rank %d\n", t, converged_3D[t] ? "true" : "false", comm_rank());
         }
+	if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+	  printf("t=%d converged = %s from rank %d\n", t, converged_3D[t] ? "true" : "false", comm_rank());
+	}
       }
-
-      printf("All converged = %s from rank %d\n", all_converged ? "true" : "false", comm_rank());
 
       if (all_converged) {
         reorder3D(kSpace);
@@ -574,7 +573,6 @@ namespace quda
       blas3d::cDotProduct(s_t, vecs[i], rvecs[0]);
       for (int t = 0; t < ortho_dim_size; t++) {
         s_t[t] *= active_3D[t] ? -1.0 : 0.0;
-        // printfQuda("Ortho active at %d = %s: S = (%e,%e)\n", t, active_3D[t] ? "T" : "F", s_t[t].real(), s_t[t].imag());
       }
 
       // Block orthogonalise
@@ -616,28 +614,10 @@ namespace quda
 
     // Compute spectral radius estimate
     std::vector<double> inner_products(ortho_dim_size, 0.0);
-    blas3d::reDotProduct(inner_products, out, in);
-
-    double result = 1.0;
-    std::vector<double> all_results(comm_dim(ortho_dim) * ortho_dim_size, 0.0);
-    for (int t = 0; t < ortho_dim_size; t++) {
-      all_results[comm_coord(ortho_dim) * ortho_dim_size + t] = inner_products[t];
-    }
-
-    comm_allreduce_sum(all_results);
-
-    int spatial_comm_vol = 1;
-    for (int i = 0; i < 4; i++)
-      if (i != ortho_dim) spatial_comm_vol *= comm_dim(i);
-
-    for (int t = 0; t < ortho_dim_size * comm_dim(ortho_dim); t++) {
-      // scale out the redundant summations
-      all_results[t] /= spatial_comm_vol;
-
-      logQuda(QUDA_VERBOSE, "Chebyshev max at slice %d = %e\n", t, all_results[t]);
-      if (all_results[t] > result) result = all_results[t];
-    }
-
+    blas3d::reDotProduct(inner_products, out, in);    
+    double result = getArrayMinMax3D(inner_products, 0.0, MAX);    
+    logQuda(QUDA_VERBOSE, "Chebyshev max %e\n", result);
+    
     // Increase final result by 10% for safety
     return result * 1.10;
   }
@@ -685,37 +665,19 @@ namespace quda
 
     // If size = n_conv, this routine is called post sort
     if (size == n_conv) {
-      // We are computing T problems split across T nodes, so we must do an MPI gather
-      // to display all the data to stdout.
-      int t_size = ortho_dim_size * comm_dim(3);
-      std::vector<Complex> evals_t_all(size * t_size, 0.0);
-      std::vector<double> resid_t_all(size * t_size, 0.0);
+      int t_offset = ortho_dim_size * comm_coord(3);      
       for (int t = 0; t < ortho_dim_size; t++)
         for (int i = 0; i < size; i++) {
-          evals_t_all[(comm_coord(3) * ortho_dim_size + t) * size + i] = evals_t[i][t];
-          resid_t_all[(comm_coord(3) * ortho_dim_size + t) * size + i] = residua_3D[t][i];
-        }
 
-      comm_allreduce_sum(evals_t_all);
-      comm_allreduce_sum(resid_t_all);
-
-      int spatial_comm_vol = 1;
-      for (int i = 0; i < 4; i++)
-        if (i != ortho_dim) spatial_comm_vol *= comm_dim(i);
-
-      for (int t = 0; t < t_size; t++)
-        for (int i = 0; i < size; i++) {
-
-          // scale out the redundant summations
-          evals_t_all[t * size + i] /= spatial_comm_vol;
-          resid_t_all[t * size + i] /= spatial_comm_vol;
-
-          logQuda(QUDA_SUMMARIZE, "Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t, i,
-                  evals_t_all[t * size + i].real(), evals_t_all[t * size + i].imag(), resid_t_all[t * size + i]);
-
+	  // Use printf to get data from t dim only
+	  if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+	    printf("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n",t_offset + t, i,
+		   evals_t[i][t].real(), evals_t[i][t].imag(), residua_3D[t][i]);
+	  }
+	  
           // Transfer evals to eval array
           evals.resize(size * evecs[0].X()[3]);
-          evals[t * size + i] = evals_t_all[t * size + i];
+          evals[t * size + i] = evals_t[i][t];
         }
     }
   }
@@ -734,26 +696,28 @@ namespace quda
     computeEvals3D(mat, kSpace, evals);
   }
 
-  int TRLM3D::getArrayMinMax3D(const std::vector<int> &array, const int limit, const bool min)
+  template <typename T> T TRLM3D::getArrayMinMax3D(const std::vector<T> &array, const T limit, const arrayExtremumType min_max)
   {
-    int ret_val = limit;
-    int spatial_comm_vol = 1;
-    int t_size = comm_dim(ortho_dim) * ortho_dim_size;
-    for (int i = 0; i < 4; i++)
-      if (i != ortho_dim) spatial_comm_vol *= comm_dim(i);
-
-    std::vector<double> all_array(t_size, 0);
-    for (int t = 0; t < ortho_dim_size; t++) all_array[comm_coord(ortho_dim) * ortho_dim_size + t] = array[t];
-
-    comm_allreduce_sum(all_array);
-
-    for (int t = 0; t < t_size; t++) {
-      // scale out the redundant summations
-      all_array[t] /= spatial_comm_vol;
-      if (all_array[t] < ret_val && min) ret_val = all_array[t];
-      if (all_array[t] > ret_val && !min) ret_val = all_array[t];
+    T ret_val = limit;
+    // QUDA reduction done in double, hence copy to double array
+    std::vector<double> array_cpy(array.size(), 0);
+    for (int t = 0; t < ortho_dim_size; t++) array_cpy[t] = array[t];
+    switch (min_max) {
+    case MIN:
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(array_cpy[t] < ret_val) ret_val = array_cpy[t];
+      }
+      comm_allreduce_min(ret_val);
+      break;
+    case MAX:
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(array_cpy[t] > ret_val) ret_val = array_cpy[t];
+      }
+      comm_allreduce_max(ret_val);
+      break;
+    default: errorQuda("Unknown arrayExtremumType %d", min_max);
     }
-
+    
     return ret_val;
   }
 
