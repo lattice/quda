@@ -189,9 +189,6 @@ static TimeProfile profileGaugeObs("gaugeObservablesQuda");
 //!< Profiler for gaugeSmearQuda
 static TimeProfile profileGaugeSmear("gaugeSmearQuda");
 
-//!< Profiler for APEQuda
-static TimeProfile profileAPE("APEQuda");
-
 //!< Profiler for STOUTQuda
 static TimeProfile profileSTOUT("STOUTQuda");
 
