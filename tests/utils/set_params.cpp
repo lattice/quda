@@ -1004,9 +1004,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  // Gauge smear param
-  // setGaugeSmearParam(*inv_param.smear_param);
-
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
