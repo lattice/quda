@@ -198,7 +198,7 @@ int launch_contract_test(const QudaContractType cType, const std::array<int, 4> 
 
   if (nspin == 1) {
     faults = launch_contract_test<Float, 1, src_colors, n_mom>(cType, X, red_size, source_position, mom, fft_type);
-    //} else  if ( nspin == 4 ){
+    //} else  if ( nspin == 4 ){ //TODO : must be enabled when spin=4 case will be re-activated
     // faults = launch_contract_test<Float, 4, src_colors, n_mom>(cType, X, red_size, source_position, mom, fft_type );
   } else {
     errorQuda("Unsupported spin.\n");
