@@ -274,6 +274,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartosz Kostrzewa (HPC/A-Lab, University of Bonn)
 *  Damon McDougall (AMD)
+*  Colin Morningstar (Carnegie Mellon University)
 *  James Osborn (Argonne National Laboratory)
 *  Ferenc Pittler (Cyprus)
 *  Claudio Rebbi (Boston University) 

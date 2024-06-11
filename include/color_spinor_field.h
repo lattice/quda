@@ -183,7 +183,7 @@ namespace quda
               1 :
               4),
       twistFlavor(inv_param.twist_flavor),
-      gammaBasis(inv_param.gamma_basis),
+      gammaBasis(nSpin == 4 ? inv_param.gamma_basis : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
       create(QUDA_REFERENCE_FIELD_CREATE),
       pc_type(inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
       v(V)
@@ -1013,6 +1013,14 @@ namespace quda
   */
   void spinorDilute(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, QudaDilutionType type,
                     const lat_dim_t &local_block = {});
+
+  /**
+     @brief Reweight a color spinor for distance preconditioning
+     @param[out] src The colorspinorfield
+     @param[in] alpha0 The parameter for distance preconditioning, negative value means a inversed reweighting
+     @param[in] t0 The parameter for distance preconditioning
+  */
+  void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0);
 
   /**
      @brief Helper function for determining if the preconditioning

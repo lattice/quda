@@ -7,30 +7,30 @@
 namespace quda
 {
 
-  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<double, 2>> {
+  template <typename store_t_, bool twist_, bool compute_tr_log_>
+  struct CloverInvertArg : public ReduceArg<array<double, 2>> {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
+    static constexpr bool compute_tr_log = compute_tr_log_;
     static constexpr int nColor = 3;
     static constexpr int nSpin = 4;
     // we must disable clover reconstruction when writing the inverse
-    using Clover = typename clover_mapper<store_t, 72, false, false>::type;
+    using Clover = typename clover_mapper<store_t, 72, false, compute_tr_log ? clover::reconstruct() : false>::type;
 
     Clover inverse;
     const Clover clover;
-    bool compute_tr_log;
     real mu2;
     real epsilon2;
     real mu2_minus_epsilon2;
 
-    CloverInvertArg(CloverField &field, bool compute_tr_log) :
+    CloverInvertArg(CloverField &field) :
       ReduceArg<reduce_t>(dim3(field.VolumeCB(), 2, 1)),
       inverse(field, clover::dynamic_inverse() ? false : true), // if dynamic_inverse, then alias to direct term
       clover(field, false),
-      compute_tr_log(compute_tr_log),
       mu2(field.Mu2()),
       epsilon2(field.Epsilon2()),
-      mu2_minus_epsilon2(field.Mu2()-field.Epsilon2())
+      mu2_minus_epsilon2(field.Mu2() - field.Epsilon2())
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
@@ -68,11 +68,12 @@ namespace quda
         linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
 
         // Accumulate trlogA
-        if (arg.compute_tr_log)
-          for (int j = 0; j < N; j++) trLogA += 2.0 * log(cholesky.D(j));
+        for (int j = 0; j < N; j++) trLogA += 2.0 * log(cholesky.D(j));
 
-        Mat Ainv = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
-        arg.inverse(x_cb, parity, ch) = Ainv;
+        if (!Arg::compute_tr_log) {
+          Mat Ainv = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
+          arg.inverse(x_cb, parity, ch) = Ainv;
+        }
       }
 
       reduce_t result{0, 0};

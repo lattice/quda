@@ -22,17 +22,15 @@ namespace quda
   public:
     using Smem::shared_mem_size;
 
-    __device__ __host__ constexpr thread_array() : array_(sharedMem()[target::thread_idx_linear<3>()])
+    template <typename... U>
+    __device__ __host__ constexpr thread_array(const KernelOps<U...> &ops) :
+      Smem(ops), array_(sharedMem()[target::thread_idx_linear<3>()])
     {
-      array_ = array<T, n>(); // call default constructor
+      checkKernelOps<thread_array<T, n, O>>(ops);
+      array_ = array<T, n> {}; // call default constructor
     }
 
-    template <typename... Ts>
-    __device__ __host__ constexpr thread_array(T first, const Ts... other) :
-      array_(sharedMem()[target::thread_idx_linear<3>()])
-    {
-      array_ = array<T, n> {first, other...};
-    }
+    constexpr thread_array(const thread_array<T, n, O> &) = delete;
 
     __device__ __host__ T &operator[](int i) { return array_[i]; }
     __device__ __host__ const T &operator[](int i) const { return array_[i]; }

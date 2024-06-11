@@ -56,7 +56,7 @@ set (QUDA_OBJS
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
-  spinor_noise.cu spinor_dilute.cu
+  spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -95,8 +95,11 @@ set (QUDA_OBJS
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
   dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
-  dslash_wilson_clover_preconditioned.cu 
+  dslash_wilson.cu dslash_wilson_distance.cu
+  dslash_wilson_clover.cu dslash_wilson_clover_distance.cu
+  dslash_wilson_clover_preconditioned.cu
+  dslash_wilson_clover_preconditioned_distance.cu
+  dslash5_domain_wall.cu
   dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
   dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
   dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
