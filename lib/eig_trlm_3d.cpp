@@ -128,40 +128,45 @@ namespace quda
       eigensolveFromArrowMat3D();
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-      // mat_norm is updated.
-      for (int t = 0; t < ortho_dim_size; t++) {
-        if (!converged_3D[t]) {
-          for (int i = num_locked_3D[t]; i < n_kr; i++) {
-            if (fabs(alpha_3D[t][i]) > mat_norm_3D[t]) mat_norm_3D[t] = fabs(alpha_3D[t][i]);
-          }
-        }
-      }
-
+      // mat_norm is updated and used for LR
+      for (int t = 0; t < ortho_dim_size; t++) 
+	for (int i = num_locked_3D[t]; i < n_kr; i++)
+	  if (fabs(alpha_3D[t][i]) > mat_norm_3D[t]) mat_norm_3D[t] = fabs(alpha_3D[t][i]);
+      
+      // Lambda that returns mat_norm for LR and returns the relevant alpha
+      // (the corresponding Ritz value) for SR
+      auto check_norm = [&](double sr_norm, int t) -> double {
+        if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+          return mat_norm_3D[t];
+        else
+          return sr_norm;
+      };
+      
       // Locking check
       for (int t = 0; t < ortho_dim_size; t++) {
         if (!converged_3D[t]) {
           iter_locked_3D[t] = 0;
           for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
-            if (residua_3D[t][i + num_locked_3D[t]] < epsilon * mat_norm_3D[t]) {
-              logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i,
-                      residua_3D[t][i + num_locked_3D[t]], epsilon * mat_norm_3D[t]);
-              iter_locked_3D[t] = i;
-            } else {
-              // Unlikely to find new locked pairs
-              break;
-            }
-          }
-        }
+            if (residua_3D[t][i + num_locked_3D[t]] < epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
+	      logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i,
+		      residua_3D[t][i + num_locked_3D[t]], epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
+	      iter_locked_3D[t] = i;
+	    } else {
+	      // Unlikely to find new locked pairs
+	      break;
+	    }
+	  }
+	}
       }
-
+      
       // Convergence check
       for (int t = 0; t < ortho_dim_size; t++) {
         if (!converged_3D[t]) {
           iter_converged_3D[t] = iter_locked_3D[t];
           for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
-            if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
+            if (residua_3D[t][i + num_locked_3D[t]] < tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i,
-                      residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
+                      residua_3D[t][i + num_locked_3D[t]], tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
               iter_converged_3D[t] = i;
             } else {
               // Unlikely to find new converged pairs
@@ -170,7 +175,7 @@ namespace quda
           }
         }
       }
-
+      
       for (int t = 0; t < ortho_dim_size; t++) {
         if (!converged_3D[t])
           iter_keep_3D[t]
