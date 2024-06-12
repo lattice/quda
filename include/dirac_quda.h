@@ -1965,7 +1965,7 @@ public:
       @param[in] use_mma If the MMA option is turned on
       @return Whether or not we should apply MMA for the coarse dslash
      */
-    static bool apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma);
+    static bool apply_mma(cvector_ref<ColorSpinorField> &f, bool use_mma);
   };
 
   /**

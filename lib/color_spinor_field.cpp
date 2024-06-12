@@ -1052,8 +1052,8 @@ namespace quda
       }
     }
 
-    PackGhost(packBuffer, *this, in.size() == 0 ? *this : in, location_label,
-              nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
+    cvector_ref<const ColorSpinorField> tmp(*this);
+    PackGhost(packBuffer, *this, in.size() > 0 ? in : tmp, location_label, nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
   }
 
   void ColorSpinorField::pack(int nFace, int parity, int dagger, const qudaStream_t &stream,
