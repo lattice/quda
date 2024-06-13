@@ -19,21 +19,21 @@ namespace quda
     real a; /** this is the Wilson-dslash scale factor */
     real b; /** this is the chiral twist factor */
     real c; /** this is the flavor twist factor */
-    
+
     NdegTwistedCloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                         const ColorSpinorField &halo, const GaugeField &U,
-                         const CloverField &A, double a, double b, double c,
-                         cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
+                         const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a, double b,
+                         double c, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                         const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       // if dagger flip the chiral twist
-      // factor of 1/2 comes from clover normalization 
+      // factor of 1/2 comes from clover normalization
       b(dagger ? -0.5 * b : 0.5 * b),
       c(c)
-      {
-        checkPrecision(U, A);
-        checkLocation(U, A);
+    {
+      checkPrecision(U, A);
+      checkLocation(U, A);
       }
   };
   
@@ -55,7 +55,7 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
-      
+
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
 

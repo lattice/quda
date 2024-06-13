@@ -23,37 +23,31 @@ namespace quda
   {
     using Dslash = Dslash<staggered_qsmear, Arg>;
     using Dslash::arg;
-    using Dslash::in;
     using Dslash::halo;
+    using Dslash::in;
 
   public:
     StaggeredQSmear(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                    const ColorSpinorField &halo) : Dslash(arg, out, in, halo)
+                    const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
     {
     }
 
     void apply(const qudaStream_t &stream) override
     {
       if (arg.is_t0_kernel) {
-        arg.exterior_threads = 2 * (halo.GhostFaceCB()[0] + halo.GhostFaceCB()[1] +
-                                    halo.GhostFaceCB()[2] + halo.GhostFaceCB()[3])
+        arg.exterior_threads = 2
+          * (halo.GhostFaceCB()[0] + halo.GhostFaceCB()[1] + halo.GhostFaceCB()[2] + halo.GhostFaceCB()[3])
           / (in.X(3) * in.size());
         switch (arg.kernel_type) {
         case EXTERIOR_KERNEL_X:
         case EXTERIOR_KERNEL_Y:
         case EXTERIOR_KERNEL_Z:
-        case EXTERIOR_KERNEL_T:
-          arg.threads = 2 * halo.GhostFaceCB()[arg.kernel_type] / (in.X(3) * in.size());
-          break;
-        case EXTERIOR_KERNEL_ALL:
-          arg.threads = arg.exterior_threads;
-          break;
+        case EXTERIOR_KERNEL_T: arg.threads = 2 * halo.GhostFaceCB()[arg.kernel_type] / (in.X(3) * in.size()); break;
+        case EXTERIOR_KERNEL_ALL: arg.threads = arg.exterior_threads; break;
         case INTERIOR_KERNEL:
-        case UBER_KERNEL:
-          arg.threads = in.VolumeCB() / in.X(3);
-          break;
-         default:
-           errorQuda("Unexpected kernel type %d", arg.kernel_type);
+        case UBER_KERNEL: arg.threads = in.VolumeCB() / in.X(3); break;
+        default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
         }
       }
 
@@ -113,9 +107,8 @@ namespace quda
     virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      int spinor_bytes
-        = 2 * in.Ncolor() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
-      int ghost_bytes = (spinor_bytes + gauge_bytes) + 2 * spinor_bytes; // 2 since we have to load the partial
+      int spinor_bytes = 2 * in.Ncolor() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int ghost_bytes = (spinor_bytes + gauge_bytes) + 2 * spinor_bytes;      // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
       int pack_bytes = 2 * 2 * in.Ncolor() * in.Precision();
 
@@ -202,8 +195,8 @@ namespace quda
         constexpr int nSpin = 1;
 
         auto halo = ColorSpinorField::create_comms_batch(in);
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, t0, is_tslice_kernel,
-                                                                  parity, dir, dagger, comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity, dir,
+                                                                  dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, in, halo, profile);
       } else {
@@ -213,14 +206,16 @@ namespace quda
   };
 
   // Apply the StaggeredQSmear operator
-  void ApplyStaggeredQSmear(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U, int t0,
-                            bool is_tslice_kernel, int parity, int dir, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyStaggeredQSmear(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            const GaugeField &U, int t0, bool is_tslice_kernel, int parity, int dir, bool dagger,
+                            const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
       // Local lattice size should be bigger than or equal to 6 in every partitioned direction.
       for (int i = 0; i < 4; i++) {
         if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
-          errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in two-link Gaussian smearing");
+          errorQuda(
+            "ERROR: partitioned dimension with local size less than 6 is not supported in two-link Gaussian smearing");
         }
       }
       instantiate<StaggeredQSmearApply>(out, in, in, U, t0, is_tslice_kernel, parity, dir, dagger, comm_override,

@@ -10,13 +10,13 @@ namespace quda
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
   struct DomainWall5DArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     typedef typename mapper<Float>::type real;
-    int_fastdiv Ls;   /** fifth dimension length */
+    int_fastdiv Ls; /** fifth dimension length */
     real a;   /** xpay scale factor */
     real m_f; /** fermion mass parameter */
 
-    DomainWall5DArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-                    const GaugeField &U, double a, double m_f, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity,
-                    bool dagger, const int *comm_override) :
+    DomainWall5DArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                    const ColorSpinorField &halo, const GaugeField &U, double a, double m_f, bool xpay,
+                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
       Ls(in.X(4)),
       a(a),
@@ -44,7 +44,8 @@ namespace quda
 
       int src_idx = src_s / arg.Ls;
       int s = src_s % arg.Ls;
-      int idx = s * (mykernel_type == EXTERIOR_KERNEL_ALL ? arg.exterior_threads : arg.threads) + x4; // 5-d checkerboard index
+      int idx = s * (mykernel_type == EXTERIOR_KERNEL_ALL ? arg.exterior_threads : arg.threads)
+        + x4; // 5-d checkerboard index
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trivial for fused kernel only)

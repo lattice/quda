@@ -398,8 +398,7 @@ struct StaggeredGSmearTestWrapper { //
 
     for (int dir = 0; dir < 4; ++dir) {
       double deviation_per_dir
-        = compare_floats_v2(qdp_twolnk[dir], qdp_ref_twolnk[dir], V * gauge_site_size,
-                            1e-3, gauge_param.cpu_prec);
+        = compare_floats_v2(qdp_twolnk[dir], qdp_ref_twolnk[dir], V * gauge_site_size, 1e-3, gauge_param.cpu_prec);
       deviation = std::max(deviation, deviation_per_dir);
     }
 

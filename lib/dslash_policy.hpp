@@ -108,7 +108,7 @@ namespace quda
 #define PROFILE(f, profile, idx)		\
   profile.TPSTART(idx);				\
   f;						\
-  profile.TPSTOP(idx); 
+  profile.TPSTOP(idx);
 #define PROFILE_START(idx) profile.TPSTART(idx);
 #define PROFILE_STOP(idx) profile.TPSTOP(idx);
 #else
@@ -287,7 +287,6 @@ namespace quda
           PROFILE(if (dslash_copy) halo.scatter(2 * dim + dir, device::get_stream(scatterIndex)), profile,
                   QUDA_PROFILE_SCATTER);
         }
-
       }
 
     }
@@ -464,7 +463,8 @@ namespace quda
   template <typename Dslash, int shmem> struct DslashShmemGeneric : DslashPolicyImp<Dslash> {
 
 #ifdef NVSHMEM_COMMS
-    void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo, TimeProfile &profile)
+    void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+                    TimeProfile &profile)
     {
       PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
@@ -481,7 +481,9 @@ namespace quda
       const int packIndex = device::get_default_stream_idx();
       constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
 
-      if (!((shmem & 2) and (shmem & 1))) { issuePack(halo, in, dslash, 1 - dslashParam.parity, location, packIndex, shmem); }
+      if (!((shmem & 2) and (shmem & 1))) {
+        issuePack(halo, in, dslash, 1 - dslashParam.parity, location, packIndex, shmem);
+      }
 
       dslash.setPack(((shmem & 2) or (shmem & 1)), location); // enable fused kernel packing
 

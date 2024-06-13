@@ -117,7 +117,7 @@ namespace quda {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       if (nFace == 1) {
         computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 0, coeff, nFace);
-        double coeff_[2] = {-coeff[0],0.0}; // need to multiply by -1 on odd sites
+        double coeff_[2] = {-coeff[0], 0.0}; // need to multiply by -1 on odd sites
         computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 1, coeff_, nFace);
       } else if (nFace == 3) {
         computeStaggeredOprod(*out[0], *out[1], in.Even(), in.Odd(), 0, coeff, nFace);

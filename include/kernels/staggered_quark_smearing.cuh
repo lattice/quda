@@ -34,8 +34,8 @@ namespace quda
 
     F out[MAX_MULTI_RHS]; /** output vector field */
     F in[MAX_MULTI_RHS];  /** input vector field */
-    Ghost halo_pack;  /** input vector field used in packing to be able to independently resetGhost */
-    Ghost halo;       /** input vector field used in packing to be able to independently resetGhost */
+    Ghost halo_pack;      /** input vector field used in packing to be able to independently resetGhost */
+    Ghost halo;           /** input vector field used in packing to be able to independently resetGhost */
     const G U;       /** the gauge field */
     int dir;         /** The direction from which to omit the derivative */
     int t0;

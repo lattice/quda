@@ -24,8 +24,8 @@ namespace quda {
 
     static constexpr bool dagger = dagger_;
 
-    F out[MAX_MULTI_RHS];    /** output vector field */
-    F in[MAX_MULTI_RHS];     /** input vector field */
+    F out[MAX_MULTI_RHS]; /** output vector field */
+    F in[MAX_MULTI_RHS];  /** input vector field */
     const X xInv;        /** Kahler-Dirac inverse gauge field */
     int_fastdiv X0h;     /** One-half of X dimension length */
     int_fastdiv dim[4];  /** full lattice dimensions */

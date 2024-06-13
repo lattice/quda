@@ -16,8 +16,8 @@ namespace quda {
     constexpr static int nColor = nColor_;
     using F = typename colorspinor_mapper<Float, 4, nColor, false, false, true>::type;
 
-    F out[MAX_MULTI_RHS];      // output vector field
-    F in[MAX_MULTI_RHS];      // input vector field
+    F out[MAX_MULTI_RHS]; // output vector field
+    F in[MAX_MULTI_RHS];  // input vector field
     const int d;          // which gamma matrix are we applying
     const int nParity;    // number of parities we're working on
     const bool doublet;   // whether we applying the operator to a doublet
@@ -27,13 +27,17 @@ namespace quda {
     real b;               // chiral twist
     real c;               // flavor twist
 
-    GammaArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d,
-	     real kappa = 0.0, real mu = 0.0, real epsilon = 0.0,
-	     bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
-      d(d), nParity(in.SiteSubset()),
+    GammaArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, real kappa = 0.0,
+             real mu = 0.0, real epsilon = 0.0, bool dagger = false,
+             QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
+      d(d),
+      nParity(in.SiteSubset()),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       n_flavor(doublet ? 2 : 1),
-      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
+      volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB()),
+      a(0.0),
+      b(0.0),
+      c(0.0)
     {
       for (auto i = 0u; i < in.size(); i++) {
         this->in[i] = in[i];
@@ -128,8 +132,8 @@ namespace quda {
     constexpr static int nColor = nColor_;
     typedef typename colorspinor_mapper<Float, 4, nColor>::type F;
 
-    F out[MAX_MULTI_RHS];      // output vector field
-    F in[MAX_MULTI_RHS];      // input vector field
+    F out[MAX_MULTI_RHS]; // output vector field
+    F in[MAX_MULTI_RHS];  // input vector field
     const int d;        // which gamma matrix are we applying
     const int nParity;  // number of parities we're working on
     bool doublet;       // whether we applying the operator to a doublet

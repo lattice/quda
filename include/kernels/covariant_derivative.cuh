@@ -32,16 +32,15 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    F out[MAX_MULTI_RHS];      /** output vector field */
-    F in[MAX_MULTI_RHS]; /** input vector field */
+    F out[MAX_MULTI_RHS];  /** output vector field */
+    F in[MAX_MULTI_RHS];   /** input vector field */
     const Ghost halo_pack; /** accessor for writing the halo field */
     const Ghost halo;      /** accessor for reading the halo field */
     const G U;  /** the gauge field */
     int mu;     /** The direction in which to apply the derivative */
 
     CovDevArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-              const GaugeField &U, int mu, int parity, bool dagger,
-              const int *comm_override) :
+              const GaugeField &U, int mu, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, 1, spin_project, comm_override),
       halo_pack(halo),
       halo(halo),
@@ -69,8 +68,8 @@ namespace quda
 
   */
   template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyCovDev(Vector &out, const Arg &arg, Coord &coord, int parity,
-                                              int, int thread_dim, bool &active, int src_idx)
+  __device__ __host__ inline void applyCovDev(Vector &out, const Arg &arg, Coord &coord, int parity, int,
+                                              int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -146,14 +145,30 @@ namespace quda
       Vector out;
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
-      case 0: applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 1: applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 2: applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 3: applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 4: applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 5: applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 6: applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
-      case 7: applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 0:
+        applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 1:
+        applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 2:
+        applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 3:
+        applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 4:
+        applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 5:
+        applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 6:
+        applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 7:
+        applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
       }
 
       if (mykernel_type != INTERIOR_KERNEL && active) {

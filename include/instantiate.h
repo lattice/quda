@@ -298,13 +298,13 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int> class Apply, typename O, typename I, typename... Args>
-  constexpr void instantiate_recurse2(cvector_ref<O> &out, cvector_ref<I> &in, Args &&... args)
+  constexpr void instantiate_recurse2(cvector_ref<O> &out, cvector_ref<I> &in, Args &&...args)
   {
     if (in.size() > get_max_multi_rhs()) {
-      instantiate_recurse2<Apply>(cvector_ref<O>{out.begin(), out.begin() + out.size() / 2},
-                                  cvector_ref<I>{in.begin(), in.begin() + in.size() / 2}, args...);
-      instantiate_recurse2<Apply>(cvector_ref<O>{out.begin() + out.size() / 2, out.end()},
-                                  cvector_ref<I>{in.begin() + in.size() / 2, in.end()}, args...);
+      instantiate_recurse2<Apply>(cvector_ref<O> {out.begin(), out.begin() + out.size() / 2},
+                                  cvector_ref<I> {in.begin(), in.begin() + in.size() / 2}, args...);
+      instantiate_recurse2<Apply>(cvector_ref<O> {out.begin() + out.size() / 2, out.end()},
+                                  cvector_ref<I> {in.begin() + in.size() / 2, in.end()}, args...);
       return;
     }
     instantiate<Apply>(out, in, args...);
@@ -322,15 +322,15 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int> class Apply, typename O, typename I, typename X, typename... Args>
-  constexpr void instantiate_recurse3(cvector_ref<O> &out, cvector_ref<I> &in, cvector_ref<X> &x, Args &&... args)
+  constexpr void instantiate_recurse3(cvector_ref<O> &out, cvector_ref<I> &in, cvector_ref<X> &x, Args &&...args)
   {
     if (in.size() > get_max_multi_rhs()) {
-      instantiate_recurse3<Apply>(cvector_ref<O>{out.begin(), out.begin() + out.size() / 2},
-                                  cvector_ref<I>{in.begin(), in.begin() + in.size() / 2},
-                                  cvector_ref<X>{x.begin(), x.begin() + x.size() / 2}, args...);
-      instantiate_recurse3<Apply>(cvector_ref<O>{out.begin() + out.size() / 2, out.end()},
-                                  cvector_ref<I>{in.begin() + in.size() / 2, in.end()},
-                                  cvector_ref<X>{x.begin() + x.size() / 2, x.end()}, args...);
+      instantiate_recurse3<Apply>(cvector_ref<O> {out.begin(), out.begin() + out.size() / 2},
+                                  cvector_ref<I> {in.begin(), in.begin() + in.size() / 2},
+                                  cvector_ref<X> {x.begin(), x.begin() + x.size() / 2}, args...);
+      instantiate_recurse3<Apply>(cvector_ref<O> {out.begin() + out.size() / 2, out.end()},
+                                  cvector_ref<I> {in.begin() + in.size() / 2, in.end()},
+                                  cvector_ref<X> {x.begin() + x.size() / 2, x.end()}, args...);
       return;
     }
     instantiate<Apply>(out, in, x, args...);
@@ -545,10 +545,7 @@ namespace quda
      @tparam dslash_type The dslash_type requested
      @return True if enabled, false if not
   */
-  template <QudaDslashType dslash_type> constexpr bool is_enabled()
-  {
-    return false;
-  }
+  template <QudaDslashType dslash_type> constexpr bool is_enabled() { return false; }
 #ifdef GPU_WILSON_DIRAC
   template <> constexpr bool is_enabled<QUDA_WILSON_DSLASH>() { return true; }
 #endif

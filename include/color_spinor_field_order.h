@@ -1235,7 +1235,7 @@ namespace quda
         real v[length];
 #ifndef LEGACY_ACCESSOR_NORM
         auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
-        auto norm = reinterpret_cast<float*>(field + volumeCB * (2 * Nc * Ns));
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
 #endif
         norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
@@ -1257,7 +1257,7 @@ namespace quda
         real v[length];
 #ifndef LEGACY_ACCESSOR_NORM
         auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
-        auto norm = reinterpret_cast<float*>(field + volumeCB * (2 * Nc * Ns));
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
 #endif
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {

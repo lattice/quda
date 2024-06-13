@@ -32,9 +32,9 @@ namespace quda
       using F = typename colorspinor_mapper<storage_type, 4, nColor, false, false, true>::type;
       using real = typename mapper<storage_type>::type;
 
-      F out[MAX_MULTI_RHS];                  // output vector field
-      F in[MAX_MULTI_RHS];             // input vector field
-      F x[MAX_MULTI_RHS];              // auxiliary input vector field
+      F out[MAX_MULTI_RHS];   // output vector field
+      F in[MAX_MULTI_RHS];    // input vector field
+      F x[MAX_MULTI_RHS];     // auxiliary input vector field
       const int nParity;      // number of parities we're working on
       const int volume_cb;    // checkerboarded volume
       const int volume_4d_cb; // 4-d checkerboarded volume
@@ -52,9 +52,10 @@ namespace quda
 
       eofa_coeff<real> coeff;
 
-      Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-                 const double m_f_, const double m_5_, const Complex */*b_5_*/, const Complex */*c_5_*/, double a_, double inv_, double kappa_,
-                 const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
+      Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 cvector_ref<const ColorSpinorField> &x, const double m_f_, const double m_5_, const Complex * /*b_5_*/,
+                 const Complex * /*c_5_*/, double a_, double inv_, double kappa_, const double *eofa_u,
+                 const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
         kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
         nParity(in.SiteSubset()),
         volume_cb(in.VolumeCB()),

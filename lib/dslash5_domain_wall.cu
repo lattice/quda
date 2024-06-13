@@ -54,9 +54,7 @@ namespace quda
       size_t bytes = 0u;
       switch (type) {
       case Dslash5Type::DSLASH5_DWF: bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
-      case Dslash5Type::DSLASH5_MOBIUS_PRE:
-        bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
-        break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
       case Dslash5Type::DSLASH5_MOBIUS: bytes = out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
       case Dslash5Type::M5_INV_DWF: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;
       case Dslash5Type::M5_INV_MOBIUS: bytes = out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0); break;

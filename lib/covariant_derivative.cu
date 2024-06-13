@@ -135,8 +135,8 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct CovDevApply {
 
     CovDevApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                cvector_ref<const ColorSpinorField> &,  const GaugeField &U,
-                int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                cvector_ref<const ColorSpinorField> &, const GaugeField &U, int mu, int parity, bool dagger,
+                const int *comm_override, TimeProfile &profile)
 
     {
       constexpr int nDim = 4;

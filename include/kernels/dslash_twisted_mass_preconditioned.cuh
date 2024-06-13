@@ -71,7 +71,8 @@ namespace quda
             idx;
 
           Link U = arg.U(d, coord.x_cb, parity);
-          HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
+                                         their_spinor_parity);
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
@@ -107,7 +108,8 @@ namespace quda
             idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
-          HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
+                                         their_spinor_parity);
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {

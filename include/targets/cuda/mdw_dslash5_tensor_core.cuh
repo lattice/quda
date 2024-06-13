@@ -304,7 +304,7 @@ namespace quda
       }
     }
 
-    auto norm = reinterpret_cast<float*>(output.field + output.volumeCB * 24);
+    auto norm = reinterpret_cast<float *>(output.field + output.volumeCB * 24);
     norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<storage_type>::value;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));

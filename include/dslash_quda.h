@@ -856,8 +856,8 @@ namespace quda
      @param[in] profile Timer used to profile operator application
   */
   void ApplyStaggeredQSmear(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            const GaugeField &U, int t0, bool compute_time_slice, int parity, int dir,
-                            bool dagger, const int *comm_override, TimeProfile &profile);
+                            const GaugeField &U, int t0, bool compute_time_slice, int parity, int dir, bool dagger,
+                            const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Apply the (improved) staggered Kahler-Dirac inverse block to a color-spinor field.
@@ -880,8 +880,8 @@ namespace quda
      @param[in] dagger Whether we are applying the dagger or not
      @param[in] twist The type of kernel we are doing
   */
-  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa, double mu,
-		       double epsilon, int dagger, QudaTwistGamma5Type type);
+  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
+                       double mu, double epsilon, int dagger, QudaTwistGamma5Type type);
 
   /**
      @brief Apply twisted clover-matrix field to a color-spinor field

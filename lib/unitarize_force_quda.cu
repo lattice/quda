@@ -60,8 +60,7 @@ namespace quda {
         checkReconstruct(u, oldForce, newForce);
         checkPrecision(u, oldForce, newForce);
 
-        if (!u.isNative() || !oldForce.isNative() || !newForce.isNative())
-          errorQuda("Only native order supported");
+        if (!u.isNative() || !oldForce.isNative() || !newForce.isNative()) errorQuda("Only native order supported");
 
         instantiate<ForceUnitarize, ReconstructNone>(newForce, oldForce, u, fails);
         getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -118,7 +117,7 @@ namespace quda {
               newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
               svd_rel_error, svd_abs_error);
             unitarizeForceCPU<double>(arg);
-        } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+          } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
             UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
               newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
               svd_rel_error, svd_abs_error);

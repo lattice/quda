@@ -35,9 +35,9 @@ namespace quda
     typedef typename mapper<Float>::type real;
 
     const int_fastdiv n_src;
-    F out[MAX_MULTI_RHS];     /** output vector field set */
-    F in[MAX_MULTI_RHS];      /** input vector field set */
-    F x[MAX_MULTI_RHS];       /** input vector set when doing xpay */
+    F out[MAX_MULTI_RHS]; /** output vector field set */
+    F in[MAX_MULTI_RHS];  /** input vector field set */
+    F x[MAX_MULTI_RHS];   /** input vector set when doing xpay */
     Ghost halo_pack;
     Ghost halo;
     const G U;    /** the gauge field */
@@ -49,9 +49,10 @@ namespace quda
     const int comm_dim_dim_3;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-              const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x,
-              int parity, bool dagger, const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
-      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
+              const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+              const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
+                             comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -81,8 +82,8 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active,
-                                              int src_idx)
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
+                                              int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -94,8 +95,10 @@ namespace quda
 
     const int t = arg.comm_coord_dim_3 + coord[3];
     const int nt = arg.comm_dim_dim_3;
-    real fwd_coeff_3 = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
-    real bwd_coeff_3 = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
+    real fwd_coeff_3
+      = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
+    real bwd_coeff_3
+      = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -114,7 +117,8 @@ namespace quda
             ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
+                                         their_spinor_parity);
 
           out += fwd_coeff * (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
@@ -141,7 +145,8 @@ namespace quda
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
-          HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
+                                         their_spinor_parity);
 
           out += bwd_coeff * (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {

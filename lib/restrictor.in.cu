@@ -116,7 +116,10 @@ namespace quda {
       param.aux.x = 2; // swizzle factor
     }
 
-    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB(); }
+    long long flops() const
+    {
+      return out.size() * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB();
+    }
 
     long long bytes() const
     {
@@ -211,10 +214,12 @@ namespace quda {
   {
     if constexpr (is_enabled_multigrid()) {
       if (in.size() > get_max_multi_rhs()) {
-        Restrict<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                                         v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-        Restrict<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                                         v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        Restrict<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2},
+                                         {in.begin(), in.begin() + in.size() / 2}, v, fine_to_coarse, coarse_to_fine,
+                                         spin_map, parity);
+        Restrict<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()},
+                                         {in.begin() + in.size() / 2, in.end()}, v, fine_to_coarse, coarse_to_fine,
+                                         spin_map, parity);
         return;
       }
 

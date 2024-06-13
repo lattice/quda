@@ -981,7 +981,8 @@ namespace quda
      @param[in] v Vector fields to batch into ghost (if v.size() > 0)
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                        MemoryLocation *destination = nullptr, int shmem = 0, cvector_ref<const ColorSpinorField> &v = {});
+                        MemoryLocation *destination = nullptr, int shmem = 0,
+                        cvector_ref<const ColorSpinorField> &v = {});
 
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)
@@ -1095,8 +1096,7 @@ namespace quda
      @param[in] b Input field
      @return If length is unique return the length
    */
-  template <class T, class U>
-  inline int Length_(const char *func, const char *file, int line, const T &a, const U &b)
+  template <class T, class U> inline int Length_(const char *func, const char *file, int line, const T &a, const U &b)
   {
     int length = 0;
     if (a.Length() == b.Length())
@@ -1114,7 +1114,7 @@ namespace quda
      @return If length is unique return the length
    */
   template <class T, class U, typename... Args>
-  inline int Length_(const char *func, const char *file, int line, const T &a, const U&b, const Args &...args)
+  inline int Length_(const char *func, const char *file, int line, const T &a, const U &b, const Args &...args)
   {
     return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
   }
