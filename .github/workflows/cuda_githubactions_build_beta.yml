@@ -1,0 +1,66 @@
+name: cuda_ghactions_build_ubuntu24.04
+
+on:
+  pull_request:
+    branches: [ "develop" ]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  BUILD_TYPE: STRICT
+  CCACHE_COMPILERCHECK: content
+
+jobs:
+    build:
+      strategy:
+        matrix:
+          compiler: [g++-13, clang++-17]
+      runs-on: ubuntu-24.04
+
+      steps:
+      - name: Install software
+        run: |
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
+          sudo dpkg -i cuda-keyring_1.0-1_all.deb
+          sudo apt-get update -y
+          # Note CUDA 12.5 does not officially support Ubnutu 24.04
+          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
+      
+      # currently deactivated as it cuased build errors - maybe put in again later
+      # - uses: awalsh128/cache-apt-pkgs-action@latest
+      #   with:
+      #     packages: cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
+      #     execute_install_scripts: true
+
+      - uses: actions/checkout@v4
+
+      - name: Ccache for gh actions
+        uses: hendrikmuhs/ccache-action@v1.2.13
+        with:
+          key: ${{ github.job }}-${{ matrix.compiler }}
+          max-size: 2000M
+
+      - name: Configure CMake
+        run: >
+          cmake 
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.5/bin/nvcc
+          -DCMAKE_CXX_COMPILER=${{matrix.compiler}}
+          -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DQUDA_GPU_ARCH=sm_90 -DQUDA_GPU_ARCH_SUFFIX=virtual -DQUDA_JITIFY=OFF
+          -DQUDA_MULTIGRID=ON
+          -DQUDA_MULTIGRID_NVEC_LIST=24
+          -DQUDA_MDW_FUSED_LS_LIST=4
+          -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON 
+          -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON
+          -GNinja
+          -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build
+
+      - name: Install
+        run: cmake --install ${{github.workspace}}/build 
+
