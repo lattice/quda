@@ -109,8 +109,12 @@ namespace quda
   profile.TPSTART(idx);				\
   f;						\
   profile.TPSTOP(idx); 
+#define PROFILE_START(idx) profile.TPSTART(idx);
+#define PROFILE_STOP(idx) profile.TPSTOP(idx);
 #else
 #define PROFILE(f, profile, idx) f;
+#define PROFILE_START(profile, idx) (void)profile;
+#define PROFILE_STOP(profile, idx)
 #endif
 
 
@@ -364,7 +368,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = halo.getDslashConstant().volume_4d_cb;
@@ -441,7 +445,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -462,7 +466,7 @@ namespace quda
 #ifdef NVSHMEM_COMMS
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo, TimeProfile &profile)
     {
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       setFusedParam(dslashParam, dslash, halo);
@@ -495,7 +499,7 @@ namespace quda
 
       dslash::inc_dslash_shmem_sync_counter();
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
 #else
     void operator()(Dslash &, cvector_ref<const ColorSpinorField> &, const ColorSpinorField &, TimeProfile &)
@@ -518,8 +522,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -591,7 +594,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -603,8 +606,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -674,7 +676,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -686,8 +688,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -751,7 +752,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -763,8 +764,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -830,7 +830,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -842,8 +842,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -904,7 +903,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -917,8 +916,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1008,7 +1006,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1021,8 +1019,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1105,7 +1102,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1117,8 +1114,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1197,7 +1193,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1210,8 +1206,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1284,7 +1279,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1297,8 +1292,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1377,7 +1371,7 @@ namespace quda
       }
 
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1390,8 +1384,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1465,7 +1458,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1479,8 +1472,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1559,7 +1551,7 @@ namespace quda
       }
 
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
@@ -1574,7 +1566,7 @@ namespace quda
     void operator()(Dslash &dslash, cvector_ref<const ColorSpinorField> &, const ColorSpinorField &halo,
                     TimeProfile &profile)
     {
-      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      PROFILE_START(profile, QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1647,7 +1639,7 @@ namespace quda
 
       completeDslash(halo, dslashParam);
       halo.bufferIndex = (1 - halo.bufferIndex);
-      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+      PROFILE_STOP(profile, QUDA_PROFILE_TOTAL);
     }
   };
 
