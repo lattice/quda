@@ -237,7 +237,7 @@ namespace quda
       // additional limit since there's diminished benefit past a certain point
       constexpr auto max_nyw = 128lu;
 
-      return std::min({arg_nyw, coeff_nyw, max_nyw});
+      return std::min(arg_nyw, std::min(coeff_nyw, max_nyw));
     }
 
     /**
@@ -292,7 +292,7 @@ namespace quda
       // additional limit since there's diminished benefit past a certain point
       constexpr auto max_nyw = 128lu;
 
-      return std::min({arg_nyw, coeff_nyw, max_nyw});
+      return std::min(arg_nyw, std::min(coeff_nyw, max_nyw));
     }
 
     /**
