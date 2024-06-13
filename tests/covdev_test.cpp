@@ -46,7 +46,7 @@ const int nColor = 3;
 
 void init(int argc, char **argv)
 {
-  if(test_type != 0 and test_type != 1)	errorQuda("Test type %d is not supported", test_type);
+  if (test_type != 0 and test_type != 1) errorQuda("Test type %d is not supported", test_type);
 
   initQuda(device_ordinal);
 
