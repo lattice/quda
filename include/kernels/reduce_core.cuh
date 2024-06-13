@@ -219,8 +219,8 @@ namespace quda
     struct axpbyzNorm2 : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1, 1, 0> read{ };
       static constexpr memory_access<0, 0, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
       axpbyzNorm2(cvector<double> &a, cvector<double> &b)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -245,7 +245,7 @@ namespace quda
     struct AxpyReDot : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      real a[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
       AxpyReDot(cvector<double> &a, cvector<double> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -269,8 +269,8 @@ namespace quda
     struct caxpyNorm2 : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       caxpyNorm2(cvector<Complex> &a, cvector<Complex> &b)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -298,8 +298,8 @@ namespace quda
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1, 1, 0> read{ };
       static constexpr memory_access<1, 0, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       cabxpyzaxnorm(cvector<Complex> &a, cvector<Complex> &b)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i].real();
@@ -354,7 +354,7 @@ namespace quda
       using reduce_t = array<real_reduce_t, 2>;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
       caxpydotzy(cvector<Complex> &a, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -420,8 +420,8 @@ namespace quda
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr memory_access<1, 1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       caxpbypzYmbwcDotProductUYNormY_(cvector<Complex> &a, cvector<Complex> &b)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -452,7 +452,7 @@ namespace quda
       using reduce_t = array<real_reduce_t, 2>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      real a[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
       axpyCGNorm2(cvector<double> &a, cvector<double> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -605,7 +605,7 @@ namespace quda
     struct quadrupleCG3InitNorm_ : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1, 1, 0, 0, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
-      real a[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
       quadrupleCG3InitNorm_(cvector<double> &a, cvector<double> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -639,8 +639,8 @@ namespace quda
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<reduce_t> {
       static constexpr memory_access<1, 1, 1, 1, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
       quadrupleCG3UpdateNorm_(cvector<double> &a, cvector<double> &b)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];

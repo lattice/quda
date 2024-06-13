@@ -95,8 +95,8 @@ namespace quda
     template <typename real> struct axpbyz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 0, 0, 0> read{ };
       static constexpr memory_access<0, 0, 0, 0, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
 
       axpbyz_(cvector<double> &a, cvector<double> &b, cvector<double> &)
       {
@@ -118,7 +118,7 @@ namespace quda
     template <typename real> struct axy_ : public BlasFunctor {
       static constexpr memory_access<1, 0> read{ };
       static constexpr memory_access<0, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
       axy_(cvector<Complex> &a, cvector<Complex> &, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -138,7 +138,7 @@ namespace quda
     template <typename real> struct caxpy_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
       caxpy_(cvector<Complex> &a, cvector<Complex> &, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -173,8 +173,8 @@ namespace quda
     template <typename real> struct caxpby_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       caxpby_(cvector<Complex> &a, cvector<Complex> &b, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -194,9 +194,9 @@ namespace quda
     template <typename real> struct axpbypczw_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
-      real c[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+      real c[MAX_MULTI_RHS] = {};
       axpbypczw_(cvector<double> &a, cvector<double> &b, cvector<double> &c)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -217,9 +217,9 @@ namespace quda
     template <typename real> struct axpyBzpcx_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
-      real c[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
+      real c[MAX_MULTI_RHS] = {};
       axpyBzpcx_(cvector<double> &a, cvector<double> &b, cvector<double> &c)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -243,8 +243,8 @@ namespace quda
     template <typename real> struct axpyZpbx_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
       axpyZpbx_(cvector<double> &a, cvector<double> &b, cvector<double> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -267,8 +267,8 @@ namespace quda
     template <typename real> struct cxpaypbz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       cxpaypbz_(cvector<Complex> &a, cvector<Complex> &b, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -291,8 +291,8 @@ namespace quda
     template <typename real> struct caxpyBzpx_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       caxpyBzpx_(cvector<Complex> &a, cvector<Complex> &b, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -315,8 +315,8 @@ namespace quda
     template <typename real> struct caxpyBxpz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       caxpyBxpz_(cvector<Complex> &a, cvector<Complex> &b, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -339,8 +339,8 @@ namespace quda
     template <typename real> struct caxpbypzYmbw_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       caxpbypzYmbw_(cvector<Complex> &a, cvector<Complex> &b, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -364,8 +364,8 @@ namespace quda
     template <typename real> struct cabxpyAx_ : public BlasFunctor {
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      complex<real> b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      complex<real> b[MAX_MULTI_RHS] = {};
       cabxpyAx_(cvector<Complex> &a, cvector<Complex> &b, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i].real();
@@ -390,7 +390,7 @@ namespace quda
     template <typename real> struct caxpyxmaz_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
       caxpyxmaz_(cvector<Complex> &a, cvector<Complex> &, cvector<Complex> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
@@ -417,7 +417,7 @@ namespace quda
     template <typename real> struct caxpyxmazMR_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
-      complex<real> a[MAX_MULTI_RHS];
+      complex<real> a[MAX_MULTI_RHS] = {};
       double3 *Ar3;
       caxpyxmazMR_(cvector<double> &a, cvector<double> &, cvector<double> &) :
         Ar3(static_cast<double3 *>(reducer::get_device_buffer()))
@@ -449,8 +449,8 @@ namespace quda
     template <typename real> struct tripleCGUpdate_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1, 1> write{ };
-      real a[MAX_MULTI_RHS];
-      real b[MAX_MULTI_RHS];
+      real a[MAX_MULTI_RHS] = {};
+      real b[MAX_MULTI_RHS] = {};
       tripleCGUpdate_(cvector<double> &a, cvector<double> &b, cvector<double> &)
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
