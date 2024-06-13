@@ -827,7 +827,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   inv_param->clover_coeff
     = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);
 
-  CloverField *in = nullptr;
+  CloverField in;
 
   bool clover_update = false;
   // If either of the clover params have changed, trigger a recompute
@@ -859,24 +859,22 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       inParam.create = QUDA_REFERENCE_FIELD_CREATE;
       inParam.location = inv_param->clover_location;
       inParam.reconstruct = false;
-      in = new CloverField(inParam);
+      in = CloverField(inParam);
     }
 
     if (!device_calc) {
-      cloverPrecise->copy(*in, false);
-      if ((h_clovinv && !inv_param->compute_clover_inverse) && !clover::dynamic_inverse())
-        cloverPrecise->copy(*in, true);
+      cloverPrecise->copy(in, false);
+      if (!clover::dynamic_inverse()) {
+        if (h_clovinv && !inv_param->compute_clover_inverse)
+          cloverPrecise->copy(in, true);
+        else
+          cloverInvert(*cloverPrecise, false);
+      }
     } else {
       createCloverQuda(inv_param);
     }
 
-    if ((!h_clovinv || inv_param->compute_clover_inverse) && !clover::dynamic_inverse()) {
-      cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
-      if (inv_param->compute_clover_trlog) {
-        inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
-        inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
-      }
-    }
+    for (auto i = 0; i < 2; i++) inv_param->trlogA[i] = cloverPrecise->TrLog()[i];
   } else {
     logQuda(QUDA_VERBOSE, "Gauge field unchanged - using cached clover field\n");
   }
@@ -885,12 +883,12 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if (inv_param->return_clover || inv_param->return_clover_inverse) {
     if (inv_param->return_clover) {
       if (!h_clover) errorQuda("Requested clover field return but no clover host pointer set");
-      in->copy(*cloverPrecise, false);
+      in.copy(*cloverPrecise, false);
     }
 
     if (inv_param->return_clover_inverse) {
       if (!h_clovinv) errorQuda("Requested clover field inverse return but no clover host pointer set");
-      in->copy(*cloverPrecise, true);
+      in.copy(*cloverPrecise, true);
     }
   }
 
@@ -903,8 +901,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     tmp.copy(*cloverPrecise);
     std::exchange(*cloverPrecise, tmp);
   }
-
-  if (in) delete in; // delete object referencing input field
 
   QudaPrecision prec[] = {inv_param->clover_cuda_prec_sloppy, inv_param->clover_cuda_prec_precondition,
                           inv_param->clover_cuda_prec_refinement_sloppy, inv_param->clover_cuda_prec_eigensolver};
@@ -3972,6 +3968,9 @@ void createCloverQuda(QudaInvertParam* invertParam)
   computeFmunu(Fmunu, *ex);
   computeClover(*cloverPrecise, Fmunu, invertParam->clover_coeff);
 
+  // if the clover reconstruction is enabled then we just compute the trace log
+  cloverInvert(*cloverPrecise, cloverPrecise->Reconstruct());
+
   if (ex != gauge) delete ex;
 
   // FIXME always preserve the extended gauge
@@ -5302,6 +5301,7 @@ void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark
   ColorSpinorParam cpu_evec_param(host_evec, *inv_param, x, false, QUDA_CPU_FIELD_LOCATION);
   // Switch to spin 1
   cpu_evec_param.nSpin = 1;
+  cpu_evec_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   // QUDA style wrapper around the host data
   std::vector<ColorSpinorField> evec(n_evec);
   for (auto i = 0; i < n_evec; i++) {
