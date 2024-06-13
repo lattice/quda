@@ -104,7 +104,7 @@ namespace quda
     if constexpr (is_enabled_multigrid()) {
       if (!DiracCoarse::apply_mma(out, use_mma) || checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
         ApplyCoarse<false>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision,
-                           IntList<@QUDA_MULTIGRID_NVEC_LIST @>());
+                           IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
       } else {
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         ColorSpinorField v_inA = create_color_spinor_copy(inA, csOrder);
