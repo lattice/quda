@@ -131,10 +131,10 @@ if(QUDA_DIRAC_STAGGERED)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(QUDA_CONTRACT)
-    add_executable(contractFT_test contractFT_test.cpp)
-    target_link_libraries(contractFT_test ${TEST_LIBS})
-    quda_checkbuildtest(contractFT_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS contractFT_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+    add_executable(contract_ft_test contract_ft_test.cpp)
+    target_link_libraries(contract_ft_test ${TEST_LIBS})
+    quda_checkbuildtest(contract_ft_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS contract_ft_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 endif()
 
@@ -358,10 +358,10 @@ endif()
 #Contraction test
 if(QUDA_DIRAC_STAGGERED)
   if(QUDA_CONTRACT)
-    add_test(NAME contractFT_test
-	    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contractFT_test> ${MPIEXEC_POSTFLAGS}
+    add_test(NAME contract_ft_test
+	    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_ft_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8 --enable-testing true
-    --gtest_output=xml:contractFT_test.xml)
+    --gtest_output=xml:contract_ft_test.xml)
   endif()  
 endif()
 

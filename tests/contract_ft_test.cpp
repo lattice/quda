@@ -8,11 +8,11 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
-#include <contractFT_reference.h>
+#include <contract_ft_reference.h>
 #include "misc.h"
 
 // google test
-#include <contractFT_test_gtest.hpp>
+#include <contract_ft_test_gtest.hpp>
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
