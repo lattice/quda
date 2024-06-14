@@ -321,8 +321,7 @@ struct StaggeredDslashTestWrapper {
         _hp_x[i] = vp_spinor_out[i].data();
         _hp_b[i] = vp_spinor[i].data();
       }
-      dslashMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, milc_fatlink, milc_longlink,
-                                  &gauge_param);
+      dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity);
 
     } else {
 
