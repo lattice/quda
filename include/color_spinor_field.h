@@ -456,7 +456,7 @@ namespace quda
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int *X() const { return x.data; }
-    int X(int d) const { return x[d]; }
+    int X(int d) const { return d < nDim ? x[d] : 1; }
     size_t Length() const { return length; }
     size_t Bytes() const { return bytes; }
     size_t TotalBytes() const { return bytes; }
@@ -530,7 +530,8 @@ namespace quda
       */
     void packGhost(const int nFace, const QudaParity parity, const int dagger, const qudaStream_t &stream,
                    MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, bool spin_project,
-                   double a = 0, double b = 0, double c = 0, int shmem = 0) const;
+                   double a = 0, double b = 0, double c = 0, int shmem = 0,
+                   cvector_ref<const ColorSpinorField> &in = {}) const;
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -550,7 +551,7 @@ namespace quda
     */
     void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
-              int shmem = 0) const;
+              int shmem = 0, cvector_ref<const ColorSpinorField> &in = {}) const;
 
     /**
       @brief Initiate the gpu to cpu send of the ghost zone (halo)
@@ -667,7 +668,7 @@ namespace quda
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination = nullptr,
                        const MemoryLocation *halo_location = nullptr, bool gdr_send = false, bool gdr_recv = false,
                        QudaPrecision ghost_precision = QUDA_INVALID_PRECISION, int shmem = 0,
-                       cvector_ref<const ColorSpinorField> v = {}) const;
+                       cvector_ref<const ColorSpinorField> &v = {}) const;
 
     /**
       This function returns true if the field is stored in an internal
@@ -718,7 +719,7 @@ namespace quda
     /**
        @brief Get the dslash_constant structure from this field
     */
-    const DslashConstant &getDslashConstant() const { return *dslash_constant; }
+    const DslashConstant &getDslashConstant() const;
 
     const ColorSpinorField &Even() const;
     const ColorSpinorField &Odd() const;
@@ -980,7 +981,8 @@ namespace quda
      @param[in] v Vector fields to batch into ghost (if v.size() > 0)
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                        MemoryLocation *destination = nullptr, int shmem = 0, cvector_ref<const ColorSpinorField> v = {});
+                        MemoryLocation *destination = nullptr, int shmem = 0,
+                        cvector_ref<const ColorSpinorField> &v = {});
 
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)
@@ -1062,8 +1064,8 @@ namespace quda
      @param[in] b Input field
      @return If order is unique return the order
    */
-  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                               const ColorSpinorField &b)
+  template <class T, class U>
+  QudaFieldOrder Order_(const char *func, const char *file, int line, const T &a, const U &b)
   {
     QudaFieldOrder order = QUDA_INVALID_FIELD_ORDER;
     if (a.FieldOrder() == b.FieldOrder())
@@ -1080,9 +1082,8 @@ namespace quda
      @param[in] args List of additional fields to check order on
      @return If order is unique return the order
    */
-  template <typename... Args>
-  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                               const ColorSpinorField &b, const Args &...args)
+  template <class T, class U, typename... Args>
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const T &a, const U &b, const Args &...args)
   {
     return static_cast<QudaFieldOrder>(Order_(func, file, line, a, b) & Order_(func, file, line, a, args...));
   }
@@ -1095,7 +1096,7 @@ namespace quda
      @param[in] b Input field
      @return If length is unique return the length
    */
-  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b)
+  template <class T, class U> inline int Length_(const char *func, const char *file, int line, const T &a, const U &b)
   {
     int length = 0;
     if (a.Length() == b.Length())
@@ -1112,9 +1113,8 @@ namespace quda
      @param[in] args List of additional fields to check length on
      @return If length is unique return the length
    */
-  template <typename... Args>
-  inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
-                     const Args &...args)
+  template <class T, class U, typename... Args>
+  inline int Length_(const char *func, const char *file, int line, const T &a, const U &b, const Args &...args)
   {
     return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
   }

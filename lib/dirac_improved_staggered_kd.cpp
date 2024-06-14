@@ -31,19 +31,20 @@ namespace quda
     return *this;
   }
 
-  void DiracImprovedStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+  void DiracImprovedStaggeredKD::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                        QudaParity) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracImprovedStaggeredKD::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity,
-                                            const ColorSpinorField &, const double &) const
+  void DiracImprovedStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                            QudaParity, cvector_ref<const ColorSpinorField> &, double) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }
 
   // Full staggered operator
-  void DiracImprovedStaggeredKD::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredKD::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // Due to the staggered convention, the staggered part is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
@@ -52,7 +53,7 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (dagger == QUDA_DAG_NO) {
 
@@ -80,14 +81,15 @@ namespace quda
     }
   }
 
-  void DiracImprovedStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
 
-  void DiracImprovedStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out,
+                                                cvector_ref<const ColorSpinorField> &in) const
   {
     ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }
@@ -120,7 +122,7 @@ namespace quda
     for (auto i = 0u; i < b.size(); i++) {
       checkFullSpinor(x[i], b[i]);
 
-      src[i] = getFieldTmp(b[i]);
+      src[i] = getFieldTmp(x[i]);
       KahlerDiracInv(src[i], b[i]);
 
       // if we're preconditioning the Schur op, we need to rescale by the mass

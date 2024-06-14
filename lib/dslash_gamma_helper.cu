@@ -6,19 +6,18 @@
 
 namespace quda {
 
-  template <typename Float, int nColor> class GammaApply : public TunableKernel2D {
-    ColorSpinorField &out;
-    const ColorSpinorField &in;
+  template <typename Float, int nColor> class GammaApply : public TunableKernel3D
+  {
+    cvector_ref<ColorSpinorField> &out;
+    cvector_ref<const ColorSpinorField> &in;
     const int d;
     unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
-    GammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d) :
-      TunableKernel2D(in, in.SiteSubset()),
-      out(out),
-      in(in),
-      d(d)
+    GammaApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d) :
+      TunableKernel3D(in[0], in.size(), in.SiteSubset()), out(out), in(in), d(d)
     {
+      setRHSstring(aux, in.size());
       apply(device::get_default_stream());
     }
 
@@ -35,14 +34,15 @@ namespace quda {
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
-  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
+  void ApplyGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
-    instantiate<GammaApply>(out, in, d);
+    instantiate_recurse2<GammaApply>(out, in, d);
   }
 
-  template <typename Float, int nColor> class TwistGammaApply : public TunableKernel2D {
-    ColorSpinorField &out;
-    const ColorSpinorField &in;
+  template <typename Float, int nColor> class TwistGammaApply : public TunableKernel3D
+  {
+    cvector_ref<ColorSpinorField> &out;
+    cvector_ref<const ColorSpinorField> &in;
     int d;
     double kappa;
     double mu;
@@ -52,9 +52,9 @@ namespace quda {
     unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
-    TwistGammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu,
-                    double epsilon, int dagger, QudaTwistGamma5Type type) :
-      TunableKernel2D(in, in.SiteSubset()),
+    TwistGammaApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
+                    double mu, double epsilon, int dagger, QudaTwistGamma5Type type) :
+      TunableKernel3D(in[0], in.size(), in.SiteSubset()),
       out(out),
       in(in),
       d(d),
@@ -64,6 +64,7 @@ namespace quda {
       dagger(dagger),
       type(type)
     {
+      setRHSstring(aux, in.size());
       if (d != 4) errorQuda("Unexpected d=%d", d);
       apply(device::get_default_stream());
     }
@@ -74,46 +75,39 @@ namespace quda {
       launch<TwistGamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, kappa, mu, epsilon, dagger, type));
     }
 
-    void preTune()
-    {
-      if (out.data() == in.data()) out.backup();
-    }
-    void postTune()
-    {
-      if (out.data() == in.data()) out.restore();
-    }
+    void preTune() { out.backup(); }
+    void postTune() { out.restore(); }
     long long flops() const { return 0; }
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
-#ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
+  void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
+                       double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
-    instantiate<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
+    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+      instantiate_recurse2<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else {
+      errorQuda("Twisted mass operator has not been built");
+    }
   }
-#else
-  void ApplyTwistGamma(ColorSpinorField &, const ColorSpinorField &, int, double, double, double, int, QudaTwistGamma5Type)
-  {
-    errorQuda("Twisted mass dslash has not been built");
-  }
-#endif // GPU_TWISTED_MASS_DIRAC
 
   // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
-  void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
+  void gamma5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) { ApplyGamma(out, in, 4); }
 
-  template <typename Float, int nColor> class TauApply : public TunableKernel2D
+  template <typename Float, int nColor> class TauApply : public TunableKernel3D
   {
-    ColorSpinorField &out;
-    const ColorSpinorField &in;
+    cvector_ref<ColorSpinorField> &out;
+    cvector_ref<const ColorSpinorField> &in;
     const int d;
     unsigned int minThreads() const { return in.VolumeCB() / 2; }
 
   public:
-    TauApply(ColorSpinorField &out, const ColorSpinorField &in, int d) :
-      TunableKernel2D(in, in.SiteSubset()), out(out), in(in), d(d)
+    TauApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d) :
+      TunableKernel3D(in[0], in.size(), in.SiteSubset()), out(out), in(in), d(d)
     {
+      setRHSstring(aux, in.size());
       apply(device::get_default_stream());
     }
 
@@ -130,12 +124,12 @@ namespace quda {
 
   // Apply the tau1 matrix to a doublet colorspinor field
   // out(x) = tau_1*in
-#ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTau(ColorSpinorField &out, const ColorSpinorField &in, int d) { instantiate<TauApply>(out, in, d); }
-#else
-  void ApplyTau(ColorSpinorField &, const ColorSpinorField &, int)
+  void ApplyTau(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
-    errorQuda("Twisted mass dslash has not been built");
+    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+      instantiate_recurse2<TauApply>(out, in, d);
+    } else {
+      errorQuda("Twisted mass operator has not been built");
+    }
   }
-#endif // GPU_TWISTED_MASS_DIRAC
 }

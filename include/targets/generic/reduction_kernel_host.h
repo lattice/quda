@@ -29,7 +29,7 @@ namespace quda
       value[k] = t.init();
 
       for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
-        for (int i = 0; i < static_cast<int>(arg.threads.x); i++) { value[j] = t(value[j], i, j, k); }
+        for (int i = 0; i < static_cast<int>(arg.threads.x); i++) { value[k] = t(value[k], i, j, k); }
       }
     }
 

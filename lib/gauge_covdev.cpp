@@ -19,7 +19,8 @@ namespace quda {
     return *this;
   }
 
-  void GaugeCovDev::DslashCD(ColorSpinorField &out, const ColorSpinorField &in,  const QudaParity parity, const int mu) const
+  void GaugeCovDev::DslashCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                             QudaParity parity, int mu) const
   {
     checkSpinorAlias(in, out);
 
@@ -29,37 +30,38 @@ namespace quda {
     ApplyCovDev(out, in, *gauge, mu, parity, dagger, comm_dim, profile);
   }
 
-  void GaugeCovDev::MCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const
+  void GaugeCovDev::MCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const
   {
     checkFullSpinor(out, in);
     DslashCD(out, in, QUDA_INVALID_PARITY, mu);
   }
 
-  void GaugeCovDev::MdagMCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const
+  void GaugeCovDev::MdagMCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     MCD(tmp, in, mu);
     MCD(out, tmp, (mu+4)%8);
   }
 
-  void GaugeCovDev::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void GaugeCovDev::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const
   {
     DslashCD(out, in, parity, covdev_mu);
   }
 
-  void GaugeCovDev::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity, const ColorSpinorField &,
-                               const double &) const
+  void GaugeCovDev::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
+                               cvector_ref<const ColorSpinorField> &, double) const
   {
     //do nothing
   }
 
-  void GaugeCovDev::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeCovDev::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     MCD(out, in, covdev_mu);
   }
 
-  void GaugeCovDev::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeCovDev::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     MdagMCD(out, in, covdev_mu);
   }

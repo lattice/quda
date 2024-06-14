@@ -21,7 +21,10 @@ namespace quda
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
+                                                    spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool distance_pc = distance_pc_;
@@ -31,26 +34,27 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    F out;        /** output vector field */
-    const F in;   /** input vector field */
-    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
-    const F x;    /** input vector when doing xpay */
+    const int_fastdiv n_src;
+    F out[MAX_MULTI_RHS]; /** output vector field set */
+    F in[MAX_MULTI_RHS];  /** input vector field set */
+    F x[MAX_MULTI_RHS];   /** input vector set when doing xpay */
+    Ghost halo_pack;
+    Ghost halo;
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
-
     /** parameters for distance preconditioning */
     const real alpha0;
     const int t0;
     const int comm_coord_dim_3;
     const int comm_dim_dim_3;
 
-    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, const ColorSpinorField &x,
-              int parity, bool dagger, const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
-      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
-      out(out),
-      in(in),
-      in_pack(in),
-      x(x),
+    WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+              const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+              const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
+                             comm_override),
+      halo_pack(halo),
+      halo(halo),
       U(U),
       a(a),
       alpha0(alpha0),
@@ -58,6 +62,11 @@ namespace quda
       comm_coord_dim_3(comm_coord(3) * this->dim[3]),
       comm_dim_dim_3(comm_dim(3) * this->dim[3])
     {
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->in[i] = in[i];
+        this->x[i] = x[i];
+      }
     }
   };
 
@@ -73,7 +82,8 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
+                                              int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -83,17 +93,12 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-    real fwd_coeff_3 = 1.0;
-    real bwd_coeff_3 = 1.0;
-    if constexpr (Arg::distance_pc) {
-      const int t = arg.comm_coord_dim_3 + coord[3];
-      const int nt = arg.comm_dim_dim_3;
-      fwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t + 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
-      bwd_coeff_3 = distanceWeight(arg.alpha0, arg.t0, t - 1, nt) / distanceWeight(arg.alpha0, arg.t0, t, nt);
-    } else {
-      fwd_coeff_3 = 1.0;
-      bwd_coeff_3 = 1.0;
-    }
+    const int t = arg.comm_coord_dim_3 + coord[3];
+    const int nt = arg.comm_dim_dim_3;
+    real fwd_coeff_3
+      = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
+    real bwd_coeff_3
+      = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -112,13 +117,14 @@ namespace quda
             ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
+                                         their_spinor_parity);
 
           out += fwd_coeff * (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in = arg.in[src_idx](fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += fwd_coeff * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -139,13 +145,14 @@ namespace quda
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
+                                         their_spinor_parity);
 
           out += bwd_coeff * (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in = arg.in[src_idx](back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -161,7 +168,7 @@ namespace quda
 
     // out(x) = M*in = (-D + m) * in(x-mu)
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -174,18 +181,18 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(xs, my_spinor_parity);
+        Vector x = arg.x[src_idx](xs, my_spinor_parity);
         out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out(xs, my_spinor_parity);
+        Vector x = arg.out[src_idx](xs, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](xs, my_spinor_parity) = out;
     }
   };
 

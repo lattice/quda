@@ -33,7 +33,6 @@ namespace quda
     const double kappa;
     const int parity;
     const int nParity;
-    const int nSrc;
     const ColorSpinorField &halo;
 
     const int max_color_col_stride = 8;
@@ -43,13 +42,13 @@ namespace quda
     long long flops() const
     {
       return ((dslash * 2 * nDim + clover * 1) * (8 * Ns * Nc * Ns * Nc) - 2 * Ns * Nc) * nParity
-        * static_cast<long long>(out[0].VolumeCB()) * out.size() * out[0].Nvec();
+        * static_cast<long long>(out.VolumeCB()) * out.size() * out[0].Nvec();
     }
 
     long long bytes() const
     {
-      return (dslash || clover) * out[0].Bytes() + dslash * 8 * inA[0].Bytes() + clover * inB[0].Bytes()
-        + nSrc * nParity * (dslash * Y.Bytes() * Y.VolumeCB() / (2 * Y.Stride()) + clover * X.Bytes() / 2);
+      return (dslash || clover) * out.Bytes() + dslash * 8 * inA.Bytes() + clover * inB.Bytes()
+        + (nParity * (dslash * Y.Bytes() * Y.VolumeCB() / (2 * Y.Stride()) + clover * X.Bytes() / 2)) * out.size();
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -128,12 +127,11 @@ namespace quda
       X(X),
       kappa(kappa),
       parity(parity),
-      nParity(out[0].SiteSubset()),
-      nSrc(out[0].Ndim() == 5 ? out[0].X(4) : 1),
+      nParity(out.SiteSubset()),
       halo(halo),
       color_col_stride(-1)
     {
-      strcpy(vol, out[0].VolString().c_str());
+      strcpy(vol, out.VolString().c_str());
       strcpy(aux, (std::string("policy_kernel,") + vol).c_str());
       strcat(aux, comm_dim_partitioned_string());
 
@@ -206,7 +204,7 @@ namespace quda
       int bM = m_atom_size * get_int_factor_array((Ns * Nc) / m_atom_size)[tp.aux.z];
       if ((Ns * Nc) % bM != 0) { errorQuda("Invalid bM"); }
 
-      tp.grid = dim3(out[0].SiteSubset() * out[0].VolumeCB(), (Ns * Nc) / bM, out[0].Nvec() / bN);
+      tp.grid = dim3(out.SiteSubset() * out.VolumeCB(), (Ns * Nc) / bM, out[0].Nvec() / bN);
       tp.set_max_shared_bytes = true;
 
       if ((Ns * Nc) % k_atom_size != 0) { errorQuda("(Ns * Nc) %% k_atom_size != 0"); }

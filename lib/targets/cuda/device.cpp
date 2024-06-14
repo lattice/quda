@@ -36,6 +36,10 @@ namespace quda
       CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
       printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
+#ifdef QUDA_LARGE_KERNEL_ARG
+      if (driver_version < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
+#endif
+
       nvmlReturn_t result = nvmlInit();
       if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
       const int length = 80;

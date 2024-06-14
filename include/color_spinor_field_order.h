@@ -1068,6 +1068,7 @@ namespace quda
       // if spin projecting, check that short vector length is compatible, if not halve the vector length
       static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N / 2;
       static constexpr int M_ghost = length_ghost / N_ghost;
+      using Accessor = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
       using GhostVector = typename VectorType<Float, N_ghost>::type;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1156,6 +1157,22 @@ namespace quda
           vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
         }
       }
+
+      /**
+         @brief This accessor routine returns a const
+         colorspinor_ghost_wrapper to this object, allowing us to
+         overload various operators for manipulating at the site
+         level interms of matrix operations.
+         @param[in] dim Dimensions of the ghost we are requesting
+         @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_ghost_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
+      {
+        return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
+      }
     };
 
     /**
@@ -1184,11 +1201,15 @@ namespace quda
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
+      //#define LEGACY_ACCESSOR_NORM // legacy code where norm pointer and offset are stored instead of computed
+#ifdef LEGACY_ACCESSOR_NORM
       norm_type *norm = nullptr;
+#endif
       AllocInt offset = 0; // offset can be 32-bit or 64-bit
+#ifdef LEGACY_ACCESSOR_NORM
       AllocInt norm_offset = 0;
+#endif
       int volumeCB = 0;
-      size_t bytes = 0;
 
       FloatNOrder() = default;
       FloatNOrder(const FloatNOrder &) = default;
@@ -1196,12 +1217,15 @@ namespace quda
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         GhostNOrder(a, nFace, ghost_),
         field(buffer ? buffer : a.data<Float *>()),
+#ifdef LEGACY_ACCESSOR_NORM
         norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
                       const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
+#endif
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
+#ifdef LEGACY_ACCESSOR_NORM
         norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
-        volumeCB(a.VolumeCB()),
-        bytes(a.Bytes())
+#endif
+        volumeCB(a.VolumeCB())
       {
       }
       FloatNOrder &operator=(const FloatNOrder &) = default;
@@ -1209,6 +1233,10 @@ namespace quda
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
         real v[length];
+#ifndef LEGACY_ACCESSOR_NORM
+        auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+#endif
         norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
 #pragma unroll
@@ -1227,7 +1255,10 @@ namespace quda
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];
-
+#ifndef LEGACY_ACCESSOR_NORM
+        auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+#endif
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {
           v[2 * i + 0] = in[i].real();
@@ -1275,23 +1306,7 @@ namespace quda
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
       }
 
-      /**
-         @brief This accessor routine returns a const
-         colorspinor_ghost_wrapper to this object, allowing us to
-         overload various operators for manipulating at the site
-         level interms of matrix operations.
-         @param[in] dim Dimensions of the ghost we are requesting
-         @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
-         @param[in] parity Parity we are requesting
-         @return Instance of a colorspinor_ghost+wrapper that curries in access to
-         this field at the above coordinates.
-      */
-      __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
-      {
-        return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
-      }
-
-      size_t Bytes() const { return bytes; }
+      size_t Bytes() const { return offset * 2ll * sizeof(Vector) * N; }
     };
 
     template <int N, bool spin_project, bool huge_alloc>
@@ -1300,6 +1315,7 @@ namespace quda
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
       static constexpr int length_ghost = 2 * Ns * Nc;
+      using Accessor = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
       using GhostVector = int4; // 128-bit packed type
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1378,6 +1394,22 @@ namespace quda
         for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
         vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
+
+      /**
+         @brief This accessor routine returns a const
+         colorspinor_ghost_wrapper to this object, allowing us to
+         overload various operators for manipulating at the site
+         level interms of matrix operations.
+         @param[in] dim Dimensions of the ghost we are requesting
+         @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_ghost_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
+      {
+        return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
+      }
     };
 
     /**
@@ -1407,7 +1439,6 @@ namespace quda
       Float *field = nullptr;
       AllocInt offset = 0; // offset can be 32-bit or 64-bit
       int volumeCB = 0;
-      size_t bytes = 0;
 
       FloatNOrder() = default;
       FloatNOrder(const FloatNOrder &) = default;
@@ -1416,8 +1447,7 @@ namespace quda
         GhostNOrder(a, nFace, ghost_),
         field(buffer ? buffer : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Vector))),
-        volumeCB(a.VolumeCB()),
-        bytes(a.Bytes())
+        volumeCB(a.VolumeCB())
       {
       }
 
@@ -1488,23 +1518,7 @@ namespace quda
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
       }
 
-      /**
-         @brief This accessor routine returns a const
-         colorspinor_ghost_wrapper to this object, allowing us to
-         overload various operators for manipulating at the site
-         level interms of matrix operations.
-         @param[in] dim Dimensions of the ghost we are requesting
-         @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
-         @param[in] parity Parity we are requesting
-         @return Instance of a colorspinor_ghost+wrapper that curries in access to
-         this field at the above coordinates.
-      */
-      __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
-      {
-        return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
-      }
-
-      size_t Bytes() const { return bytes; }
+      size_t Bytes() const { return offset * 2ll * sizeof(Vector); }
     };
 
     template <typename Float, int Ns, int Nc> struct SpaceColorSpinorOrder {

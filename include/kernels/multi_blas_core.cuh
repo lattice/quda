@@ -44,9 +44,8 @@ namespace quda
       Functor f;
 
       template <typename V>
-      MultiBlasArg(V &x, V&y, V &z, V &w, Functor f, int NYW, int length) :
-        kernel_param(dim3(length * warp_split, NYW, x[0].SiteSubset())),
-        f(f)
+      MultiBlasArg(V &x, V &y, V &z, V &w, Functor f, int NYW, int length) :
+        kernel_param(dim3(length * warp_split, NYW, x.SiteSubset())), f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
