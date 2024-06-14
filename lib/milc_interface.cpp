@@ -1419,7 +1419,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
-  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam, nullptr, nullptr);
+  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
 
   host_free(sln_pointer);
   host_free(src_pointer);

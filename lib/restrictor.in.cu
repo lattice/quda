@@ -27,7 +27,7 @@ namespace quda {
 
     bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
-    unsigned int minThreads() const { return in[0].Volume(); } // fine parity is the block y dimension
+    unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
 
   public:
     RestrictLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
@@ -37,13 +37,10 @@ namespace quda {
       parity(parity)
     {
       strcat(vol, ",");
-      strcat(vol, out[0].VolString().c_str());
+      strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
-      strcat(aux, out[0].AuxString().c_str());
-      strcat(aux, ",n_rhs=");
-      char rhs_str[16];
-      i32toa(rhs_str, out.size());
-      strcat(aux, rhs_str);
+      strcat(aux, out.AuxString().c_str());
+      setRHSstring(aux, in.size());
       if (in[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",from_non_rel");
 
       apply(device::get_default_stream());
@@ -94,7 +91,7 @@ namespace quda {
      */
     unsigned int blockMapper() const
     {
-      auto aggregate_size = in[0].Volume() / out[0].Volume();
+      auto aggregate_size = in.Volume() / out.Volume();
       // for multi-RHS use minimum block size to allow more srcs per block
       auto max_block = in.size() > 1 ? blockMin() : 64u;
       for (uint32_t b = blockMin(); b < max_block; b += blockStep()) if (aggregate_size <= b) return b;
@@ -105,7 +102,7 @@ namespace quda {
     {
       TunableBlock2D::initTuneParam(param);
       param.block.x = blockMapper();
-      param.grid.x = out[0].Volume();
+      param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
     }
@@ -114,17 +111,20 @@ namespace quda {
     {
       TunableBlock2D::defaultTuneParam(param);
       param.block.x = blockMapper();
-      param.grid.x = out[0].Volume();
+      param.grid.x = out.Volume();
       param.shared_bytes = 0;
       param.aux.x = 2; // swizzle factor
     }
 
-    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in[0].SiteSubset() * in[0].VolumeCB(); }
+    long long flops() const
+    {
+      return out.size() * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB();
+    }
 
     long long bytes() const
     {
-      size_t v_bytes = v.Bytes() / (v.SiteSubset() == in[0].SiteSubset() ? 1 : 2);
-      return out.size() * (in[0].Bytes() + out[0].Bytes() + v_bytes + in[0].SiteSubset() * in[0].VolumeCB() * sizeof(int));
+      size_t v_bytes = v.Bytes() / (v.SiteSubset() == in.SiteSubset() ? 1 : 2);
+      return out.size() * (in[0].Bytes() + out[0].Bytes() + v_bytes + in.SiteSubset() * in.VolumeCB() * sizeof(int));
     }
   };
 
@@ -212,11 +212,21 @@ namespace quda {
   void Restrict<fineColor, coarseColor>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                                         const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
-    checkLocation(out[0], in[0], v);
-    if (in[0].Nspin() == 2) checkPrecision(in[0], out[0]);
-    QudaPrecision precision = out[0].Precision();
-
     if constexpr (is_enabled_multigrid()) {
+      if (in.size() > get_max_multi_rhs()) {
+        Restrict<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2},
+                                         {in.begin(), in.begin() + in.size() / 2}, v, fine_to_coarse, coarse_to_fine,
+                                         spin_map, parity);
+        Restrict<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()},
+                                         {in.begin() + in.size() / 2, in.end()}, v, fine_to_coarse, coarse_to_fine,
+                                         spin_map, parity);
+        return;
+      }
+
+      checkLocation(out, in, v);
+      if (in[0].Nspin() == 2) checkPrecision(in, out);
+      QudaPrecision precision = out.Precision();
+
       if (precision == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())
           Restrict<double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
@@ -224,7 +234,7 @@ namespace quda {
       } else if (precision == QUDA_SINGLE_PRECISION) {
         Restrict<float, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
       } else {
-        errorQuda("Unsupported precision %d", out[0].Precision());
+        errorQuda("Unsupported precision %d", precision);
       }
     } else {
       errorQuda("Multigrid has not been built");

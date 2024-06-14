@@ -19,7 +19,8 @@ namespace quda {
   }
 
 // Modification for the 4D preconditioned domain wall operator
-  void DiracDomainWall4D::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracDomainWall4D::Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                  const QudaParity parity) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -28,7 +29,7 @@ namespace quda {
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim.data, profile);
   }
 
-  void DiracDomainWall4D::Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4D::Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -38,8 +39,8 @@ namespace quda {
   }
 
   // Modification for the 4D preconditioned domain wall operator
-  void DiracDomainWall4D::Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+  void DiracDomainWall4D::Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                      const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -48,8 +49,8 @@ namespace quda {
     ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim.data, profile);
   }
 
-  void DiracDomainWall4D::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                                      const double &k) const
+  void DiracDomainWall4D::Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                      cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -58,7 +59,7 @@ namespace quda {
     ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, Dslash5Type::DSLASH5_DWF);
   }
 
-  void DiracDomainWall4D::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4D::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
 
@@ -68,10 +69,10 @@ namespace quda {
     blas::xpay(in, -kappa5, out);
   }
 
-  void DiracDomainWall4D::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4D::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -111,7 +112,7 @@ namespace quda {
     return *this;
   }
 
-  void DiracDomainWall4DPC::M5inv(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4DPC::M5inv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -120,8 +121,8 @@ namespace quda {
     ApplyDslash5(out, in, in, mass, m5, nullptr, nullptr, 0.0, dagger, Dslash5Type::M5_INV_DWF);
   }
 
-  void DiracDomainWall4DPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                                      const double &b) const
+  void DiracDomainWall4DPC::M5invXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                      cvector_ref<const ColorSpinorField> &x, double b) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -131,11 +132,11 @@ namespace quda {
   }
 
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
-  void DiracDomainWall4DPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4DPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     double kappa2 = kappa5*kappa5;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (symmetric && !dagger) {
       // 1 - k^2 M5^-1 D4 M5^-1 D4
@@ -158,9 +159,9 @@ namespace quda {
     }
   }
 
-  void DiracDomainWall4DPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracDomainWall4DPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -178,7 +179,7 @@ namespace quda {
     }
 
     // we desire solution to full system
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       if (symmetric) {
         // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
@@ -203,7 +204,7 @@ namespace quda {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       checkFullSpinor(x[i], b[i]);
       // x_o = M5^-1 (b_o + k D4_oe x_e)

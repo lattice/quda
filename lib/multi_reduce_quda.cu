@@ -317,9 +317,9 @@ namespace quda {
         max_tile_size = make_uint2(1, 1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
-        strcat(aux, x[0].AuxString().c_str());
-      	strcat(aux, ",");
-        strcat(aux, y[0].AuxString().c_str());
+        strcat(aux, x.AuxString().c_str());
+        strcat(aux, ",");
+        strcat(aux, y.AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
 	strcat(aux,",n=");
@@ -450,9 +450,7 @@ namespace quda {
         param.aux.w = 0;
       }
 
-      TuneKey tuneKey() const override {
-        return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux);
-      }
+      TuneKey tuneKey() const override { return TuneKey(x.VolString().c_str(), typeid(*this).name(), aux); }
 
       long long bytes() const override { return 0; } // FIXME
 
@@ -480,9 +478,9 @@ namespace quda {
         Anorm(Anorm)
       {
         strcpy(aux, "policy,");
-        strcat(aux, x[0].AuxString().c_str());
+        strcat(aux, x.AuxString().c_str());
         strcat(aux, ",");
-        strcat(aux, y[0].AuxString().c_str());
+        strcat(aux, y.AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
         strcat(aux, ",n=");
@@ -585,7 +583,7 @@ namespace quda {
 
       void defaultTuneParam(TuneParam &param) const override { initTuneParam(param); }
 
-      TuneKey tuneKey() const override { return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(x.VolString().c_str(), typeid(*this).name(), aux); }
 
       long long bytes() const override { return 0; } // FIXME
 

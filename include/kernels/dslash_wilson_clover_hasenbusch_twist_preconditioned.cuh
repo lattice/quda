@@ -21,10 +21,11 @@ namespace quda
     const C A_inv;
     real b;
 
-    WilsonCloverHasenbuschTwistPCArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                     const CloverField &A_, double a_, double b_, const ColorSpinorField &x, int parity,
+    WilsonCloverHasenbuschTwistPCArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                     const ColorSpinorField &halo, const GaugeField &U, const CloverField &A_,
+                                     double a_, double b_, cvector_ref<const ColorSpinorField> &x, int parity,
                                      bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a_, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a_, x, parity, dagger, comm_override),
       A(A_, false),
       A_inv(A_, dynamic_clover ? false : true),
       b(dagger ? -0.5 * b_ : 0.5 * b_) // if dynamic clover we don't want the inverse field
@@ -47,7 +48,7 @@ namespace quda
        - with xpay:  out(x) = M*in = (1 - a*A(x)^{-1}D) * in(x-mu)
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity)
     {
       using namespace linalg; // for Cholesky
       typedef typename mapper<typename Arg::Float>::type real;
@@ -64,18 +65,18 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
-        Vector x = arg.out(coord.x_cb, my_spinor_parity);
+        Vector x = arg.out[src_idx](coord.x_cb, my_spinor_parity);
         out += x;
       }
 
       if (isComplete<mykernel_type>(arg, coord) && active) {
 
         if (!Arg::clov_inv) {
-          Vector x = arg.x(coord.x_cb, my_spinor_parity);
+          Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           out = x + arg.a * out;
         } else {
           out.toRel(); // switch to chiral basis
@@ -99,7 +100,7 @@ namespace quda
           }
 
           tmp.toNonRel(); // switch back to non-chiral basis
-          Vector x = arg.x(coord.x_cb, my_spinor_parity);
+          Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           out = x + arg.a * tmp;
         }
 
@@ -107,7 +108,7 @@ namespace quda
         //
         // now we must add on i g_5 b A x
         {
-          Vector x = arg.x(coord.x_cb, my_spinor_parity);
+          Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           x.toRel();
           Vector tmp;
 #pragma unroll
@@ -125,7 +126,7 @@ namespace quda
         }
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
     }
   };
 

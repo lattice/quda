@@ -56,7 +56,8 @@ namespace quda
 
 protected:
     void **ghost;
-    const ColorSpinorField &in;
+    const ColorSpinorField &halo;
+    cvector_ref<const ColorSpinorField> &in;
     MemoryLocation location;
     const int nFace;
     const bool dagger; // only has meaning for nSpin=4
@@ -139,6 +140,7 @@ protected:
     {
       strcpy(aux, "policy_kernel,");
       strcat(aux, in.AuxString().c_str());
+      setRHSstring(aux, in.size());
       char comm[5];
       for (int i = 0; i < 4; i++) comm[i] = (comm_dim_pack[i] ? '1' : '0');
       comm[4] = '\0';
@@ -169,15 +171,16 @@ protected:
     }
 
 public:
-  Pack(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity, double a,
-       double b, double c,
+  Pack(void *ghost[], const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in, MemoryLocation location,
+       int nFace, bool dagger, int parity, double a, double b, double c,
 #ifdef NVSHMEM_COMMS
        int shmem) :
 #else
        int) :
 #endif
-    TunableKernel3D(in, (in.Ndim() == 5 ? in.X(4) : 1), in.SiteSubset()),
+    TunableKernel3D(in[0], halo.X(4), in.SiteSubset()),
     ghost(ghost),
+    halo(halo),
     in(in),
     location(location),
     nFace(nFace),
@@ -199,7 +202,7 @@ public:
     // compute number of number of work items we have to do
     for (int i = 0; i < 4; i++) {
       if (!comm_dim_pack[i]) continue;
-      work_items += 2 * nFace * in.getDslashConstant().ghostFaceCB[i]; // 2 for forwards and backwards faces
+      work_items += 2 * nFace * halo.getDslashConstant().ghostFaceCB[i]; // 2 for forwards and backwards faces
     }
   }
 
@@ -218,20 +221,28 @@ public:
         if (in.PCType() == QUDA_4D_PC) {
           if (dagger) {
             switch (twist) {
-            case 0: launch_device<pack_wilson>(tp, stream, Arg<4, true, 0>(ghost, in, nFace, parity, work_items,
-                                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
+            case 0:
+              launch_device<pack_wilson>(
+                tp, stream,
+                Arg<4, true, 0>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
-            case 1: launch_device<pack_wilson>(tp, stream, Arg<4, true, 1>(ghost, in, nFace, parity, work_items,
-                                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
+            case 1:
+              launch_device<pack_wilson>(
+                tp, stream,
+                Arg<4, true, 1>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
-            case 2: launch_device<pack_wilson>(tp, stream, Arg<4, true, 2>(ghost, in, nFace, parity, work_items,
-                                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
+            case 2:
+              launch_device<pack_wilson>(
+                tp, stream,
+                Arg<4, true, 2>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             }
           } else {
             switch (twist) {
-            case 0: launch_device<pack_wilson>(tp, stream, Arg<4, false, 0>(ghost, in, nFace, parity, work_items,
-                                                                            a, b, c, tp.block.x, tp.grid.x, shmem));
+            case 0:
+              launch_device<pack_wilson>(
+                tp, stream,
+                Arg<4, false, 0>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             default: errorQuda("Twisted packing only for dagger");
             }
@@ -239,11 +250,13 @@ public:
         } else if (in.PCType() == QUDA_5D_PC) {
           if (twist) errorQuda("Twist packing not defined");
           if (dagger) {
-            launch_device<pack_wilson>(tp, stream, Arg<4, true, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                               a, b, c, tp.block.x, tp.grid.x, shmem));
+            launch_device<pack_wilson>(tp, stream,
+                                       Arg<4, true, 0, QUDA_5D_PC>(ghost, halo, in, nFace, parity, work_items, a, b, c,
+                                                                   tp.block.x, tp.grid.x, shmem));
           } else {
-            launch_device<pack_wilson>(tp, stream, Arg<4, false, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                                a, b, c, tp.block.x, tp.grid.x, shmem));
+            launch_device<pack_wilson>(tp, stream,
+                                       Arg<4, false, 0, QUDA_5D_PC>(ghost, halo, in, nFace, parity, work_items, a, b, c,
+                                                                    tp.block.x, tp.grid.x, shmem));
           }
         } else {
           errorQuda("Unexpected preconditioning type %d", in.PCType());
@@ -254,38 +267,46 @@ public:
             switch (twist) {
             case 0:
               if (location & Host || location & Shmem)
-                launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 0>(ghost, in, nFace, parity, work_items,
-                                                                             a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson_shmem>(
+                  tp, stream,
+                  Arg<4, true, 0>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               else
-                launch_device<pack_wilson>(tp, stream, Arg<4, true, 0>(ghost, in, nFace, parity, work_items,
-                                                                       a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson>(
+                  tp, stream,
+                  Arg<4, true, 0>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             case 1:
               if (location & Host || location & Shmem)
-                launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 1>(ghost, in, nFace, parity, work_items,
-                                                                             a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson_shmem>(
+                  tp, stream,
+                  Arg<4, true, 1>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               else
-                launch_device<pack_wilson>(tp, stream, Arg<4, true, 1>(ghost, in, nFace, parity, work_items,
-                                                                       a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson>(
+                  tp, stream,
+                  Arg<4, true, 1>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             case 2:
               if (location & Host || location & Shmem)
-                launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 2>(ghost, in, nFace, parity, work_items,
-                                                                             a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson_shmem>(
+                  tp, stream,
+                  Arg<4, true, 2>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               else
-                launch_device<pack_wilson>(tp, stream, Arg<4, true, 2>(ghost, in, nFace, parity, work_items,
-                                                                       a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson>(
+                  tp, stream,
+                  Arg<4, true, 2>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             }
           } else {
             switch (twist) {
             case 0:
               if (location & Host || location & Shmem)
-                launch_device<pack_wilson_shmem>(tp, stream, Arg<4, false, 0>(ghost, in, nFace, parity, work_items,
-                                                                              a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson_shmem>(
+                  tp, stream,
+                  Arg<4, false, 0>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               else
-                launch_device<pack_wilson>(tp, stream, Arg<4, false, 0>(ghost, in, nFace, parity, work_items,
-                                                                        a, b, c, tp.block.x, tp.grid.x, shmem));
+                launch_device<pack_wilson>(
+                  tp, stream,
+                  Arg<4, false, 0>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             default: errorQuda("Twisted packing only for dagger");
             }
@@ -293,11 +314,13 @@ public:
         } else if (in.PCType() == QUDA_5D_PC) {
           if (twist) errorQuda("Twist packing not defined");
           if (dagger) {
-            launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                                     a, b, c, tp.block.x, tp.grid.x, shmem));
+            launch_device<pack_wilson_shmem>(tp, stream,
+                                             Arg<4, true, 0, QUDA_5D_PC>(ghost, halo, in, nFace, parity, work_items, a,
+                                                                         b, c, tp.block.x, tp.grid.x, shmem));
           } else {
-            launch_device<pack_wilson_shmem>(tp, stream, Arg<4, false, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                                      a, b, c, tp.block.x, tp.grid.x, shmem));
+            launch_device<pack_wilson_shmem>(tp, stream,
+                                             Arg<4, false, 0, QUDA_5D_PC>(ghost, halo, in, nFace, parity, work_items, a,
+                                                                          b, c, tp.block.x, tp.grid.x, shmem));
           }
         }
 #endif
@@ -305,15 +328,15 @@ public:
     } else if (in.Nspin() == 1) {
 
 #ifdef STRIPED
-        launch_device<pack_staggered>(tp, stream, Arg<1>(ghost, in, nFace, parity, work_items,
-                                                         a, b, c, tp.block.x, tp.grid.x, shmem));
+      launch_device<pack_staggered>(
+        tp, stream, Arg<1>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
 #else
         if (location & Host || location & Shmem)
-          launch_device<pack_staggered_shmem>(tp, stream, Arg<1>(ghost, in, nFace, parity, work_items,
-                                                                 a, b, c, tp.block.x, tp.grid.x, shmem));
+          launch_device<pack_staggered_shmem>(
+            tp, stream, Arg<1>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
         else
-          launch_device<pack_staggered>(tp, stream, Arg<1>(ghost, in, nFace, parity, work_items,
-                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
+          launch_device<pack_staggered>(
+            tp, stream, Arg<1>(ghost, halo, in, nFace, parity, work_items, a, b, c, tp.block.x, tp.grid.x, shmem));
 #endif
 
     } else {
@@ -356,7 +379,7 @@ public:
     long long flops() const
     {
       // unless we are spin projecting (nSpin = 4), there are no flops to do
-      return in.Nspin() == 4 ? 2 * in.Nspin() / 2 * nColor * nParity * in.getDslashConstant().Ls * work_items : 0;
+      return in.Nspin() == 4 ? 2 * in.Nspin() / 2 * nColor * nParity * halo.getDslashConstant().Ls * work_items : 0;
     }
 
     long long bytes() const
@@ -365,28 +388,29 @@ public:
       size_t faceBytes = 2 * ((in.Nspin() == 4 ? in.Nspin() / 2 : in.Nspin()) + in.Nspin()) * nColor * precision;
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
         faceBytes += 2 * sizeof(float); // 2 is from input and output
-      return faceBytes * nParity * in.getDslashConstant().Ls * work_items;
+      return faceBytes * nParity * halo.getDslashConstant().Ls * work_items;
     }
   };
 
   template <typename Float, int nColor> struct GhostPack {
-    GhostPack(const ColorSpinorField &in, void *ghost[], MemoryLocation location, int nFace, bool dagger, int parity,
-              bool spin_project, double a, double b, double c, int shmem, const qudaStream_t &stream)
+    GhostPack(const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in, void *ghost[],
+              MemoryLocation location, int nFace, bool dagger, int parity, bool spin_project, double a, double b,
+              double c, int shmem, const qudaStream_t &stream)
     {
       if (spin_project) {
-        Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c, shmem);
+        Pack<Float, nColor, true> pack(ghost, halo, in, location, nFace, dagger, parity, a, b, c, shmem);
         pack.apply(stream);
       } else {
-        Pack<Float, nColor, false> pack(ghost, in, location, nFace, dagger, parity, a, b, c, shmem);
+        Pack<Float, nColor, false> pack(ghost, halo, in, location, nFace, dagger, parity, a, b, c, shmem);
         pack.apply(stream);
       }
     }
   };
 
   // Pack the ghost for the Dslash operator
-  void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &in, MemoryLocation location, int nFace,
-                 bool dagger, int parity, bool spin_project, double a, double b, double c, int shmem,
-                 const qudaStream_t &stream)
+  void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in,
+                 MemoryLocation location, int nFace, bool dagger, int parity, bool spin_project, double a, double b,
+                 double c, int shmem, const qudaStream_t &stream)
   {
     int nDimPack = 0;
     for (int d = 0; d < 4; d++) {
@@ -395,7 +419,7 @@ public:
     }
     if (!nDimPack) return; // if zero then we have nothing to pack
 
-    instantiate<GhostPack>(in, ghost, location, nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
+    instantiate<GhostPack>(halo, in, ghost, location, nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
   }
 
 } // namespace quda

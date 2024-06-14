@@ -161,9 +161,8 @@ namespace quda {
     // if a timer is already running, stop it and push to stack
     for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++) {
       if (profile[i].running) {
-        if ((i == QUDA_PROFILE_COMPUTE || i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H)
-            && i != idx) // don't synchronize if nesting the same profile type
-          qudaDeviceSynchronize();
+        // don't synchronize if nesting the same profile type
+        if ((i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H) && i != idx) qudaDeviceSynchronize();
         profile[i].stop(file, func, line);
         if (use_global) StopGlobal(func, file, line, static_cast<QudaProfileType>(i));
         POP_RANGE;
@@ -179,8 +178,8 @@ namespace quda {
   void TimeProfile::Stop_(const char *func, const char *file, int line, QudaProfileType idx)
   {
     auto i = !pt_stack.empty() ? pt_stack.top() : QUDA_PROFILE_COUNT;
-    if ((idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H)
-        && i != idx)           // don't synchronize if nesting same profile type
+    // don't synchronize if nesting same profile type
+    if ((idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H) && i != idx)
       qudaDeviceSynchronize(); // ensure accurate profiling
 
     if (!profile[idx].stop(func, file, line)) {

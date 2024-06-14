@@ -9,8 +9,8 @@
 #include <gauge_field.h>
 #include <uint_to_char.h>
 
-#include <dslash_policy.cuh>
-#include <kernels/covDev.cuh>
+#include <dslash_policy.hpp>
+#include <kernels/covariant_derivative.cuh>
 
 /**
    This is the covariant derivative based on the basic gauged Laplace operator
@@ -23,10 +23,15 @@ namespace quda
   {
     using Dslash = Dslash<covDev, Arg>;
     using Dslash::arg;
+    using Dslash::halo;
     using Dslash::in;
 
   public:
-    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    CovDev(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+           const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
+    {
+    }
 
     void apply(const qudaStream_t &stream) override
     {
@@ -54,22 +59,22 @@ namespace quda
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
         if (arg.kernel_type != dim) break;
-        flops_ = (ghost_flops)*in.GhostFace()[dim];
+        flops_ = (ghost_flops)*halo.GhostFace()[dim];
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = in.GhostFace()[dim];
+        long long ghost_sites = halo.GhostFace()[dim];
         flops_ = ghost_flops * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.Volume();
+        long long sites = halo.Volume();
         flops_ = num_mv_multiply * mv_flops * sites; // SU(3) matrix-vector multiplies
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for flops done by exterior kernel
-        long long ghost_sites = arg.commDim[dim] ? in.GhostFace()[dim] : 0;
+        long long ghost_sites = arg.commDim[dim] ? halo.GhostFace()[dim] : 0;
         flops_ -= ghost_flops * ghost_sites;
 
         break;
@@ -94,22 +99,22 @@ namespace quda
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
         if (arg.kernel_type != dim) break;
-        bytes_ = ghost_bytes * in.GhostFace()[dim];
+        bytes_ = ghost_bytes * halo.GhostFace()[dim];
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = in.GhostFace()[dim];
+        long long ghost_sites = halo.GhostFace()[dim];
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.Volume();
+        long long sites = halo.Volume();
         bytes_ = (gauge_bytes + 2 * spinor_bytes) * sites;
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for bytes done by exterior kernel
-        long long ghost_sites = arg.commDim[dim] ? in.GhostFace()[dim] : 0;
+        long long ghost_sites = arg.commDim[dim] ? halo.GhostFace()[dim] : 0;
         bytes_ -= ghost_bytes * ghost_sites;
 
         break;
@@ -129,24 +134,23 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct CovDevApply {
 
-    inline CovDevApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
-                       bool dagger, const int *comm_override, TimeProfile &profile)
+    CovDevApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                cvector_ref<const ColorSpinorField> &, const GaugeField &U, int mu, int parity, bool dagger,
+                const int *comm_override, TimeProfile &profile)
 
     {
       constexpr int nDim = 4;
-
+      auto halo = ColorSpinorField::create_comms_batch(in);
       if (in.Nspin() == 4) {
-        CovDevArg<Float, nColor, 4, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
-        CovDev<decltype(arg)> covDev(arg, out, in);
-
-        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+        CovDevArg<Float, 4, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
       } else if (in.Nspin() == 1) {
-        CovDevArg<Float, nColor, 1, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
-        CovDev<decltype(arg)> covDev(arg, out, in);
-
-        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+        CovDevArg<Float, 1, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
       } else {
-        errorQuda("Spin not supported\n");
+        errorQuda("Spin not supported");
       }
     }
   };
@@ -154,17 +158,14 @@ namespace quda
   // Apply the covariant derivative operator
   // out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   // out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
-#ifdef GPU_COVDEV
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
-                   bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyCovDev(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+                   int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_COVDEV_DSLASH>()) {
+      instantiate<CovDevApply>(out, in, in, U, mu, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Covariant derivative kernels have not been built");
+    }
   }
-#else
-  void ApplyCovDev(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, int,
-                   bool, const int *, TimeProfile &)
-  {
-    errorQuda("Covariant derivative kernels have not been built");
-  }
-#endif
+
 } // namespace quda

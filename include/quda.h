@@ -1220,37 +1220,8 @@ extern "C" {
    * @param _hp_x       Array of solution spinor fields
    * @param _hp_b       Array of source spinor fields
    * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
-  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param);
-
-  /**
-   * @brief Really the same with @invertMultiSrcQuda but for staggered-style fermions, by accepting pointers
-   * to fat links and long links.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
-   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   */
-  void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
-                                   void *milc_longlinks, QudaGaugeParam *gauge_param);
-
-  /**
-   * @brief Really the same with @invertMultiSrcQuda but for clover-style fermions, by accepting pointers
-   * to direct and inverse clover field pointers.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   * @param h_clover    Base pointer to the direct clover field
-   * @param h_clovinv   Base pointer to the inverse clover field
-   */
-  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1345,40 +1316,8 @@ extern "C" {
    * @param _hp_b       Array of source spinor fields
    * @param param       Contains all metadata regarding host and device storage and solver parameters
    * @param parity      Parity to apply dslash on
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
-  void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                          QudaGaugeParam *gauge_param);
-  /**
-   * @brief Really the same with @dslashMultiSrcQuda but for staggered-style fermions, by accepting pointers
-   * to fat links and long links.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param parity      Parity to apply dslash on
-   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
-   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   */
-
-  void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity,
-                                   void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param);
-
-  /**
-   * @brief Really the same with @dslashMultiSrcQuda but for clover-style fermions, by accepting pointers
-   * to direct and inverse clover field pointers.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param parity      Parity to apply dslash on
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   * @param h_clover    Base pointer to the direct clover field
-   * @param h_clovinv   Base pointer to the inverse clover field
-   */
-  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+  void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.
