@@ -30,9 +30,7 @@ jobs:
             -DQUDA_DIRAC_WILSON=ON \
             -DQUDA_DIRAC_LAPLACE=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
-            -DQUDA_CONTRACT=ON \
             -DQUDA_COVDEV=ON \
-            -DQUDA_SMEAR_GAUSS_TWOLINK=ON \
             -DQUDA_QDPJIT=OFF \
             -DQUDA_INTERFACE_QDPJIT=OFF \
             -DQUDA_INTERFACE_MILC=ON \

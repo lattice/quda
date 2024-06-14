@@ -104,7 +104,6 @@ namespace quda {
     }
   };
 
-#ifdef GPU_CONTRACT
   void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result_global,
                           const QudaContractType cType, const int *const source_position, const int *const mom_mode,
                           const QudaFFTSymmType *const fft_type, const size_t s1, const size_t b1)
@@ -127,14 +126,6 @@ namespace quda {
 
     instantiate<ContractionSummed>(x, y, result_global, cType, source_position, mom_mode, fft_type, s1, b1);
   }
-#else
-  void contractSummedQuda(const ColorSpinorField &, const ColorSpinorField &, std::vector<Complex> &,
-                          const QudaContractType, const int *const, const int *const, const QudaFFTSymmType *const,
-                          const size_t, const size_t)
-  {
-    errorQuda("Contraction code has not been built");
-  }
-#endif
 
   template <typename Float, int nColor> class Contraction : TunableKernel2D
   {
@@ -204,7 +195,6 @@ public:
     }
   };
 
-#ifdef GPU_CONTRACT
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
@@ -226,10 +216,5 @@ public:
     instantiate<Contraction>(x, y, result, cType);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void contractQuda(const ColorSpinorField &, const ColorSpinorField &, void *, const QudaContractType)
-  {
-    errorQuda("Contraction code has not been built");
-  }
-#endif
+
 } // namespace quda

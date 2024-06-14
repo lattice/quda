@@ -45,6 +45,7 @@ RUN  QUDA_TEST_GRID_SIZE="1 1 1 2" cmake -S /quda/src \
     -DQUDA_DIRAC_TWISTED_CLOVER=ON \
     -DQUDA_DIRAC_STAGGERED=ON \
     -DQUDA_DIRAC_LAPLACE=ON \
+    -DQUDA_COVDEV=ON \
     -GNinja \
     -B /quda/build 
 
