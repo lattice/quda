@@ -127,7 +127,6 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
                                 const std::array<int, 4> &source_position, const std::array<int, n_mom * 4> &mom,
                                 const std::array<QudaFFTSymmType, n_mom * 4> &fft_type)
 {
-
   ColorSpinorParam cs_param;
 
   cs_param.nColor = 3;
@@ -169,9 +168,9 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
 
   std::array<std::vector<Float>, 2> buffs {std::vector<Float>(nprops * spinor_field_floats, 0),
                                            std::vector<Float>(nprops * spinor_field_floats, 0)};
-  //
+
   fill_buffers<Float, 2>(buffs, X, dof);
-  //
+
   for (int s = 0; s < nprops; ++s, off += spinor_field_floats * sizeof(Float)) {
     spinorX[s] = (void *)((uintptr_t)buffs[0].data() + off);
     spinorY[s] = (void *)((uintptr_t)buffs[1].data() + off);
@@ -211,7 +210,7 @@ int launch_contract_test(const QudaContractType cType, const std::array<int, 4> 
 // Performs the CPU GPU comparison with the given parameters
 int contract(test_t param)
 {
-  if (xdim % 2) errorQuda("odd local x-dimension is not supported.\n");
+  if (xdim % 2) errorQuda("odd local x-dimension is not supported");
 
   const std::array<int, 4> X = {xdim, ydim, zdim, tdim};
 

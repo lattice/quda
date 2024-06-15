@@ -169,23 +169,24 @@ int contractionFT_reference(Float **spinorX, Float **spinorY, const double *cons
   if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) reduct_dim = 2;
 
   // The number of slices in the reduction dimension.
-  size_t reduct_slices = X[reduct_dim] * comm_dim(reduct_dim);
+  size_t reduction_slices = X[reduct_dim] * comm_dim(reduct_dim);
 
   // space for the host result
-  const size_t n_floats = n_mom * reduct_slices * nSpin * nSpin * 2;
+  const size_t n_floats = n_mom * reduction_slices * nSpin * nSpin * 2;
   double *h_result = static_cast<double *>(safe_malloc(n_floats * sizeof(double)));
 
   // compute contractions on the host
   contractFTHost<Float>(spinorX, spinorY, h_result, cType, src_colors, X, source_position, n_mom, mom_modes, fft_type);
 
   const int ntol = 7;
-  double fact = (sizeof(Float) == sizeof(double) ? 0.5e-14 : 0.5e-5); // about fourteen (double) or five (float) digits
-  fact *= sqrt((double)nSpin * 6 * V * 2 / reduct_slices);            // account for repeated roundoff in float ops
-  double epsilon = std::numeric_limits<Float>::epsilon();
+  auto epsilon = std::numeric_limits<Float>::epsilon();
+  auto fact = epsilon;
+  fact *= sqrt((double)nSpin * 6 * V * 2 / reduction_slices); // account for repeated roundoff in float ops
+  fact *= 10;                                                 // account for variation in phase computation
   std::array<double, ntol> tolerance {1.0e-5 * fact, 1.0e-4 * fact, 1.0e-3 * fact, 1.0e-2 * fact,
                                       1.0e-1 * fact, 1.0e+0 * fact, 1.0e+1 * fact};
-  int check_tol = 4;
-  std::array<int, ntol> fails {0, 0, 0, 0, 0};
+  int check_tol = 5;
+  std::array<int, ntol> fails = {};
 
   for (size_t idx = 0; idx < n_floats; ++idx) {
     double rel = abs(d_result[idx] - h_result[idx]) / (abs(h_result[idx]) + epsilon);
