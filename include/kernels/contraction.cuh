@@ -129,7 +129,7 @@ namespace quda
       for (int i = 0; i < 4; i++)
         Sum_dXi_dot_Pi += (arg.source_position[i] - sink[i] - arg.offsets[i]) * arg.mom_mode[i] * 1. / arg.NxNyNzNt[i];
 
-      complex<double> phase = {cos(Sum_dXi_dot_Pi * 2. * M_PI), -sin(Sum_dXi_dot_Pi * 2. * M_PI)};
+      complex<double> phase = {cospi(Sum_dXi_dot_Pi * 2.), -sinpi(Sum_dXi_dot_Pi * 2.)};
 
       // Collect vector data
       int parity = 0;
@@ -202,17 +202,17 @@ namespace quda
       // Phase factor for each direction is either the cos, sin, or exp Fourier phase
 #pragma unroll
       for (int dir = 0; dir < 4; dir++) {
-        auto dXi_dot_Pi = 2.0 * M_PI * (sink[dir] + arg.offsets[dir] - arg.source_position[dir]) * arg.mom_mode[dir]
+        auto dXi_dot_Pi = 2.0 * (sink[dir] + arg.offsets[dir] - arg.source_position[dir]) * arg.mom_mode[dir]
           / arg.NxNyNzNt[dir];
         if (arg.fft_type[dir] == QUDA_FFT_SYMM_EO) {
           // exp(+i k.x) case
-          ph = {cos(dXi_dot_Pi), sin(dXi_dot_Pi)};
+          ph = {cospi(dXi_dot_Pi), sinpi(dXi_dot_Pi)};
         } else if (arg.fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
           // cos(k.x) case
-          ph = {cos(dXi_dot_Pi), 0.0};
+          ph = {cospi(dXi_dot_Pi), 0.0};
         } else if (arg.fft_type[dir] == QUDA_FFT_SYMM_ODD) {
           // sin(k.x) case
-          ph = {0.0, sin(dXi_dot_Pi)};
+          ph = {0.0, sinpi(dXi_dot_Pi)};
         }
         phase *= ph;
       }
