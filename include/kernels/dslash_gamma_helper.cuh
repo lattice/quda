@@ -27,8 +27,8 @@ namespace quda {
     real b;               // chiral twist
     real c;               // flavor twist
 
-    GammaArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, int proj = 0, real kappa = 0.0,
-             real mu = 0.0, real epsilon = 0.0, bool dagger = false,
+    GammaArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, int proj = 0,
+             real kappa = 0.0, real mu = 0.0, real epsilon = 0.0, bool dagger = false,
              QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
       kernel_param(dim3(doublet ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(), in.SiteSubset())),
       d(d),

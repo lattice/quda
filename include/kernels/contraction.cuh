@@ -202,8 +202,8 @@ namespace quda
       // Phase factor for each direction is either the cos, sin, or exp Fourier phase
 #pragma unroll
       for (int dir = 0; dir < 4; dir++) {
-        auto dXi_dot_Pi = 2.0 * (sink[dir] + arg.offsets[dir] - arg.source_position[dir]) * arg.mom_mode[dir]
-          / arg.NxNyNzNt[dir];
+        auto dXi_dot_Pi
+          = 2.0 * (sink[dir] + arg.offsets[dir] - arg.source_position[dir]) * arg.mom_mode[dir] / arg.NxNyNzNt[dir];
         if (arg.fft_type[dir] == QUDA_FFT_SYMM_EO) {
           // exp(+i k.x) case
           ph = {cospi(dXi_dot_Pi), sinpi(dXi_dot_Pi)};
