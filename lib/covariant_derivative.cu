@@ -42,7 +42,7 @@ namespace quda
 
       constexpr bool xpay = false;
       constexpr int nParity = 2;
-      Dslash::template instantiate<packShmem, nParity, xpay>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem, nParity, xpay>(tp, stream);
     }
 
     long long flops() const override
@@ -141,9 +141,17 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      CovDevArg<Float, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-      CovDev<decltype(arg)> covDev(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+      if (in.Nspin() == 4) {
+        CovDevArg<Float, 4, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+      } else if (in.Nspin() == 1) {
+        CovDevArg<Float, 1, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+      } else {
+        errorQuda("Spin not supported");
+      }
     }
   };
 

@@ -927,4 +927,26 @@ namespace quda
   */
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
+  /**
+     @brief Applies a (1 \pm gamma5)/2 projection matrix to a spinor
+     @param[out] out Output field
+     @param[in] in Input field
+     @param[in] proj Sign of \pm projection
+  */
+  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj);
+
+  /**
+     @brief Constructs the mid-point 4D propagator from a 5D domain wall propagator
+     @param[out] out Output field
+     @param[in] in Input field
+  */
+  void make4DMidPointProp(ColorSpinorField &out, ColorSpinorField &in);
+
+  /**
+     @brief Constructs the chiral 4D propagator from a 5D domain wall propagator
+     @param[out] out Output field
+     @param[in] in Input field
+  */
+  void make4DChiralProp(ColorSpinorField &out, ColorSpinorField &in);
+
 } // namespace quda

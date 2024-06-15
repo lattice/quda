@@ -90,6 +90,7 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
   } QudaGaugeParam;
 
 
@@ -1146,7 +1147,12 @@ extern "C" {
    * Free QUDA's internal smeared gauge field.
    */
   void freeGaugeSmearedQuda(void);
-  
+
+  /**
+   * Free QUDA's internal two-link gauge field.
+   */
+  void freeGaugeTwoLinkQuda(void);
+
   /**
    * Save the gauge field to the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1263,13 +1269,42 @@ extern "C" {
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] param  Contains all metadata regarding host and device
    *               storage
-   * @param parity The destination parity of the field
+   * @param[in] parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
+
+  /**
+   * Apply the covariant derivative.
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] dir    Direction of application
+   * @param[in] param  Metadata for host and device storage
+   */
+  void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param);
+
+  /**
+   * Apply the covariant derivative.
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] dir    Direction of application
+   * @param[in] sym    Apply forward=2, backward=2 or symmetric=3 shift
+   * @param[in] param  Metadata for host and device storage
+   */
+  void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param);
+
+  /**
+   * Apply the spin-taste operator.
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] spin   Spin gamma structure
+   * @param[in] taste  Taste gamma structure
+   * @param[in] param  Metadata for host and device storage
+   */
+  void spinTasteQuda(void *h_out, void *h_in, int spin, int taste, QudaInvertParam *param);
 
   /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
@@ -1597,6 +1632,21 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
+   * Performs gaussian/Wuppertal smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field
+   * @param h_out  Output spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   * @param coeff  Width of the Gaussian distribution
+   * @param smear_type Gaussian/Wuppertal smearing
+   */
+  void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double coeff,
+                               const QudaFermionSmearType smear_type);
+
+  /**
+   * LEGACY
    * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
@@ -1607,6 +1657,19 @@ extern "C" {
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
+
+  /**
+   * LEGACY
+   * Performs gaussian smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field
+   * @param h_out  Output spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   * @param omega  Width of the Gaussian distribution
+   */
+  void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
 
   /**
    * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
@@ -1645,6 +1708,23 @@ extern "C" {
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
+
+  /**
+   * @param[in] x pointer to host data array
+   * @param[in] y pointer to host data array
+   * @param[out] result pointer to the spin*spin projections per lattice slice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] src_colors color dilution parameter
+   * @param[in] X local lattice dimansions
+   * @param[in] source_position source position array
+   * @param[in] number of momentum modes
+   * @param[in] mom_modes momentum modes
+   * @param[in] fft_type Fourier phase factor type (cos, sin or exp{ikx})
+   */
+  void contractFTQuda(void **x, void **y, void **result, const QudaContractType cType, void *cs_param_ptr,
+                      const int src_colors, const int *X, const int *const source_position, const int n_mom,
+                      const int *const mom_modes, const QudaFFTSymmType *const fft_type);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

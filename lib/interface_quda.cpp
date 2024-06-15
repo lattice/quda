@@ -24,6 +24,7 @@
 #include <unitarization_links.h>
 #include <algorithm>
 #include <staggered_oprod.h>
+#include <spin_taste.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
 #include <random_quda.h>
@@ -95,6 +96,9 @@ GaugeField *gaugeLongEigensolver = nullptr;
 GaugeField *gaugeLongExtended = nullptr;
 
 GaugeField *gaugeSmeared = nullptr;
+
+// Holds the Two Link gauge
+GaugeField *gaugeTwoLink = nullptr;
 
 CloverField *cloverPrecise = nullptr;
 CloverField *cloverSloppy = nullptr;
@@ -198,6 +202,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
+
+//!< Profiler for FT contractions
+static TimeProfile profileContractFT("contractFTQuda");
 
 //!< Profiler for GEMM and other BLAS
 static TimeProfile profileBLAS("blasQuda");
@@ -992,6 +999,7 @@ void freeGaugeQuda(void)
   freeUniqueGaugeQuda(QUDA_ASQTAD_FAT_LINKS);
   freeUniqueGaugeQuda(QUDA_ASQTAD_LONG_LINKS);
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+  freeUniqueGaugeQuda(QUDA_TWOLINK_LINKS);
 
   // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
   if (extendedGaugeResident) {
@@ -1063,6 +1071,10 @@ void freeUniqueGaugeQuda(QudaLinkType link_type)
     if (gaugeSmeared) delete gaugeSmeared;
     gaugeSmeared = nullptr;
     break;
+  case QUDA_TWOLINK_LINKS:
+    if (gaugeTwoLink) delete gaugeTwoLink;
+    gaugeTwoLink = nullptr;
+    break;
   default: errorQuda("Invalid gauge type %d", link_type);
   }
 }
@@ -1071,6 +1083,12 @@ void freeGaugeSmearedQuda()
 {
   // thin wrapper
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+}
+
+void freeGaugeTwoLinkQuda()
+{
+  // thin wrapper
+  freeUniqueGaugeQuda(QUDA_TWOLINK_LINKS);
 }
 
 void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *recon)
@@ -1384,6 +1402,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
+    profileContractFT.Print();
     profileBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
@@ -1874,6 +1893,446 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param)
+{
+  auto profile = pushProfile(profileCovDev, param->secs, param->gflops);
+
+  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  QudaInvertParam &inv_param = *param;
+
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (!gaugePrecise) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param.verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
+
+  ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
+  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, inv_param, QUDA_CUDA_FIELD_LOCATION);
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param.output_location;
+  ColorSpinorField out_h(cpuParam);
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField in(cudaParam);
+  in = in_h;
+  ColorSpinorField out(cudaParam);
+  out = in;
+  ColorSpinorField tmp(cudaParam);
+  tmp = in;
+
+  profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
+  DiracParam diracParam;
+  setDiracParam(diracParam, &inv_param, false);
+
+  GaugeCovDev myCovDev(diracParam); // create the Dirac operator
+
+  if (sym & 1) {
+    myCovDev.MCD(out, in, dir); // apply the operator
+  }
+  if (sym & 2) {
+    myCovDev.MCD(tmp, in, dir + 4); // apply the operator
+  }
+
+  quda::blas::xpy(tmp, out);
+
+  if (sym == 3) quda::blas::ax(0.5, out);
+
+  profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  popVerbosity();
+}
+
+void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam *param)
+{
+  auto profile = pushProfile(profileCovDev, param->secs, param->gflops);
+
+  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  QudaInvertParam &inv_param = *param;
+
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (!gaugePrecise) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param.verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
+
+  ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
+  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, inv_param, QUDA_CUDA_FIELD_LOCATION);
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param.output_location;
+  ColorSpinorField out_h(cpuParam);
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField in(cudaParam); // cudaColorSpinorField
+  in = in_h;
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE; // create new field and zero it
+  ColorSpinorField out(cudaParam);           // cudaColorSpinorField = 0
+  ColorSpinorField tmp(cudaParam);           // cudaColorSpinorField = 0
+
+  profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
+  DiracParam diracParam;
+  setDiracParam(diracParam, &inv_param, false);
+
+  GaugeCovDev myCovDev(diracParam); // create the Dirac operator
+
+  int offset = spin_ ^ taste;
+  QudaSpinTasteGamma spin = (QudaSpinTasteGamma)spin_;
+
+  constexpr QudaSpinTasteGamma gDirs[4]
+    = {QUDA_SPIN_TASTE_GX, QUDA_SPIN_TASTE_GY, QUDA_SPIN_TASTE_GZ, QUDA_SPIN_TASTE_GT};
+
+  switch (offset) {
+
+  case 0: // local
+  {
+    applySpinTaste(tmp, in, spin);
+    applySpinTaste(out, tmp, QUDA_SPIN_TASTE_G5); // antiquark
+    break;
+  }
+
+  case 1: // one-link X
+  case 2: // one-link Y
+  case 4: // one-link Z
+  case 8: // one-link T
+  {
+    int cDir = 0;
+
+    if (offset == 1) {
+      cDir = 0;
+    } else if (offset == 2) {
+      cDir = 1;
+    } else if (offset == 4) {
+      cDir = 2;
+    } else if (offset == 8) {
+      cDir = 3;
+    }
+
+    ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+    applySpinTaste(out, in, spin);
+    myCovDev.MCD(tmp, out, cDir);
+    myCovDev.MCD(pr1, out, cDir + 4);
+    quda::blas::xpy(pr1, tmp);
+    applySpinTaste(pr1, tmp, gDirs[cDir]);
+    applySpinTaste(out, pr1, QUDA_SPIN_TASTE_G5);
+    quda::blas::ax(0.5, out);
+    break;
+  }
+
+  case 3:  // two-link XY
+  case 6:  // two-link YZ
+  case 5:  // two-link ZX
+  case 9:  // two-link XT
+  case 10: // two-link YT
+  case 12: // two-link ZT
+  {
+    int dirs[2];
+
+    {
+      if (offset == 3) {
+        dirs[0] = 0;
+        dirs[1] = 1;
+      }
+      if (offset == 6) {
+        dirs[0] = 1;
+        dirs[1] = 2;
+      }
+      if (offset == 5) {
+        dirs[0] = 2;
+        dirs[1] = 0;
+      }
+      if (offset == 9) {
+        dirs[0] = 0;
+        dirs[1] = 3;
+      }
+      if (offset == 10) {
+        dirs[0] = 1;
+        dirs[1] = 3;
+      }
+      if (offset == 12) {
+        dirs[0] = 2;
+        dirs[1] = 3;
+      }
+    }
+
+    ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+    ColorSpinorField acc(cudaParam); // cudaColorSpinorField = 0
+
+    applySpinTaste(out, in, spin);
+    // YX result in acc
+    myCovDev.MCD(tmp, out, dirs[1]);
+    myCovDev.MCD(pr1, out, dirs[1] + 4);
+    quda::blas::xpy(pr1, tmp);
+    applySpinTaste(pr1, tmp, gDirs[dirs[1]]);
+    myCovDev.MCD(tmp, pr1, dirs[0]);
+    myCovDev.MCD(acc, pr1, dirs[0] + 4);
+    quda::blas::xpy(acc, tmp);
+    applySpinTaste(acc, tmp, gDirs[dirs[0]]);
+    // XY result in tmp
+    myCovDev.MCD(tmp, out, dirs[0]);
+    myCovDev.MCD(pr1, out, dirs[0] + 4);
+    quda::blas::xpy(pr1, tmp);
+    applySpinTaste(pr1, tmp, gDirs[dirs[0]]);
+    myCovDev.MCD(tmp, pr1, dirs[1]);
+    myCovDev.MCD(out, pr1, dirs[1] + 4);
+    quda::blas::xpy(tmp, out);
+    applySpinTaste(tmp, out, gDirs[dirs[1]]);
+
+    quda::blas::mxpy(tmp, acc);
+    applySpinTaste(out, acc, QUDA_SPIN_TASTE_G5);
+    quda::blas::ax(0.125, out);
+    break;
+  }
+
+  case 14: // three-link 5X
+  case 13: // three-link 5Y
+  case 11: // three-link 5Z
+  case 7:  // three-link 5T
+  {
+    ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+    ColorSpinorField pr2(cudaParam); // cudaColorSpinorField = 0
+    ColorSpinorField acc(cudaParam); // cudaColorSpinorField = 0
+
+    applySpinTaste(out, in, spin);
+
+    int noDir = 0;
+    int dirs[3];
+
+    // quda::blas::ax(0.0, acc);
+    if (offset == 14) {
+      noDir = 0;
+    } else if (offset == 13) {
+      noDir = 1;
+    } else if (offset == 11) {
+      noDir = 2;
+    } else if (offset == 7) {
+      noDir = 3;
+    }
+    {
+      int j = 0;
+      for (int i = 0; i < 4; i++) {
+        if (i == noDir) continue;
+        dirs[j++] = i;
+      }
+    }
+
+    for (int i = 0; i < 3; i++) {
+
+      const int d1 = dirs[(i + 0) % 3];
+      const int d2 = dirs[(i + 1) % 3];
+      const int d3 = dirs[(i + 2) % 3];
+
+      // Accumulate result in acc
+      myCovDev.MCD(tmp, out, d1);
+      myCovDev.MCD(pr1, out, d1 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[d1]);
+      myCovDev.MCD(tmp, pr1, d2);
+      myCovDev.MCD(pr2, pr1, d2 + 4);
+      quda::blas::xpy(pr2, tmp);
+      applySpinTaste(pr2, tmp, gDirs[d2]);
+      myCovDev.MCD(tmp, pr2, d3);
+      myCovDev.MCD(pr1, pr2, d3 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[d3]);
+      quda::blas::xpy(pr1, acc);
+
+      // Accumulate result in acc
+      myCovDev.MCD(tmp, out, d3);
+      myCovDev.MCD(pr1, out, d3 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[d3]);
+      myCovDev.MCD(tmp, pr1, d2);
+      myCovDev.MCD(pr2, pr1, d2 + 4);
+      quda::blas::xpy(pr2, tmp);
+      applySpinTaste(pr2, tmp, gDirs[d2]);
+      myCovDev.MCD(tmp, pr2, d1);
+      myCovDev.MCD(pr1, pr2, d1 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[d1]);
+      quda::blas::mxpy(pr1, acc);
+    }
+
+    applySpinTaste(out, acc, QUDA_SPIN_TASTE_G5);
+    quda::blas::ax(0.125 / 6., out);
+    break;
+  }
+
+  case 15: // four-link 5
+  {
+    const int dPlus[12][4] = {{0, 1, 2, 3}, {1, 2, 0, 3}, {2, 0, 1, 3}, {0, 3, 1, 2}, {1, 3, 2, 0}, {2, 3, 0, 1},
+                              {3, 2, 1, 0}, {3, 0, 2, 1}, {3, 1, 0, 2}, {2, 1, 3, 0}, {0, 2, 3, 1}, {1, 0, 3, 2}};
+    const int dMnus[12][4] = {{0, 2, 1, 3}, {1, 0, 2, 3}, {2, 1, 0, 3}, {0, 3, 2, 1}, {1, 3, 0, 2}, {2, 3, 1, 0},
+                              {3, 1, 2, 0}, {3, 2, 0, 1}, {3, 0, 1, 2}, {1, 2, 3, 0}, {2, 0, 3, 1}, {0, 1, 3, 2}};
+
+    ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+    ColorSpinorField pr2(cudaParam); // cudaColorSpinorField = 0
+    ColorSpinorField acc(cudaParam); // cudaColorSpinorField = 0
+
+    applySpinTaste(out, in, spin);
+
+    for (int i = 0; i < 12; i++) {
+
+      const int d1 = dPlus[i][0];
+      const int d2 = dPlus[i][1];
+      const int d3 = dPlus[i][2];
+      const int d4 = dPlus[i][3];
+
+      // Accumulate result in acc
+      myCovDev.MCD(tmp, out, d1);
+      myCovDev.MCD(pr1, out, d1 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[d1]);
+      myCovDev.MCD(tmp, pr1, d2);
+      myCovDev.MCD(pr2, pr1, d2 + 4);
+      quda::blas::xpy(pr2, tmp);
+      applySpinTaste(pr2, tmp, gDirs[d2]);
+      myCovDev.MCD(tmp, pr2, d3);
+      myCovDev.MCD(pr1, pr2, d3 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[d3]);
+      myCovDev.MCD(tmp, pr1, d4);
+      myCovDev.MCD(pr2, pr1, d4 + 4);
+      quda::blas::xpy(pr2, tmp);
+      applySpinTaste(pr2, tmp, gDirs[d4]);
+      quda::blas::xpy(pr2, acc);
+
+      const int m1 = dMnus[i][0];
+      const int m2 = dMnus[i][1];
+      const int m3 = dMnus[i][2];
+      const int m4 = dMnus[i][3];
+
+      // Accumulate result in acc
+      myCovDev.MCD(tmp, out, m1);
+      myCovDev.MCD(pr1, out, m1 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[m1]);
+      myCovDev.MCD(tmp, pr1, m2);
+      myCovDev.MCD(pr2, pr1, m2 + 4);
+      quda::blas::xpy(pr2, tmp);
+      applySpinTaste(pr2, tmp, gDirs[m2]);
+      myCovDev.MCD(tmp, pr2, m3);
+      myCovDev.MCD(pr1, pr2, m3 + 4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[m3]);
+      myCovDev.MCD(tmp, pr1, m4);
+      myCovDev.MCD(pr2, pr1, m4 + 4);
+      quda::blas::xpy(pr2, tmp);
+      applySpinTaste(pr2, tmp, gDirs[m4]);
+      quda::blas::mxpy(pr2, acc);
+    }
+
+    applySpinTaste(out, acc, QUDA_SPIN_TASTE_G5);
+    quda::blas::ax(0.0625 / 24., out);
+    break;
+  }
+  }
+
+  // FIXME: This is not exactly all covDev
+  profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  popVerbosity();
+}
+
+void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
+{
+  auto profile = pushProfile(profileCovDev, param->secs, param->gflops);
+
+  QudaInvertParam &inv_param = *param;
+
+  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  // if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+  //    || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+  if (!gaugePrecise) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param.verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
+
+  ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
+  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, inv_param, QUDA_CUDA_FIELD_LOCATION);
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param.output_location;
+  ColorSpinorField out_h(cpuParam);
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField in(cudaParam); // cudaColorSpinorField
+  in = in_h;
+  ColorSpinorField out(cudaParam); // cudaColorSpinorField
+  out = in;
+
+  profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
+  DiracParam diracParam;
+  setDiracParam(diracParam, &inv_param, false);
+
+  GaugeCovDev myCovDev(diracParam); // create the Dirac operator
+  myCovDev.MCD(out, in, dir);       // apply the operator
+  profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  popVerbosity();
+}
+
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
@@ -2353,7 +2812,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
 {
   QudaInvertParam *param = mg_param.invert_param;
-  // set whether we are going use native or generic blas
+  // set whether we are going to use native or generic blas
   blas_lapack::set_native(param->native_blas_lapack);
 
   checkMultigridParam(&mg_param);
@@ -5021,14 +5480,13 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   saveTuneCache();
 }
 
-
 void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
 {
   auto profile = pushProfile(profileGaugeSmear);
   pushOutputPrefix("performGaugeSmearQuda: ");
   checkGaugeSmearParam(smear_param);
 
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+  if (gaugePrecise == nullptr) errorQuda("Precise gauge field must be loaded");
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGaugeSmear);
 
@@ -5200,6 +5658,101 @@ int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const u
   }
 
   return 0;
+}
+
+void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **result, const QudaContractType cType,
+                    void *cs_param_ptr, const int src_colors, const int *X, const int *const source_position,
+                    const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type)
+{
+  auto profile = pushProfile(profileContractFT);
+
+  // create ColorSpinorFields from void** and parameter
+  auto cs_param = (ColorSpinorParam *)cs_param_ptr;
+  const size_t nSpin = cs_param->nSpin;
+  const size_t src_nColor = src_colors;
+  cs_param->location = QUDA_CPU_FIELD_LOCATION;
+  cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
+
+  // The number of complex contraction results expected in the output
+  size_t num_out_results = nSpin * nSpin;
+
+  // FIXME can we merge the two propagators if they are the same to save mem?
+  // wrap CPU host side pointers
+  std::vector<ColorSpinorField> h_prop1, h_prop2;
+  h_prop1.reserve(nSpin * src_nColor);
+  h_prop2.reserve(nSpin * src_nColor);
+  for (size_t i = 0; i < nSpin * src_nColor; i++) {
+    cs_param->v = prop_array_flavor_1[i];
+    h_prop1.push_back(ColorSpinorField(*cs_param));
+    cs_param->v = prop_array_flavor_2[i];
+    h_prop2.push_back(ColorSpinorField(*cs_param));
+  }
+
+  // Create device spinor fields
+  ColorSpinorParam cudaParam(*cs_param);
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not relevant for staggered
+  cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
+
+  std::vector<ColorSpinorField> d_prop1, d_prop2;
+  d_prop1.reserve(nSpin * src_nColor);
+  d_prop2.reserve(nSpin * src_nColor);
+  for (size_t i = 0; i < nSpin * src_nColor; i++) {
+    d_prop1.push_back(ColorSpinorField(cudaParam));
+    d_prop2.push_back(ColorSpinorField(cudaParam));
+  }
+
+  // temporal or spatial correlator?
+  size_t corr_dim = 0, local_decay_dim_slices = 0;
+  if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z)
+    corr_dim = 2;
+  else if (cType == QUDA_CONTRACT_TYPE_DR_FT_T || cType == QUDA_CONTRACT_TYPE_STAGGERED_FT_T)
+    corr_dim = 3;
+  else
+    errorQuda("Unsupported contraction type %d given", cType);
+
+  // The number of slices in the decay dimension on this MPI rank.
+  local_decay_dim_slices = X[corr_dim];
+
+  // The number of slices in the decay dimension globally.
+  size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim(corr_dim);
+
+  // Transfer data from host to device
+  for (size_t i = 0; i < nSpin * src_nColor; i++) {
+    d_prop1[i] = h_prop1[i];
+    d_prop2[i] = h_prop2[i];
+  }
+
+  // Array for all decay slices and spins, is zeroed prior to kernel launch
+  std::vector<Complex> result_global(global_decay_dim_slices * num_out_results);
+
+  profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
+  for (int mom_idx = 0; mom_idx < n_mom; ++mom_idx) {
+
+    for (size_t s1 = 0; s1 < nSpin; s1++) {
+      for (size_t b1 = 0; b1 < nSpin; b1++) {
+        for (size_t c1 = 0; c1 < src_nColor; c1++) {
+
+          std::fill(result_global.begin(), result_global.end(), 0.0);
+          contractSummedQuda(d_prop1[s1 * src_nColor + c1], d_prop2[b1 * src_nColor + c1], result_global, cType,
+                             source_position, &mom_modes[4 * mom_idx], &fft_type[4 * mom_idx], s1, b1);
+
+          comm_allreduce_sum(result_global);
+          for (size_t t = 0; t < global_decay_dim_slices; t++) {
+            for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
+              int index = 2 * (global_decay_dim_slices * num_out_results * mom_idx + num_out_results * t + G_idx);
+              ((double *)*result)[index + 0] += result_global[num_out_results * t + G_idx].real();
+              ((double *)*result)[index + 1] += result_global[num_out_results * t + G_idx].imag();
+            }
+          }
+        }
+      }
+    }
+  }
+  profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  saveTuneCache();
 }
 
 void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
