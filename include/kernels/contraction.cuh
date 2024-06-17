@@ -114,8 +114,8 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      constexpr array<array<int, nSpin>, nSpin * nSpin> gm_i = get_dr_gm_i();
-      constexpr array<array<complex<real>, nSpin>, nSpin * nSpin> g5gm_z = get_dr_g5gm_z<real>();
+      constexpr array<array<int, nSpin>, nSpin *nSpin> gm_i = get_dr_gm_i();
+      constexpr array<array<complex<real>, nSpin>, nSpin *nSpin> g5gm_z = get_dr_g5gm_z<real>();
 
       int s1 = arg.s1;
       int b1 = arg.b1;

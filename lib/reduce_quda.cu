@@ -147,8 +147,8 @@ namespace quda {
     // split the fields and recurse if needed
     template <template <typename reduce_t, typename real> class Functor, bool mixed, typename coeff_t, typename X,
               typename Y, typename Z, typename W, typename V>
-    auto instantiateReduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w,
-                           V &v) -> vector<typename Functor<double, double>::reduce_t>
+    auto instantiateReduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, X &x, Y &y, Z &z, W &w, V &v)
+      -> vector<typename Functor<double, double>::reduce_t>
     {
       if (x.size() > get_max_multi_rhs()) {
         auto value0 = instantiateReduce<Functor, mixed, coeff_t, X, Y, Z, W, V>(

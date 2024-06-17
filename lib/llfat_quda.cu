@@ -215,10 +215,10 @@ namespace quda {
                 for (int sig = 0; sig < 4; sig++) {
                   if (sig != nu && sig != rho) { computeStaple(fat, staple, staple1, u, sig, nu, rho, coeff[4], 0); }
                 } // sig
-              } // MIN_COEFF
+              }   // MIN_COEFF
             }
           } // rho
-        } // nu
+        }   // nu
       }
 
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);

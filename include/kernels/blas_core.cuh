@@ -53,7 +53,9 @@ namespace quda
     */
     template <typename Arg> struct Blas_ {
       Arg &arg;
-      constexpr Blas_(const Arg &arg) : arg(const_cast<Arg &>(arg)) { }
+      constexpr Blas_(const Arg &arg) : arg(const_cast<Arg&>(arg))
+      {
+      }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline void operator()(int i, int src_idx, int parity) const

@@ -379,7 +379,7 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               typename T, typename store_t, typename y_store_t, typename V, typename... Args>
-    constexpr void instantiate(const T &a, const T &b, const T &c, V &x_, Args &&...args)
+    constexpr void instantiate(const T &a, const T &b, const T &c, V &x_, Args &&... args)
     {
       unwrap_t<V> &x(x_);
       if (x.Nspin() == 4 || x.Nspin() == 2) {

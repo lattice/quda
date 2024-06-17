@@ -333,8 +333,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
       _hp_x[i] = out[i].data();
       _hp_b[i] = in[i].data();
     }
-
-    // Run split grid
+    
+		// Run split grid
     invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
     quda::comm_allreduce_int(inv_param.iter);

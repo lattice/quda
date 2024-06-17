@@ -228,15 +228,14 @@ namespace quda {
     /**
        @brief apply 'dslash' operator for the DiracOp. This may be e.g. AD
     */
-    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const
-      = 0;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const = 0;
 
     /**
        @brief Xpay version of Dslash
     */
     virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
-      = 0;
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const = 0;
 
     /**
        @brief Similar to the Xpay version of Dslash, but used only by the Laplace op for

@@ -54,12 +54,13 @@ namespace quda
       else {
         eigensolver = new CloverField(*eigensolver_);
       }
+
     }
   }; // Class
 
   void setupCloverFields(CloverField *collected_clover, CloverField *&precise, CloverField *&sloppy,
-                         CloverField *&precondition, CloverField *&refinement, CloverField *&eigensolver,
-                         const CloverBundleBackup &bkup)
+                        CloverField *&precondition, CloverField *&refinement, CloverField *&eigensolver,
+                        const CloverBundleBackup &bkup)
   {
     // First things first. The new collected gauge is going to become the 'precise'
     // Things to check: what to do about precise first (We copied it so we can free it)
@@ -135,5 +136,6 @@ namespace quda
       eigensolver = new CloverField(eigensolver_param);
       eigensolver->copy(*precise);
     }
+
   }
 } // namespace quda

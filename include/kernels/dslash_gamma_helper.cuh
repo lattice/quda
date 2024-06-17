@@ -30,8 +30,7 @@ namespace quda {
     GammaArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, int proj = 0,
              real kappa = 0.0, real mu = 0.0, real epsilon = 0.0, bool dagger = false,
              QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(),
-                        in.SiteSubset())),
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(), in.SiteSubset())),
       d(d),
       proj(proj),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
@@ -168,13 +167,12 @@ namespace quda {
 
     F out[MAX_MULTI_RHS]; // output vector field
     F in[MAX_MULTI_RHS];  // input vector field
-    const int d;          // which gamma matrix are we applying
+    const int d;        // which gamma matrix are we applying
     bool doublet;       // whether we applying the operator to a doublet
     const int volumeCB; // checkerboarded volume
 
     TauArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d) :
-      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(),
-                        in.SiteSubset())),
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB() / 2 : in.VolumeCB(), in.size(), in.SiteSubset())),
       d(d),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB() / 2 : in.VolumeCB())

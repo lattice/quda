@@ -59,7 +59,9 @@ namespace quda
       using Arg::Reducer::reducer::operator();
       static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       Arg &arg;
-      constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg &>(arg)) { }
+      constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
+      {
+      }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int src_idx) const
@@ -94,7 +96,8 @@ namespace quda
        @tparam reduce_t The fundamental reduction type
        @tparam site_unroll Whether each thread must update the entire site
     */
-    template <typename reduce_t_, bool site_unroll_ = false> struct ReduceFunctor {
+    template <typename reduce_t_, bool site_unroll_ = false>
+    struct ReduceFunctor {
       using reduce_t = reduce_t_;
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = site_unroll_;
@@ -475,7 +478,8 @@ namespace quda
        lattice site hence the site_unroll template parameter must be
        set true.
     */
-    template <typename real_reduce_t, typename real> struct HeavyQuarkResidualNorm_ {
+    template <typename real_reduce_t, typename real>
+    struct HeavyQuarkResidualNorm_ {
       using reduce_t = array<real_reduce_t, 3>;
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
@@ -511,7 +515,8 @@ namespace quda
       an entire lattice site hence the site_unroll template parameter
       must be set true.
     */
-    template <typename real_reduce_t, typename real> struct xpyHeavyQuarkResidualNorm_ {
+    template <typename real_reduce_t, typename real>
+    struct xpyHeavyQuarkResidualNorm_ {
       using reduce_t = array<real_reduce_t, 3>;
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;

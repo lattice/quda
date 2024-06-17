@@ -141,4 +141,5 @@ namespace quda {
       errorQuda("Twisted-clover operator has not been built");
     }
   }
+
 }

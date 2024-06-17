@@ -3433,6 +3433,7 @@ void loadFatLongGaugeQuda(QudaInvertParam *inv_param, QudaGaugeParam *gauge_para
   }
 }
 
+
 template <class Interface, class... Args>
 void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // color spinor field pointers, and inv_param
                       Interface op, Args... args)
@@ -3671,12 +3672,12 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // Since input fields are in Native order now
     param_copy.dirac_order = QUDA_INTERNAL_DIRAC_ORDER;
 
-    // We need to set the cpu_prec in the param_copy, because the op() passed in
-    // to us will try to create wrappers to the pointers we pass in. They expect
-    // the input spinors to be on the host, and will use param_copy.cpu_prec to set
-    // the precision. We want to avoid the situation, where the internal prec and the
-    // cpu_prec are somehow different.
-    param_copy.cpu_prec = _collect_b[0].Precision();
+		// We need to set the cpu_prec in the param_copy, because the op() passed in
+		// to us will try to create wrappers to the pointers we pass in. They expect
+		// the input spinors to be on the host, and will use param_copy.cpu_prec to set
+		// the precision. We want to avoid the situation, where the internal prec and the
+		// cpu_prec are somehow different. 
+		param_copy.cpu_prec = _collect_b[0].Precision();
 
     // Do the solves
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
@@ -3750,6 +3751,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
+
 
 void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {

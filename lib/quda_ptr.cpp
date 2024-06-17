@@ -88,7 +88,10 @@ namespace quda
     host = nullptr;
   }
 
-  quda_ptr::~quda_ptr() { destroy(); }
+  quda_ptr::~quda_ptr()
+  {
+    destroy();
+  }
 
   void quda_ptr::exchange(quda_ptr &obj, quda_ptr &&new_value)
   {

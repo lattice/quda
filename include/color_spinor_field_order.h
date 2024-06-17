@@ -1201,7 +1201,7 @@ namespace quda
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
-      // #define LEGACY_ACCESSOR_NORM // legacy code where norm pointer and offset are stored instead of computed
+      //#define LEGACY_ACCESSOR_NORM // legacy code where norm pointer and offset are stored instead of computed
 #ifdef LEGACY_ACCESSOR_NORM
       norm_type *norm = nullptr;
 #endif

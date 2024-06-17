@@ -277,8 +277,8 @@ namespace quda {
       const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
-        param.block = dim3(min_block_size, 1, 1);
-        param.grid = dim3(min_grid_size, 1, 1);
+	param.block = dim3(min_block_size,1,1);
+	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
