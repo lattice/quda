@@ -940,9 +940,9 @@ namespace quda {
   {
     const unwrap_t<T1> &a(a_);
     const unwrap_t<T2> &b(b_);
-    if (!a.dd.check(a, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
-    if (!b.dd.check(b, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
-    if (!a.dd.match(b.dd, true)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
+    if (!a.DD().check(a, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!b.DD().check(b, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!a.DD().match(b.DD(), true)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
     return true;
   }
 

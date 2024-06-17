@@ -357,6 +357,9 @@ namespace quda
     //
     CompositeColorSpinorField components;
 
+    /** Domain decomposition options */
+    DDParam dd {};
+
     /**
        Compute the required extended ghost zone sizes and offsets
        @param[in] nFace The depth of the halo
@@ -384,9 +387,6 @@ namespace quda
     inline static int initGhostFaceBuffer = 0;
     inline static size_t ghostFaceBytes[QUDA_MAX_DIM] = {};
     static void freeGhostBuffer(void);
-
-    /** Domain decomposition options */
-    DDParam dd {};
 
     /**
        @brief Default constructor
@@ -443,11 +443,24 @@ namespace quda
     void copy(const ColorSpinorField &src);
 
     /**
-       @brief Project the field to a domain determined by
-       ddParam
+       @brief Project the field to a domain determined by DDParam
      */
-
     void projectDD();
+
+    /**
+       @brief Returns DDParam
+     */
+    DDParam DD() const { return dd; }
+
+    /**
+       @brief Sets DDParam from a given DDParam
+     */
+    void DD(const DDParam &in) { dd = in; }
+
+    /**
+       @brief Sets DDParam from a given list of options (DD flags)
+     */
+    template <typename... Args> void DD(const quda::DD &flag, const Args &...args) { dd.set(flag, args...); }
 
     /**
        @brief Zero all elements of this field

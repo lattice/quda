@@ -350,9 +350,9 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
-      dd_out(out),
-      dd_in(in),
-      dd_x(x),
+      dd_out(out.DD()),
+      dd_in(in.DD()),
+      dd_x(x.DD()),
 #ifndef NVSHMEM_COMMS
       counter(0)
 #else

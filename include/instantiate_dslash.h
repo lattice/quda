@@ -51,16 +51,17 @@ namespace quda
   */
   template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
             int nColor, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
+  inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
-    if (out.dd.type == QUDA_DD_NO and in.dd.type == QUDA_DD_NO) {
-      instantiate<Apply, Recon, Float, 3, DDNo>(out, in, U, args...);
+    if (out.DD().type == QUDA_DD_NO and in.DD().type == QUDA_DD_NO) {
+      instantiate<Apply, Recon, Float, 3, DDNo>(out, in, x, U, args...);
 #ifdef GPU_DD_DIRAC
-    } else if (out.dd.type == QUDA_DD_RED_BLACK or in.dd.type == QUDA_DD_RED_BLACK) {
-      instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, U, args...);
+    } else if (out.DD().type == QUDA_DD_RED_BLACK or in.DD().type == QUDA_DD_RED_BLACK) {
+      instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, x, U, args...);
 #endif
     } else {
-      errorQuda("Unsupported DD type %d\n", out.dd.type);
+      errorQuda("Unsupported DD type %d\n", out.DD().type);
     }
   }
 

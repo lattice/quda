@@ -7,6 +7,7 @@
 #include <enum_quda.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <domain_decomposition.h>
 
 namespace quda
 {
@@ -461,6 +462,21 @@ namespace quda
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, std::string> AuxString() const
     {
       return operator[](0).AuxString();
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, DDParam &> DD() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).DD() != operator[](i).DD()) errorQuda("DD do not match %d != %d", i - 1, i);
+      return operator[](0).DD();
+    }
+
+    template <class U = T, typename... Args>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, void> DD(const quda::DD &flag,
+                                                                                        const Args &...args)
+    {
+      for (auto i = 0u; i < vector::size(); i++) operator[](i).DD(flag, args...);
     }
   };
 

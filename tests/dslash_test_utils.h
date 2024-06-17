@@ -852,10 +852,10 @@ struct DslashTestWrapper {
 
       if (dd_red_black) {
         for (auto i = 0u; i < 4; i++) {
-          cudaSpinor.dd.blockDim[i] = dd_block_size[i];
-          cudaSpinorTmp.dd.blockDim[i] = dd_block_size[i];
-          cudaSpinorTmp2.dd.blockDim[i] = dd_block_size[i];
-          cudaSpinorTmp3.dd.blockDim[i] = dd_block_size[i];
+          cudaSpinor.DD().blockDim[i] = dd_block_size[i];
+          cudaSpinorTmp.DD().blockDim[i] = dd_block_size[i];
+          cudaSpinorTmp2.DD().blockDim[i] = dd_block_size[i];
+          cudaSpinorTmp3.DD().blockDim[i] = dd_block_size[i];
         }
 
         blas::zero(cudaSpinorOut);
@@ -863,8 +863,8 @@ struct DslashTestWrapper {
         // We test that applying all 4 possible operators Drr, Drb, Dbr, Dbb gived D
         for (int col = 0; col < 4; col++) {
 
-          cudaSpinor.dd.reset(DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
-          cudaSpinorTmp.dd.reset(DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinor.DD(DD::reset, DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp.DD(DD::reset, DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
 
           switch (dtest_type) {
           case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp, cudaSpinor, parity); break;
@@ -876,14 +876,14 @@ struct DslashTestWrapper {
             errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
           }
 
-          cudaSpinor.dd.reset();
-          cudaSpinorTmp.dd.reset();
+          cudaSpinor.DD(DD::reset);
+          cudaSpinorTmp.DD(DD::reset);
 
           // We also test that Dyx is same as D applied to projected in and out spinors
           cudaSpinorTmp2 = cudaSpinor;
-          cudaSpinorTmp2.dd.reset(DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp2.DD(DD::reset, DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
           cudaSpinorTmp2.projectDD();
-          cudaSpinorTmp2.dd.reset();
+          cudaSpinorTmp2.DD(DD::reset);
 
           switch (dtest_type) {
           case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp3, cudaSpinorTmp2, parity); break;
@@ -895,9 +895,9 @@ struct DslashTestWrapper {
             errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
           }
 
-          cudaSpinorTmp3.dd.reset(DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
+          cudaSpinorTmp3.DD(DD::reset, DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
           cudaSpinorTmp3.projectDD();
-          cudaSpinorTmp3.dd.reset();
+          cudaSpinorTmp3.DD(DD::reset);
 
           if (dd_test_projection)
             blas::xpy(cudaSpinorTmp3, cudaSpinorOut);

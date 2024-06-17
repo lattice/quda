@@ -25,10 +25,10 @@ namespace quda
     ProjectDD(ColorSpinorField &out) : TunableKernel2D(out, out.SiteSubset()), out(out)
     {
       strcat(aux, out.AuxString().c_str());
-      switch (out.dd.type) {
+      switch (out.DD().type) {
       case QUDA_DD_NO: strcat(aux, ",DDNo"); break;
       case QUDA_DD_RED_BLACK: strcat(aux, ",DDRedBlack"); break;
-      default: errorQuda("DD type %d not implemented", out.dd.type);
+      default: errorQuda("DD type %d not implemented", out.DD().type);
       }
 
       apply(device::get_default_stream());
@@ -124,10 +124,10 @@ namespace quda
 
   template <typename Float> void genericProjectDD(ColorSpinorField &a)
   {
-    switch (a.dd.type) {
+    switch (a.DD().type) {
     case QUDA_DD_NO: genericProjectDD<Float, DDNo>(a); break;
     case QUDA_DD_RED_BLACK: genericProjectDD<Float, DDRedBlack>(a); break;
-    default: errorQuda("DD type %d not implemented", a.dd.type);
+    default: errorQuda("DD type %d not implemented", a.DD().type);
     }
   }
 

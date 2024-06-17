@@ -10,9 +10,9 @@ namespace quda
   struct DDNo {
 
     // Initialization of input parameters from ColorSpinorField
-    DDNo(const ColorSpinorField &in)
+    DDNo(const DDParam &dd)
     {
-      if (in.dd.type != QUDA_DD_NO) { errorQuda("Unsupported type %d\n", in.dd.type); }
+      if (dd.type != QUDA_DD_NO) { errorQuda("Unsupported type %d\n", dd.type); }
     }
 
     // Only DDNo returns true. All others return false
@@ -39,15 +39,13 @@ namespace quda
     const bool black_active;       // if black blocks are active
     const bool block_hopping;      // if hopping between red and black is allowed
 
-    DDRedBlack(const ColorSpinorField &in) :
-      blockDim {in.dd.blockDim[0], in.dd.blockDim[1], in.dd.blockDim[2], in.dd.blockDim[3]},
-      red_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::red_active)),
-      black_active(in.dd.type == QUDA_DD_NO or in.dd.is(DD::black_active)),
-      block_hopping(in.dd.type == QUDA_DD_NO or not in.dd.is(DD::no_block_hopping))
+    DDRedBlack(const DDParam &dd) :
+      blockDim {dd.blockDim[0], dd.blockDim[1], dd.blockDim[2], dd.blockDim[3]},
+      red_active(dd.type == QUDA_DD_NO or dd.is(DD::red_active)),
+      black_active(dd.type == QUDA_DD_NO or dd.is(DD::black_active)),
+      block_hopping(dd.type == QUDA_DD_NO or not dd.is(DD::no_block_hopping))
     {
-      if (in.dd.type != QUDA_DD_NO and in.dd.type != QUDA_DD_RED_BLACK) {
-        errorQuda("Unsupported type %d\n", in.dd.type);
-      }
+      if (dd.type != QUDA_DD_NO and dd.type != QUDA_DD_RED_BLACK) { errorQuda("Unsupported type %d\n", dd.type); }
     }
 
     constexpr bool operator!() const { return false; }

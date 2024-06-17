@@ -107,12 +107,12 @@ namespace quda
         if (param.do_block_schwarz()) {
           if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
             // Red or black active
-            Ar.dd.reset(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
-            r_sloppy.dd.reset(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+            Ar.DD(DD::reset, DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+            r_sloppy.DD(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
           } else {
             // Both red and black active but no hopping
-            Ar.dd.reset(DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
-            r_sloppy.dd.reset(DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+            Ar.DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+            r_sloppy.DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
           }
         }
 
@@ -157,8 +157,8 @@ namespace quda
 
         if (param.do_block_schwarz()) {
           // Disable domain decomposition
-          Ar.dd.reset();
-          r_sloppy.dd.reset();
+          Ar.DD(DD::reset);
+          r_sloppy.DD(DD::reset);
         }
 
         commGlobalReductionPop(); // renable global reductions for outer solver

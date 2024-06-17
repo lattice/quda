@@ -23,7 +23,7 @@ namespace quda
     ProjectDDArg(ColorSpinorField &out) :
       kernel_param(dim3(out.VolumeCB(), out.SiteSubset(), 1)),
       out(out),
-      dd(out),
+      dd(out.DD()),
       parity(out.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
       nParity(out.SiteSubset()),
       X0h(nParity == 2 ? out.X(0) / 2 : out.X(0)),

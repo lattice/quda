@@ -9,6 +9,8 @@ namespace quda
 
   DECLARE_ENUM(DD, // name of the enum class
 
+               reset, // No domain decomposition. It sets all flags to zero.
+
                red_black_type,   // Flags used by red_black
                red_active,       // if red blocks are active
                black_active,     // if black blocks are active
@@ -36,25 +38,18 @@ namespace quda
     {
       flags[(int)flag] = true;
 
-      if ((int)flag >= (int)DD::red_black_type) type = QUDA_DD_RED_BLACK;
+      if ((int)flag == (int)DD::reset) {
+#pragma unroll
+        for (auto i = 0u; i < (int)DD::size; i++) flags[i] = 0;
+        type = QUDA_DD_NO;
+      } else if ((int)flag >= (int)DD::red_black_type) {
+        type = QUDA_DD_RED_BLACK;
+      }
     }
 
-    template <typename... Args> constexpr void set(const DD &flag, Args... args)
+    template <typename... Args> constexpr void set(const DD &flag, const Args &...args)
     {
       set(flag);
-      set(args...);
-    }
-
-    constexpr void reset()
-    {
-      type = QUDA_DD_NO;
-#pragma unroll
-      for (auto i = 0u; i < (int)DD::size; i++) flags[i] = 0;
-    }
-
-    template <typename... Args> constexpr void reset(Args... args)
-    {
-      reset();
       set(args...);
     }
 
@@ -82,7 +77,7 @@ namespace quda
             if (verbose) printfQuda("blockDim[%d] = %d is not positive \n", i, blockDim[i]);
             return false;
           }
-          int globalDim = comm_dim(i) * field.full_dim(i);
+          int globalDim = comm_dim(i) * field.X(i);
           if (globalDim % blockDim[i] != 0) {
             if (verbose) printfQuda("blockDim[%d] = %d does not divide %d \n", i, blockDim[i], globalDim);
             return false;
@@ -123,6 +118,29 @@ namespace quda
 
       return true;
     }
+
+    // Checks if this is equal to given DDParam
+    inline bool operator==(const DDParam &dd) const
+    {
+      // if both are not in use we return true
+      if (not *this and not dd) return true;
+
+      // false if type does not match
+      if (type != dd.type) return false;
+
+      // checking all flags matches (note this should be actually type-wise)
+      for (int i = 0; i < (int)DD::size; i++)
+        if (flags[i] != dd.flags[i]) return false;
+
+      // checking blockDim matches when needed
+      if (type == QUDA_DD_RED_BLACK)
+        for (int i = 0; i < QUDA_MAX_DIM; i++)
+          if (blockDim[i] != dd.blockDim[i]) return false;
+
+      return true;
+    }
+
+    inline bool operator!=(const DDParam &dd) { return !(*this == dd); }
   };
 
 } // namespace quda
