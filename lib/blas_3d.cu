@@ -183,11 +183,11 @@ namespace quda
     {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<double> &result_global;
+      std::vector<double> &result;
 
     public:
-      reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<double> &result_global) :
-        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result_global(result_global)
+      reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<double> &result) :
+        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result(result)
       {
         apply(device::get_default_stream());
       }
@@ -195,15 +195,8 @@ namespace quda
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-        std::vector<double> result_local(x.X()[3]);
         reDotProduct3dArg<Float, nColor> arg(x, y);
-        launch<reDotProduct3d>(result_local, tp, stream, arg);
-
-        // Copy results back to host array
-        if (!activeTuning()) {
-          for (int i = 0; i < x.X()[3]; i++) { result_global[comm_coord(3) * x.X()[3] + i] = result_local[i]; }
-        }
+        launch<reDotProduct3d>(result, tp, stream, arg);
       }
 
       long long flops() const { return x.Volume() * x.Nspin() * x.Ncolor() * 2; }
@@ -224,17 +217,23 @@ namespace quda
 
       // We must give a Lattice field as the first argument
       instantiate<reDotProduct3D>(x, y, result);
+
+      // Do global reduction
+      std::vector<double> result_global(result.size() * comm_dim(3));
+      for (auto i = 0u; i < result.size(); i++) result_global[comm_coord(3) * x.X()[3] + i] = result[i];
+      comm_allreduce_sum(result_global);
+      for (auto i = 0u; i < result.size(); i++) result[i] = result_global[comm_coord(3) * x.X()[3] + i];
     }
 
     template <typename Float, int nColor> class cDotProduct3D : TunableMultiReduction
     {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<Complex> &result_global;
+      std::vector<array<double, 2>> &result;
 
     public:
-      cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<Complex> &result_global) :
-        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result_global(result_global)
+      cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y, std::vector<array<double, 2>> &result) :
+        TunableMultiReduction(x, x.SiteSubset(), x.X()[3]), x(x), y(y), result(result)
       {
         apply(device::get_default_stream());
       }
@@ -242,18 +241,8 @@ namespace quda
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-        std::vector<double> result_local(2 * x.X()[3]);
         cDotProduct3dArg<Float, nColor> arg(x, y);
-        launch<cDotProduct3d>(result_local, tp, stream, arg);
-
-        // Copy results back to host array
-        if (!activeTuning()) {
-          for (int i = 0; i < x.X()[3]; i++) {
-            result_global[comm_coord(3) * x.X()[3] + i].real(result_local[2 * i + 0]);
-            result_global[comm_coord(3) * x.X()[3] + i].imag(result_local[2 * i + 1]);
-          }
-        }
+        launch<cDotProduct3d>(result, tp, stream, arg);
       }
 
       long long flops() const { return x.Volume() * x.Nspin() * x.Ncolor() * 8; }
@@ -272,8 +261,17 @@ namespace quda
       if (result.size() != (unsigned int)x.X()[3])
         errorQuda("Unexpected coeff array size a=%lu, x[3]=%d", result.size(), x.X()[3]);
 
+      std::vector<array<double, 2>> result_local(result.size());
+
       // We must give a Lattice field as the first argument
-      instantiate<cDotProduct3D>(x, y, result);
+      instantiate<cDotProduct3D>(x, y, result_local);
+
+      // Do global reduction
+      std::vector<array<double, 2>> result_global(result.size() * comm_dim(3));
+      for (auto i = 0u; i < result.size(); i++) result_global[comm_coord(3) * x.X()[3] + i] = result_local[i];
+      comm_allreduce_sum(result_global);
+      for (auto i = 0u; i < result.size(); i++)
+        result[i] = {result_global[comm_coord(3) * x.X()[3] + i][0], result_global[comm_coord(3) * x.X()[3] + i][1]};
     }
 
   } // namespace blas3d

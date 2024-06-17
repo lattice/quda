@@ -53,8 +53,7 @@ namespace quda
       getCoords(idx, x_cb, arg.X, parity);
 
       if (idx[3] == arg.slice) {
-        using real = typename Arg::real;
-        using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+        using Vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
 
         // Get 4D data
         Vector y = arg.y(x_cb, parity);
@@ -78,8 +77,7 @@ namespace quda
       getCoords(idx, x_cb, arg.X, parity);
 
       if (idx[3] == arg.slice) {
-        using real = typename Arg::real;
-        using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+        using Vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
 
         // Get 3D location
         int xyz = ((idx[2] * arg.X[1] + idx[1]) * arg.X[0] + idx[0]);
@@ -228,7 +226,7 @@ namespace quda
   template <typename Arg> struct reDotProduct3d : plus<double> {
     using reduce_t = double;
     using plus<reduce_t>::operator();
-    static constexpr int reduce_block_dim = 2; // only doing a reduce in the x thread dimension
+    static constexpr int reduce_block_dim = 2;
     const Arg &arg;
     constexpr reDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -283,7 +281,7 @@ namespace quda
   template <typename Arg> struct cDotProduct3d : plus<array<double, 2>> {
     using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
-    static constexpr int reduce_block_dim = 2; // only doing a reduce in the x thread dimension
+    static constexpr int reduce_block_dim = 2;
 
     const Arg &arg;
     constexpr cDotProduct3d(const Arg &arg) : arg(arg) { }
