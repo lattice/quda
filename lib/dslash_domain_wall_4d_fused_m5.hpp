@@ -143,7 +143,8 @@ namespace quda
   };
 
   // use custom instantiate to deal with field splitting if needed
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U,
                    Args... args)
