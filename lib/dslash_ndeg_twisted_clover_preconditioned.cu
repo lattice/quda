@@ -104,8 +104,8 @@ namespace quda
       {
         constexpr int nDim = 4;
         auto halo = ColorSpinorField::create_comms_batch(in);
-        NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, recon> arg(out, in, halo, U, A, a, b, c, xpay, x,
-                                                                           parity, dagger, comm_override);
+        NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, c, xpay, x,
+                                                                                  parity, dagger, comm_override);
         NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
       }

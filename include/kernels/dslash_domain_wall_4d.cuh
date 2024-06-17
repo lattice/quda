@@ -58,7 +58,6 @@ namespace quda
 
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = arg.a_5[s] * out;
       } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
