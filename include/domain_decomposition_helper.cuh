@@ -73,7 +73,7 @@ namespace quda
 
     template <typename Coord> constexpr bool on_border(const Coord &x, const int &mu, const int &dir) const
     {
-      return (dir > 0) ? ((x.gx[mu] + 1) % blockDim[mu] == 0) : (x.gx[mu] % blockDim[mu] == 0);
+      return x.gx[mu] / blockDim[mu] != (x.gx[mu] + dir) / blockDim[mu];
     }
 
     template <typename Coord> constexpr bool isZero(const Coord &x) const
