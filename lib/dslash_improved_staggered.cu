@@ -22,14 +22,16 @@ namespace quda
   {
     using Dslash = Dslash<staggered, Arg>;
     using Dslash::arg;
-    using Dslash::in;
     using Dslash::halo;
+    using Dslash::in;
     const GaugeField &L;
 
   public:
     Staggered(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
               const ColorSpinorField &halo, const GaugeField &L) :
-      Dslash(arg, out, in, halo), L(L) {}
+      Dslash(arg, out, in, halo), L(L)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -75,7 +77,8 @@ namespace quda
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T: flops_ = ghost_flops * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         flops_ = ghost_flops * ghost_sites;
         break;
       }
@@ -118,7 +121,8 @@ namespace quda
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
@@ -149,9 +153,9 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
-    ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-                           const GaugeField &L, const GaugeField &U, double a, int parity, bool dagger,
-                           const int *comm_override, TimeProfile &profile)
+    ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
+                           int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       constexpr bool improved = true;

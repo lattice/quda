@@ -90,9 +90,9 @@ namespace quda
     static constexpr Dslash5Type type = type_;
     using F = typename colorspinor_mapper<Float, 4, nColor, false, false, true>::type;
 
-    F out[MAX_MULTI_RHS];                  // output vector field
-    F in[MAX_MULTI_RHS];             // input vector field
-    F x[MAX_MULTI_RHS];              // auxiliary input vector field
+    F out[MAX_MULTI_RHS];   // output vector field
+    F in[MAX_MULTI_RHS];    // input vector field
+    F x[MAX_MULTI_RHS];     // auxiliary input vector field
     const int nParity;      // number of parities we're working on
     const int volume_cb;    // checkerboarded volume
     const int volume_4d_cb; // 4-d checkerboarded volume
@@ -164,8 +164,9 @@ namespace quda
       }
     }
 
-    Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-               double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a_) :
+    Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+               cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+               double a_) :
       kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
       nParity(in.SiteSubset()),
       volume_cb(in.VolumeCB()),
@@ -374,7 +375,8 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, int src_idx)
+  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_,
+                                                int src_idx)
   {
     using real = typename Arg::real;
     const auto k = arg.kappa;
@@ -431,7 +433,8 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, int src_idx)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_,
+                                                int src_idx)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;

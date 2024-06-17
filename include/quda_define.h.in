@@ -129,15 +129,6 @@
 #define GPU_COVDEV
 #endif
 
-#cmakedefine QUDA_CONTRACT
-#ifdef QUDA_CONTRACT
-/**
- * @def   GPU_CONTRACT
- * @brief This macro is set when we have contractions enabled
- */
-#define GPU_CONTRACT
-#endif
-
 #cmakedefine QUDA_MULTIGRID
 #ifdef QUDA_MULTIGRID
 /**

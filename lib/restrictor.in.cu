@@ -40,10 +40,7 @@ namespace quda {
       strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
-      strcat(aux, ",n_rhs=");
-      char rhs_str[16];
-      i32toa(rhs_str, out.size());
-      strcat(aux, rhs_str);
+      setRHSstring(aux, in.size());
       if (in[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",from_non_rel");
 
       apply(device::get_default_stream());
@@ -119,7 +116,10 @@ namespace quda {
       param.aux.x = 2; // swizzle factor
     }
 
-    long long flops() const { return out.size() * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB(); }
+    long long flops() const
+    {
+      return out.size() * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB();
+    }
 
     long long bytes() const
     {
@@ -214,10 +214,12 @@ namespace quda {
   {
     if constexpr (is_enabled_multigrid()) {
       if (in.size() > get_max_multi_rhs()) {
-        Restrict<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                                         v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-        Restrict<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                                         v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+        Restrict<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2},
+                                         {in.begin(), in.begin() + in.size() / 2}, v, fine_to_coarse, coarse_to_fine,
+                                         spin_map, parity);
+        Restrict<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()},
+                                         {in.begin() + in.size() / 2, in.end()}, v, fine_to_coarse, coarse_to_fine,
+                                         spin_map, parity);
         return;
       }
 

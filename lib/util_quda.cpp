@@ -157,7 +157,8 @@ void errorQuda_(const char *func, const char *file, int line, ...)
   comm_abort(1);
 }
 
-namespace quda {
+namespace quda
+{
 
   unsigned int get_max_multi_rhs()
   {
@@ -179,4 +180,4 @@ namespace quda {
     return max;
   }
 
-}
+} // namespace quda

@@ -521,12 +521,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifdef CHECK_PARAM
   if (in_ptr && quda::get_pointer_location(in_ptr) != param->input_location) {
     warningQuda("input_location=%d, however supplied pointer is location=%d", param->input_location, quda::get_pointer_location(in_ptr));
-    param->input_location = quda::get_pointer_location(in_ptr);
+    // param->input_location = quda::get_pointer_location(in_ptr);
   }
 
   if (out_ptr && quda::get_pointer_location(out_ptr) != param->output_location) {
     warningQuda("output_location=%d, however supplied pointer is location=%d", param->output_location, quda::get_pointer_location(out_ptr));
-    param->output_location = quda::get_pointer_location(out_ptr);
+    // param->output_location = quda::get_pointer_location(out_ptr);
   }
 #endif
 

@@ -143,8 +143,8 @@ namespace quda
     public:
       FusedDslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, cvector_ref<ColorSpinorField> &y,
-                  double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-                  bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) :
+                  double m_f, double m_5, const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
+                  int halo_shift[4], MdwfFusedDslashType type) :
         TunableGridStrideKernel2D(in[0], x.X(4)),
         out(out[0]),
         in(in[0]),

@@ -61,6 +61,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", gtest_type, "Test method")->transform(CLI::CheckedTransformer(gtest_type_map));
   add_quark_smear_option_group(app);
+  add_su3_option_group(app);
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);

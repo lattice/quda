@@ -49,8 +49,9 @@ namespace quda
   };
 
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
-    StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-                   const GaugeField &U, double a, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, int parity, bool dagger,
+                   const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       constexpr bool improved = false;

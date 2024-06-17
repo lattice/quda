@@ -149,14 +149,19 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-    LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-                 const GaugeField &U, int dir, double a, double b, int parity, bool dagger,
-                 const int *comm_override, TimeProfile &profile)
+    LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U, int dir, double a, double b, int parity,
+                 bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       if (in.Nspin() == 1) {
         constexpr int nSpin = 1;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+      } else if (in.Nspin() == 4) {
+        constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, dagger, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);

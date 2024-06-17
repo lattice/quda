@@ -32,7 +32,7 @@ namespace quda {
 
   // Protected method for applying twist
   void DiracTwistedMass::twistedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-				      const QudaTwistGamma5Type twistType) const
+                                      const QudaTwistGamma5Type twistType) const
   {
     checkParitySpinor(out, in);
     ApplyTwistGamma(out, in, 4, kappa, mu, epsilon, dagger, twistType);

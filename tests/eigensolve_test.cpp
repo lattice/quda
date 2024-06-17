@@ -20,6 +20,7 @@
 QudaGaugeParam gauge_param;
 QudaInvertParam eig_inv_param;
 QudaEigParam eig_param;
+QudaGaugeSmearParam smear_param;
 
 std::vector<char> gauge_;
 std::array<void *, 4> gauge;
@@ -76,6 +77,10 @@ void init(int argc, char **argv)
   //------------------------------------------------------
   gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+  }
 
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
@@ -245,6 +250,7 @@ int main(int argc, char **argv)
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
+  add_su3_option_group(app);
   add_madwf_option_group(app);
   add_comms_option_group(app);
   add_testing_option_group(app);

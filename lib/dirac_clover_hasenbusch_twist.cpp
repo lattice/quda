@@ -86,9 +86,10 @@ namespace quda
   }
 
   // xpay version of the above
-  void DiracCloverHasenbuschTwistPC::DslashXpayTwistClovInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                                            QudaParity parity, cvector_ref<const ColorSpinorField> &x,
-                                                            double k, double b) const
+  void DiracCloverHasenbuschTwistPC::DslashXpayTwistClovInv(cvector_ref<ColorSpinorField> &out,
+                                                            cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                                                            cvector_ref<const ColorSpinorField> &x, double k,
+                                                            double b) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -97,7 +98,8 @@ namespace quda
   }
 
   // xpay version of the above
-  void DiracCloverHasenbuschTwistPC::DslashXpayTwistNoClovInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+  void DiracCloverHasenbuschTwistPC::DslashXpayTwistNoClovInv(cvector_ref<ColorSpinorField> &out,
+                                                              cvector_ref<const ColorSpinorField> &in,
                                                               QudaParity parity, cvector_ref<const ColorSpinorField> &x,
                                                               double k, double b) const
   {

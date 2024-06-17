@@ -55,9 +55,7 @@ namespace quda
         size_t bytes = 0;
         switch (type) {
         case Dslash5Type::M5_EOFA:
-        case Dslash5Type::M5INV_EOFA:
-          bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
-          break;
+        case Dslash5Type::M5INV_EOFA: bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
         default: errorQuda("Unknown Dslash5Type %d for EOFA", static_cast<int>(type));
         }
         return bytes;

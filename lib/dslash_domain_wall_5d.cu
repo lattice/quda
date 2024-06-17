@@ -21,7 +21,8 @@ namespace quda
 
   public:
     DomainWall5D(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                 const ColorSpinorField &halo) : Dslash(arg, out, in, halo)
+                 const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
     {
     }
 
@@ -66,12 +67,13 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall5DApply {
 
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f,
-                      int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
+                      bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 5;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger,
+                                                      comm_override);
       DomainWall5D<decltype(arg)> dwf(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
     }
@@ -79,9 +81,9 @@ namespace quda
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-  void ApplyDomainWall5D(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                         double a, double m_f, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-                         const int *comm_override, TimeProfile &profile)
+  void ApplyDomainWall5D(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                         const GaugeField &U, double a, double m_f, cvector_ref<const ColorSpinorField> &x, int parity,
+                         bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_DOMAIN_WALL_DSLASH>()) {
       instantiate<DomainWall5DApply>(out, in, x, U, a, m_f, parity, dagger, comm_override, profile);

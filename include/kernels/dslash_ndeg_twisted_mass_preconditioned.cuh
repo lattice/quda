@@ -19,8 +19,8 @@ namespace quda
     real c_inv;      /** inverse flavor twist factor - used to allow early xpay inclusion */
 
     NdegTwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                       const ColorSpinorField &halo, const GaugeField &U, double a, double b,
-                       double c, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
+                       const ColorSpinorField &halo, const GaugeField &U, double a, double b, double c, bool xpay,
+                       cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the chiral twist

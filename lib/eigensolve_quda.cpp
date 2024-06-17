@@ -283,8 +283,7 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     mat({out.begin(), out.end()}, {in.begin(), in.end()});
-    for (auto i = 0u; i < in.size(); i++)
-      blas::caxpby(d2, in[i], d1, out[i]);
+    blas::caxpby(d2, in, d1, out);
 
     if (eig_param->poly_deg == 1) return;
 
@@ -312,8 +311,7 @@ namespace quda
       // mat*C_{m}(x)
       mat(out, tmp2);
 
-      for (auto i = 0u; i < in.size(); i++)
-        blas::axpbypczw(d3, tmp1[i], d2, tmp2[i], d1, out[i], tmp1[i]);
+      blas::axpbypczw(d3, tmp1, d2, tmp2, d1, out, tmp1);
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;

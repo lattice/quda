@@ -36,8 +36,8 @@ namespace quda
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
-                                    QudaParity, cvector_ref<const ColorSpinorField> &, double) const
+  void DiracStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
+                                    cvector_ref<const ColorSpinorField> &, double) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }

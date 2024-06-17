@@ -44,7 +44,8 @@ namespace quda {
     MCD(out, tmp, (mu+4)%8);
   }
 
-  void GaugeCovDev::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const
+  void GaugeCovDev::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const
   {
     DslashCD(out, in, parity, covdev_mu);
   }

@@ -20,24 +20,21 @@ namespace quda {
     unsigned int minThreads() const { return out.VolumeCB(); } // fine parity is the block y dimension
 
   public:
-    ProlongateLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &V,
-                     const int *fine_to_coarse, int parity)
-      : TunableKernel3D(in[0], out.SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>()),
-        out(out),
-        in(in),
-        V(V),
-        fine_to_coarse(fine_to_coarse),
-        parity(parity),
-        location(checkLocation(out[0], in[0], V))
+    ProlongateLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                     const ColorSpinorField &V, const int *fine_to_coarse, int parity) :
+      TunableKernel3D(in[0], out.SiteSubset() * out.size(), fineColor / fine_colors_per_thread<fineColor, coarseColor>()),
+      out(out),
+      in(in),
+      V(V),
+      fine_to_coarse(fine_to_coarse),
+      parity(parity),
+      location(checkLocation(out[0], in[0], V))
     {
       strcat(vol, ",");
       strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
-      strcat(aux, ",n_rhs=");
-      char rhs_str[16];
-      i32toa(rhs_str, out.size());
-      strcat(aux, rhs_str);
+      setRHSstring(aux, in.size());
       if (out[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",to_non_rel");
 
       apply(device::get_default_stream());
@@ -132,10 +129,10 @@ namespace quda {
   {
     if constexpr (is_enabled_multigrid()) {
       if (in.size() > get_max_multi_rhs()) {
-        Prolongate<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                                           v, fine_to_coarse, spin_map, parity);
-        Prolongate<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                                           v, fine_to_coarse, spin_map, parity);
+        Prolongate<fineColor, coarseColor>({out.begin(), out.begin() + out.size() / 2},
+                                           {in.begin(), in.begin() + in.size() / 2}, v, fine_to_coarse, spin_map, parity);
+        Prolongate<fineColor, coarseColor>({out.begin() + out.size() / 2, out.end()},
+                                           {in.begin() + in.size() / 2, in.end()}, v, fine_to_coarse, spin_map, parity);
         return;
       }
 

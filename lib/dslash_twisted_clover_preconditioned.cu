@@ -22,8 +22,8 @@ namespace quda
     using Dslash::in;
 
   public:
-    TwistedCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out,
-                                cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo) :
+    TwistedCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                const ColorSpinorField &halo) :
       Dslash(arg, out, in, halo)
     {
     }
@@ -116,8 +116,8 @@ namespace quda
 
     TwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C,
-                                     double a, double b, bool xpay, int parity, bool dagger,
-                                     const int *comm_override, TimeProfile &profile)
+                                     double a, double b, bool xpay, int parity, bool dagger, const int *comm_override,
+                                     TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);

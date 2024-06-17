@@ -105,9 +105,9 @@ namespace quda
 
     precision = param.Precision();
 
-    if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2 &&
-        !(param.create == QUDA_GHOST_FIELD_CREATE ||
-          (param.create == QUDA_REFERENCE_FIELD_CREATE && param.siteSubset == QUDA_PARITY_SITE_SUBSET))) // two flavors
+    if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2
+        && !(param.create == QUDA_GHOST_FIELD_CREATE
+             || (param.create == QUDA_REFERENCE_FIELD_CREATE && param.siteSubset == QUDA_PARITY_SITE_SUBSET))) // two flavors
       errorQuda(
         "Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)",
         x[4]);
@@ -298,7 +298,7 @@ namespace quda
     }
   }
 
-  const DslashConstant& ColorSpinorField::getDslashConstant() const
+  const DslashConstant &ColorSpinorField::getDslashConstant() const
   {
     if (!dslash_constant) errorQuda("Dslash constant not initialized");
     return *dslash_constant;
@@ -433,7 +433,6 @@ namespace quda
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0);
         qudaMemcpy(v.data(), buffer, bytes, qudaMemcpyDefault);
         pool_pinned_free(buffer);
-
       } else { // reorder on device
 
         if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -465,11 +464,10 @@ namespace quda
     } else if (Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) { // D2H
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on the host
-        void *buffer = pool_pinned_malloc(bytes);
-        qudaMemcpy(buffer, v.data(), bytes, qudaMemcpyDefault);
+        void *buffer = pool_pinned_malloc(src.Bytes());
+        qudaMemcpy(buffer, src.data(), src.Bytes(), qudaMemcpyDefault);
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer);
         pool_pinned_free(buffer);
-
       } else { // reorder on the device
 
         if (FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -830,9 +828,7 @@ namespace quda
       param.nDim++;
       param.x[param.nDim - 1] = v.size();
       break;
-    case 5:
-      param.x[param.nDim - 1] *= v.size();
-      break;
+    case 5: param.x[param.nDim - 1] *= v.size(); break;
     default: errorQuda("Cannot batch together %d-d fields", v.Ndim());
     }
     param.create = QUDA_GHOST_FIELD_CREATE;
@@ -1015,10 +1011,10 @@ namespace quda
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void ColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dagger, const qudaStream_t &stream,
-                                   MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                                   bool spin_project, double a, double b, double c, int shmem,
-                                   cvector_ref<const ColorSpinorField> &in) const
+  void ColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dagger,
+                                   const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
+                                   MemoryLocation location_label, bool spin_project, double a, double b, double c,
+                                   int shmem, cvector_ref<const ColorSpinorField> &in) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     void *packBuffer[4 * QUDA_MAX_DIM] = {};
@@ -1054,14 +1050,14 @@ namespace quda
       }
     }
 
-    PackGhost(packBuffer, *this, in.size() == 0 ? *this : in, location_label,
-              nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
+    cvector_ref<const ColorSpinorField> tmp(*this);
+    PackGhost(packBuffer, *this, in.size() > 0 ? in : tmp, location_label, nFace, dagger, parity, spin_project, a, b, c,
+              shmem, stream);
   }
 
   void ColorSpinorField::pack(int nFace, int parity, int dagger, const qudaStream_t &stream,
-                              MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                              bool spin_project, double a, double b, double c, int shmem,
-                              cvector_ref<const ColorSpinorField> &in) const
+                              MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, bool spin_project,
+                              double a, double b, double c, int shmem, cvector_ref<const ColorSpinorField> &in) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     createComms(nFace, spin_project); // must call this first

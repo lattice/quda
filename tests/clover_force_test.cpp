@@ -91,10 +91,8 @@ std::tuple<int, double> clover_force_test(test_t param)
   if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.epsilon = epsilon;
     inv_param.evmax = evmax;
-    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      for (int i = 0; i < nvector; i++) inv_param.offset[i] = 0.06 + i * i * 0.1;
-    }
   }
+  for (int i = 0; i < nvector; i++) inv_param.offset[i] = 0.06 + i * i * 0.1;
   bool detratio = ::testing::get<2>(param);
 
   std::vector<quda::ColorSpinorField> out_nvector(nvector);

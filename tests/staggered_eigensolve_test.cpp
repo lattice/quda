@@ -74,6 +74,12 @@ void init()
   gauge_param = newQudaGaugeParam();
   setStaggeredGaugeParam(gauge_param);
 
+  QudaGaugeSmearParam smear_param;
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+  }
+
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator.
@@ -259,6 +265,7 @@ int main(int argc, char **argv)
 
   auto app = make_app();
   add_eigen_option_group(app);
+  add_su3_option_group(app);
   add_testing_option_group(app);
   try {
     app->parse(argc, argv);

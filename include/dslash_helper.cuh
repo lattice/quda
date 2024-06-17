@@ -305,10 +305,9 @@ namespace quda
 #endif
 
     // constructor needed for staggered to set xpay from derived class
-    DslashArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-              const ColorSpinorField &halo, const GaugeField &U,
-              cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool xpay, int nFace,
-              int spin_project, const int *comm_override,
+    DslashArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+              const GaugeField &U, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool xpay,
+              int nFace, int spin_project, const int *comm_override,
 #ifdef NVSHMEM_COMMS
               int shmem_ = 0) :
 #else
@@ -351,7 +350,8 @@ namespace quda
       retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
     {
-      if (out.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
+      if (out.size() > get_max_multi_rhs())
+        errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < in.size(); i++)
         if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match

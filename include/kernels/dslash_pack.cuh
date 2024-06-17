@@ -76,15 +76,14 @@ namespace quda
 #else
     static constexpr int shmem = 0;
 #endif
-    PackArg(void **ghost, const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in,
-            int nFace, int parity, int work_items, double a, double b,
-            double c, unsigned int block, unsigned int grid,
+    PackArg(void **ghost, const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &in, int nFace, int parity,
+            int work_items, double a, double b, double c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
             int) :
 #endif
-  kernel_param(dim3(block * grid, halo.X(4), in.SiteSubset())),
+      kernel_param(dim3(block * grid, halo.X(4), in.SiteSubset())),
       halo_pack(halo, nFace, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       parity(parity),
@@ -172,7 +171,8 @@ namespace quda
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        arg.halo_pack.Ghost(dim, 0, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.halo_pack.Ghost(dim, 0, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity)
+          = f.project(dim, proj_dir);
       } else {
         arg.halo_pack.Ghost(dim, 0, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
@@ -191,7 +191,8 @@ namespace quda
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        arg.halo_pack.Ghost(dim, 1, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.halo_pack.Ghost(dim, 1, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity)
+          = f.project(dim, proj_dir);
       } else {
         arg.halo_pack.Ghost(dim, 1, ghost_idx + (src_idx * arg.Ls + s) * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
@@ -248,10 +249,18 @@ namespace quda
 
         if (Arg::pc_type == QUDA_5D_PC) { // 5-d checkerboarded, include s (not ghostFaceCB since both faces)
           switch (dim) {
-          case 0: pack<Arg::dagger, Arg::twist, 0, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity, src_idx); break;
-          case 1: pack<Arg::dagger, Arg::twist, 1, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity, src_idx); break;
-          case 2: pack<Arg::dagger, Arg::twist, 2, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity, src_idx); break;
-          case 3: pack<Arg::dagger, Arg::twist, 3, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity, src_idx); break;
+          case 0:
+            pack<Arg::dagger, Arg::twist, 0, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity, src_idx);
+            break;
+          case 1:
+            pack<Arg::dagger, Arg::twist, 1, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity, src_idx);
+            break;
+          case 2:
+            pack<Arg::dagger, Arg::twist, 2, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity, src_idx);
+            break;
+          case 3:
+            pack<Arg::dagger, Arg::twist, 3, Arg::pc_type>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity, src_idx);
+            break;
           }
         } else { // 4-d checkerboarding, keeping s separate (if it exists)
           switch (dim) {

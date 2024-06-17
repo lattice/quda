@@ -88,7 +88,8 @@ namespace quda
     Mdag(out, tmp);
   }
 
-  void DiracImprovedStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  void DiracImprovedStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out,
+                                                cvector_ref<const ColorSpinorField> &in) const
   {
     ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }

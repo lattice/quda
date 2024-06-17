@@ -80,7 +80,8 @@ namespace quda
     }
 
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
-    computeCloverOprod(force, gauge, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p, coeff);
+    computeCloverOprod(force, gauge, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
+                       coeff);
     // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
     if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
 

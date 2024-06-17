@@ -37,10 +37,11 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)
     const int nParity; // number of parities of input fine field
-    
-    ProlongateArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
-                  const int *geo_map,  const int parity) :
-      kernel_param(dim3(out.VolumeCB(), out.SiteSubset() * out.size(), fineColor/fine_colors_per_thread<fineColor, coarseColor>())),
+
+    ProlongateArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                  const ColorSpinorField &v, const int *geo_map, const int parity) :
+      kernel_param(dim3(out.VolumeCB(), out.SiteSubset() * out.size(),
+                        fineColor / fine_colors_per_thread<fineColor, coarseColor>())),
       n_src(out.size()),
       v(v),
       geo_map(geo_map),
@@ -48,7 +49,8 @@ namespace quda {
       parity(parity),
       nParity(out.SiteSubset())
     {
-      if (out.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
+      if (out.size() > get_max_multi_rhs())
+        errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];

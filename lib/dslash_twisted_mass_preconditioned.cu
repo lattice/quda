@@ -28,8 +28,8 @@ namespace quda
     using Dslash::in;
 
   public:
-    TwistedMassPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out,
-                              cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo) :
+    TwistedMassPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                              const ColorSpinorField &halo) :
       Dslash(arg, out, in, halo)
     {
     }
@@ -73,8 +73,9 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {
 
     TwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, bool xpay,
-                                   int parity, bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
+                                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
+                                   bool xpay, int parity, bool dagger, bool asymmetric, const int *comm_override,
+                                   TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);

@@ -265,14 +265,8 @@ namespace quda {
       }
     }
 
-    void preTune()
-    {
-      out.backup();
-    }
-    void postTune()
-    {
-      out.restore();
-    }
+    void preTune() { out.backup(); }
+    void postTune() { out.restore(); }
   };
 
   template <template <class, class, class, int, bool, bool, DslashType> class D, typename Float, typename yFloat,
@@ -818,7 +812,7 @@ namespace quda {
    long long bytes() const {
      int nParity = dslash.inA.SiteSubset();
      return (dslash.dslash || dslash.clover) * dslash.out.Bytes() + dslash.dslash * 8 * dslash.inA.Bytes()
-             + dslash.clover * dslash.inB.Bytes()
+       + dslash.clover * dslash.inB.Bytes()
        + (nParity
           * (dslash.dslash * dslash.Y.Bytes() * dslash.Y.VolumeCB() / (2 * dslash.Y.Stride())
              + dslash.clover * dslash.X.Bytes() / 2))

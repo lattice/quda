@@ -1201,11 +1201,12 @@ namespace quda
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
-#if 0
+      //#define LEGACY_ACCESSOR_NORM // legacy code where norm pointer and offset are stored instead of computed
+#ifdef LEGACY_ACCESSOR_NORM
       norm_type *norm = nullptr;
 #endif
       AllocInt offset = 0; // offset can be 32-bit or 64-bit
-#if 0
+#ifdef LEGACY_ACCESSOR_NORM
       AllocInt norm_offset = 0;
 #endif
       int volumeCB = 0;
@@ -1216,12 +1217,12 @@ namespace quda
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         GhostNOrder(a, nFace, ghost_),
         field(buffer ? buffer : a.data<Float *>()),
-#if 0
+#ifdef LEGACY_ACCESSOR_NORM
         norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
                       const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
 #endif
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
-#if 0
+#ifdef LEGACY_ACCESSOR_NORM
         norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
 #endif
         volumeCB(a.VolumeCB())
@@ -1232,8 +1233,10 @@ namespace quda
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
         real v[length];
+#ifndef LEGACY_ACCESSOR_NORM
         auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
-        auto norm = reinterpret_cast<float*>(field + volumeCB * (2 * Nc * Ns));
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+#endif
         norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
 #pragma unroll
@@ -1252,9 +1255,10 @@ namespace quda
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];
+#ifndef LEGACY_ACCESSOR_NORM
         auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
-        auto norm = reinterpret_cast<float*>(field + volumeCB * (2 * Nc * Ns));
-
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+#endif
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {
           v[2 * i + 0] = in[i].real();
@@ -1915,8 +1919,18 @@ namespace quda
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::SpaceSpinorColorOrder<T, Ns, Nc> type;
   };
+
+  // specializations for native orderings
+  template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT_FIELD_ORDER, Ns, Nc> {
+    typedef colorspinor::FloatNOrder<T, Ns, Nc, 1> type;
+  };
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT2_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type;
   };
-
+  template <typename T, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT4_FIELD_ORDER, 4, Nc> {
+    typedef colorspinor::FloatNOrder<T, 4, Nc, 4> type;
+  };
+  template <typename T, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT8_FIELD_ORDER, 4, Nc> {
+    typedef colorspinor::FloatNOrder<T, 4, Nc, 8> type;
+  };
 } // namespace quda

@@ -32,19 +32,19 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    F out[MAX_MULTI_RHS];        /** output vector field */
+    F out[MAX_MULTI_RHS];  /** output vector field */
     F in[MAX_MULTI_RHS];   /** input vector field */
-    const Ghost halo_pack;   /** accessor used for writing the halo field */
-    const Ghost halo;        /** accessor used for reading the halo field */
+    const Ghost halo_pack; /** accessor used for writing the halo field */
+    const Ghost halo;      /** accessor used for reading the halo field */
     F x[MAX_MULTI_RHS];    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
-    LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-               const GaugeField &U, int dir, double a, double b, cvector_ref<const ColorSpinorField> &x,
-               int parity, bool dagger, const int *comm_override) :
+    LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+               const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
+               cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       halo_pack(halo),
       halo(halo),
@@ -75,8 +75,8 @@ namespace quda
 
   */
   template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity,
-                                               int, int thread_dim, bool &active, int src_idx)
+  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity, int, int thread_dim,
+                                               bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -121,7 +121,7 @@ namespace quda
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
             const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
-	    
+
             out += conj(U) * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
@@ -163,7 +163,9 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3: applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 3:
+        applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
       case 4:
       default:
         applyLaplace<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);

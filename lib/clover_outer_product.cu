@@ -181,13 +181,9 @@ namespace quda {
   {
     if constexpr (is_enabled_clover()) {
       if (x.size() > get_max_multi_rhs()) {
-        computeCloverOprod(force, U,
-                           {x.begin(), x.begin() + x.size() / 2},
-                           {p.begin(), p.begin() + p.size() / 2},
+        computeCloverOprod(force, U, {x.begin(), x.begin() + x.size() / 2}, {p.begin(), p.begin() + p.size() / 2},
                            {coeff.begin(), coeff.begin() + coeff.size() / 2});
-        computeCloverOprod(force, U,
-                           {x.begin() + x.size() / 2, x.end()},
-                           {p.begin() + p.size() / 2, p.end()},
+        computeCloverOprod(force, U, {x.begin() + x.size() / 2, x.end()}, {p.begin() + p.size() / 2, p.end()},
                            {coeff.begin() + coeff.size() / 2, coeff.end()});
         return;
       }

@@ -38,11 +38,11 @@ namespace quda
         typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
 
     const int_fastdiv n_src;
-    F out[MAX_MULTI_RHS];      /** output vector field */
-    F in[MAX_MULTI_RHS]; /** input vector field */
+    F out[MAX_MULTI_RHS];  /** output vector field */
+    F in[MAX_MULTI_RHS];   /** input vector field */
     const Ghost halo_pack; /** accessor for writing the halo */
-    const Ghost halo;       /** accessor for reading the halo */
-    F x[MAX_MULTI_RHS];  /** input vector when doing xpay */
+    const Ghost halo;      /** accessor for reading the halo */
+    F x[MAX_MULTI_RHS];    /** input vector when doing xpay */
     const GU U; /** the gauge field */
     const GL L; /** the long gauge field */
 
@@ -57,8 +57,8 @@ namespace quda
     StaggeredArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L, double a,
                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
-                             comm_override),
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1,
+                             spin_project, comm_override),
       halo_pack(halo, improved_ ? 3 : 1),
       halo(halo, improved_ ? 3 : 1),
       U(U),
@@ -88,8 +88,8 @@ namespace quda
      @param[in] x_cb The checkerboarded site index
   */
   template <int nParity, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, const Arg &arg, Coord & coord, int parity,
-                                                 int, int thread_dim, bool &active, int src_idx)
+  __device__ __host__ inline void applyStaggered(Vector &out, const Arg &arg, Coord &coord, int parity, int,
+                                                 int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -120,7 +120,8 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
           const Link L = arg.L(d, coord.x_cb, parity);
-          const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          const Vector in
+            = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
           out = mv_add(L, in, out);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
@@ -158,7 +159,8 @@ namespace quda
           // when updating replace arg.nFace with 1 here
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
-          const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+          const Vector in
+            = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
           out = mv_add(conj(L), -in, out);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back3_idx = linkIndexM3(coord, arg.dim, d);

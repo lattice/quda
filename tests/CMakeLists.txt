@@ -130,6 +130,10 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(contract_ft_test contract_ft_test.cpp)
+  target_link_libraries(contract_ft_test ${TEST_LIBS})
+  quda_checkbuildtest(contract_ft_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS contract_ft_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -205,13 +209,6 @@ if(QUDA_COVDEV)
   target_link_libraries(covdev_test ${TEST_LIBS})
   quda_checkbuildtest(covdev_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
-if(QUDA_CONTRACT)
-  add_executable(contract_test contract_test.cpp)
-  target_link_libraries(contract_test ${TEST_LIBS})
-  quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -355,19 +352,31 @@ if(QUDA_BUILD_NATIVE_LAPACK)
 endif()
 
 #Contraction test
-if(QUDA_CONTRACT)
-  add_test(NAME contract_test
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
-    --dim 2 4 6 8
-    --gtest_output=xml:contract_test.xml)
-endif()  
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME contract_ft_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_ft_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8 --enable-testing true
+    --gtest_output=xml:contract_ft_test.xml)
+endif()
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
-  set(DSLASH_POLICIES 0 1 6 7 8 9 12 13 -1)
+  set(DSLASH_POLICIES 0 1)
+
+  if(DEFINED ENV{QUDA_ENABLE_ZERO_COPY})
+    if($ENV{QUDA_ENABLE_ZERO_COPY} EQUAL 1)
+      set(DSLASH_POLICIES 6 7 8 9 12 13 ${DSLASH_POLICIES})
+      message(STATUS "QUDA_ENABLE_ZERO_COPY=1: enabling zero-copy dslash policies in ctest")
+    else()
+      message(STATUS "QUDA_ENABLE_ZERO_COPY!=1: disabling zero-copy dslash policies in ctest")
+    endif()
+  else()
+    message(STATUS "QUDA_ENABLE_ZERO_COPY not set: disabling zero-copy dslash policies in ctest")
+  endif()
+
   if(DEFINED ENV{QUDA_ENABLE_GDR})
     if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
-      set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 12 13 -1)
+      set(DSLASH_POLICIES 2 3 4 5 10 11 ${DSLASH_POLICIES})
       message(STATUS "QUDA_ENABLE_GDR=1: enabling GDR-enabled dslash policies in ctest")
     else()
       message(STATUS "QUDA_ENABLE_GDR!=1: disabling GDR-enabled dslash policies in ctest")
@@ -375,9 +384,21 @@ if(QUDA_CTEST_SEP_DSLASH_POLICIES)
   else()
     message(STATUS "QUDA_ENABLE_GDR not set: disabling GDR-enabled dslash policies in ctest")
   endif()
-else()
-  set(DSLASH_POLICIES -1)
+
+  if(QUDA_NVSHMEM)
+    if(NOT DEFINED $ENV{QUDA_ENABLE_NVSHMEM} OR $ENV{QUDA_ENABLE_NVSHMEM} EQUAL 1)
+      set(DSLASH_POLICIES 14 15 16 17 ${DSLASH_POLICIES})
+      message(STATUS "QUDA_ENABLE_NVSHMEM=1: enabling NVSHMEM dslash policies in ctest")
+    elseif()
+      message(STATUS "QUDA_ENABLE_NVSHMEM!=1: disabling NVSHMEM dslash policies in ctest")
+    endif()
+  endif()
+
+  list(SORT DSLASH_POLICIES COMPARE NATURAL)
+  message(STATUS "Enabled dslash policies are ${DSLASH_POLICIES}")
 endif()
+
+set(DSLASH_POLICIES ${DSLASH_POLICIES} -1)
 
 foreach(pol IN LISTS DSLASH_POLICIES)
 
@@ -579,7 +600,7 @@ endif()
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -608,7 +629,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -621,7 +642,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -654,7 +675,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -668,7 +689,7 @@ endif()
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -729,9 +750,9 @@ endif()
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric 4-d preconditioning
@@ -742,7 +763,7 @@ endif()
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()

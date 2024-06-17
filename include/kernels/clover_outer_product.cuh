@@ -52,7 +52,8 @@ namespace quda {
       volume_4d_cb(x_halo.getDslashConstant().volume_4d_cb),
       ghost_face_4d_cb(x_halo.getDslashConstant().ghostFaceCB[dim > 0 ? dim : 0])
     {
-      if (p.size() > get_max_multi_rhs()) errorQuda("vector set size %lu greater than max size %d", p.size(), get_max_multi_rhs());
+      if (p.size() > get_max_multi_rhs())
+        errorQuda("vector set size %lu greater than max size %d", p.size(), get_max_multi_rhs());
       for (auto i = 0u; i < p.size(); i++) {
         this->p[i] = p[i];
         this->x[i] = x[i];

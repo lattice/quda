@@ -12,8 +12,7 @@ namespace quda
 
   using namespace staggered_quark_smearing;
 
-  template <typename real, int nColor, QudaReconstructType recon>
-  class ComputeTwoLink : public TunableKernel3D
+  template <typename real, int nColor, QudaReconstructType recon> class ComputeTwoLink : public TunableKernel3D
   {
     GaugeField &twoLink;
     const GaugeField &link;
@@ -21,9 +20,7 @@ namespace quda
 
   public:
     ComputeTwoLink(GaugeField &twoLink, const GaugeField &link) :
-      TunableKernel3D(link, 2, 4),
-      twoLink(twoLink),
-      link(link)
+      TunableKernel3D(link, 2, 4), twoLink(twoLink), link(link)
     {
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
@@ -46,7 +43,7 @@ namespace quda
       checkNative(twoLink, link);
       checkLocation(twoLink, link);
       checkPrecision(twoLink, link);
-      //FIXME: enable link-12/8 reconstruction
+      // FIXME: enable link-12/8 reconstruction
       instantiate<ComputeTwoLink, ReconstructNone>(twoLink, link);
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
