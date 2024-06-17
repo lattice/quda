@@ -465,7 +465,7 @@ namespace quda
     }
 
     template <class U = T>
-    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, DDParam &> DD() const
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, const DDParam> DD() const
     {
       for (auto i = 1u; i < vector::size(); i++)
         if (operator[](i - 1).DD() != operator[](i).DD()) errorQuda("DD do not match %d != %d", i - 1, i);

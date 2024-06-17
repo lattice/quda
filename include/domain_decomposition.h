@@ -140,7 +140,7 @@ namespace quda
       return true;
     }
 
-    inline bool operator!=(const DDParam &dd) { return !(*this == dd); }
+    inline bool operator!=(const DDParam &dd) const { return !(*this == dd); }
   };
 
 } // namespace quda

@@ -450,7 +450,7 @@ namespace quda
     /**
        @brief Returns DDParam
      */
-    DDParam DD() const { return dd; }
+    const DDParam DD() const { return dd; }
 
     /**
        @brief Sets DDParam from a given DDParam
