@@ -64,7 +64,7 @@ namespace quda
       Vector out;
 
       if (arg.dd_out.isZero(coord)) {
-        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
         return;
       }
 
