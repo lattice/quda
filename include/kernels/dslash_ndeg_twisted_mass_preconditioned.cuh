@@ -69,16 +69,19 @@ namespace quda
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
+      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        return;
+      }
 
       if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
         applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       else // defined in dslash_twisted_mass_preconditioned
         applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
-
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && not arg.dd_x.isZero(coord)) {
 
         if (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
           // use consistent load order across s to ensure better cache locality
@@ -98,7 +101,7 @@ namespace quda
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out += x;
       }
-      
+
       if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
         SharedMemoryCache<Vector> cache;
         if (isComplete<mykernel_type>(arg, coord) && active) {

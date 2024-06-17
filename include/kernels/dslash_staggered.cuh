@@ -99,7 +99,7 @@ namespace quda
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
-      {
+      if (arg.dd_in.doHopping(coord, d, +1)) {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
@@ -115,7 +115,7 @@ namespace quda
       }
 
       // improved - forward direction
-      if (arg.improved) {
+      if (arg.improved and arg.dd_in.doHopping(coord, d, +3)) {
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
@@ -131,7 +131,7 @@ namespace quda
         }
       }
 
-      {
+      if (arg.dd_in.doHopping(coord, d, -1)) {
         // Backward gather - compute back offset for spinor and gauge fetch
         const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
@@ -153,7 +153,7 @@ namespace quda
       }
 
       // improved - backward direction
-      if (arg.improved) {
+      if (arg.improved and arg.dd_in.doHopping(coord, d, -3)) {
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           // when updating replace arg.nFace with 1 here
@@ -196,12 +196,18 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
 
       applyStaggered<nParity, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       out *= arg.dagger_scale;
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = -out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         out = arg.a * x - out;
       } else if (mykernel_type != INTERIOR_KERNEL) {

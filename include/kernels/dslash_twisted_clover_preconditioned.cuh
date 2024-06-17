@@ -67,6 +67,10 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
 
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
@@ -104,7 +108,7 @@ namespace quda
 
         tmp.toNonRel(); // switch back to non-chiral basis
 
-        if (xpay) {
+        if (xpay && not arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {

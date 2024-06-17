@@ -86,7 +86,7 @@ namespace quda
 #pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       if (d != dir) {
-        {
+        if (arg.dd_in.doHopping(coord, d, +1)) {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 	  
@@ -107,7 +107,7 @@ namespace quda
             out += U * in;
           }
         }
-        {
+        if (arg.dd_in.doHopping(coord, d, -1)) {
           // Backward gather - compute back offset for spinor and gauge fetch
 
           const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -159,6 +159,10 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
 
       // We instantiate two kernel types:
       // case 4 is an operator in all x,y,z,t dimensions
@@ -173,7 +177,9 @@ namespace quda
         break;
       }
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         out = arg.a * out + arg.b * x;
       } else if (mykernel_type != INTERIOR_KERNEL) {

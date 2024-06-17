@@ -71,12 +71,15 @@ namespace quda
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
+      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        return;
+      }
 
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-
-      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
@@ -143,7 +146,7 @@ namespace quda
         Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         tmp.toNonRel(); // switch back to non-chiral basis
 
-        if (xpay) {
+        if (xpay and not arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {

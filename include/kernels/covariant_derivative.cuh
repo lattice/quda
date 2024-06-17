@@ -77,7 +77,8 @@ namespace quda
 
     const int d = mu % 4;
 
-    if (mu < 4) { // Forward gather - compute fwd offset for vector fetch
+    if (mu < 4 and arg.dd_in.doHopping(coord, d, +1)) {
+      // Forward gather - compute fwd offset for vector fetch
 
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -96,7 +97,8 @@ namespace quda
         out += U * in;
       }
 
-    } else { // Backward gather - compute back offset for spinor and gauge fetch
+    } else if (mu >= 4 and arg.dd_in.doHopping(coord, d, -1)) {
+      // Backward gather - compute back offset for spinor and gauge fetch
 
       const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
       const int gauge_idx = back_idx;
@@ -143,6 +145,11 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
+
+      if (arg.dd_x.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
       case 0:
