@@ -277,9 +277,8 @@ namespace quda {
       const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
-	param.block = dim3(min_block_size,1,1);
-
-	param.grid = dim3(min_grid_size,1,1);
+        param.block = dim3(min_block_size, 1, 1);
+        param.grid = dim3(min_grid_size, 1, 1);
       } else {
 	// find the minimum valid blockDim
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
@@ -438,6 +437,17 @@ namespace quda {
    * @brief Query whether we are tuning an uber kernel
    */
   bool uberTuning();
+
+  /**
+   * @brief Helper for setting the rhs string
+   */
+  inline void setRHSstring(char *str, int size)
+  {
+    strcat(str, ",n_rhs=");
+    char rhs_str[16];
+    i32toa(rhs_str, size);
+    strcat(str, rhs_str);
+  }
 
 } // namespace quda
 

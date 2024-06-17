@@ -8,7 +8,7 @@
 #include <index_helper.cuh>
 #include <gauge_field.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/dslash_staggered.cuh>
 
 /**
@@ -22,10 +22,16 @@ namespace quda
   {
     using Dslash = Dslash<staggered, Arg>;
     using Dslash::arg;
+    using Dslash::halo;
     using Dslash::in;
+    const GaugeField &L;
 
   public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Staggered(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+              const ColorSpinorField &halo, const GaugeField &L) :
+      Dslash(arg, out, in, halo), L(L)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -69,16 +75,17 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: flops_ = ghost_flops * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: flops_ = ghost_flops * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         flops_ = ghost_flops * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.Volume();
+        long long sites = halo.Volume();
         flops_ = (2 * num_dir * mv_flops + // SU(3) matrix-vector multiplies
                   (2 * num_dir - 1) * 2 * in.Ncolor() * in.Nspin())
           * sites;                                  // accumulation
@@ -88,7 +95,7 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
         break;
@@ -100,7 +107,7 @@ namespace quda
     long long bytes() const
     {
       int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in.Precision();
-      int gauge_bytes_long = arg.reconstruct * in.Precision();
+      int gauge_bytes_long = L.Reconstruct() * in.Precision();
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
         + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
@@ -112,16 +119,17 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.Volume();
+        long long sites = halo.Volume();
         bytes_ = (num_dir * (gauge_bytes_fat + gauge_bytes_long) + // gauge reads
                   num_dir * 2 * spinor_bytes +                     // spinor reads
                   spinor_bytes)
@@ -132,7 +140,7 @@ namespace quda
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 
         break;
@@ -145,43 +153,38 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
-    inline ImprovedStaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
-                                  const GaugeField &U, double a, const ColorSpinorField &x, int parity, bool dagger,
-                                  const int *comm_override, TimeProfile &profile)
+    ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
+                           int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
-      StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger,
-                                                                               comm_override);
-      Staggered<decltype(arg)> staggered(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity,
+                                                                               dagger, comm_override);
+      Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
     }
   };
 
-#ifdef GPU_STAGGERED_DIRAC
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                              const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
-                              const int *comm_override, TimeProfile &profile)
+  void ApplyImprovedStaggered(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                              const GaugeField &U, const GaugeField &L, double a, cvector_ref<const ColorSpinorField> &x,
+                              int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    for (int i = 0; i < 4; i++) {
-      if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
-        errorQuda(
-          "ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
+    if constexpr (is_enabled<QUDA_ASQTAD_DSLASH>()) {
+      for (int i = 0; i < 4; i++) {
+        if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
+          errorQuda("partitioned dimension with local size less than 6 is not supported in improved staggered dslash");
+        }
       }
-    }
 
-    // L must be first gauge field argument since we template on long reconstruct
-    instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override,
-                                                              profile);
+      // L must be first gauge field argument since we template on long reconstruct
+      instantiate<ImprovedStaggeredApply, ReconstructStaggered>(out, in, x, L, U, a, parity, dagger, comm_override,
+                                                                profile);
+    } else {
+      errorQuda("Improved staggered operator has not been built");
+    }
   }
-#else
-  void ApplyImprovedStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                              const GaugeField &, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-  {
-    errorQuda("Staggered dslash has not been built");
-  }
-#endif
 
 } // namespace quda

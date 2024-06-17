@@ -291,4 +291,123 @@ namespace quda {
     inline constexpr int Dir() const { return dir;  }
   };
 
+  // list of specialized structures used in the contraction kernels:
+
+  constexpr array<array<int, 4>, 16> get_dr_gm_i()
+  {
+    return {{// VECTORS
+             // G_idx = 1: \gamma_1
+             {3, 2, 1, 0},
+
+             // G_idx = 2: \gamma_2
+             {3, 2, 1, 0},
+
+             // G_idx = 3: \gamma_3
+             {2, 3, 0, 1},
+
+             // G_idx = 4: \gamma_4
+             {2, 3, 0, 1},
+
+             // PSEUDO-VECTORS
+             // G_idx = 6: \gamma_5\gamma_1
+             {3, 2, 1, 0},
+
+             // G_idx = 7: \gamma_5\gamma_2
+             {3, 2, 1, 0},
+
+             // G_idx = 8: \gamma_5\gamma_3
+             {2, 3, 0, 1},
+
+             // G_idx = 9: \gamma_5\gamma_4
+             {2, 3, 0, 1},
+
+             // SCALAR
+             // G_idx = 0: I
+             {0, 1, 2, 3},
+
+             // PSEUDO-SCALAR
+             // G_idx = 5: \gamma_5
+             {0, 1, 2, 3},
+
+             // TENSORS
+             // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+             {0, 1, 2, 3},
+
+             // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
+             {1, 0, 3, 2},
+
+             // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+             {1, 0, 3, 2},
+
+             // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+             {1, 0, 3, 2},
+
+             // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
+             {1, 0, 3, 2},
+
+             // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
+             {0, 1, 2, 3}}};
+  }
+
+  template <typename T> constexpr array<array<complex<T>, 4>, 16> get_dr_g5gm_z()
+  {
+
+    constexpr complex<T> p_i = complex<T>(0., +1.);
+    constexpr complex<T> m_i = complex<T>(0., -1.);
+    constexpr complex<T> p_1 = complex<T>(+1., 0.);
+    constexpr complex<T> m_1 = complex<T>(-1., 0.);
+
+    return {{// VECTORS
+             // G_idx = 1: \gamma_1
+             {p_i, p_i, p_i, p_i},
+
+             // G_idx = 2: \gamma_2
+             {m_1, p_1, m_1, p_1},
+
+             // G_idx = 3: \gamma_3
+             {p_i, m_i, p_i, m_i},
+
+             // G_idx = 4: \gamma_4
+             {p_1, p_1, m_1, m_1},
+
+             // PSEUDO-VECTORS
+             // G_idx = 6: \gamma_5\gamma_1
+             {p_i, p_i, m_i, m_i},
+
+             // G_idx = 7: \gamma_5\gamma_2
+             {m_1, p_1, p_1, m_1},
+
+             // G_idx = 8: \gamma_5\gamma_3
+             {p_i, m_i, m_i, p_i},
+
+             // G_idx = 9: \gamma_5\gamma_4
+             {p_1, p_1, p_1, p_1},
+
+             // SCALAR
+             // G_idx = 0: I
+             {p_1, p_1, m_1, m_1},
+
+             // PSEUDO-SCALAR
+             // G_idx = 5: \gamma_5
+             {p_1, p_1, p_1, p_1},
+
+             // TENSORS
+             // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+             {p_1, m_1, m_1, p_1},
+
+             // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
+             {m_i, p_i, p_i, m_i},
+
+             // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+             {m_1, m_1, m_1, m_1},
+
+             // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+             {p_1, p_1, m_1, m_1},
+
+             // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
+             {m_i, p_i, m_i, p_i},
+
+             // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
+             {m_1, p_1, m_1, p_1}}};
+  }
 } // namespace quda

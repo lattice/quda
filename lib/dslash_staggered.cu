@@ -7,7 +7,7 @@
 #include <index_helper.cuh>
 #include <gauge_field.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/dslash_staggered.cuh>
 
 /**
@@ -23,7 +23,11 @@ namespace quda
     using Dslash::arg;
 
   public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Staggered(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+              const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -45,63 +49,48 @@ namespace quda
   };
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_u> struct StaggeredApply {
-
-#if defined(BUILD_MILC_INTERFACE) || defined(BUILD_TIFR_INTERFACE)
-    StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                   TimeProfile &profile)
+    StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, int parity, bool dagger,
+                   const int *comm_override, TimeProfile &profile)
     {
-      if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
-#ifdef BUILD_MILC_INTERFACE
-        constexpr int nDim = 4;
-        constexpr bool improved = false;
+      constexpr int nDim = 4;
+      constexpr bool improved = false;
+      auto halo = ColorSpinorField::create_comms_batch(in);
 
-        StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
-          out, in, U, U, a, x, parity, dagger, comm_override);
-        Staggered<decltype(arg)> staggered(arg, out, in);
+      if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC
+          || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
+        if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+          StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
+            out, in, halo, U, U, a, x, parity, dagger, comm_override);
+          Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
-#else
-        errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
-#endif
+          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+        } else {
+          errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
+        }
       } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
-#ifdef BUILD_TIFR_INTERFACE
-        constexpr int nDim = 4;
-        constexpr bool improved = false;
+        if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+          StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
+            out, in, halo, U, U, a, x, parity, dagger, comm_override);
+          Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
-        StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
-          out, in, U, U, a, x, parity, dagger, comm_override);
-        Staggered<decltype(arg)> staggered(arg, out, in);
-
-        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
-#else
-        errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
-#endif
-      } else {
-        errorQuda("Unsupported combination of staggered phase type %d gauge link type %d and reconstruct %d", U.StaggeredPhase(), U.LinkType(), U.Reconstruct());
+          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+        } else {
+          errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
+        }
       }
     }
-#else
-    StaggeredApply(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, double,
-                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-    {
-      errorQuda("Unsupported combination of staggered phase type %d gauge link type %d and reconstruct %d", U.StaggeredPhase(), U.LinkType(), U.Reconstruct());
-    }
-#endif
   };
 
-#ifdef GPU_STAGGERED_DIRAC
-  void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyStaggered(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+                      double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                      const int *comm_override, TimeProfile &profile)
   {
-    instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      instantiate<StaggeredApply, ReconstructStaggered>(out, in, x, U, a, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Staggered operator has not been built");
+    }
   }
-#else
-  void ApplyStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,  double,
-                      const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-  {
-    errorQuda("Staggered dslash has not been built");
-  }
-#endif
 
 } // namespace quda

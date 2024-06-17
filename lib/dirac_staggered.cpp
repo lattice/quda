@@ -19,17 +19,16 @@ namespace quda {
     return *this;
   }
 
-  void DiracStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			      const QudaParity parity) const
+  void DiracStaggered::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                              QudaParity parity) const
   {
     checkParitySpinor(in, out);
 
     ApplyStaggered(out, in, *gauge, 0., in, parity, dagger, commDim.data, profile);
   }
 
-  void DiracStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				  const QudaParity parity, const ColorSpinorField &x,
-				  const double &k) const
+  void DiracStaggered::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                  QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {    
     checkParitySpinor(in, out);
 
@@ -48,7 +47,7 @@ namespace quda {
   }
 
   // Full staggered operator
-  void DiracStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggered::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // Due to the staggered convention, this is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
@@ -68,9 +67,9 @@ namespace quda {
     }
   }
 
-  void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggered::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in.Even());
+    auto tmp = getFieldTmp(out.Even());
 
     //even
     Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
@@ -112,21 +111,22 @@ namespace quda {
 
     StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
-  
-  void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double, const double,
-                             const int t0, const QudaParity parity) const
+
+  void DiracStaggered::SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, double,
+                               double, int t0, QudaParity parity) const
   {
     checkSpinorAlias(in, out);
-    
-    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3)*in.X(3) ? true : false;
+
+    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3) * in.X(3) ? true : false;
     if( is_time_slice && laplace3D > 3 )
     {
-      if (getVerbosity() == QUDA_DEBUG_VERBOSE) warningQuda("t0 will be ignored for d>3 dimensional Laplacian.");
+      logQuda(QUDA_DEBUG_VERBOSE, "t0 will be ignored for d>3 dimensional Laplacian");
       is_time_slice = false;
     }
 
-    int t0_local = t0 - comm_coord(3)*in.X(3);
-    if( is_time_slice && ( t0_local < 0 || t0_local >= in.X(3) ) ) t0_local = -1; // when source is not in this local lattice
+    int t0_local = t0 - comm_coord(3) * in.X(3);
+    if (is_time_slice && (t0_local < 0 || t0_local >= in.X(3)))
+      t0_local = -1; // when source is not in this local lattice
 
     int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative
@@ -135,8 +135,8 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
 
-    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET){
-      errorQuda( "Single parity site smearing is not supported yet." );
+    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+      errorQuda("Single parity site smearing not supported");
     } else {
       ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     }
@@ -174,9 +174,9 @@ namespace quda {
   // NOT divide out the factor of "2m", i.e., for the even system we invert
   // (4m^2 - D_eo D_oe), not (1 - (1/(4m^2)) D_eo D_oe).
 
-  void DiracStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     QudaParity parity = QUDA_INVALID_PARITY;
     QudaParity other_parity = QUDA_INVALID_PARITY;
@@ -198,17 +198,9 @@ namespace quda {
     DslashXpay(out, tmp, parity, in, 4 * mass * mass);
   }
 
-  void DiracStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
+  void DiracStaggeredPC::MdagM(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const
   {
-    errorQuda("MdagM is no longer defined for DiracStaggeredPC. Use M instead.\n");
-    /*
-    // need extra temporary because for multi-gpu the input
-    // and output fields cannot alias
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    M(out, *tmp2); // doesn't need to be Mdag b/c M is normal!
-    deleteTmp(&tmp2, reset);
-    */
+    errorQuda("MdagM is no longer defined for DiracStaggeredPC. Use M instead");
   }
 
   void DiracStaggeredPC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,

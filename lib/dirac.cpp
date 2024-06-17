@@ -99,42 +99,46 @@ namespace quda {
 
 #undef flip
 
-  void Dirac::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::checkParitySpinor(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    if ( (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) && 
-	 in.Nspin() == 4) {
-      errorQuda("Dirac operator requires UKQCD basis, out = %d, in = %d", out.GammaBasis(), in.GammaBasis());
-    }
-
-    if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
-		in.SiteSubset(), out.SiteSubset());
-    }
-
-    if (out.Ndim() != 5) {
-      if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	  (out.Volume() != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-        errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
+    for (auto i = 0u; i < out.size(); i++) {
+      if ((in[i].GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out[i].GammaBasis() != QUDA_UKQCD_GAMMA_BASIS)
+          && in[i].Nspin() == 4) {
+        errorQuda("Dirac operator requires UKQCD basis, out = %d, in = %d", out[i].GammaBasis(), in[i].GammaBasis());
       }
-    } else {
-      // Domain wall fermions, compare 4d volumes not 5d
-      if ((out.Volume()/out.X(4) != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	  (out.Volume()/out.X(4) != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-        errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
+
+      if (in[i].SiteSubset() != QUDA_PARITY_SITE_SUBSET || out[i].SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
+        errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", in[i].SiteSubset(), out[i].SiteSubset());
+      }
+
+      if (out[i].Ndim() != 5) {
+        if ((out[i].Volume() != gauge->Volume() && out[i].SiteSubset() == QUDA_FULL_SITE_SUBSET)
+            || (out[i].Volume() != gauge->VolumeCB() && out[i].SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
+          errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out[i].Volume(), gauge->VolumeCB());
+        }
+      } else {
+        // Domain wall fermions, compare 4d volumes not 5d
+        if ((out[i].Volume() / out[i].X(4) != gauge->Volume() && out[i].SiteSubset() == QUDA_FULL_SITE_SUBSET)
+            || (out[i].Volume() / out[i].X(4) != gauge->VolumeCB() && out[i].SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
+          errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out[i].Volume(), gauge->VolumeCB());
+        }
       }
     }
   }
 
-  void Dirac::checkFullSpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::checkFullSpinor(cvector_ref<const ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", 
-		in.SiteSubset(), out.SiteSubset());
-    } 
+    for (auto i = 0u; i < out.size(); i++) {
+      if (in[i].SiteSubset() != QUDA_FULL_SITE_SUBSET || out[i].SiteSubset() != QUDA_FULL_SITE_SUBSET) {
+        errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", in[i].SiteSubset(), out[i].SiteSubset());
+      }
+    }
   }
 
-  void Dirac::checkSpinorAlias(const ColorSpinorField &a, const ColorSpinorField &b) const {
-    if (a.data() == b.data()) errorQuda("Aliasing pointers");
+  void Dirac::checkSpinorAlias(cvector_ref<const ColorSpinorField> &a, cvector_ref<const ColorSpinorField> &b) const
+  {
+    for (auto i = 0u; i < a.size(); i++)
+      if (a[i].data() == b[i].data()) errorQuda("Aliasing pointers");
   }
 
   // Dirac operator factory

@@ -52,11 +52,10 @@ namespace quda {
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-    F out[max_n_src];
-    F inA[max_n_src];
-    F inB[max_n_src];
+    F out[MAX_MULTI_RHS];
+    F inA[MAX_MULTI_RHS];
+    F inB[MAX_MULTI_RHS];
     G halo;
     const GY Y;
     const GY X;
@@ -70,9 +69,9 @@ namespace quda {
     int ghostFaceCB[4];
 
     DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                    real kappa, int parity, const ColorSpinorField &halo) :
-      kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
+                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real kappa,
+                    int parity, const ColorSpinorField &halo) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset() * out.size(),
                         2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       n_src(out.size()),
       halo(halo, nFace),
@@ -80,13 +79,12 @@ namespace quda {
       X(const_cast<GaugeField &>(X)),
       kappa(kappa),
       parity(parity),
-      nParity(out[0].SiteSubset()),
-      X0h(((3 - nParity) * out[0].X(0)) / 2),
-      dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
+      nParity(out.SiteSubset()),
+      X0h(((3 - nParity) * out.X(0)) / 2),
+      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out[0].Ndim() == 5 ? out.X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out[0].VolumeCB() / dim[4])
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->inA[i] = inA[i];

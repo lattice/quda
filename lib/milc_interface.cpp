@@ -1259,14 +1259,108 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   int src_offset = getColorVectorOffset(other_parity, false, localDim);
   int dst_offset = getColorVectorOffset(local_parity, false, localDim);
 
-  dslashQuda(static_cast<char*>(dst) + dst_offset*host_precision,
-	     static_cast<char*>(src) + src_offset*host_precision,
-	     &invertParam, local_parity);
+  dslashQuda(static_cast<char *>(dst) + dst_offset * host_precision,
+             static_cast<char *>(src) + src_offset * host_precision, &invertParam, local_parity);
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaDslash
+
+void qudaShift(int external_precision, int quda_precision, const void *const links, void *src, void *dst, int dir,
+               int sym, int reloadGaugeField)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  // static const QudaVerbosity verbosity = getVerbosity();
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  QudaGaugeParam gparam = newQudaGaugeParam();
+  QudaGaugeParam dparam = newQudaGaugeParam();
+
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, 1.0, 0.0);
+  gparam.type = QUDA_WILSON_LINKS;
+  gparam.make_resident_gauge = true;
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, QUDA_EVEN_PARITY,
+                  verbosity, QUDA_CG_INVERTER, &invertParam);
+  invertParam.solution_type = QUDA_MAT_SOLUTION;
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  csParam.x[0] *= 2;
+  QudaDslashType saveDslash = invertParam.dslash_type;
+  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)) {
+    if (links == nullptr) {
+      errorQuda("Can't offload a null gauge field\n");
+      exit(1);
+    }
+    loadGaugeQuda(const_cast<void *>(links), &gparam);
+    // Assume the caller resets reloadGaugeField
+    // invalidate_quda_gauge = false;
+  }
+  invertParam.dslash_type = saveDslash;
+
+  if ((sym < 1) || (sym > 3)) {
+    errorQuda("Wrong shift. Select forward (1), backward (2) or symmetric (3).\n");
+  } else {
+    shiftQuda(dst, src, dir, sym, &invertParam);
+  }
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaShift
+
+void qudaSpinTaste(int external_precision, int quda_precision, const void *const links, void *src, void *dst, int spin,
+                   int taste, int reloadGaugeField)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  // static const QudaVerbosity verbosity = getVerbosity();
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  QudaGaugeParam gparam = newQudaGaugeParam();
+  QudaGaugeParam dparam = newQudaGaugeParam();
+
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, 1.0, 0.0);
+  gparam.type = QUDA_WILSON_LINKS;
+  gparam.make_resident_gauge = true;
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, QUDA_EVEN_PARITY,
+                  verbosity, QUDA_CG_INVERTER, &invertParam);
+  invertParam.solution_type = QUDA_MAT_SOLUTION;
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  csParam.x[0] *= 2;
+  QudaDslashType saveDslash = invertParam.dslash_type;
+  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (reloadGaugeField || !canReuseResidentGauge(&invertParam)) {
+    if (links == nullptr) {
+      errorQuda("Can't offload a null gauge field\n");
+      exit(1);
+    }
+    loadGaugeQuda(const_cast<void *>(links), &gparam);
+    // Assume the caller resets reloadGaugeField
+  }
+  invertParam.dslash_type = saveDslash;
+
+  spinTasteQuda(dst, src, spin, taste, &invertParam);
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaSpinTaste
 
 void qudaInvertMsrc(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                     double target_residual, double target_fermilab_residual, const void *const fatlink,
@@ -1325,7 +1419,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
-  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam, nullptr, nullptr);
+  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
 
   host_free(sln_pointer);
   host_free(src_pointer);
@@ -1976,6 +2070,47 @@ struct mgInputStruct {
     return true;
   }
 };
+
+void qudaContractFT(int external_precision, QudaContractArgs_t *cont_args, void *const quark1, void *const quark2,
+                    double *corr)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  ColorSpinorParam csParam;
+  { // set ColorSpinorParam block
+    csParam.nColor = 3;
+    csParam.nSpin = 1; // Support only staggered color fields for now
+    for (int dir = 0; dir < 4; ++dir) csParam.x[dir] = localDim[dir];
+    csParam.x[4] = 1;
+    csParam.setPrecision(host_precision);
+    csParam.pad = 0;
+    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
+    csParam.pc_type = QUDA_4D_PC; // must be set
+  }
+
+  int const n_mom = cont_args->n_mom;
+  int *const mom_modes = cont_args->mom_modes;
+  const QudaFFTSymmType *const fft_type = cont_args->fft_type;
+  int const *source_position = cont_args->source_position;
+
+  QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+  int const src_colors = 1;
+  // Only one pair of color fields and one result, so only one element in the arrays
+  void *prop_array_flavor_1[1] = {quark1};
+  void *prop_array_flavor_2[1] = {quark2};
+  void *result[1] = {corr};
+
+  contractFTQuda(prop_array_flavor_1, prop_array_flavor_2, result, cType, &csParam, src_colors, localDim,
+                 source_position, n_mom, mom_modes, fft_type);
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaContractFT
 
 // Internal structure that maintains `QudaMultigridParam`,
 // `QudaInvertParam`, `QudaEigParam`s, and the traditional
@@ -2766,7 +2901,7 @@ void qudaFreeGaugeField() {
 void qudaFreeTwoLink()
 {
   qudamilc_called<true>(__func__);
-  freeGaugeSmearedQuda();
+  freeGaugeTwoLinkQuda();
   qudamilc_called<false>(__func__);
 } // qudaFreeTwoLink
 

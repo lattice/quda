@@ -9,7 +9,7 @@
 #include <gauge_field.h>
 #include <uint_to_char.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/laplace.cuh>
 
 /**
@@ -23,10 +23,15 @@ namespace quda
   {
     using Dslash = Dslash<laplace, Arg>;
     using Dslash::arg;
+    using Dslash::halo;
     using Dslash::in;
 
   public:
-    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Laplace(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+            const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
+    {
+    }
 
     void apply(const qudaStream_t &stream) override
     {
@@ -61,17 +66,18 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * 2 * in.GhostFace()[arg.kernel_type];
+        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * 2 * halo.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.Volume();
+        long long sites = halo.Volume();
         flops_ = (num_dir * in.Nspin() * mv_flops +                  // SU(3) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
           * sites; // accumulation
@@ -81,7 +87,7 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
         break;
@@ -105,16 +111,17 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.Volume();
+        long long sites = halo.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
         if (arg.xpay) bytes_ += spinor_bytes;
 	
@@ -122,7 +129,7 @@ namespace quda
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 	
         break;
@@ -142,21 +149,26 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct LaplaceApply {
 
-    LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
-                 double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int * comm_override, TimeProfile &profile)
+    LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U, int dir, double a, double b, int parity,
+                 bool dagger, const int *comm_override, TimeProfile &profile)
     {
-      if constexpr (is_enabled_laplace()) {
-        if (in.Nspin() == 1) {
-          constexpr int nDim = 4;
-          constexpr int nSpin = 1;
-          LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, U, dir, a, b, x, parity, dagger,
-                                                                   comm_override);
-          Laplace<decltype(arg)> laplace(arg, out, in);
-
-          dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(), in.GhostFaceCB(), profile);
-        } else {
-          errorQuda("Unsupported nSpin= %d", in.Nspin());
-        }
+      constexpr int nDim = 4;
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      if (in.Nspin() == 1) {
+        constexpr int nSpin = 1;
+        LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, dagger,
+                                                                 comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+      } else if (in.Nspin() == 4) {
+        constexpr int nSpin = 4;
+        LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, dagger,
+                                                                 comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+      } else {
+        errorQuda("Unsupported nSpin= %d", in.Nspin());
       }
     }
   };
@@ -164,9 +176,14 @@ namespace quda
   // Apply the Laplace operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
-                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyLaplace(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
+                    int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                    const int *comm_override, TimeProfile &profile)
   {
-    instantiate<LaplaceApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_LAPLACE_DSLASH>()) {
+      instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Laplace operator has not been enabled");
+    }
   }
 } // namespace quda

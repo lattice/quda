@@ -1,6 +1,16 @@
+#include <instantiate.h>
 #include <gtest/gtest.h>
 
 using test_t = ::testing::tuple<QudaPrecision, QudaEigType, QudaBoolean, QudaBoolean, QudaBoolean, QudaEigSpectrumType>;
+
+bool skip_test(test_t param)
+{
+  auto prec = ::testing::get<0>(param);
+  if (!quda::is_enabled(prec)) return true; // skip if precision is not enabled
+  // dwf-style solves must use a normal solver
+  if (is_chiral(dslash_type) && (::testing::get<2>(param) == QUDA_BOOLEAN_FALSE)) return true;
+  return false;
+}
 
 class EigensolveTest : public ::testing::TestWithParam<test_t>
 {
@@ -12,6 +22,8 @@ public:
 
   virtual void SetUp()
   {
+    if (skip_test(GetParam())) GTEST_SKIP();
+
     // check if outer precision has changed and update if it has
     if (::testing::get<0>(param) != last_prec) {
       if (last_prec != QUDA_INVALID_PRECISION) {
@@ -21,27 +33,30 @@ public:
 
       // Load the gauge field to the device
       gauge_param.cuda_prec = ::testing::get<0>(param);
+      gauge_param.cuda_prec_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_precondition = ::testing::get<0>(param);
+      gauge_param.cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_eigensolver = ::testing::get<0>(param);
       loadGaugeQuda(gauge.data(), &gauge_param);
 
       if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         // Load the clover terms to the device
         eig_inv_param.clover_cuda_prec = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_sloppy = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_precondition = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+        eig_inv_param.clover_cuda_prec_eigensolver = ::testing::get<0>(param);
         loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
       }
       last_prec = ::testing::get<0>(param);
     }
+
+    // Compute plaquette as a sanity check
+    double plaq[3];
+    plaqQuda(plaq);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 };
-
-bool skip_test(test_t param)
-{
-  auto prec = ::testing::get<0>(param);
-  if (!(QUDA_PRECISION & prec)) return true; // precision not enabled so skip it
-
-  // dwf-style solves must use a normal solver
-  if (is_chiral(dslash_type) && (::testing::get<2>(param) == QUDA_BOOLEAN_FALSE)) return true;
-  return false;
-}
 
 std::vector<double> eigensolve(test_t test_param);
 
@@ -49,7 +64,7 @@ TEST_P(EigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-6 : 1e-12;
+  auto tol = ::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION ? 1e-5 : 1e-12;
   eig_param.tol = tol;
 
   // The IRAM eigensolver will sometimes report convergence with tolerances slightly

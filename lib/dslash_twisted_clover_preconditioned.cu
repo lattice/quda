@@ -4,7 +4,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/dslash_twisted_clover_preconditioned.cuh>
 
 /**
@@ -18,11 +18,13 @@ namespace quda
   {
     using Dslash = Dslash<twistedCloverPreconditioned, Arg>;
     using Dslash::arg;
+    using Dslash::halo;
     using Dslash::in;
 
   public:
-    TwistedCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
+    TwistedCloverPreconditioned(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                const ColorSpinorField &halo) :
+      Dslash(arg, out, in, halo)
     {
     }
 
@@ -54,20 +56,21 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: flops += clover_flops * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: flops += clover_flops * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL:
-        flops += clover_flops * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        flops
+          += clover_flops * 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY:
-        flops += clover_flops * in.Volume();
+        flops += clover_flops * halo.Volume();
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         flops -= clover_flops * ghost_sites;
 
         break;
@@ -85,20 +88,21 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: bytes += clover_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL:
-        bytes += clover_bytes * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        bytes
+          += clover_bytes * 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY:
-        bytes += clover_bytes * in.Volume();
+        bytes += clover_bytes * halo.Volume();
 
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         bytes -= clover_bytes * ghost_sites;
 
         break;
@@ -111,16 +115,17 @@ namespace quda
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct TwistedCloverPreconditionedApply {
 
-    inline TwistedCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
-        const int *comm_override, TimeProfile &profile)
+    TwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C,
+                                     double a, double b, bool xpay, int parity, bool dagger, const int *comm_override,
+                                     TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      TwistedCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, U, C, a, b, xpay, x, parity, dagger,
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      TwistedCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, C, a, b, xpay, x, parity, dagger,
                                                               comm_override);
-      TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+      TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
     }
   };
 
@@ -129,20 +134,16 @@ namespace quda
 
     out = x + a*A^{-1} D * in = x + a*(C + i*b*gamma_5)^{-1}*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   */
-#ifdef GPU_TWISTED_CLOVER_DIRAC
-  void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
-      const int *comm_override, TimeProfile &profile)
+  void ApplyTwistedCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                        const GaugeField &U, const CloverField &C, double a, double b, bool xpay,
+                                        cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                        const int *comm_override, TimeProfile &profile)
   {
-    instantiate<TwistedCloverPreconditionedApply>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
+    if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
+      instantiate<TwistedCloverPreconditionedApply>(out, in, x, U, C, a, b, xpay, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Twisted-clover operator has not been built");
+    }
   }
-#else
-  void ApplyTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                        const CloverField &, double, double, bool, const ColorSpinorField &, int, bool,
-                                        const int *, TimeProfile &)
-  {
-    errorQuda("Twisted-clover dslash has not been built");
-  }
-#endif // GPU_TWISTED_CLOVER_DIRAC
 
 } // namespace quda

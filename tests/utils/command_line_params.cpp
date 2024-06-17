@@ -72,6 +72,7 @@ quda::mgarray<bool> mg_vec_partfile = {};
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
+bool gauge_smear = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
@@ -101,6 +102,7 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
+quda::mass_array<double> kappa_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double evmax = 0.1;
@@ -283,7 +285,7 @@ int heatbath_num_steps = 10;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
-
+// GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
 int gf_verbosity_interval = 100;
@@ -300,7 +302,38 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.85;
 double eofa_mq3 = 1.0;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
+// SU(3) smearing options
+double gauge_smear_rho = 0.1;
+double gauge_smear_epsilon = 1.0;
+double gauge_smear_alpha = 0.6;
+int gauge_smear_steps = 5;
+QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
+int measurement_interval = 5;
+QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
+
+// contract options
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+std::array<int, 4> momentum = {0, 0, 0, 0};
+char correlator_file_affix[256] = "";
+char correlator_save_dir[256] = ".";
+bool open_flavor = false;
+
+// Propagator options
+quda::file_array<char[256]> prop_source_infile;
+quda::file_array<char[256]> prop_source_outfile;
+quda::file_array<char[256]> prop_sink_infile;
+quda::file_array<char[256]> prop_sink_outfile;
+quda::source_array<std::array<int, 4>> prop_source_position = {{{0, 0, 0, 0}}};
+
+int prop_source_smear_steps = 0;
+int prop_sink_smear_steps = 0;
+double prop_source_smear_coeff = 2.0;
+double prop_sink_smear_coeff = 2.0;
+bool prop_read_sources = false;
+int prop_n_sources = 1;
+QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
+
+std::array<int, 4> covdev_mu = {1, 1, 1, 1};
 
 // Parameters for the (gaussian) quark smearing operator
 int    smear_n_steps = 50;
@@ -316,9 +349,6 @@ bool detratio = false;
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
-
-  CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
-                                                           {"dr", QUDA_CONTRACT_TYPE_DR}};
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
@@ -424,9 +454,19 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
+
+  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {
+    {"ape", QUDA_GAUGE_SMEAR_APE}, {"stout", QUDA_GAUGE_SMEAR_STOUT}, {"ovr-imp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT}};
+
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
+
+  CLI::TransformPairs<QudaContractType> contract_type_map {{"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
+                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
+                                                           {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}};
 
 } // namespace
 
@@ -473,12 +513,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
 
-  quda_app
-    ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on "
-                 "spin (default open)")
-    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
@@ -506,8 +540,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
-  quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
-  quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
+  quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver (default false)");
+  quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid (default false)");
+  quda_app->add_option("--gauge-smear", gauge_smear,
+                       "Smear the gauge prior to dirac operator construction (default false)");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
@@ -1071,6 +1107,32 @@ void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--dd-test-projection", dd_red_black, "Compare against the projected result (default false)");
 }
 
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+
+  // Option group for SU(3) related options
+  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
+
+  opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.1)");
+
+  opgroup->add_option(
+    "--su3-smear-epsilon", gauge_smear_epsilon,
+    "epsilon coefficient for Over-Improved Stout smearing and step size for Wilson flow (default 1.0)");
+
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 10)");
+
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
+
+  opgroup->add_option("--su3-measurement-interval", measurement_interval,
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameters");
@@ -1106,6 +1168,79 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Number of measurement steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
                       "Number of warmup steps in heatbath test (default 10)");
+  // DMH
+  // opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
+  //"Number of measurement steps in heatbath before checkpointing (default 5)");
+}
+
+void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for propagator related options
+  auto opgroup = quda_app->add_option_group("Propagator", "Options controlling propagator construction");
+
+  opgroup->add_option("--prop-read-sources", prop_read_sources,
+                      "Read all sources from file. There will be one propagator for each source (default false)");
+
+  opgroup->add_option("--prop-n-sources", prop_n_sources, "The number of point sources to construct (default 1)");
+
+  quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(),
+                           "Save propagators to <file> (requires QIO)");
+
+  quda_app
+    ->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
+                     "Load propagators from <file> (requires QIO)")
+    ->check(CLI::ExistingFile);
+
+  quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
+                           "Save source to <file> (requires QIO)");
+
+  // Do not check for an existing file as QUDA will append any
+  // string with a dilution index: "string_<dilution_index>"
+  quda_app->add_fileoption(opgroup, "--prop-load-source-file", prop_source_infile, CLI::Validator(),
+                           "Load source to <file> (requires QIO)");
+
+  opgroup->add_option("--prop-source-smear-coeff", prop_source_smear_coeff,
+                      "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
+
+  opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
+                      "Set the number of source smearing steps (default 0)");
+
+  opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
+                      "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
+
+  opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
+                      "Set the number of sink smearing steps (default 0)");
+
+  quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
+                         "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
+
+  CLI::QUDACheckedTransformer prec_transform(precision_map);
+  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
+    ->transform(prec_transform);
+}
+
+void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for contraction related options
+  auto opgroup = quda_app->add_option_group("Contraction", "Options controlling contraction");
+
+  opgroup
+    ->add_option("--contraction-type", contract_type,
+                 "Whether to leave spin elemental open or insert a gamma basis, "
+                 "and whether to sum in t,z, or not at all (default stag-ft-t)")
+    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
+
+  opgroup->add_option("--correlator-save-dir", correlator_save_dir, "Save propagators in directory <dir>");
+  opgroup->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
+  opgroup->add_option("--open-flavor", open_flavor, "Compute the open flavor correlators (default false)");
+  opgroup->add_option("--correlator-file-affix", correlator_file_affix,
+                      "Additional string to put into the correlator file name");
+
+  quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
+                           "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
+
+  quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
+                           "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
 }
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
@@ -1158,4 +1293,10 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Clover force", "Options controlling clover force testing");
   opgroup->add_option("--determinant-ratio", detratio, "Test a ratio of determinants. Default is false");
+}
+
+void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Covdev", "Options controlling  cov derivative parameteres");
+  opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction(s) (default 1 1 1 1 - all directions)")->expected(4);
 }

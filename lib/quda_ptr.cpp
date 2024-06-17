@@ -71,6 +71,7 @@ namespace quda
   void quda_ptr::destroy()
   {
     if (size > 0) {
+      getProfile().TPSTART(QUDA_PROFILE_FREE);
       switch (type) {
       case QUDA_MEMORY_DEVICE: pool ? pool_device_free(device) : device_free(device); break;
       case QUDA_MEMORY_DEVICE_PINNED: device_pinned_free(device); break;
@@ -79,6 +80,7 @@ namespace quda
       case QUDA_MEMORY_MAPPED: host_free(host); break;
       default: errorQuda("Unknown memory type %d", type);
       }
+      getProfile().TPSTOP(QUDA_PROFILE_FREE);
     }
 
     size = 0;
@@ -86,12 +88,7 @@ namespace quda
     host = nullptr;
   }
 
-  quda_ptr::~quda_ptr()
-  {
-    getProfile().TPSTART(QUDA_PROFILE_FREE);
-    destroy();
-    getProfile().TPSTOP(QUDA_PROFILE_FREE);
-  }
+  quda_ptr::~quda_ptr() { destroy(); }
 
   void quda_ptr::exchange(quda_ptr &obj, quda_ptr &&new_value)
   {

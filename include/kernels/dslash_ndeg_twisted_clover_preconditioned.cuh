@@ -23,10 +23,12 @@ namespace quda
     real c;          /** this is the flavor twist factor */
     real b2_minus_c2;
 
-    NdegTwistedCloverPreconditionedArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                       const CloverField &A, double a, double b, double c, bool xpay,
-                                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+    NdegTwistedCloverPreconditionedArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                       const ColorSpinorField &halo, const GaugeField &U, const CloverField &A,
+                                       double a, double b, double c, bool xpay, cvector_ref<const ColorSpinorField> &x,
+                                       int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
+                                                          comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a),
@@ -52,13 +54,16 @@ namespace quda
        out(x) = M*in = in + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == true )
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity)
     {
       using namespace linalg; // for Cholesky
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
       typedef HMatrix<real, Arg::nColor * Arg::nSpin / 2> HMat;
+
+      int src_idx = src_flavor / 2;
+      int flavor = src_flavor % 2;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
@@ -69,13 +74,13 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
-        Vector x = arg.out(my_flavor_idx, my_spinor_parity);
+        Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out += x;
       }
 
@@ -91,20 +96,19 @@ namespace quda
 
         SharedMemoryCache<HalfVector> cache;
 
-        enum swizzle_direction {
-          FORWARDS = 0,
-          BACKWARDS = 1
-        };
-
-        auto swizzle = [&](HalfVector x[2], int chirality, swizzle_direction dir) {
-          if (chirality == 0) cache.save_y(x[1], dir);
-          else                cache.save_y(x[0], 1 - dir);
+        auto swizzle = [&](HalfVector x[2], int chirality) {
+          if (chirality == 0)
+            cache.save_y(x[1], target::thread_idx().y);
+          else
+            cache.save_y(x[0], target::thread_idx().y);
           cache.sync();
-          if (chirality == 0) x[1] = cache.load_y(1 - dir);
-          else                x[0] = cache.load_y(dir);
+          if (chirality == 0)
+            x[1] = cache.load_y(target::thread_idx().y + 1);
+          else
+            x[0] = cache.load_y(target::thread_idx().y - 1);
         };
 
-        swizzle(out_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
+        swizzle(out_chi, chirality); // apply the flavor-chirality swizzle between threads
 
         // load in the clover matrix
         HMat A = arg.A(coord.x_cb, parity, chirality);
@@ -135,12 +139,12 @@ namespace quda
           }
         }
 
-        swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
+        swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
         Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         tmp.toNonRel(); // switch back to non-chiral basis
 
         if (xpay) {
-          Vector x = arg.x(my_flavor_idx, my_spinor_parity);
+          Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {
           // multiplication with a needed here?
@@ -148,7 +152,7 @@ namespace quda
         }
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
   };
 } // namespace quda

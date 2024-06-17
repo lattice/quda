@@ -12,20 +12,17 @@ namespace quda
   //                               + fwd(x_4)*U_4(x)in(x+\hat{4}) + bwd(x_4)*U^\dagger_4(x-\hat{4})in(x-\hat{4}) ]
   // with fwd(t)=\alpha(t+1)/\alpha(t), bwd(t)=\alpha(t+1)/\alpha(t), \alpha(t)=\cosh(\alpha_0*((t-t_0)%L_t-L_t/2))
   // Uses the kappa normalization for the Wilson operator.
-#if defined(GPU_CLOVER_DIRAC) && defined(GPU_DISTANCE_PRECONDITIONING)
-  void ApplyWilsonCloverDistance(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                 const CloverField &A, double a, double alpha0, int t0, const ColorSpinorField &x,
-                                 int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyWilsonCloverDistance(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                 const GaugeField &U, const CloverField &A, double a, double alpha0, int t0,
+                                 cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                                 const int *comm_override, TimeProfile &profile)
   {
-    auto dummy = DistanceType<true>();
-    instantiate<WilsonCloverApply>(out, in, U, A, a, alpha0, t0, x, parity, dagger, comm_override, dummy, profile);
+    if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>() && is_enabled_distance_precondition()) {
+      auto dummy = DistanceType<true>();
+      instantiate<WilsonCloverApply>(out, in, x, U, A, a, alpha0, t0, parity, dagger, comm_override, dummy, profile);
+    } else {
+      errorQuda("Wilson-clover operator with distance preconditioning has not been built");
+    }
   }
-#else
-  void ApplyWilsonCloverDistance(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
-                                 double, double, int, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
-  {
-    errorQuda("Distance preconditioned clover dslash has not been built");
-  }
-#endif // GPU_CLOVER_DIRAC && GPU_DISTANCE_PRECONDITIONING
 
 } // namespace quda

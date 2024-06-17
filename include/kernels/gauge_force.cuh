@@ -36,7 +36,7 @@ namespace quda {
       epsilon(epsilon),
       p(p)
     {
-      for (int i=0; i<4; i++) {
+      for (int i = 0; i < 4; i++) {
         X[i] = mom.X()[i];
         E[i] = u.X()[i];
         border[i] = (E[i] - X[i])/2;

@@ -12,43 +12,30 @@ namespace quda
   {
 
     template <typename real_, int nColor_, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
-    struct BaseArg : kernel_param<> {
+    struct TwoLinkArg : kernel_param<> {
       using real = real_;
       static constexpr int nColor = nColor_;
       typedef typename gauge_mapper<real, reconstruct>::type G;
       const G link;
+
+      typedef typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type F;
+      F outA;
+
       int X[4]; // regular grid dims
       int E[4]; // extended grid dims
-
-      int commDim[4];
       int border[4];
 
       /**
          @param[in] link Gauge field
        */
-      BaseArg(const GaugeField &link) :
-        kernel_param(dim3(1, 2, 4)),
-        link(link),
-        commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)}
+      TwoLinkArg(GaugeField &twoLink, const GaugeField &link) :
+        kernel_param(dim3(twoLink.VolumeCB(), 2, 4)), link(link), outA(twoLink)
       {
         for (int d = 0; d < 4; d++) {
           E[d] = link.X()[d];
           border[d] = link.R()[d];
           X[d] = E[d] - 2 * border[d];
-          this->threads.x *= X[d];
         }
-        this->threads.x /= 2;
-      }
-    };
-
-    template <typename real, int nColor, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
-    struct TwoLinkArg : public BaseArg<real, nColor, reconstruct> {
-
-      typedef typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type F;
-      F outA;
-
-      TwoLinkArg(GaugeField &twoLink, const GaugeField &link) : BaseArg<real, nColor, reconstruct>(link), outA(twoLink)
-      {
       }
     };
 
@@ -66,7 +53,6 @@ namespace quda
         int x[4];
         int dx[4] = {0, 0, 0, 0};
         dx[mu] = 1;
-
         getCoords(x, x_cb, arg.X, parity);
 
         for (int i = 0; i < 4; i++) x[i] += arg.border[i];

@@ -132,6 +132,8 @@ namespace quda
 
   bool comm_gdr_blacklist() { return get_current_communicator().comm_gdr_blacklist(); }
 
+  bool comm_zero_copy_enabled() { return get_current_communicator().comm_zero_copy_enabled(); }
+
   bool comm_nvshmem_enabled() { return get_current_communicator().comm_nvshmem_enabled(); }
 
   MsgHandle *comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)

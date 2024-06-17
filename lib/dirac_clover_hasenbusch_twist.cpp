@@ -26,7 +26,7 @@ namespace quda
     return *this;
   }
 
-  void DiracCloverHasenbuschTwist::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverHasenbuschTwist::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     if (symmetric) {
       ApplyWilsonCloverHasenbuschTwist(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity],
@@ -41,10 +41,10 @@ namespace quda
     }
   }
 
-  void DiracCloverHasenbuschTwist::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverHasenbuschTwist::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -86,9 +86,10 @@ namespace quda
   }
 
   // xpay version of the above
-  void DiracCloverHasenbuschTwistPC::DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in,
-                                                            const QudaParity parity, const ColorSpinorField &x,
-                                                            const double &k, const double &b) const
+  void DiracCloverHasenbuschTwistPC::DslashXpayTwistClovInv(cvector_ref<ColorSpinorField> &out,
+                                                            cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                                                            cvector_ref<const ColorSpinorField> &x, double k,
+                                                            double b) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -97,9 +98,10 @@ namespace quda
   }
 
   // xpay version of the above
-  void DiracCloverHasenbuschTwistPC::DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
-                                                              const QudaParity parity, const ColorSpinorField &x,
-                                                              const double &k, const double &b) const
+  void DiracCloverHasenbuschTwistPC::DslashXpayTwistNoClovInv(cvector_ref<ColorSpinorField> &out,
+                                                              cvector_ref<const ColorSpinorField> &in,
+                                                              QudaParity parity, cvector_ref<const ColorSpinorField> &x,
+                                                              double k, double b) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -108,10 +110,10 @@ namespace quda
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
-  void DiracCloverHasenbuschTwistPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverHasenbuschTwistPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa * kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
@@ -148,9 +150,9 @@ namespace quda
     }
   }
 
-  void DiracCloverHasenbuschTwistPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverHasenbuschTwistPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }

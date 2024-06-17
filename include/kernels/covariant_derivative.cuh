@@ -12,15 +12,18 @@ namespace quda
 {
 
   /**
-     @brief Parameter structure for driving the covariatnt derivative operator
+     @brief Parameter structure for driving the covariant derivative operator
   */
-  template <typename Float, int nColor_, typename DDArg, QudaReconstructType reconstruct_, int nDim>
+  template <typename Float, int nSpin_, int nColor_, typename DDArg, QudaReconstructType reconstruct_, int nDim>
   struct CovDevArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = 4;
+    static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
+                                                    spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
@@ -29,21 +32,25 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    F out;      /** output vector field */
-    const F in; /** input vector field */
-    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
-    const G U;  /** the gauge field */
-    int mu;     /** The direction in which to apply the derivative */
+    F out[MAX_MULTI_RHS];  /** output vector field */
+    F in[MAX_MULTI_RHS];   /** input vector field */
+    const Ghost halo_pack; /** accessor for writing the halo field */
+    const Ghost halo;      /** accessor for reading the halo field */
+    const G U;             /** the gauge field */
+    int mu;                /** The direction in which to apply the derivative */
 
-    CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity, bool dagger,
-              const int *comm_override) :
-      DslashArg<Float, nDim, DDArg>(out, in, U, in, parity, dagger, false, 1, spin_project, comm_override),
-      out(out),
-      in(in),
-      in_pack(in),
+    CovDevArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+              const GaugeField &U, int mu, int parity, bool dagger, const int *comm_override) :
+      DslashArg<Float, nDim, DDArg>(out, in, halo, U, in, parity, dagger, false, 1, spin_project, comm_override),
+      halo_pack(halo),
+      halo(halo),
       U(U),
       mu(mu)
     {
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->in[i] = in[i];
+      }
     }
   };
 
@@ -61,8 +68,8 @@ namespace quda
 
   */
   template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyCovDev(Vector &out, const Arg &arg, Coord &coord, int parity,
-                                              int, int thread_dim, bool &active)
+  __device__ __host__ inline void applyCovDev(Vector &out, const Arg &arg, Coord &coord, int parity, int,
+                                              int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -80,12 +87,12 @@ namespace quda
       if (doHalo<kernel_type>(d) && ghost) {
 
         const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-        const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+        const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
         out += U * in;
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        const Vector in = arg.in(fwd_idx, their_spinor_parity);
+        const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
         out += U * in;
       }
 
@@ -100,13 +107,13 @@ namespace quda
 
         const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
         const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
-        const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+        const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
         out += conj(U) * in;
       } else if (doBulk<kernel_type>() && !ghost) {
 
         const Link U = arg.U(d, gauge_idx, 1 - parity);
-        const Vector in = arg.in(back_idx, their_spinor_parity);
+        const Vector in = arg.in[src_idx](back_idx, their_spinor_parity);
 
         out += conj(U) * in;
       }
@@ -117,14 +124,14 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
 
     const Arg &arg;
-    constexpr covDev(const Arg &arg) : arg(arg) {}
+    constexpr covDev(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int src_idx, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
-      using Vector = ColorSpinor<real, Arg::nColor, 4>;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // is thread active (non-trival for fused kernel only)
       bool active = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true;
@@ -132,28 +139,44 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
-      case 0: applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 1: applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 2: applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 3: applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 4: applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 5: applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 6: applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active); break;
-      case 7: applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 0:
+        applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 1:
+        applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 2:
+        applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 3:
+        applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 4:
+        applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 5:
+        applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 6:
+        applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
+      case 7:
+        applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        break;
       }
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out(coord.x_cb, my_spinor_parity);
+        Vector x = arg.out[src_idx](coord.x_cb, my_spinor_parity);
         out += x;
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
     }
   };
 

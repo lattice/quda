@@ -3,6 +3,17 @@
 #include <host_utils.h>
 #include "misc.h"
 
+void setGaugeSmearParam(QudaGaugeSmearParam &smear_param)
+{
+  smear_param.alpha = gauge_smear_alpha;
+  smear_param.rho = gauge_smear_rho;
+  smear_param.epsilon = gauge_smear_epsilon;
+  smear_param.n_steps = gauge_smear_steps;
+  smear_param.meas_interval = measurement_interval;
+  smear_param.smear_type = gauge_smear_type;
+  smear_param.struct_size = sizeof(smear_param);
+}
+
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
   gauge_param.type = QUDA_SU3_LINKS;
@@ -275,6 +286,22 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.use_mobius_fused_kernel = use_mobius_fused_kernel ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   inv_param.struct_size = sizeof(inv_param);
+}
+
+void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
+{
+  // Construct a copy of the current invert parameters
+  setInvertParam(smear_param);
+
+  // Construct 4D smearing parameters.
+  smear_param.dslash_type = QUDA_LAPLACE_DSLASH;
+  double smear_coeff = -1.0 * omega * omega / (4 * steps);
+  smear_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; // Enforce kappa normalisation
+  smear_param.mass = 1.0;
+  smear_param.kappa = smear_coeff;
+  smear_param.laplace3D = laplace3D; // Omit this dim
+  smear_param.solution_type = QUDA_MAT_SOLUTION;
+  smear_param.solve_type = QUDA_DIRECT_SOLVE;
 }
 
 // Parameters defining the eigensolver

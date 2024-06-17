@@ -29,6 +29,7 @@ typedef enum QudaLinkType_s {
   QUDA_MOMENTUM_LINKS,
   QUDA_COARSE_LINKS,                  // used for coarse-gauge field with multigrid
   QUDA_SMEARED_LINKS,                 // used for loading and saving gaugeSmeared in the interface
+  QUDA_TWOLINK_LINKS,                 // used for staggered fermion smearing.
   QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
   QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
   QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
@@ -370,13 +371,18 @@ typedef enum QudaFieldCreate_s {
   QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
 } QudaFieldCreate;
 
-typedef enum QudaGammaBasis_s {
-  QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
-  QUDA_UKQCD_GAMMA_BASIS,
-  QUDA_CHIRAL_GAMMA_BASIS,
-  QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM
+typedef enum QudaGammaBasis_s { // gamj=((top 2 rows)(bottom 2 rows))  s1,s2,s3 are Pauli spin matrices, 1 is 2x2 identity
+  QUDA_DEGRAND_ROSSI_GAMMA_BASIS, // gam1=((0,i*s1)(-i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,i*s3)(-i*s3,0))
+                                  // gam4=((0,1)(1,0))  gam5=((-1,0)(0,1))
+  QUDA_UKQCD_GAMMA_BASIS, // gam1=((0,i*s1)(-i*s1,0)) gam2=((0,i*s2)(-i*s2,0)) gam3=((0,i*s3)(-i*s3,0)) gam4=((1,0)(0,-1)) gam5=((0,-1)(-1,0))
+  QUDA_CHIRAL_GAMMA_BASIS, // gam1=((0,-i*s1)(i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,-i*s3)(i*s3,0)) gam4=((0,-1)(-1,0))gam5=((1,0)(0,-1))
+  QUDA_DIRAC_PAULI_GAMMA_BASIS, // gam1=((0,-i*s1)(i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,-i*s3)(i*s3,0))
+                                // gam4=((1,0)(0,-1)) gam5=((0,1)(1,0))
+  QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM //  gam5=gam4*gam1*gam2*gam3
 } QudaGammaBasis;
-
+//  Dirac-Pauli -> DeGrand-Rossi   T = i/sqrt(2)*((s2,-s2)(s2,s2))     field_DR = T * field_DP
+//  UKQCD -> DeGrand-Rossi         T = i/sqrt(2)*((-s2,-s2)(-s2,s2))   field_DR = T * field_UK
+//  Chiral -> DeGrand-Rossi        T = i*((0,-s2)(s2,0))               field_DR = T * field_chiral
 typedef enum QudaSourceType_s {
   QUDA_POINT_SOURCE,
   QUDA_RANDOM_SOURCE,
@@ -541,11 +547,46 @@ typedef enum QudaStaggeredPhase_s {
   QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
 } QudaStaggeredPhase;
 
+typedef enum QudaSpinTasteGamma_s {
+  QUDA_SPIN_TASTE_G1 = 0,
+  QUDA_SPIN_TASTE_GX = 1,
+  QUDA_SPIN_TASTE_GY = 2,
+  QUDA_SPIN_TASTE_GZ = 4,
+  QUDA_SPIN_TASTE_GT = 8,
+  QUDA_SPIN_TASTE_G5 = 15,
+  QUDA_SPIN_TASTE_GYGZ = 6,
+  QUDA_SPIN_TASTE_GZGX = 5,
+  QUDA_SPIN_TASTE_GXGY = 3,
+  QUDA_SPIN_TASTE_GXGT = 9,
+  QUDA_SPIN_TASTE_GYGT = 10,
+  QUDA_SPIN_TASTE_GZGT = 12,
+  QUDA_SPIN_TASTE_G5GX = 14,
+  QUDA_SPIN_TASTE_G5GY = 13,
+  QUDA_SPIN_TASTE_G5GZ = 11,
+  QUDA_SPIN_TASTE_G5GT = 7,
+  QUDA_SPIN_TASTE_INVALID = QUDA_INVALID_ENUM
+} QudaSpinTasteGamma;
+
 typedef enum QudaContractType_s {
-  QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
-  QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+  QUDA_CONTRACT_TYPE_STAGGERED_FT_T, // Staggered, FT in tdim
+  QUDA_CONTRACT_TYPE_DR_FT_T,        // DegrandRossi insertion, FT in tdim
+  QUDA_CONTRACT_TYPE_DR_FT_Z,        // DegrandRossi insertion, FT in zdim
+  QUDA_CONTRACT_TYPE_STAGGERED,      // Staggered, no summation (TODO: remove line)
+  QUDA_CONTRACT_TYPE_DR,             // DegrandRossi insertion, no summation
+  QUDA_CONTRACT_TYPE_OPEN,           // Open spin elementals, no summation
+  QUDA_CONTRACT_TYPE_OPEN_SUM_T,     // Open spin elementals, spatially summed over tdim
+  QUDA_CONTRACT_TYPE_OPEN_SUM_Z,     // Open spin elementals, spatially summed over zdim
+  QUDA_CONTRACT_TYPE_OPEN_FT_T,      // Open spin elementals, FT in tdim
+  QUDA_CONTRACT_TYPE_OPEN_FT_Z,      // Open spin elementals, FT in zdim
   QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaContractType;
+
+typedef enum QudaFFTSymmType_t {
+  QUDA_FFT_SYMM_ODD = 1,  // sin(phase)
+  QUDA_FFT_SYMM_EVEN = 2, // cos(phase)
+  QUDA_FFT_SYMM_EO = 3,   // exp(-i phase)
+  QUDA_FFT_SYMM_INVALID = QUDA_INVALID_ENUM
+} QudaFFTSymmType;
 
 typedef enum QudaContractGamma_s {
   QUDA_CONTRACT_GAMMA_I = 0,
@@ -576,6 +617,12 @@ typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_SYMANZIK_FLOW,
   QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeSmearType;
+
+typedef enum QudaWFlowType_s {
+  QUDA_WFLOW_TYPE_WILSON,
+  QUDA_WFLOW_TYPE_SYMANZIK,
+  QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaWFlowType;
 
 typedef enum QudaFermionSmearType_s {
   QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,

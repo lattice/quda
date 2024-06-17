@@ -16,7 +16,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // seems to be legacy, copied from dslash_staggered.cuh
-    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
 
     static constexpr QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO;
     static constexpr bool gauge_direct_load = false; // seems to be legacy, copied from dslash_staggered.cuh
@@ -24,31 +24,30 @@ namespace quda {
 
     static constexpr bool dagger = dagger_;
 
-    F out;               /** output vector field */
-    const F in;          /** input vector field */
+    F out[MAX_MULTI_RHS]; /** output vector field */
+    F in[MAX_MULTI_RHS];  /** input vector field */
     const X xInv;        /** Kahler-Dirac inverse gauge field */
     int_fastdiv X0h;     /** One-half of X dimension length */
     int_fastdiv dim[4];  /** full lattice dimensions */
     const int volumeCB;  /** checkerboarded volume */
 
-    StaggeredKDBlockArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &xInv) :
-      kernel_param(dim3(in.VolumeCB(), 2, 1)),
-      out(out),
-      in(in),
-      xInv(xInv),
-      X0h(out.X()[0]/2),
-      volumeCB(in.VolumeCB())
+    StaggeredKDBlockArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        const GaugeField &xInv) :
+      kernel_param(dim3(in.VolumeCB(), in.size(), 2)), xInv(xInv), X0h(out.X(0) / 2), volumeCB(in.VolumeCB())
     {
-      if (in.data() == out.data()) errorQuda("Aliasing pointers");
+      for (auto i = 0u; i < in.size(); i++)
+        if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
       checkOrder(out, in); // check all orders match
       checkPrecision(out, in, xInv); // check all precisions match
       checkLocation(out, in, xInv);
-      if (xInv.Ndim() != nDim)
-        errorQuda("Number of dimensions is not supported");
 
-      for (int i=0; i<nDim; i++) {
-        dim[i] = out.X()[i];
+      for (auto i = 0u; i < in.size(); i++) {
+        this->out[i] = out[i];
+        this->in[i] = in[i];
       }
+
+      if (xInv.Ndim() != nDim) errorQuda("Number of dimensions is not supported");
+      for (int i = 0; i < nDim; i++) dim[i] = out.X(i);
     }
   };
 
@@ -62,7 +61,7 @@ namespace quda {
     constexpr StaggeredKDBlockApply(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline void operator()(int x_cb, int src_idx, int parity)
     {
       // Get coordinates
       constexpr auto nDim = Arg::nDim;
@@ -95,7 +94,7 @@ namespace quda {
               const int offset[4] = { (nbr_parity + nbr_t + nbr_z + nbr_y) & 1, nbr_y, nbr_z, nbr_t };
               const int neighbor_idx = linkIndexShift(x_c, offset, arg.dim);
               const Link Xinv = Arg::dagger ? arg.xInv(my_corner, neighbor_idx, nbr_parity) : arg.xInv(nbr_corner, coord.x_cb, parity);
-              const Vector in = arg.in(neighbor_idx, nbr_parity);
+              const Vector in = arg.in[src_idx](neighbor_idx, nbr_parity);
               out = mv_add(Arg::dagger ? conj(Xinv) : Xinv, in, out);
               nbr_corner++;
             }
@@ -104,7 +103,7 @@ namespace quda {
       }
 
       // And we're done
-      arg.out(coord.x_cb, parity) = out;
+      arg.out[src_idx](coord.x_cb, parity) = out;
     }
   };
 

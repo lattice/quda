@@ -242,7 +242,7 @@ namespace quda {
   }
 
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                        MemoryLocation *destination_, int shmem, cvector_ref<const ColorSpinorField> v)
+                        MemoryLocation *destination_, int shmem, cvector_ref<const ColorSpinorField> &v)
   {
     if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       errorQuda("Field order %d not supported", a.FieldOrder());

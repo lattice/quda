@@ -18,9 +18,11 @@ namespace quda
     real b_inv;      /** inverse chiral twist factor - used to allow early xpay inclusion */
     real c_inv;      /** inverse flavor twist factor - used to allow early xpay inclusion */
 
-    NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                       double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+    NdegTwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                       const ColorSpinorField &halo, const GaugeField &U, double a, double b, double c, bool xpay,
+                       cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
+                                                          comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the chiral twist
       c(c),
@@ -53,10 +55,13 @@ namespace quda
     */
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
+
+      int src_idx = src_flavor / 2;
+      int flavor = src_flavor % 2;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
@@ -67,9 +72,9 @@ namespace quda
       Vector out;
 
       if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       else // defined in dslash_twisted_mass_preconditioned
-        applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+        applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
@@ -77,20 +82,20 @@ namespace quda
 
         if (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
           // use consistent load order across s to ensure better cache locality
-          Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-          Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+          Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
+          Vector x1 = arg.x[src_idx](coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
           if (flavor == 0)
             out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
           else
             out += arg.a_inv * (x1 - arg.b_inv * x1.igamma(4) + arg.c_inv * x0);
         } else {
-          Vector x = arg.x(my_flavor_idx, my_spinor_parity);
+          Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           out += x; // just directly add since twist already applied in the dslash
         }
 
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
-        Vector x = arg.out(my_flavor_idx, my_spinor_parity);
+        Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out += x;
       }
       
@@ -104,13 +109,13 @@ namespace quda
         cache.sync(); // safe to sync in here since other threads will exit
         if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
-            out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(1));
+            out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y + 1));
           else
-            out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load_y(0));
+            out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y - 1));
         }
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
 
   };
