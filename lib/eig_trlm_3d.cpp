@@ -283,12 +283,8 @@ namespace quda
     std::vector<double> alpha_j(ortho_dim_size, 0.0);
     std::vector<double> beta_j(ortho_dim_size, 0.0);
 
-    // Clone a 4D workspace vector
-    ColorSpinorParam csParamClone(v[0]);
-    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField workspace(csParamClone);
-
     // 3D vectors that hold data for individual t components
+    ColorSpinorParam csParamClone(v[0]);
     csParamClone.change_dim(ortho_dim, 1);
     std::vector<ColorSpinorField> vecs_t(1, csParamClone);
     ColorSpinorField r_t(csParamClone);
@@ -298,36 +294,28 @@ namespace quda
     // algorithm.
     for (int t = 0; t < ortho_dim_size; t++) {
       // Every element of the active array must be assessed
-      active_3D[t] = (num_keep_3D[t] <= j && !converged_3D[t] ? true : false);
-      // Copy the relevant slice to the workspace array if active
-      if (active_3D[t]) {
-        // printfQuda(" j = %d, slice %d is active\n", j, t);
-        blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[0], v[j]);
-        blas3d::copy(t, blas3d::COPY_FROM_3D, vecs_t[0], workspace);
-      }
+      active_3D[t] = (num_keep_3D[t] <= j && !converged_3D[t]) ? true : false;
     }
 
     // This will be a blocked operator with no
     // connections in the ortho_dim (usually t)
     // hence the 3D sections of each vector
     // will be independent.
-    chebyOp(r[0], workspace);
+    chebyOp(r[0], v[j]);
 
     // a_j[t] = v_j^dag[t] * r[t]
-    blas3d::reDotProduct(alpha_j, workspace, r[0]);
+    blas3d::reDotProduct(alpha_j, v[j], r[0]);
     for (int t = 0; t < ortho_dim_size; t++) {
       // Only active problem data is recorded
       if (active_3D[t]) alpha_3D[t][j] = alpha_j[t];
     }
 
     // r[t] = r[t] - a_j[t] * v_j[t]
-    for (int t = 0; t < ortho_dim_size; t++) { alpha_j[t] *= active_3D[t] ? -1.0 : 0.0; }
-    blas3d::axpby(alpha_j, workspace, unit, r[0]);
+    for (int t = 0; t < ortho_dim_size; t++) alpha_j[t] = active_3D[t] ? -alpha_j[t] : 0.0;
+    blas3d::axpby(alpha_j, v[j], unit, r[0]);
 
     // r[t] = r[t] - b_{j-1}[t] * v_{j-1}[t]
-    // We do this problem by problem so that we can use the multiblas axpy
-    // on 3D arrays. Only orthogonalise active problems
-
+    // Only orthogonalise active problems
     for (int t = 0; t < ortho_dim_size; t++) {
       if (active_3D[t]) {
         int start = (j > num_keep_3D[t]) ? j - 1 : 0;
@@ -362,11 +350,10 @@ namespace quda
 
     // b_j[t] = ||r[t]||
     blas3d::reDotProduct(beta_j, r[0], r[0]);
-    for (int t = 0; t < ortho_dim_size; t++) beta_j[t] = sqrt(beta_j[t]);
+    for (int t = 0; t < ortho_dim_size; t++) beta_j[t] = active_3D[t] ? sqrt(beta_j[t]) : 0.0;
 
     // Prepare next step.
     // v_{j+1}[t] = r[t] / b_{j}[t]
-    blas::zero(workspace);
     for (int t = 0; t < ortho_dim_size; t++) {
       if (active_3D[t]) {
         beta_3D[t][j] = beta_j[t];
@@ -374,15 +361,9 @@ namespace quda
       }
     }
 
-    blas3d::axpby(beta_j, r[0], unit, workspace);
-
-    // Copy data from workspace into the relevant 3D slice of the kSpace
-    for (int t = 0; t < ortho_dim_size; t++) {
-      if (active_3D[t]) {
-        blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[0], workspace);
-        blas3d::copy(t, blas3d::COPY_FROM_3D, vecs_t[0], v[j + 1]);
-      }
-    }
+    std::vector<double> c(ortho_dim_size);
+    for (int t = 0; t < ortho_dim_size; t++) c[t] = beta_j[t] == 0.0 ? 1.0 : 0.0;
+    blas3d::axpby(beta_j, r[0], c, v[j + 1]);
   }
 
   void TRLM3D::reorder3D(std::vector<ColorSpinorField> &kSpace)

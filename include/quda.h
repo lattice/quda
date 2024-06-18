@@ -1494,7 +1494,7 @@ extern "C" {
    * @param inGauge Pointer to the device gauge field (QUDA device field)
    * @param param The parameters of the host and device fields
    */
-  void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
+  void saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
    * Reinterpret gauge as a pointer to a GaugeField and call destructor.
