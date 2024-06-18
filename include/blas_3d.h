@@ -10,8 +10,16 @@ namespace quda
   {
 
     // Local enum for the 3D copy type
-    enum copy3dType { COPY_TO_3D, COPY_FROM_3D };
-    void copy(const int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y);
+    enum copy3dType { COPY_TO_3D, COPY_FROM_3D, SWAP_3D };
+    void copy(int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Swap the slice in two given fields
+       @param[in] slice The slice we wish to swap in the fields
+       @param[in,out] x Field whose slice we wish to swap
+       @param[in,out] y Field whose slice we wish to swap
+     */
+    void swap(int slice, ColorSpinorField &x, ColorSpinorField &y);
 
     // Reductions
     void reDotProduct(std::vector<double> &result, const ColorSpinorField &a, const ColorSpinorField &b);

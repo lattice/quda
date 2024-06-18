@@ -35,10 +35,10 @@ namespace quda
     F x;
     const int slice;
 
-    copy3dArg(ColorSpinorField &y, ColorSpinorField &x, const int slice) :
-      baseArg(dim3(y.VolumeCB(), x.SiteSubset(), 1), x), y(y), x(x), slice(slice) { }
-
-    __device__ __host__ double init() const { return double(); }
+    copy3dArg(ColorSpinorField &y, ColorSpinorField &x, int slice) :
+      baseArg(dim3(y.VolumeCB(), y.SiteSubset(), 1), y), y(y), x(x), slice(slice)
+    {
+    }
   };
 
   template <typename Arg> struct copyTo3d {
@@ -83,6 +83,26 @@ namespace quda
         int xyz = ((idx[2] * arg.X[1] + idx[1]) * arg.X[0] + idx[0]);
         Vector x = arg.x(xyz / 2, xyz % 2);
         // Write to 4D
+        arg.y(x_cb, parity) = x;
+      }
+    }
+  };
+
+  template <typename Arg> struct swap3d {
+    const Arg &arg;
+    constexpr swap3d(const Arg &arg) : arg(arg) { }
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity)
+    {
+      int idx[4] = {};
+      getCoords(idx, x_cb, arg.X, parity);
+
+      if (idx[3] == arg.slice) {
+        using Vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
+        Vector x = arg.x(x_cb, parity);
+        Vector y = arg.y(x_cb, parity);
+        arg.x(x_cb, parity) = y;
         arg.y(x_cb, parity) = x;
       }
     }

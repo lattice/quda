@@ -368,11 +368,6 @@ namespace quda
 
   void TRLM3D::reorder3D(std::vector<ColorSpinorField> &kSpace)
   {
-    ColorSpinorParam csParamClone(kSpace[0]);
-    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    csParamClone.change_dim(ortho_dim, 1);
-
-    std::vector<ColorSpinorField> vecs_t(2, csParamClone);
     for (int t = 0; t < ortho_dim_size; t++) {
       int i = 0;
       if (reverse) {
@@ -381,10 +376,7 @@ namespace quda
             i++;
           else {
             std::swap(alpha_3D[t][i], alpha_3D[t][i - 1]);
-            blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[0], kSpace[i]);
-            blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[1], kSpace[i - 1]);
-            blas3d::copy(t, blas3d::COPY_FROM_3D, vecs_t[0], kSpace[i - 1]);
-            blas3d::copy(t, blas3d::COPY_FROM_3D, vecs_t[1], kSpace[i]);
+            blas3d::swap(t, kSpace[i], kSpace[i - 1]);
             i--;
           }
         }
@@ -394,10 +386,7 @@ namespace quda
             i++;
           else {
             std::swap(alpha_3D[t][i], alpha_3D[t][i - 1]);
-            blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[0], kSpace[i]);
-            blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[1], kSpace[i - 1]);
-            blas3d::copy(t, blas3d::COPY_FROM_3D, vecs_t[0], kSpace[i - 1]);
-            blas3d::copy(t, blas3d::COPY_FROM_3D, vecs_t[1], kSpace[i]);
+            blas3d::swap(t, kSpace[i], kSpace[i - 1]);
             i--;
           }
         }
