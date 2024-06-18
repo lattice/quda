@@ -293,7 +293,9 @@ namespace quda
     std::vector<ColorSpinorField> vecs_t(1, csParamClone);
     ColorSpinorField r_t(csParamClone);
 
-    // Identify active 3D slices
+    // Identify active 3D slices. The active_3D array
+    // should be modified here only throughout the entire
+    // algorithm.
     for (int t = 0; t < ortho_dim_size; t++) {
       // Every element of the active array must be assessed
       active_3D[t] = (num_keep_3D[t] <= j && !converged_3D[t] ? true : false);
@@ -501,7 +503,7 @@ namespace quda
     std::vector<ColorSpinorField> kSpace_t;
 
     for (int t = 0; t < ortho_dim_size; t++) {
-      if (active_3D[t]) {
+      if (!converged_3D[t]) {
         int dim = n_kr - num_locked_3D[t];
         int keep = iter_keep_3D[t];
 
