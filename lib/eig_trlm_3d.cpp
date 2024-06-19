@@ -466,11 +466,16 @@ namespace quda
 
   void TRLM3D::computeKeptRitz3D(std::vector<ColorSpinorField> &kSpace)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     std::vector<std::vector<double>> ritz_mat_keep(ortho_dim_size);
 
     std::vector<ColorSpinorField> vecs_t;
     std::vector<ColorSpinorField> kSpace_t;
+
+    ColorSpinorParam csParamClone(kSpace[0]);
+    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    csParamClone.change_dim(ortho_dim, 1);
 
     for (int t = 0; t < ortho_dim_size; t++) {
       if (!converged_3D[t]) {
@@ -482,23 +487,13 @@ namespace quda
           for (int i = 0; i < keep; i++) { ritz_mat_keep[t][j * keep + i] = ritz_mat_3D[t][i * dim + j]; }
         }
 
-        // Pointers to the relevant vectors
-        vector_ref<ColorSpinorField> vecs_locked;
-
         // Alias the vectors we wish to keep.
-        vecs_locked.reserve(dim);
-        for (int j = 0; j < dim; j++) vecs_locked.push_back(kSpace[num_locked_3D[t] + j]);
+        vector_ref<ColorSpinorField> vecs_locked(kSpace.begin() + num_locked_3D[t], kSpace.begin() + num_locked_3D[t] + dim);
 
         // multiBLAS axpy. Create 3D vectors so that we may perform all t independent
         // vector rotations.
-        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-
         vecs_t.reserve(dim);
         kSpace_t.reserve(keep);
-
-        ColorSpinorParam csParamClone(kSpace[0]);
-        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-        csParamClone.change_dim(ortho_dim, 1);
 
         // Create 3D arrays
         for (int i = vecs_t.size(); i < dim; i++) vecs_t.push_back(csParamClone);
@@ -514,7 +509,6 @@ namespace quda
                           {kSpace_t.begin(), kSpace_t.begin() + keep});
 
         // Copy back to the 4D workspace array
-        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
         // Copy compressed Krylov
         for (int i = 0; i < keep; i++) {
@@ -530,6 +524,8 @@ namespace quda
           beta_3D[t][i + num_locked_3D[t]] = beta_3D[t][n_kr - 1] * ritz_mat_3D[t][dim * (i + 1) - 1];
       }
     }
+
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   // Orthogonalise r[t][0:] against V_[t][0:j]
