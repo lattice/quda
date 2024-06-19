@@ -49,6 +49,14 @@ extern "C" {
                         HISQ fermions since the tadpole factor is
                         baked into the links during their construction */
     double naik_epsilon; /** Naik epsilon parameter (HISQ fermions only).*/
+
+    /** Parameters needed for deflation **/
+    int n_ev; /** Number of eigenvectors **/
+    int n_ev_deflate; /** Number of eigenvectors to use in deflation **/
+    char vec_infile[256]; /** Filename where to load the eigenvectors **/
+    char vec_outfile[256]; /** Filename where to save the eigenvectors **/
+    QudaBoolean preserve_deflation; /** Whether to preserve the deflation space for the next solve **/
+    QudaBoolean preserve_evals; /** Whether to use evalues computed during earlier solve **/
   } QudaInvertArgs_t;
 
   /**

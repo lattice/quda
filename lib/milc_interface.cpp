@@ -1180,6 +1180,19 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                  inv_args.tadpole, inv_args.naik_epsilon);
 
+  // create and fill QudaEigParam with deflation parameters
+  QudaEigParam qep = newQudaEigParam();
+  qep.n_ev = inv_args.n_ev;
+  qep.n_ev_deflate = inv_args.n_ev_deflate;
+  qep.n_conv = qep.n_ev;
+  qep.n_kr = 2*qep.n_conv;
+  strcpy( qep.vec_infile, inv_args.vec_infile );
+  strcpy( qep.vec_outfile, inv_args.vec_outfile );
+  qep.io_parity_inflate = QUDA_BOOLEAN_TRUE;
+  qep.preserve_deflation = inv_args.preserve_deflation;
+  qep.preserve_evals = inv_args.preserve_evals;
+
+  // create and fill QudaInvertParam
   QudaInvertParam invertParam = newQudaInvertParam();
 
   QudaParity local_parity = inv_args.evenodd;
@@ -1188,6 +1201,19 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
+
+  // deflate if even parity and requested
+  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_conv>0) ? &qep : nullptr; 
+
+  // setup preserved deflation space
+  static void* deflation_space = nullptr;
+  static bool deflation_init = false;
+  if (invertParam.eig_param && qep.preserve_deflation) {
+    if (deflation_init) {
+      if (!deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
+      qep.preserve_deflation_space = deflation_space;
+    }
+  }
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
@@ -1206,6 +1232,11 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
 
   invertQuda(static_cast<char *>(solution) + quark_offset, static_cast<char *>(source) + quark_offset, &invertParam);
+
+  if (invertParam.eig_param && qep.preserve_deflation) {
+    deflation_space = qep.preserve_deflation_space;
+    deflation_init = true; // signal that we have deflation space preserved
+  }
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
