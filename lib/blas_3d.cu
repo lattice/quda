@@ -50,6 +50,8 @@ namespace quda
         }
       }
 
+      void preTune() { x.backup(); y.backup(); }
+      void postTune() { x.restore(); y.restore(); }
       long long bytes() const { return (type == SWAP_3D ? 2 : 1) * (x.Bytes() / x.X(3) + y.Bytes() / y.X(3)); }
     };
 
@@ -70,16 +72,14 @@ namespace quda
 
     template <typename Float, int nColor> class axpby3D : TunableKernel2D
     {
-    protected:
       ColorSpinorField &x;
       ColorSpinorField &y;
-      void *a;
-      void *b;
-
+      const std::vector<double> &a;
+      const std::vector<double> &b;
       unsigned int minThreads() const { return x.VolumeCB(); }
 
     public:
-      axpby3D(ColorSpinorField &x, ColorSpinorField &y, void *a, void *b) :
+      axpby3D(ColorSpinorField &x, ColorSpinorField &y, const std::vector<double> &a, const std::vector<double> &b) :
         TunableKernel2D(x, x.SiteSubset()), x(x), y(y), a(a), b(b)
       {
         apply(device::get_default_stream());
@@ -87,19 +87,12 @@ namespace quda
 
       void apply(const qudaStream_t &stream)
       {
-        size_t data_bytes = x.X()[3] * x.Precision();
-        void *d_a = pool_device_malloc(data_bytes);
-        void *d_b = pool_device_malloc(data_bytes);
-        qudaMemcpy(d_a, a, data_bytes, qudaMemcpyHostToDevice);
-        qudaMemcpy(d_b, b, data_bytes, qudaMemcpyHostToDevice);
-
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor>((Float *)d_a, x, (Float *)d_b, y));
-
-        pool_device_free(d_b);
-        pool_device_free(d_a);
+        launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor>(a, x, b, y));
       }
 
+      void preTune() override { y.backup(); }
+      void postTune() override { y.restore(); }
       long long flops() const { return 6 * x.Volume() * x.Nspin() * x.Ncolor(); }
       long long bytes() const { return x.Bytes() + 2 * y.Bytes(); }
     };
@@ -119,7 +112,7 @@ namespace quda
         errorQuda("Unexpected coeff array sizes a=%lu b=%lu, x[3]=%d", a.size(), b.size(), x.X()[3]);
 
       // We must give a Lattice field as the first argument
-      instantiate<axpby3D>(x, y, a.data(), b.data());
+      instantiate<axpby3D>(x, y, a, b);
     }
 
     void ax(std::vector<double> &a, ColorSpinorField &x)
@@ -130,16 +123,14 @@ namespace quda
 
     template <typename Float, int nColor> class caxpby3D : TunableKernel2D
     {
-    protected:
       ColorSpinorField &x;
       ColorSpinorField &y;
-      void *a;
-      void *b;
-
+      const std::vector<Complex> &a;
+      const std::vector<Complex> &b;
       unsigned int minThreads() const { return x.VolumeCB(); }
 
     public:
-      caxpby3D(ColorSpinorField &x, ColorSpinorField &y, void *a, void *b) :
+      caxpby3D(ColorSpinorField &x, ColorSpinorField &y, const std::vector<Complex> &a, const std::vector<Complex> &b) :
         TunableKernel2D(x, x.SiteSubset()), x(x), y(y), a(a), b(b)
       {
         apply(device::get_default_stream());
@@ -147,19 +138,12 @@ namespace quda
 
       void apply(const qudaStream_t &stream)
       {
-        size_t data_bytes = 2 * x.X()[3] * x.Precision();
-        void *d_a = pool_device_malloc(data_bytes);
-        void *d_b = pool_device_malloc(data_bytes);
-        qudaMemcpy(d_a, a, data_bytes, qudaMemcpyHostToDevice);
-        qudaMemcpy(d_b, b, data_bytes, qudaMemcpyHostToDevice);
-
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor>((complex<Float> *)d_a, x, (complex<Float> *)d_b, y));
-
-        pool_device_free(d_a);
-        pool_device_free(d_b);
+        launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor>(a, x, b, y));
       }
 
+      void preTune() { y.backup(); }
+      void postTune() { y.restore(); }
       long long flops() const { return 14 * x.Volume() * x.Nspin() * x.Ncolor(); }
       long long bytes() const { return x.Bytes() + 2 * y.Bytes(); }
     };
@@ -179,7 +163,7 @@ namespace quda
         errorQuda("Unexpected coeff array sizes a=%lu b=%lu, x[3]=%d", a.size(), b.size(), x.X()[3]);
 
       // We must give a Lattice field as the first argument
-      instantiate<caxpby3D>(x, y, a.data(), b.data());
+      instantiate<caxpby3D>(x, y, a, b);
     }
 
     template <typename Float, int nColor> class reDotProduct3D : TunableMultiReduction

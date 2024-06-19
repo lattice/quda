@@ -114,17 +114,24 @@ namespace quda
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
+    static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
 
-    const Float *a;
-    F x;
-    const Float *b;
+    static constexpr int MAX_ORTHO_DIM = 128;
+    real a[MAX_ORTHO_DIM];
+    const F x;
+    real b[MAX_ORTHO_DIM];
     F y;
 
-    axpby3dArg(const Float *a, ColorSpinorField &x, const Float *b, ColorSpinorField &y) :
-      baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), a(a), x(x), b(b), y(y) {}
+    axpby3dArg(const std::vector<double> &a, const ColorSpinorField &x, const std::vector<double> &b, ColorSpinorField &y) :
+      baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
+    {
+      if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
+      for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+      for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+    }
   };
 
   template <typename Arg> struct axpby3d {
@@ -161,17 +168,24 @@ namespace quda
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
+    static constexpr bool disable_ghost = true;
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, disable_ghost>::type F;
 
-    const complex<Float> *a;
-    F x;
-    const complex<Float> *b;
+    static constexpr int MAX_ORTHO_DIM = 64;
+    complex<real> a[MAX_ORTHO_DIM];
+    const F x;
+    complex<real> b[MAX_ORTHO_DIM];
     F y;
 
-    caxpby3dArg(const complex<Float> *a, ColorSpinorField &x, const complex<Float> *b, ColorSpinorField &y) :
-      baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), a(a), x(x), b(b), y(y) {}
+    caxpby3dArg(const std::vector<Complex> &a, ColorSpinorField &x, const std::vector<Complex> &b, ColorSpinorField &y) :
+      baseArg(dim3(x.VolumeCB(), x.SiteSubset(), 1), x), x(x), y(y)
+    {
+      if (x.X(3) > MAX_ORTHO_DIM) errorQuda("Orthogonal dimension %d exceeds maximum %d", x.X(3), MAX_ORTHO_DIM);
+      for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
+      for (auto i = 0u; i < b.size(); i++) this->b[i] = b[i];
+    }
   };
 
   template <typename Arg> struct caxpby3d {
