@@ -225,6 +225,12 @@ namespace quda
 	}
       }
 
+      // ensure that all processes partake even if all eigenvalues in
+      // those processes have converged
+      int all_converged_int = all_converged;
+      comm_allreduce_int(all_converged_int);
+      all_converged = all_converged_int;
+
       if (all_converged) {
         reorder3D(kSpace);
         converged = true;
@@ -531,9 +537,7 @@ namespace quda
   // Orthogonalise r[t][0:] against V_[t][0:j]
   void TRLM3D::blockOrthogonalize3D(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int j)
   {
-    int vec_size = j;
-
-    for (int i = 0; i < vec_size; i++) {
+    for (int i = 0; i < j; i++) {
       std::vector<Complex> s_t(ortho_dim_size, 0.0);
       std::vector<Complex> unit_new(ortho_dim_size, {1.0, 0.0});
 
