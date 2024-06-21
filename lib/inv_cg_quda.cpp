@@ -206,7 +206,7 @@ namespace quda {
     }
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
+  void CG::operator()(ColorSpinorField &x, const ColorSpinorField &b, const ColorSpinorField &p_init, double r2_old_init)
   {
     if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
@@ -315,10 +315,10 @@ namespace quda {
 
     ColorSpinorParam csParam(rSloppy);
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    XUpdateBatch x_update_batch(Np, p_init ? *p_init : rSloppy, csParam);
+    XUpdateBatch x_update_batch(Np, !p_init.empty() ? p_init : rSloppy, csParam);
 
     double r2_old = 0.0;
-    if (r2_old_init != 0.0 and p_init) {
+    if (r2_old_init != 0.0 and !p_init.empty()) {
       r2_old = r2_old_init;
       Complex rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
       blas::caxpy(-rp, rSloppy, x_update_batch.get_current_field());
@@ -541,7 +541,7 @@ namespace quda {
   }
 
   // Separate HQ residual codepath
-  void CG::hqsolve(ColorSpinorField &x, ColorSpinorField &b)
+  void CG::hqsolve(ColorSpinorField &x, const ColorSpinorField &b)
   {
     logQuda(QUDA_VERBOSE, "Performing a HQ CG solve\n");
 

@@ -724,12 +724,16 @@ namespace quda {
     CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
        SolverParam &param);
     virtual ~CG();
+
     /**
      * @brief Run CG.
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override { (*this)(out, in, nullptr, 0.0); };
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override
+    {
+      (*this)(out, in, ColorSpinorField(), 0.0);
+    };
 
     /**
      * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
@@ -739,7 +743,8 @@ namespace quda {
      * @param p_init Initial-search direction.
      * @param r2_old_init [description]
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &p_init,
+                    double r2_old_init);
 
     void blocksolve(ColorSpinorField &out, ColorSpinorField &in) override;
 
@@ -758,7 +763,7 @@ namespace quda {
      * @param out Solution-vector.
      * @param in Right-hand side.
      */
-    void hqsolve(ColorSpinorField &out, ColorSpinorField &in);
+    void hqsolve(ColorSpinorField &out, const ColorSpinorField &in);
   };
 
   class CGNE : public CG

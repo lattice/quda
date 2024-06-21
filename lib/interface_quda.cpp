@@ -4041,7 +4041,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
         {
           CG cg(*m, *mSloppy, *mSloppy, *mSloppy, solverParam);
           if (i==0)
-            cg(x[i], b, &p[i], r2_old[i]);
+            cg(x[i], b, p[i], r2_old[i]);
           else
             cg(x[i], b);
         }
