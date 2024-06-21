@@ -111,7 +111,7 @@ namespace quda {
                  cvector_ref<const ColorSpinorField> &v) :
       kernel_param(
         dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
-      n_src(v.size() > 0 ? 1 : v.size()),
+      n_src(v.size() > 0 ? v.size() : 1),
       out(a, nFace, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
@@ -130,16 +130,19 @@ namespace quda {
       shmem(shmem_)
     {
       int prev = -1; // previous dimension that was partitioned
+
+      int Ls = nDim == 5 ? (a.X(4) / n_src) : 1;
       for (int i = 0; i < 4; i++) {
         if (!comm_dim_partitioned(i)) continue;
         // include fifth dimension but not batch dimension in face indices
-        ghostFaceCB[i] = dc.ghostFaceCB[i] * nFace * ((nDim == 5 && v.size() == 0) ? dc.Ls : 1);
+        ghostFaceCB[i] = dc.ghostFaceCB[i] * nFace * Ls;
         // include fifth and batch dimensions in thread count
-        ghostThreadsCB[i] = dc.ghostFaceCB[i] * nFace * (nDim == 5 ? dc.Ls : 1);
+        ghostThreadsCB[i] = dc.ghostFaceCB[i] * nFace * Ls * n_src;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * ghostThreadsCB[i];
         prev = i;
       }
+
 #ifdef NVSHMEM_COMMS
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
       for (int dim = 0; dim < 4; dim++) {

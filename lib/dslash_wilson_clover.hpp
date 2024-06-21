@@ -4,7 +4,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-#include <dslash_policy.cuh>
+#include <dslash_policy.hpp>
 #include <kernels/dslash_wilson_clover.cuh>
 
 /**
@@ -18,10 +18,16 @@ namespace quda
   {
     using Dslash = Dslash<wilsonClover, Arg>;
     using Dslash::arg;
+    using Dslash::halo;
     using Dslash::in;
+    const CloverField &A;
 
   public:
-    WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) { }
+    WilsonClover(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 const ColorSpinorField &halo, const CloverField &A) :
+      Dslash(arg, out, in, halo), A(A)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -35,13 +41,14 @@ namespace quda
 
     long long flops() const
     {
-      int clover_flops = 504;
+      int n = (in.Nspin() / 2) * in.Ncolor();
+      int mv_flops = 8 * n * n - 2 * n;
       long long flops = Dslash::flops();
 
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
-      case KERNEL_POLICY: flops += clover_flops * in.Volume(); break;
+      case KERNEL_POLICY: flops += 2 * mv_flops * halo.Volume(); break;
       default: break; // all clover flops are in the interior kernel
       }
       return flops;
@@ -49,12 +56,11 @@ namespace quda
 
     long long bytes() const
     {
-      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
       long long bytes = Dslash::bytes();
 
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
-      case KERNEL_POLICY: bytes += clover_bytes * in.Volume(); break;
+      case KERNEL_POLICY: bytes += in.size() * A.Bytes(); break;
       default: break;
       }
 
@@ -68,16 +74,18 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {
 
     template <bool distance_pc>
-    inline WilsonCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                             double a, double alpha0, int t0, const ColorSpinorField &x, int parity, bool dagger,
-                             const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
+    WilsonCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
+                      double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                      DistanceType<distance_pc>, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, nDim, recon, false, distance_pc> arg(out, in, U, A, a, 0.0, x, parity, dagger,
-                                                                          comm_override, alpha0, t0);
-      WilsonClover<decltype(arg)> wilson(arg, out, in);
+      auto halo = ColorSpinorField::create_comms_batch(in);
+      WilsonCloverArg<Float, nColor, nDim, recon, false, distance_pc> arg(out, in, halo, U, A, a, 0.0, x, parity,
+                                                                          dagger, comm_override, alpha0, t0);
+      WilsonClover<decltype(arg)> wilson(arg, out, in, halo, A);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }
   };
 

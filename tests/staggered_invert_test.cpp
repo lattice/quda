@@ -138,6 +138,11 @@ void init()
   // Set QUDA internal parameters
   gauge_param = newQudaGaugeParam();
   setStaggeredGaugeParam(gauge_param);
+  QudaGaugeSmearParam smear_param;
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+  }
 
   inv_param = newQudaInvertParam();
   mg_inv_param = newQudaInvertParam();
@@ -385,8 +390,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
       _hp_b[n] = in[n].data();
     }
     // Run split grid
-    invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, cpuFatMILC.data(), cpuLongMILC.data(),
-                                &gauge_param);
+    invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
     quda::comm_allreduce_int(inv_param.iter);
     inv_param.iter /= comm_size() / num_sub_partition;

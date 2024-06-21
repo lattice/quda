@@ -8,37 +8,6 @@ using schwarz_t = ::testing::tuple<QudaSchwarzType, QudaInverterType, QudaPrecis
 using test_t = ::testing::tuple<QudaPrecision, QudaPrecision, QudaInverterType, QudaSolutionType, QudaSolveType, int,
                                 int, schwarz_t, QudaResidualType>;
 
-class InvertTest : public ::testing::TestWithParam<test_t>
-{
-protected:
-  test_t param;
-
-public:
-  InvertTest() : param(GetParam()) { }
-
-  virtual void SetUp()
-  {
-    // check if outer precision has changed and update if it has
-    if (::testing::get<0>(param) != last_prec) {
-      if (last_prec != QUDA_INVALID_PRECISION) {
-        freeGaugeQuda();
-        if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
-      }
-
-      // Load the gauge field to the device
-      gauge_param.cuda_prec = ::testing::get<0>(param);
-      loadGaugeQuda(gauge.data(), &gauge_param);
-
-      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        // Load the clover terms to the device
-        inv_param.clover_cuda_prec = ::testing::get<0>(param);
-        loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
-      }
-      last_prec = ::testing::get<0>(param);
-    }
-  }
-};
-
 bool skip_test(test_t param)
 {
   auto prec = ::testing::get<0>(param);
@@ -84,6 +53,52 @@ bool skip_test(test_t param)
 
   return false;
 }
+
+class InvertTest : public ::testing::TestWithParam<test_t>
+{
+protected:
+  test_t param;
+
+public:
+  InvertTest() : param(GetParam()) { }
+
+  virtual void SetUp()
+  {
+    if (skip_test(GetParam())) GTEST_SKIP();
+
+    // check if outer precision has changed and update if it has
+    if (::testing::get<0>(param) != last_prec) {
+      if (last_prec != QUDA_INVALID_PRECISION) {
+        freeGaugeQuda();
+        if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
+      }
+
+      // Load the gauge field to the device
+      gauge_param.cuda_prec = ::testing::get<0>(param);
+      gauge_param.cuda_prec_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_precondition = ::testing::get<0>(param);
+      gauge_param.cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_eigensolver = ::testing::get<0>(param);
+      loadGaugeQuda(gauge.data(), &gauge_param);
+
+      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        // Load the clover terms to the device
+        inv_param.clover_cuda_prec = ::testing::get<0>(param);
+        inv_param.clover_cuda_prec_sloppy = ::testing::get<0>(param);
+        inv_param.clover_cuda_prec_precondition = ::testing::get<0>(param);
+        inv_param.clover_cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+        inv_param.clover_cuda_prec_eigensolver = ::testing::get<0>(param);
+        loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
+      }
+      last_prec = ::testing::get<0>(param);
+    }
+
+    // Compute plaquette as a sanity check
+    double plaq[3];
+    plaqQuda(plaq);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
+};
 
 std::vector<std::array<double, 2>> solve(test_t param);
 

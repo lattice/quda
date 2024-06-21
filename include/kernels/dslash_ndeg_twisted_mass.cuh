@@ -12,9 +12,10 @@ namespace quda
     real b; /** this is the chiral twist factor */
     real c; /** this is the flavor twist factor */
 
-    NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                       double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+    NdegTwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                       const ColorSpinorField &halo, const GaugeField &U, double a, double b, double c,
+                       cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the chiral twist
       c(c)
@@ -35,10 +36,13 @@ namespace quda
        Note this routine only exists in xpay form.
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
+
+      int flavor = src_flavor % 2;
+      int src_idx = src_flavor / 2;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
@@ -49,15 +53,15 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
       if (mykernel_type == INTERIOR_KERNEL) {
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
-        Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-        Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+        Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
+        Vector x1 = arg.x[src_idx](coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
 
         if (flavor == 0) {
           out = x0 + arg.a * out;
@@ -70,11 +74,11 @@ namespace quda
         }
 
       } else if (active) {
-        Vector x = arg.out(my_flavor_idx, my_spinor_parity);
+        Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out = x + arg.a * out;
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
   };
 

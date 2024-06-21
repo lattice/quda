@@ -29,24 +29,27 @@ namespace quda {
     return *this;
   }
 
-  void DiracTwistedClover::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedClover::checkParitySpinor(cvector_ref<const ColorSpinorField> &out,
+                                             cvector_ref<const ColorSpinorField> &in) const
   {
     Dirac::checkParitySpinor(out, in);
 
-    if (out.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      if (out.Volume() != clover->VolumeCB())
-        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(),
-                  clover->VolumeCB());
-    } else {
-      //
-      if (out.Volume() / 2 != clover->VolumeCB())
-        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(),
-                  clover->VolumeCB());
+    for (auto i = 0u; i < out.size(); i++) {
+      if (out[i].TwistFlavor() == QUDA_TWIST_SINGLET) {
+        if (out[i].Volume() != clover->VolumeCB())
+          errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out[i].Volume(),
+                    clover->VolumeCB());
+      } else {
+        if (out[i].Volume() / 2 != clover->VolumeCB())
+          errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out[i].Volume(),
+                    clover->VolumeCB());
+      }
     }
   }
 
   // Protected method for applying twist
-  void DiracTwistedClover::twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType, const int parity) const
+  void DiracTwistedClover::twistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                              QudaTwistGamma5Type twistType, QudaParity parity) const
   {
     checkParitySpinor(out, in);
     ApplyTwistClover(out, in, *clover, kappa, mu, epsilon, parity, dagger, twistType);
@@ -54,19 +57,20 @@ namespace quda {
 
 
   // Public method to apply the twist
-  void DiracTwistedClover::TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const
+  void DiracTwistedClover::TwistClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                       QudaParity parity) const
   {
     twistedCloverApply(out, in, QUDA_TWIST_GAMMA5_DIRECT, parity);
   }
 
-  void DiracTwistedClover::Dslash(ColorSpinorField &, const ColorSpinorField &, QudaParity) const
+  void DiracTwistedClover::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity) const
   {
     // this would really just be a Wilson dslash (not actually instantiated at present)
     errorQuda("Not implemented");
   }
 
-  void DiracTwistedClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-                                      const ColorSpinorField &x, const double &k) const
+  void DiracTwistedClover::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                      QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -83,7 +87,7 @@ namespace quda {
   }
 
   // apply full operator
-  void DiracTwistedClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedClover::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     if (in.TwistFlavor() != out.TwistFlavor())
@@ -104,10 +108,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedClover::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -175,12 +179,14 @@ namespace quda {
   }
 
   // Public method to apply the inverse twist
-  void DiracTwistedCloverPC::TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const
+  void DiracTwistedCloverPC::TwistCloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                            QudaParity parity) const
   {
     twistedCloverApply(out, in, QUDA_TWIST_GAMMA5_INVERSE, parity);
   }
 
-  void DiracTwistedCloverPC::WilsonDslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const
+  void DiracTwistedCloverPC::WilsonDslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                          QudaParity parity) const
   {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       DiracWilson::DslashXpay(out, in, parity, in, 0.0);
@@ -190,8 +196,8 @@ namespace quda {
     }
   }
 
-  void DiracTwistedCloverPC::WilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-                                              const ColorSpinorField &x, double k) const
+  void DiracTwistedCloverPC::WilsonDslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                              QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       DiracWilson::DslashXpay(out, in, parity, x, k);
@@ -203,7 +209,8 @@ namespace quda {
 
   // apply hopping term, then inverse twist: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
   // and likewise for dagger: (D^dagger_eo D_ee^-1) or (D^dagger_oe A_oo^-1)
-  void DiracTwistedCloverPC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracTwistedCloverPC::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                    QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -214,8 +221,8 @@ namespace quda {
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
 
     if (dagger && symmetric && !reverse) {
-      auto tmp = getFieldTmp(in);
-      TwistCloverInv(tmp, in, 1 - parity);
+      auto tmp = getFieldTmp(out);
+      TwistCloverInv(tmp, in, (QudaParity)(1 - parity));
       WilsonDslash(out, tmp, parity);
     } else {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -229,8 +236,8 @@ namespace quda {
   }
 
   // xpay version of the above
-  void DiracTwistedCloverPC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+  void DiracTwistedCloverPC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                        QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -240,8 +247,8 @@ namespace quda {
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
 
     if (dagger && symmetric && !reverse) {
-      auto tmp = getFieldTmp(in);
-      TwistCloverInv(tmp, in, 1 - parity);
+      auto tmp = getFieldTmp(out);
+      TwistCloverInv(tmp, in, (QudaParity)(1 - parity));
       WilsonDslashXpay(out, tmp, parity, x, k);
     } else {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -254,10 +261,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (!symmetric) { // asymmetric preconditioning
       Dslash(tmp, in, other_parity);
@@ -274,10 +281,10 @@ namespace quda {
     }
   }
 
-  void DiracTwistedCloverPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracTwistedCloverPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -296,7 +303,7 @@ namespace quda {
     }
 
     // we desire solution to full system
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       src[i] = x[i][other_parity].create_alias();
       sol[i] = x[i][this_parity].create_alias();
@@ -320,7 +327,7 @@ namespace quda {
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x[0].Even());
     for (auto i = 0u; i < b.size(); i++) {
       checkFullSpinor(x[i], b[i]);
       // x_o = A_oo^-1 (b_o + k D_oe x_e)

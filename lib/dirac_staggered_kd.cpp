@@ -31,19 +31,19 @@ namespace quda
     return *this;
   }
 
-  void DiracStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+  void DiracStaggeredKD::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracStaggeredKD::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity,
-                                    const ColorSpinorField &, const double &) const
+  void DiracStaggeredKD::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
+                                    cvector_ref<const ColorSpinorField> &, double) const
   {
     errorQuda("The staggered Kahler-Dirac operator does not have a single parity form");
   }
 
   // Full staggered operator
-  void DiracStaggeredKD::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // Due to the staggered convention, the staggered part is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
@@ -52,7 +52,7 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
 
     if (dagger == QUDA_DAG_NO) {
 
@@ -76,14 +76,14 @@ namespace quda
     }
   }
 
-  void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
   }
 
-  void DiracStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredKD::KahlerDiracInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     ApplyStaggeredKahlerDiracInverse(out, in, *Xinv, dagger == QUDA_DAG_YES);
   }

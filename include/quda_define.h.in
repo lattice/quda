@@ -38,24 +38,6 @@
 
 #cmakedefine QUDA_LARGE_KERNEL_ARG
 
-#cmakedefine QUDA_DIRAC_NDEG_TWISTED_CLOVER
-#ifdef QUDA_DIRAC_NDEG_TWISTED_CLOVER
-/**
- * @def   GPU_NDEG_TWISTED_CLOVER_DIRAC
- * @brief This macro is set when we have ndeg-TMC fermions enabled
- */
-#define GPU_NDEG_TWISTED_CLOVER_DIRAC
-#endif
-
-#cmakedefine QUDA_DIRAC_NDEG_TWISTED_MASS
-#if defined(QUDA_DIRAC_NDEG_TWISTED_MASS) || defined(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-/**
- * @def   GPU_NDEG_TWISTED_MASS_DIRAC
- * @brief This macro is set when we have ndeg-TM fermions enabled
- */
-#define GPU_NDEG_TWISTED_MASS_DIRAC
-#endif
-
 #cmakedefine QUDA_DIRAC_CLOVER_HASENBUSCH
 #ifdef QUDA_DIRAC_CLOVER_HASENBUSCH
 /**
@@ -66,7 +48,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_TWISTED_CLOVER
-#if defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH) || defined(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_TWISTED_CLOVER_DIRAC
  * @brief This macro is set when we have TMC fermions enabled
@@ -93,7 +75,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_WILSON
-#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWSITED_MASS)
+#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_MASS)
 /**
  * @def   GPU_WILSON_DIRAC
  * @brief This macro is set when we kave Wilson fermions enabled
@@ -145,24 +127,6 @@
  * @brief This macro is set when we have the covariant derivative enabled
  */
 #define GPU_COVDEV
-#endif
-
-#cmakedefine QUDA_CONTRACT
-#ifdef QUDA_CONTRACT
-/**
- * @def   GPU_CONTRACT
- * @brief This macro is set when we have contractions enabled
- */
-#define GPU_CONTRACT
-#endif
-
-#cmakedefine QUDA_SMEAR_GAUSS_TWOLINK
-#ifdef QUDA_SMEAR_GAUSS_TWOLINK
-/**
- * @def   GPU_TWOLINK_GSMEAR
- * @brief This macro is set when we have the two link smearing enabled
- */
-#define GPU_TWOLINK_GSMEAR
 #endif
 
 #cmakedefine QUDA_MULTIGRID

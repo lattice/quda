@@ -121,6 +121,44 @@ namespace quda
     {
       thread_array<int, 4> d {ftor};
 
+      // load U(x)_(+mu)
+      Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), parity);
+
+      // load U(x+mu)_(+nu)
+      d[mu]++;
+      Link U2 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      d[mu]--;
+
+      // load U(x+nu)_(+mu)
+      d[nu]++;
+      Link U3 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      d[nu]--;
+
+      // load U(x)_(+nu)
+      Link U4 = arg.gauge(nu, linkIndexShift(x, d, arg.E), parity);
+
+      // load opposite parity Oprod
+      d[nu]++;
+      Link Oprod3 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
+      Link force = U1 * U2 * conj(U3) * Oprod3 * conj(U4);
+
+      // load Oprod(x+mu)
+      d[nu]--;
+      d[mu]++;
+      Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), otherparity);
+      force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
+
+      if (nu < mu)
+        force_total -= force;
+      else
+        force_total += force;
+    }
+
+    // Lower leaf
+    // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
+    {
+      thread_array<int, 4> d {ftor};
+
       // load U(x-nu)(+nu)
       d[nu]--;
       Link U1 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);

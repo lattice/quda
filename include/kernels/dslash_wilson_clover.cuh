@@ -20,10 +20,11 @@ namespace quda
     const real a; /** xpay scale factor */
     const real b; /** chiral twist factor (twisted-clover only) */
 
-    WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+    WilsonCloverArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                    const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a, double b,
+                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                     double alpha0 = 0.0, int t0 = -1) :
-      WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>(out, in, U, a, x, parity, dagger, comm_override,
+      WilsonArg<Float, nColor, nDim, reconstruct_, distance_pc_>(out, in, halo, U, a, x, parity, dagger, comm_override,
                                                                  alpha0, t0),
       A(A, false),
       a(a),
@@ -47,7 +48,7 @@ namespace quda
        Note this routine only exists in xpay form.
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -62,10 +63,10 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(coord.x_cb, my_spinor_parity);
+        Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         x.toRel(); // switch to chiral basis
 
         Vector tmp;
@@ -87,11 +88,11 @@ namespace quda
 
         out = tmp + arg.a * out;
       } else if (active) {
-        Vector x = arg.out(coord.x_cb, my_spinor_parity);
+        Vector x = arg.out[src_idx](coord.x_cb, my_spinor_parity);
         out = x + arg.a * out;
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
     }
   };
 

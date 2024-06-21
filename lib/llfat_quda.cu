@@ -167,63 +167,65 @@ namespace quda {
     instantiate<Staple, ReconstructNo12>(u, fat, staple, mulink, nu, dir1, dir2, coeff, save_staple);
   }
 
-#ifdef GPU_STAGGERED_DIRAC
   void longKSLink(GaugeField &lng, const GaugeField &u, const double *coeff)
   {
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    computeLongLink(lng, u, coeff[1]);
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      computeLongLink(lng, u, coeff[1]);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Long-link computation requires staggered operator to be enabled");
+    }
   }
 
   void fatKSLink(GaugeField &fat, const GaugeField &u, const double *coeff)
   {
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    GaugeFieldParam gParam(u);
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.setPrecision(gParam.Precision());
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    GaugeField staple(gParam);
-    GaugeField staple1(gParam);
+      GaugeFieldParam gParam(u);
+      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+      gParam.setPrecision(gParam.Precision());
+      gParam.create = QUDA_NULL_FIELD_CREATE;
+      GaugeField staple(gParam);
+      GaugeField staple1(gParam);
 
-    if (((fat.X()[0] % 2 != 0) || (fat.X()[1] % 2 != 0) || (fat.X()[2] % 2 != 0) || (fat.X()[3] % 2 != 0))
-        && (u.Reconstruct() != QUDA_RECONSTRUCT_NO)) {
-      errorQuda("Reconstruct %d and odd dimension size is not supported by link fattening code (yet)", u.Reconstruct());
+      if (((fat.X()[0] % 2 != 0) || (fat.X()[1] % 2 != 0) || (fat.X()[2] % 2 != 0) || (fat.X()[3] % 2 != 0))
+          && (u.Reconstruct() != QUDA_RECONSTRUCT_NO)) {
+        errorQuda("Reconstruct %d and odd dimension size is not supported by link fattening code (yet)", u.Reconstruct());
+      }
+
+      computeOneLink(fat, u, coeff[0] - 6.0 * coeff[5]);
+
+      // Check the coefficients. If all of the following are zero, return.
+      if (fabs(coeff[2]) >= MIN_COEFF || fabs(coeff[3]) >= MIN_COEFF || fabs(coeff[4]) >= MIN_COEFF
+          || fabs(coeff[5]) >= MIN_COEFF) {
+
+        for (int nu = 0; nu < 4; nu++) {
+          computeStaple(fat, staple, u, u, nu, -1, -1, coeff[2], 1);
+
+          if (coeff[5] != 0.0) computeStaple(fat, staple, staple, u, nu, -1, -1, coeff[5], 0);
+
+          for (int rho = 0; rho < 4; rho++) {
+            if (rho != nu) {
+
+              computeStaple(fat, staple1, staple, u, rho, nu, -1, coeff[3], 1);
+
+              if (fabs(coeff[4]) > MIN_COEFF) {
+                for (int sig = 0; sig < 4; sig++) {
+                  if (sig != nu && sig != rho) { computeStaple(fat, staple, staple1, u, sig, nu, rho, coeff[4], 0); }
+                } // sig
+              }   // MIN_COEFF
+            }
+          } // rho
+        }   // nu
+      }
+
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Fat-link computation requires staggered oprator to be enabled");
     }
-
-    computeOneLink(fat, u, coeff[0] - 6.0 * coeff[5]);
-
-    // Check the coefficients. If all of the following are zero, return.
-    if (fabs(coeff[2]) >= MIN_COEFF || fabs(coeff[3]) >= MIN_COEFF ||
-	fabs(coeff[4]) >= MIN_COEFF || fabs(coeff[5]) >= MIN_COEFF) {
-
-      for (int nu = 0; nu < 4; nu++) {
-        computeStaple(fat, staple, u, u, nu, -1, -1, coeff[2], 1);
-
-        if (coeff[5] != 0.0) computeStaple(fat, staple, staple, u, nu, -1, -1, coeff[5], 0);
-
-        for (int rho = 0; rho < 4; rho++) {
-          if (rho != nu) {
-
-            computeStaple(fat, staple1, staple, u, rho, nu, -1, coeff[3], 1);
-
-            if (fabs(coeff[4]) > MIN_COEFF) {
-              for (int sig = 0; sig < 4; sig++) {
-                if (sig != nu && sig != rho) { computeStaple(fat, staple, staple1, u, sig, nu, rho, coeff[4], 0); }
-              } //sig
-            } // MIN_COEFF
-          }
-        } //rho
-      } //nu
-    }
-
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void longKSLink(GaugeField &, const GaugeField &, const double *) { errorQuda("Long-link computation not enabled"); }
-
-  void fatKSLink(GaugeField &, const GaugeField &, const double *) { errorQuda("Fat-link computation not enabled"); }
-#endif
 
 #undef MIN_COEFF
 

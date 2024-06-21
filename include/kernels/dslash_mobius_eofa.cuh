@@ -29,12 +29,12 @@ namespace quda
       static constexpr bool xpay = xpay_;
       static constexpr Dslash5Type type = type_;
 
-      typedef typename colorspinor_mapper<storage_type, 4, nColor>::type F;
-      typedef typename mapper<storage_type>::type real;
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, false, false, true>::type;
+      using real = typename mapper<storage_type>::type;
 
-      F out;                  // output vector field
-      const F in;             // input vector field
-      const F x;              // auxiliary input vector field
+      F out[MAX_MULTI_RHS];   // output vector field
+      F in[MAX_MULTI_RHS];    // input vector field
+      F x[MAX_MULTI_RHS];     // auxiliary input vector field
       const int nParity;      // number of parities we're working on
       const int volume_cb;    // checkerboarded volume
       const int volume_4d_cb; // 4-d checkerboarded volume
@@ -52,13 +52,11 @@ namespace quda
 
       eofa_coeff<real> coeff;
 
-      Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f_,
-                 const double m_5_, const Complex */*b_5_*/, const Complex */*c_5_*/, double a_, double inv_, double kappa_,
-                 const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
-        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
-        out(out),
-        in(in),
-        x(x),
+      Dslash5Arg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 cvector_ref<const ColorSpinorField> &x, const double m_f_, const double m_5_, const Complex * /*b_5_*/,
+                 const Complex * /*c_5_*/, double a_, double inv_, double kappa_, const double *eofa_u,
+                 const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
+        kernel_param(dim3(in.VolumeCB() / in.X(4), in.size() * in.X(4), in.SiteSubset())),
         nParity(in.SiteSubset()),
         volume_cb(in.VolumeCB()),
         volume_4d_cb(volume_cb / in.X(4)),
@@ -70,9 +68,13 @@ namespace quda
         inv(inv_),
         sherman_morrison(sherman_morrison_)
       {
+        for (auto i = 0u; i < out.size(); i++) {
+          this->out[i] = out[i];
+          this->in[i] = in[i];
+          this->x[i] = x[i];
+        }
         if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
-        if (!in.isNative() || !out.isNative())
-          errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        checkNative(in, out, x);
 
         switch (type) {
         case Dslash5Type::M5_EOFA:
@@ -107,16 +109,19 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
+      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity, bool active = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
+
+        int src_idx = src_s / arg.Ls;
+        int s = src_s % arg.Ls;
 
         SharedMemoryCache<Vector> cache{*this};
 
         Vector out;
 	if (!allthreads || active) {
-	  cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
+	  cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
 	}
         cache.sync();
 
@@ -162,13 +167,13 @@ namespace quda
 
           if (Arg::xpay) { // really axpy
 	    if (!allthreads || active) {
-	      Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+	      Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
 	      out = arg.a * x + out;
 	    }
           }
         }
 	if (!allthreads || active) {
-	  arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+	  arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
 	}
       }
     };
@@ -195,15 +200,18 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
+      __device__ __host__ inline void operator()(int x_cb, int src_s, int parity, bool active = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
+        int src_idx = src_s / arg.Ls;
+        int s = src_s % arg.Ls;
+
         const auto sherman_morrison = arg.sherman_morrison;
         SharedMemoryCache<Vector> cache{*this};
 	if (!allthreads || active) {
-	  cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
+	  cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
 	}
         cache.sync();
 
@@ -232,12 +240,12 @@ namespace quda
         }
         if (Arg::xpay) { // really axpy
 	  if (!allthreads || active) {
-	    Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+	    Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
 	    out = x + arg.a * out;
 	  }
         }
 	if (!allthreads || active) {
-	  arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+	  arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
 	}
       }
     };

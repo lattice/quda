@@ -16,7 +16,7 @@ namespace quda
                                      int halo_shift[4], MdwfFusedDslashType type)
     {
       checkLocation(out, in); // check all locations match
-      instantiatePreconditioner<FusedDslashLs<Ls>::type>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+      instantiatePreconditioner<FusedDslashLs<Ls>::type>(out, in, x, U, y, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                          halo_shift, type);
     }
 #else

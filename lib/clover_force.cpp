@@ -27,8 +27,9 @@ namespace quda
 
     ColorSpinorParam csParam(x[0]);
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    std::vector<ColorSpinorField> p(x.size());
-    for (auto i = 0u; i < p.size(); i++) p[i] = ColorSpinorField(csParam);
+    std::vector<ColorSpinorField> p_(x.size());
+    for (auto i = 0u; i < x.size(); i++) p_[i] = ColorSpinorField(csParam);
+    auto p = vector_ref<ColorSpinorField>(p_);
 
     // create oprod and trace field
     GaugeFieldParam param(mom);
@@ -42,58 +43,57 @@ namespace quda
 
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-    for (auto i = 0u; i < x.size(); i++) {
-      gamma5(p[i][parity], x[i][parity]);
-      if (dagger) dirac->Dagger(QUDA_DAG_YES);
-      dirac->Dslash(x[i][other_parity], p[i][parity], other_parity);
-      // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
-      dirac->M(p[i][parity], p[i][parity]); // this is the odd part of Y
-      if (dagger) dirac->Dagger(QUDA_DAG_NO);
+    gamma5(p(parity), x(parity));
+    if (dagger) dirac->Dagger(QUDA_DAG_YES);
+    dirac->Dslash(x(other_parity), p(parity), other_parity);
+    // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
+    dirac->M(p(parity), p(parity)); // this is the odd part of Y
+    if (dagger) dirac->Dagger(QUDA_DAG_NO);
 
-      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-        blas::ax(1.0 / inv_param.evmax, p[i][parity]);
-        ApplyTau(x[i][other_parity], x[i][other_parity], 1);
-        ApplyTau(p[i][parity], p[i][parity], 1);
-        Complex a(0.0, -inv_param.offset[i]);
-        blas::caxpy(a, x[i][parity], p[i][parity]);
-      }
+    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      blas::ax(1.0 / inv_param.evmax, p(parity));
+      ApplyTau(x(other_parity), x(other_parity), 1);
+      ApplyTau(p(parity), p(parity), 1);
+      std::vector<Complex> a(x.size());
+      for (auto i = 0u; i < x.size(); i++) a[i] = {0.0, -inv_param.offset[i]};
+      blas::caxpy(a, x(parity), p(parity));
+    }
 
-      gamma5(x[i][other_parity], x[i][other_parity]);
-      if (detratio && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0[i][parity], p[i][parity]);
+    gamma5(x(other_parity), x(other_parity));
+    if (detratio && inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) blas::xpy(x0(parity), p(parity));
 
-      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_YES);
-      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) gamma5(p[i][parity], p[i][parity]);
-      dirac->Dslash(p[i][other_parity], p[i][parity], other_parity); // and now the even part of Y
-      if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_NO);
+    if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_YES);
+    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) gamma5(p(parity), p(parity));
+    dirac->Dslash(p(other_parity), p(parity), other_parity); // and now the even part of Y
+    if (not_dagger || inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) dirac->Dagger(QUDA_DAG_NO);
 
-      if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
-        // up to here x.odd match X.odd in tmLQCD and p.odd=- gamma5 Y.odd of tmLQCD
-        // x.Even= X.Even.tmLQCD/kappa and p.Even=- gamma5 Y.Even.tmLQCD/kappa
-        // the gamma5 application in tmLQCD inside deriv_Sb is otimized away in here
-      } else {
-        // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
-        // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
-        // the gamma5 application in tmLQCD is done inside deriv_Sb
-        gamma5(p[i], p[i]);
-      }
+    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      ApplyTau(p(other_parity), p(other_parity), 1);
+      // up to here x.odd match X.odd in tmLQCD and p.odd=- gamma5 Y.odd of tmLQCD
+      // x.Even= X.Even.tmLQCD/kappa and p.Even=- gamma5 Y.Even.tmLQCD/kappa
+      // the gamma5 application in tmLQCD inside deriv_Sb is otimized away in here
+    } else {
+      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
+      // x.Even= X.Even.tmLQCD/kappa and p.Even=-Y.Even.tmLQCD/kappa
+      // the gamma5 application in tmLQCD is done inside deriv_Sb
+      gamma5(p, p);
     }
 
     // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
-    computeCloverForce(force, gauge, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p, coeff);
+    computeCloverOprod(force, gauge, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
+                       coeff);
     // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
     if (!detratio) computeCloverSigmaTrace(oprod, clover, sigma_coeff, other_parity);
 
     // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
     // sw_spinor_eo(OO,..)  in tmLQCD
     if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      for (auto i = 0u; i < x.size(); i++) {
-        ApplyTau(p[i][parity], p[i][parity], 1);
-        ApplyTau(p[i][other_parity], p[i][other_parity], 1);
-      }
+      ApplyTau(p(parity), p(parity), 1);
+      ApplyTau(p(other_parity), p(other_parity), 1);
     }
     computeCloverSigmaOprod(oprod, inv_param.dagger == QUDA_DAG_YES ? p : x, inv_param.dagger == QUDA_DAG_YES ? x : p,
                             epsilon);
+    p_.clear(); // deallocate the p vectors prior to cloverDerivative to reduce footprint
 
     // oprod = (A12) of hep-lat/0112051
     // compute the insertion of oprod in Fig.27 of hep-lat/0112051
