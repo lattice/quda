@@ -61,7 +61,7 @@ namespace quda {
     return updateR;
   }
 
-  void BiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void BiCGstab::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     create(x, b);
 
@@ -138,7 +138,7 @@ namespace quda {
       r_sloppy = r.create_alias();
 
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        r0 = b.create_alias();
+        r0 = const_cast<ColorSpinorField &>(b).create_alias();
       } else {
         ColorSpinorParam csParam(r);
         csParam.create = QUDA_NULL_FIELD_CREATE;

@@ -127,7 +127,7 @@ namespace quda
     3. Update solution and residual vectors
     4. (Optional) restart if convergence or maxiter not reached
   */
-  void CAGCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CAGCR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     const int n_krylov = param.Nkrylov;
 

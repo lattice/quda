@@ -45,7 +45,7 @@ namespace quda {
   }
 
   // CG3NE: M Mdag y = b is solved; x = Mdag y is returned as solution.
-  void CG3NE::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CG3NE::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -123,7 +123,7 @@ namespace quda {
   }
 
   // CG3NR: Mdag M x = Mdag b is solved.
-  void CG3NR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CG3NR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -198,7 +198,7 @@ namespace quda {
     return r;
   }
 
-  void CG3::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CG3::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 

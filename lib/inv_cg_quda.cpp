@@ -85,7 +85,7 @@ namespace quda {
   }
 
   // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
-  void CGNE::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CGNE::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -164,7 +164,7 @@ namespace quda {
   }
 
   // CGNR: Mdag M x = Mdag b is solved.
-  void CGNR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CGNR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);

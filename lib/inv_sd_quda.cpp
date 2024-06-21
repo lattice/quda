@@ -30,7 +30,7 @@ namespace quda {
     return r;
   }
 
-  void SD::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void SD::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     commGlobalReductionPush(param.global_reduction);
 

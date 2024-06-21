@@ -175,7 +175,16 @@ namespace quda {
     }
   }
 
-  void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  ColorSpinorField &GCR::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    if (param.compute_true_res)
+      return r;
+    else
+      return K ? r_sloppy : p[k_break];
+  }
+
+  void GCR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (n_krylov == 0) {
       // Krylov space is zero-dimensional so return doing no work
@@ -290,7 +299,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
-    int k_break = 0;
+    k_break = 0;
 
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
@@ -394,10 +403,6 @@ namespace quda {
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;
-      //if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
-    } else {
-      // reuse this when we add the get_residual method to GCR
-      if (0) blas::copy(b, K ? r_sloppy : p[k_break]);
     }
 
     param.iter += total_iter;

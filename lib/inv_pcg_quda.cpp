@@ -100,8 +100,7 @@ namespace quda
     }
   }
 
-  void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b,
-                                   cvector_ref<ColorSpinorField> &v_r,
+  void PreconCG::solve_and_collect(ColorSpinorField &x, const ColorSpinorField &b, cvector_ref<ColorSpinorField> &v_r,
                                    int collect_miniter, double collect_tol)
   {
     if (K) K->train_param(*this, b);

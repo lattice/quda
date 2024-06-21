@@ -18,8 +18,10 @@ namespace quda {
 #ifdef __CUDACC__
 #ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
 #pragma nv_diag_suppress 611
+#pragma nv_diag_suppress 997
 #else
 #pragma diag_suppress 611
+#pragma diag_suppress 997
 #endif
 #endif
 
@@ -427,15 +429,10 @@ namespace quda {
            const DiracMatrix &matEig, SolverParam &param);
     virtual ~Solver();
 
-    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
-
     /**
        @brief Naive loop over RHS, for solvers that are not yet multi-RHS aware
      */
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in)
-    {
-      for (auto i = 0u; i < in.size(); i++) { this->operator()(out[i], in[i]); }
-    }
+    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) = 0;
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
@@ -455,7 +452,7 @@ namespace quda {
       @param Solver the solver to be used to collect the null space vectors.
       @param ColorSpinorField the vector used to perform the training.
      */
-    virtual void train_param(Solver &, ColorSpinorField &)
+    virtual void train_param(Solver &, const ColorSpinorField &)
     {
       // Do nothing
     }
@@ -464,7 +461,8 @@ namespace quda {
       @brief a virtual method that performs the inversion and collect some vectors.
         The default here is a no-op and should not be called.
      */
-    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, cvector_ref<ColorSpinorField> &, int, double)
+    virtual void solve_and_collect(ColorSpinorField &, const ColorSpinorField &, cvector_ref<ColorSpinorField> &, int,
+                                   double)
     {
       errorQuda("NOT implemented.");
     }
@@ -730,9 +728,9 @@ namespace quda {
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      (*this)(out, in, ColorSpinorField(), 0.0);
+      for (auto i = 0u; i < in.size(); i++) (*this)(out[i], in[i], ColorSpinorField(), 0.0);
     };
 
     /**
@@ -789,7 +787,12 @@ namespace quda {
     CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -823,7 +826,12 @@ namespace quda {
     CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -859,7 +867,12 @@ namespace quda {
   public:
     CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -892,7 +905,12 @@ namespace quda {
   public:
     CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -924,7 +942,12 @@ namespace quda {
   public:
     CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(cvector<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -980,9 +1003,10 @@ namespace quda {
 
     virtual ~PreconCG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      this->solve_and_collect(out, in, cvector_ref<ColorSpinorField>(), 0, 0);
+      for (auto i = 0u; i < in.size(); i++)
+        this->solve_and_collect(out[i], in[i], cvector_ref<ColorSpinorField>(), 0, 0);
     }
 
     /**
@@ -993,8 +1017,8 @@ namespace quda {
        @param collect_miniter minimal iteration start from which the r vectors are to be collected
        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
     */
-    virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, cvector_ref<ColorSpinorField> &v_r,
-                                   int collect_miniter, double collect_tol) override;
+    virtual void solve_and_collect(ColorSpinorField &out, const ColorSpinorField &in,
+                                   cvector_ref<ColorSpinorField> &v_r, int collect_miniter, double collect_tol) override;
 
     virtual bool hermitian() const override { return true; } /** PCG is only Hermitian system */
 
@@ -1029,7 +1053,12 @@ namespace quda {
              const DiracMatrix &matEig, SolverParam &param);
     virtual ~BiCGstab();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -1140,7 +1169,12 @@ namespace quda {
     BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param);
     virtual ~BiCGstabL();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
 
@@ -1172,6 +1206,7 @@ namespace quda {
     ColorSpinorField r;       //! residual vector
     ColorSpinorField r_sloppy; //! sloppy residual vector
 
+    int k_break = 0;                  //! track when the solver converged
     std::vector<ColorSpinorField> p;  // GCR direction vectors
     std::vector<ColorSpinorField> Ap; // mat * direction vectors
 
@@ -1201,7 +1236,17 @@ namespace quda {
         const DiracMatrix &matEig, SolverParam &param);
     virtual ~GCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** GCR is for any linear system */
 
@@ -1227,7 +1272,12 @@ namespace quda {
   public:
     MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -1299,7 +1349,12 @@ namespace quda {
          SolverParam &param);
     virtual ~CACG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -1333,7 +1388,12 @@ namespace quda {
     CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -1367,7 +1427,12 @@ namespace quda {
     CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -1423,7 +1488,12 @@ namespace quda {
           SolverParam &param);
     virtual ~CAGCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
@@ -1452,7 +1522,12 @@ namespace quda {
   public:
     SD(const DiracMatrix &mat, SolverParam &param);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual from the prior solve
@@ -1482,7 +1557,7 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(ColorSpinorField &x, ColorSpinorField &b) override
+    void operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b) override
     {
       pushOutputPrefix(prefix);
 
@@ -1685,11 +1760,16 @@ public:
     void RestartVT(const double beta, const double rho);
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
     // EigCG solver:
-    int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    int eigCGsolve(ColorSpinorField &out, const ColorSpinorField &in);
     // InitCG solver:
-    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    int initCGsolve(ColorSpinorField &out, const ColorSpinorField &in);
     // Incremental eigCG solver (for eigcg and initcg calls)
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     virtual bool hermitian() const final { return true; } // EigCG is only for Hermitian systems
 
@@ -1726,7 +1806,12 @@ public:
     virtual ~GMResDR();
 
     //GMRES-DR solver
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
     //
     //GMRESDR method
     void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, const double tol_threshold);

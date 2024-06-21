@@ -59,7 +59,7 @@ namespace quda
   }
 
   // CACGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
-  void CACGNE::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CACGNE::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -138,7 +138,7 @@ namespace quda
   }
 
   // CACGNR: Mdag M x = Mdag b is solved.
-  void CACGNR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CACGNR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
@@ -397,7 +397,7 @@ namespace quda
     2. Steepest descent minmization of the residual in this basis
     3. Update solution and residual vectors
   */
-  void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CACG::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 

@@ -1130,7 +1130,7 @@ namespace quda
     popLevel();
   }
 
-  void MG::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void MG::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     pushOutputPrefix(prefix);
 
@@ -1194,12 +1194,13 @@ namespace quda
         false;
 
       // FIXME this is currently borked if inner solver is preconditioned
-      ColorSpinorField &residual = !presmoother ? b :
-        use_solver_residual                     ? presmoother->get_residual() :
-        b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? r :
-                                                  r.Even();
+      const ColorSpinorField &residual = !presmoother ? b :
+        use_solver_residual                           ? presmoother->get_residual() :
+        b.SiteSubset() == QUDA_FULL_SITE_SUBSET       ? r :
+                                                        r.Even();
 
       if (!use_solver_residual && presmoother) {
+        auto &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? r : r.Even();
         (*param.matResidual)(residual, x);
         axpby(1.0, b, -1.0, residual);
       }

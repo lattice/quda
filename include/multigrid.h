@@ -440,7 +440,12 @@ namespace quda {
        @param out The solution vector
        @param in The residual vector (or equivalently the right hand side vector)
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @brief Load the null space vectors in from file

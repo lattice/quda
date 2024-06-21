@@ -53,7 +53,7 @@ namespace quda
     return r;
   }
 
-  void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void MR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);

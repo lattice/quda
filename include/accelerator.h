@@ -46,7 +46,12 @@ namespace quda
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in)
+    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    {
+      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in)
     {
       if (transformer.trained) {
         transformer.apply(*base_solver, out, in);
@@ -64,7 +69,7 @@ namespace quda
      * @param null Solver to solve for null vectors.
      * @param in meta color spinor field.
      */
-    virtual void train_param(Solver &null, ColorSpinorField &in)
+    virtual void train_param(Solver &null, const ColorSpinorField &in)
     {
       if (!active_training && !transformer.trained) {
         active_training = true;
