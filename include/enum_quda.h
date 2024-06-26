@@ -635,6 +635,12 @@ typedef enum QudaExtLibType_s {
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 
+typedef enum QudaWFlowStepType_s {
+  WFLOW_STEP_W1,
+  WFLOW_STEP_W2,
+  WFLOW_STEP_VT,
+} QudaWFlowStepType;
+
 #ifdef __cplusplus
 }
 #endif
