@@ -37,10 +37,7 @@ namespace quda
         } else {
           strcat(aux, ",b2v");
         }
-        strcat(aux, ",n_rhs=");
-        char rhs_str[8];
-        i32toa(rhs_str, B.size());
-        strcat(aux, rhs_str);
+        setRHSstring(aux, B.size());
         resizeStep(1);
         apply(device::get_default_stream());
       }
@@ -138,7 +135,7 @@ namespace quda
       if constexpr (sizeof...(N) > 0) {
         launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nVecs);
       } else {
-        errorQuda("nColor = %d not instantiated\n", V.Ncolor());
+        errorQuda("nColor = %d not instantiated", V.Ncolor());
       }
     }
   }
@@ -184,7 +181,7 @@ namespace quda
       } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0].Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) block_transpose<v_t, b_t, float, float>(V, B);
       } else {
-        errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0].Precision());
+        errorQuda("Unsupported precision combination V=%d B=%d", V.Precision(), B[0].Precision());
       }
     } else {
       errorQuda("Multigrid has not been built");
