@@ -469,7 +469,6 @@ namespace quda {
     DiracWilson(const DiracWilson &dirac);
     DiracWilson(const DiracParam &param, const int nDims); // to correctly adjust face for DW and non-deg twisted mass
 
-    virtual ~DiracWilson();
     DiracWilson& operator=(const DiracWilson &dirac);
 
     virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -518,7 +517,6 @@ namespace quda {
   public:
     DiracWilsonPC(const DiracParam &param);
     DiracWilsonPC(const DiracWilsonPC &dirac);
-    virtual ~DiracWilsonPC();
     DiracWilsonPC& operator=(const DiracWilsonPC &dirac);
 
     void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;

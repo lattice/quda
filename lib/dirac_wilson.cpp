@@ -12,8 +12,6 @@ namespace quda {
   // hack (for DW and TM operators)
   DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { }
 
-  DiracWilson::~DiracWilson() { }
-
   DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
   {
     if (&dirac != this) { Dirac::operator=(dirac); }
@@ -105,11 +103,6 @@ namespace quda {
 
   DiracWilsonPC::DiracWilsonPC(const DiracWilsonPC &dirac) : DiracWilson(dirac) { }
 
-  DiracWilsonPC::~DiracWilsonPC()
-  {
-
-  }
-
   DiracWilsonPC& DiracWilsonPC::operator=(const DiracWilsonPC &dirac)
   {
     if (&dirac != this) {
@@ -155,9 +148,9 @@ namespace quda {
     }
 
     // we desire solution to full system
+    // src = b_e + k D_eo b_o
+    DslashXpay(x(other_parity), b(other_parity), this_parity, b(this_parity), kappa);
     for (auto i = 0u; i < b.size(); i++) {
-      // src = b_e + k D_eo b_o
-      DslashXpay(x[i][other_parity], b[i][other_parity], this_parity, b[i][this_parity], kappa);
       src[i] = x[i][other_parity].create_alias();
       sol[i] = x[i][this_parity].create_alias();
     }
@@ -169,11 +162,9 @@ namespace quda {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
-      // x_o = b_o + k D_oe x_e
-      DslashXpay(x[i][other_parity], x[i][this_parity], other_parity, b[i][other_parity], kappa);
-    }
+    checkFullSpinor(x, b);
+    // x_o = b_o + k D_oe x_e
+    DslashXpay(x(other_parity), x(this_parity), other_parity, b(other_parity), kappa);
   }
 
 } // namespace quda
