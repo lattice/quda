@@ -655,6 +655,9 @@ extern "C" {
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
+    /** Solver batch size to use in the setup phase */
+    int n_vec_batch[QUDA_MAX_MG_LEVEL];
+
     /** Number of setup iterations */
     int num_setup_iter[QUDA_MAX_MG_LEVEL];
 

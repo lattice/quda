@@ -1195,7 +1195,7 @@ namespace quda
 
       // FIXME this is currently borked if inner solver is preconditioned
       const ColorSpinorField &residual = !presmoother ? b :
-        use_solver_residual                           ? presmoother->get_residual() :
+        use_solver_residual                           ? presmoother->get_residual()[0] :
         b.SiteSubset() == QUDA_FULL_SITE_SUBSET       ? r :
                                                         r.Even();
 
@@ -1361,8 +1361,9 @@ namespace quda
     csParam.gammaBasis = B[0].Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
                                              QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField b(csParam);
-    ColorSpinorField x(csParam);
+    std::vector<ColorSpinorField> b, x;
+    resize(b, param.n_vec_batch, csParam);
+    resize(x, param.n_vec_batch, csParam);
 
     csParam.create = QUDA_NULL_FIELD_CREATE;
 
@@ -1429,25 +1430,35 @@ namespace quda
       }
 
       // launch solver for each source
-      for (auto i = 0u; i < B.size(); i++) {
-        if (param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
-          b = B[i];                                                 // inverting against the vector
-          zero(x);                                                  // with zero initial guess
+      if (B.size() % param.n_vec_batch != 0) errorQuda("Bad batch size %d", param.n_vec_batch);
+      for (auto i = 0u; i < B.size(); i += param.n_vec_batch) {
+        if (param.mg_global.setup_type
+            == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea solving against the vector
+          copy({b.begin(), b.begin() + param.n_vec_batch}, {B.begin() + i, B.begin() + i + param.n_vec_batch});
+          zero(x); // with zero initial guess
         } else {
-          x = B[i];
+          copy({x.begin(), x.begin() + param.n_vec_batch}, {B.begin() + i, B.begin() + i + param.n_vec_batch});
           zero(b);
         }
 
-        logQuda(QUDA_VERBOSE, "Initial guess = %g\n", norm2(x));
-        logQuda(QUDA_VERBOSE, "Initial rhs = %g\n", norm2(b));
+        if (getVerbosity() >= QUDA_VERBOSE) {
+          auto nrm2 = norm2(x);
+          auto b2 = norm2(b);
+          for (auto j = 0; j < param.n_vec_batch; j++)
+            printfQuda("%d Initial guess = %g, Initial rhs = %g\n", i + j, nrm2[j], b2[j]);
+        }
 
-        ColorSpinorField out, in;
+        std::vector<ColorSpinorField> out(param.n_vec_batch), in(param.n_vec_batch);
         diracSmoother->prepare(out, in, x, b, QUDA_MAT_SOLUTION);
         (*solve)(out, in);
         diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
 
-        logQuda(QUDA_VERBOSE, "Solution = %g\n", norm2(x));
-        B[i] = x;
+        if (getVerbosity() >= QUDA_VERBOSE) {
+          auto nrm2 = norm2(x);
+          for (auto j = 0; j < param.n_vec_batch; j++) printfQuda("%d Solution = %g\n", i + j, nrm2[j]);
+        }
+
+        copy({B.begin() + i, B.begin() + i + param.n_vec_batch}, {x.begin(), x.begin() + param.n_vec_batch});
       }
 
       // global orthonormalization of the generated null-space vectors

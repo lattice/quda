@@ -66,6 +66,7 @@ int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
 quda::mgarray<int> nvec = {};
+quda::mgarray<int> nvec_batch = {};
 quda::mgarray<std::string> mg_vec_infile;
 quda::mgarray<std::string> mg_vec_outfile;
 quda::mgarray<bool> mg_vec_partfile = {};
@@ -994,6 +995,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The number of pre-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nvec", nvec, CLI::PositiveNumber,
                          "Number of null-space vectors to define the multigrid transfer operator on a given level");
+  quda_app->add_mgoption(opgroup, "--mg-nvec-batch", nvec_batch, CLI::PositiveNumber,
+                         "Batch size to use when computing the null-space vectors to define the multigrid transfer operator on a given level");
   opgroup->add_option("--mg-oblique-proj-check", oblique_proj_check,
                       "Measure how well the null vector subspace adjusts the low eigenmode subspace (default false)");
   opgroup->add_option("--mg-omega", omega,

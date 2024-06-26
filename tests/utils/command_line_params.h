@@ -324,6 +324,7 @@ extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
 extern quda::mgarray<int> nvec;
+extern quda::mgarray<int> nvec_batch;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
 extern quda::mgarray<bool> mg_vec_partfile;

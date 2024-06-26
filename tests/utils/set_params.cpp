@@ -471,6 +471,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_vec_batch[i] = nvec_batch[i] == 0 ? 1 : nvec_batch[i]; // default to batch size 1 if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.block_ortho_two_pass[i]
       = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
@@ -1078,6 +1079,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i]; // default to 64 vectors if not set
+    mg_param.n_vec_batch[i] = nvec_batch[i] == 0 ? 1 : nvec_batch[i]; // default to batch size 1 if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.block_ortho_two_pass[i]
       = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
