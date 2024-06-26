@@ -1855,7 +1855,6 @@ public:
        @param[in] param Parameters defining this operator
      */
     DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
-    virtual ~DiracCoarse();
 
     virtual bool isCoarse() const { return true; }
 
@@ -1999,8 +1998,6 @@ public:
        @param[in] param Parameters defining this operator
      */
     DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param);
-
-    virtual ~DiracCoarsePC();
 
     /**
        @brief Apply preconditioned Dslash out = (D * in)

@@ -121,10 +121,6 @@ namespace quda {
   {
   }
 
-  DiracCoarse::~DiracCoarse()
-  {
-  }
-
   void DiracCoarse::createY(bool gpu, bool mapped) const
   {
     int ndim = transfer->Vectors().Ndim();
@@ -513,8 +509,6 @@ namespace quda {
     /* do nothing */
   }
 
-  DiracCoarsePC::~DiracCoarsePC() { }
-
   void DiracCoarsePC::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                              QudaParity parity) const
   {
@@ -592,61 +586,53 @@ namespace quda {
       return;
     }
 
-    auto tmp = getFieldTmp(b[0].Even());
+    auto tmp = getFieldTmp(x.Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = x[i][other_parity].create_alias();
+      sol[i] = x[i][this_parity].create_alias();
+    }
 
     // we desire solution to full system
-    for (auto i = 0u; i < b.size(); i++) {
-
-      if (symmetric) {
-        // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
-        src[i] = x[i][other_parity].create_alias();
+    if (symmetric) {
+      // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
 #if 0
-        CloverInv(src[i], b[other_parity], other_parity);
-        DiracCoarse::Dslash(tmp, src[i], this_parity);
-        blas::xpay(b[i][this_parity], -1.0, tmp);
-        CloverInv(src[i], tmp, this_parity);
+      CloverInv(src, b(other_parity), other_parity);
+      DiracCoarse::Dslash(tmp, src, this_parity);
+      blas::xpay(b(this_parity), -1.0, tmp);
+      CloverInv(src, tmp, this_parity);
+#else
+      // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
+      CloverInv(src, b(other_parity), other_parity);
+      Dslash(tmp, src, this_parity);
+      CloverInv(src, b(this_parity), this_parity);
+      blas::axpy(-1.0, tmp, src);
 #endif
-        // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
-        CloverInv(src[i], b[i][other_parity], other_parity);
-        Dslash(tmp, src[i], this_parity);
-        CloverInv(src[i], b[i][this_parity], this_parity);
-        blas::axpy(-1.0, tmp, src[i]);
-
-        sol[i] = x[i][this_parity].create_alias();
-      } else {
-        // src = b_e - D_eo A_oo^-1 b_o
-        src[i] = x[i][other_parity].create_alias();
-        CloverInv(tmp, b[i][other_parity], other_parity);
-        DiracCoarse::Dslash(src[i], tmp, this_parity);
-        blas::xpay(b[i][this_parity], -1.0, src[i]);
-        sol[i] = x[i][this_parity].create_alias();
-      }
+    } else {
+      // src = b_e - D_eo A_oo^-1 b_o
+      CloverInv(tmp, b(other_parity), other_parity);
+      DiracCoarse::Dslash(src, tmp, this_parity);
+      blas::xpay(b(this_parity), -1.0, src);
     }
   }
 
   void DiracCoarsePC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                                   const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    auto tmp = getFieldTmp(b[0].Even());
-
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
-
-#if 0
-      // x_o = A_oo^-1 (b_o - D_oe x_e)
-      DiracCoarse::Dslash(tmp, x.Even(), QUDA_ODD_PARITY);
-      blas::xpay(b.Odd(), -1.0, tmp);
-      CloverInv(x.Odd(), tmp, QUDA_ODD_PARITY);
+    checkFullSpinor(x, b);
+    auto tmp = getFieldTmp(x.Even());
+#if 1
+    // x_o = A_oo^-1 (b_o - D_oe x_e)
+    DiracCoarse::Dslash(tmp, x.Even(), QUDA_ODD_PARITY);
+    blas::xpay(b.Odd(), -1.0, tmp);
+    CloverInv(x.Odd(), tmp, QUDA_ODD_PARITY);
+#else
+    // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
+    Dslash(tmp, x(this_parity), other_parity);
+    CloverInv(x(other_parity), b(other_parity), other_parity);
+    blas::axpy(-1.0, tmp, x(other_parity));
 #endif
-      // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
-      Dslash(tmp, x[i][this_parity], other_parity);
-      CloverInv(x[i][other_parity], b[i][other_parity], other_parity);
-      blas::axpy(-1.0, tmp, x[i][other_parity]);
-    }
   }
 
   //Make the coarse operator one level down.  For the preconditioned
