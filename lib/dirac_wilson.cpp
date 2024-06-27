@@ -73,10 +73,8 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-      sol[i] = x[i].create_alias();
-    }
+    create_alias(src, b);
+    create_alias(sol, x);
   }
 
   void DiracWilson::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
@@ -138,22 +136,18 @@ namespace quda {
                               cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                               const QudaSolutionType solType) const
   {
-
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      for (auto i = 0u; i < b.size(); i++) {
-        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-        sol[i] = x[i].create_alias();
-      }
+      create_alias(src, b);
+      create_alias(sol, x);
       return;
     }
 
     // we desire solution to full system
     // src = b_e + k D_eo b_o
     DslashXpay(x(other_parity), b(other_parity), this_parity, b(this_parity), kappa);
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = x[i][other_parity].create_alias();
-      sol[i] = x[i][this_parity].create_alias();
-    }
+
+    create_alias(src, x(other_parity));
+    create_alias(sol, x(this_parity));
   }
 
   void DiracWilsonPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
