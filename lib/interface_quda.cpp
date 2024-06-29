@@ -4046,8 +4046,8 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
             cg(x[i], b);
         }
 
-        solverParam.true_res_offset[i] = solverParam.true_res;
-        solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+        solverParam.true_res_offset[i] = static_cast<double>(solverParam.true_res);
+        solverParam.true_res_hq_offset[i] = static_cast<double>(solverParam.true_res_hq);
         solverParam.updateInvertParam(*param,i);
 
         if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
