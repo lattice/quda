@@ -10,8 +10,15 @@
 #endif
 
 #include <math.h>
+
+// hide annoying warning
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 #include <Eigen/LU>
+
+#pragma GCC diagnostic pop
 
 using namespace Eigen;
