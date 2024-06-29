@@ -535,7 +535,37 @@ namespace quda
       if (std::vector<T>::size() != 1) errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
       return std::vector<T>::operator[](0);
     }
+
+    bool operator<(const vector<T> &v) const
+    {
+      for (auto i = 0u; i < v.size(); i++)
+        if (this->operator[](i) >= v[i]) return false;
+      return true;
+    }
+
+    bool operator>(const vector<T> &v) const
+    {
+      for (auto i = 0u; i < v.size(); i++)
+        if (this->operator[](i) <= v[i]) return false;
+      return true;
+    }
+
+    vector<T> operator-() const
+    {
+      vector<T> negative(*this);
+      for (auto &v : negative) v = -v;
+      return negative;
+    }
+
+    vector<T> operator*(const T &u) const
+    {
+      vector<T> multiplied(*this);
+      for (auto &v : multiplied) v *= u;
+      return multiplied;
+    }
   };
+
+  template <class T, class U> vector<U> operator*(const T &a, const vector<U> &b) { return b * a; }
 
   template <class T> using cvector = const vector<T>;
 
