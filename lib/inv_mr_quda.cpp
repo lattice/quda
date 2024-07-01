@@ -32,7 +32,7 @@ namespace quda
       bool local = true;
       for (int i = 0; i < QUDA_MAX_DIM; i++) {
         csParam.dd.blockDim[i] = param.schwarz_block[i];
-        local &= (x.full_dim(i) % csParam.dd.blockDim[i] == 0);
+        local &= (param.do_block_schwarz() && x.full_dim(i) % csParam.dd.blockDim[i] == 0);
       }
       // Disabling global_reduction if blocks are local and we do block_schwarz
       if (param.do_block_schwarz() and param.global_reduction) param.global_reduction = not local;
