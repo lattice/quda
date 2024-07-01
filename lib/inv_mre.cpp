@@ -128,7 +128,7 @@ namespace quda
       // compute the residual only if we're going to print it
       ColorSpinorField r(b);
       for (auto &a : alpha) a = -a;
-      blas::caxpy(alpha, q, r);
+      blas::block::caxpy(alpha, q, r);
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
