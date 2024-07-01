@@ -448,9 +448,14 @@ namespace quda
     void projectDD();
 
     /**
-       @brief Returns DDParam
+       @brief Returns DDParam (const version)
      */
-    const DDParam DD() const { return dd; }
+    const DDParam& DD() const { return dd; }
+
+    /**
+       @brief Returns DDParam (non const version)
+     */
+    DDParam& DD() { return dd; }
 
     /**
        @brief Sets DDParam from a given DDParam
