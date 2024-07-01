@@ -50,7 +50,7 @@ namespace quda
     }
   }
 
-  ColorSpinorField &CACGNE::get_residual()
+  cvector_ref<const ColorSpinorField> CACGNE::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -130,7 +130,7 @@ namespace quda
     }
   }
 
-  ColorSpinorField &CACGNR::get_residual()
+  cvector_ref<const ColorSpinorField> CACGNR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -373,7 +373,7 @@ namespace quda
     return updateR;
   }
 
-  ColorSpinorField &CACG::get_residual()
+  cvector_ref<const ColorSpinorField> CACG::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");

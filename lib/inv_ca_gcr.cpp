@@ -113,7 +113,7 @@ namespace quda
     }
   }
 
-  ColorSpinorField &CAGCR::get_residual()
+  cvector_ref<const ColorSpinorField> CAGCR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");

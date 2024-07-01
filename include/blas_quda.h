@@ -323,7 +323,7 @@ namespace quda {
 
     inline double axpyReDot(double a, const ColorSpinorField &x, ColorSpinorField &y)
     {
-      return axpyReDot(cvector<double>(a), x, y)[0];
+      return axpyReDot(cvector<double>(a), cvector_ref<const ColorSpinorField>(x), y)[0];
     }
 
     /**
@@ -352,7 +352,7 @@ namespace quda {
     inline double axpbyzNorm(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y,
                              ColorSpinorField &z)
     {
-      return axpbyzNorm(cvector<double>(a), x, cvector<double>(b), y, z)[0];
+      return axpbyzNorm(cvector<double>(a), cvector_ref<const ColorSpinorField>(x), cvector<double>(b), y, z)[0];
     }
 
     /**
@@ -455,7 +455,8 @@ namespace quda {
                                                   ColorSpinorField &y, ColorSpinorField &z, const ColorSpinorField &w,
                                                   const ColorSpinorField &u)
     {
-      return caxpbypzYmbwcDotProductUYNormY(cvector<Complex>(a), x, cvector<Complex>(b), y, z, w, u)[0];
+      return caxpbypzYmbwcDotProductUYNormY(cvector<Complex>(a), cvector_ref<const ColorSpinorField>(x), b, y, z, w,
+                                            u)[0];
     }
 
     /**
@@ -514,7 +515,7 @@ namespace quda {
     inline double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, const ColorSpinorField &y,
                                 ColorSpinorField &z)
     {
-      return cabxpyzAxNorm(cvector<double>(a), cvector<Complex>(b), x, y, z)[0];
+      return cabxpyzAxNorm(cvector<double>(a), cvector<Complex>(b), cvector_ref<ColorSpinorField>(x), y, z)[0];
     }
 
     /**
@@ -529,7 +530,7 @@ namespace quda {
 
     inline Complex caxpyDotzy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
     {
-      return caxpyDotzy(cvector<Complex>(a), x, y, z)[0];
+      return caxpyDotzy(cvector<Complex>(a), cvector_ref<const ColorSpinorField>(x), y, z)[0];
     }
 
     /**
@@ -544,7 +545,7 @@ namespace quda {
 
     inline double2 axpyCGNorm(double a, const ColorSpinorField &x, ColorSpinorField &y)
     {
-      return axpyCGNorm(cvector<double>(a), x, y)[0];
+      return axpyCGNorm(cvector<double>(a), cvector_ref<const ColorSpinorField>(x), y)[0];
     }
 
     /**
@@ -602,6 +603,11 @@ namespace quda {
     cvector<double4> quadrupleCGReduction(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
                                           cvector_ref<const ColorSpinorField> &z);
 
+    inline double4 quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
+    {
+      return quadrupleCGReduction(cvector_ref<const ColorSpinorField>(x), y, z)[0];
+    }
+
     /**
        @brief Computes z = x, w = y, x += a * y, y -= a * v and ||y||^2
        @param[in] a scalar multiplier
@@ -614,6 +620,12 @@ namespace quda {
     cvector<double> quadrupleCG3InitNorm(cvector<double> &a, cvector_ref<ColorSpinorField> &x,
                                          cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                          cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v);
+
+    inline double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                                       ColorSpinorField &w, const ColorSpinorField &v)
+    {
+      return quadrupleCG3InitNorm(cvector<double>(a), cvector_ref<ColorSpinorField>(x), y, z, w, v)[0];
+    }
 
     /**
        @brief Computes x = b * (x + a * y) + ( 1 - b) * z,
@@ -630,6 +642,12 @@ namespace quda {
     cvector<double> quadrupleCG3UpdateNorm(cvector<double> &a, cvector<double> &b, cvector_ref<ColorSpinorField> &x,
                                            cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                            cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v);
+
+    inline double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
+                                         ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
+    {
+      return quadrupleCG3UpdateNorm(cvector<double>(a), b, cvector_ref<ColorSpinorField>(x), y, z, w, v)[0];
+    }
 
     namespace block
     {

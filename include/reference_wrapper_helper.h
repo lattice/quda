@@ -530,7 +530,7 @@ namespace quda
     /**
        @brief Cast to scalar.  Only works if the vector size is 1.
     */
-    operator T() const
+    explicit operator T() const
     {
       if (std::vector<T>::size() != 1) errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
       return std::vector<T>::operator[](0);
@@ -563,6 +563,7 @@ namespace quda
       for (auto &v : multiplied) v *= u;
       return multiplied;
     }
+
   };
 
   template <class T, class U> vector<U> operator*(const T &a, const vector<U> &b) { return b * a; }

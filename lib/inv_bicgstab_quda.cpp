@@ -40,7 +40,7 @@ namespace quda {
     } // init
   }
 
-  ColorSpinorField &BiCGstab::get_residual()
+  cvector_ref<const ColorSpinorField> BiCGstab::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");

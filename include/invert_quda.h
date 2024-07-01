@@ -113,7 +113,7 @@ namespace quda {
     int max_hq_res_increase = 0;
 
     /**< This parameter determines how many total heavy-quark residual
-    restarts we tolerate before terminating the solver, i.e., how long
+       restarts we tolerate before terminating the solver, i.e., how long
     do we want to keep trying to converge */
     int max_hq_res_restart_total = 0;
 
@@ -139,10 +139,10 @@ namespace quda {
     bool sloppy_converge = false;
 
     /**< Actual L2 residual norm achieved in solver */
-    double true_res = 0.0;
+    vector<double> true_res;
 
     /**< Actual heavy quark residual norm achieved in solver */
-    double true_res_hq = 0.0;
+    vector<double> true_res_hq;
 
     /**< Maximum number of iterations in the linear solver */
     int maxiter = 0;
@@ -374,8 +374,8 @@ namespace quda {
        @param param the QudaInvertParam to be updated
      */
     void updateInvertParam(QudaInvertParam &param, int offset=-1) {
-      param.true_res = true_res;
-      param.true_res_hq = true_res_hq;
+      param.true_res = static_cast<double>(true_res);
+      param.true_res_hq = static_cast<double>(true_res_hq);
       param.iter += iter;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
@@ -439,11 +439,10 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    virtual ColorSpinorField &get_residual()
+    virtual cvector_ref<const ColorSpinorField> get_residual()
     {
       errorQuda("Not implemented");
-      static ColorSpinorField dummy;
-      return dummy;
+      return cvector_ref<const ColorSpinorField>();
     }
 
     /**
@@ -490,7 +489,7 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
      */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
     /**
        @brief Solver factory
@@ -544,7 +543,12 @@ namespace quda {
        @param[in] residual_type The type of residual we want to solve for
        @return L2 stopping condition
     */
-    static double stopping(double tol, double b2, QudaResidualType residual_type);
+    static vector<double> stopping(double tol, cvector<double> &b2, QudaResidualType residual_type);
+
+    static inline double stopping(double tol, double b2, QudaResidualType residual_type)
+    {
+      return stopping(tol, cvector<double>(b2), residual_type)[0];
+    }
 
     /**
        @briefTest for solver convergence
@@ -554,7 +558,7 @@ namespace quda {
        @param[in] hq_tol Solver heavy-quark tolerance
        @return Whether converged
      */
-    bool convergence(double r2, double hq2, double r2_tol, double hq_tol);
+    bool convergence(cvector<double> &r2, cvector<double> &hq2, cvector<double> &r2_tol, cvector<double> &hq_tol);
 
     /**
        @brief Test for HQ solver convergence -- ignore L2 residual
@@ -564,7 +568,7 @@ namespace quda {
        @param[in[ hq_tol Solver heavy-quark tolerance
        @return Whether converged
      */
-    bool convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol);
+    bool convergenceHQ(cvector<double> &hq2, cvector<double> &hq_tol);
 
     /**
        @brief Test for L2 solver convergence -- ignore HQ residual
@@ -573,7 +577,7 @@ namespace quda {
        @param[in] r2_tol Solver L2 tolerance
        @param[in] hq_tol Solver heavy-quark tolerance
      */
-    bool convergenceL2(double r2, double hq2, double r2_tol, double hq_tol);
+    bool convergenceL2(cvector<double> &r2, cvector<double> &r2_tol);
 
     /**
        @brief Prints out the running statistics of the solver
@@ -583,7 +587,7 @@ namespace quda {
        @param[in] r2 L2 norm squared of the residual
        @param[in] hq2 Heavy quark residual
      */
-    void PrintStats(const char *name, int k, double r2, double b2, double hq2);
+    void PrintStats(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2 = {});
 
     /**
        @brief Prints out the summary of the solver convergence
@@ -596,7 +600,8 @@ namespace quda {
        @param[in] r2_tol Solver L2 tolerance
        @param[in] hq_tol Solver heavy-quark tolerance
     */
-    void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
+    void PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &r2_tol,
+                      cvector<double> &hq_tol = {});
 
     /**
        @brief Returns the epsilon tolerance for a given precision, by default returns
@@ -702,13 +707,13 @@ namespace quda {
   class CG : public Solver {
 
   private:
-    ColorSpinorField y;
-    ColorSpinorField r;
-    ColorSpinorField rnew;
-    ColorSpinorField p;
-    ColorSpinorField Ap;
-    ColorSpinorField rSloppy;
-    ColorSpinorField xSloppy;
+    std::vector<ColorSpinorField> y;
+    std::vector<ColorSpinorField> r;
+    std::vector<ColorSpinorField> rnew;
+    std::vector<ColorSpinorField> p;
+    std::vector<ColorSpinorField> Ap;
+    std::vector<ColorSpinorField> r_sloppy;
+    std::vector<ColorSpinorField> x_sloppy;
     bool init = false;
 
     /**
@@ -716,7 +721,7 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
     CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -730,8 +735,9 @@ namespace quda {
      */
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      for (auto i = 0u; i < in.size(); i++) (*this)(out[i], in[i], ColorSpinorField(), 0.0);
-    };
+      std::vector<ColorSpinorField> tmp(in.size());
+      operator()(out, in, tmp, vector<double>(in.size(), 0.0));
+    }
 
     /**
      * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
@@ -741,15 +747,15 @@ namespace quda {
      * @param p_init Initial-search direction.
      * @param r2_old_init [description]
      */
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &p_init,
-                    double r2_old_init);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                    cvector_ref<const ColorSpinorField> &p_init, cvector<double> &r2_old_init);
 
     void blocksolve(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
@@ -761,7 +767,7 @@ namespace quda {
      * @param out Solution-vector.
      * @param in Right-hand side.
      */
-    void hqsolve(ColorSpinorField &out, const ColorSpinorField &in);
+    void hqsolve(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
   };
 
   class CGNE : public CG
@@ -797,7 +803,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CGNE is for any system */
 
@@ -836,7 +842,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CGNR is for any system */
 
@@ -877,7 +883,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
@@ -915,7 +921,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CG3NE is for any system */
 
@@ -952,7 +958,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    cvector_ref<const ColorSpinorField> get_residual();
 
     virtual bool hermitian() const final { return false; } /** CG3NR is for any system */
 
@@ -1063,7 +1069,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
 
@@ -1246,7 +1252,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** GCR is for any linear system */
 
@@ -1256,10 +1262,10 @@ namespace quda {
   class MR : public Solver {
 
   private:
-    ColorSpinorField r;
-    ColorSpinorField r_sloppy;
-    ColorSpinorField Ar;
-    ColorSpinorField x_sloppy;
+    std::vector<ColorSpinorField> r;
+    std::vector<ColorSpinorField> r_sloppy;
+    std::vector<ColorSpinorField> Ar;
+    std::vector<ColorSpinorField> x_sloppy;
     bool init = false;
 
     /**
@@ -1267,22 +1273,23 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
      */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
     MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param);
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
+#if 0
     {
       for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in);
-
+#endif
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** MR is for any linear system */
 
@@ -1359,7 +1366,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
@@ -1398,7 +1405,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CA-CGNE is for any linear system */
 
@@ -1437,7 +1444,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CA-CGNR is for any linear system */
 
@@ -1498,7 +1505,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** GCR is for any linear system */
 
@@ -1508,8 +1515,8 @@ namespace quda {
   // Steepest descent solver used as a preconditioner
   class SD : public Solver {
   private:
-    ColorSpinorField Ar;
-    ColorSpinorField r;
+    std::vector<ColorSpinorField> Ar;
+    std::vector<ColorSpinorField> r;
     bool init = false;
 
     /**
@@ -1517,22 +1524,17 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
     SD(const DiracMatrix &mat, SolverParam &param);
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     /**
        @return Return the residual from the prior solve
      */
-    ColorSpinorField &get_residual() override;
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const override { return false; } /** SD is for any linear system */
 

@@ -36,7 +36,7 @@ namespace quda {
     }
   }
 
-  ColorSpinorField &CG3NE::get_residual()
+  cvector_ref<const ColorSpinorField> CG3NE::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -115,7 +115,7 @@ namespace quda {
     }
   }
 
-  ColorSpinorField &CG3NR::get_residual()
+  cvector_ref<const ColorSpinorField> CG3NR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -192,7 +192,7 @@ namespace quda {
   /**
      @return Return the residual vector from the prior solve
   */
-  ColorSpinorField &CG3::get_residual()
+  cvector_ref<const ColorSpinorField> CG3::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     return r;
@@ -320,7 +320,7 @@ namespace quda {
         if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) update = true;
 
         // For heavy-quark inversion force a reliable update if we continue after
-        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol ) {
+        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(heavy_quark_res, param.tol_hq) and param.delta >= param.tol ) {
           update = true;
         }
 

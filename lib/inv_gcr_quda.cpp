@@ -175,7 +175,7 @@ namespace quda {
     }
   }
 
-  ColorSpinorField &GCR::get_residual()
+  cvector_ref<const ColorSpinorField> GCR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (param.compute_true_res)
