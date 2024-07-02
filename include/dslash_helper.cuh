@@ -105,6 +105,7 @@ namespace quda
   {
     constexpr auto nDim = Arg::nDim;
     Coord<nDim> coord;
+    for (auto i = 0; i < nDim; i++) coord.gDim[i] = arg.gDim[i];
     dim = kernel_type; // keep compiler happy
 
     // only for 5-d checkerboarding where we need to include the fifth dimension
@@ -256,6 +257,7 @@ namespace quda
 
     const int_fastdiv X0h;
     const int_fastdiv dim[5]; // full lattice dimensions
+    const int gDim[5];        // global full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 
@@ -328,9 +330,9 @@ namespace quda
       reconstruct(U.Reconstruct()),
       X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
       dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
+      gDim {comm_dim(0) * dim[0], comm_dim(1) * dim[1], comm_dim(2) * dim[2], comm_dim(3) * dim[3], dim[4]},
       volumeCB(in.VolumeCB()),
-      commCoord {comm_coord(0) * dim[0], comm_coord(1) * dim[1], comm_coord(2) * dim[2], comm_coord(3) * dim[3],
-                 comm_coord(4) * dim[4]},
+      commCoord {comm_coord(0) * dim[0], comm_coord(1) * dim[1], comm_coord(2) * dim[2], comm_coord(3) * dim[3], dim[4]},
       globalDim3(comm_dim(3) * this->dim[3]),
       dagger(dagger),
       xpay(xpay),

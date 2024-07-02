@@ -19,7 +19,7 @@ namespace quda
     constexpr bool operator!() const { return true; }
 
     // Whether comms are required along given direction
-    template <typename DDArg, typename Arg> constexpr bool commDim(const int &, const DDArg &, const Arg &) const
+    template <typename DDArg, typename Arg> constexpr bool commDim(int, const DDArg &, const Arg &) const
     {
       return true;
     }
@@ -28,7 +28,7 @@ namespace quda
     template <typename Coord> constexpr bool isZero(const Coord &) const { return false; }
 
     // Whether do hopping with field at neighboring coord
-    template <typename Coord> constexpr bool doHopping(const Coord &, const int &, const int &) const { return true; }
+    template <typename Coord> constexpr bool doHopping(const Coord &, int, int) const { return true; }
   };
 
   // Red-black Block DD
@@ -45,13 +45,13 @@ namespace quda
       black_active(dd.type == QUDA_DD_NO or dd.is(DD::black_active)),
       block_hopping(dd.type == QUDA_DD_NO or not dd.is(DD::no_block_hopping))
     {
-      if (dd.type != QUDA_DD_NO and dd.type != QUDA_DD_RED_BLACK) { errorQuda("Unsupported type %d\n", dd.type); }
+      if (dd.type != QUDA_DD_NO and dd.type != QUDA_DD_RED_BLACK) { errorQuda("Unsupported type %d", dd.type); }
     }
 
     constexpr bool operator!() const { return false; }
 
     // Whether comms are required along given direction
-    template <typename DDArg, typename Arg> constexpr bool commDim(const int &d, const DDArg &dd, const Arg &arg) const
+    template <typename DDArg, typename Arg> constexpr bool commDim(int d, const DDArg &dd, const Arg &arg) const
     {
       if (not red_active and not black_active) return false;
       if (not dd.red_active and not dd.black_active) return false;
@@ -71,41 +71,37 @@ namespace quda
       return block_parity % 2 == 1;
     }
 
-    template <typename Coord> constexpr bool on_border(const Coord &x, const int &mu, const int &dir) const
+    template <typename Coord> constexpr bool on_border(const Coord &x, int mu, int dir) const
     {
-      return x.gx[mu] / blockDim[mu] != (x.gx[mu] + dir) / blockDim[mu];
+      int x_mu = x.gx[mu] + dir;
+      if (x_mu < 0) x_mu += x.gDim[mu];
+      if (x_mu >= x.gDim[mu]) x_mu -= x.gDim[mu];
+      return x.gx[mu] / blockDim[mu] != x_mu / blockDim[mu];
     }
 
     template <typename Coord> constexpr bool isZero(const Coord &x) const
     {
-      if (red_active and black_active) return false;
-      if (not red_active and not black_active) return true;
-
       bool is_black = block_parity(x);
+      bool is_red = not is_black;
 
-      // Checking if my parity is active
-      if (red_active and not is_black) return false;
-      if (black_active and is_black) return false;
-
+      if (is_red and red_active) return false;
+      if (is_black and black_active) return false;
       return true;
     }
 
-    template <typename Coord> constexpr bool doHopping(const Coord &x, const int &mu, const int &dir) const
+    template <typename Coord> constexpr bool doHopping(const Coord &x, int mu, int dir) const
     {
-      if (red_active and black_active and block_hopping) return true;
-      if (not red_active and not black_active) return false;
+      bool is_black = block_parity(x);
+      bool is_red = !is_black;
+      bool is_border = on_border(x, mu, dir);
 
-      bool swap = on_border(x, mu, dir);
-      if (swap and not block_hopping) return false;
-      if (not swap and red_active and black_active) return true;
-
-      // Neighbor color
-      bool is_black = block_parity(x) ^ swap;
-
-      // Checking if neighbor is active
-      if (red_active and not is_black) return true;
-      if (black_active and is_black) return true;
-
+      if (!is_border) { // Within block
+        if (is_red and red_active) return true;
+        if (is_black and black_active) return true;
+      } else if (block_hopping) { // Between blocks
+        if (is_red and black_active) return true;
+        if (is_black and red_active) return true;
+      }
       return false;
     }
   };
