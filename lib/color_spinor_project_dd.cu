@@ -41,7 +41,6 @@ namespace quda
       launch<ProjectDD_, enable_host>(tp, stream, Arg(out));
     }
 
-    long long flops() const { return 0; }
     long long bytes() const { return out.Bytes(); }
   };
 

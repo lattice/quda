@@ -473,10 +473,14 @@ namespace quda
     }
 
     template <class U = T, typename... Args>
-    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, void> DD(const quda::DD &flag,
-                                                                                        const Args &...args)
+    std::enable_if_t<std::is_same_v<U, ColorSpinorField>, void> DD(const quda::DD &flag, const Args &...args)
     {
       for (auto i = 0u; i < vector::size(); i++) operator[](i).DD(flag, args...);
+    }
+
+    template <class U = T, typename... Args> std::enable_if_t<std::is_same_v<U, ColorSpinorField>, void> projectDD()
+    {
+      for (auto i = 0u; i < vector::size(); i++) operator[](i).projectDD();
     }
   };
 

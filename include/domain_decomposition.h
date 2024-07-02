@@ -20,12 +20,12 @@ namespace quda
   // Params for domain decompation
   struct DDParam {
 
-    QudaDDType type;
-    bool flags[(int)DD::size];  // the default value of all flags is 0
-    int blockDim[QUDA_MAX_DIM]; // the size of the block per direction
+    QudaDDType type = QUDA_DD_NO;
+    array<bool, static_cast<int>(DD::size)> flags = {}; // the default value of all flags is 0
+    array<int, QUDA_MAX_DIM> block_dim = {};            // the size of the block per direction
 
     // Default constructor
-    DDParam() : type(QUDA_DD_NO), flags {0}, blockDim {0} { }
+    DDParam() = default;
 
     // returns false if in use
     constexpr bool operator!() const { return type == QUDA_DD_NO; }
@@ -54,7 +54,7 @@ namespace quda
     }
 
     // Pretty print the args struct
-    void print()
+    void print() const
     {
       if (not *this) {
         printfQuda("DD not in use\n");
@@ -63,7 +63,7 @@ namespace quda
       printfQuda("Printing DDParam\n");
       for (int i = 0; i < (int)DD::size; i++)
         printfQuda("flags[DD::%s] = %s\n", to_string((DD)i).c_str(), flags[i] ? "true" : "false");
-      for (int i = 0; i < QUDA_MAX_DIM; i++) printfQuda("blockDim[%d] = %d\n", i, static_cast<int>(blockDim[i]));
+      for (int i = 0; i < QUDA_MAX_DIM; i++) printfQuda("block_dim[%d] = %d\n", i, static_cast<int>(block_dim[i]));
     }
 
     // Checks if this matches to given DDParam
@@ -73,17 +73,17 @@ namespace quda
 
       if (type == QUDA_DD_RED_BLACK) {
         for (int i = 0; i < field.Ndim(); i++) {
-          if (blockDim[i] <= 0) {
-            if (verbose) printfQuda("blockDim[%d] = %d is not positive \n", i, blockDim[i]);
+          if (block_dim[i] <= 0) {
+            if (verbose) printfQuda("block_dim[%d] = %d is not positive \n", i, block_dim[i]);
             return false;
           }
           int globalDim = comm_dim(i) * field.X(i);
-          if (globalDim % blockDim[i] != 0) {
-            if (verbose) printfQuda("blockDim[%d] = %d does not divide %d \n", i, blockDim[i], globalDim);
+          if (globalDim % block_dim[i] != 0) {
+            if (verbose) printfQuda("block_dim[%d] = %d does not divide %d \n", i, block_dim[i], globalDim);
             return false;
           }
-          if ((globalDim / blockDim[i]) % 2 != 0) {
-            if (verbose) printfQuda("blockDim[%d] = %d does not divide %d **evenly** \n", i, blockDim[i], globalDim);
+          if ((globalDim / block_dim[i]) % 2 != 0) {
+            if (verbose) printfQuda("block_dim[%d] = %d does not divide %d **evenly** \n", i, block_dim[i], globalDim);
             return false;
           }
         }
@@ -106,8 +106,8 @@ namespace quda
 
       if (type == QUDA_DD_RED_BLACK) {
         for (int i = 0; i < QUDA_MAX_DIM; i++)
-          if (blockDim[i] != dd.blockDim[i]) {
-            if (verbose) printfQuda("blockDim[%d] = %d != %d \n", i, blockDim[i], dd.blockDim[i]);
+          if (block_dim[i] != dd.block_dim[i]) {
+            if (verbose) printfQuda("block_dim[%d] = %d != %d \n", i, block_dim[i], dd.block_dim[i]);
             return false;
           }
         if (is(DD::no_block_hopping) != dd.is(DD::no_block_hopping)) {
@@ -132,10 +132,10 @@ namespace quda
       for (int i = 0; i < (int)DD::size; i++)
         if (flags[i] != dd.flags[i]) return false;
 
-      // checking blockDim matches when needed
+      // checking block_dim matches when needed
       if (type == QUDA_DD_RED_BLACK)
         for (int i = 0; i < QUDA_MAX_DIM; i++)
-          if (blockDim[i] != dd.blockDim[i]) return false;
+          if (block_dim[i] != dd.block_dim[i]) return false;
 
       return true;
     }

@@ -88,9 +88,11 @@ struct DslashTestWrapper {
   static inline bool test_domain_decomposition = false;
   int num_src = 1;
 
+  static inline int dd_col = 0;
+
   const bool transfer = false;
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon, int dd_value)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon, int dd_value, int dd_color)
   {
     if (first_time) {
       gauge_param = newQudaGaugeParam();
@@ -118,7 +120,7 @@ struct DslashTestWrapper {
     inv_param.clover_cuda_prec_precondition = cuda_prec;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec;
 
-    init_domain_decomposition(dd_value);
+    init_domain_decomposition(dd_value, dd_color);
 
     init();
   }
@@ -282,13 +284,14 @@ struct DslashTestWrapper {
     inv_param.verbosity = verbosity;
   }
 
-  void init_domain_decomposition(int value)
+  void init_domain_decomposition(int value, int color)
   {
     if (value == 0) {
       test_domain_decomposition = false;
       return;
     }
     test_domain_decomposition = true;
+    dd_col = color;
 
     if (value < 3) {
       dd_red_black = true;
@@ -379,12 +382,21 @@ struct DslashTestWrapper {
   static void destroy()
   {
     for (int dir = 0; dir < 4; dir++)
-      if (hostGauge[dir]) host_free(hostGauge[dir]);
+      if (hostGauge[dir]) {
+        host_free(hostGauge[dir]);
+        hostGauge[dir] = nullptr;
+      }
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      if (hostClover) host_free(hostClover);
-      if (hostCloverInv) host_free(hostCloverInv);
+      if (hostClover) {
+        host_free(hostClover);
+        hostClover = nullptr;
+      }
+      if (hostCloverInv) {
+        host_free(hostCloverInv);
+        hostCloverInv = nullptr;
+      }
     }
 
     spinor = {};
@@ -397,6 +409,7 @@ struct DslashTestWrapper {
       vp_spinorOut.clear();
       vp_spinorRef.clear();
     }
+    first_time = true;
   }
 
   void dslashRef()
@@ -850,78 +863,68 @@ struct DslashTestWrapper {
 
     } else if (test_domain_decomposition) {
 
+      vector_ref<ColorSpinorField> spinor = cudaSpinor;
+      vector_ref<ColorSpinorField> tmp = cudaSpinorTmp;
+      vector_ref<ColorSpinorField> tmp2 = cudaSpinorTmp2;
+      vector_ref<ColorSpinorField> tmp3 = cudaSpinorTmp3;
+
       if (dd_red_black) {
         for (int n = 0; n < Nsrc; n++) {
           for (auto i = 0u; i < 4; i++) {
-            cudaSpinor[n].DD().blockDim[i] = dd_block_size[i];
-            cudaSpinorTmp[n].DD().blockDim[i] = dd_block_size[i];
-            cudaSpinorTmp2[n].DD().blockDim[i] = dd_block_size[i];
-            cudaSpinorTmp3[n].DD().blockDim[i] = dd_block_size[i];
+            cudaSpinor[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorTmp[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorTmp2[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorTmp3[n].DD().block_dim[i] = dd_block_size[i];
           }
         }
 
         blas::zero(cudaSpinorOut);
+        blas::zero(cudaSpinorTmp);
 
-        // We test that applying all 4 possible operators Drr, Drb, Dbr, Dbb gived D
-        for (int col = 0; col < 4; col++) {
+        spinor.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
+        tmp.DD(DD::reset, DD::red_black_type, dd_col / 2 == 0 ? DD::red_active : DD::black_active);
 
-          for (int n = 0; n < num_src; n++) {
-            cudaSpinor[n].DD(DD::reset, DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
-            cudaSpinorTmp[n].DD(DD::reset, DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
-          }
-
-          switch (dtest_type) {
-          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp, cudaSpinor, parity); break;
-          case dslash_test_type::MatPC:
-          case dslash_test_type::Mat: dirac->M(cudaSpinorTmp, cudaSpinor); break;
-          case dslash_test_type::MatPCDagMatPC:
-          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorTmp, cudaSpinor); break;
-          default:
-            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
-          }
-
-          for (int n = 0; n < num_src; n++) {
-            cudaSpinor[n].DD(DD::reset);
-            cudaSpinorTmp[n].DD(DD::reset);
-
-            // We also test that Dyx is same as D applied to projected in and out spinors
-            cudaSpinorTmp2[n] = cudaSpinor[n];
-            cudaSpinorTmp2[n].DD(DD::reset, DD::red_black_type, col % 2 == 0 ? DD::red_active : DD::black_active);
-            cudaSpinorTmp2[n].projectDD();
-            cudaSpinorTmp2[n].DD(DD::reset);
-          }
-
-          switch (dtest_type) {
-          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp3, cudaSpinorTmp2, parity); break;
-          case dslash_test_type::MatPC:
-          case dslash_test_type::Mat: dirac->M(cudaSpinorTmp3, cudaSpinorTmp2); break;
-          case dslash_test_type::MatPCDagMatPC:
-          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorTmp3, cudaSpinorTmp2); break;
-          default:
-            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
-          }
-
-          for (int n = 0; n < num_src; n++) {
-            cudaSpinorTmp3[n].DD(DD::reset, DD::red_black_type, col / 2 == 0 ? DD::red_active : DD::black_active);
-            cudaSpinorTmp3[n].projectDD();
-            cudaSpinorTmp3[n].DD(DD::reset);
-          }
-
-          if (dd_test_projection)
-            blas::xpy(cudaSpinorTmp3, cudaSpinorOut);
-          else
-            blas::xpy(cudaSpinorTmp, cudaSpinorOut);
-
-          spinorTmp = cudaSpinorTmp;
-          spinorOut = cudaSpinorTmp3;
-
-          for (int n = 0; n < Nsrc; n++) {
-            double deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorTmp[n], spinorOut[n])));
-            printfQuda("Deviation for (D-PDP)_{%d,%d}*spinor is %e\n", col % 2, col / 2, deviation);
-            double tol = getTolerance(cuda_prec);
-            EXPECT_LE(deviation, tol) << "Projected Dirac and project spinors do not agree";
-          }
+        switch (dtest_type) {
+        case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp, cudaSpinor, parity); break;
+        case dslash_test_type::MatPC:
+        case dslash_test_type::Mat: dirac->M(cudaSpinorTmp, cudaSpinor); break;
+        case dslash_test_type::MatPCDagMatPC:
+        case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorTmp, cudaSpinor); break;
+        default:
+          errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
         }
+
+        spinor.DD(DD::reset);
+        tmp.DD(DD::reset);
+
+        // We also test that Dyx is same as D applied to projected in and out spinors
+        blas::copy(tmp2, cudaSpinor);
+        tmp2.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
+        tmp2.projectDD();
+        tmp2.DD(DD::reset);
+
+        switch (dtest_type) {
+        case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorTmp3, cudaSpinorTmp2, parity); break;
+        case dslash_test_type::MatPC:
+        case dslash_test_type::Mat: dirac->M(cudaSpinorTmp3, cudaSpinorTmp2); break;
+        case dslash_test_type::MatPCDagMatPC:
+        case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorTmp3, cudaSpinorTmp2); break;
+        default:
+          errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+        }
+
+        tmp3.DD(DD::reset, DD::red_black_type, dd_col / 2 == 0 ? DD::red_active : DD::black_active);
+        tmp3.projectDD();
+        tmp3.DD(DD::reset);
+
+        if (dd_test_projection)
+          blas::xpy(cudaSpinorTmp3, cudaSpinorOut);
+        else
+          blas::xpy(cudaSpinorTmp, cudaSpinorOut);
+
+        spinorTmp = cudaSpinorTmp;
+        spinorOut = cudaSpinorTmp3;
+
       } else {
         errorQuda("Test dd type not supported");
       }
@@ -1141,7 +1144,7 @@ struct DslashTestWrapper {
 
   void run_test(int niter, bool = false)
   {
-    {
+    if (getTuning()) {
       printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
     }
@@ -1157,7 +1160,7 @@ struct DslashTestWrapper {
     unsigned long long bytes = (quda::Tunable::bytes_global() - bytes0);
 
     if (!test_split_grid) {
-      if (!transfer) spinorOut = cudaSpinorOut;
+      if (!transfer && !test_domain_decomposition) spinorOut = cudaSpinorOut;
 
       // print timing information
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
@@ -1205,6 +1208,13 @@ struct DslashTestWrapper {
                    norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
         deviation
           = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[0], vp_spinorOut[n]))));
+      }
+    } else if (test_domain_decomposition) {
+      for (int n = 0; n < Nsrc; n++) {
+        auto deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorTmp[n], spinorOut[n])));
+        printfQuda("Deviation for (D-PDP)_{%d,%d}*spinor is %e\n", dd_col % 2, dd_col / 2, deviation);
+        double tol = getTolerance(cuda_prec);
+        EXPECT_LE(deviation, tol) << "Projected Dirac and project spinors do not agree";
       }
     } else {
       for (int n = 0; n < Nsrc; n++) {
