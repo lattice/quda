@@ -223,8 +223,8 @@ int openQCD_qudaIndexIup(const int *x, const int mu);
 double openQCD_qudaNorm(void *h_in);
 
 /**
- * @brief      Prototype function for the norm-square in QUDA without loading
- *             the field.
+ * @brief      Prototype function for the norm-square in QUDA without
+ *             transfering the field. Should serve as an example.
  *
  * @param[in]  d_in  Spinor input field (device pointer)
  *
@@ -244,8 +244,28 @@ double openQCD_qudaNorm_NoLoads(void *d_in);
  */
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out);
 
+/**
+ * @brief      Explicit transfer of an openQCD field from host to device
+ *
+ * @param      openQCD_field  Input openQCD spinor (host pointer)
+ *
+ * @return     Device pointer
+ */
 void *openQCD_qudaH2D(void *openQCD_field);
+
+/**
+ * @brief      Explicit transfer of a QUDA field from device to host
+ *
+ * @param      quda_field     Input quda spinor field (device pointer)
+ * @param      openQCD_field  Output openQCD spinor (host pointer)
+ */
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field);
+
+/**
+ * @brief      Free a device field allocated by openQCD_qudaH2D()
+ *
+ * @param      quda_field  Pointer to device pointer
+ */
 void openQCD_qudaSpinorFree(void **quda_field);
 
 /**
@@ -255,6 +275,8 @@ void openQCD_qudaSpinorFree(void **quda_field);
  * @param[in]  src   Source spinor field
  * @param[out] dst   Destination spinor field
  * @param[in]  p     Dirac parameter struct
+ *
+ * @deprecated  Replaced by openQCD_qudaDw()
  */
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
@@ -263,11 +285,22 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
  *             setup to a field. All fields passed and returned are host (CPU)
  *             fields in openQCD order.
  *
- * @param[in]  mu    Twisted mass
- * @param      in    Input spinor
- * @param      out   Output spinor
+ * @param[in]  mu    Twisted mass parameter
+ * @param[in]  in    Input spinor (host pointer)
+ * @param[out] out   Output spinor (host pointer)
  */
 void openQCD_qudaDw(double mu, void *in, void *out);
+
+/**
+ * @brief      Apply the Dirac operator that corresponds to the current openQxD
+ *             setup to a field. All fields passed and returned are devicde
+ *             (GPU) fields returned by openQCD_qudaH2D().
+ *
+ * @param[in]  mu     Twisted mass parameter
+ * @param[in]  d_in   Input spinor (device pointer)
+ * @param[out] d_out  Output spinor (device pointer)
+ */
+void openQCD_qudaDw_NoLoads(double mu, void *d_in, void *d_out);
 
 /**
  * Setup the solver interface to quda.  This function parses the file given by

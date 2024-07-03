@@ -23,6 +23,7 @@
 
 static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, {}, {}, nullptr, {}, {}, ""};
 
+
 using namespace quda;
 
 /**
@@ -1551,6 +1552,54 @@ void openQCD_qudaDw(double mu, void *in, void *out)
 
   MatQuda(static_cast<char *>(out), static_cast<char *>(in), param);
 }
+
+void openQCD_qudaDw_NoLoads(double mu, void *d_in, void *d_out)
+{
+  if (gauge_field_get_unset()) { errorQuda("Gauge field not populated in openQxD."); }
+
+  QudaInvertParam *inv_param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+  inv_param->mu = mu;
+
+  if (!openQCD_qudaInvertParamCheck(inv_param)) {
+    errorQuda("QudaInvertParam struct check failed, parameters/fields between openQxD and QUDA are not in sync.");
+  }
+
+  /* both fields reside on the GPU */
+  inv_param->input_location = QUDA_CUDA_FIELD_LOCATION;
+  inv_param->output_location = QUDA_CUDA_FIELD_LOCATION;
+
+  ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(d_in);
+  ColorSpinorField *out = reinterpret_cast<ColorSpinorField *>(d_out);
+
+  /* truncated version of what MatQuda does */
+  pushVerbosity(inv_param->verbosity);
+
+  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
+      inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+
+  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
+  dirac->M(*out, *in); // apply the operator
+  delete dirac; // clean up
+
+  if (pc) {
+    if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+      blas::ax(0.25/(inv_param->kappa*inv_param->kappa), *out);
+    } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+      blas::ax(0.5/inv_param->kappa, *out);
+    }
+  } else {
+    if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION ||
+        inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+      blas::ax(0.5/inv_param->kappa, *out);
+    }
+  }
+
+  popVerbosity();
+}
+
 
 /**
  * @brief      Take the string-hash over a struct using std::hash.
