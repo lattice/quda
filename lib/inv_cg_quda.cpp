@@ -678,7 +678,7 @@ namespace quda {
     auto get_hq_res = [](cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &r) {
       auto hq_nrm = blas::HeavyQuarkResidualNorm(x, r);
       vector<double> hq_res(hq_nrm.size());
-      for (auto i = 0u; i < hq_nrm.size(); i++) hq_res[i] = sqrt(hq_res[i]);
+      for (auto i = 0u; i < hq_nrm.size(); i++) hq_res[i] = sqrt(hq_nrm[i].z);
       return hq_res;
     };
 
@@ -824,7 +824,7 @@ namespace quda {
                               cvector_ref<const ColorSpinorField> &r) {
           auto hq_nrm = blas::xpyHeavyQuarkResidualNorm(x, y, r);
           vector<double> hq_res(hq_nrm.size());
-          for (auto i = 0u; i < hq_nrm.size(); i++) hq_res[i] = sqrt(hq_res[i]);
+          for (auto i = 0u; i < hq_nrm.size(); i++) hq_res[i] = sqrt(hq_nrm[i].z);
           return hq_res;
         };
 
