@@ -137,6 +137,7 @@ namespace quda {
                               const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      // we desire solution to preconditioned system
       create_alias(src, b);
       create_alias(sol, x);
       return;

@@ -93,10 +93,8 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-      sol[i] = x[i].create_alias();
-    }
+    create_alias(src, b);
+    create_alias(sol, x);
   }
 
   void DiracImprovedStaggered::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
@@ -212,18 +210,17 @@ namespace quda {
       return;
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      // we desire solution to full system.
-      // With the convention given in DiracStaggered::M(),
-      // the source is src = 2m b_e + D_eo b_o
-      // But remember, DslashXpay actually applies
-      // -D_eo. Flip the sign on 2m to compensate, and
-      // then flip the overall sign.
-      src[i] = x[i][other_parity].create_alias();
-      DslashXpay(src[i], b[i][other_parity], this_parity, b[i][this_parity], -2.0 * mass);
-      blas::ax(-1.0, src[i]);
-      sol[i] = x[i][this_parity].create_alias();
-    }
+    create_alias(src, x(other_parity));
+    create_alias(sol, x(this_parity));
+
+    // we desire solution to full system.
+    // With the convention given in DiracStaggered::M(),
+    // the source is src = 2m b_e + D_eo b_o
+    // But remember, DslashXpay actually applies
+    // -D_eo. Flip the sign on 2m to compensate, and
+    // then flip the overall sign.
+    DslashXpay(src, b(other_parity), this_parity, b(this_parity), -2.0 * mass);
+    blas::ax(-1.0, src);
   }
 
   void DiracImprovedStaggeredPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
@@ -233,19 +230,17 @@ namespace quda {
       return;
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
+    checkFullSpinor(x, b);
 
-      // create full solution
-      // With the convention given in DiracStaggered::M(),
-      // the reconstruct is x_o = 1/(2m) (b_o + D_oe x_e)
-      // But remember: DslashXpay actually applies -D_oe,
-      // so just like above we need to flip the sign
-      // on b_o. We then correct this by applying an additional
-      // minus sign when we rescale by 2m.
-      DslashXpay(x[i][other_parity], x[i][this_parity], other_parity, b[i][other_parity], -1.0);
-      blas::ax(-0.5 / mass, x[i][other_parity]);
-    }
+    // create full solution
+    // With the convention given in DiracStaggered::M(),
+    // the reconstruct is x_o = 1/(2m) (b_o + D_oe x_e)
+    // But remember: DslashXpay actually applies -D_oe,
+    // so just like above we need to flip the sign
+    // on b_o. We then correct this by applying an additional
+    // minus sign when we rescale by 2m.
+    DslashXpay(x(other_parity), x(this_parity), other_parity, b(other_parity), -1.0);
+    blas::ax(-0.5 / mass, x(other_parity));
   }
 
   void DiracImprovedStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
