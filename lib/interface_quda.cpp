@@ -5496,7 +5496,9 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
 
   int measurement_n = 0; // The nth measurement to take
   gaugeObservablesQuda(&obs_param[measurement_n]);
-  logQuda(QUDA_SUMMARIZE, "Q charge at step %03d = %+.16e\n", 0, obs_param[measurement_n].qcharge);
+  logQuda(QUDA_SUMMARIZE, "step %03d plaquette (mean %.16e, spatial %.16e temporal %.16e) Q charge = %.16e\n", 0,
+          obs_param[measurement_n].plaquette[0], obs_param[measurement_n].plaquette[1],
+          obs_param[measurement_n].plaquette[2], obs_param[measurement_n].qcharge);
 
   // set default dir_ignore = 3 for APE and STOUT for compatibility
   int dir_ignore = smear_param->dir_ignore;
@@ -5515,13 +5517,15 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
     case QUDA_GAUGE_SMEAR_HYP:
       HYPStep(*gaugeSmeared, tmp, smear_param->alpha1, smear_param->alpha2, smear_param->alpha3, dir_ignore);
       break;
-    default: errorQuda("Unkown gauge smear type %d", smear_param->smear_type);
+    default: errorQuda("Unknown gauge smear type %d", smear_param->smear_type);
     }
 
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++;
       gaugeObservablesQuda(&obs_param[measurement_n]);
-      logQuda(QUDA_SUMMARIZE, "Q charge at step %03d = %+.16e\n", i + 1, obs_param[measurement_n].qcharge);
+      logQuda(QUDA_SUMMARIZE, "step %03d plaquette (mean %.16e, spatial %.16e temporal %.16e) Q charge = %.16e\n",
+              i + 1, obs_param[measurement_n].plaquette[0], obs_param[measurement_n].plaquette[1],
+              obs_param[measurement_n].plaquette[2], obs_param[measurement_n].qcharge);
     }
   }
 
