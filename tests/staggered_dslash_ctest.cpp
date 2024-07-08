@@ -3,6 +3,7 @@
 using namespace quda;
 
 bool ctest_all_partitions = false;
+bool ctest_domain_decomposition = false;
 
 using ::testing::Bool;
 using ::testing::Combine;
@@ -10,10 +11,10 @@ using ::testing::Range;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, int, int>>
 {
 protected:
-  ::testing::tuple<int, int, int> param;
+  ::testing::tuple<int, int, int, int, int> param;
 
   bool skip()
   {
@@ -31,6 +32,10 @@ protected:
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
 
     if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
+
+    if (::testing::get<3>(GetParam()) == 0 && ::testing::get<4>(GetParam()) > 0) return true;
+    if (!ctest_domain_decomposition && ::testing::get<3>(GetParam()) > 0) return true;
+
     return false;
   }
 
@@ -42,6 +47,11 @@ protected:
     printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
     printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec),
                get_recon_str(link_recon), get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
@@ -58,7 +68,10 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init_ctest(prec, recon);
+    int dd_value = ::testing::get<3>(GetParam());
+    int dd_color = ::testing::get<4>(GetParam());
+
+    dslash_test_wrapper.init_ctest(prec, recon, dd_value, dd_color);
     display_test_info(prec, recon);
   }
 
@@ -108,6 +121,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
+  app->add_option("--domain-decomposition", ctest_domain_decomposition, "Test domain decomposition");
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
@@ -154,29 +168,55 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, int, int>> param)
 {
   const int prec = ::testing::get<0>(param.param);
   const int recon = ::testing::get<1>(param.param);
   const int part = ::testing::get<2>(param.param);
+  const int dd = ::testing::get<3>(param.param);
+  const int col = ::testing::get<4>(param.param);
   std::stringstream ss;
   // ss << get_dslash_str(dslash_type) << "_";
   ss << get_prec_str(getPrecision(prec));
   ss << "_r" << recon;
   ss << "_partition" << part;
+  if (dd > 0) {
+    switch (dd) {
+    case 1: ss << "_dd_local"; break;
+    case 2: ss << "_dd_global"; break;
+    }
+    switch (col) {
+    case 0: ss << "_red_red"; break;
+    case 1: ss << "_black_red"; break;
+    case 2: ss << "_red_black"; break;
+    case 3: ss << "_black_black"; break;
+    }
+  } else if (col > 0) {
+    ss << "_skipped" << col;
+  }
   return ss.str();
 }
 
 #ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-                         Combine(Range(0, 4),
-                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, 16)),
-                         getstaggereddslashtestname);
+#define N_PARTITIONS 16
 #else
+#define N_PARTITIONS 1
+#endif
+
+#ifdef GPU_DD_DIRAC
+#define N_DD_TESTS 3
+#define N_DD_COLS 4
+#else
+#define N_DD_TESTS 1
+#define N_DD_COLS 1
+#endif
+
 INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 ::testing::Values(0)),
+                                 Range(0, N_PARTITIONS), Range(0, N_DD_TESTS), Range(0, N_DD_COLS)),
                          getstaggereddslashtestname);
-#endif
+
+#undef N_PARTITIONS
+#undef N_DD_TESTS
+#undef N_DD_COLS
