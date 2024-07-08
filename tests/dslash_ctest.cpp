@@ -42,6 +42,7 @@ protected:
                                                   true, false, false, false, true, false, true, true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
 
+    if (::testing::get<3>(GetParam()) == 0 && ::testing::get<4>(GetParam()) > 0) return true;
     if (!ctest_domain_decomposition && ::testing::get<3>(GetParam())>0) return true;
 
     return false;
@@ -191,6 +192,8 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
     case 2: ss << "_red_black"; break;
     case 3: ss << "_black_black"; break;
     }
+  } else if (col > 0) {
+    ss << "_skipped" << col;
   }
   return ss.str();
 }
