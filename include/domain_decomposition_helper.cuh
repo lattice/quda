@@ -34,13 +34,13 @@ namespace quda
   // Red-black Block DD
   struct DDRedBlack {
 
-    const int_fastdiv blockDim[QUDA_MAX_DIM]; // the size of the block per direction
+    const int_fastdiv block_dim[QUDA_MAX_DIM]; // the size of the block per direction
     const bool red_active;         // if red blocks are active
     const bool black_active;       // if black blocks are active
     const bool block_hopping;      // if hopping between red and black is allowed
 
     DDRedBlack(const DDParam &dd) :
-      blockDim {dd.blockDim[0], dd.blockDim[1], dd.blockDim[2], dd.blockDim[3]},
+      block_dim {dd.block_dim[0], dd.block_dim[1], dd.block_dim[2], dd.block_dim[3]},
       red_active(dd.type == QUDA_DD_NO or dd.is(DD::red_active)),
       black_active(dd.type == QUDA_DD_NO or dd.is(DD::black_active)),
       block_hopping(dd.type == QUDA_DD_NO or not dd.is(DD::no_block_hopping))
@@ -55,7 +55,7 @@ namespace quda
     {
       if (not red_active and not black_active) return false;
       if (not dd.red_active and not dd.black_active) return false;
-      if (arg.dim[d] % blockDim[d] == 0) {
+      if (arg.dim[d] % block_dim[d] == 0) {
         if (not red_active and not dd.red_active) return false;
         if (not black_active and not dd.black_active) return false;
         if (not block_hopping and not dd.block_hopping) return false;
@@ -67,7 +67,7 @@ namespace quda
     template <typename Coord> constexpr bool block_parity(const Coord &x) const
     {
       int block_parity = 0;
-      for (int i = 0; i < x.size(); i++) { block_parity += x.gx[i] / blockDim[i]; }
+      for (int i = 0; i < x.size(); i++) { block_parity += x.gx[i] / block_dim[i]; }
       return block_parity % 2 == 1;
     }
 
@@ -76,7 +76,7 @@ namespace quda
       int x_mu = x.gx[mu] + dir;
       if (x_mu < 0) x_mu += x.gDim[mu];
       if (x_mu >= x.gDim[mu]) x_mu -= x.gDim[mu];
-      return x.gx[mu] / blockDim[mu] != x_mu / blockDim[mu];
+      return x.gx[mu] / block_dim[mu] != x_mu / block_dim[mu];
     }
 
     template <typename Coord> constexpr bool isZero(const Coord &x) const
