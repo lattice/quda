@@ -77,7 +77,7 @@ namespace quda
             if (verbose) printfQuda("block_dim[%d] = %d is not positive \n", i, block_dim[i]);
             return false;
           }
-          int globalDim = comm_dim(i) * field.X(i);
+          int globalDim = comm_dim(i) * field.full_dim(i);
           if (globalDim % block_dim[i] != 0) {
             if (verbose) printfQuda("block_dim[%d] = %d does not divide %d \n", i, block_dim[i], globalDim);
             return false;
@@ -86,6 +86,10 @@ namespace quda
             if (verbose) printfQuda("block_dim[%d] = %d does not divide %d **evenly** \n", i, block_dim[i], globalDim);
             return false;
           }
+        }
+        if (block_dim[0] % 2) {
+          if (verbose) printfQuda("block_dim[0] = %d must be even \n", block_dim[0]);
+          return false;
         }
       }
 
