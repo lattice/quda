@@ -624,7 +624,7 @@ namespace quda
 #ifdef GITVERSION
         trace_file << "\t" << gitversion;
 #else
-      trace_file << "\t" << quda_version;
+        trace_file << "\t" << quda_version;
 #endif
         trace_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
 
