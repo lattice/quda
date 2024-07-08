@@ -30,7 +30,7 @@
 #include <unordered_map>
 
 // Add the definition of this method into a cpp file. (only the declaration in the header)
-static inline const std::vector<std::string> &get_enum_names(std::string en_key, std::string en_str)
+static inline const std::vector<std::string> get_enum_names(const std::string &en_key, const std::string &en_str)
 {
   static std::unordered_map<std::string, std::vector<std::string>> en_names_map;
   const auto it = en_names_map.find(en_key);
@@ -55,6 +55,6 @@ static inline const std::vector<std::string> &get_enum_names(std::string en_key,
   enum class ENUM_NAME : unsigned int { __VA_ARGS__ size };                                                            \
   inline std::string to_string(ENUM_NAME en)                                                                           \
   {                                                                                                                    \
-    const auto &names = get_enum_names(#ENUM_NAME, #__VA_ARGS__);                                                      \
+    const auto names = get_enum_names(#ENUM_NAME, #__VA_ARGS__);                                                       \
     return names[static_cast<std::size_t>(en)];                                                                        \
   }
