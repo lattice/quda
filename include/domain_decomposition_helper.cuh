@@ -67,12 +67,15 @@ namespace quda
     template <typename Coord> constexpr bool block_parity(const Coord &x) const
     {
       int block_parity = 0;
-      for (int i = 0; i < x.size(); i++) { block_parity += x.gx[i] / block_dim[i]; }
+      for (int i = 0; i < x.size(); i++) {
+        if (block_dim[i] > 0) block_parity += x.gx[i] / block_dim[i];
+      }
       return block_parity % 2 == 1;
     }
 
     template <typename Coord> constexpr bool on_border(const Coord &x, int mu, int dir) const
     {
+      if (block_dim[mu] == 0) return false;
       int x_mu = x.gx[mu] + dir;
       if (x_mu < 0) x_mu += x.gDim[mu];
       if (x_mu >= x.gDim[mu]) x_mu -= x.gDim[mu];

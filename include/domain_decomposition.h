@@ -73,18 +73,21 @@ namespace quda
 
       if (type == QUDA_DD_RED_BLACK) {
         for (int i = 0; i < field.Ndim(); i++) {
-          if (block_dim[i] <= 0) {
-            if (verbose) printfQuda("block_dim[%d] = %d is not positive \n", i, block_dim[i]);
+          if (block_dim[i] < 0) {
+            if (verbose) printfQuda("block_dim[%d] = %d is negative\n", i, block_dim[i]);
             return false;
           }
-          int globalDim = comm_dim(i) * field.full_dim(i);
-          if (globalDim % block_dim[i] != 0) {
-            if (verbose) printfQuda("block_dim[%d] = %d does not divide %d \n", i, block_dim[i], globalDim);
-            return false;
-          }
-          if ((globalDim / block_dim[i]) % 2 != 0) {
-            if (verbose) printfQuda("block_dim[%d] = %d does not divide %d **evenly** \n", i, block_dim[i], globalDim);
-            return false;
+          if (block_dim[i] > 0) {
+            int globalDim = comm_dim(i) * field.full_dim(i);
+            if (globalDim % block_dim[i] != 0) {
+              if (verbose) printfQuda("block_dim[%d] = %d does not divide %d \n", i, block_dim[i], globalDim);
+              return false;
+            }
+            if ((globalDim / block_dim[i]) % 2 != 0) {
+              if (verbose)
+                printfQuda("block_dim[%d] = %d does not divide %d **evenly** \n", i, block_dim[i], globalDim);
+              return false;
+            }
           }
         }
         if (block_dim[0] % 2) {
