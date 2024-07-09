@@ -48,7 +48,7 @@ namespace quda
   template <bool is_device> struct atomic_fetch_abs_max_impl {
     template <typename T> inline void operator()(T *addr, T val)
     {
-#pragma omp atomic update
+#pragma omp critical
       *addr = std::max(*addr, val);
     }
   };
