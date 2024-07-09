@@ -100,18 +100,44 @@ namespace quda
     }
   }
 
-  static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
-  static std::string resource_path;
+  static const std::string quda_hash = QUDA_HASH;
+  const std::string get_quda_hash() { return quda_hash; }
+
+  const std::string get_resource_path()
+  {
+    static std::string resource_path;
+    static bool init = false;
+
+    if (!init) {
+      auto path = getenv("QUDA_RESOURCE_PATH");
+      struct stat pstat;
+
+      if (!path) {
+        warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
+        return {};
+      } else if (stat(path, &pstat) || !S_ISDIR(pstat.st_mode)) {
+        warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path);
+        return {};
+      } else {
+        resource_path = path;
+      }
+      init = true;
+    }
+
+    return resource_path;
+  }
+
   static map tunecache;
   static map::iterator it;
   static size_t initial_cache_size = 0;
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
-  static const std::string quda_version
-    = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
+    static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
 #undef STR
 #undef STR_
+
+  const std::string get_quda_version() { return quda_version; }
 
   /** tuning in progress? */
   static bool tuning = false;
@@ -333,25 +359,9 @@ namespace quda
       return;
     }
 
-    char *path;
-    struct stat pstat;
     std::string cache_path, line, token;
     std::ifstream cache_file;
     std::stringstream ls;
-
-    path = getenv("QUDA_RESOURCE_PATH");
-
-    if (!path) {
-      warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
-      warningQuda("Caching of tuned parameters will be disabled.");
-      return;
-    } else if (stat(path, &pstat) || !S_ISDIR(pstat.st_mode)) {
-      warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path);
-      warningQuda("Caching of tuned parameters will be disabled.");
-      return;
-    } else {
-      resource_path = path;
-    }
 
     bool version_check = true;
     char *override_version_env = getenv("QUDA_TUNE_VERSION_CHECK");
@@ -361,7 +371,7 @@ namespace quda
     }
 
     if (comm_rank_global() == 0) {
-      cache_path = resource_path;
+      cache_path = get_resource_path();
       cache_path += "/tunecache.tsv";
       cache_file.open(cache_path.c_str());
 
@@ -384,7 +394,7 @@ namespace quda
                     "QUDA_RESOURCE_PATH environment variable to point to a new path.",
                     cache_path.c_str());
 #else
-      if (version_check && token.compare(quda_version))
+        if (version_check && token.compare(quda_version))
         errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
                   "QUDA_RESOURCE_PATH environment variable to point to a new path.",
                   cache_path.c_str());
@@ -426,8 +436,12 @@ namespace quda
     int lock_handle;
     std::string lock_path, cache_path;
     std::ofstream cache_file;
+    auto &resource_path = get_resource_path();
 
-    if (resource_path.empty()) return;
+    if (resource_path.empty()) {
+      warningQuda("Caching of tuned parameters will be disabled");
+      return;
+    }
 
       // FIXME: We should really check to see if any nodes have tuned a kernel that was not also tuned on node 0, since as things
       //       stand, the corresponding launch parameters would never get cached to disk in this situation.  This will come up if we
@@ -464,7 +478,7 @@ namespace quda
 #ifdef GITVERSION
       cache_file << "\t" << gitversion;
 #else
-    cache_file << "\t" << quda_version;
+      cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << std::setw(16) << "volume"
@@ -514,8 +528,12 @@ namespace quda
     int lock_handle;
     std::string lock_path, profile_path, async_profile_path, trace_path;
     std::ofstream profile_file, async_profile_file, trace_file;
+    auto &resource_path = get_resource_path();
 
-    if (resource_path.empty()) return;
+    if (resource_path.empty()) {
+      warningQuda("Storing profile info disabled");
+      return;
+    }
 
     if (comm_rank_global() == 0) { // Make sure only one rank is writing to disk
 
