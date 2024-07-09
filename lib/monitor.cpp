@@ -16,15 +16,11 @@ namespace quda
   namespace monitor
   {
 
-    static std::thread monitor_thread;
-    static std::atomic<int> check(0);
-    static std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
-
-    static bool initialized = false;
-
+    /**
+       Linked list that we record the evolving state of the device being
+       monitored
+     */
     static std::list<device::state_t> state_history;
-
-    static double energy = 0.0;
 
     /**
        @brief Return the time period for the monitor measurements.
@@ -64,16 +60,37 @@ namespace quda
     }
 
     /**
+       Thread that performs the monitoring
+     */
+    static std::thread monitor_thread;
+
+    /**
+       Atomic variable used to signal the monitoring thread
+     */
+    static std::atomic<bool> is_running(false);
+
+    /**
        @brief The function that is run by the spawned monitor thread
     */
     void device_monitor()
     {
-      while (check.load() == 1) {
+      while (is_running.load()) {
         auto state = device::get_state();
         state_history.push_back(state);
         std::this_thread::sleep_for(get_period());
       }
     }
+
+    /**
+       Static variable used to track if we have initiated the
+       monitoring
+     */
+    static bool initialized = false;
+
+    /**
+       Static variable used to record the start time
+     */
+    static std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
 
     void init()
     {
@@ -85,7 +102,7 @@ namespace quda
 
         try { // spawn monitoring thread and release
           monitor_thread = std::thread([&]() { device_monitor(); });
-          check.store(1);
+          is_running.store(true);
         } catch (const std::system_error &e) {
           std::stringstream error;
           error << "Caught system_error with code [" << e.code() << "] meaning [" << e.what() << "]";
@@ -103,7 +120,7 @@ namespace quda
         qudaDeviceSynchronize();
 
         // safely end the monitoring thread
-        check.store(0);
+        is_running.store(false);
         monitor_thread.join(); // thread cleanup
 
         serialize();
@@ -145,6 +162,7 @@ namespace quda
 
       static uint64_t count = 0;
       static double last_power = 0;
+      static double energy = 0.0; // integrated energy
       static std::chrono::time_point<std::chrono::high_resolution_clock> last_time;
 
       for (auto &state : state_history) {
