@@ -424,12 +424,6 @@ static void init_default_comms()
 }
 
 
-#define STR_(x) #x
-#define STR(x) STR_(x)
-  static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
-#undef STR
-#undef STR_
-
 extern char* gitversion;
 
 /*
@@ -446,9 +440,9 @@ void initQudaDevice(int dev)
   profileInit.TPSTART(QUDA_PROFILE_INIT);
 
 #ifdef GITVERSION
-  logQuda(QUDA_SUMMARIZE, "QUDA %s (git %s)\n", quda_version.c_str(), gitversion);
+  logQuda(QUDA_SUMMARIZE, "QUDA %s (git %s)\n", get_quda_version().c_str(), gitversion);
 #else
-  logQuda(QUDA_SUMMARIZE, "QUDA %s\n", quda_version.c_str());
+  logQuda(QUDA_SUMMARIZE, "QUDA %s\n", get_quda_version().c_str());
 #endif
 
 #ifdef MULTI_GPU
@@ -1376,6 +1370,9 @@ void endQuda(void)
 
     initialized = false;
 
+    assertAllMemFree();
+    device::destroy();
+
     comm_finalize();
     comms_initialized = false;
   }
@@ -1425,10 +1422,6 @@ void endQuda(void)
     printPeakMemUsage();
     printfQuda("\n");
   }
-
-  assertAllMemFree();
-
-  device::destroy();
 }
 
 
