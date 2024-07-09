@@ -32,7 +32,6 @@ namespace quda {
 
     void preTune() { out.backup(); }
     void postTune() { out.restore(); }
-    long long flops() const { return 0; }
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 
@@ -86,12 +85,11 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<TwistGamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, kappa, mu, epsilon, dagger, type));
+      launch<TwistGamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, 0, kappa, mu, epsilon, dagger, type));
     }
 
     void preTune() { out.backup(); }
     void postTune() { out.restore(); }
-    long long flops() const { return 0; }
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 

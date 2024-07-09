@@ -19,16 +19,14 @@ namespace quda
     F out;      /** output vector field */
     const F in; /** input vector field */
 
-    SpinTasteArg(ColorSpinorField &out_, const ColorSpinorField &in_) :
-      kernel_param(dim3(in_.VolumeCB(), in_.SiteSubset(), 1)), out(out_), in(in_)
+    SpinTasteArg(ColorSpinorField &out, const ColorSpinorField &in) :
+      kernel_param(dim3(in.VolumeCB(), in.SiteSubset(), 1)), out(out), in(in)
     {
-      checkOrder(out_, in_);     // check all orders match
-      checkPrecision(out_, in_); // check all precisions match
-      checkLocation(out_, in_);  // check all locations match
-      if (!in_.isNative()) errorQuda("Unsupported field order colorspinor= %d \n", in_.FieldOrder());
-      if (!out_.isNative()) errorQuda("Unsupported field order colorspinor= %d \n", out_.FieldOrder());
-#pragma unroll
-      for (int i = 0; i < 4; i++) { X[i] = in_.X()[i]; }
+      checkOrder(out, in);     // check all orders match
+      checkPrecision(out, in); // check all precisions match
+      checkLocation(out, in);  // check all locations match
+      checkNative(out, in);
+      for (int i = 0; i < 4; i++) { X[i] = in.X()[i]; }
     }
   };
 
