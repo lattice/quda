@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
 #include <nvml.h>
-
+#include "monitor.h"
 
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
@@ -12,6 +12,19 @@ static const int Nstream = 9;
 
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
+#define NVML_CHECK(func)						\
+  {									\
+    nvmlReturn_t ret = func;						\
+    if (ret == NVML_ERROR_NOT_SUPPORTED) {				\
+      static int i=0;							\
+      if (i==0) printf("%s not supported on this GPU\n", #func);	\
+      i++;								\
+    } else if (ret != NVML_SUCCESS) {					\
+      printf("Error %s returns %s\n", #func, nvmlErrorString(ret));	\
+      exit(-1);								\
+    }									\
+  }
 
 namespace quda
 {
@@ -22,6 +35,8 @@ namespace quda
     static bool initialized = false;
 
     static int device_id = -1;
+
+    static nvmlDevice_t monitor_device_id;
 
     void init(int dev)
     {
@@ -40,21 +55,15 @@ namespace quda
       if (driver_version < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
 #endif
 
-      nvmlReturn_t result = nvmlInit();
-      if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
+      NVML_CHECK(nvmlInit());
       const int length = 80;
       char graphics_version[length];
-      result = nvmlSystemGetDriverVersion(graphics_version, length);
-      if (NVML_SUCCESS != result) errorQuda("nvmlSystemGetDriverVersion failed with error %d", result);
+      NVML_CHECK(nvmlSystemGetDriverVersion(graphics_version, length));
       printfQuda("Graphic driver version = %s\n", graphics_version);
-      result = nvmlShutdown();
-      if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
 
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("Found device %d: %s\n", i, deviceProp.name);
-        }
+        logQuda(QUDA_SUMMARIZE, "Found device %d: %s\n", i, deviceProp.name);
       }
 
       CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, dev));
@@ -100,7 +109,7 @@ namespace quda
 
       if (!deviceProp.unifiedAddressing) errorQuda("Device %d does not support unified addressing", dev);
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Using device %d: %s\n", dev, deviceProp.name);
+      logQuda(QUDA_SUMMARIZE, "Using device %d: %s\n", dev, deviceProp.name);
 #ifndef USE_QDPJIT
       CHECK_CUDA_ERROR(cudaSetDevice(dev));
 #endif
@@ -110,12 +119,48 @@ namespace quda
       // cudaGetDeviceProperties(&deviceProp, dev);
 
       device_id = dev;
+
+      NVML_CHECK(nvmlDeviceGetHandleByIndex(device_id, &monitor_device_id));
+      char name[NVML_DEVICE_NAME_BUFFER_SIZE];
+      NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
+
+      printfQuda("Initializing monitoring on device %d: %s\n", device_id, name);
+      monitor::init();
     }
 
     void init_thread()
     {
       if (device_id == -1) errorQuda("No CUDA device has been initialized for this process");
       CHECK_CUDA_ERROR(cudaSetDevice(device_id));
+    }
+
+    auto get_power() {
+      unsigned int power;
+      NVML_CHECK(nvmlDeviceGetPowerUsage(monitor_device_id, &power));
+      return 1e-3 * power;
+    }
+
+    auto get_clock() {
+      // other clocks available NVML_CLOCK_MEM and NVML_CLOCK_GRAPHICS
+      unsigned int clock;
+      NVML_CHECK(nvmlDeviceGetClockInfo(monitor_device_id, NVML_CLOCK_SM, &clock));
+      return clock;
+    }
+
+    auto get_temperature() {
+      unsigned int temp;
+      NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+      return temp;
+    }
+
+    state_t get_state()
+    {
+      state_t state;
+      state.time = std::chrono::high_resolution_clock::now();
+      state.power = get_power();
+      state.clock = get_clock();
+      state.temp = get_temperature();
+      return state;
     }
 
     int get_device_count()
@@ -227,6 +272,10 @@ namespace quda
         delete []streams;
         streams = nullptr;
       }
+
+      monitor::destroy();
+
+      NVML_CHECK(nvmlShutdown());
 
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env, "1") == 0) {
