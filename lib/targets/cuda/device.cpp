@@ -17,12 +17,9 @@ static const int Nstream = 9;
   {									\
     nvmlReturn_t ret = func;						\
     if (ret == NVML_ERROR_NOT_SUPPORTED) {				\
-      static int i=0;							\
-      if (i==0) printf("%s not supported on this GPU\n", #func);	\
-      i++;								\
+      warningQuda("%s not supported on this GPU\n", nvmlErrorString(ret)); \
     } else if (ret != NVML_SUCCESS) {					\
-      printf("Error %s returns %s\n", #func, nvmlErrorString(ret));	\
-      exit(-1);								\
+      errorQuda(" NVML returns %s", nvmlErrorString(ret));              \
     }									\
   }
 
@@ -135,20 +132,20 @@ namespace quda
     }
 
     auto get_power() {
-      unsigned int power;
+      unsigned int power = 0;
       NVML_CHECK(nvmlDeviceGetPowerUsage(monitor_device_id, &power));
       return 1e-3 * power;
     }
 
     auto get_clock() {
       // other clocks available NVML_CLOCK_MEM and NVML_CLOCK_GRAPHICS
-      unsigned int clock;
+      unsigned int clock = 0;
       NVML_CHECK(nvmlDeviceGetClockInfo(monitor_device_id, NVML_CLOCK_SM, &clock));
       return clock;
     }
 
     auto get_temperature() {
-      unsigned int temp;
+      unsigned int temp = 0;
       NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
       return temp;
     }
