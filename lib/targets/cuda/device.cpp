@@ -13,14 +13,14 @@ static const int Nstream = 9;
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
-#define NVML_CHECK(func)						\
-  {									\
-    nvmlReturn_t ret = func;						\
-    if (ret == NVML_ERROR_NOT_SUPPORTED) {				\
-      warningQuda("%s not supported on this GPU\n", nvmlErrorString(ret)); \
-    } else if (ret != NVML_SUCCESS) {					\
-      errorQuda(" NVML returns %s", nvmlErrorString(ret));              \
-    }									\
+#define NVML_CHECK(func)                                                                                               \
+  {                                                                                                                    \
+    nvmlReturn_t ret = func;                                                                                           \
+    if (ret == NVML_ERROR_NOT_SUPPORTED) {                                                                             \
+      warningQuda("%s not supported on this GPU\n", nvmlErrorString(ret));                                             \
+    } else if (ret != NVML_SUCCESS) {                                                                                  \
+      errorQuda(" NVML returns %s", nvmlErrorString(ret));                                                             \
+    }                                                                                                                  \
   }
 
 namespace quda
@@ -131,20 +131,23 @@ namespace quda
       CHECK_CUDA_ERROR(cudaSetDevice(device_id));
     }
 
-    auto get_power() {
+    auto get_power()
+    {
       unsigned int power = 0;
       NVML_CHECK(nvmlDeviceGetPowerUsage(monitor_device_id, &power));
       return 1e-3 * power;
     }
 
-    auto get_clock() {
+    auto get_clock()
+    {
       // other clocks available NVML_CLOCK_MEM and NVML_CLOCK_GRAPHICS
       unsigned int clock = 0;
       NVML_CHECK(nvmlDeviceGetClockInfo(monitor_device_id, NVML_CLOCK_SM, &clock));
       return clock;
     }
 
-    auto get_temperature() {
+    auto get_temperature()
+    {
       unsigned int temp = 0;
       NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
       return temp;

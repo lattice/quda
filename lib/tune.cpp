@@ -133,7 +133,8 @@ namespace quda
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
-    static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
+  static const std::string quda_version
+    = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
 #undef STR
 #undef STR_
 
@@ -395,9 +396,9 @@ namespace quda
                     cache_path.c_str());
 #else
         if (version_check && token.compare(quda_version))
-        errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
-                  "QUDA_RESOURCE_PATH environment variable to point to a new path.",
-                  cache_path.c_str());
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #endif
         ls >> token;
         if (version_check && token.compare(quda_hash))

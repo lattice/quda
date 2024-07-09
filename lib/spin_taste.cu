@@ -72,7 +72,7 @@ namespace quda
 
   void applySpinTaste(ColorSpinorField &out, const ColorSpinorField &in, QudaSpinTasteGamma gamma)
   {
-    if constexpr(is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
       instantiate<SpinTastePhase_>(out, in, gamma);
     } else {
       errorQuda("Staggered operator has not been built");

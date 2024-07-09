@@ -57,7 +57,7 @@ namespace quda
       CHECK_HIP_ERROR(hipSetDevice(device_id));
     }
 
-    void init_monitor() {}
+    void init_monitor() { }
 
     // not implemented on HIP at present
     state_t get_state() { return {}; }
