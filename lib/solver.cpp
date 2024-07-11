@@ -215,9 +215,8 @@ namespace quda {
       errorQuda("Unexpected preconditioned solver %d", outer.inv_type);
     }
 
-    // this sets a fixed iteration count if we're using the MR solver
-    inner.residual_type
-      = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+    // allows the inner solver to early exit if it converges quickly
+    inner.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
     inner.iter = 0;
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
