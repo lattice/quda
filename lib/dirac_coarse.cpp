@@ -513,11 +513,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
 
-    if ( location == QUDA_CUDA_FIELD_LOCATION) {
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
       auto Y = apply_mma(out, dslash_use_mma) ? Yhat_aos_d : Yhat_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
       ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim.data, halo_precision, dslash_use_mma);
-    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
+    } else if (location == QUDA_CPU_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim.data, halo_precision,
                   dslash_use_mma);
     }
@@ -618,9 +618,9 @@ namespace quda {
     auto tmp = getFieldTmp(x.Even());
 #if 1
     // x_o = A_oo^-1 (b_o - D_oe x_e)
-    DiracCoarse::Dslash(tmp, x.Even(), QUDA_ODD_PARITY);
-    blas::xpay(b.Odd(), -1.0, tmp);
-    CloverInv(x.Odd(), tmp, QUDA_ODD_PARITY);
+    DiracCoarse::Dslash(tmp, x(this_parity), other_parity);
+    blas::xpay(b(other_parity), -1.0, tmp);
+    CloverInv(x(other_parity), tmp, other_parity);
 #else
     // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
     Dslash(tmp, x(this_parity), other_parity);
