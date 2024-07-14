@@ -4,7 +4,7 @@
 /**
  * @file transfer.h
  *
- * @section DESCRIPTION 
+ * @section DESCRIPTION
  *
  * Defines the prolongation and restriction operators used to transfer
  * between grids.
@@ -12,6 +12,7 @@
 
 #include <color_spinor_field.h>
 #include <vector>
+#include <reference_wrapper_helper.h>
 
 namespace quda {
 
@@ -31,7 +32,7 @@ namespace quda {
   private:
 
     /** The raw null space components */
-    const std::vector<ColorSpinorField*> &B;
+    const std::vector<ColorSpinorField> &B;
 
     /** The number of null space components */
     const int Nvec;
@@ -46,47 +47,41 @@ namespace quda {
     const QudaPrecision null_precision;
 
     /** CPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField *V_h;
+    mutable ColorSpinorField V_h;
 
     /** GPU copy of the block-normalized null-space components that define the prolongator */
-    mutable ColorSpinorField *V_d;
+    mutable ColorSpinorField V_d;
 
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable ColorSpinorField *fine_tmp_h;
-
-    /** A GPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable ColorSpinorField *fine_tmp_d;
+    mutable ColorSpinorField fine_tmp_h;
 
     /** A CPU temporary field with coarse geometry and coarse color */
-    mutable ColorSpinorField *coarse_tmp_h;
-
-    /** A GPU temporary field with coarse geometry and coarse color we use for CPU input / output */
-    mutable ColorSpinorField *coarse_tmp_d;
+    mutable ColorSpinorField coarse_tmp_h;
 
     /** The geometrical coase grid blocking */
-    int *geo_bs;
+    int *geo_bs = nullptr;
 
     /** The mapping onto coarse sites from fine sites.  This has
 	length equal to the fine-grid volume, and is sorted into
 	lexicographical fine-grid order, with each value corresponding
 	to a coarse-grid offset. (CPU) */
-    mutable int *fine_to_coarse_h;
+    mutable int *fine_to_coarse_h = nullptr;
 
     /** The mapping onto fine sites from coarse sites. This has length
 	equal to the fine-grid volume, and is sorted into lexicographical
 	block order, with each value corresponding to a fine-grid offset. (CPU) */
-    mutable int *coarse_to_fine_h;
+    mutable int *coarse_to_fine_h = nullptr;
 
     /** The mapping onto coarse sites from fine sites.  This has
 	length equal to the fine-grid volume, and is sorted into
 	lexicographical fine-grid order, with each value corresponding
 	to a coarse-grid offset. (GPU) */
-    mutable int *fine_to_coarse_d;
+    mutable int *fine_to_coarse_d = nullptr;
 
     /** The mapping onto fine sites from coarse sites. This has length
 	equal to the fine-grid volume, and is sorted into lexicographical
 	block order, with each value corresponding to a fine-grid offset. (GPU) */
-    mutable int *coarse_to_fine_d;
+    mutable int *coarse_to_fine_d = nullptr;
 
     /** The spin blocking. Defined as zero when the fine operator is staggered. */
     int spin_bs;
@@ -104,10 +99,10 @@ namespace quda {
     QudaParity parity;
 
     /** Whether the GPU transfer operator has been constructed */
-    mutable bool enable_gpu;
+    mutable bool enable_gpu = false;
 
     /** Whether the CPU transfer operator has been constructed */
-    mutable bool enable_cpu;
+    mutable bool enable_cpu = false;
 
     /** Whether to apply the transfer operaton the GPU (requires
 	enable_gpu=true in the constructor) */
@@ -124,10 +119,19 @@ namespace quda {
     void createV(QudaFieldLocation location) const;
 
     /**
-     * @brief Allocate temporaries used when applying transfer operators
+     * @brief Allocate host temporaries used when applying transfer operators
      * @param[in] location Where to allocate the temporaries
      */
-    void createTmp(QudaFieldLocation location) const;
+    void createTmp() const;
+
+    /**
+     * @brief Allocate temporaries needed for prolongator / restrictor
+     * application (if changing location)
+     * @param[in,out] tmp Storaage for temporaries
+     * @param[in] location Location for new temporaries
+     * @param[in] a Field whose metadata we are cloning (aside from location and ordering)
+     */
+    void createTmp(std::vector<ColorSpinorField> &tmp, QudaFieldLocation new_location, ColorSpinorField &a) const;
 
     /**
      * @brief Creates the map between fine and coarse grids
@@ -135,7 +139,7 @@ namespace quda {
      */
     void createGeoMap(int *geo_bs);
 
-    /** 
+    /**
      * @brief Creates the map between fine spin and parity to coarse spin dimensions
      * @param spin_bs The spin block size
      */
@@ -146,17 +150,6 @@ namespace quda {
      * @param[in] location Where to allocate the temporaries
      */
     void initializeLazy(QudaFieldLocation location) const;
-
-    /**
-     * Internal flops accumulator
-     */
-    mutable double flops_;
-
-    /**
-     * Reference to profile kept in the corresponding MG instance.
-     * Use this to record restriction and prolongation overhead.
-     */
-    TimeProfile &profile;
 
   public:
     /**
@@ -172,8 +165,8 @@ namespace quda {
      * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
-             int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
+    Transfer(const std::vector<ColorSpinorField> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
+             int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -188,21 +181,21 @@ namespace quda {
      * @param out The resulting field on the fine lattice
      * @param in The input field on the coarse lattice
      */
-    void P(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     /**
      * Apply the restrictor
      * @param out The resulting field on the coarse lattice
      * @param in The input field on the fine lattice
      */
-    void R(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     /**
      * @brief The precision of the packed null-space vectors
      */
     QudaPrecision NullPrecision(QudaFieldLocation location) const
     {
-      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
+      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0].Precision(), QUDA_SINGLE_PRECISION);
     }
 
     /**
@@ -213,9 +206,9 @@ namespace quda {
     const ColorSpinorField& Vectors(QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION) const {
       if (location == QUDA_INVALID_FIELD_LOCATION) {
         // if not set then we return the memory space where the input vectors are stored
-        return B[0]->Location() == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
+        return B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? V_d : V_h;
       } else {
-        return location == QUDA_CUDA_FIELD_LOCATION ? *V_d : *V_h;
+        return location == QUDA_CUDA_FIELD_LOCATION ? V_d : V_h;
       }
     }
 
@@ -226,7 +219,7 @@ namespace quda {
     int nvec() const {return Nvec;}
 
     /**
-     * Returns the amount of spin blocking. Defined as zero when coarsening staggered. 
+     * Returns the amount of spin blocking. Defined as zero when coarsening staggered.
      * @return spin_bs
      */
     int Spin_bs() const {return spin_bs;}
@@ -270,12 +263,6 @@ namespace quda {
      * applicable)
      */
     void setSiteSubset(QudaSiteSubset site_subset, QudaParity parity);
-
-    /**
-     * Return flops
-     * @return flops expended by this operator
-     */
-    double flops() const;
   };
 
   /**
@@ -295,22 +282,46 @@ namespace quda {
      calculation.  This this provides better accuracy in fixed-point
      precision.
    */
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
+
+  template <int coarseColor, int fineColor>
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,
+                          const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
+
+  /**
+     @brief Transpose the B vectors into a composite V field:
+       - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
+       - V: spatial -> spin/color -> nVec
+     @param[out] The output V Matrix field
+     @param[in] B input vectors
+   */
+  void BlockTransposeForward(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B);
+
+  /**
+     @brief Transpose the a composite V field into B vectors:
+       - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
+       - V: spatial -> spin/color -> nVec
+     @param[in] The output V Matrix field
+     @param[out] B input vectors
+   */
+  void BlockTransposeBackward(const ColorSpinorField &V, const cvector_ref<ColorSpinorField> &B);
 
   /**
      @brief Apply the prolongation operator
      @param[out] out Resulting fine grid field
      @param[in] in Input field on coarse grid
      @param[in] v Matrix field containing the null-space components
-     @param[in] Nvec Number of null-space components
      @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		  int Nvec, const int *fine_to_coarse, const int * const *spin_map,
-		  int parity=QUDA_INVALID_PARITY);
+  void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                  const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+
+  template <int coarseColor, int fineColor>
+  void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                  const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
      @brief Apply the restriction operator
@@ -322,9 +333,12 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the input fine field (if single parity input field)
    */
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
-		int parity=QUDA_INVALID_PARITY);
+  void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+
+  template <int coarseColor, int fineColor>
+  void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
      @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning
@@ -334,7 +348,7 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse,
+  void StaggeredProlongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int *fine_to_coarse,
                            const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
@@ -345,7 +359,7 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void StaggeredRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse,
+  void StaggeredRestrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int *fine_to_coarse,
                          const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
 } // namespace quda

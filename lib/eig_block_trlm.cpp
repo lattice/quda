@@ -17,11 +17,9 @@
 namespace quda
 {
   // Thick Restarted Block Lanczos Method constructor
-  BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    TRLM(mat, eig_param, profile)
+  BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param) : TRLM(mat, eig_param)
   {
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // Block Thick restart specific checks
     if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
@@ -38,37 +36,32 @@ namespace quda
       errorQuda("Block size %d is not a factor of the compressed space %d", block_size, n_ev);
     }
 
-    if (block_size == 0) { errorQuda("Block size %d passed to block eigensolver", block_size); }
+    if (block_size <= 0) errorQuda("Block size %d passed to block eigensolver must be positive", block_size);
 
-    int n_blocks = n_kr / block_size;
+    if (block_size > n_conv) errorQuda("block_size = %d cannot exceed n_conv = %d", block_size, n_conv);
+
+    auto n_blocks = n_kr / block_size;
     block_data_length = block_size * block_size;
-    int arrow_mat_array_size = block_data_length * n_blocks;
+    auto arrow_mat_array_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
-    block_alpha = (Complex *)safe_malloc(arrow_mat_array_size * sizeof(Complex));
-    block_beta = (Complex *)safe_malloc(arrow_mat_array_size * sizeof(Complex));
-    for (int i = 0; i < arrow_mat_array_size; i++) {
-      block_alpha[i] = 0.0;
-      block_beta[i] = 0.0;
-    }
+    block_alpha.resize(arrow_mat_array_size, 0.0);
+    block_beta.resize(arrow_mat_array_size, 0.0);
 
     // Temp storage used in blockLanczosStep
-    jth_block = (Complex *)safe_malloc(block_data_length * sizeof(Complex));
+    jth_block.resize(block_data_length);
 
-    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void BLKTRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
   {
-    // In case we are deflating an operator, save the tunechache from the inverter
-    saveTuneCache();
-
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+    queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
-      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
-      loadFromFile(mat, kSpace, evals);
+      logQuda(QUDA_VERBOSE, "Loading evecs from file name %s\n", eig_param->vec_infile);
+      loadFromFile(kSpace, evals);
       return;
     }
 
@@ -85,11 +78,11 @@ namespace quda
     prepareKrylovSpace(kSpace, evals);
 
     // Check for Chebyshev maximum estimation
-    checkChebyOpMax(mat, kSpace);
+    checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
     double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0]->Precision());
+    double epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -97,7 +90,7 @@ namespace quda
 
     // Begin BLOCK TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
@@ -106,21 +99,29 @@ namespace quda
       iter += (n_kr - num_keep);
 
       // Solve current block tridiag
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromBlockArrowMat();
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-      // mat_norm is updated.
+      // mat_norm is updated and used for LR
       for (int i = num_locked; i < n_kr; i++)
         if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+
+      // Lambda that returns mat_norm for LR and returns the relevant alpha
+      // (the corresponding Ritz value) for SR
+      auto check_norm = [&](double sr_norm) -> double {
+        if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+          return mat_norm;
+        else
+          return sr_norm;
+      };
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
-        if (residua[i + num_locked] < epsilon * mat_norm) {
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-            printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                       epsilon * mat_norm);
+        if (residua[i + num_locked] < epsilon * check_norm(alpha[i + num_locked])) {
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  epsilon * check_norm(alpha[i + num_locked]));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -131,9 +132,9 @@ namespace quda
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
-        if (residua[i + num_locked] < tol * mat_norm) {
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-            printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
+        if (residua[i + num_locked] < tol * check_norm(alpha[i + num_locked])) {
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  tol * check_norm(alpha[i + num_locked]));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -145,9 +146,9 @@ namespace quda
       // algorithmic variables to be multiples of the block size
       iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
       iter_keep = (iter_keep / block_size) * block_size;
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
       computeBlockKeptRitz(kSpace);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       num_converged = num_locked + iter_converged;
       num_keep = num_locked + iter_keep;
@@ -159,20 +160,16 @@ namespace quda
       num_keep = (num_keep / block_size) * block_size;
       num_locked = (num_locked / block_size) * block_size;
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
-      }
+      logQuda(QUDA_VERBOSE, "%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
 
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        printfQuda("iter Conv = %d\n", iter_converged);
-        printfQuda("iter Keep = %d\n", iter_keep);
-        printfQuda("iter Lock = %d\n", iter_locked);
-        printfQuda("num_converged = %d\n", num_converged);
-        printfQuda("num_keep = %d\n", num_keep);
-        printfQuda("num_locked = %d\n", num_locked);
-        for (int i = 0; i < n_kr; i++) {
-          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
-        }
+      logQuda(QUDA_DEBUG_VERBOSE, "iter Conv = %d\n", iter_converged);
+      logQuda(QUDA_DEBUG_VERBOSE, "iter Keep = %d\n", iter_keep);
+      logQuda(QUDA_DEBUG_VERBOSE, "iter Lock = %d\n", iter_locked);
+      logQuda(QUDA_DEBUG_VERBOSE, "num_converged = %d\n", num_converged);
+      logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
+      logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
+      for (int i = 0; i < n_kr; i++) {
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
       }
 
       // Check for convergence
@@ -180,7 +177,7 @@ namespace quda
       restart_iter++;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // Post computation report
     //---------------------------------------------------------------------------
@@ -195,36 +192,28 @@ namespace quda
                     n_conv, n_ev, n_kr, block_size, max_restarts);
       }
     } else {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
-                   "%d BLOCKED OP*x operations.\n",
-                   n_conv, restart_iter, block_size, iter / block_size);
+      logQuda(QUDA_SUMMARIZE,
+              "BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
+              "%d BLOCKED OP*x operations.\n",
+              n_conv, restart_iter, block_size, iter / block_size);
 
-        // Dump all Ritz values and residua
-        for (int i = 0; i < n_conv; i++) {
-          printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
-        }
+      // Dump all Ritz values and residua
+      for (int i = 0; i < n_conv; i++) {
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
       }
 
       // Compute eigenvalues
-      computeEvals(mat, kSpace, evals);
+      computeEvals(kSpace, evals);
+      if (compute_svd) computeSVD(kSpace, evals);
     }
 
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
   }
 
-  // Destructor
-  BLKTRLM::~BLKTRLM()
-  {
-    host_free(jth_block);
-    host_free(block_alpha);
-    host_free(block_beta);
-  }
-
   // Block Thick Restart Member functions
   //---------------------------------------------------------------------------
-  void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField *> v, int j)
+  void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField> &v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
 
@@ -233,19 +222,15 @@ namespace quda
     int idx = 0, idx_conj = 0;
 
     // r = A * v_j
-    for (int b = 0; b < block_size; b++) chebyOp(mat, *r[b], *v[j + b]);
+    //for (int b = 0; b < block_size; b++) chebyOp(mat, r[b], v[j + b]);
+    chebyOp({r.begin(), r.begin() + block_size}, {v.begin() + j, v.begin() + j + block_size});
 
     // r = r - b_{j-1} * v_{j-1}
     int start = (j > num_keep) ? j - block_size : 0;
+
     if (j - start > 0) {
-
-      std::vector<ColorSpinorField *> r_;
-      r_.reserve(block_size);
-      for (int i = 0; i < block_size; i++) r_.push_back(r[i]);
-
       int blocks = (j - start) / block_size;
-      std::vector<Complex> beta_;
-      beta_.reserve(blocks * block_data_length);
+      std::vector<Complex> beta_(blocks * block_data_length);
 
       // Switch beta block order from COLUMN to ROW major
       // This switches the block from upper to lower triangular
@@ -254,26 +239,22 @@ namespace quda
         for (int b = 0; b < block_size; b++) {
           for (int c = 0; c < block_size; c++) {
             idx = c * block_size + b;
-            beta_.push_back(-block_beta[block_offset + idx]);
+            beta_[(i * block_size + b) * block_size + c] = -block_beta[block_offset + idx];
           }
         }
       }
 
-      std::vector<ColorSpinorField *> v_;
-      v_.reserve(j - start);
-      for (int i = start; i < j; i++) { v_.push_back(v[i]); }
       if (blocks == 1)
-        blas::caxpy_L(beta_.data(), v_, r_);
+        blas::block::caxpy_L(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
       else
-        blas::caxpy(beta_.data(), v_, r_);
+        blas::block::caxpy(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
     }
 
     // a_j = v_j^dag * r
-    std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(block_size);
-    for (int b = 0; b < block_size; b++) { vecs_ptr.push_back(v[j + b]); }
     // Block dot products stored in alpha_block.
-    blas::cDotProduct(block_alpha + arrow_offset, vecs_ptr, r);
+    std::vector<Complex> block_alpha_(block_size);
+    blas::block::cDotProduct(block_alpha_, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
+    for (auto i = 0u; i < block_alpha_.size(); i++) block_alpha[arrow_offset + i] = block_alpha_[i];
 
     // Use jth_block to negate alpha data and apply block BLAS.
     // Data is in square hermitian form, no need to switch to ROW major
@@ -285,10 +266,10 @@ namespace quda
     }
 
     // r = r - a_j * v_j
-    blas::caxpy(jth_block, vecs_ptr, r);
+    blas::block::caxpy(jth_block, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
-    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
+    for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + block_size);
 
     // QR decomposition via modified Gram-Schmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
@@ -304,18 +285,18 @@ namespace quda
 
     // Column major order
     bool orthed = false;
-    int k = 0, kmax = 3;
-    while (!orthed && k < kmax) {
+    int k = 0;
+    while (!orthed && k < max_ortho_attempts) {
       // Compute R_{k}
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Orthing k = %d\n", k);
+      logQuda(QUDA_DEBUG_VERBOSE, "Orthonormalisation attempt k = %d\n", k);
       for (int b = 0; b < block_size; b++) {
-        double norm = sqrt(blas::norm2(*r[b]));
-        blas::ax(1.0 / norm, *r[b]);
+        double norm = sqrt(blas::norm2(r[b]));
+        blas::ax(1.0 / norm, r[b]);
         jth_block[b * (block_size + 1)] = norm;
         for (int c = b + 1; c < block_size; c++) {
 
-          Complex cnorm = blas::cDotProduct(*r[b], *r[c]);
-          blas::caxpy(-cnorm, *r[b], *r[c]);
+          Complex cnorm = blas::cDotProduct(r[b], r[c]);
+          blas::caxpy(-cnorm, r[b], r[c]);
 
           idx = c * block_size + b;
           idx_conj = b * block_size + c;
@@ -330,12 +311,11 @@ namespace quda
       k++;
     }
 
+    if (!orthed) errorQuda("Block TRLM unable to orthonormalise the block residual after %d iterations", k + 1);
+
     // Prepare next step.
     // v_{j+1} = r
-    for (int b = 0; b < block_size; b++) *v[j + block_size + b] = *r[b];
-
-    // Save Lanczos step tuning
-    saveTuneCache();
+    for (int b = 0; b < block_size; b++) v[j + block_size + b] = r[b];
   }
 
   void BLKTRLM::updateBlockBeta(int k, int arrow_offset)
@@ -381,7 +361,7 @@ namespace quda
 
   void BLKTRLM::eigensolveFromBlockArrowMat()
   {
-    profile.TPSTART(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTART(QUDA_PROFILE_EIGEN);
     int dim = n_kr - num_locked;
     if (dim % block_size != 0) errorQuda("dim = %d modulo block_size = %d != 0", dim, block_size);
     int blocks = dim / block_size;
@@ -457,29 +437,33 @@ namespace quda
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++) block_ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
+    // Use Sum of all beta values in the final block for
+    // the convergence condition
+    double beta_sum = 0;
+    for (int i = 0; i < block_data_length; i++) beta_sum += fabs(block_beta[n_kr * block_size - block_data_length + i]);
+
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = fabs(block_beta[n_kr * block_size - block_data_length + idx]
-                                                        * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
+        residua[i * block_size + b + num_locked] = fabs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
-  void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace)
+  void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField> &kSpace)
   {
     int offset = n_kr + block_size;
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * iter_keep) * sizeof(Complex));
+    std::vector<Complex> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
 
-    rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked);
 
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);
@@ -516,11 +500,6 @@ namespace quda
         }
       }
     }
-
-    host_free(ritz_mat_keep);
-
-    // Save Krylov rotation tuning
-    saveTuneCache();
   }
 
 } // namespace quda

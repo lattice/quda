@@ -62,7 +62,7 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
+    int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
@@ -90,6 +90,7 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
   } QudaGaugeParam;
 
 
@@ -132,10 +133,12 @@ extern "C" {
     double mu;    /**< Twisted mass parameter */
     double tm_rho;  /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
     double epsilon; /**< Twisted mass parameter */
+    double evmax;   /** maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces  **/
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
+    int covdev_mu; /**< Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3) */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -447,6 +450,17 @@ extern "C" {
     /** Whether to use fused kernels for mobius */
     QudaBoolean use_mobius_fused_kernel;
 
+    /**
+     * Parameters for distance preconditioning algorithm proposed in arXiv:1006.4028,
+     * which is useful to solve a precise heavy quark propagator.
+     * alpha0 and t0 follow Eq.(9) in the article.
+     */
+
+    /** The alpha0 parameter for distance preconditioning, related to the pseudoscalar meson mass */
+    double distance_pc_alpha0;
+    /** The t0 parameter for distance preconditioning, the timeslice where the source is located */
+    int distance_pc_t0;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
@@ -493,8 +507,10 @@ extern "C" {
     /** If use_dagger, use Mdag **/
     /** If use_norm_op, use MdagM **/
     /** If use_norm_op && use_dagger use MMdag. **/
+    /** If use_pc for any, then use the even-odd pc version **/
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
+    QudaBoolean use_pc;
 
     /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
     QudaBoolean use_eigen_qr;
@@ -534,6 +550,10 @@ extern "C" {
     int batched_rotate;
     /** For block method solvers, the block size **/
     int block_size;
+    /** For block method solvers, quit after n attempts at block orthonormalisation **/
+    int max_ortho_attempts;
+    /** For hybrid modifeld Gram-Schmidt orthonormalisations **/
+    int ortho_block_size;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
@@ -579,6 +599,9 @@ extern "C" {
         MILC I/O) */
     QudaBoolean io_parity_inflate;
 
+    /** Whether to save eigenvectors in QIO singlefile or partfile format */
+    QudaBoolean partfile;
+
     /** The Gflops rate of the eigensolver setup */
     double gflops;
 
@@ -622,6 +645,12 @@ extern "C" {
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
+
+    /** Setup MMA usage on each level of the multigrid */
+    QudaBoolean setup_use_mma[QUDA_MAX_MG_LEVEL];
+
+    /** Dslash MMA usage on each level of the multigrid */
+    QudaBoolean dslash_use_mma[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
@@ -767,6 +796,9 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
+    /** Whether to store the null-space vectors in singlefile or partfile format */
+    QudaBoolean mg_vec_partfile[QUDA_MAX_MG_LEVEL];
+
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
 
@@ -791,28 +823,60 @@ extern "C" {
     /** Whether or not to use the dagger approximation for the KD preconditioned operator */
     QudaBoolean staggered_kd_dagger_approximation;
 
-    /** Whether to use tensor cores (if available) */
-    QudaBoolean use_mma;
-
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
-    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
-    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
-    double qcharge;                      /**< Computed topological charge */
-    double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
+    QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
+    QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
+    double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_polyakov_loop;    /**< Whether to compute the temporal Polyakov loop */
+    double ploop[2];                      /**< Real and imaginary part of temporal Polyakov loop */
+    QudaBoolean compute_gauge_loop_trace; /**< Whether to compute gauge loop traces */
+    double_complex *traces;               /**< Individual complex traces of each loop */
+    int **input_path_buff;                /**< Array of paths */
+    int *path_length;                     /**< Length of each path */
+    double *loop_coeff;                   /**< Multiplicative factor for each loop */
+    int num_paths;                        /**< Total number of paths */
+    int max_length;                       /**< Maximum length of any path */
+    double factor;                        /**< Global multiplicative factor to apply to each loop trace */
+    QudaBoolean compute_qcharge;          /**< Whether to compute the topological charge and field energy */
+    double qcharge;                       /**< Computed topological charge */
+    double energy[3];                     /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge_density;  /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+    QudaBoolean
+      remove_staggered_phase; /**< Whether or not the resident gauge field has staggered phases applied and if they should
+                                 be removed; this was needed for the Polyakov loop calculation when called through MILC,
+                                 with the underlying issue documented https://github.com/lattice/quda/issues/1315 */
   } QudaGaugeObservableParam;
+
+  typedef struct QudaGaugeSmearParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    unsigned int n_steps; /**< The total number of smearing steps to perform. */
+    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
+                             Wilson/Symanzik flow */
+    double alpha;         /**< The single coefficient used in APE smearing */
+    double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/
+    double alpha2;                 /**< The coefficient used in HYP smearing step 2*/
+    double alpha3;                 /**< The coefficient used in HYP smearing step 1*/
+    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
+    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+    QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
+    double t0;                     /**< Starting flow time for Wilson flow */
+    int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
+                                        A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
+  } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
+    QudaBLASType blas_type; /**< Type of BLAS computation to perfrom */
+
+    // GEMM params
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
     int m;                     /**< number of rows of matrix op(A) and C. */
@@ -827,14 +891,17 @@ extern "C" {
     int a_stride;              /**< stride of the A array in strided(batched) mode */
     int b_stride;              /**< stride of the B array in strided(batched) mode */
     int c_stride;              /**< stride of the C array in strided(batched) mode */
-
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
 
-    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+    // LU inversion params
+    int inv_mat_size; /**< The rank of the square matrix in the LU inversion */
 
+    // Common params
+    int batch_count;              /**< number of pointers contained in arrayA, arrayB and arrayC. */
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
+
   } QudaBLASParam;
 
   /*
@@ -1000,9 +1067,18 @@ extern "C" {
    * immediately after it's defined (and prior to explicitly setting
    * its members) using this function.  Typical usage is as follows:
    *
-   *   QudaGaugeParam obs_param = newQudaGaugeObservableParam();
+   *   QudaGaugeObservalbeParam obs_param = newQudaGaugeObservableParam();
    */
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
+
+  /**
+   * A new QudaGaugeSmearParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+   */
+  QudaGaugeSmearParam newQudaGaugeSmearParam(void);
 
   /**
    * A new QudaBLASParam should always be initialized immediately
@@ -1060,6 +1136,22 @@ extern "C" {
    * Free QUDA's internal copy of the gauge field.
    */
   void freeGaugeQuda(void);
+
+  /**
+   * Free a unique type (Wilson, HISQ fat, HISQ long, smeared) of internal gauge field.
+   * @param link_type[in] Type of link type to free up
+   */
+  void freeUniqueGaugeQuda(QudaLinkType link_type);
+
+  /**
+   * Free QUDA's internal smeared gauge field.
+   */
+  void freeGaugeSmearedQuda(void);
+
+  /**
+   * Free QUDA's internal two-link gauge field.
+   */
+  void freeGaugeTwoLinkQuda(void);
 
   /**
    * Save the gauge field to the host.
@@ -1128,37 +1220,8 @@ extern "C" {
    * @param _hp_x       Array of solution spinor fields
    * @param _hp_b       Array of source spinor fields
    * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
-  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param);
-
-  /**
-   * @brief Really the same with @invertMultiSrcQuda but for staggered-style fermions, by accepting pointers
-   * to fat links and long links.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
-   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   */
-  void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
-                                   void *milc_longlinks, QudaGaugeParam *gauge_param);
-
-  /**
-   * @brief Really the same with @invertMultiSrcQuda but for clover-style fermions, by accepting pointers
-   * to direct and inverse clover field pointers.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   * @param h_clover    Base pointer to the direct clover field
-   * @param h_clovinv   Base pointer to the inverse clover field
-   */
-  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
-                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1206,13 +1269,42 @@ extern "C" {
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] param  Contains all metadata regarding host and device
    *               storage
-   * @param parity The destination parity of the field
+   * @param[in] parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
+
+  /**
+   * Apply the covariant derivative.
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] dir    Direction of application
+   * @param[in] param  Metadata for host and device storage
+   */
+  void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param);
+
+  /**
+   * Apply the covariant derivative.
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] dir    Direction of application
+   * @param[in] sym    Apply forward=2, backward=2 or symmetric=3 shift
+   * @param[in] param  Metadata for host and device storage
+   */
+  void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param);
+
+  /**
+   * Apply the spin-taste operator.
+   * @param[out] h_out  Result spinor field
+   * @param[in] h_in   Input spinor field
+   * @param[in] spin   Spin gamma structure
+   * @param[in] taste  Taste gamma structure
+   * @param[in] param  Metadata for host and device storage
+   */
+  void spinTasteQuda(void *h_out, void *h_in, int spin, int taste, QudaInvertParam *param);
 
   /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
@@ -1224,40 +1316,8 @@ extern "C" {
    * @param _hp_b       Array of source spinor fields
    * @param param       Contains all metadata regarding host and device storage and solver parameters
    * @param parity      Parity to apply dslash on
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
-  void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                          QudaGaugeParam *gauge_param);
-  /**
-   * @brief Really the same with @dslashMultiSrcQuda but for staggered-style fermions, by accepting pointers
-   * to fat links and long links.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param parity      Parity to apply dslash on
-   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
-   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   */
-
-  void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity,
-                                   void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param);
-
-  /**
-   * @brief Really the same with @dslashMultiSrcQuda but for clover-style fermions, by accepting pointers
-   * to direct and inverse clover field pointers.
-   * @param _hp_x       Array of solution spinor fields
-   * @param _hp_b       Array of source spinor fields
-   * @param param       Contains all metadata regarding host and device storage and solver parameters
-   * @param parity      Parity to apply dslash on
-   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
-   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
-   * @param h_clover    Base pointer to the direct clover field
-   * @param h_clovinv   Base pointer to the inverse clover field
-   */
-  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
-                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+  void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.
@@ -1300,6 +1360,16 @@ extern "C" {
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
+                         
+  /**
+   * Compute two-link field
+   *
+   * @param[out] twolink computed two-link field
+   * @param[in] inlink  the external field
+   * @param[in] param  Contains all metadata regarding host and device
+   *               storage
+   */
+  void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param);
 
   /**
    * Either downloads and sets the resident momentum field, or uploads
@@ -1341,6 +1411,20 @@ extern "C" {
    */
   int computeGaugePathQuda(void *out, void *sitelink, int ***input_path_buf, int *path_length, double *loop_coeff,
                            int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
+
+  /**
+   * Compute the traces of products of gauge links along paths using the resident field
+   *
+   * @param[in,out] traces The computed traces
+   * @param[in] sitelink The gauge field from which we compute the products of gauge links
+   * @param[in] path_length The number of links in each loop
+   * @param[in] loop_coeff Multiplicative coefficients for each loop
+   * @param[in] num_paths Total number of loops
+   * @param[in] max_length The maximum number of non-zero of links in any path in the action
+   * @param[in] factor An overall normalization factor
+   */
+  void computeGaugeLoopTraceQuda(double_complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                 int num_paths, int max_length, double factor);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -1407,7 +1491,7 @@ extern "C" {
   void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
-   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Reinterpret gauge as a pointer to a GaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
    */
@@ -1421,9 +1505,9 @@ extern "C" {
   void createCloverQuda(QudaInvertParam* param);
 
   /**
-   * Compute the clover force contributions in each dimension mu given
-   * the array of solution fields, and compute the resulting momentum
-   * field.
+   * Compute the clover force contributions from a set of partial
+   * fractions stemming from a rational approximation suitable for use
+   * within MILC.
    *
    * @param mom Force matrix
    * @param dt Integrating step size
@@ -1441,6 +1525,23 @@ extern "C" {
   void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
 			      int nvector, double multiplicity, void *gauge,
 			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+
+  /**
+   * Compute the force from a clover or twisted clover determinant or
+   * a set of partial fractions stemming from a rational approximation
+   * suitable for use from within tmLQCD.
+   *
+   * @param h_mom Host force matrix
+   * @param h_x Array of solution vectors x_i = ( Q^2 + s_i )^{-1} b
+   * @param h_x0 Array of source vector necessary to compute the force of a ratio of determinant
+   * @param coeff Array of coefficients for the rational approximation or {1.0} for the determinant.
+   * @param nvector Number of solution vectors and coefficients
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   * @param detratio if 0 compute the force of a determinant otherwise compute the force from a ratio of determinants
+   */
+  void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector,
+                                QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.
@@ -1486,10 +1587,10 @@ extern "C" {
 
   /**
      @brief Generate Gaussian distributed fields and store in the
-     resident gauge field.  We create a Gaussian-distributed su(n)
+     resident gauge field. We create a Gaussian-distributed su(n)
      field and exponentiate it, e.g., U = exp(sigma * H), where H is
-     the distributed su(n) field and beta is the width of the
-     distribution (beta = 0 results in a free field, and sigma = 1 has
+     the distributed su(n) field and sigma is the width of the
+     distribution (sigma = 0 results in a free field, and sigma = 1 has
      maximum disorder).
 
      @param seed The seed used for the RNG
@@ -1498,10 +1599,31 @@ extern "C" {
   void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
+   * @brief Generate Gaussian distributed fields and store in the
+   * resident momentum field. We create a Gaussian-distributed su(n)
+   * field, e.g., sigma * H, where H is the distributed su(n) field
+   * and sigma is the width of the distribution (sigma = 0 results
+   * in a free field, and sigma = 1 has maximum disorder).
+   *
+   * @param seed The seed used for the RNG
+   * @param sigma Width of Gaussian distrubution
+   */
+  void gaussMomQuda(unsigned long long seed, double sigma);
+
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
-   * @param Array for storing the averages (total, spatial, temporal)
+   * @param[out] Array for storing the averages (total, spatial, temporal)
    */
   void plaqQuda(double plaq[3]);
+
+  /**
+     @brief Computes the trace of the Polyakov loop of the current resident field
+     in a given direction.
+
+     @param[out] ploop Trace of the Polyakov loop in direction dir
+     @param[in] dir Direction of Polyakov loop
+  */
+  void polyakovLoopQuda(double ploop[2], int dir);
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
@@ -1510,6 +1632,21 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
+   * Performs gaussian/Wuppertal smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field
+   * @param h_out  Output spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   * @param coeff  Width of the Gaussian distribution
+   * @param smear_type Gaussian/Wuppertal smearing
+   */
+  void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double coeff,
+                               const QudaFermionSmearType smear_type);
+
+  /**
+   * LEGACY
    * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
@@ -1522,38 +1659,33 @@ extern "C" {
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
-   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
+   * LEGACY
+   * Performs gaussian smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field
+   * @param h_out  Output spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
-   * @param alpha  Alpha coefficient for APE smearing.
-   * @param meas_interval Measure the Q charge every Nth step
+   * @param omega  Width of the Gaussian distribution
    */
-  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
+  void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
 
   /**
-   * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
+   * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
    */
-  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
-
-  /**
-   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
-   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
+  void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param step_size Size of Wilson Flow step
-   * @param meas_interval Measure the Q charge and field energy every Nth step
-   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
    */
-  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
+  void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
@@ -1578,6 +1710,23 @@ extern "C" {
                     const int *X);
 
   /**
+   * @param[in] x pointer to host data array
+   * @param[in] y pointer to host data array
+   * @param[out] result pointer to the spin*spin projections per lattice slice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] src_colors color dilution parameter
+   * @param[in] X local lattice dimansions
+   * @param[in] source_position source position array
+   * @param[in] number of momentum modes
+   * @param[in] mom_modes momentum modes
+   * @param[in] fft_type Fourier phase factor type (cos, sin or exp{ikx})
+   */
+  void contractFTQuda(void **x, void **y, void **result, const QudaContractType cType, void *cs_param_ptr,
+                      const int src_colors, const int *X, const int *const source_position, const int n_mom,
+                      const int *const mom_modes, const QudaFFTSymmType *const fft_type);
+
+  /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
@@ -1589,12 +1738,11 @@ extern "C" {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
    */
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                                const unsigned int reunit_interval, const unsigned int stopWtheta,
-                                QudaGaugeParam *param, double *timeinfo);
+                                const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1607,22 +1755,29 @@ extern "C" {
    * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
    */
   int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
-                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
-                                double *timeinfo);
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Strided Batched GEMM
    * @param[in] arrayA The array containing the A matrix data
-   * @param[in] arrayB The array containing the A matrix data
-   * @param[in] arrayC The array containing the A matrix data
-   * @param[in] native boolean to use either the native or generic version
+   * @param[in] arrayB The array containing the B matrix data
+   * @param[in] arrayC The array containing the C matrix data
+   * @param[in] native Boolean to use either the native or generic version
    * @param[in] param The data defining the problem execution.
    */
   void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
+
+  /**
+   * @brief Strided Batched in-place matrix inversion via LU
+   * @param[in] Ainv The array containing the A inverse matrix data
+   * @param[in] A The array containing the A matrix data
+   * @param[in] use_native Boolean to use either the native or generic version
+   * @param[in] param The data defining the problem execution.
+   */
+  void blasLUInvQuda(void *Ainv, void *A, QudaBoolean use_native, QudaBLASParam *param);
 
   /**
    * @brief Flush the chronological history for the given index
@@ -1635,7 +1790,6 @@ extern "C" {
   * Create deflation solver resources.
   *
   **/
-
   void* newDeflationQuda(QudaEigParam *param);
 
   /**
@@ -1644,6 +1798,54 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
+  
+  // Parameter set for quark smearing operations
+  typedef struct QudaQuarkSmearParam_s {
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
+    QudaInvertParam *inv_param;
+
+    /** Number of steps to apply **/
+    int  n_steps;
+    /** The width of the Gaussian **/
+    double  width;
+    /** if nonzero then compute two-link, otherwise reuse gaugeSmeared**/
+    int compute_2link;
+    /** if nonzero then delete two-link, otherwise keep two-link for future use**/
+    int delete_2link;
+    /** Set if the input spinor is on a time slice **/
+    int t0;
+    /** Time taken for the smearing operations **/
+    double secs;
+    /** Flops count for the smearing operations **/
+    double gflops;
+
+  } QudaQuarkSmearParam;
+
+  /**
+   * Performs two-link Gaussian smearing on a given spinor (for staggered fermions).
+   * @param[in,out] h_in Input spinor field to smear
+   * @param[in] smear_param   Contains all metadata the operator which will be applied to the spinor
+   */
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param);
+
+  /**
+   * @brief Performs contractions between a set of quark fields and
+   * eigenvectors of the 3-d Laplace operator.
+   * @param[in,out] host_sinks An array representing the inner
+   * products between the quark fields and the eigen-vector fields.
+   * Ordered as [nQuark][nEv][Lt][nSpin][complexity].
+   * @param[in] host_quark Array of quark fields we are taking the inner over
+   * @param[in] n_quark Number of quark fields
+   * @param[in] tile_quark Tile size for quark fields (batch size)
+   * @param[in] host_evec Array of eigenvectors we are taking the inner over
+   * @param[in] n_evec Number of eigenvectors
+   * @param[in] tile_evec Tile size for eigenvectors (batch size)
+   * @param[in] inv_param Meta-data structure
+   * @param[in] X Lattice dimensions
+   */
+  void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark,
+                       void **host_evec, int nevec, int tile_evec, QudaInvertParam *inv_param, const int X[4]);
 
 #ifdef __cplusplus
 }

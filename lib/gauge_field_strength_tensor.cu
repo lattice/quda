@@ -11,6 +11,7 @@ namespace quda
     GaugeField &f;
     const GaugeField &u;
     unsigned int minThreads() const { return f.VolumeCB(); }
+    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     Fmunu(const GaugeField &u, GaugeField &f) :
@@ -32,17 +33,12 @@ namespace quda
     long long bytes() const { return ((16 * u.Reconstruct() + f.Reconstruct()) * 6 * f.Volume() * f.Precision()); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void computeFmunu(GaugeField &f, const GaugeField &u)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(f, u);
     instantiate2<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void computeFmunu(GaugeField &, const GaugeField &)
-  {
-    errorQuda("Gauge tools are not built");
-  }
-#endif // GPU_GAUGE_TOOLS
 
 } // namespace quda

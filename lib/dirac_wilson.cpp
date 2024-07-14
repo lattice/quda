@@ -16,69 +16,74 @@ namespace quda {
 
   DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
   {
-    if (&dirac != this) {
-      Dirac::operator=(dirac);
-    }
+    if (&dirac != this) { Dirac::operator=(dirac); }
     return *this;
   }
 
-  void DiracWilson::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			   const QudaParity parity) const
+  void DiracWilson::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
-    flops += 1320ll*in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonDistance(out, in, *gauge, 0.0, distance_pc_alpha0, distance_pc_t0, in, parity, dagger, commDim.data,
+                          profile);
+    } else {
+      ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim.data, profile);
+    }
   }
 
-  void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
+  void DiracWilson::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
-    flops += 1368ll*in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonDistance(out, in, *gauge, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger, commDim.data,
+                          profile);
+    } else {
+      ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim.data, profile);
+    }
   }
 
-  void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilson::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-
-    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1368ll * in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonDistance(out, in, *gauge, -kappa, distance_pc_alpha0, distance_pc_t0, in, QUDA_INVALID_PARITY, dagger,
+                          commDim.data, profile);
+    } else {
+      ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    }
   }
 
-  void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilson::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
-
-    bool reset = newTmp(&tmp1, in);
-    checkFullSpinor(*tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(out);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
-  void DiracWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
+  void DiracWilson::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                            cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                            const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracWilson::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracWilson::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                const QudaSolutionType) const
   {
-    // do nothing
   }
 
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -98,11 +103,7 @@ namespace quda {
 
   }
 
-  DiracWilsonPC::DiracWilsonPC(const DiracWilsonPC &dirac) 
-    : DiracWilson(dirac)
-  {
-
-  }
+  DiracWilsonPC::DiracWilsonPC(const DiracWilsonPC &dirac) : DiracWilson(dirac) { }
 
   DiracWilsonPC::~DiracWilsonPC()
   {
@@ -117,80 +118,61 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilsonPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilsonPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-
-    bool reset = newTmp(&tmp1, in);
+    auto tmp = getFieldTmp(out);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash(*tmp1, in, QUDA_ODD_PARITY);
-      DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_ODD_PARITY);
+      DslashXpay(out, tmp, QUDA_EVEN_PARITY, in, kappa2);
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-      DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_EVEN_PARITY);
+      DslashXpay(out, tmp, QUDA_ODD_PARITY, in, kappa2);
     } else {
       errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
     }
-
-    deleteTmp(&tmp1, reset);
   }
 
-  void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracWilsonPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
-    deleteTmp(&tmp2, reset);
+    auto tmp = getFieldTmp(out);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
-  void DiracWilsonPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			      ColorSpinorField &x, ColorSpinorField &b, 
-			      const QudaSolutionType solType) const
+  void DiracWilsonPC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                              cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                              const QudaSolutionType solType) const
   {
-    // we desire solution to preconditioned system
+
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
-    } else {
-      // we desire solution to full system
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-	// src = b_e + k D_eo b_o
-	DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-	src = &(x.Odd());
-	sol = &(x.Even());
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-	// src = b_o + k D_oe b_e
-	DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-	src = &(x.Even());
-	sol = &(x.Odd());
-      } else {
-	errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+      for (auto i = 0u; i < b.size(); i++) {
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
       }
-      // here we use final solution to store parity solution and parity source
-      // b is now up for grabs if we want
+      return;
     }
 
+    // we desire solution to full system
+    for (auto i = 0u; i < b.size(); i++) {
+      // src = b_e + k D_eo b_o
+      DslashXpay(x[i][other_parity], b[i][other_parity], this_parity, b[i][this_parity], kappa);
+      src[i] = x[i][other_parity].create_alias();
+      sol[i] = x[i][this_parity].create_alias();
+    }
   }
 
-  void DiracWilsonPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				  const QudaSolutionType solType) const
+  void DiracWilsonPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }				
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-
-    checkFullSpinor(x, b);
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
       // x_o = b_o + k D_oe x_e
-      DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // x_e = b_e + k D_eo x_o
-      DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-    } else {
-      errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+      DslashXpay(x[i][other_parity], x[i][this_parity], other_parity, b[i][other_parity], kappa);
     }
   }
 

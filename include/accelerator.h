@@ -34,11 +34,11 @@ namespace quda
 
   public:
     AcceleratedSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-      Solver(mat, matSloppy, matPrecon, matEig, param, profile), matPrecon(matPrecon), transformer(param, profile)
+                      const DiracMatrix &matEig, SolverParam &param) :
+      Solver(mat, matSloppy, matPrecon, matEig, param), matPrecon(matPrecon), transformer(param)
     {
-      base_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param, profile);
-      ref_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param, profile);
+      base_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param);
+      ref_solver = std::make_unique<solver_t>(mat, matSloppy, matPrecon, matEig, param);
     }
 
     /**
@@ -55,7 +55,9 @@ namespace quda
       }
     }
 
-    virtual bool hermitian() { return base_solver->hermitian(); }
+    virtual bool hermitian() const final { return base_solver->hermitian(); }
+
+    virtual QudaInverterType getInverterType() const final { return base_solver->getInverterType(); }
 
     /**
      * @brief Train the underlying accelerate parameter.

@@ -7,7 +7,7 @@ namespace quda
 {
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class QCharge : TunableReduction2D<> {
+  class QCharge : TunableReduction2D {
     const GaugeField &Fmunu;
     double *energy;
     double &qcharge;
@@ -33,7 +33,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      typename Arg<>::reduce_t result;
+      typename Arg<>::reduce_t result{};
       if (!density) {
         Arg<false> arg(Fmunu, static_cast<Float*>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
@@ -60,28 +60,18 @@ namespace quda
     long long bytes() const { return Fmunu.Bytes() + Fmunu.Volume() * (density * Fmunu.Precision()); }
   }; // QChargeCompute
 
-#ifdef GPU_GAUGE_TOOLS
   void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void computeQCharge(double [3], double &, const GaugeField &)
-  {
-    errorQuda("Gauge tools are not built");
-  }
-#endif // GPU_GAUGE_TOOLS
 
-#ifdef GPU_GAUGE_TOOLS
   void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void computeQChargeDensity(double [3], double &, void *, const GaugeField &)
-  {
-    errorQuda("Gauge tools are not built");
-  }
-#endif // GPU_GAUGE_TOOLS
 
 } // namespace quda

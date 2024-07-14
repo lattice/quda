@@ -20,70 +20,77 @@ namespace quda {
     return *this;
   }
 
-  void DiracClover::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracClover::checkParitySpinor(cvector_ref<const ColorSpinorField> &out,
+                                      cvector_ref<const ColorSpinorField> &in) const
   {
     Dirac::checkParitySpinor(out, in);
 
-    if (out.Volume() != clover->VolumeCB()) {
-      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+    for (auto i = 0u; i < out.size(); i++) {
+      if (out[i].Volume() != clover->VolumeCB())
+        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(),
+                  clover->VolumeCB());
     }
   }
 
   /** Applies the operator (A + k D) */
-  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
+  void DiracClover::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
-    flops += 1872ll*in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x, parity, dagger,
+                                commDim.data, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);
+    }
   }
 
   // Public method to apply the clover term only
-  void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracClover::Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     ApplyClover(out, in, *clover, false, parity);
-    flops += 504ll*in.Volume();
   }
 
-  void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracClover::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1872ll * in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonCloverDistance(out, in, *gauge, *clover, -kappa, distance_pc_alpha0, distance_pc_t0, in,
+                                QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    } else {
+      ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+    }
   }
 
-  void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracClover::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
+    auto tmp = getFieldTmp(out);
 
-    bool reset = newTmp(&tmp1, in);
-    checkFullSpinor(*tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
-  void DiracClover::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
+  void DiracClover::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                            cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                            const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracClover::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                const QudaSolutionType) const
   {
-    // do nothing
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -109,7 +116,7 @@ namespace quda {
     DiracClover(param)
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
-    if (!clover->cloverInv && !clover::dynamic_inverse()) errorQuda("Clover inverse required for DiracCloverPC");
+    if (!clover->Inverse() && !clover::dynamic_inverse()) errorQuda("Clover inverse required for DiracCloverPC");
   }
 
   DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : DiracClover(dirac) { }
@@ -125,49 +132,50 @@ namespace quda {
   }
 
   // Public method
-  void DiracCloverPC::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, 
-				const QudaParity parity) const
+  void DiracCloverPC::CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     ApplyClover(out, in, *clover, true, parity);
-    flops += 504ll*in.Volume();
   }
 
   // apply hopping term, then clover: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
   // and likewise for dagger: (A_ee^-1 D^dagger_eo) or (A_oo^-1 D^dagger_oe)
   // NOTE - this isn't Dslash dagger since order should be reversed!
-  void DiracCloverPC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			     const QudaParity parity) const
+  void DiracCloverPC::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                             QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
-    flops += 1824ll*in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, 0.0, distance_pc_alpha0, distance_pc_t0, in,
+                                              parity, dagger, commDim.data, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim.data, profile);
+    }
   }
 
   // xpay version of the above
-  void DiracCloverPC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				 const QudaParity parity, const ColorSpinorField &x,
-				 const double &k) const
+  void DiracCloverPC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
-    flops += 1872ll*in.Volume();
+    if (useDistancePC()) {
+      ApplyWilsonCloverPreconditionedDistance(out, in, *gauge, *clover, k, distance_pc_alpha0, distance_pc_t0, x,
+                                              parity, dagger, commDim.data, profile);
+    } else {
+      ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim.data, profile);
+    }
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
-  void DiracCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     double kappa2 = -kappa*kappa;
-    bool reset1 = newTmp(&tmp1, in);
-
-    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+    auto tmp = getFieldTmp(out);
 
     if (!symmetric) {
 
@@ -177,122 +185,85 @@ namespace quda {
       // the pieces in Dslash and DslashXPay respect the dagger
 
       // DiracCloverPC::Dslash applies A^{-1}Dslash
-      Dslash(*tmp1, in, parity[0]);
+      Dslash(tmp, in, other_parity);
       // DiracClover::DslashXpay applies (A - kappa^2 D)
-      DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+      DiracClover::DslashXpay(out, tmp, this_parity, in, kappa2);
     } else if (!dagger) { // symmetric preconditioning
       // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
       // where A is actually a clover inverse.
 
       // This is the non-dag case: AD
-      Dslash(*tmp1, in, parity[0]);
+      Dslash(tmp, in, other_parity);
 
       // Then x + AD (AD)
-      DslashXpay(out, *tmp1, parity[1], in, kappa2);
+      DslashXpay(out, tmp, this_parity, in, kappa2);
     } else { // symmetric preconditioning, dagger
 
       // This is the dagger: 1 - DADA
       //  i) Apply A
-      CloverInv(out, in, parity[1]);
+      CloverInv(out, in, this_parity);
       // ii) Apply A D => ADA
-      Dslash(*tmp1, out, parity[0]);
+      Dslash(tmp, out, other_parity);
       // iii) Apply  x + D(ADA)
-      DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+      DiracWilson::DslashXpay(out, tmp, this_parity, in, kappa2);
     }
-
-    deleteTmp(&tmp1, reset1);
   }
 
-  void DiracCloverPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracCloverPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
     // and for multi-gpu the input and output fields cannot alias
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
-    deleteTmp(&tmp2, reset);
+    auto tmp = getFieldTmp(out);
+
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
-  void DiracCloverPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol, 
-			      ColorSpinorField &x, ColorSpinorField &b, 
-			      const QudaSolutionType solType) const
+  void DiracCloverPC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                              cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                              const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
+      for (auto i = 0u; i < b.size(); i++) {
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
+      }
       return;
     }
 
-    bool reset = newTmp(&tmp1, b.Even());
-  
     // we desire solution to full system
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
-      src = &(x.Odd());
-      CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
-      DiracWilson::DslashXpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
-      CloverInv(*src, *tmp1, QUDA_EVEN_PARITY);
-      sol = &(x.Even());
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
-      src = &(x.Even());
-      CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
-      DiracWilson::DslashXpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
-      CloverInv(*src, *tmp1, QUDA_ODD_PARITY);
-      sol = &(x.Odd());
-    } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      // src = b_e + k D_eo A_oo^-1 b_o
-      src = &(x.Odd());
-      CloverInv(*tmp1, b.Odd(), QUDA_ODD_PARITY); // safe even when *tmp1 = b.odd
-      DiracWilson::DslashXpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa);
-      sol = &(x.Even());
-    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // src = b_o + k D_oe A_ee^-1 b_e
-      src = &(x.Even());
-      CloverInv(*tmp1, b.Even(), QUDA_EVEN_PARITY); // safe even when *tmp1 = b.even
-      DiracWilson::DslashXpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa);
-      sol = &(x.Odd());
-    } else {
-      errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
+    auto tmp = getFieldTmp(b[0].Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      if (symmetric) {
+        // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
+        src[i] = x[i][other_parity].create_alias();
+        CloverInv(src[i], b[i][other_parity], other_parity);
+        DiracWilson::DslashXpay(tmp, src[i], this_parity, b[i][this_parity], kappa);
+        CloverInv(src[i], tmp, this_parity);
+        sol[i] = x[i][this_parity].create_alias();
+      } else {
+        // src = b_e + k D_eo A_oo^-1 b_o
+        src[i] = x[i][other_parity].create_alias();
+        CloverInv(tmp, b[i][other_parity], other_parity); // safe even when tmp = b.odd
+        DiracWilson::DslashXpay(src[i], tmp, this_parity, b[this_parity], kappa);
+        sol[i] = x[i][this_parity].create_alias();
+      }
     }
-
-    // here we use final solution to store parity solution and parity source
-    // b is now up for grabs if we want
-
-    deleteTmp(&tmp1, reset);
-
   }
 
-  void DiracCloverPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				  const QudaSolutionType solType) const
+  void DiracCloverPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    checkFullSpinor(x, b);
-
-    bool reset = newTmp(&tmp1, b.Even());
-
-    // create full solution
-
-    if (matpcType == QUDA_MATPC_EVEN_EVEN ||
-	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    auto tmp = getFieldTmp(b[0].Even());
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
       // x_o = A_oo^-1 (b_o + k D_oe x_e)
-      DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-      CloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD ||
-	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // x_e = A_ee^-1 (b_e + k D_eo x_o)
-      DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-      CloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
-    } else {
-      errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
+      DiracWilson::DslashXpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa);
+      CloverInv(x[i][other_parity], tmp, other_parity);
     }
-
-    deleteTmp(&tmp1, reset);
-
   }
 
   void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
@@ -309,15 +280,11 @@ namespace quda {
   {
     Dirac::prefetch(mem_space, stream);
 
-    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
     if (symmetric) {
       clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE);
     } else {
-      clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
-      clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
+      clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, other_parity);
+      clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, this_parity);
     }
   }
 

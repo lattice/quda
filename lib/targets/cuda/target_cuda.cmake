@@ -1,9 +1,8 @@
 # ######################################################################################################################
 # CUDA specific part of CMakeLists
+set(CMAKE_CUDA_EXTENSIONS OFF)
 
 find_package(CUDAToolkit REQUIRED)
-include(CheckLanguage)
-check_language(CUDA)
 
 set(QUDA_TARGET_CUDA ON)
 
@@ -18,8 +17,8 @@ endif()
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90)
 set(QUDA_GPU_ARCH_SUFFIX
     ""
     CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
@@ -43,20 +42,20 @@ set(CMAKE_CUDA_FLAGS_DEVEL
     "-g -O3 "
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
-    "-g -O3"
+    "-O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w"
+    "-O3 -Xcompiler \"${CXX_OPT}\""
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
-    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
+    CACHE STRING "Flags used by the CUDA compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g -G"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+    "-G -g -fno-inline"
+    CACHE STRING "Flags used by the CUDA compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g "
-    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
+    "-g -fno-inline \"-fsanitize=address,undefined\" "
+    CACHE STRING "Flags used by the CUDA compiler during sanitizer debug builds.")
 
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
@@ -80,11 +79,22 @@ elseif(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
 endif()
 
 # ######################################################################################################################
-# CUDA specific QUDA options options
+# CUDA specific QUDA options
 include(CMakeDependentOption)
 
-option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
-option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
+# large arg support requires CUDA 12.1
+cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1" OFF )
+message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
+mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# Set the maximum multi-RHS per kernel
+if(QUDA_LARGE_KERNEL_ARG)
+  set(QUDA_MAX_MULTI_RHS "64" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+else()
+  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+endif()
+message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
@@ -100,37 +110,31 @@ set(QUDA_GDRCOPY_HOME
 # NVTX options
 option(QUDA_INTERFACE_NVTX "add NVTX markup to interface calls" OFF)
 
-if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
   message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
-if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
 mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
 mark_as_advanced(QUDA_GDRCOPY_HOME)
-mark_as_advanced(QUDA_NVML)
-mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 # ######################################################################################################################
 # CUDA specific variables
-string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
+string(REGEX REPLACE sm_ "" QUDA_COMPUTE_CAPABILITY ${QUDA_GPU_ARCH})
 if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
   set(QUDA_GPU_ARCH_SUFFIX real)
 endif()
 if(QUDA_GPU_ARCH_SUFFIX)
-  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
+  set(CMAKE_CUDA_ARCHITECTURES "${QUDA_COMPUTE_CAPABILITY}-${QUDA_GPU_ARCH_SUFFIX}")
 else()
-  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+  set(CMAKE_CUDA_ARCHITECTURES ${QUDA_COMPUTE_CAPABILITY})
 endif()
 
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
@@ -174,8 +178,70 @@ if(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES
   target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:SHELL: -gpu=nodebug" >)
 endif()
 
+if((${QUDA_TARGET_TYPE} STREQUAL "CUDA") AND (${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70))
+  set(MRHS_MMA_ENABLED 1)
+else()
+  set(MRHS_MMA_ENABLED 0)
+endif()
+
+if(${MRHS_MMA_ENABLED})
+  set(QUDA_MULTIGRID_MRHS_DEFAULT_LIST "16")
+else()
+  set(QUDA_MULTIGRID_MRHS_DEFAULT_LIST "")
+endif()
+set(QUDA_MULTIGRID_MRHS_LIST ${QUDA_MULTIGRID_MRHS_DEFAULT_LIST} CACHE STRING "The list of multi-rhs sizes that get compiled")
+mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
+message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
+
+if(QUDA_MULTIGRID)
+  option(QUDA_ENABLE_MMA "Enabling using tensor core" ON)
+  mark_as_advanced(QUDA_ENABLE_MMA)
+
+  option(QUDA_MULTIGRID_SETUP_USE_SMMA "Enabling using SMMA (3xTF32/3xBF16/3xFP16) for multigrid setup" ON)
+  mark_as_advanced(QUDA_MULTIGRID_SETUP_USE_SMMA)
+
+  string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
+
+  if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70)
+
+    if(${QUDA_COMPUTE_CAPABILITY} EQUAL 70)
+      set(MRHS_ATOM 16)
+    else()
+      set(MRHS_ATOM 8)
+    endif()
+
+    # add dslash_coarse last to the list so it is compiled first
+    foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+      foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+
+        math(EXPR MRHS_MODULO "${QUDA_MULTIGRID_MRHS} % ${MRHS_ATOM}")
+
+        if((${QUDA_MULTIGRID_MRHS} GREATER 0) AND (${QUDA_MULTIGRID_MRHS} LESS_EQUAL 64) AND (${MRHS_MODULO} EQUAL 0))
+          set(QUDA_MULTIGRID_DAGGER "false")
+          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+          set(QUDA_MULTIGRID_DAGGER "true")
+          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+        else()
+          message(SEND_ERROR "MRHS not supported:" "${QUDA_MULTIGRID_MRHS}")
+        endif()
+
+      endforeach()
+    endforeach()
+  endif()
+
+endif()
+
+set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block, 0 corresponds to architecture default")
+mark_as_advanced(QUDA_MAX_SHARED_MEMORY)
+configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/device.in.hpp
+               ${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp @ONLY)
+install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp" DESTINATION include/)
+
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
-target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_MATH_INCLUDE_DIR}>)
+target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS} ${CUDAToolkit_MATH_INCLUDE_DIR})
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-Xfatbin=-compress-all>)
@@ -183,15 +249,25 @@ target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
                                        $<INSTALL_INTERFACE:include/targets/cuda>)
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
+target_include_directories(quda_cpp SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 
 # Specific config dependent warning suppressions and lineinfo forwarding
+
+target_compile_options(
+  quda 
+  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: 
+          $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+          >)
+
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
           -Wreorder
           $<$<CXX_COMPILER_ID:Clang>:
           -Xcompiler=-Wno-unused-function
-          -Xcompiler=-Wno-unknown-pragmas>
+          -Xcompiler=-Wno-unknown-pragmas
+          -Xcompiler=-mllvm\ -unroll-count=4
+          >
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
           $<$<CONFIG:DEVEL>:-Xptxas
@@ -204,7 +280,38 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-lineinfo>
           >)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=lineinfo >)
+# older gcc throws false warnings so disable these
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA,NVIDIA>: -Wno-unused-but-set-parameter>)
+  endif()
+
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA,NVIDIA>: -Wno-unused-but-set-variable>)
+  endif()
+endif()
+
+# older nvcc throws false warnings with respect to constexpr if code removal
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+            "SHELL:-Xcudafe --diag_suppress=607" >)
+endif()
+
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.5")
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+            "SHELL: -Xcudafe --diag_suppress=177" >)
+endif()
+
+target_compile_options(
+  quda 
+  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+          -gpu=lineinfo
+          $<$<CONFIG:STRICT>:-Werror>
+          >)
 
 target_compile_options(
   quda
@@ -218,9 +325,17 @@ target_compile_options(
           -fsanitize=undefined>
           >)
 
+if(QUDA_OPENMP)
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+    "-Xcompiler=${OpenMP_CXX_FLAGS}"
+    >)
+endif()
+
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
-# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
-target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
+target_link_libraries(quda PUBLIC CUDA::cuda_driver)
+target_link_libraries(quda PUBLIC CUDA::nvml)
 if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
@@ -296,7 +411,7 @@ if(QUDA_NVSHMEM)
   set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
   set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
 
-  # set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${COMP_CAP})
+  # set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${QUDA_COMPUTE_CAPABILITY})
   target_include_directories(quda_pack PRIVATE dslash_core)
   target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
   target_include_directories(quda_pack PRIVATE .)
@@ -304,7 +419,7 @@ if(QUDA_NVSHMEM)
   target_compile_definitions(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
   target_include_directories(quda_pack PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
   target_compile_options(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
-  if((${COMP_CAP} LESS "70"))
+  if((${QUDA_COMPUTE_CAPABILITY} LESS "70"))
     message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
   endif()
   set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -325,9 +440,7 @@ if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
 endif()
 
-if(QUDA_GAUGE_ALG)
-  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
-endif(QUDA_GAUGE_ALG)
+target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
 
 if(QUDA_JITIFY)
   target_compile_definitions(quda PRIVATE JITIFY)
@@ -343,32 +456,8 @@ endif()
 
 if(QUDA_INTERFACE_NVTX)
   target_compile_definitions(quda PRIVATE INTERFACE_NVTX)
-  set(QUDA_NVTX ON)
+  target_link_libraries(quda PRIVATE CUDA::nvtx3)
 endif(QUDA_INTERFACE_NVTX)
-
-if(QUDA_NVTX)
-  find_path(
-    NVTX3 "nvtx3/nvToolsExt.h"
-    PATHS ${CUDA_TOOLKIT_INCLUDE}
-    NO_DEFAULT_PATH)
-  if(NVTX3)
-    target_compile_definitions(quda PRIVATE QUDA_NVTX_VERSION=3)
-  else()
-    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
-  endif(NVTX3)
-endif(QUDA_NVTX)
-
-if(QUDA_NUMA_NVML)
-  target_compile_definitions(quda PRIVATE NUMA_NVML)
-  target_sources(quda_cpp PRIVATE numa_affinity.cpp)
-  find_package(NVML REQUIRED)
-  target_include_directories(quda PRIVATE SYSTEM NVML_INCLUDE_DIR)
-  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
-endif(QUDA_NUMA_NVML)
-
-if(QUDA_NVML)
-  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
-endif()
 
 add_subdirectory(targets/cuda)
 

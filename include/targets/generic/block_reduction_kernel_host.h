@@ -5,6 +5,7 @@ namespace quda
   {
     Functor<Arg> t(arg);
     dim3 block(0, 0, 0);
+#pragma omp parallel for
     for (block.y = 0; block.y < arg.grid_dim.y; block.y++) {
       for (block.x = 0; block.x < arg.grid_dim.x; block.x++) { t(block, dim3(0, 0, 0)); }
     }

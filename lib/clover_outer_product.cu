@@ -7,165 +7,204 @@ namespace quda {
 
   enum OprodKernelType { INTERIOR, EXTERIOR };
 
-  template <typename Float, int nColor, QudaReconstructType recon> class CloverForce : public TunableKernel1D {
+  template <typename Float, int nColor, QudaReconstructType recon> class CloverOprod : public TunableKernel3D
+  {
     using real = typename mapper<Float>::type;
-    template <int dim = -1> using Arg = CloverForceArg<Float, nColor, recon, dim>;
+    template <int dim = -1, bool doublet = false> using Arg = CloverOprodArg<Float, nColor, recon, dim, doublet>;
     GaugeField &force;
     const GaugeField &U;
-    const ColorSpinorField &inA;
-    const ColorSpinorField &inB;
-    const ColorSpinorField &inC;
-    const ColorSpinorField &inD;
-    const int parity;
-    const real coeff;
+    cvector_ref<const ColorSpinorField> &p;
+    const ColorSpinorField &p_halo;
+    cvector_ref<const ColorSpinorField> &x;
+    const ColorSpinorField &x_halo;
+    const std::vector<double> &coeff;
+    const bool doublet; // whether we applying the operator to a doublet
+    const int n_flavor;
     OprodKernelType kernel;
     int dir;
-    unsigned int minThreads() const { return kernel == INTERIOR ? inB.VolumeCB() : inB.GhostFaceCB()[dir]; }
+    unsigned int minThreads() const override
+    {
+      return (kernel == INTERIOR ? (int)x_halo.getDslashConstant().volume_4d_cb :
+                                   x_halo.getDslashConstant().ghostFaceCB[dir]);
+    }
 
   public:
-    CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
-                const ColorSpinorField& inB, const ColorSpinorField& inC, const ColorSpinorField& inD,
-                int parity, double coeff) :
-      TunableKernel1D(force),
+    CloverOprod(const GaugeField &U, GaugeField &force, cvector_ref<const ColorSpinorField> &p,
+                const ColorSpinorField &p_halo, cvector_ref<const ColorSpinorField> &x, const ColorSpinorField &x_halo,
+                const std::vector<double> &coeff) :
+      TunableKernel3D(force, x.SiteSubset(), 4),
       force(force),
       U(U),
-      inA(inA),
-      inB(inB),
-      inC(inC),
-      inD(inD),
-      parity(parity),
-      coeff(static_cast<real>(coeff))
+      p(p),
+      p_halo(p_halo),
+      x(x),
+      x_halo(x_halo),
+      coeff(coeff),
+      doublet(x.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      n_flavor(doublet ? 2 : 1)
     {
+      if (doublet) strcat(aux, ",doublet");
+      setRHSstring(aux, p.size());
       char aux2[TuneKey::aux_n];
       strcpy(aux2, aux);
       strcat(aux, ",interior");
       kernel = INTERIOR;
       apply(device::get_default_stream());
 
-      for (int i=3; i>=0; i--) {
+      for (int i = 3; i >= 0; i--) {
+        resizeVector(x.SiteSubset(), 1);
+        dir = i;
         if (!commDimPartitioned(i)) continue;
         strcpy(aux, aux2);
-        strcat(aux, ",exterior");
-        if (dir==0) strcat(aux, ",dir=0");
-        else if (dir==1) strcat(aux, ",dir=1");
-        else if (dir==2) strcat(aux, ",dir=2");
-        else if (dir==3) strcat(aux, ",dir=3");
+        strcat(aux, ",exterior,dir=");
+        strcat(aux, dir == 0 ? "0" : dir == 1 ? "1" : dir == 2 ? "2" : "3");
         kernel = EXTERIOR;
-        dir = i;
         apply(device::get_default_stream());
       }
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (kernel == INTERIOR) {
-        launch<Interior>(tp, stream, Arg<>(force, U, inA, inB, inC, inD, parity, coeff));
+        if (doublet)
+          launch<Interior>(tp, stream, Arg<-1, true>(force, U, p, p_halo, x, x_halo, coeff));
+        else
+          launch<Interior>(tp, stream, Arg<>(force, U, p, p_halo, x, x_halo, coeff));
       } else if (kernel == EXTERIOR) {
         switch (dir) {
-        case 0: launch<Exterior>(tp, stream, Arg<0>(force, U, inA, inB, inC, inD, parity, coeff)); break;
-        case 1: launch<Exterior>(tp, stream, Arg<1>(force, U, inA, inB, inC, inD, parity, coeff)); break;
-        case 2: launch<Exterior>(tp, stream, Arg<2>(force, U, inA, inB, inC, inD, parity, coeff)); break;
-        case 3: launch<Exterior>(tp, stream, Arg<3>(force, U, inA, inB, inC, inD, parity, coeff)); break;
+        case 0: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<0, true>(force, U, p, p_halo, x, x_halo, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<0>(force, U, p, p_halo, x, x_halo, coeff));
+          break;
+        }
+        case 1: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<1, true>(force, U, p, p_halo, x, x_halo, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<1>(force, U, p, p_halo, x, x_halo, coeff));
+          break;
+        }
+        case 2: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<2, true>(force, U, p, p_halo, x, x_halo, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<2>(force, U, p, p_halo, x, x_halo, coeff));
+          break;
+        }
+        case 3: {
+          if (doublet)
+            launch<Exterior>(tp, stream, Arg<3, true>(force, U, p, p_halo, x, x_halo, coeff));
+          else
+            launch<Exterior>(tp, stream, Arg<3>(force, U, p, p_halo, x, x_halo, coeff));
+          break;
+        }
         default: errorQuda("Unexpected direction %d", dir);
         }
       }
     }
 
-    void preTune() { force.backup(); }
-    void postTune() { force.restore(); }
+    void preTune() override { force.backup(); }
+    void postTune() override { force.restore(); }
 
     // spin trace + multiply-add (ignore spin-project)
-    long long flops() const { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
+    long long flops() const override
+    {
+      int oprod_flops = nColor * nColor * (8 * x.Nspin() - 2);
+      int gemm_flops = nColor * nColor * (8 * nColor - 2);
+      int mat_size = 2 * nColor * nColor;
 
-    long long bytes() const
+      return 2 * minThreads() * n_flavor * p.size() * (2 * oprod_flops + gemm_flops + 3 * mat_size)
+        * (kernel == INTERIOR ? 4 : 1);
+    }
+
+    long long bytes() const override
     {
       if (kernel == INTERIOR) {
-	return inA.Bytes() + inC.Bytes() + 4*(inB.Bytes() + inD.Bytes()) + force.Bytes() + U.Bytes() / 2;
+        return 8 * (x.Bytes() + p.Bytes()) + 2 * force.Bytes() + U.Bytes();
       } else {
-	return minThreads() * (nColor * (4 * 2 + 2 * 2) + 2 * force.Reconstruct() + U.Reconstruct())
+        return 2 * minThreads()
+          * (n_flavor * p.size() * nColor * (2 * x.Nspin() + 2 * x.Nspin() / 2) * 2 + 2 * force.Reconstruct()
+             + U.Reconstruct())
           * sizeof(Float);
       }
     }
-  }; // CloverForce
+  }; // CloverOprod
 
-  void exchangeGhost(ColorSpinorField &a, int parity, int dag) {
+  void exchangeGhost(const ColorSpinorField &halo, cvector_ref<const ColorSpinorField> &v, int dag)
+  {
     // this sets the communications pattern for the packing kernel
     int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1),
                                 commDimPartitioned(2), commDimPartitioned(3) };
+
     setPackComms(comms);
 
     // first transfer src1
     qudaDeviceSynchronize();
 
     MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
-    a.pack(1, 1-parity, dag, device::get_default_stream(), location, Device);
+    halo.pack(1, 0, dag, device::get_default_stream(), location, Device, true, 0.0, 0.0, 0.0, 0, v);
 
     qudaDeviceSynchronize();
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
 	// Initialize the host transfer from the source spinor
-	a.gather(2*i, device::get_stream(2*i));
+        halo.gather(2 * i, device::get_stream(2 * i));
       } // commDim(i)
     } // i=3,..,0
 
     qudaDeviceSynchronize(); comm_barrier();
 
     for (int i=3; i>=0; i--) {
-      if (commDimPartitioned(i)) {
-	a.commsStart(2*i, device::get_stream(2 * i));
-      }
+      if (commDimPartitioned(i)) { halo.commsStart(2 * i, device::get_stream(2 * i)); }
     }
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
-	a.commsWait(2*i, device::get_stream(2*i));
-	a.scatter(2*i, device::get_stream(2*i));
+        halo.commsWait(2 * i, device::get_stream(2 * i));
+        halo.scatter(2 * i, device::get_stream(2 * i));
       }
     }
 
     qudaDeviceSynchronize();
 
-    a.bufferIndex = (1 - a.bufferIndex);
+    halo.bufferIndex = (1 - halo.bufferIndex);
     comm_barrier();
   }
 
-#ifdef GPU_CLOVER_DIRAC
-  void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
-                          std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
+  void computeCloverOprod(GaugeField &force, const GaugeField &U, cvector_ref<const ColorSpinorField> &x,
+                          cvector_ref<const ColorSpinorField> &p, const std::vector<double> &coeff)
   {
-    checkNative(*x[0], *p[0], force, U);
-    checkPrecision(*x[0], *p[0], force, U);
-
-    int dag = 1;
-
-    for (unsigned int i=0; i<x.size(); i++) {
-      x[i]->Even().allocateGhostBuffer(1);
-      x[i]->Odd().allocateGhostBuffer(1);
-      p[i]->Even().allocateGhostBuffer(1);
-      p[i]->Odd().allocateGhostBuffer(1);
-
-      for (int parity=0; parity<2; parity++) {
-	ColorSpinorField& inA = (parity&1) ? p[i]->Odd() : p[i]->Even();
-	ColorSpinorField& inB = (parity&1) ? x[i]->Even(): x[i]->Odd();
-	ColorSpinorField& inC = (parity&1) ? x[i]->Odd() : x[i]->Even();
-	ColorSpinorField& inD = (parity&1) ? p[i]->Even(): p[i]->Odd();
-
-        exchangeGhost(inB, parity, dag);
-        exchangeGhost(inD, parity, 1-dag);
-
-        instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
+    if constexpr (is_enabled_clover()) {
+      if (x.size() > get_max_multi_rhs()) {
+        computeCloverOprod(force, U, {x.begin(), x.begin() + x.size() / 2}, {p.begin(), p.begin() + p.size() / 2},
+                           {coeff.begin(), coeff.begin() + coeff.size() / 2});
+        computeCloverOprod(force, U, {x.begin() + x.size() / 2, x.end()}, {p.begin() + p.size() / 2, p.end()},
+                           {coeff.begin() + coeff.size() / 2, coeff.end()});
+        return;
       }
+
+      checkNative(x, p, force, U);
+      checkPrecision(x, p, force, U);
+
+      int dag = 1;
+      getProfile().TPSTART(QUDA_PROFILE_COMMS);
+      auto x_halo = ColorSpinorField::create_comms_batch(x);
+      auto p_halo = ColorSpinorField::create_comms_batch(p);
+      exchangeGhost(x_halo, x, dag);
+      exchangeGhost(p_halo, p, 1 - dag);
+      getProfile().TPSTOP(QUDA_PROFILE_COMMS);
+
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      instantiate<CloverOprod, ReconstructNo12>(U, force, p, p_halo, x, x_halo, coeff);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Clover Dirac operator has not been built");
     }
   }
-#else // GPU_CLOVER_DIRAC not defined
-  void computeCloverForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,
-                          std::vector<ColorSpinorField *> &, std::vector<double> &)
-  {
-    errorQuda("Clover Dirac operator has not been built!");
-  }
-#endif
 
 } // namespace quda

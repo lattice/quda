@@ -4,20 +4,17 @@
 namespace quda
 {
 
-  MadwfAcc::MadwfAcc(const SolverParam &solve_param, TimeProfile &profile) :
+  MadwfAcc::MadwfAcc(const SolverParam &solve_param) :
     param(solve_param.madwf_param),
     mu(param.madwf_diagonal_suppressor),
-    prec_precondition(solve_param.precision_precondition),
-    profile(profile)
+    prec_precondition(solve_param.precision_precondition)
   {
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("Launching MADWF accelerator ... \n");
-      printfQuda("madwf_mu (low modes suppressor)                   = %.4f\n", param.madwf_diagonal_suppressor);
-      printfQuda("madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
-      printfQuda("madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
-      printfQuda("madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);
-      printfQuda("madwf_train_maxiter (max # of iters for training) = %d\n", param.madwf_train_maxiter);
-    }
+    logQuda(QUDA_VERBOSE, "Launching MADWF accelerator ... \n");
+    logQuda(QUDA_VERBOSE, "madwf_mu (low modes suppressor)                   = %.4f\n", param.madwf_diagonal_suppressor);
+    logQuda(QUDA_VERBOSE, "madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
+    logQuda(QUDA_VERBOSE, "madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
+    logQuda(QUDA_VERBOSE, "madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);
+    logQuda(QUDA_VERBOSE, "madwf_train_maxiter (max # of iters for training) = %d\n", param.madwf_train_maxiter);
   }
 
   void MadwfAcc::fill_random(std::vector<transfer_float> &v)
@@ -33,16 +30,15 @@ namespace quda
 
   void MadwfAcc::apply(Solver &base, ColorSpinorField &out, const ColorSpinorField &in)
   {
-    madwf_ml::transfer_5d_hh(*forward_tmp, in, device_param, false);
-    base(*backward_tmp, *forward_tmp);
-    madwf_ml::transfer_5d_hh(out, *backward_tmp, device_param, true);
+    madwf_ml::transfer_5d_hh(forward_tmp, in, device_param, false);
+    base(backward_tmp, forward_tmp);
+    madwf_ml::transfer_5d_hh(out, backward_tmp, device_param, true);
 
-    blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
+    blas::axpy(mu, in, out);
   }
 
   double MadwfAcc::cost(const DiracMatrix &ref, Solver &base, ColorSpinorField &out, const ColorSpinorField &in)
   {
-
     ColorSpinorParam csParam(in);
     ColorSpinorField tmp1(csParam);
     ColorSpinorField tmp2(csParam);
@@ -60,7 +56,7 @@ namespace quda
                        bool tune_suppressor)
   {
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
 
     if (in.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
@@ -71,8 +67,8 @@ namespace quda
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      profile.TPSTART(QUDA_PROFILE_IO);
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      getProfile().TPSTART(QUDA_PROFILE_IO);
       load_parameter(Ls, Ls_base);
 
       ColorSpinorParam csParam(in);
@@ -80,9 +76,9 @@ namespace quda
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.setPrecision(prec_precondition);
 
-      forward_tmp = std::make_unique<ColorSpinorField>(csParam);
-      backward_tmp = std::make_unique<ColorSpinorField>(csParam);
-      profile.TPSTOP(QUDA_PROFILE_IO);
+      forward_tmp = ColorSpinorField(csParam);
+      backward_tmp = ColorSpinorField(csParam);
+      getProfile().TPSTOP(QUDA_PROFILE_IO);
 
       return;
     }
@@ -96,16 +92,14 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Generating Null Space Vectors ... \n"); }
     spinorNoise(null_b, rng, QUDA_NOISE_GAUSS);
 
-    std::vector<ColorSpinorField *> B(16);
+    std::vector<ColorSpinorField> B(16);
     csParam.setPrecision(prec_precondition);
-    for (auto &pB : B) { pB = new ColorSpinorField(csParam); }
+    for (auto &pB : B) { pB = ColorSpinorField(csParam); }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
     null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-    for (auto pb : B) { blas::ax(5e3 / sqrt(blas::norm2(*pb)), *pb); }
-
-    saveTuneCache();
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
+    for (auto &pb : B) { blas::ax(5e3 / sqrt(blas::norm2(pb)), pb); }
 
     commGlobalReductionPush(false);
 
@@ -117,10 +111,10 @@ namespace quda
 
     double residual = 0.0;
     int count = 0;
-    for (auto phi : B) {
-      residual += blas::norm2(*phi);
+    for (auto &phi : B) {
+      residual += blas::norm2(phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(*phi));
+        printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(phi));
       }
       count++;
     }
@@ -135,8 +129,8 @@ namespace quda
 
     ColorSpinorField ATMchi(csParam);
 
-    forward_tmp = std::make_unique<ColorSpinorField>(csParam);
-    backward_tmp = std::make_unique<ColorSpinorField>(csParam);
+    forward_tmp = ColorSpinorField(csParam);
+    backward_tmp = ColorSpinorField(csParam);
 
     fill_random(host_param);
 
@@ -157,8 +151,8 @@ namespace quda
       printfQuda("training mu   = %.3f\n", mu);
     }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_TRAINING);
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
+    getProfile().TPSTART(QUDA_PROFILE_TRAINING);
 
     for (int iteration = 0; iteration < param.madwf_train_maxiter; iteration++) {
 
@@ -167,25 +161,25 @@ namespace quda
       double chi2 = 0.0;
       std::array<double, 5> a = {};
 
-      for (auto phi : B) {
-        chi2 += cost(ref, base, chi, *phi);
-        // ATx(ATphi, *phi, T);
-        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
-        base(ATphi, *forward_tmp);
+      for (auto &phi : B) {
+        chi2 += cost(ref, base, chi, phi);
+        // ATx(ATphi, phi, T);
+        madwf_ml::transfer_5d_hh(forward_tmp, phi, device_param, false);
+        base(ATphi, forward_tmp);
 
         ref(Mchi, chi);
 
         // ATx(ATMchi, Mchi, T);
-        madwf_ml::transfer_5d_hh(*forward_tmp, Mchi, device_param, false);
-        base(ATMchi, *forward_tmp);
+        madwf_ml::transfer_5d_hh(forward_tmp, Mchi, device_param, false);
+        base(ATMchi, forward_tmp);
 
         // d1 = A * T * phi -x- M * chi
         madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
         // d2 = A * T * M * phi -x- phi
-        madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
+        madwf_ml::tensor_5d_hh(ATMchi, phi, d2);
 
         axpby(D, 2.0f, d1, 2.0f, d2);
-        if (tune_suppressor) { dmu += 2.0 * blas::reDotProduct(Mchi, *phi); }
+        if (tune_suppressor) { dmu += 2.0 * blas::reDotProduct(Mchi, phi); }
       }
 
       axpby(P, (b - 1), P, (1 - b), D);
@@ -193,27 +187,27 @@ namespace quda
 
       chi2 = 0.0;
       // line search
-      for (auto phi : B) {
+      for (auto &phi : B) {
 
-        double ind_chi2 = cost(ref, base, chi, *phi);
+        double ind_chi2 = cost(ref, base, chi, phi);
         chi2 += ind_chi2;
 
-        // ATx(ATphi, *phi, T);
-        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
-        base(ATphi, *forward_tmp);
+        // ATx(ATphi, phi, T);
+        madwf_ml::transfer_5d_hh(forward_tmp, phi, device_param, false);
+        base(ATphi, forward_tmp);
 
         // D' * A * T * phi
         madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
 
-        // ATx(ADphi, *phi, P);
-        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, P, false);
-        base(ADphi, *forward_tmp);
+        // ATx(ADphi, phi, P);
+        madwf_ml::transfer_5d_hh(forward_tmp, phi, P, false);
+        base(ADphi, forward_tmp);
 
         // T' * A * D * phi
         madwf_ml::transfer_5d_hh(tmp, ADphi, device_param, true);
         // theta
         blas::axpy(1.0, theta, tmp);
-        if (tune_suppressor) { blas::axpy(pmu, *phi, tmp); }
+        if (tune_suppressor) { blas::axpy(pmu, phi, tmp); }
 
         ref(theta, tmp);
 
@@ -222,10 +216,8 @@ namespace quda
 
         ref(lambda, tmp);
 
-        std::vector<ColorSpinorField *> lhs {&chi, &theta, &lambda};
-        std::vector<ColorSpinorField *> rhs {&chi, &theta, &lambda};
-        Complex dot[9];
-        blas::cDotProduct(dot, lhs, rhs);
+        std::vector<Complex> dot(9);
+        blas::block::cDotProduct(dot, {chi, theta, lambda}, {chi, theta, lambda});
 
         a[0] += dot[0].real();
         a[1] += -2.0 * dot[1].real();
@@ -260,16 +252,14 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training finished ...\n"); }
     count = 0;
-    for (auto phi : B) {
-      double ind_chi2 = cost(ref, base, chi, *phi);
-      double phi2 = blas::norm2(*phi);
+    for (auto &phi : B) {
+      double ind_chi2 = cost(ref, base, chi, phi);
+      double phi2 = blas::norm2(phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
       }
       count++;
     }
-
-    for (auto pb : B) { delete pb; }
 
     // Broadcast the trained parameters
     host_param = device_param.to_host();
@@ -277,13 +267,13 @@ namespace quda
     device_param.from_host(host_param);
 
     commGlobalReductionPop();
-    profile.TPSTOP(QUDA_PROFILE_TRAINING);
+    getProfile().TPSTOP(QUDA_PROFILE_TRAINING);
 
     if (param.madwf_param_save) {
-      profile.TPSTART(QUDA_PROFILE_IO);
+      getProfile().TPSTART(QUDA_PROFILE_IO);
       if (comm_rank() == 0) { save_parameter(Ls, Ls_base); } // Only rank zero write out to the disk
       comm_barrier();
-      profile.TPSTOP(QUDA_PROFILE_IO);
+      getProfile().TPSTOP(QUDA_PROFILE_IO);
     }
   }
 

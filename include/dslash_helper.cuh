@@ -7,12 +7,16 @@
 #include <shmem_helper.cuh>
 #include <fast_intdiv.h>
 #include <dslash_quda.h>
+#include <dslash_shmem.h>
+#include <shmem_pack_helper.cuh>
+#include <kernel_helper.h>
+#include <tune_quda.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
-constexpr bool use_kernel_arg = false;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::FALSE;
 #else
-constexpr bool use_kernel_arg = true;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 #endif
 
 #include <kernel.h>
@@ -261,11 +265,11 @@ namespace quda
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
     int_fastdiv threads; // number of threads in x-thread dimension
-    int_fastdiv exterior_threads; //  number of threads in x-thread dimension for fused exterior dslash
+    int_fastdiv exterior_threads; // number of threads in x-thread dimension for fused exterior dslash
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
-    const bool spin_project; // whether to spin project nSpin=4 fields (generally true, except for, e.g., covariant derivative)
+    int_fastdiv Ls;
 
     // these are set with symmetric preconditioned twisted-mass dagger
     // operator for the packing (which needs to a do a twist)
@@ -303,8 +307,9 @@ namespace quda
 #endif
 
     // constructor needed for staggered to set xpay from derived class
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
-              int spin_project, const int *comm_override,
+    DslashArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
+              const GaugeField &U, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool xpay,
+              int nFace, int spin_project, const int *comm_override,
 #ifdef NVSHMEM_COMMS
               int shmem_ = 0) :
 #else
@@ -324,7 +329,7 @@ namespace quda
       exterior_threads(0),
       threadDimMapLower {},
       threadDimMapUpper {},
-      spin_project(spin_project),
+      Ls(halo.X(4) / in.size()),
       twist_a(0.0),
       twist_b(0.0),
       twist_c(0.0),
@@ -343,28 +348,35 @@ namespace quda
       counter(0)
 #else
       shmem(shmem_),
-      counter(dslash::get_shmem_sync_counter()),
-      sync_arr(dslash::get_shmem_sync_arr()),
+      counter(dslash::get_dslash_shmem_sync_counter()),
+      sync_arr(dslash::get_dslash_shmem_sync_arr()),
       interior_done(*dslash::get_shmem_interior_done()),
       interior_count(*dslash::get_shmem_interior_count()),
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
-
     {
+      if (out.size() > get_max_multi_rhs())
+        errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
+      for (auto i = 0u; i < in.size(); i++)
+        if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
+      checkOrder(out, in, x);        // check all orders match
+      checkLocation(out, in, x, U);  // check all locations match
+      checkNative(in, U);
+
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
-        const_cast<ColorSpinorField &>(in).createComms(nFace, spin_project);
+        halo.createComms(nFace, spin_project);
       }
-      dc = in.getDslashConstant();
+      dc = halo.getDslashConstant();
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           neighbor_ranks[2 * dim + dir] = commDim[dim] ? comm_neighbor_rank(dir, dim) : -1;
-          bytes[2 * dim + dir] = in.GhostFaceBytes(dim);
+          bytes[2 * dim + dir] = halo.GhostFaceBytes(dim);
         }
       }
     }

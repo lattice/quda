@@ -45,12 +45,9 @@ namespace quda {
     for (int i = 0; i < 4; ++i) {
       rand1[i] = uniform<real>::rand(localState);
       rand2[i] = uniform<real>::rand(localState);
-    }
-
-    for (int i = 0; i < 4; ++i) {
-      phi[i] = 2.0 * M_PI * rand1[i];
+      phi[i] = 2.0 * rand1[i];
       radius[i] = sqrt(-log(rand2[i]));
-      quda::sincos(phi[i], &temp2[i], &temp1[i]);
+      quda::sincospi(phi[i], &temp2[i], &temp1[i]);
       temp1[i] *= radius[i];
       temp2[i] *= radius[i];
     }
@@ -92,16 +89,15 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
       } else if (not arg.group and arg.sigma == 0.0) {
         // if sigma = 0 then we just set the output matrix to the zero and finish
-        Link O;
-        setZero(&O);
+        Link O = {};
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = O;
       } else {
         for (int mu = 0; mu < 4; mu++) {
           RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
 
-          // generate Gaussian distributed su(n) fiueld
+          // generate Gaussian distributed su(n) field
           Link u = arg.sigma * gauss_su3<real, Link>(localState);
-          if (arg.group) {
+          if constexpr (Arg::group) {
             expsu3<real>(u);
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;

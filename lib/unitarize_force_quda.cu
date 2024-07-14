@@ -52,24 +52,22 @@ namespace quda {
       long long bytes() const { return 4ll * meta.Volume() * (arg.force.Bytes() + arg.force_old.Bytes() + arg.u.Bytes()); }
     }; // UnitarizeForce
 
-#ifdef GPU_HISQ_FORCE
     void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
 			int* fails)
     {
-      checkReconstruct(u, oldForce, newForce);
-      checkPrecision(u, oldForce, newForce);
+      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+        getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+        checkReconstruct(u, oldForce, newForce);
+        checkPrecision(u, oldForce, newForce);
 
-      if (!u.isNative() || !oldForce.isNative() || !newForce.isNative())
-        errorQuda("Only native order supported");
+        if (!u.isNative() || !oldForce.isNative() || !newForce.isNative()) errorQuda("Only native order supported");
 
-      instantiate<ForceUnitarize, ReconstructNone>(newForce, oldForce, u, fails);
+        instantiate<ForceUnitarize, ReconstructNone>(newForce, oldForce, u, fails);
+        getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+      } else {
+        errorQuda("HISQ force requires staggered operator to be enabled");
+      }
     }
-#else
-    void unitarizeForce(GaugeField &, const GaugeField &, const GaugeField &, int*)
-    {
-      errorQuda("HISQ force has not been built");
-    }
-#endif
 
     template <typename Float, typename Arg> void unitarizeForceCPU(Arg &arg)
     {
@@ -93,52 +91,48 @@ namespace quda {
       }
     }
 
-#ifdef GPU_HISQ_FORCE
     void unitarizeForceCPU(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u)
     {
-      if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
-      int num_failures = 0;
-      constexpr int nColor = 3;
-      Matrix<complex<double>, nColor> old_force, new_force, v;
-      if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
-        if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-          UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
-            newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
-            svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<double>(arg);
-        } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
-          UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
-            newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
-            svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<float>(arg);
+      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+        if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
+        int num_failures = 0;
+        constexpr int nColor = 3;
+        if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+          if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+            UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
+              newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
+              svd_rel_error, svd_abs_error);
+            unitarizeForceCPU<double>(arg);
+          } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+            UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
+              newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
+              svd_rel_error, svd_abs_error);
+            unitarizeForceCPU<float>(arg);
+          } else {
+            errorQuda("Precision = %d not supported", u.Precision());
+          }
+        } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+          if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+            UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
+              newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
+              svd_rel_error, svd_abs_error);
+            unitarizeForceCPU<double>(arg);
+          } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+            UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
+              newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
+              svd_rel_error, svd_abs_error);
+            unitarizeForceCPU<float>(arg);
+          } else {
+            errorQuda("Precision = %d not supported", u.Precision());
+          }
         } else {
-          errorQuda("Precision = %d not supported", u.Precision());
+          errorQuda("Only MILC and QDP gauge orders supported");
         }
-      } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
-        if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-          UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
-            newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
-            svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<double>(arg);
-        } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
-          UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
-            newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
-            svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<float>(arg);
-        } else {
-          errorQuda("Precision = %d not supported", u.Precision());
-        }
+        if (num_failures) errorQuda("Unitarization failed, failures = %d", num_failures);
       } else {
-        errorQuda("Only MILC and QDP gauge orders supported\n");
+        errorQuda("HISQ force requires staggered operator to be built");
       }
-      if (num_failures) errorQuda("Unitarization failed, failures = %d", num_failures);
     } // unitarize_force_cpu
-#else
-    void unitarizeForceCPU(GaugeField &, const GaugeField &, const GaugeField &)
-    {
-      errorQuda("HISQ force has not been built");
-    }
-#endif
 
   } // namespace fermion_force
 

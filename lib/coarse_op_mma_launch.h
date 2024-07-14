@@ -35,12 +35,18 @@ namespace quda
       tp.block.x = 1;
       tp.block.y = block_y;
       tp.block.z = block_z;
-      constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
+
+      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+      constexpr int shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
-      // TODO: Fix the split M/N.
-      constexpr int t_m = 1;
-      constexpr int t_n = 1;
+      constexpr int M = Arg::uvTileType::m * Arg::fineSpin;
+      constexpr int N = Arg::uvTileType::n;
+      constexpr int K = Arg::uvTileType::k;
+
+      constexpr bool divide_b_no = bM < M && bK >= K && bN == N;
+      constexpr int t_m = divide_b_no ? 1 : (Arg::uvTileType::m * Arg::fineSpin + bM - 1) / bM;
+      constexpr int t_n = divide_b_no ? 1 : (Arg::uvTileType::n + bN - 1) / bN;
 
       tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
       tp.set_max_shared_bytes = true;
@@ -293,7 +299,7 @@ namespace quda
     std::enable_if_t<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
     {
-      if (query_max) return 5;
+      if (query_max) return 7;
       switch (tp.aux.x) {
       // clang-format off
       case 0: launch_compute_uv_kernel<192,  96,  48,  24,  12>(tp, arg, min_threads, stream, tunable); break;
@@ -302,11 +308,31 @@ namespace quda
       case 3: launch_compute_uv_kernel< 96,  96,  96,  24,  24>(tp, arg, min_threads, stream, tunable); break;
       case 4: launch_compute_uv_kernel< 96,  96,  96,  32,  12>(tp, arg, min_threads, stream, tunable); break;
       case 5: launch_compute_uv_kernel< 96,  96,  96,  12,  32>(tp, arg, min_threads, stream, tunable); break;
+      case 6: launch_compute_uv_kernel< 48,  48,  96,  12,  24>(tp, arg, min_threads, stream, tunable); break;
+      case 7: launch_compute_uv_kernel< 48,  48,  96,  24,  12>(tp, arg, min_threads, stream, tunable); break;
       // clang-format on
       default:
         errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,
                   Arg::fineColor, Arg::coarseColor);
       }
+      return -1;
+    }
+
+    // catch any cases that have not been implemented
+    template <bool query_max = false, class Arg, class Tunable>
+    std::enable_if_t<!((Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)),
+                     int>
+    launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &, Tunable &)
+    {
+      errorQuda("MMA implementation not available for fineColor = %d coarseColor = %d", Arg::fineColor, Arg::coarseColor);
       return -1;
     }
 
@@ -325,12 +351,12 @@ namespace quda
       tp.block.x = 1;
       tp.block.y = block_y;
       tp.block.z = block_z;
-      constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
+      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+      constexpr int shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
-      // TODO: Fix the split M/N.
-      constexpr int t_m = 1;
-      constexpr int t_n = 1;
+      constexpr int t_m = (Arg::vuvTileType::m + bM - 1) / bM;
+      constexpr int t_n = (Arg::vuvTileType::n + bN - 1) / bN;
 
       tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
       tp.set_max_shared_bytes = true;
@@ -401,7 +427,7 @@ namespace quda
     std::enable_if_t<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
     {
-      if (query_max) return 2;
+      if (query_max) return 1;
       switch (tp.aux.x) {
       // clang-format off
       case 0: launch_compute_vuv_kernel< 16,  16,   8,   8,   4>(tp, arg, min_threads, stream, tunable); break;
@@ -577,7 +603,7 @@ namespace quda
     std::enable_if_t<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
     {
-      if (query_max) return 6;
+      if (query_max) return 8;
       switch (tp.aux.x) {
       // clang-format off
       case 0: launch_compute_vuv_kernel< 96,  96,  96,  12,   8>(tp, arg, min_threads, stream, tunable); break;
@@ -587,6 +613,8 @@ namespace quda
       case 4: launch_compute_vuv_kernel< 96,  96,  96,  24,  16>(tp, arg, min_threads, stream, tunable); break;
       case 5: launch_compute_vuv_kernel< 96,  96,  96,  12,  24>(tp, arg, min_threads, stream, tunable); break;
       case 6: launch_compute_vuv_kernel< 96,  96,  96,  24,  24>(tp, arg, min_threads, stream, tunable); break;
+      case 7: launch_compute_vuv_kernel< 48,  48,  96,  12,  24>(tp, arg, min_threads, stream, tunable); break;
+      case 8: launch_compute_vuv_kernel< 48,  48,  96,  24,  24>(tp, arg, min_threads, stream, tunable); break;
       // clang-format on
       default:
         errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,
@@ -595,6 +623,23 @@ namespace quda
       return -1;
     }
 
+    // catch any cases that have not been implemented
+    template <bool query_max = false, class Arg, class Tunable>
+    std::enable_if_t<!((Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)
+                       || (Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)),
+                     int>
+    launch_compute_vuv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &, Tunable &)
+    {
+      errorQuda("MMA implementation not available for fineColor = %d coarseColor = %d", Arg::fineColor, Arg::coarseColor);
+      return -1;
+    }
 #else
 
     template <bool query_max = false, class Arg, class Tunable>

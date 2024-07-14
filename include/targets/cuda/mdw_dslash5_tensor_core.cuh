@@ -6,21 +6,12 @@
 #include <index_helper.cuh>
 #include <inline_ptx.h>
 #include <math_helper.cuh>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 #include <quda_fp16.cuh>
 
 #include <block_reduce_helper.h>
-
-#if (__COMPUTE_CAPABILITY__ < 750)
-
-#include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
-
-#else // (__COMPUTE_CAPABILITY__ < 750)
-
-#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
-
-#endif // (__COMPUTE_CAPABILITY__ < 750)
+#include <mma_tensor_op/mma_dispatch.cuh>
 
 namespace quda
 {
@@ -245,7 +236,7 @@ namespace quda
 
   constexpr float target_scale = 2e3;
 
-  template <int block_x, int block_y, class Vector>
+  template <class Vector>
   __device__ inline float block_wise_reduce_vector(const Vector &v)
   {
     // Find the maximum absolute value in a lane
@@ -260,13 +251,14 @@ namespace quda
     }
     warp_max[0] = fmaxf(warp_max[0], warp_max[1]);
 
-    return BlockReduce<float, block_x, block_y>().AllMax(warp_max[0]) / target_scale;
+    constexpr int block_dim = 2;
+    return BlockReduce<float, block_dim>().AllMax(warp_max[0]) / target_scale;
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store
   // to sm_b
-  template <int block_x, int block_y, int N_sm_d2, bool accumulate, bool store = true, class Vector>
+  template <int N_sm_d2, bool accumulate, bool store = true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float &scale, float m_scale = 1.0f)
   {
     if (accumulate) {
@@ -282,7 +274,7 @@ namespace quda
       }
     }
     if (store) {
-      scale = block_wise_reduce_vector<block_x, block_y>(v);
+      scale = block_wise_reduce_vector(v);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
@@ -312,10 +304,11 @@ namespace quda
       }
     }
 
-    output.norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<storage_type>::value;
+    auto norm = reinterpret_cast<float *>(output.field + output.volumeCB * 24);
+    norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<storage_type>::value;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
-#ifdef FLOAT8 // use float8/short8
+#if QUDA_ORDER_FP == 8 // use float8/short8
     typedef typename VectorType<storage_type, 8>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b, c, d;
@@ -337,8 +330,7 @@ namespace quda
     c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
-#else
-
+#elif QUDA_ORDER_FP == 4
     typedef typename VectorType<storage_type, 4>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b;
@@ -366,23 +358,17 @@ namespace quda
     a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
-
 #endif
   }
 
-  template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
-  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const mma::WarpRegisterMapping &wrm)
+  template <class mma_t, int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
+  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c,
+                                       const typename mma_t::WarpRegisterMapping &wrm)
   {
 
-#ifdef USE_FP16_HMMA_ACCUMULATE
-    using accumuate_reg_type = half;
-#else
-    using accumuate_reg_type = float;
-#endif
-
-    constexpr int tile_row_dim = M / mma::MMA_M; // number of tiles in the column dimension
-    constexpr int tile_col_dim = N / mma::MMA_N; // number of tiles in the row dimension
-    constexpr int tile_acc_dim = M / mma::MMA_K; // number of tiles in the row dimension
+    constexpr int tile_row_dim = M / mma_t::MMA_M; // number of tiles in the column dimension
+    constexpr int tile_col_dim = N / mma_t::MMA_N; // number of tiles in the row dimension
+    constexpr int tile_acc_dim = M / mma_t::MMA_K; // number of tiles in the row dimension
 
     constexpr int total_warp = BlockDimX * Ls / 32;
 
@@ -401,7 +387,7 @@ namespace quda
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
 
-      mma::MmaOperandC<accumuate_reg_type> op_c;
+      typename mma_t::OperandC op_c;
 
       // The logical warp assigned to each part of the matrix.
       const int logical_warp_index = warp_id * warp_cycle + c;
@@ -418,19 +404,19 @@ namespace quda
           op_a[0].template load<M_PAD>(sm_a, tile_k, warp_row, wrm);
         }
 
-        mma::MmaOperandB op_b;
-        op_b.load<N_PAD>(sm_b, tile_k, warp_col, wrm);
+        typename mma_t::OperandB op_b;
+        op_b.template load<N_PAD>(sm_b, tile_k, warp_col, wrm);
 
         if (reload) {
-          mma::gemm(op_a[0], op_b, op_c);
+          mma_t::mma(op_a[0], op_b, op_c);
         } else {
-          mma::gemm(op_a[tile_k], op_b, op_c);
+          mma_t::mma(op_a[tile_k], op_b, op_c);
         }
       }
 
       __syncthreads();
 
-      op_c.store<N_PAD>(sm_c, warp_row, warp_col, wrm);
+      op_c.template store<N_PAD>(sm_c, warp_row, warp_col, wrm);
     }
   }
 

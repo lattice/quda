@@ -33,8 +33,9 @@ namespace quda
 
   protected:
     Arg &arg;
-    const ColorSpinorField &out;
-    const ColorSpinorField &in;
+    cvector_ref<ColorSpinorField> &out;
+    cvector_ref<const ColorSpinorField> &in;
+    const ColorSpinorField &halo;
 
     const int nDimComms;
 
@@ -52,19 +53,20 @@ namespace quda
     */
     inline void fillAuxBase(const std::string &app_base)
     {
+      strcpy(aux_base, TunableKernel3D::aux);
       char comm[5];
       comm[0] = (arg.commDim[0] ? '1' : '0');
       comm[1] = (arg.commDim[1] ? '1' : '0');
       comm[2] = (arg.commDim[2] ? '1' : '0');
       comm[3] = (arg.commDim[3] ? '1' : '0');
       comm[4] = '\0';
-      strcpy(aux_base, ",commDim=");
+      strcat(aux_base, ",commDim=");
       strcat(aux_base, comm);
-
       strcat(aux_base, app_base.c_str());
 
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
+      setRHSstring(aux_base, in.size());
     }
 
     /**
@@ -75,8 +77,8 @@ namespace quda
     inline void fillAux(KernelType kernel_type, const char *kernel_str)
     {
       strcpy(aux[kernel_type], kernel_str);
-      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
+      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
     }
 
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
@@ -125,36 +127,34 @@ namespace quda
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
           if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL) {
-            ghost[2 * dim + dir] = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir));
+            ghost[2 * dim + dir] = (typename Arg::Float *)((char *)halo.Ghost2() + halo.GhostOffset(dim, dir));
           }
         }
       }
 
-      arg.in.resetGhost(ghost);
+      arg.halo.resetGhost(ghost);
 
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
-        arg.in_pack.resetGhost(this->packBuffer);
+        arg.halo_pack.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
-        arg.counter = dslash::get_shmem_sync_counter();
+        arg.counter = dslash::get_dslash_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
         // if we are doing tuning we should not wait on the sync_arr to be set.
-        arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter();
+        arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_dslash_shmem_sync_counter();
       }
       if (arg.shmem > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
-        arg.counter = activeTuning() ?
-          (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
-          dslash::get_shmem_sync_counter();
+        arg.counter = activeTuning() ? (uberTuning() && !policyTuning() ? dslash::inc_dslash_shmem_sync_counter() :
+                                                                          dslash::get_dslash_shmem_sync_counter()) :
+                                       dslash::get_dslash_shmem_sync_counter();
         arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
           (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
           0;
         tp.grid.x += arg.exterior_blocks;
       }
     }
-
-    virtual int tuningIter() const override { return 10; }
 
     virtual int blockStep() const override { return 16; }
     virtual int blockMin() const override { return 16; }
@@ -329,28 +329,29 @@ namespace quda
 
     Arg &dslashParam; // temporary addition for policy compatibility
 
-    Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in, const std::string &app_base = "") :
-      TunableKernel3D(in, 1, arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
+    Dslash(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+           const ColorSpinorField &halo, const std::string &app_base = "") :
+      TunableKernel3D(in[0], halo.X(4), arg.nParity), arg(arg), out(out), in(in), halo(halo), nDimComms(4), dslashParam(arg)
     {
       if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
         errorQuda("CPU Fields not supported in Dslash framework yet");
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString());
+      // strcpy(aux, in.AuxString().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
-      fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
-      fillAux(UBER_KERNEL, "policy_kernel=uber");
-      fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
-      fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x");
-      fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y");
-      fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z");
-      fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t");
+      fillAux(INTERIOR_KERNEL, "policy_kernel=interior,");
+      fillAux(UBER_KERNEL, "policy_kernel=uber,");
+      fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all,");
+      fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x,");
+      fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y,");
+      fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z,");
+      fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t,");
 #else
-      fillAux(INTERIOR_KERNEL, "policy_kernel=single-GPU");
+      fillAux(INTERIOR_KERNEL, "policy_kernel=single,");
 #endif // MULTI_GPU
-      fillAux(KERNEL_POLICY, "policy");
+      fillAux(KERNEL_POLICY, "policy,");
 
 #ifdef NVSHMEM_COMMS
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
@@ -378,21 +379,21 @@ namespace quda
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir] = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir);
+            packBuffer[2 * dim + dir] = static_cast<char *>(halo.remoteFace_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
-            packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
+            packBuffer[2 * dim + dir] = halo.myFace_hd(dir, dim);
           } else if (location & Shmem) {
             // we check whether we can directly pack into the in.remoteFace_d(dir, dim) buffer on the remote GPU
             // pack directly into remote or local memory
-            packBuffer[2 * dim + dir] = in.remoteFace_d(dir, dim) ?
-              static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir) :
-              in.myFace_d(dir, dim);
+            packBuffer[2 * dim + dir] = halo.remoteFace_d(dir, dim) ?
+              static_cast<char *>(halo.remoteFace_d(dir, dim)) + halo.GhostOffset(dim, 1 - dir) :
+              halo.myFace_d(dir, dim);
             // whether we need to shmem_putmem into the receiving buffer
-            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = in.remoteFace_d(dir, dim) ?
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = halo.remoteFace_d(dir, dim) ?
               nullptr :
-              static_cast<char *>(in.remoteFace_r()) + in.GhostOffset(dim, 1 - dir);
+              static_cast<char *>(halo.remoteFace_r()) + halo.GhostOffset(dim, 1 - dir);
           } else { // pack to local gpu memory
-            packBuffer[2 * dim + dir] = in.myFace_d(dir, dim);
+            packBuffer[2 * dim + dir] = halo.myFace_d(dir, dim);
           }
         }
       }
@@ -435,7 +436,7 @@ namespace quda
       auto aux_ = (arg.pack_blocks > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) ?
         aux_pack :
         ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
     /**
@@ -492,10 +493,11 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * 2 * in.GhostFace()[arg.kernel_type];
+        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * 2 * halo.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * ghost_sites;
         break;
       }
@@ -503,8 +505,8 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
-          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
-        long long sites = in.Volume();
+          flops_ += pack_flops * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
+        long long sites = halo.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
                   num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
@@ -515,11 +517,11 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
         if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
-          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
+          flops_ += pack_flops * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -543,9 +545,10 @@ namespace quda
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * halo.GhostFace()[arg.kernel_type]; break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        long long ghost_sites
+          = 2 * (halo.GhostFace()[0] + halo.GhostFace()[1] + halo.GhostFace()[2] + halo.GhostFace()[3]);
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
@@ -553,8 +556,8 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
-          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
-        long long sites = in.Volume();
+          bytes_ += pack_bytes * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
+        long long sites = halo.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
         if (arg.xpay) bytes_ += spinor_bytes;
 
@@ -562,11 +565,11 @@ namespace quda
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          if (arg.commDim[d]) ghost_sites += 2 * halo.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 
         if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
-          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
+          bytes_ += pack_bytes * arg.nParity * halo.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }

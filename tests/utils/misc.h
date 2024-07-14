@@ -1,18 +1,19 @@
 #pragma once
 #include <quda.h>
+#include <string>
 
 const char *get_quda_ver_str();
 const char *get_recon_str(QudaReconstructType recon);
 const char *get_prec_str(QudaPrecision prec);
 const char *get_gauge_order_str(QudaGaugeFieldOrder order);
 const char *get_test_type(int t);
-const char *get_staggered_test_type(int t);
 const char *get_unitarization_str(bool svd_only);
 const char *get_mass_normalization_str(QudaMassNormalization);
 const char *get_verbosity_str(QudaVerbosity);
 const char *get_matpc_str(QudaMatPCType);
 const char *get_solution_str(QudaSolutionType);
 const char *get_solve_str(QudaSolveType);
+const char *get_schwarz_str(QudaSchwarzType);
 const char *get_dslash_str(QudaDslashType type);
 const char *get_flavor_str(QudaTwistFlavorType type);
 const char *get_solver_str(QudaInverterType type);
@@ -21,6 +22,11 @@ const char *get_eig_type_str(QudaEigType type);
 const char *get_ritz_location_str(QudaFieldLocation type);
 const char *get_memory_type_str(QudaMemoryType type);
 const char *get_contract_str(QudaContractType type);
+const char *get_dag_str(QudaDagType type);
+const char *get_gauge_smear_str(QudaGaugeSmearType type);
+std::string get_dilution_type_str(QudaDilutionType type);
+const char *get_blas_type_str(QudaBLASType type);
+const char *get_TwistFlavor_str(QudaTwistFlavorType type);
 
 #define XUP 0
 #define YUP 1

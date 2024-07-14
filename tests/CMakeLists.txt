@@ -1,14 +1,30 @@
-include(GNUInstallDirs)
-set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
-
 # enable tests build a common library for all test utilities
-add_library(quda_test STATIC googletest/src/gtest-all.cc)
+add_library(quda_test googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
 set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(
+  quda_test PUBLIC
+  $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+  $<$<CONFIG:STRICT>:-Werror>
+)
+
+# ignore any unkown pragmas if not using OpenMP
+if(NOT ${QUDA_OPENMP})
+  target_compile_options(quda_test PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
+    $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+    >)
+endif()
+
+if(BUILD_SHARED_LIBS)
+  install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 add_subdirectory(utils)
 add_subdirectory(host_reference)
+# enable_language(Fortran)
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)
@@ -16,11 +32,15 @@ endif()
 
 set(TEST_LIBS quda_test)
 
+# custom target for building all tests (useful if QUDA_BUILD_ALL_TESTS is OFF)
+add_custom_target(all_tests)
+
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
+  add_dependencies(all_tests ${mytarget})
 endmacro()
 
 if(NOT ${QUDA_INSTALL_ALL_TESTS})
@@ -36,7 +56,7 @@ endif()
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
-target_link_libraries(c_interface_test ${TEST_LIBS})
+target_link_libraries(c_interface_test ${TEST_LIBS} "-lstdc++")
 quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
@@ -70,6 +90,12 @@ if(QUDA_DIRAC_WILSON
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  if(QUDA_DIRAC_LAPLACE)
+    add_executable(laph_test laph_test.cpp)
+    target_link_libraries(laph_test ${TEST_LIBS})
+    quda_checkbuildtest(laph_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS laph_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -104,6 +130,10 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(contract_ft_test contract_ft_test.cpp)
+  target_link_libraries(contract_ft_test ${TEST_LIBS})
+  quda_checkbuildtest(contract_ft_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS contract_ft_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -119,6 +149,11 @@ if(QUDA_DIRAC_WILSON
 
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(dilution_test dilution_test.cpp)
+  target_link_libraries(dilution_test ${TEST_LIBS})
+  quda_checkbuildtest(dilution_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS dilution_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_MULTIGRID)
@@ -128,12 +163,10 @@ if(QUDA_MULTIGRID)
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  if(${QUDA_GAUGE_ALG})
-    add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
-    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
-    quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
+  add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
+  target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+  quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 endif()
 
@@ -143,6 +176,18 @@ if(QUDA_BUILD_NATIVE_LAPACK)
   quda_checkbuildtest(blas_interface_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_interface_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+
+if(QUDA_QIO)
+  add_executable(io_test io_test.cpp)
+  target_link_libraries(io_test ${TEST_LIBS})
+  quda_checkbuildtest(io_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+add_executable(tune_test tune_test.cpp)
+target_link_libraries(tune_test ${TEST_LIBS})
+quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
@@ -166,13 +211,6 @@ if(QUDA_COVDEV)
   install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_CONTRACT)
-  add_executable(contract_test contract_test.cpp)
-  target_link_libraries(contract_test ${TEST_LIBS})
-  quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
 if(QUDA_DIRAC_STAGGERED)
   add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
@@ -188,28 +226,12 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(hisq_stencil_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
 
-if(QUDA_FORCE_GAUGE)
-  add_executable(gauge_force_test gauge_force_test.cpp)
-  target_link_libraries(gauge_force_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+  add_executable(hisq_stencil_ctest hisq_stencil_ctest.cpp)
+  target_link_libraries(hisq_stencil_ctest ${TEST_LIBS})
+  quda_checkbuildtest(hisq_stencil_ctest QUDA_BUILD_ALL_TESTS)
+  install(TARGETS hisq_stencil_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(QUDA_GAUGE_ALG)
-  add_executable(gauge_alg_test gauge_alg_test.cpp)
-  target_link_libraries(gauge_alg_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-  add_executable(heatbath_test heatbath_test.cpp)
-  target_link_libraries(heatbath_test ${TEST_LIBS})
-  quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
-if(QUDA_FORCE_HISQ)
   add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
@@ -219,19 +241,56 @@ if(QUDA_FORCE_HISQ)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+add_executable(gauge_path_test gauge_path_test.cpp)
+target_link_libraries(gauge_path_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+  add_executable(clover_force_test clover_force_test.cpp)
+  target_link_libraries(clover_force_test ${TEST_LIBS})
+  quda_checkbuildtest(clover_force_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS clover_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+add_executable(gauge_alg_test gauge_alg_test.cpp)
+target_link_libraries(gauge_alg_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(heatbath_test heatbath_test.cpp)
+target_link_libraries(heatbath_test ${TEST_LIBS})
+quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+
 if(QUDA_MPI OR QUDA_QMP)
-  if(DEFINED ENV{QUDA_TEST_NUMPROCS})
-    # user is setting number of processes to use through the QUDA_TEST_NUMPROCS env
-    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
-                          $ENV{QUDA_TEST_NUMPROCS} ${MPIEXEC_PREFLAGS})
-  else()
-    # use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
-    # number of ranks you want to launch
-    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
-                          ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
+  #helper function to extract required number of ranks from environment variable
+  function(get_test_ranks TEST_GRID RANKS)
+    separate_arguments(TEST_GRID)
+    LIST(LENGTH TEST_GRID TEST_LENGTH)
+    if(NOT ${TEST_LENGTH} EQUAL 4)
+      message(SEND_ERROR "QUDA_TEST_GRID_SIZE takes 4 INTEGERS. GOT: ${TEST_GRID_SIZE}")
+    endif()
+      LIST(JOIN TEST_GRID * TEST_GRID_EXPR)
+    math(EXPR TEST_RANKS ${TEST_GRID_EXPR} OUTPUT_FORMAT DECIMAL)
+    set(${RANKS} ${TEST_RANKS} PARENT_SCOPE )
+  endfunction()
+
+  set(QUDA_TEST_NUM_PROCS 1)
+  if(DEFINED ENV{QUDA_TEST_GRID_SIZE})
+    get_test_ranks($ENV{QUDA_TEST_GRID_SIZE} QUDA_TEST_NUM_PROCS)
   endif()
+  message(STATUS "ctest will run on ${QUDA_TEST_NUM_PROCS} processes")
+  set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE};${MPIEXEC_NUMPROC_FLAG};${QUDA_TEST_NUM_PROCS};${MPIEXEC_PREFLAGS}
+    CACHE STRING "CTest Launcher command for QUDA's tests")
 endif()
 
 # BLAS tests
@@ -244,13 +303,13 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8  --niter 1
                    --nsrc 8 --msrc 9
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 --niter 1
                    --nsrc 8 --msrc 9
                    --solve-type direct
                    --gtest_output=xml:blas_test_full.xml)
@@ -259,14 +318,14 @@ endif()
 if(QUDA_DIRAC_STAGGERED)
   add_test(NAME blas_test_parity_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 --niter 1
                    --nsrc 8 --msrc 9
                    --dslash-type staggered
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 --niter 1
                    --nsrc 8 --msrc 9
                    --dslash-type staggered
                    --solve-type direct
@@ -277,33 +336,47 @@ endif()
 if(QUDA_BUILD_NATIVE_LAPACK)
   add_test(NAME blas_interface_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}
-    --blas-mnk 64 64 64
-    --blas-leading-dims 128 128 128
-    --blas-offsets 16 16 16
+    --blas-gemm-mnk 64 64 64
+    --blas-gemm-leading-dims 128 128 128
+    --blas-gemm-offsets 16 16 16
+    --blas-gemm-alpha 1.0 2.0
+    --blas-gemm-beta -3.0 1.5
+    --blas-gemm-trans-a T
+    --blas-gemm-trans-b C
+    --blas-lu-inv-mat-size 96
     --blas-data-type Z
     --blas-data-order row
     --blas-batch 20
-    --blas-alpha 1.0 2.0
-    --blas-beta -3.0 1.5
-    --blas-trans-a T
-    --blas-trans-b C
+    --enable-testing true
     --gtest_output=xml:blas_interface_test.xml)
 endif()
 
 #Contraction test
-if(QUDA_CONTRACT)
-  add_test(NAME contract_test
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
-    --dim 2 4 6 8
-    --gtest_output=xml:contract_test.xml)
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME contract_ft_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_ft_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8 --enable-testing true
+    --gtest_output=xml:contract_ft_test.xml)
 endif()
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
-  set(DSLASH_POLICIES 0 1 6 7 8 9 12 13 -1)
+  set(DSLASH_POLICIES 0 1)
+
+  if(DEFINED ENV{QUDA_ENABLE_ZERO_COPY})
+    if($ENV{QUDA_ENABLE_ZERO_COPY} EQUAL 1)
+      set(DSLASH_POLICIES 6 7 8 9 12 13 ${DSLASH_POLICIES})
+      message(STATUS "QUDA_ENABLE_ZERO_COPY=1: enabling zero-copy dslash policies in ctest")
+    else()
+      message(STATUS "QUDA_ENABLE_ZERO_COPY!=1: disabling zero-copy dslash policies in ctest")
+    endif()
+  else()
+    message(STATUS "QUDA_ENABLE_ZERO_COPY not set: disabling zero-copy dslash policies in ctest")
+  endif()
+
   if(DEFINED ENV{QUDA_ENABLE_GDR})
     if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
-      set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 12 13 -1)
+      set(DSLASH_POLICIES 2 3 4 5 10 11 ${DSLASH_POLICIES})
       message(STATUS "QUDA_ENABLE_GDR=1: enabling GDR-enabled dslash policies in ctest")
     else()
       message(STATUS "QUDA_ENABLE_GDR!=1: disabling GDR-enabled dslash policies in ctest")
@@ -311,9 +384,21 @@ if(QUDA_CTEST_SEP_DSLASH_POLICIES)
   else()
     message(STATUS "QUDA_ENABLE_GDR not set: disabling GDR-enabled dslash policies in ctest")
   endif()
-else()
-  set(DSLASH_POLICIES -1)
+
+  if(QUDA_NVSHMEM)
+    if(NOT DEFINED $ENV{QUDA_ENABLE_NVSHMEM} OR $ENV{QUDA_ENABLE_NVSHMEM} EQUAL 1)
+      set(DSLASH_POLICIES 14 15 16 17 ${DSLASH_POLICIES})
+      message(STATUS "QUDA_ENABLE_NVSHMEM=1: enabling NVSHMEM dslash policies in ctest")
+    elseif()
+      message(STATUS "QUDA_ENABLE_NVSHMEM!=1: disabling NVSHMEM dslash policies in ctest")
+    endif()
+  endif()
+
+  list(SORT DSLASH_POLICIES COMPARE NATURAL)
+  message(STATUS "Enabled dslash policies are ${DSLASH_POLICIES}")
 endif()
+
+set(DSLASH_POLICIES ${DSLASH_POLICIES} -1)
 
 foreach(pol IN LISTS DSLASH_POLICIES)
 
@@ -327,289 +412,321 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
   if(QUDA_DIRAC_WILSON)
     set(DIRAC_NAME wilson)
-    add_test(NAME dslash_wilson-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type wilson
-                     --test MatPCDagMatPC
-                     --dim 2 4 6 8
-                     --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
-    if(polenv)
-      set_tests_properties(dslash_wilson-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif()
-
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
+                     --test MatPCDagMatPC
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Dslash
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_splitgrid_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
                      --test 0
                      --dim 20 20 20 20
                      --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
                      --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
-  endif()
+endif()
 
   if(QUDA_DIRAC_CLOVER)
-    # symmetric preconditioning
     set(DIRAC_NAME clover)
-    add_test(NAME dslash_clover-sym-policy${pol2}
+
+    # symmetric preconditioning
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type clover
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_clover-asym-policy${pol2}
+    set(DIRAC_NAME clover)
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type clover
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
   endif()
 
-  if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
+  if(QUDA_DIRAC_CLOVER_HASENBUSCH)
     set(DIRAC_NAME clover-hasenbusch-twist)
+
     # symmetric preconditioning
-    add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type clover-hasenbusch-twist
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type clover-hasenbusch-twist
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
   endif()
 
   if(QUDA_DIRAC_TWISTED_MASS)
     set(DIRAC_NAME twisted-mass)
-    add_test(NAME dslash_twisted-mass-sym-policy${pol2}
+
+    # symmetric preconditioning
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-mass-sym-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_twisted-mass-asym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-mass-asym-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
     # the ndeg-twisted-mas operator does not fit the pattern used for most other operators
     # since it is defined via 'dslash-type = twisted-mass` and 'flavor = nondeg-doublet'
-    # as a result, we set DIRAC_NAME and then manually specify 'twisted-mass' and 'nondeg-doublet'
-    # below
-    set(DIRAC_NAME ndeg-twisted-mass)
+    set(DIRAC_NAME twisted-mass)
+
     # symmetric preconditioning
-    add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
+    add_test(NAME dslash_ndeg_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_ndeg-twisted-mass-sym-policy${pol2}
+      set_tests_properties(dslash_ndeg_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
+    add_test(NAME dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_ndeg-twisted-mass-asym-policy${pol2}
+      set_tests_properties(dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    add_test(NAME benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    set_tests_properties(benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_CLOVER)
     set(DIRAC_NAME twisted-clover)
+
     # symmetric preconditioning
-    add_test(NAME dslash_twisted-clover-sym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-clover-sym-policy${pol2}
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_twisted-clover-asym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_twisted-clover-asym-policy${pol2}
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
-    
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})  
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
   endif()
-  
+
   if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
     # the ndeg-twisted-clover operator does not fit the pattern used for most other operators
     # since it is defined via 'dslash-type = twisted-clover` and 'flavor = nondeg-doublet'
-    # as a result, we set DIRAC_NAME and then manually specify 'twisted-clover' and 'nondeg-doublet'
-    # below
-    set(DIRAC_NAME ndeg-twisted-clover)
+    set(DIRAC_NAME twisted-clover)
+
     # symmetric preconditioning
-    add_test(NAME dslash_ndeg-twisted-clover-sym-policy${pol2}
+    add_test(NAME dslash_ndeg_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover
+                     --dslash-type ${DIRAC_NAME}
                      --flavor nondeg-doublet
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg-twisted-clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_ndeg-twisted-clover-sym-policy${pol2}
+      set_tests_properties(dslash_ndeg_${DIRAC_NAME}_sym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
-    add_test(NAME dslash_ndeg-twisted-clover-asym-policy${pol2}
+    add_test(NAME dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover
+                     --dslash-type ${DIRAC_NAME}
                      --flavor nondeg-doublet
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_ndeg-twisted-clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_ndeg-twisted-clover-asym-policy${pol2}
+      set_tests_properties(dslash_ndeg_${DIRAC_NAME}_asym_policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
-    
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+
+    add_test(NAME benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-            --dslash-type twisted-clover
+            --dslash-type ${DIRAC_NAME}
             --flavor nondeg-doublet
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})  
+    set_tests_properties(benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
   endif()
 
   if(QUDA_DIRAC_DOMAIN_WALL)
+    # 5-d preconditioned
     set(DIRAC_NAME domain-wall)
-    add_test(NAME dslash_domain-wall-sym-policy${pol2}
+
+    add_test(NAME dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type domain-wall
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_domain-wall-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
             --test 0
@@ -617,98 +734,93 @@ foreach(pol IN LISTS DSLASH_POLICIES)
             --Lsdim 12
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    # 4-d preconditioned
+    set(DIRAC_NAME domain-wall-4d)
 
     # symmetric 4-d preconditioning
-    set(DIRAC_NAME domain-wall-4d)
-    add_test(NAME dslash_domain-wall-4d-sym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type domain-wall-4d
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
-
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-            --dslash-type ${DIRAC_NAME}
-            --test 0
-            --dim 20 20 20 20
-            --Lsdim 12
-            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
-            --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+        --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif()
-
-    set(DIRAC_NAME mobius)
-    add_test(NAME dslash_mobius-sym-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius
-                     --test MatPCDagMatPC
-                     --matpc even-even
-                     --dim 2 4 6 8
-                     --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
-    
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-            --dslash-type ${DIRAC_NAME}
-            --test 0
-            --dim 20 20 20 20
-            --Lsdim 12
-            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
-            --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
-    if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif()
-
-    add_test(NAME dslash_mobius_eofa-sym-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius-eofa
-                     --test MatPCDagMatPC
-                     --matpc even-even
-                     --dim 2 4 6 8
-                     --Lsdim 4
-        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
-
-    if(polenv)
-      set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-      set_tests_properties(dslash_mobius-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric 4-d preconditioning
-    add_test(NAME dslash_domain-wall-4d-asym-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type domain-wall-4d
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
-    add_test(NAME dslash_mobius-asym-policy${pol2}
+        --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --Lsdim 12
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    # Mobius fermions
+    set(DIRAC_NAME mobius)
+
+    # 4-d preconditioning
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPCDagMatPC
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --Lsdim 4
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
-    add_test(NAME dslash_mobius_eofa-asym-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius-eofa
-                     --test MatPCDagMatPC
-                     --matpc even-even-asym
-                     --dim 2 4 6 8
-                     --Lsdim 4
-        --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --Lsdim 12
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
 
     # MdagM local operator
     # This requires tensor cores so only enable NVIDIA targets
@@ -717,72 +829,127 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     # specific guard
     # 
     if( QUDA_TARGET_CUDA )
-	    add_test(NAME dslash_mobius_local-policy${pol2}
-		     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-			     --dslash-type mobius
-			     --test MatPCDagMatPCLocal
-			     --matpc even-even
-			     --dim 2 4 6 8
-			     --Lsdim 4
-			     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
+      add_test(NAME dslash_${DIRAC_NAME}_local_policy${pol2}
+               COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                       --dslash-type ${DIRAC_NAME}
+                       --test MatPCDagMatPCLocal
+                       --matpc even-even
+                       --dim 2 4 6 8
+                       --Lsdim 4
+                       --gtest_output=xml:dslash_${DIRAC_NAME}_local{pol2}.xml)
     endif()
 
+    # Mobius-EOFA fermions
+    set(DIRAC_NAME mobius-eofa)
+
+    add_test(NAME dslash_${DIRAC_NAME}_sym_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPCDagMatPC
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --Lsdim 4
+        --gtest_output=xml:dslash_${DIRAC_NAME}_sym_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-      set_tests_properties(dslash_mobius-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_sym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPCDagMatPC
+                     --matpc even-even-asym
+                     --dim 2 4 6 8
+                     --Lsdim 4
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
+ 
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
   if(QUDA_DIRAC_STAGGERED)
-    set(DIRAC_NAME asqtad)
-    add_test(NAME dslash_improved_staggered-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type asqtad
-                     --test MatPC
-                     --dim 6 8 10 12
-                     --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
-
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
-            --dslash-type ${DIRAC_NAME}
-            --test 0
-            --dim 20 20 20 20
-            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
-            --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
-    if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif()                 
-
-
     set(DIRAC_NAME staggered)
-    add_test(NAME dslash_naive_staggered-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_matpc_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type staggered
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPC
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_improved_staggered-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
-      set_tests_properties(dslash_naive_staggered-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      set_tests_properties(dslash_${DIRAC_NAME}_matpc_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
-    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test MatPC
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
-            --test 0
+            --test MatPC
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
             --gtest_filter=*benchmark/*n0)
-    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
-      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif() 
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
 
-    add_test(NAME dslash_improved_staggered_build-policy${pol2}
+    set(DIRAC_NAME asqtad)
+    add_test(NAME dslash_${DIRAC_NAME}_matpc_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
+                     --test MatPC
+                     --dim 6 8 10 12
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_matpc_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
+                     --test Mat
+                     --dim 6 8 10 12
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --all-partitions 1
+            --test MatPC
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_build_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type asqtad
                      --test MatPC
@@ -790,15 +957,27 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --compute-fat-long true
                      --epsilon-naik -0.01
                      --tadpole-coeff 0.9
-        --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
+        --gtest_output=xml:dslash_${DIRAC_NAME}_build_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_improved_staggered_build-policy${pol2}
-                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      set_tests_properties(dslash_${DIRAC_NAME}_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    if(QUDA_LAPLACE)
+      set(DIRAC_NAME laplace)
+      add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+               COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                       --dslash-type ${DIRAC_NAME}
+                       --test Mat
+                       --dim 2 4 6 8
+                       --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+      if(polenv)
+        set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      endif()
     endif()
   endif()
 
   if(QUDA_COVDEV)
-    add_test(NAME covdev_-policy${pol2}
+    add_test(NAME covdev_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
@@ -807,8 +986,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 endforeach(pol)
 
 # enable the precisions that are compiled
-math(EXPR double_prec "${QUDA_PRECISION} & 8")
-math(EXPR single_prec "${QUDA_PRECISION} & 4")
+math(EXPR double_prec  "${QUDA_PRECISION} & 8")
+math(EXPR single_prec  "${QUDA_PRECISION} & 4")
+math(EXPR half_prec    "${QUDA_PRECISION} & 2")
+math(EXPR quarter_prec "${QUDA_PRECISION} & 1")
 
 if(double_prec AND single_prec)
   set(TEST_PRECS single double)
@@ -818,23 +999,527 @@ elseif(single_prec)
   set(TEST_PRECS single)
 endif()
 
+# Wilson-type Inversions
+if(QUDA_DIRAC_WILSON)
+  add_test(NAME invert_test_wilson
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type wilson --ngcrkrylov 8
+    --dim 2 4 6 8 --niter 1000
+    --enable-testing true
+    --gtest_output=xml:invert_test_wilson.xml)
+
+  if(DEFINED ENV{QUDA_ENABLE_TUNING})
+    if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+      add_test(NAME invert_test_splitgrid_wilson
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type wilson --ngcrkrylov 8
+        --dim 2 4 6 8 --niter 1000
+        --nsrc ${QUDA_TEST_NUM_PROCS}
+        --enable-testing true
+        --gtest_output=xml:invert_test_splitgrid_wilson.xml)
+
+      set_tests_properties(invert_test_splitgrid_wilson PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+    endif()
+  endif()
+endif()
+  
+if(QUDA_DIRAC_TWISTED_MASS)
+  add_test(NAME invert_test_twisted_mass_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:invert_test_twisted_mass_sym.xml)
+
+  add_test(NAME invert_test_twisted_mass_asym}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:invert_test_twisted_mass_asym.xml)
+endif()
+
+if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+  add_test(NAME invert_test_ndeg_twisted_mass_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even --flavor nondeg-doublet
+    --enable-testing true
+    --gtest_output=xml:invert_test_ndeg_twisted_mass_sym.xml)
+
+  add_test(NAME invert_test_ndeg_twisted_mass_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym --flavor nondeg-doublet
+    --enable-testing true
+    --gtest_output=xml:invert_test_ndeg_twisted_mass_asym.xml)
+endif()
+
+if(QUDA_DIRAC_CLOVER)
+  add_test(NAME invert_test_clover_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type clover --compute-clover true
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:invert_test_clover_sym.xml)
+
+  add_test(NAME invert_test_clover_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type clover --compute-clover true
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:invert_test_clover_asym.xml)
+endif()
+
+if(QUDA_DIRAC_TWISTED_CLOVER)
+  add_test(NAME invert_test_twisted_clover_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:invert_test_twisted_clover_sym.xml)
+
+  add_test(NAME invert_test_twisted_clover_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:invert_test_twisted_clover_asym.xml)
+endif()
+
+if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  add_test(NAME invert_test_ndeg_twisted_clover_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even --flavor nondeg-doublet
+    --enable-testing true
+    --gtest_output=xml:invert_test_ndeg_twisted_clover_sym.xml)
+
+  add_test(NAME invert_test_ndeg_twisted_clover_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym --flavor nondeg-doublet
+    --enable-testing true
+    --gtest_output=xml:invert_test_ndeg_twisted_clover_asym.xml)
+endif()
+
+if(QUDA_DIRAC_DOMAIN_WALL)
+  add_test(NAME invert_test_domain_wall
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type domain-wall
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even
+    --enable-testing true
+    --gtest_output=xml:invert_test_domain_wall.xml)
+
+  add_test(NAME invert_test_domain_wall_4d_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type domain-wall-4d
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even
+    --enable-testing true
+    --gtest_output=xml:invert_test_domain_wall_4d_sym.xml)
+
+  add_test(NAME invert_test_domain_wall_4d_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type domain-wall-4d
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym
+    --enable-testing true
+    --gtest_output=xml:invert_test_domain_wall_4d_asym.xml)
+
+  add_test(NAME invert_test_mobius_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even
+    --enable-testing true
+    --gtest_output=xml:invert_test_mobius_sym.xml)
+
+  add_test(NAME invert_test_mobius_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym
+    --enable-testing true
+    --gtest_output=xml:invert_test_mobius_asym.xml)
+
+  add_test(NAME invert_test_mobius_eofa_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius-eofa
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even
+    --enable-testing true
+    --gtest_output=xml:invert_test_mobius_eofa_sym.xml)
+
+  add_test(NAME invert_test_mobius_eofa_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius-eofa
+    --dim 2 4 6 8 --Lsdim 4 --niter 1000 --ngcrkrylov 8
+    --matpc even-even-asym
+    --enable-testing true
+    --gtest_output=xml:invert_test_mobius_eofa_asym.xml)
+endif()
+
+# Staggered-type Inversions
 foreach(prec IN LISTS TEST_PRECS)
 
-  if(QUDA_FORCE_GAUGE)
-    add_test(NAME gauge_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:gauge_force_test_${prec}.xml)
+  # These require looser tolerances to keep iterations to solution in check
+  if(${prec} STREQUAL "double")
+    set(tol 1e-6)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-5)
   endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    # --compute-fat-long true is necessary to get well-behaved fields
+
+    add_test(NAME invert_test_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_staggered_${prec}.xml)
+
+    if(DEFINED ENV{QUDA_ENABLE_TUNING})
+      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+        add_test(NAME invert_test_splitgrid_staggered_${prec}
+          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+          --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+          --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+          --nsrc ${QUDA_TEST_NUM_PROCS}
+          --enable-testing true
+          --gtest_output=xml:invert_test_splitgrid_staggered_${prec}.xml)
+
+        set_tests_properties(invert_test_splitgrid_staggered_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+      endif()
+    endif()
+
+    add_test(NAME invert_test_asqtad_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+      --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_asqtad_${prec}.xml)
+
+    if(DEFINED ENV{QUDA_ENABLE_TUNING})
+      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+        add_test(NAME invert_test_splitgrid_asqtad_${prec}
+          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+          --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+          --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+          --nsrc ${QUDA_TEST_NUM_PROCS}
+          --enable-testing true
+          --gtest_output=xml:invert_test_splitgrid_asqtad_${prec}.xml)
+
+        set_tests_properties(invert_test_splitgrid_asqtad_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+      endif()
+    endif()
+
+    if (QUDA_LAPLACE)
+      add_test(NAME invert_test_laplace_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type laplace --ngcrkrylov 8 --compute-fat-long true
+        --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+        --enable-testing true
+        --gtest_output=xml:invert_test_laplace_${prec}.xml)
+    endif()
+  endif()
+endforeach(prec)
+
+# Distance preconditioning for Wilson/clover
+if (QUDA_DIRAC_DISTANCE_PRECONDITIONING)
+  # Wilson-type Inversions
+  if(QUDA_DIRAC_WILSON)
+    add_test(NAME invert_test_wilson_distance_pc
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type wilson --ngcrkrylov 8
+      --dim 2 4 6 8 --niter 1000
+      --distance-pc-alpha0 0.1 --distance-pc-t0 4
+      --enable-testing true
+      --gtest_output=xml:invert_test_wilson_distance_pc.xml)
+
+    if(DEFINED ENV{QUDA_ENABLE_TUNING})
+      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
+        add_test(NAME invert_test_splitgrid_wilson
+          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+          --dslash-type wilson --ngcrkrylov 8
+          --dim 2 4 6 8 --niter 1000
+          --distance-pc-alpha0 0.1 --distance-pc-t0 4
+          --nsrc ${QUDA_TEST_NUM_PROCS}
+          --enable-testing true
+          --gtest_output=xml:invert_test_splitgrid_wilson_distance_pc.xml)
+
+        set_tests_properties(invert_test_splitgrid_wilson PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+      endif()
+    endif()
+  endif()
+
+  if(QUDA_DIRAC_CLOVER)
+    add_test(NAME invert_test_clover_sym_distance_pc
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type clover --compute-clover true
+      --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+      --distance-pc-alpha0 0.1 --distance-pc-t0 4
+      --matpc even-even --enable-testing true
+      --gtest_output=xml:invert_test_clover_sym_distance_pc.xml)
+
+    add_test(NAME invert_test_clover_asym_distance_pc
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type clover --compute-clover true
+      --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
+      --distance-pc-alpha0 0.1 --distance-pc-t0 4
+      --matpc even-even-asym --enable-testing true
+      --gtest_output=xml:invert_test_clover_asym_distance_pc.xml)
+  endif()
+endif()
+
+# Wilson-type eigensolves
+if(QUDA_DIRAC_WILSON)    
+  add_test(NAME eigensolve_test_wilson
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type wilson --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --dim 2 4 6 8 --eig-max-restarts 1000
+    --enable-testing true 
+    --gtest_output=xml:eigensolve_test_wilson.xml)
+endif()
+  
+if(QUDA_DIRAC_TWISTED_MASS)
+  add_test(NAME eigensolve_test_twisted_mass_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --dim 2 4 6 8 --eig-max-restarts 1000
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:eigensolve_test_twisted_mass_sym.xml)
+    
+  add_test(NAME eigensolve_test_twisted_mass_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --dim 2 4 6 8 --eig-max-restarts 1000
+    --matpc even-even-asym --enable-testing true 
+    --gtest_output=xml:eigensolve_test_twisted_mass_asym.xml)
+endif()
+  
+if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+  add_test(NAME eigensolve_test_ndeg_twisted_mass_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --dim 2 4 6 8 --eig-max-restarts 1000
+    --matpc even-even --flavor nondeg-doublet 
+    --enable-testing true --eig-use-eigen-qr false
+    --gtest_output=xml:eigensolve_test_ndeg_twisted_mass_sym.xml)
+
+  add_test(NAME eigensolve_test_ndeg_twisted_mass_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --dim 2 4 6 8 --eig-max-restarts 1000
+    --matpc even-even-asym --flavor nondeg-doublet
+    --enable-testing true --eig-use-eigen-qr false
+    --gtest_output=xml:eigensolve_test_ndeg_twisted_mass_asym.xml)
+endif()
+  
+if(QUDA_DIRAC_CLOVER)
+  add_test(NAME eigensolve_test_clover_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type clover --compute-clover true      
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --enable-testing true 
+    --gtest_output=xml:eigensolve_test_clover_sym.xml)
+
+  add_test(NAME eigensolve_test_clover_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type clover --compute-clover true      
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:eigensolve_test_clover_asym.xml)
+endif()
+
+if(QUDA_DIRAC_TWISTED_CLOVER)
+  add_test(NAME eigensolve_test_twisted_clover_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --enable-testing true 
+    --gtest_output=xml:eigensolve_test_twisted_clover_sym.xml)
+    
+  add_test(NAME eigensolve_test_twisted_clover_asym      
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even-asym --enable-testing true 
+    --gtest_output=xml:eigensolve_test_twisted_clover_asym.xml)
+endif()
+  
+if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  add_test(NAME eigensolve_test_ndeg_twisted_clover_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --flavor nondeg-doublet
+    --enable-testing true 
+    --gtest_output=xml:eigensolve_test_ndeg_twisted_clover_sym.xml)
+    
+  add_test(NAME eigensolve_test_ndeg_twisted_clover_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type twisted-clover --compute-clover true
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even-asym --flavor nondeg-doublet
+    --enable-testing true 
+    --gtest_output=xml:eigensolve_test_ndeg_twisted_clover_asym.xml)
+endif()
+
+if(QUDA_DIRAC_DOMAIN_WALL)
+  add_test(NAME eigensolve_test_domain_wall
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type domain-wall
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:eigensolve_test_domain_wall.xml)
+
+  add_test(NAME eigensolve_test_domain_wall_4d_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type domain-wall-4d
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:eigensolve_test_domain_wall_4d_sym.xml)
+
+  add_test(NAME eigensolve_test_domain_wall_4d_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type domain-wall-4d
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:eigensolve_test_domain_wall_4d_asym.xml)
+
+  add_test(NAME eigensolve_test_mobius_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:eigensolve_test_mobius_sym.xml)
+
+  add_test(NAME eigensolve_test_mobius_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:eigensolve_test_mobius_asym.xml)
+
+  add_test(NAME eigensolve_test_mobius_eofa_sym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius-eofa
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even --enable-testing true
+    --gtest_output=xml:eigensolve_test_mobius_eofa_sym.xml)
+
+  add_test(NAME eigensolve_test_mobius_eofa_asym
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type mobius-eofa
+    --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 64
+    --eig-max-restarts 1000
+    --matpc even-even-asym --enable-testing true
+    --gtest_output=xml:eigensolve_test_mobius_eofa_asym.xml)
+endif()
+
+# Staggered-type eigensolves
+foreach(prec IN LISTS TEST_PRECS)
+
+  # These require looser tolerances to keep iterations to solution in check
+  if(${prec} STREQUAL "double")
+    set(tol 1e-5)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-4)
+  endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    # --compute-fat-long true is necessary to get well-behaved fields
+
+    add_test(NAME eigensolve_test_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --compute-fat-long true
+      --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 64
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --enable-testing true
+      --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+
+    # These tests are particularly expensive so they are disabled by default
+    if(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST)
+      add_test(NAME eigensolve_test_asqtad_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type asqtad --compute-fat-long true
+        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 64
+        --dim 6 6 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+        --enable-testing true
+        --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
+    endif()
+
+    if (QUDA_LAPLACE)
+      add_test(NAME eigensolve_test_laplace_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+        --dslash-type laplace --compute-fat-long true
+        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 64
+        --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+        --enable-testing true
+        --gtest_output=xml:staggered_eigensolve_test_laplace_${prec}.xml)
+    endif()
+  endif()
+endforeach(prec)
+
+if (QUDA_DIRAC_LAPLACE AND QUDA_DIRAC_WILSON)
+  add_test(NAME laph_test
+           COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:laph_test> ${MPIEXEC_POSTFLAGS}
+           --dim 2 4 6 8
+           --enable-testing true
+           --gtest_output=xml:laph_test.xml)
+endif()
+
+
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME hisq_stencil
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_stencil_ctest> ${MPIEXEC_POSTFLAGS}
+                   --dim 8 8 8 8
+                   --gtest_output=xml:hisq_stencil_test.xml)
+endif()
+
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  add_test(NAME clover_force_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8
+    --compute-clover true
+    --solution-type mat-pc-dag-mat-pc
+    --matpc odd-odd-asym --dagger
+    --enable-testing true --niter 1
+    --gtest_output=xml:clover_force_test.xml)
+endif()
+
+add_test(NAME gauge_path
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
+  --dim 2 4 6 8 --enable-testing true --niter 1
+  --gtest_output=xml:gauge_path_test.xml)
+
+foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
                      --gtest_output=xml:unitarize_link_test_${prec}.xml)
-  endif()
 
-  if(QUDA_FORCE_HISQ)
     add_test(NAME hisq_paths_force_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
@@ -844,13 +1529,47 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
                      --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
-  endif()
 
-  if(QUDA_GAUGE_ALG)
-    add_test(NAME gauge_alg_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 4 6 8 10 --prec ${prec}
-                     --gtest_output=xml:gauge_arg_test_${prec}.xml)
+    set(KERNEL_TYPE TwoLink GaussianSmear)
+    foreach(kerneltp IN LISTS KERNEL_TYPE)
+      if(${kerneltp} STREQUAL "TwoLink")
+	set(laplace3D 4)
+	set(smear_t0 -1)
+      elseif(${kerneltp} STREQUAL "GaussianSmear")
+	set(laplace3D 3)
+	set(smear_t0 1)
+      endif()	    
+      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+        --dim 6 8 10 12 --prec ${prec}
+        --test ${kerneltp}
+	--laplace3D ${laplace3D}
+	--smear-t0 ${smear_t0}
+        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
+    endforeach(kerneltp)
   endif()
 
 endforeach(prec)
+
+add_test(NAME gauge_alg
+  COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
+  --dim 4 6 8 10
+  --gtest_output=xml:gauge_alg_test.xml)
+
+if (TARGET dilution_test)
+  add_test(NAME dilution_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
+    --dim 4 6 8 10 --dilution-block-size 4 6 4 5
+    --gtest_output=xml:dilution_test.xml)
+endif()
+
+if(QUDA_QIO)
+  add_test(NAME io_test
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:io_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 4 6 8 10
+                   --gtest_output=xml:io_test.xml)
+endif()
+
+add_test(NAME tune_test
+         COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}
+                   --gtest_output=xml:tune_test.xml)

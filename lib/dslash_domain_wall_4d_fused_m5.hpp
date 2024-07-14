@@ -1,8 +1,8 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <worker.h>
-#include <dslash_policy.cuh>
 #include <kernels/dslash_domain_wall_4d_fused_m5.cuh>
+#include <dslash_policy.hpp>
 #include <dslash.h>
 
 /**
@@ -19,6 +19,7 @@ namespace quda
     using Dslash::arg;
     using Dslash::aux_base;
     using Dslash::in;
+    cvector_ref<ColorSpinorField> &y;
 
     inline std::string get_app_base()
     {
@@ -36,23 +37,26 @@ namespace quda
       }
     }
 
+    int blockStep() const override { return 8; }
+    int blockMin() const override { return 8; }
+
   public:
-    DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in, get_app_base())
+    DomainWall4DFusedM5(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        const ColorSpinorField &halo, cvector_ref<ColorSpinorField> &y) :
+      Dslash(arg, out, in, halo, get_app_base()), y(y)
     {
       arg.use_graph = true;
-      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
-      TunableKernel3D::resizeStep(in.X(4), 1);
+      TunableKernel3D::resizeStep(in.X(4), 1); // keep Ls local to the thread block
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
 
-    unsigned int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const override
     {
       // spin components in shared depend on inversion algorithm
       if (mobius_m5::use_half_vector()) {
@@ -60,15 +64,6 @@ namespace quda
       } else {
         return 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
       }
-    }
-
-    void initTuneParam(TuneParam &param) const
-    {
-      Dslash::initTuneParam(param);
-
-      param.block.y = arg.Ls; // Ls must be contained in the block
-      param.grid.y = 1;
-      param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     long long m5pre_flops() const
@@ -96,7 +91,7 @@ namespace quda
       return (12ll * n * Ls) * in.Volume();
     }
 
-    long long flops() const
+    long long flops() const override
     {
       long long flops_ = 0;
       switch (Arg::dslash5_type) {
@@ -110,19 +105,17 @@ namespace quda
       default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
       }
 
-      return flops_ + Dslash::flops();
+      return in.size() * flops_ + Dslash::flops();
     }
 
-    long long bytes() const
+    long long bytes() const override
     {
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
-        return arg.y.Bytes() + Dslash::bytes();
+        return y.Bytes() + Dslash::bytes();
       } else {
         return Dslash::bytes();
       }
     }
-
-    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
   };
 
   template <Dslash5Type...> struct Dslash5TypeList {
@@ -131,23 +124,39 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
-    inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                    double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
-                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
-                                    Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
+    DomainWall4DApplyFusedM5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                             cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
+                             cvector_ref<ColorSpinorField> &y, const Complex *b_5, const Complex *c_5, double a,
+                             double m_5, int parity, bool dagger, const int *comm_override, double m_f,
+                             Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
 #ifdef NVSHMEM_COMMS
       errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
 #else
       constexpr int nDim = 4;
+      auto halo = ColorSpinorField::create_comms_batch(in);
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
-      Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
-      DomainWall4DFusedM5<Arg> dwf(arg, out, in);
-
-      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb,
-                                                     in.getDslashConstant().ghostFaceCB, profile);
+      Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
+      DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
 #endif
     }
   };
+
+  // use custom instantiate to deal with field splitting if needed
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U,
+                   Args... args)
+  {
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                                {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2}, U, args...);
+      instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                                {x.begin() + x.size() / 2, x.end()}, {y.begin() + y.size() / 2, y.end()}, U, args...);
+      return;
+    }
+    instantiate<Apply, Recon>(out, in, x, U, y, args...);
+  }
 
 } // namespace quda

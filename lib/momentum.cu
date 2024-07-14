@@ -9,6 +9,7 @@
 #include <tunable_reduction.h>
 #include <tunable_nd.h>
 #include <kernels/momentum.cuh>
+#include "timer.h"
 
 namespace quda {
 
@@ -67,7 +68,7 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class ActionMom : TunableReduction2D<> {
+  class ActionMom : TunableReduction2D {
     const GaugeField &mom;
     double &action;
 
@@ -92,18 +93,16 @@ namespace quda {
   };
 
   double computeMomAction(const GaugeField& mom) {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (!mom.isNative()) errorQuda("Unsupported output ordering: %d\n", mom.Order());
     double action = 0.0;
-#ifdef GPU_GAUGE_TOOLS
     instantiate<ActionMom, Reconstruct10>(mom, action);
-#else
-    errorQuda("%s not build", __func__);
-#endif
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return action;
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class UpdateMom : TunableReduction2D<> {
+  class UpdateMom : TunableReduction2D {
     using Arg = UpdateMomArg<Float, nColor, recon>;
     const GaugeField &force;
     GaugeField &mom;
@@ -134,21 +133,16 @@ namespace quda {
     long long bytes() const { return 2 * mom.Bytes() + force.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void updateMomentum(GaugeField &mom, double coeff, GaugeField &force, const char *fname)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10)
       errorQuda("Momentum field with reconstruct %d not supported", mom.Reconstruct());
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void updateMomentum(GaugeField &, double, GaugeField &, const char *)
-  {
-    errorQuda("%s not built", __func__);
-  }
-#endif // GPU_GAUGE_TOOLS
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class UApply : TunableKernel2D {
@@ -182,18 +176,13 @@ namespace quda {
     long long bytes() const { return 2 * force.Bytes() + U.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void applyU(GaugeField &force, GaugeField &U)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
     instantiate<UApply, ReconstructNo12>(U, force);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-#else
-  void applyU(GaugeField &, GaugeField &)
-  {
-    errorQuda("%s not built", __func__);
-  }
-#endif // GPU_GAUGE_TOOLS
 
 } // namespace quda

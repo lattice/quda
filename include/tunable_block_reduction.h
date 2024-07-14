@@ -12,7 +12,7 @@ namespace quda
      @brief This derived tunable class is for block reduction kernels,
      and partners the BlockReduction2D kernel.  Each reduction block
      is mapped to x grid, with each block mapping to a thread block.
-     Each thread block is potentially two dimensional, with the y
+     Each thread block is potentially two dimensional, with the z
      dimension can be mapped to vector of computations, similar to
      TunableKernel2D.  Due to the exact mapping of reduction block to
      the thread blocks, no block-size tuning is performed in the x
@@ -22,19 +22,18 @@ namespace quda
   {
   protected:
     const LatticeField &field;
+    const bool tune_block_x;
     mutable unsigned int vector_length_z;
     mutable unsigned int step_z;
     const unsigned int max_block_z;
-    bool tune_block_x;
 
     static constexpr bool grid_stride = false;
 
     /**
        @brief Block reduction kernels do not use grid-size tuning, so
-       disable this, and we mark as final to prevent a derived class
-       from accidentally switching it on.
+       disable this.
     */
-    bool tuneGridDim() const final { return grid_stride; }
+    bool tuneGridDim() const { return grid_stride; }
 
     /**
        @brief Launch the block reduction kernel with a given block
@@ -56,7 +55,8 @@ namespace quda
     template <template <typename> class Functor, typename Block, unsigned int idx = 0, typename FunctorArg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const FunctorArg &arg)
     {
-      if (tp.block.x == Block::block[idx]) {
+      // in block == 0, then we aren't templating on block size
+      if (tp.block.x == Block::block[idx] || Block::block[idx] == 1) {
         const_cast<FunctorArg &>(arg).grid_dim = tp.grid;
         const_cast<FunctorArg &>(arg).block_dim = tp.block;
         // derive a BlockKernelArg from the kernel argument to allow for block-size knowledge in the kernel
@@ -136,23 +136,14 @@ namespace quda
        @param[in] max_block_z Maximum batch size per block (maximum z-dimension block size)
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableBlock2D(const LatticeField &field, unsigned int vector_length_z, unsigned int max_block_z = 0,
-                   QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+    TunableBlock2D(const LatticeField &field, bool tune_block_x, unsigned int vector_length_z,
+                   unsigned int max_block_z = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel(field, location),
       field(field),
+      tune_block_x(tune_block_x),
       vector_length_z(vector_length_z),
       step_z(1),
-      max_block_z(max_block_z == 0 ? vector_length_z : max_block_z),
-      tune_block_x(false)
-    {
-      strcpy(vol, field.VolString());
-      strcpy(aux, compile_type_str(field, location));
-      if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
-      strcat(aux, field.AuxString());
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      strcat(aux, ",fast_compile");
-#endif
-    }
+      max_block_z(max_block_z == 0 ? vector_length_z : max_block_z) {}
 
     /**
        @brief Derived specialization for autotuning the batch size
@@ -171,12 +162,17 @@ namespace quda
         return true;
       } else { // block.x (spacetime) was reset
 
+        auto next = param;
+        next.block.z += step_z;
+        auto shared_bytes = setSharedBytes(next);
+
         // we can advance spin/block-color since this is valid
         if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2)
             && param.block.x * param.block.y * (param.block.z + step_z) <= device::max_threads_per_block()
-            && ((param.block.z + step_z) <= max_block_z)) {
+            && ((param.block.z + step_z) <= max_block_z) && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.z += step_z;
           param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
+          param.shared_bytes = shared_bytes;
           return true;
         } else { // we have run off the end so let's reset
           param.block.z = step_z;

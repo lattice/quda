@@ -21,8 +21,8 @@
 
 // these are helper macros used to enable spin-1, spin-2 and spin-4 building blocks as needed
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_CLOVER_DIRAC)                           \
-  || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_NDEG_TWISTED_MASS_DIRAC)      \
-  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV)
+  || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_CLOVER_HASENBUSCH_TWIST)      \
+  || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
 #define NSPIN4
 #endif
 
@@ -30,7 +30,7 @@
 #define NSPIN2
 #endif
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_LAPLACE)
 #define NSPIN1
 #endif
 
@@ -48,16 +48,29 @@
 #include <malloc_quda.h>
 #include <object.h>
 #include <device.h>
+#include <array.h>
+#include "timer.h"
 
 namespace quda {
 
   using Complex = std::complex<double>;
 
   /**
+     Array object type used to storing lattice dimensions
+   */
+  using lat_dim_t = array<int, QUDA_MAX_DIM>;
+
+  /**
    * Check that the resident gauge field is compatible with the requested inv_param
    * @param inv_param   Contains all metadata regarding host and device storage
    */
   bool canReuseResidentGauge(QudaInvertParam *inv_param);
+
+  /**
+     Runtime query of what the maximum number of RHS per kernel is
+     @return Maximum number of RHS per kernel
+   */
+  unsigned int get_max_multi_rhs();
 
   class TimeProfile;
 

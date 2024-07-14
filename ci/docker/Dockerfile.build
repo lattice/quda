@@ -1,0 +1,57 @@
+FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN echo "Running CSCS CI on $(nproc) processors"
+
+RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
+    build-essential \
+    cmake \
+    wget \
+    ninja-build && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG MPICH_VERSION=3.3.2
+ARG MPICH_PATH=/usr/local/mpich
+RUN wget -q https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPICH_VERSION}.tar.gz && \
+    tar -xzf mpich-${MPICH_VERSION}.tar.gz && \
+    cd mpich-${MPICH_VERSION} && \
+    ./configure \
+    --disable-fortran \
+    --prefix=$MPICH_PATH && \
+    make install -j$(nproc) && \
+    rm -rf /root/mpich-${MPICH_VERSION}.tar.gz /root/mpich-${MPICH_VERSION}
+
+RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
+
+COPY . /quda/src
+
+ENV QUDA_TEST_GRID_SIZE="1 1 1 2"
+
+RUN  QUDA_TEST_GRID_SIZE="1 1 1 2" cmake -S /quda/src \
+    -DCMAKE_CUDA_COMPILER=nvcc \
+    -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
+    -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
+    -DCMAKE_BUILD_TYPE=STRICT \
+    -DQUDA_CTEST_LAUNCH="" \
+    -DQUDA_GPU_ARCH=sm_60 \
+    -DQUDA_MULTIGRID=ON \
+    -DQUDA_MULTIGRID_NVEC_LIST=6 \
+    -DQUDA_MDW_FUSED_LS_LIST=4 \
+    -DQUDA_MPI=ON  \
+    -DQUDA_DIRAC_DEFAULT_OFF=ON \
+    -DQUDA_DIRAC_WILSON=ON \
+    -DQUDA_DIRAC_CLOVER=ON \
+    -DQUDA_DIRAC_TWISTED_CLOVER=ON \
+    -DQUDA_DIRAC_STAGGERED=ON \
+    -DQUDA_DIRAC_LAPLACE=ON \
+    -DQUDA_COVDEV=ON \
+    -GNinja \
+    -B /quda/build 
+
+RUN cmake --build /quda/build -j $(nproc)
+
+RUN cmake --install /quda/build
+
+
+

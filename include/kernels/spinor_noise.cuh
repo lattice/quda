@@ -7,11 +7,12 @@ namespace quda {
 
   using namespace colorspinor;
 
-  template <typename real_, int nSpin_, int nColor_, QudaFieldOrder order, QudaNoiseType noise_>
+  template <typename real_, int nSpin_, int nColor_, QudaNoiseType noise_>
   struct SpinorNoiseArg : kernel_param<> {
     using real = real_;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
+    static constexpr QudaFieldOrder order = colorspinor::getNative<real>(nSpin);
     static constexpr QudaNoiseType noise = noise_;
     using V = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order>;
     V v;
@@ -24,11 +25,11 @@ namespace quda {
 
   template<typename real, typename Arg> // Gauss
   __device__ __host__ inline void genGauss(Arg &arg, RNGState& localState, int parity, int x_cb, int s, int c) {
-    real phi = 2.0*M_PI*uniform<real>::rand(localState);
+    real phi = 2.0 * uniform<real>::rand(localState);
     real radius = uniform<real>::rand(localState);
     radius = sqrt(-log(radius));
     real phi_sin, phi_cos;
-    quda::sincos(phi, &phi_sin, &phi_cos);
+    quda::sincospi(phi, &phi_sin, &phi_cos);
     arg.v(parity, x_cb, s, c) = radius * complex<real>(phi_cos, phi_sin);
   }
 

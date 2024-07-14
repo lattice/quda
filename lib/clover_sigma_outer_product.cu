@@ -12,84 +12,74 @@ namespace quda {
 
   template <typename Float, int nColor> class CloverSigmaOprod : public TunableKernel3D
   {
-    template <int nvector> using Arg = CloverSigmaOprodArg<Float, nColor, nvector>;
+    template <bool doublet> using Arg = CloverSigmaOprodArg<Float, nColor, doublet>;
     GaugeField &oprod;
-    const std::vector<ColorSpinorField*> &inA;
-    const std::vector<ColorSpinorField*> &inB;
-    const std::vector<std::vector<double>> &coeff;
-    unsigned int minThreads() const { return oprod.VolumeCB(); }
+    cvector_ref<const ColorSpinorField> &inA;
+    cvector_ref<const ColorSpinorField> &inB;
+    const std::vector<array<double, 2>> &coeff;
+    const bool doublet; // whether we are applying the operator to a doublet
+    unsigned int minThreads() const override { return oprod.VolumeCB(); }
 
   public:
-    CloverSigmaOprod(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA,
-                     const std::vector<ColorSpinorField*> &inB,
-                     const std::vector<std::vector<double>> &coeff) :
+    CloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &inA,
+                     cvector_ref<const ColorSpinorField> &inB, const std::vector<array<double, 2>> &coeff) :
       TunableKernel3D(oprod, 2, 6),
       oprod(oprod),
       inA(inA),
       inB(inB),
-      coeff(coeff)
+      coeff(coeff),
+      doublet(inA.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET)
     {
-      char tmp[16];
-      sprintf(tmp, ",nvector=%lu", inA.size());
-      strcat(aux, tmp);
+      if (doublet) strcat(aux, ",doublet");
+      setRHSstring(aux, inA.size());
       apply(device::get_default_stream());
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      switch (inA.size()) {
-      case 1: launch<SigmaOprod>(tp, stream, Arg<1>(oprod, inA, inB, coeff)); break;
-      default: errorQuda("Unsupported nvector = %lu\n", inA.size());
-      }
+      if (doublet)
+        launch<SigmaOprod>(tp, stream, Arg<true>(oprod, inA, inB, coeff));
+      else
+        launch<SigmaOprod>(tp, stream, Arg<false>(oprod, inA, inB, coeff));
     } // apply
 
-    void preTune() { oprod.backup(); }
-    void postTune() { oprod.restore(); }
+    void preTune() override { oprod.backup(); }
+    void postTune() override { oprod.restore(); }
 
-    long long flops() const
+    long long flops() const override
     {
-      return ((144 + 18) * inA.size() + 18) * 6 * oprod.Volume(); // spin trace + multiply-add
+      int n_flavor = doublet ? 2 : 1;
+      int oprod_flops = inA.Ncolor() * inA.Ncolor() * (8 * inA.Nspin() - 2);
+      int mat_size = 2 * inA.Ncolor() * inA.Ncolor();
+      // ((spin trace + multiply-add) * n_flavor * n_vector + projection) * 6 dir * sites
+      return ((oprod_flops + 2 * mat_size) * n_flavor * inA.size() + mat_size) * 6 * oprod.Volume();
     }
-    long long bytes() const
-    {
-      return (inA[0]->Bytes() + inB[0]->Bytes()) * inA.size() * 6 + 2 * oprod.Bytes();
-    }
+    long long bytes() const override { return (inA.Bytes() + inB.Bytes()) * 6 + 2 * oprod.Bytes(); }
   }; // CloverSigmaOprod
 
-#ifdef GPU_CLOVER_DIRAC
-  void computeCloverSigmaOprod(GaugeField& oprod, std::vector<ColorSpinorField*> &x,
-			       std::vector<ColorSpinorField*> &p, std::vector<std::vector<double> > &coeff)
+  void computeCloverSigmaOprod(GaugeField &oprod, cvector_ref<const ColorSpinorField> &x,
+                               cvector_ref<const ColorSpinorField> &p, const std::vector<array<double, 2>> &coeff)
   {
-    if (x.size() > MAX_NVECTOR) {
-      // divide and conquer
-      std::vector<ColorSpinorField*> x0(x.begin(), x.begin()+x.size()/2);
-      std::vector<ColorSpinorField*> p0(p.begin(), p.begin()+p.size()/2);
-      std::vector<std::vector<double> > coeff0(coeff.begin(), coeff.begin()+coeff.size()/2);
-      for (unsigned int i=0; i<coeff0.size(); i++) {
-	coeff0[i].reserve(2); coeff0[i][0] = coeff[i][0]; coeff0[i][1] = coeff[i][1];
-      }
-      computeCloverSigmaOprod(oprod, x0, p0, coeff0);
+    if constexpr (is_enabled_clover()) {
+      if (x.size() > get_max_multi_rhs()) {
+        // divide and conquer
+        computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin(), x.begin() + x.size() / 2},
+                                cvector_ref<const ColorSpinorField> {p.begin(), p.begin() + p.size() / 2},
+                                {coeff.begin(), coeff.begin() + coeff.size() / 2});
 
-      std::vector<ColorSpinorField*> x1(x.begin()+x.size()/2, x.end());
-      std::vector<ColorSpinorField*> p1(p.begin()+p.size()/2, p.end());
-      std::vector<std::vector<double> > coeff1(coeff.begin()+coeff.size()/2, coeff.end());
-      for (unsigned int i=0; i<coeff1.size(); i++) {
-	coeff1[i].reserve(2); coeff1[i][0] = coeff[coeff.size()/2 + i][0]; coeff1[i][1] = coeff[coeff.size()/2 + i][1];
+        computeCloverSigmaOprod(oprod, cvector_ref<const ColorSpinorField> {x.begin() + x.size() / 2, x.end()},
+                                cvector_ref<const ColorSpinorField> {p.begin() + p.size() / 2, p.end()},
+                                {coeff.begin() + coeff.size() / 2, coeff.end()});
+        return;
       }
-      computeCloverSigmaOprod(oprod, x1, p1, coeff1);
 
-      return;
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+      instantiate<CloverSigmaOprod>(oprod, x, p, coeff);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      errorQuda("Clover Dirac operator has not been built!");
     }
-
-    instantiate<CloverSigmaOprod>(oprod, x, p, coeff);
   }
-#else // GPU_CLOVER_DIRAC not defined
-  void computeCloverSigmaOprod(GaugeField &, std::vector<ColorSpinorField*> &,
-			       std::vector<ColorSpinorField*> &, std::vector<std::vector<double> > &)
-  {
-    errorQuda("Clover Dirac operator has not been built!");
-  }
-#endif
 
 } // namespace quda

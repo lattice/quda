@@ -12,6 +12,7 @@ namespace quda {
     FloatOut *Out;
     FloatIn *In;
 
+    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
     unsigned int minThreads() const { return in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(); }
 
   public:
@@ -24,7 +25,7 @@ namespace quda {
       Out(Out),
       In(In)
     {
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
       apply(device::get_default_stream());
     }
 

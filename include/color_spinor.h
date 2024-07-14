@@ -24,7 +24,7 @@ namespace quda {
     struct ColorSpinor {
 
     static constexpr int size = Nc * Ns;
-    complex<Float> data[size];
+    complex<Float> data[size] = {};
 
     __device__ __host__ inline ColorSpinor<Float, Nc, Ns>()
     {
@@ -124,7 +124,7 @@ namespace quda {
     template <typename Float, int Nc> struct ColorSpinor<Float, Nc, 4> {
       static constexpr int Ns = 4;
       static constexpr int size = Nc * Ns;
-      complex<Float> data[size];
+      complex<Float> data[size] = {};
 
       __device__ __host__ inline ColorSpinor<Float, Nc, 4>()
       {
@@ -648,7 +648,7 @@ namespace quda {
     struct ColorSpinor<Float, Nc, 2> {
     static constexpr int Ns = 2;
     static constexpr int size = Ns * Nc;
-    complex<Float> data[size];
+    complex<Float> data[size] = {};
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>() {
 #pragma unroll
@@ -693,7 +693,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 4> reconstruct(int dim, int sign) const
     {
       ColorSpinor<Float, Nc, 4> recon;
-      const auto t = *this;
+      const auto &t = *this;
 
       switch (dim) {
       case 0: // x dimension

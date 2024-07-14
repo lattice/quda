@@ -34,12 +34,12 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
-    // handles for obtained ghost pointers
-    cudaIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
-
 #ifndef NVSHMEM_COMMS
+    // handles for obtained ghost pointers
+    cudaIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
+
   for (int dim = 0; dim < 4; ++dim) {
     if (comm_dim(dim) == 1) continue;
     for (int dir = 0; dir < 2; ++dir) {
@@ -49,7 +49,7 @@ namespace quda
 
       // first set up receive
       if (comm_peer2peer_enabled(1 - dir, dim)) {
-        receiveHandle = comm_declare_receive_relative(&remote_handle[1 - dir][dim], dim, -disp, sizeof(remote_handle));
+        receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(remote_handle));
       }
       // now send
       cudaIpcMemHandle_t local_handle;
@@ -81,7 +81,7 @@ namespace quda
       remote[dim][dir] = nullptr;
 #ifndef NVSHMEM_COMMS
       if (!comm_peer2peer_enabled(dir, dim)) continue;
-      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
+      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dim][dir], cudaIpcMemLazyEnablePeerAccess));
 #else
       remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
 #endif
@@ -91,7 +91,7 @@ namespace quda
 }
 
 #ifndef NVSHMEM_COMMS
-void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
+void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
 {
   for (int dim = 0; dim < 4; ++dim) {
 
@@ -109,13 +109,14 @@ void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
   } // iterate over dim
 }
 #else
-void comm_destroy_neighbor_memory(void *[QUDA_MAX_DIM][2]) { }
+void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
 #endif
 
-void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
 {
   // handles for obtained events
-  cudaIpcEventHandle_t ipcRemoteEventHandle[2][QUDA_MAX_DIM];
+  cudaIpcEventHandle_t ipcRemoteEventHandle[QUDA_MAX_DIM][2];
 
   for (int dim = 0; dim < 4; ++dim) {
     if (comm_dim(dim) == 1) continue;
@@ -126,8 +127,8 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
 
       // first set up receive
       if (comm_peer2peer_enabled(1 - dir, dim)) {
-        receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[1 - dir][dim], dim, -disp,
-                                                      sizeof(ipcRemoteEventHandle[1 - dir][dim]));
+        receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[dim][1 - dir], dim, -disp,
+                                                      sizeof(ipcRemoteEventHandle[dim][1 - dir]));
       }
 
       cudaIpcEventHandle_t handle;
@@ -136,9 +137,11 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
       if (comm_peer2peer_enabled(dir, dim)) {
         cudaEvent_t event;
         CHECK_CUDA_ERROR(cudaEventCreate(&event, cudaEventDisableTiming | cudaEventInterprocess));
-        local[dir][dim].event = reinterpret_cast<void *>(event);
+        local[dim][dir].event = reinterpret_cast<void *>(event);
         CHECK_CUDA_ERROR(cudaIpcGetEventHandle(&handle, event));
         sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
+      } else {
+        local[dim][dir].event = nullptr;
       }
 
       if (receiveHandle) comm_start(receiveHandle);
@@ -157,18 +160,18 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
     for (int dir = 0; dir < 2; ++dir) {
       if (!comm_peer2peer_enabled(dir, dim)) continue;
       cudaEvent_t event;
-      CHECK_CUDA_ERROR(cudaIpcOpenEventHandle(&event, ipcRemoteEventHandle[dir][dim]));
-      remote[dir][dim].event = reinterpret_cast<void *>(event);
+      CHECK_CUDA_ERROR(cudaIpcOpenEventHandle(&event, ipcRemoteEventHandle[dim][dir]));
+      remote[dim][dir].event = reinterpret_cast<void *>(event);
     }
   }
 }
 
-void comm_destroy_neighbor_event(qudaEvent_t[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &, array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
 {
   for (int dim = 0; dim < 4; ++dim) {
     if (comm_dim(dim) == 1) continue;
     for (int dir = 0; dir < 2; dir++) {
-      cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(local[dir][dim].event);
+      cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(local[dim][dir].event);
       if (comm_peer2peer_enabled(dir, dim)) CHECK_CUDA_ERROR(cudaEventDestroy(event));
     }
   } // iterate over dim

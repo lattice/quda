@@ -3,7 +3,6 @@
 #include <index_helper.cuh>
 #include <instantiate.h>
 #include <tunable_nd.h>
-#include <instantiate_dslash.h>
 #include <kernels/dslash_mobius_eofa.cuh>
 
 namespace quda
@@ -12,9 +11,9 @@ namespace quda
   {
     template <typename store_t, int nColor> class Dslash5 : public TunableKernel3D
     {
-      ColorSpinorField &out;
-      const ColorSpinorField &in;
-      const ColorSpinorField &x;
+      cvector_ref<ColorSpinorField> &out;
+      cvector_ref<const ColorSpinorField> &in;
+      cvector_ref<const ColorSpinorField> &x;
       double m_f;
       double m_5;
       const Complex *b_5;
@@ -48,17 +47,18 @@ namespace quda
         default: errorQuda("Unknown Dslash5Type %d for EOFA", static_cast<int>(type));
         }
 
-        return flops_;
+        return in.size() * flops_;
       }
 
       long long bytes() const
       {
+        size_t bytes = 0;
         switch (type) {
         case Dslash5Type::M5_EOFA:
-        case Dslash5Type::M5INV_EOFA: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
+        case Dslash5Type::M5INV_EOFA: bytes = out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0); break;
         default: errorQuda("Unknown Dslash5Type %d for EOFA", static_cast<int>(type));
         }
-        return 0ll;
+        return bytes;
       }
 
       unsigned int minThreads() const { return in.VolumeCB() / in.X(4); }
@@ -83,11 +83,11 @@ namespace quda
       }
 
     public:
-      Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f,
-              const double m_5, const Complex *b_5, const Complex *c_5, double a, bool eofa_pm, double inv,
-              double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-              double sherman_morrison, bool dagger, Dslash5Type type) :
-        TunableKernel3D(in, in.X(4), in.SiteSubset()),
+      Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+              cvector_ref<const ColorSpinorField> &x, const double m_f, const double m_5, const Complex *b_5,
+              const Complex *c_5, double a, bool eofa_pm, double inv, double kappa, const double *eofa_u,
+              const double *eofa_x, const double *eofa_y, double sherman_morrison, bool dagger, Dslash5Type type) :
+        TunableKernel3D(in[0], in.size() * in.X(4), in.SiteSubset()),
         out(out),
         in(in),
         x(x),
@@ -107,7 +107,9 @@ namespace quda
         type(type),
         sherman_morrison(sherman_morrison)
       {
-        TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
+        // Ls must be contained in the block and different fields on different blocks
+        resizeStep(in.X(4), 1);
+        tune_block_y = false;
 
         if (dagger) strcat(aux, ",Dagger");
         if (xpay) strcat(aux, ",xpay");
@@ -121,6 +123,7 @@ namespace quda
         case Dslash5Type::M5INV_EOFA: strcat(aux, ",mobius_Dslash5Type::M5INV_EOFA"); break;
         default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
         }
+        setRHSstring(aux, in.size());
 
         apply(device::get_default_stream());
       }
@@ -169,24 +172,19 @@ namespace quda
 
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5*in
-#ifdef GPU_DOMAIN_WALL_DIRAC
-    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                       double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
-                       double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-                       double sherman_morrison, bool dagger, Dslash5Type type)
+    void apply_dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                       cvector_ref<const ColorSpinorField> &x, double m_f, double m_5, const Complex *b_5,
+                       const Complex *c_5, double a, int eofa_pm, double inv, double kappa, const double *eofa_u,
+                       const double *eofa_x, const double *eofa_y, double sherman_morrison, bool dagger, Dslash5Type type)
     {
-      checkLocation(out, in, x); // check all locations match
-      instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
-                           sherman_morrison, dagger, type);
+      if constexpr (is_enabled<QUDA_MOBIUS_DWF_EOFA_DSLASH>()) {
+        checkLocation(out, in, x); // check all locations match
+        instantiate_recurse3<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
+                                      sherman_morrison, dagger, type);
+      } else {
+        errorQuda("Mobius EOFA operator has not been built");
+      }
     }
-#else
-    void apply_dslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, double,
-                       double, const Complex *, const Complex *, double, int, double,
-                       double, const double *, const double *, const double *, double, bool, Dslash5Type)
-    {
-      errorQuda("Mobius EOFA dslash has not been built");
-    }
-#endif
 
   } // namespace mobius_eofa
 } // namespace quda

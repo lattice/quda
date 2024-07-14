@@ -5,19 +5,13 @@
 #include <block_reduce_helper.h>
 #include <kernel_helper.h>
 
-#ifdef QUAD_SUM
-using device_reduce_t = doubledouble;
-#else
-using device_reduce_t = double;
-#endif
-
 using count_t = unsigned int;
 
 namespace quda
 {
 
   // declaration of reduce function
-  template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
+  template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
   /**
@@ -28,10 +22,11 @@ namespace quda
      parameter struct as an explicit kernel argument or from constant
      memory
    */
-  template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE>
+  struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <int, int, typename Reducer, typename Arg, typename I>
+    template <typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
@@ -111,24 +106,28 @@ namespace quda
      variant which require explicit host-device synchronization to
      signal the completion of the reduction to the host.
 
-     @param arg The kernel argument, this must derive from ReduceArg
-     @param r Instance of the reducer to be used in this reduction
-     @param in The input per-thread data to be reduced
-     @param idx In the case of multiple reductions, idx identifies
-     which reduction this thread block corresponds to.  Typically idx
-     will be constant along constant block_idx().y and block_idx().z.
+     The reduce function supports:
+     - a global reduction across the x thread dimension
+     - a local block reduction across the y thread dimension
+     - the z thread dimension is a batching dimension in the case of independent reductions
+
+     @param[in,out] arg The kernel argument, this must derive from ReduceArg
+     @param[in] r Instance of the reducer to be used in this reduction
+     @param[in] in The input per-thread data to be reduced
+     @param[in] idx In the case of multiple reductions, idx identifies
+     which reduction this thread block corresponds to and should be
+     constant along the x and y thread dimensions.
   */
-  template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
+  template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
-    constexpr auto n_batch_block
-      = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
-    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
+    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
+    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     __shared__ bool isLastBlockDone[n_batch_block];
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
-    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+    if (target::thread_idx_linear<2>() == 0) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
       __threadfence(); // flush result
 
@@ -143,17 +142,17 @@ namespace quda
 
     // finish the reduction if last block
     if (isLastBlockDone[target::thread_idx().z]) {
-      auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
+      auto i = target::thread_idx_linear<2>();
       T sum = r.init();
       while (i < target::grid_dim().x) {
         sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
-        i += block_size_x * block_size_y;
+        i += target::block_size<2>();
       }
 
       sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
-      if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
+      if (target::thread_idx_linear<2>() == 0) {
         if (arg.get_output_async_buffer()) {
           arg.get_output_async_buffer()[idx] = sum;
         } else {

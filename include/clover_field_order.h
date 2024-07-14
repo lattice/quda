@@ -283,6 +283,14 @@ namespace quda {
       Accessor(const CloverField &, bool = false) { errorQuda("Not implemented for order %d", order); }
       constexpr complex<Float> &operator()(int, int, int, int, int, int) const { return complex<Float>(0.0); }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max.  This is the
+         dummy implementation in the non-specialized Accessor class.
+         @tparam reducer The reduction operation we which to apply
+         @tparam helper The helper functor which acts as the transformer
+         in transform_reduce
+      */
       template <typename reducer, typename helper> constexpr double transform_reduce(QudaFieldLocation, helper) const
       {
         return 0.0;
@@ -304,7 +312,7 @@ namespace quda {
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       FloatNAccessor(const CloverField &A, bool inverse = false) :
-        a(static_cast<Float *>(const_cast<void *>(A.V(inverse)))),
+        a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
         stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         compressed_block_size(A.compressed_block_size()),
@@ -344,6 +352,14 @@ namespace quda {
         }
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, helper h) const
       {
@@ -387,7 +403,7 @@ namespace quda {
       const int N = nSpin * nColor / 2;
       const complex<Float> zero;
       Accessor(const CloverField &A, bool inverse = false) :
-        a(static_cast<Float *>(const_cast<void *>(A.V(inverse)))),
+        a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         zero(complex<Float>(0.0, 0.0))
       {
@@ -415,6 +431,14 @@ namespace quda {
         }
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, helper h) const
       {
@@ -615,7 +639,7 @@ namespace quda {
           if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value)
             errorQuda("%p max_element(%d) appears unset", &clover, is_inverse);
           if (clover.Diagonal() == 0.0 && clover.Reconstruct()) errorQuda("%p diagonal appears unset", &clover);
-          this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
+          this->clover = clover_ ? clover_ : clover.data<Float *>(is_inverse);
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -820,7 +844,7 @@ namespace quda {
           if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
+          this->clover = clover_ ? clover_ : clover.data<Float *>(inverse);
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -868,8 +892,8 @@ namespace quda {
           if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
-          diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
+          offdiag = clover_ ? ((Float **)clover_)[0] : clover.data<Float **>(inverse)[0];
+          diag = clover_ ? ((Float **)clover_)[1] : clover.data<Float **>(inverse)[1];
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -946,7 +970,7 @@ namespace quda {
           if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
+          this->clover[0] = clover_ ? clover_ : clover.data<Float *>(inverse);
           this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
         }
 
@@ -1008,22 +1032,14 @@ namespace quda {
     using type = clover::FloatNOrder<float, N, 4, add_rho, enable_reconstruct>;
   };
 
-#ifdef FLOAT8
-#define FLOATN 8
-#else
-#define FLOATN 4
-#endif
-
-  // half precision uses Float4
+  // half precision uses QUDA_ORDER_FP (Float8 default)
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<short, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<short, N, FLOATN, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<short, N, QUDA_ORDER_FP, add_rho, enable_reconstruct>;
   };
 
-  // quarter precision uses Float4
+  // quarter precision uses QUDA_ORDER_FP (Float8 default)
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<int8_t, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<int8_t, N, FLOATN, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<int8_t, N, QUDA_ORDER_FP, add_rho, enable_reconstruct>;
   };
-
-#undef FLOATN
 
 } // namespace quda

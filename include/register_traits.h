@@ -196,29 +196,6 @@ namespace quda {
     static const int value = 2;
   };
 
-  template<typename, int N> struct vector { };
-
-  template<> struct vector<double, 2> {
-    typedef double2 type;
-    type a;
-    vector(const type &a) { this->a.x = a.x; this->a.y = a.y; }
-    operator type() const { return a; }
-  };
-
-  template<> struct vector<float, 2> {
-    typedef float2 type;
-    float2 a;
-    vector(const double2 &a) { this->a.x = a.x; this->a.y = a.y; }
-    operator type() const { return a; }
-  };
-
-  template<> struct vector<int, 2> {
-    typedef int2 type;
-    int2 a;
-    vector(const int2 &a) { this->a.x = a.x; this->a.y = a.y; }
-    operator type() const { return a; }
-  };
-
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };
@@ -278,6 +255,17 @@ namespace quda {
   template <> struct VectorType<float, 4>{typedef float4 type; };
   template <> struct VectorType<float, 8> {
     typedef float8 type;
+  };
+
+  // single precision
+  template <> struct VectorType<int, 1> {
+    typedef int type;
+  };
+  template <> struct VectorType<int, 2> {
+    typedef int2 type;
+  };
+  template <> struct VectorType<int, 4> {
+    typedef int4 type;
   };
 
   // half precision

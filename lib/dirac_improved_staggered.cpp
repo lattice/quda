@@ -27,37 +27,15 @@ namespace quda {
     return *this;
   }
 
-  void DiracImprovedStaggered::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) {
-      errorQuda("Staggered dslash requires 5-d fermion fields");
-    }
-
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input and output spinor precisions don't match in dslash_quda");
-    }
-
-    if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
-		in.SiteSubset(), out.SiteSubset());
-    }
-
-    if ((out.Volume() / out.X(4) != 2 * fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-        || (out.Volume() / out.X(4) != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
-      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge->VolumeCB());
-    }
-  }
-
-  void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracImprovedStaggered::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                      const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
-    ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, dagger, commDim, profile);
-    flops += 1146ll*in.Volume();
+    ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, dagger, commDim.data, profile);
   }
 
-  void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+  void DiracImprovedStaggered::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                          const QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {    
     checkParitySpinor(in, out);
 
@@ -66,69 +44,96 @@ namespace quda {
       // There's a sign convention difference for Dslash vs DslashXpay, which is
       // triggered by looking for k == 0. We need to hack around this.
       if (dagger == QUDA_DAG_YES) {
-        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_NO, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_NO, commDim.data, profile);
       } else {
-        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_YES, commDim.data, profile);
       }
-      flops += 1146ll * in.Volume();
     } else {
-      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, k, x, parity, dagger, commDim, profile);
-      flops += 1158ll * in.Volume();
+      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, k, x, parity, dagger, commDim.data, profile);
     }
   }
 
   // Full staggered operator
-  void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggered::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
     // Need to flip sign via dagger convention if mass == 0.
     if (mass == 0.0) {
       if (dagger == QUDA_DAG_YES) {
-        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data,
                                profile);
       } else {
-        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data,
                                profile);
       }
-      flops += 1146ll * in.Volume();
     } else {
-      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
+      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim.data,
                              profile);
-      flops += 1158ll * in.Volume();
     }
   }
 
-  void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggered::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-  
-    //even
-    Dslash(tmp1->Even(), in.Even(), QUDA_ODD_PARITY);  
-    DslashXpay(out.Even(), tmp1->Even(), QUDA_EVEN_PARITY, in.Even(), 4*mass*mass);
-  
-    //odd
-    Dslash(tmp1->Even(), in.Odd(), QUDA_EVEN_PARITY);  
-    DslashXpay(out.Odd(), tmp1->Even(), QUDA_ODD_PARITY, in.Odd(), 4*mass*mass);    
+    auto tmp = getFieldTmp(out.Even());
 
-    deleteTmp(&tmp1, reset);
+    //even
+    Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
+    DslashXpay(out.Even(), tmp, QUDA_EVEN_PARITY, in.Even(), 4 * mass * mass);
+
+    // odd
+    Dslash(tmp, in.Odd(), QUDA_EVEN_PARITY);
+    DslashXpay(out.Odd(), tmp, QUDA_ODD_PARITY, in.Odd(), 4 * mass * mass);
   }
 
-  void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			       ColorSpinorField &x, ColorSpinorField &b, 
-			       const QudaSolutionType solType) const
+  void DiracImprovedStaggered::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                       cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                       const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    src = &b;
-    sol = &x;  
+    for (auto i = 0u; i < b.size(); i++) {
+      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+      sol[i] = x[i].create_alias();
+    }
   }
 
-  void DiracImprovedStaggered::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracImprovedStaggered::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                           const QudaSolutionType) const
   {
     // do nothing
   }
+
+  void DiracImprovedStaggered::SmearOp(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                       double, double, int t0, QudaParity parity) const
+  {
+    checkSpinorAlias(in, out);
+
+    bool is_time_slice = t0 >= 0 && t0 < comm_dim(3) * in.X(3) ? true : false;
+    if( is_time_slice && laplace3D > 3 )
+    {
+      logQuda(QUDA_DEBUG_VERBOSE, "t0 will be ignored for d>3 dimensional Laplacian");
+      is_time_slice = false;
+    }
+
+    int t0_local = t0 - comm_coord(3) * in.X(3);
+    if (is_time_slice && (t0_local < 0 || t0_local >= in.X(3)))
+      t0_local = -1; // when source is not in this local lattice
+
+    int comm_dim[4] = {};
+    // only switch on comms needed for directions with a derivative
+    for (int i = 0; i < 4; i++) {
+      comm_dim[i] = comm_dim_partitioned(i);
+      if (laplace3D == i) comm_dim[i] = 0;
+    }
+
+    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+      errorQuda("Single parity site smearing not supported");
+    } else {
+      ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
+    }
+  }  
 
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
                                               double, double, bool allow_truncation) const
@@ -178,112 +183,68 @@ namespace quda {
   // NOT divide out the factor of "2m", i.e., for the even system we invert
   // (4m^2 - D_eo D_oe), not (1 - (1/(4m^2)) D_eo D_oe).
 
-  void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-  
-    QudaParity parity = QUDA_INVALID_PARITY;
-    QudaParity other_parity = QUDA_INVALID_PARITY;
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      parity = QUDA_EVEN_PARITY;
-      other_parity = QUDA_ODD_PARITY;
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      parity = QUDA_ODD_PARITY;
-      other_parity = QUDA_EVEN_PARITY;
-    } else {
-      errorQuda("Invalid matpcType(%d) in function\n", matpcType);    
-    }
-
     // Convention note: Dslash applies D_eo, DslashXpay applies 4m^2 - D_oe!
     // Note the minus sign convention in the Xpay version.
     // This applies equally for the e <-> o permutation.
 
-    Dslash(*tmp1, in, other_parity);  
-    DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(out);
+    Dslash(tmp, in, other_parity);
+    DslashXpay(out, tmp, this_parity, in, 4 * mass * mass);
   }
 
-  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
+  void DiracImprovedStaggeredPC::MdagM(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const
   {
-    errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead.\n");
-    /*
-    // need extra temporary because for multi-gpu the input
-    // and output fields cannot alias
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    M(out, *tmp2); // doesn't need to be Mdag b/c M is normal!
-    deleteTmp(&tmp2, reset);
-    */
+    errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead");
   }
 
-  void DiracImprovedStaggeredPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-				 ColorSpinorField &x, ColorSpinorField &b, 
-				 const QudaSolutionType solType) const
+  void DiracImprovedStaggeredPC::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                         const QudaSolutionType solType) const
   {
-
-    // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      src = &b;
-      sol = &x;
+      for (auto i = 0u; i < b.size(); i++) {
+        // we desire solution to preconditioned system
+        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
+        sol[i] = x[i].create_alias();
+      }
       return;
     }
-  
-    // we desire solution to full system.
-    // See sign convention comment in DiracStaggeredPC::M().
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
 
+    for (auto i = 0u; i < b.size(); i++) {
+      // we desire solution to full system.
       // With the convention given in DiracStaggered::M(),
       // the source is src = 2m b_e + D_eo b_o
       // But remember, DslashXpay actually applies
       // -D_eo. Flip the sign on 2m to compensate, and
       // then flip the overall sign.
-      src = &(x.Odd());
-      DslashXpay(*src, b.Odd(), QUDA_EVEN_PARITY, b.Even(), -2*mass);
-      blas::ax(-1.0, *src);
-      sol = &(x.Even());
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // See above, permute e <-> o
-      src = &(x.Even());
-      DslashXpay(*src, b.Even(), QUDA_ODD_PARITY, b.Odd(), -2*mass);
-      blas::ax(-1.0, *src);
-      sol = &(x.Odd());
-    } else {
-      errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
+      src[i] = x[i][other_parity].create_alias();
+      DslashXpay(src[i], b[i][other_parity], this_parity, b[i][this_parity], -2.0 * mass);
+      blas::ax(-1.0, src[i]);
+      sol[i] = x[i][this_parity].create_alias();
     }
-
-    // here we use final solution to store parity solution and parity source
-    // b is now up for grabs if we want 
   }
 
-  void DiracImprovedStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				     const QudaSolutionType solType) const
+  void DiracImprovedStaggeredPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                             const QudaSolutionType solType) const
   {
-
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       return;
     }
 
-    checkFullSpinor(x, b);
+    for (auto i = 0u; i < b.size(); i++) {
+      checkFullSpinor(x[i], b[i]);
 
-    // create full solution
-    // See sign convention comment in DiracStaggeredPC::M()
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      
+      // create full solution
       // With the convention given in DiracStaggered::M(),
       // the reconstruct is x_o = 1/(2m) (b_o + D_oe x_e)
-      // But remember: DslashXpay actually applies -D_oe, 
+      // But remember: DslashXpay actually applies -D_oe,
       // so just like above we need to flip the sign
       // on b_o. We then correct this by applying an additional
       // minus sign when we rescale by 2m.
-      DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), -1.0);
-      blas::ax(-0.5/mass, x.Odd());
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // See above, permute e <-> o
-      DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), -1.0);
-      blas::ax(-0.5/mass, x.Even());
-    } else {
-      errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
+      DslashXpay(x[i][other_parity], x[i][this_parity], other_parity, b[i][other_parity], -1.0);
+      blas::ax(-0.5 / mass, x[i][other_parity]);
     }
   }
 

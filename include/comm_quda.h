@@ -3,6 +3,7 @@
 #include <vector>
 #include <quda_constants.h>
 #include <quda_api.h>
+#include <array.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,6 +15,9 @@ typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 #ifdef __cplusplus
 }
 #endif
+
+/** Maximum length in bytes of the host string */
+#define QUDA_MAX_HOSTNAME_STRING 128
 
 namespace quda
 {
@@ -202,8 +206,8 @@ namespace quda
   /**
      @brief Gather all hostnames
      @param[out] hostname_recv_buf char array of length
-     128*comm_size() that will be filled in GPU ids for all processes.
-     Each hostname is in rank order, with 128 bytes for each.
+     QUDA_MAX_HOSTNAME_STRING*comm_size() that will be filled in GPU ids for all processes.
+     Each hostname is in rank order, with QUDA_MAX_HOSTNAME_STRING bytes for each.
   */
   void comm_gather_hostname(char *hostname_recv_buf);
 
@@ -250,7 +254,7 @@ namespace quda
      @param[in] local The process-local memory pointer to be exchanged
      from this process
   */
-  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local);
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
      @brief Deallocate the remote addresses to logically neighboring
@@ -258,26 +262,28 @@ namespace quda
      @param[in] remote Array of remote memory pointers to neighboring
      pointers
   */
-  void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2]);
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 
   /**
-       @brief Create unique events shared between each logical pair of
-       neighboring processes, e.g., the event in the forwards direction
-       in a given dimension on a given process aliases the event in the
-       backward direction in the same dimension, and is unique
-       between that process pair. This exchange is only defined between
-       devices that are peer-to-peer enabled.
-       @param[out] remote Array of remote events to neighboring processes
-       @param[in] local Array of local event to neighboring processes
-     */
-  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+     @brief Create unique events shared between each logical pair of
+     neighboring processes, e.g., the event in the forwards direction
+     in a given dimension on a given process aliases the event in the
+     backward direction in the same dimension, and is unique
+     between that process pair. This exchange is only defined between
+     devices that are peer-to-peer enabled.
+     @param[out] remote Array of remote events to neighboring processes
+     @param[in] local Array of local event to neighboring processes
+   */
+  void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                  array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Destroy the coupled events
      @param[out] remote Array of remote events to neighboring processes
      @param[in] local Array of local event to neighboring processes
    */
-  void comm_destroy_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+  void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on
@@ -329,6 +335,17 @@ namespace quda
      @brief Query if GPU Direct RDMA communication is enabled (global setting)
   */
   bool comm_gdr_enabled();
+
+  /**
+     @brief Return if zero-copy policy kernels have been enabled.  By
+     default kernels that read their communication halos directly from
+     host memory are disabled to reduce tuning time, since on
+     PCIe-based architectures, these kernels underperform and can take
+     excessive tuning time.  They can be enabled with the environment
+     variable QUDA_ENABLE_ZERO_COPY=1
+     @return Return if zero-copy policy halos are enabled
+   */
+  bool comm_zero_copy_enabled();
 
   /**
      @brief Query if NVSHMEM communication is enabled (global setting)
@@ -391,7 +408,16 @@ namespace quda
 
   void comm_allreduce_int(int &data);
   void comm_allreduce_xor(uint64_t &data);
-  void comm_broadcast(void *data, size_t nbytes);
+
+  /**
+     @brief Broadcast from the root rank
+     @param[in,out] data The data to be read from on the root rank, and
+     written to on all other ranks
+     @param[in] nbytes The size in bytes of data to be broadcast
+     @param[in] root The process that will be broadcasting
+  */
+  void comm_broadcast(void *data, size_t nbytes, int root = 0);
+
   void comm_barrier(void);
   void comm_abort(int status);
   void comm_abort_(int status);

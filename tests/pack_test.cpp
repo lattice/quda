@@ -24,23 +24,24 @@ ColorSpinorParam csParam;
 
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-    
+
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
-void init() {
+void init()
+{
 
   param.cpu_prec = prec_cpu;
   param.cuda_prec = prec;
   param.reconstruct = link_recon;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
-  
+
   param.X[0] = xdim;
   param.X[1] = ydim;
   param.X[2] = zdim;
   param.X[3] = tdim;
 #ifdef MULTI_GPU
-  param.ga_pad = xdim*ydim*zdim/2;
+  param.ga_pad = xdim * ydim * zdim / 2;
 #else
   param.ga_pad = 0;
 #endif
@@ -58,7 +59,7 @@ void init() {
   csParam.nSpin = 4;
   csParam.nDim = 4;
   csParam.pc_type = QUDA_4D_PC;
-  for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
+  for (int d = 0; d < 4; d++) csParam.x[d] = param.X[d];
   csParam.setPrecision(prec_cpu);
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -84,7 +85,8 @@ void init() {
   cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
 }
 
-void end() {
+void end()
+{
   // release memory
   cudaSpinor.reset();
   spinor2.reset();
@@ -106,20 +108,20 @@ void packTest()
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
 
     GaugeFieldParam cpsParam(param, cpsCpuGauge_p);
-    cpuGaugeField cpsCpuGauge(cpsParam);
+    GaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
     cpsParam.reconstruct = param.reconstruct;
     cpsParam.setPrecision(param.cuda_prec, true);
     cpsParam.pad = param.ga_pad;
-    cudaGaugeField cudaCpsGauge(cpsParam);
+    GaugeField cudaCpsGauge(cpsParam);
 
     host_timer.start();
-    cudaCpsGauge.loadCPUField(cpsCpuGauge);
+    cudaCpsGauge.copy(cpsCpuGauge);
     host_timer.stop();
     printfQuda("CPS Gauge send time = %e seconds\n", host_timer.last());
 
     host_timer.start();
-    cudaCpsGauge.saveCPUField(cpsCpuGauge);
+    cpsCpuGauge.copy(cudaCpsGauge);
     host_timer.stop();
     printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.last());
   }
@@ -130,20 +132,20 @@ void packTest()
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
     GaugeFieldParam qdpParam(param, qdpCpuGauge_p);
-    cpuGaugeField qdpCpuGauge(qdpParam);
+    GaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
     qdpParam.reconstruct = param.reconstruct;
     qdpParam.setPrecision(param.cuda_prec, true);
     qdpParam.pad = param.ga_pad;
-    cudaGaugeField cudaQdpGauge(qdpParam);
+    GaugeField cudaQdpGauge(qdpParam);
 
     host_timer.start();
-    cudaQdpGauge.loadCPUField(qdpCpuGauge);
+    cudaQdpGauge.copy(qdpCpuGauge);
     host_timer.stop();
     printfQuda("QDP Gauge send time = %e seconds\n", host_timer.last());
 
     host_timer.start();
-    cudaQdpGauge.saveCPUField(qdpCpuGauge);
+    qdpCpuGauge.copy(cudaQdpGauge);
     host_timer.stop();
     printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.last());
   }
@@ -168,7 +170,8 @@ void packTest()
   ColorSpinorField::Compare(*spinor, *spinor2, 1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   // command line options
   auto app = make_app();
   try {
@@ -185,4 +188,3 @@ int main(int argc, char **argv) {
 
   finalizeComms();
 }
-

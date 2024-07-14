@@ -6,7 +6,7 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePlaq : public TunableReduction2D<> {
+  class GaugePlaq : public TunableReduction2D {
     const GaugeField &u;
     array<double, 2> &plq;
 
@@ -37,9 +37,11 @@ namespace quda {
 
   double3 plaquette(const GaugeField &U)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     array<double, 2> plq{0.0, 0.0};
-    instantiate<GaugePlaq>(U, plq);
+    instantiate<GaugePlaq, ReconstructGauge>(U, plq);
     double3 plaq = make_double3(0.5*(plq[0] + plq[1]), plq[0], plq[1]);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return plaq;
   }
 

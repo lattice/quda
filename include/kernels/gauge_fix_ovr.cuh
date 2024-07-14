@@ -43,6 +43,7 @@ namespace quda {
   template <typename Arg> struct FixQualityOVR : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityOVR(const Arg &arg) : arg(arg) {}
@@ -66,9 +67,9 @@ namespace quda {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
       }
-      Link delta;
-      setZero(&delta);
+      Link delta = {};
       //load upward links
+#pragma unroll
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         Link U = arg.data(mu, linkIndex(x, X), parity);
         delta -= U;
@@ -77,6 +78,7 @@ namespace quda {
       data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       //load downward links
+#pragma unroll
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         Link U = arg.data(mu, linkIndexM1(x,X,mu), 1 - parity);
         delta += U;

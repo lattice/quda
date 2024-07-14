@@ -1,8 +1,5 @@
 #include <multigrid_helper.cuh>
 
-// this removes ghost accessor reducing the parameter space needed
-#define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
-
 #include <math_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <constant_kernel_arg.h> // allow for large parameter structs
@@ -54,15 +51,14 @@ namespace quda {
     static constexpr bool swizzle = false;
     int_fastdiv swizzle_factor; // for transposing blockIdx.x mapping to coarse grid coordinate
 
-    const Vector B[nVec];
+    Vector B[nVec];
 
     static constexpr bool launch_bounds = true;
     dim3 grid_dim;
     dim3 block_dim;
 
-    template <typename... T>
-    BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
-                  const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
+    BlockOrthoArg(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
+                  const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta) :
       kernel_param(dim3(meta.VolumeCB() * (fineSpin > 1 ? meta.SiteSubset() : 1), 1, chiral_blocks)),
       V(V),
       fine_to_coarse(fine_to_coarse),
@@ -72,10 +68,10 @@ namespace quda {
       nParity(meta.SiteSubset()),
       nBlockOrtho(n_block_ortho),
       fineVolumeCB(meta.VolumeCB()),
-      B{*B...},
       grid_dim(),
       block_dim()
     {
+      for (int i = 0; i < nVec; i++) this->B[i] = B[i];
       int aggregate_size = 1;
       for (int d = 0; d < V.Ndim(); d++) aggregate_size *= geo_bs[d];
       aggregate_size_cb = aggregate_size / 2;
@@ -149,8 +145,9 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      BlockReduce<dot_t, block_size> dot_reducer{0};
-      BlockReduce<sum_t, block_size> norm_reducer{0};
+      constexpr int block_dim = 1;
+      BlockReduce<dot_t, block_dim> dot_reducer{0};
+      BlockReduce<sum_t, block_dim> norm_reducer{0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <quda_api.h>
+
 namespace quda
 {
 
@@ -9,13 +12,46 @@ namespace quda
     /**
        @brief Create the device context.  Called by initQuda when
        initializing the library.
+       @param[in] dev Device ordinal for which to initialize
      */
     void init(int dev);
+
+    /**
+       @brief Initialize this thread to be able to use the device
+       presently initalized for this process.  This will error out if
+       init() has not previously been called.
+     */
+    void init_thread();
+
+    /**
+       @brief Struct that is used to record the state of the device
+       (or host in the future).  At present this is used for storing
+       the power, clock rate and temperature at a given point in time,
+       but can be expanded as necessary in the future.
+     */
+    struct state_t {
+      std::chrono::time_point<std::chrono::high_resolution_clock> time;
+      float power;
+      unsigned int clock;
+      unsigned int temp;
+    };
+
+    /**
+       @brief Record the present state of the GPU (power, temperature, clock)
+     */
+    state_t get_state();
 
     /**
        @brief Get number of devices present on node
     */
     int get_device_count();
+
+    /**
+       @brief Get the visible devices string from environmental variable,
+       e.g. CUDA_VISIBLE_DEVICES=1,0,2 gives '102'
+       @param device_list_string The output string
+    */
+    void get_visible_devices_string(char device_list_string[128]);
 
     /**
        @brief Query and print to stdout device properties of all GPUs

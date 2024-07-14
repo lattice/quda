@@ -112,12 +112,14 @@ module quda_fortran
      real(8) :: mq3; ! EOFA parameter
 
      real(8) :: mu    ! Chiral twisted mass parameter
-     real(8) :: epsilon ! Flavor twisted mass parameter
      real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
+     real(8) :: epsilon ! Flavor twisted mass parameter
+     real(8) :: evmax ! Maximum of the eigenvalues of the ndeg twisted mass operator needed for fermionic forces
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
-     
+     integer(4) :: covdev_mu    ! Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3)
+
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm
@@ -284,6 +286,9 @@ module quda_fortran
      ! Whether to use additive or multiplicative Schwarz preconditioning
      QudaSchwarzType :: schwarz_type
 
+     ! The type of accelerator type to use for preconditioner
+     QudaAcceleratorType :: accelerator_type_precondition
+
      ! The diagonal constant to suppress the low modes when performing 5D transfer
      real(8):: madwf_diagonal_suppressor
 
@@ -355,6 +360,11 @@ module quda_fortran
 
      ! Whether to use the fused kernels for Mobius/DWF-4D dslash
      QudaBoolean :: use_mobius_fused_kernel
+
+     ! The alpha0 parameter for distance preconditioning, related to the pseudoscalar meson mass
+     real(8) distance_pc_alpha0
+     ! The t0 parameter for distance preconditioning, the timeslice where the source is located
+     integer(4) distance_pc_t0
 
   end type quda_invert_param
 

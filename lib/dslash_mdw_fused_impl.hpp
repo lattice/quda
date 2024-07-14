@@ -10,6 +10,10 @@
 #include <kernels/dslash_mdw_fused.cuh>
 #include <dslash_mdw_fused.hpp>
 
+#ifdef QUDA_MMA_AVAILABLE
+#include <device.hpp>
+#endif
+
 namespace quda
 {
 
@@ -87,7 +91,11 @@ namespace quda
 
       int blockStep() const { return 16; }
       int blockMin() const { return 16; }
-      unsigned int maxBlockSize(const TuneParam &) const { return 32; }
+      unsigned int maxBlockSize(const TuneParam &param) const
+      {
+        unsigned int m = std::min(device::max_threads_per_block() / (param.block.y * param.block.z), 32u);
+        return std::min(m, device::maximum_resident_threads() / (param.block.y * param.block.z * param.aux.y));
+      }
 
       int gridStep() const { return device::processor_count(); }
       unsigned int maxGridSize() const { return (volume_4d_cb_active + blockMin() - 1) / blockMin(); }
@@ -116,7 +124,9 @@ namespace quda
           param.aux.x++;
           aux_advanced = true;
         } else {
-          if (param.aux.y < 3) { // second see if aux.y
+          if (param.aux.y < 3
+              && (param.aux.y + 1) * param.block.x * param.block.y
+                <= device::maximum_resident_threads()) { // second see if aux.y
             param.aux.y++;
             aux_advanced = true;
             param.aux.x = 0;
@@ -131,15 +141,16 @@ namespace quda
       unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
 
     public:
-      FusedDslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                  const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-                  bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) :
-        TunableGridStrideKernel2D(in, x.X(4)),
-        out(out),
-        in(in),
+      FusedDslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, cvector_ref<ColorSpinorField> &y,
+                  double m_f, double m_5, const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
+                  int halo_shift[4], MdwfFusedDslashType type) :
+        TunableGridStrideKernel2D(in[0], x.X(4)),
+        out(out[0]),
+        in(in[0]),
         U(U),
-        y(y),
-        x(x),
+        y(y[0]),
+        x(x[0]),
         m_f(m_f),
         m_5(m_5),
         b_5(b_5),
@@ -182,8 +193,14 @@ namespace quda
       template <int block_dim_x, int min_blocks, bool reload, MdwfFusedDslashType type>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
-        launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, Ls, block_dim_x, min_blocks, reload>
-                                               (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift));
+        if constexpr (block_dim_x * Ls * min_blocks <= device::maximum_resident_threads()) {
+          launch_cuda<FusedMobiusDslash>(tp, stream,
+                                         Arg<type, Ls, block_dim_x, min_blocks, reload>(out, in, U, y, x, m_f, m_5, b_5,
+                                                                                        c_5, parity, shift, halo_shift));
+        } else {
+          errorQuda("Maximum number of resident_threads reached: %d * %d * %d > %u\n", block_dim_x, Ls, min_blocks,
+                    device::maximum_resident_threads());
+        }
       }
 
       template <int block_dim_x, bool reload, MdwfFusedDslashType type>

@@ -38,8 +38,9 @@ namespace quda
 
       real yHatMax = 0.0;
 
-      using Config = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K,
-                               Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
+      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
+      using Config = MmaConfig<mma_t, Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, Arg::bM, Arg::bN, Arg::bK,
+                               Arg::block_y, Arg::block_z>;
 
       {
         // first do the backwards links Y^{+\mu} * X^{-\dagger}
@@ -76,8 +77,7 @@ namespace quda
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
 
-        real yHatMax_ = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m, n);
-        yHatMax = fmax(yHatMax, yHatMax_);
+        yHatMax = fmaxf(yHatMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m, n));
       }
 
       return yHatMax;
@@ -116,7 +116,8 @@ namespace quda
         case 3: max = computeYhatMMA(arg, 3, x_cb, parity, m, n); break;
         }
         if (Arg::compute_max) {
-          unsigned aggregate = BlockReduce<unsigned, 1, Arg::block_y, Arg::block_z>().Max(__float_as_uint(max));
+          constexpr int block_dim = 3;
+          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }

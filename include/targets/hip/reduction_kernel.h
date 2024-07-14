@@ -6,23 +6,6 @@ namespace quda
 {
 
   /**
-     @brief This class is derived from the arg class that the functor
-     creates and curries in the block size.  This allows the block
-     size to be set statically at launch time in the actual argument
-     class that is passed to the kernel.
-
-     @tparam block_size_x x-dimension block-size
-     @tparam block_size_y y-dimension block-size
-     @tparam Arg Kernel argument struct
-  */
-  template <int block_size_x_, int block_size_y_, typename Arg_> struct ReduceKernelArg : Arg_ {
-    using Arg = Arg_;
-    static constexpr int block_size_x = block_size_x_;
-    static constexpr int block_size_y = block_size_y_;
-    ReduceKernelArg(const Arg &arg) : Arg(arg) { }
-  };
-
-  /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
      reduction kernel.  Functors that utilize this kernel have two
      parallelization dimensions.  The y thread dimenion is constrained
@@ -57,7 +40,7 @@ namespace quda
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
+    reduce(arg, t, value);
   }
 
   /**
@@ -74,7 +57,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void>
-    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) Reduction2D(Arg arg)
+    __launch_bounds__(device::get_default_reduction_launch_bounds<Arg>()) Reduction2D(Arg arg)
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -93,7 +76,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
-    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) Reduction2D()
+    __launch_bounds__(device::get_default_reduction_launch_bounds<Arg>()) Reduction2D()
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
@@ -137,7 +120,7 @@ namespace quda
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
+    reduce(arg, t, value, j);
   }
 
   /**
@@ -154,7 +137,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void>
-    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) MultiReduction(Arg arg)
+    __launch_bounds__(device::get_default_multireduction_launch_bounds<Arg>()) MultiReduction(Arg arg)
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -173,7 +156,7 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
-    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) MultiReduction()
+    __launch_bounds__(device::get_default_multireduction_launch_bounds<Arg>()) MultiReduction()
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }

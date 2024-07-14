@@ -17,10 +17,11 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define DABS(a) ((a)<(0.)?(-(a)):(a))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define DABS(a) ((a) < (0.) ? (-(a)) : (a))
 
-namespace quda {
+namespace quda
+{
   extern void setTransferGPU(bool);
 }
 
@@ -52,33 +53,9 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-int main(int argc, char **argv)
+void heatbath_test(int argc, char **argv)
 {
-  // command line options
-  auto app = make_app();
-  add_heatbath_option_group(app);
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
-
-  // call srand() with a rank-dependent seed
-  initRand();
-
-  display_test_info();
-
-  // initialize the QUDA library
-  initQuda(device_ordinal);
-
   // *** QUDA parameters begin here.
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
   gauge_param.t_boundary = QUDA_PERIODIC_T;
@@ -90,12 +67,17 @@ int main(int argc, char **argv)
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
+
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
 
-  int *num_failures_h = (int *)mapped_malloc(sizeof(int));
-  int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
-  *num_failures_h = 0;
+  quda::quda_ptr num_failures(QUDA_MEMORY_MAPPED, sizeof(int), false);
+  int &num_failures_h = *static_cast<int *>(num_failures.data_host());
+  int &num_failures_d = *static_cast<int *>(num_failures.data_device());
+  num_failures_h = 0;
 
   // start the timer
   double time0 = -((double)clock());
@@ -103,35 +85,37 @@ int main(int argc, char **argv)
   {
     using namespace quda;
     GaugeFieldParam gParam(gauge_param);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.create      = QUDA_NULL_FIELD_CREATE;
-    gParam.link_type   = gauge_param.type;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.link_type = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
-    cudaGaugeField *gauge = new cudaGaugeField(gParam);
+    GaugeField gauge(gParam);
 
     int pad = 0;
-    int y[4];
-    int R[4] = {0,0,0,0};
-    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
-    for(int dir=0; dir<4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
-    GaugeFieldParam gParamEx(y, prec, link_recon,
-			     pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+    lat_dim_t y;
+    lat_dim_t R = {0, 0, 0, 0};
+    for (int dir = 0; dir < 4; ++dir)
+      if (comm_dim_partitioned(dir)) R[dir] = 2;
+    for (int dir = 0; dir < 4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
+    GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.order = gParam.order;
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
-    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
-    cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
+    for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
+    GaugeField gaugeEx(gParamEx);
     // CURAND random generator initialization
-    RNG *randstates = new RNG(*gauge, 1234);
+    RNG randstates(gauge, 1234);
 
     int nsteps = heatbath_num_steps;
     int nwarm = heatbath_warmup_steps;
     int nhbsteps = heatbath_num_heatbath_per_step;
     int novrsteps = heatbath_num_overrelax_per_step;
-    bool  coldstart = heatbath_coldstart;
+    bool coldstart = heatbath_coldstart;
     double beta_value = heatbath_beta_value;
 
     printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value,
@@ -142,21 +126,21 @@ int main(int argc, char **argv)
 
     if (latfile.size() > 0) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
-      copyExtendedResidentGaugeQuda((void *)gaugeEx);
+      copyExtendedResidentGaugeQuda(&gaugeEx);
     } else {
       if (coldstart)
-        InitGaugeField(*gaugeEx);
+        InitGaugeField(gaugeEx);
       else
-        InitGaugeField(*gaugeEx, *randstates);
+        InitGaugeField(gaugeEx, randstates);
 
       // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       // load the gauge field from gauge
-      gauge_param.gauge_order = gauge->Order();
+      gauge_param.gauge_order = gauge.Order();
       gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
-      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+      loadGaugeQuda(gauge.data(), &gauge_param);
     }
 
     QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -172,37 +156,37 @@ int main(int argc, char **argv)
     // Do a warmup if requested
     if (nwarm > 0) {
       for (int step = 1; step <= nwarm; ++step) {
-        Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+        Monte(gaugeEx, randstates, beta_value, nhbsteps, novrsteps);
 
-        quda::unitarizeLinks(*gaugeEx, num_failures_d);
-        if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+        quda::unitarizeLinks(gaugeEx, &num_failures_d);
+        if (num_failures_h > 0) errorQuda("Error in the unitarization\n");
       }
     }
 
     // copy into regular field
-    copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+    copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     // load the gauge field from gauge
-    gauge_param.gauge_order = gauge->Order();
+    gauge_param.gauge_order = gauge.Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
-    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+    loadGaugeQuda(gauge.data(), &gauge_param);
     gaugeObservablesQuda(&param);
     printfQuda("step=0 plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
 
     freeGaugeQuda();
 
-    for(int step=1; step<=nsteps; ++step){
-      Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+    for (int step = 1; step <= nsteps; ++step) {
+      Monte(gaugeEx, randstates, beta_value, nhbsteps, novrsteps);
 
-      //Reunitarize gauge links...
-      quda::unitarizeLinks(*gaugeEx, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+      // Reunitarize gauge links...
+      quda::unitarizeLinks(gaugeEx, &num_failures_d);
+      if (num_failures_h > 0) errorQuda("Error in the unitarization\n");
 
       // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+      loadGaugeQuda(gauge.data(), &gauge_param);
       gaugeObservablesQuda(&param);
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
 
@@ -216,14 +200,15 @@ int main(int argc, char **argv)
 
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
+      gauge_param.t_boundary = gauge.TBoundary();
 
       void *cpu_gauge[4];
       for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
       // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
+      saveGaugeFieldQuda((void *)cpu_gauge, &gauge, &gauge_param);
 
       write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
 
@@ -232,27 +217,44 @@ int main(int argc, char **argv)
       printfQuda("No output file specified.\n");
     }
 
-    delete gauge;
-    delete gaugeEx;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
-
-    delete randstates;
   }
 
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone, total time = %g secs\n", time0);
 
-  host_free(num_failures_h);
-
   freeGaugeQuda();
-
   for (int dir = 0; dir < 4; dir++) host_free(load_gauge[dir]);
+}
+
+int main(int argc, char **argv)
+{
+  // command line options
+  auto app = make_app();
+  add_heatbath_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
+  }
+
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
+
+  // call srand() with a rank-dependent seed
+  initRand();
+
+  display_test_info();
+
+  // initialize the QUDA library
+  initQuda(device_ordinal);
+
+  // run the test
+  heatbath_test(argc, argv);
 
   // finalize the QUDA library
   endQuda();

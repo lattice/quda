@@ -2,26 +2,22 @@
 #include <invert_quda.h>
 #include <multigrid.h>
 #include <eigensolve_quda.h>
+#include <accelerator.h>
+#include <madwf_ml.h> // For MADWF
 #include <cmath>
 #include <limits>
 
 namespace quda {
 
-  static void report(const char *type) {
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
-  }
+  static void report(const char *type) { logQuda(QUDA_VERBOSE, "Creating a %s solver\n", type); }
 
   Solver::Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+                 const DiracMatrix &matEig, SolverParam &param) :
     mat(mat),
     matSloppy(matSloppy),
     matPrecon(matPrecon),
     matEig(matEig),
     param(param),
-    profile(profile),
-    node_parity(0),
-    eig_solve(nullptr),
-    deflate_init(false),
     deflate_compute(true),
     recompute_evals(!param.eig_param.preserve_evals)
   {
@@ -38,13 +34,19 @@ namespace quda {
     }
   }
 
+  void Solver::create(ColorSpinorField &x, const ColorSpinorField &b)
+  {
+    if (checkPrecision(x, b) != param.precision)
+      errorQuda("Precision mismatch %d %d", checkPrecision(x, b), param.precision);
+  }
+
   // solver factory
   Solver *Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
-                         const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile)
+                         const DiracMatrix &matPrecon, const DiracMatrix &matEig)
   {
     Solver *solver = nullptr;
 
-    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
+    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER && param.inv_type != QUDA_PCG_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
 
     if (param.preconditioner && param.inv_type_precondition != QUDA_MG_INVERTER)
@@ -53,11 +55,11 @@ namespace quda {
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
-      solver = new CG(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CG(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
-      solver = new BiCGstab(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new BiCGstab(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_GCR_INVERTER:
       report("GCR");
@@ -65,58 +67,58 @@ namespace quda {
 	Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
 	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
 	if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
-        solver = new GCR(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
+        solver = new GCR(mat, *(mg), matSloppy, matPrecon, matEig, param);
       } else {
-        solver = new GCR(mat, matSloppy, matPrecon, matEig, param, profile);
+        solver = new GCR(mat, matSloppy, matPrecon, matEig, param);
       }
       break;
     case QUDA_CA_CG_INVERTER:
       report("CA-CG");
-      solver = new CACG(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CACG(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_CGNE_INVERTER:
       report("CA-CGNE");
-      solver = new CACGNE(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CACGNE(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_CGNR_INVERTER:
       report("CA-CGNR");
-      solver = new CACGNR(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CACGNR(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
-      solver = new CAGCR(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CAGCR(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_MR_INVERTER:
       report("MR");
-      solver = new MR(mat, matSloppy, param, profile);
+      solver = new MR(mat, matSloppy, param);
       break;
     case QUDA_SD_INVERTER:
       report("SD");
-      solver = new SD(mat, param, profile);
+      solver = new SD(mat, param);
       break;
     case QUDA_PCG_INVERTER:
       report("PCG");
-      solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
-      break;
-    case QUDA_MPCG_INVERTER:
-      report("MPCG");
-      solver = new MPCG(mat, param, profile);
-      break;
-    case QUDA_MPBICGSTAB_INVERTER:
-      report("MPBICGSTAB");
-      solver = new MPBiCGstab(mat, param, profile);
+      if (param.preconditioner) {
+        Solver *mg = param.mg_instance ? static_cast<MG *>(param.preconditioner) :
+                                         static_cast<multigrid_solver *>(param.preconditioner)->mg;
+        // FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+        if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
+        solver = new PreconCG(mat, *(mg), matSloppy, matPrecon, matEig, param);
+      } else {
+        solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param);
+      }
       break;
     case QUDA_BICGSTABL_INVERTER:
       report("BICGSTABL");
-      solver = new BiCGstabL(mat, matSloppy, matEig, param, profile);
+      solver = new BiCGstabL(mat, matSloppy, matEig, param);
       break;
     case QUDA_EIGCG_INVERTER:
       report("EIGCG");
-      solver = new IncEigCG(mat, matSloppy, matPrecon, param, profile);
+      solver = new IncEigCG(mat, matSloppy, matPrecon, param);
       break;
     case QUDA_INC_EIGCG_INVERTER:
       report("INC EIGCG");
-      solver = new IncEigCG(mat, matSloppy, matPrecon, param, profile);
+      solver = new IncEigCG(mat, matSloppy, matPrecon, param);
       break;
     case QUDA_GMRESDR_INVERTER:
       report("GMRESDR");
@@ -124,30 +126,30 @@ namespace quda {
 	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
 	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
 	param.precision_precondition = param.precision_sloppy;
-	solver = new GMResDR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
+        solver = new GMResDR(mat, *(mg->mg), matSloppy, matPrecon, param);
       } else {
-	solver = new GMResDR(mat, matSloppy, matPrecon, param, profile);
+        solver = new GMResDR(mat, matSloppy, matPrecon, param);
       }
       break;
     case QUDA_CGNE_INVERTER:
       report("CGNE");
-      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CGNR_INVERTER:
       report("CGNR");
-      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param, profile);
+      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
-      solver = new CG3(mat, matSloppy, matPrecon, param, profile);
+      solver = new CG3(mat, matSloppy, matPrecon, param);
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");
-      solver = new CG3NE(mat, matSloppy, matPrecon, param, profile);
+      solver = new CG3NE(mat, matSloppy, matPrecon, param);
       break;
     case QUDA_CG3NR_INVERTER:
       report("CG3NR");
-      solver = new CG3NR(mat, matSloppy, matPrecon, param, profile);
+      solver = new CG3NR(mat, matSloppy, matPrecon, param);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
@@ -157,15 +159,112 @@ namespace quda {
     return solver;
   }
 
+  // preconditioner solver factory
+  std::shared_ptr<Solver> Solver::createPreconditioner(const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                                                       const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+                                                       SolverParam &param, SolverParam &Kparam)
+  {
+    Solver *K = nullptr;
+    if (param.accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CG>(mat, matSloppy, matPrecon, matEig, Kparam);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CACG>(mat, matSloppy, matPrecon, matEig, Kparam);
+      } else { // unknown preconditioner
+        errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
+      }
+    } else {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new CG(mat, matSloppy, matPrecon, matEig, Kparam);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new CACG(mat, matSloppy, matPrecon, matEig, Kparam);
+      } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
+        K = new MR(mat, matSloppy, Kparam);
+      } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
+        K = new SD(mat, Kparam);
+      } else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+        K = new CAGCR(mat, matSloppy, matPrecon, matEig, Kparam);
+      } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
+        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+      }
+    }
+    return std::shared_ptr<Solver>(K);
+  }
+
+  // set the required parameters for the inner solver
+  void Solver::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
+  {
+    inner.tol = outer.tol_precondition;
+    inner.delta = 1e-20; // no reliable updates within the inner solver
+
+    // different solvers assume different behavior
+    if (outer.inv_type == QUDA_GCR_INVERTER) {
+      inner.precision = outer.precision_sloppy;
+      inner.precision_sloppy = outer.precision_precondition;
+    } else if (outer.inv_type == QUDA_PCG_INVERTER) {
+      inner.precision = ((outer.inv_type_precondition == QUDA_CG_INVERTER
+                          || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type == QUDA_MG_INVERTER)
+                         && !outer.precondition_no_advanced_feature) ?
+        outer.precision_sloppy :
+        outer.precision_precondition;
+      inner.precision_sloppy = outer.precision_precondition;
+    } else {
+      errorQuda("Unexpected preconditioned solver %d", outer.inv_type);
+    }
+
+    // this sets a fixed iteration count if we're using the MR solver
+    inner.residual_type
+      = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+
+    inner.iter = 0;
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // tell inner solver it is a preconditioner
+    inner.pipeline = true;
+
+    inner.schwarz_type = outer.schwarz_type;
+    inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
+
+    inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+
+    inner.maxiter = outer.maxiter_precondition;
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+      inner.ca_basis = outer.ca_basis_precondition;
+      inner.ca_lambda_min = outer.ca_lambda_min_precondition;
+      inner.ca_lambda_max = outer.ca_lambda_max_precondition;
+    } else {
+      inner.Nsteps = outer.precondition_cycle;
+    }
+
+    inner.verbosity_precondition = outer.verbosity_precondition;
+
+    inner.compute_true_res = false;
+    inner.sloppy_converge = true;
+  }
+
+  void Solver::extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
+  {
+    // extract a_max, which may have been determined via power iterations
+    if ((outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_GCR_INVERTER)
+        && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      outer.ca_lambda_max_precondition = inner.ca_lambda_max;
+    }
+  }
+
+  // preconditioner solver wrapper
+  std::shared_ptr<Solver> Solver::wrapExternalPreconditioner(const Solver &K)
+  {
+    return std::shared_ptr<Solver>(&const_cast<Solver &>(K), [](Solver *) {});
+  }
+
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)
   {
     if (deflate_init) return;
 
     // Deflation requested + first instance of solver
-    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
-    if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
-    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
+    eig_solve = EigenSolver::create(&param.eig_param, mat);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
@@ -174,13 +273,11 @@ namespace quda {
     csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
 
     if (deflate_compute) {
-      evecs.reserve(param.eig_param.n_conv);
-      evals.reserve(param.eig_param.n_conv);
 
       deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
       if (space && space->evecs.size() != 0) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
+        logQuda(QUDA_VERBOSE, "Restoring deflation space of size %lu\n", space->evecs.size());
 
         if ((!space->svd && param.eig_param.n_conv != (int)space->evecs.size())
             || (space->svd && 2 * param.eig_param.n_conv != (int)space->evecs.size()))
@@ -188,16 +285,13 @@ namespace quda {
                     param.eig_param.n_conv);
 
         // move vectors from preserved space to local space
-        for (auto &vec : space->evecs) evecs.push_back(vec);
+        evecs = std::move(space->evecs);
 
         if (param.eig_param.n_conv != (int)space->evals.size())
           errorQuda("Preserved eigenvalues %lu does not match expected %lu", space->evals.size(), evals.size());
 
         // move vectors from preserved space to local space
-        for (auto &val : space->evals) evals.push_back(val);
-
-        space->evecs.resize(0);
-        space->evals.resize(0);
+        evals = std::move(space->evals);
 
         delete space;
         param.eig_param.preserve_deflation_space = nullptr;
@@ -206,30 +300,26 @@ namespace quda {
         deflate_compute = false;
       } else {
         // Computing the deflation space, rather than transferring, so we create space.
-        for (int i = 0; i < param.eig_param.n_conv; i++) evecs.push_back(new ColorSpinorField(csParam));
-
-        evals.resize(param.eig_param.n_conv);
-        for (int i = 0; i < param.eig_param.n_conv; i++) evals[i] = 0.0;
+        resize(evecs, param.eig_param.n_conv, csParam);
+        evals.resize(param.eig_param.n_conv, 0.0);
       }
     }
 
     deflate_init = true;
 
-    if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void Solver::destroyDeflationSpace()
   {
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
+
     if (deflate_init) {
       if (param.eig_param.preserve_deflation) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Preserving deflation space of size %lu\n", evecs.size());
+        logQuda(QUDA_VERBOSE, "Preserving deflation space of size %lu\n", evecs.size());
 
         if (param.eig_param.preserve_deflation_space) {
           deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
-          // first ensure that any existing space is freed
-          for (auto &vec : space->evecs)
-            if (vec) delete vec;
-          space->evecs.resize(0);
           delete space;
         }
 
@@ -238,42 +328,32 @@ namespace quda {
         // if evecs size = 2x evals size then we are doing an SVD deflation
         space->svd = (evecs.size() == 2 * evals.size()) ? true : false;
 
-        space->evecs.reserve(evecs.size());
-        for (auto &vec : evecs) space->evecs.push_back(vec);
-
-        space->evals.reserve(evals.size());
-        for (auto &val : evals) space->evals.push_back(val);
+        space->evecs = std::move(evecs);
+        space->evals = std::move(evals);
 
         param.eig_param.preserve_deflation_space = space;
-      } else {
-        for (auto &vec : evecs)
-          if (vec) delete vec;
       }
 
-      evecs.resize(0);
+      evecs.clear();
+      evals.clear();
       deflate_init = false;
     }
+
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField> &defl_space)
   {
-    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
-    // Create space for the eigenvalues
-    evals.resize(defl_space.size());
-    // Create space for the eigenvectors, destroy defl_space
-    for (auto &e : defl_space) { evecs.push_back(e); }
-    defl_space.resize(0);
+    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", evecs.size());
+    evecs = std::move(defl_space); // move defl_space to evecs
+    evals.resize(defl_space.size()); // create space for the eigenvalues
   }
 
-  void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  void Solver::extractDeflationSpace(std::vector<ColorSpinorField> &defl_space)
   {
     if (!defl_space.empty())
       errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
-    // We do not care about the eigenvalues, they will be recomputed.
-    evals.resize(0);
-    // Create space for the eigenvectors, destroy evecs
-    for (auto &e : evecs) { defl_space.push_back(e); }
-    evecs.resize(0);
+    defl_space = std::move(evecs); // move evecs to defl_space
   }
 
   void Solver::extendSVDDeflationSpace()
@@ -281,14 +361,7 @@ namespace quda {
     if (!deflate_init) errorQuda("Deflation space for this solver not computed");
 
     // Double the size deflation space to accomodate for the extra singular vectors
-    // Clone from an existing vector
-    ColorSpinorParam csParam(*evecs[0]);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
-    for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
-      evecs.push_back(new ColorSpinorField(csParam));
-    }
+    resize(evecs, 2 * param.eig_param.n_conv, QUDA_ZERO_FIELD_CREATE);
   }
 
   void Solver::blocksolve(ColorSpinorField &out, ColorSpinorField &in)
@@ -363,13 +436,11 @@ namespace quda {
   }
 
   void Solver::PrintStats(const char* name, int k, double r2, double b2, double hq2) {
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n", name, k, r2,
-                   sqrt(r2 / b2), hq2);
-      } else {
-        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, r2, sqrt(r2 / b2));
-      }
+    if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+      logQuda(QUDA_VERBOSE, "%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n", name,
+              k, r2, sqrt(r2 / b2), hq2);
+    } else {
+      logQuda(QUDA_VERBOSE, "%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, r2, sqrt(r2 / b2));
     }
 
     if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged");
@@ -377,26 +448,28 @@ namespace quda {
 
   void Solver::PrintSummary(const char *name, int k, double r2, double b2,
                             double r2_tol, double hq_tol) {
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      if (param.compute_true_res) {
-	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
-                     "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
-        } else {
-          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
-                     "(requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2));
-        }
+    if (param.compute_true_res) {
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+        logQuda(QUDA_SUMMARIZE,
+                "%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
+                "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
+                name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
       } else {
-	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e "
-                     "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
-        } else {
-          printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), sqrt(r2_tol / b2));
-        }
+        logQuda(QUDA_SUMMARIZE,
+                "%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
+                "(requested = %9.6e)\n",
+                name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2));
+      }
+    } else {
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+        logQuda(QUDA_SUMMARIZE,
+                "%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e "
+                "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
+                name, k, sqrt(r2 / b2), sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
+      } else {
+        logQuda(QUDA_SUMMARIZE,
+                "%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e (requested = %9.6e)\n", name,
+                k, sqrt(r2 / b2), sqrt(r2_tol / b2));
       }
     }
   }
@@ -416,8 +489,14 @@ namespace quda {
     return eps;
   }
 
-  bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
+  void MultiShiftSolver::create(const std::vector<ColorSpinorField> &x, const ColorSpinorField &b)
+  {
+    if (checkPrecision(x[0], b) != param.precision)
+      errorQuda("Precision mismatch %d %d", checkPrecision(x[0], b), param.precision);
+  }
 
+  bool MultiShiftSolver::convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const
+  {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
       for (int i = 0; i < n; i++) {
