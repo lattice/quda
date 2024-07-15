@@ -28,11 +28,11 @@ namespace quda
       static constexpr int n = n_;
       using Reducer = Reducer_;
       using reduce_t = typename Reducer_::reduce_t;
-      Spinor<store_t, N> X[MAX_MULTI_RHS];
-      Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS];
-      Spinor<store_t, N> Z[MAX_MULTI_RHS];
-      Spinor<store_t, N> W[MAX_MULTI_RHS];
-      Spinor<store_t, N> V[MAX_MULTI_RHS];
+      Spinor<store_t, N> X[MAX_MULTI_RHS] = {};
+      Spinor<y_store_t, Ny> Y[MAX_MULTI_RHS] = {};
+      Spinor<store_t, N> Z[MAX_MULTI_RHS] = {};
+      Spinor<store_t, N> W[MAX_MULTI_RHS] = {};
+      Spinor<store_t, N> V[MAX_MULTI_RHS] = {};
       Reducer r;
 
       const int length_cb;
