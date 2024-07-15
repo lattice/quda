@@ -24,13 +24,30 @@ namespace quda
      @brief This helper function indicates if the present
      compilation unit has explicit constant memory usage enabled.
   */
-  static bool use_constant_memory()
+  static constexpr bool use_constant_memory()
   {
 #ifdef QUDA_USE_CONSTANT_MEMORY
     return true;
 #else
     return false;
 #endif
+  }
+
+  template <class Arg, size_t size> constexpr bool check_arg()
+  {
+    if constexpr (device::use_kernel_arg<Arg>()) {
+      // using kernel arguments
+      static_assert(size <= device::max_kernel_arg_size(), "Paramter struct is greater than max kernel size");
+      return size <= device::max_kernel_arg_size();
+    } else if constexpr (!device::use_kernel_arg<Arg>() && use_constant_memory()) {
+      // not using kernel arguments and constant memory enabled
+      static_assert(size <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+      return size <= device::max_constant_size();
+    } else {
+      // not using kernel arguments but constant memory not enabled
+      static_assert(size < 0, "Invalid parameter struct");
+      return false;
+    }
   }
 
   class TunableKernel : public Tunable
@@ -40,22 +57,15 @@ namespace quda
     QudaFieldLocation location;
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
-    std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
-    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    qudaError_t launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       checkSharedBytes(tp);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
-      return launch_error;
-    }
-
-    template <template <typename> class Functor, bool grid_stride, typename Arg>
-    std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
-    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-      checkSharedBytes(tp);
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
-      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      if constexpr (check_arg<Arg, sizeof(Arg)>()) {
+        if constexpr (!device::use_kernel_arg<Arg>() && use_constant_memory()) {
+          qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
+        }
+        launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      }
       return launch_error;
     }
 
