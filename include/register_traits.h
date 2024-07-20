@@ -39,6 +39,9 @@ namespace quda {
   template <typename T, typename R = decltype(std::declval<T>().x)>
   std::enable_if_t<std::is_arithmetic_v<R>, R&> inline elem(T &a, int i) { return (&a.x)[i]; }
 
+  template <typename T, typename R = decltype(std::declval<T>().x.x), int = 0>
+  std::enable_if_t<std::is_arithmetic_v<R>, R&> inline elem(T &a, int i) { return (&a.x.x)[i]; }
+
   /*
     Here we use traits to define the greater type used for mixing types of computation involving these types
   */
