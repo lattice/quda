@@ -1859,6 +1859,7 @@ namespace quda {
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
         for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+        //for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? gauge_[i] : u.data<Float *>(i);
       }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
@@ -1905,6 +1906,7 @@ namespace quda {
         LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
       {
         for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
+        //for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? gauge_[i] : u.data<Float *>(i);
       }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const

@@ -455,7 +455,8 @@ namespace quda {
     std::enable_if_t<std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, T> data() const
     {
       if (is_pointer_array(order)) errorQuda("Non dim-array ordered field requested but order is %d", order);
-      return reinterpret_cast<T>(gauge.data());
+      //return reinterpret_cast<T>(gauge.data());
+      return static_cast<T>(gauge.data());
     }
 
     /**
@@ -473,7 +474,8 @@ namespace quda {
                     "data() requires a pointer cast type");
       if (d >= (unsigned)geometry) errorQuda("Invalid array index %d for geometry %d field", d, geometry);
       if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
-      return reinterpret_cast<T>(gauge_array[d].data());
+      //return reinterpret_cast<T>(gauge_array[d].data());
+      return static_cast<T>(gauge_array[d].data());
     }
 
     void *raw_pointer() const
@@ -500,7 +502,7 @@ namespace quda {
     {
       if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
       array<T, QUDA_MAX_DIM> u = {};
-      for (auto d = 0; d < geometry; d++) u[d] = static_cast<T>(gauge_array[d]);
+      for (auto d = 0; d < geometry; d++) u[d] = static_cast<T>(gauge_array[d].data());
       return u;
     }
 
