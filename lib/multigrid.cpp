@@ -1691,7 +1691,6 @@ namespace quda
     }
 
     logQuda(QUDA_VERBOSE, "Done building free vectors\n");
-
     popLevel();
   }
 

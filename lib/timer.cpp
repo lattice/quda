@@ -263,6 +263,9 @@ namespace quda {
       secs = profile.Last(QUDA_PROFILE_TOTAL);
       gflops = (Tunable::flops_global() - flops) * 1e-9;
       if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
+
+      // cache is written out even if a long benchmarking job gets interrupted
+      saveTuneCache();
     }
   }
 

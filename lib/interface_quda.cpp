@@ -297,6 +297,13 @@ static void profilerStop(const char *f) {
 
 namespace quda {
   void printLaunchTimer();
+
+  void massRescale(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool for_multishift);
+
+  void distanceReweight(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool inverse);
+
+  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
+             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
 }
 
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
@@ -1703,109 +1710,6 @@ namespace quda {
     dEig = Dirac::create(diracEigParam);
   }
 
-  void massRescale(ColorSpinorField &b, QudaInvertParam &param, bool for_multishift)
-  {
-    double kappa5 = (0.5/(5.0 + param.m5));
-    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-                    || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
-      kappa5 :
-      param.kappa;
-
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: Kappa is: %g\n", kappa);
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: mass normalization: %d\n", param.mass_normalization);
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source in = %g\n", blas::norm2(b));
-
-    // staggered dslash uses mass normalization internally
-    if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
-      switch (param.solution_type) {
-        case QUDA_MAT_SOLUTION:
-        case QUDA_MATPC_SOLUTION:
-          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(2.0*param.mass, b);
-          break;
-        case QUDA_MATDAG_MAT_SOLUTION:
-        case QUDA_MATPCDAG_MATPC_SOLUTION:
-          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(4.0*param.mass*param.mass, b);
-          break;
-        default:
-          errorQuda("Not implemented");
-      }
-      return;
-    }
-
-    // multiply the source to compensate for normalization of the Dirac operator, if necessary
-    // you are responsible for restoring what's in param.offset
-    switch (param.solution_type) {
-      case QUDA_MAT_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
-            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(2.0*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
-        }
-        break;
-      case QUDA_MATDAG_MAT_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
-            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
-        }
-        break;
-      case QUDA_MATPC_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
-        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(2.0*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
-        }
-        break;
-      case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(16.0*std::pow(kappa,4), b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 16.0 * std::pow(kappa, 4);
-        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
-        }
-        break;
-      default:
-        errorQuda("Solution type %d not supported", param.solution_type);
-    }
-
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source out = %g\n", blas::norm2(b));
-  }
-}
-
-void distanceReweight(ColorSpinorField &b, QudaInvertParam &param, bool inverse)
-{
-  // Force the alpha0 to be positive.
-  // A negative alpha0 matches something like Eq.(12) in arXiv:1006.4028.
-  // Disable the negative situation as QUDA already has multigrid for light quarks.
-  const double alpha0 = abs(param.distance_pc_alpha0);
-  const int t0 = param.distance_pc_t0;
-  if (alpha0 != 0.0 && t0 >= 0) {
-    if (param.dslash_type != QUDA_WILSON_DSLASH && param.dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-      errorQuda("Only Wilson and Wilson-clover dslash support distance preconditioning, but get dslash_type %d\n",
-                param.dslash_type);
-    }
-    if (param.inv_type == QUDA_MG_INVERTER) {
-      errorQuda("Multigrid solver doesn't support distance preconditioning\n");
-    }
-    if (param.cuda_prec != QUDA_DOUBLE_PRECISION || param.cuda_prec_sloppy != QUDA_DOUBLE_PRECISION) {
-      warningQuda(
-        "Using single or half (sloppy) precision in distance preconditioning sometimes makes the solver diverge");
-    }
-
-    if (inverse)
-      spinorDistanceReweight(b, -alpha0, t0);
-    else
-      spinorDistanceReweight(b, alpha0, t0);
-  }
 }
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
@@ -1840,7 +1744,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   in = in_h;
 
-  profileDslash.TPSTART(QUDA_PROFILE_COMPUTE);
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
   logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
@@ -1872,7 +1776,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   } else {
     dirac->Dslash(out, in, parity); // apply the operator
   }
-  profileDslash.TPSTOP(QUDA_PROFILE_COMPUTE);
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
   distanceReweight(out, *inv_param, false);
 
@@ -2796,9 +2700,6 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   delete dEig;
 
   popVerbosity();
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
 }
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
@@ -2876,9 +2777,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
 
   mg = new MG(*mgParam);
   mgParam->updateInvertParam(*param);
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
 }
 
 void *newMultigridQuda(QudaMultigridParam *mg_param)
@@ -2888,8 +2786,6 @@ void *newMultigridQuda(QudaMultigridParam *mg_param)
   pushVerbosity(mg_param->invert_param->verbosity);
 
   auto *mg = new multigrid_solver(*mg_param);
-
-  saveTuneCache();
 
   popVerbosity();
   profilerStop(__func__);
@@ -3002,9 +2898,6 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   }
 
   setOutputPrefix("");
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -3124,28 +3017,17 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
-    (param->solution_type ==  QUDA_MATPC_SOLUTION);
-  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
-    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
-  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
-    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->iter = 0;
 
-  Dirac *d = nullptr;
-  Dirac *dSloppy = nullptr;
-  Dirac *dPre = nullptr;
-  Dirac *dEig = nullptr;
+  Dirac *dirac = nullptr;
+  Dirac *diracSloppy = nullptr;
+  Dirac *diracPre = nullptr;
+  Dirac *diracEig = nullptr;
 
   // Create the dirac operator and operators for sloppy, precondition,
   // and an eigensolver
-  createDiracWithEig(d, dSloppy, dPre, dEig, *param, pc_solve);
-
-  Dirac &dirac = *d;
-  Dirac &diracSloppy = *dSloppy;
-  Dirac &diracPre = *dPre;
-  Dirac &diracEig = *dEig;
+  createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, *param, pc_solve);
 
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, cudaGauge->X(), pc_solution, param->input_location);
@@ -3193,181 +3075,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     blas::zero(x);
   }
 
-  // if we're doing a managed memory MG solve and prefetching is
-  // enabled, prefetch all the Dirac matrices. There's probably
-  // a better place to put this...
-  if (param->inv_type_precondition == QUDA_MG_INVERTER) {
-    dirac.prefetch(QUDA_CUDA_FIELD_LOCATION);
-    diracSloppy.prefetch(QUDA_CUDA_FIELD_LOCATION);
-    diracPre.prefetch(QUDA_CUDA_FIELD_LOCATION);
-  }
-
-  profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-  double nb = blas::norm2(b);
-  if (nb==0.0) errorQuda("Source has zero norm");
-  logQuda(QUDA_VERBOSE, "Source: %g\n", nb);
-  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) logQuda(QUDA_VERBOSE, "Initial guess: %g\n", blas::norm2(x));
-
-  // rescale the source and solution vectors to help prevent the onset of underflow
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0 / sqrt(nb), b);
-    blas::ax(1.0 / sqrt(nb), x);
-  }
-
-  massRescale(b, *param, false);
-  distanceReweight(b, *param, true);
-
-  ColorSpinorField in;
-  ColorSpinorField out;
-  dirac.prepare(out, in, x, b, param->solution_type);
-
-  logQuda(QUDA_VERBOSE, "Prepared source = %g\n", blas::norm2(in));
-  logQuda(QUDA_VERBOSE, "Prepared solution = %g\n", blas::norm2(out));
-
-  // solution_type specifies *what* system is to be solved.
-  // solve_type specifies *how* the system is to be solved.
-  //
-  // We have the following four cases (plus preconditioned variants):
-  //
-  // solution_type    solve_type    Effect
-  // -------------    ----------    ------
-  // MAT              DIRECT        Solve Ax=b
-  // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
-  // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
-  // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
-  // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
-  //
-  // We generally require that the solution_type and solve_type
-  // preconditioning match.  As an exception, the unpreconditioned MAT
-  // solution_type may be used with any solve_type, including
-  // DIRECT_PC and NORMOP_PC.  In these cases, preparation of the
-  // preconditioned source and reconstruction of the full solution are
-  // taken care of by Dirac::prepare() and Dirac::reconstruct(),
-  // respectively.
-
-  profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
-
-  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-    ColorSpinorField tmp(in);
-    dirac.Mdag(in, tmp);
-  } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
-    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-    SolverParam solverParam(*param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(out, in);
-    blas::copy(in, out);
-    delete solve;
-    solverParam.updateInvertParam(*param);
-  }
-
-  if (direct_solve) {
-    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-    SolverParam solverParam(*param);
-
-    // chronological forecasting
-    if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
-      bool hermitian = false;
-      auto &mChrono = param->chrono_precision == param->cuda_prec ? m : mSloppy;
-      chronoExtrapolate(out, in, chronoResident[param->chrono_index], mChrono, hermitian);
-    }
-
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(out, in);
-    delete solve;
-    solverParam.updateInvertParam(*param);
-  } else if (!norm_error_solve) {
-    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-    SolverParam solverParam(*param);
-
-    // chronological forecasting
-    if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
-      bool hermitian = true;
-      auto &mChrono = param->chrono_precision == param->cuda_prec ? m : mSloppy;
-      chronoExtrapolate(out, in, chronoResident[param->chrono_index], mChrono, hermitian);
-    }
-
-    // if using a Schwarz preconditioner with a normal operator then we must use the DiracMdagMLocal operator
-    if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
-      DiracMdagMLocal mPreLocal(diracPre);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, mEig);
-      (*solve)(out, in);
-      delete solve;
-      solverParam.updateInvertParam(*param);
-    } else {
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-      (*solve)(out, in);
-      delete solve;
-      solverParam.updateInvertParam(*param);
-    }
-  } else { // norm_error_solve
-    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-    ColorSpinorField tmp(out);
-    SolverParam solverParam(*param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
-    (*solve)(tmp, in);    // y = (M M^\dag) b
-    dirac.Mdag(out, tmp); // x = M^dag y
-    delete solve;
-    solverParam.updateInvertParam(*param);
-  }
-
-  logQuda(QUDA_VERBOSE, "Solution = %g\n", blas::norm2(x));
-
-  profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
-  if (param->chrono_make_resident) {
-    const int i = param->chrono_index;
-    if (i >= QUDA_MAX_CHRONO)
-      errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
-
-    auto &basis = chronoResident[i];
-
-    if (param->chrono_max_dim < (int)basis.size()) {
-      errorQuda("Requested chrono_max_dim %i is smaller than already existing chronology %lu", param->chrono_max_dim, basis.size());
-    }
-
-    if(not param->chrono_replace_last){
-      // if we have not filled the space yet just augment
-      if ((int)basis.size() < param->chrono_max_dim) {
-        ColorSpinorParam cs_param(out);
-        cs_param.setPrecision(param->chrono_precision);
-        basis.emplace_back(cs_param);
-      }
-
-      // shuffle every entry down one and bring the last to the front
-      std::rotate(basis.begin(), basis.end() - 1, basis.end());
-    }
-    basis[0] = out; // set first entry to new solution
-  }
-  dirac.reconstruct(x, b, param->solution_type);
-
-  distanceReweight(x, *param, false);
-
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    // rescale the solution
-    blas::ax(sqrt(nb), x);
-  }
-
-  if (param->compute_action) {
-    Complex action = blas::cDotProduct(b, x);
-    param->action[0] = action.real();
-    param->action[1] = action.imag();
-  }
-
-  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, *param);
 
   if (!param->make_resident_solution) h_x = x;
 
-  logQuda(QUDA_VERBOSE, "Reconstructed solution: %g\n", blas::norm2(x));
-
   if (param->use_resident_solution && !param->make_resident_solution) solutionResident.clear();
 
-  delete d;
-  delete dSloppy;
-  delete dPre;
-  delete dEig;
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
+  delete dirac;
+  delete diracSloppy;
+  delete diracPre;
+  delete diracEig;
 
   profilerStop(__func__);
   popVerbosity();
@@ -4083,9 +3800,6 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
   delete dRefine;
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
 
   profilerStop(__func__);
   popVerbosity();
@@ -5468,8 +5182,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   delete d;
 
   if (smear_param->delete_2link != 0) { freeUniqueGaugeQuda(QUDA_SMEARED_LINKS); }
-
-  saveTuneCache();
 }
 
 void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
@@ -5743,8 +5455,6 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
     }
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  saveTuneCache();
 }
 
 void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType,
