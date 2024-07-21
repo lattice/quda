@@ -1114,7 +1114,8 @@ namespace quda
             ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x);
 #pragma unroll
           for (int j = 0; j < N_ghost; j++)
-            copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+            //copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+            copy_and_scale(v[i * N_ghost + j], elem(vecTmp, j), nrm);
         }
 
 #pragma unroll
@@ -1152,7 +1153,8 @@ namespace quda
           GhostVector vecTmp;
           // first do scalar copy converting into storage type
 #pragma unroll
-          for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
+          //for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
+          for (int j = 0; j < N_ghost; j++) copy_scaled(elem(vecTmp, j), v[i * N_ghost + j]);
           // second do vectorized copy into memory
           vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
         }
@@ -1245,7 +1247,8 @@ namespace quda
           Vector vecTmp = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
           // now copy into output and scale
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+          //for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], elem(vecTmp, j), nrm);
         }
 
 #pragma unroll
@@ -1286,7 +1289,8 @@ namespace quda
           Vector vecTmp;
           // first do scalar copy converting into storage type
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+          //for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+          for (int j = 0; j < N; j++) copy_scaled(elem(vecTmp,j), v[i * N + j]);
           // second do vectorized copy into memory
           vector_store(field, parity * offset + x + volumeCB * i, vecTmp);
         }
@@ -1355,7 +1359,8 @@ namespace quda
         memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
 
 #pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+        //for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], elem(vecTmp, i), nrm);
 
 #pragma unroll
         for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
@@ -1391,7 +1396,8 @@ namespace quda
 
         // pack the spinor elements
 #pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+        //for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+        for (int i = 0; i < length_ghost; i++) copy_scaled(elem(vecTmp,i), v[i]);
         vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
 
@@ -1461,10 +1467,14 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
+	array<short,6> vecTmpShort;
+	memcpy(&vecTmpShort, &vecTmp, sizeof(vecTmpShort));
 
         // now copy into output and scale
 #pragma unroll
-        for (int i = 0; i < length; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+        //for (int i = 0; i < length; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+        //for (int i = 0; i < length; i++) copy_and_scale(v[i], elem(vecTmp,i), nrm);
+        for (int i = 0; i < length; i++) copy_and_scale(v[i], vecTmpShort[i], nrm);
 
 #pragma unroll
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
@@ -1496,10 +1506,14 @@ namespace quda
 
         Vector vecTmp;
         memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
+	array<short,6> vecTmpShort;
 
         // pack the spinor elements
 #pragma unroll
-        for (int i = 0; i < length; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+        //for (int i = 0; i < length; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+        //for (int i = 0; i < length; i++) copy_scaled(elem(vecTmp, i), v[i]);
+        for (int i = 0; i < length; i++) copy_scaled(vecTmpShort[i], v[i]);
+	memcpy(&vecTmp, &vecTmpShort, sizeof(vecTmpShort));
 
         vector_store(field, parity * offset + x, vecTmp);
       }

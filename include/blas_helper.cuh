@@ -208,7 +208,7 @@ namespace quda
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-        for (int i = 0; i < n; i++) max_[i] = quda::max(abs((norm_t)v[i].real()), abs((norm_t)v[i].imag()));
+        for (int i = 0; i < n; i++) max_[i] = quda::max(quda::abs((norm_t)v[i].real()), quda::abs((norm_t)v[i].imag()));
         norm_t scale = 0.0;
 #pragma unroll
         for (int i = 0; i < n; i++) scale = quda::max(max_[i], scale);
@@ -257,11 +257,14 @@ namespace quda
 
           // extract norm
           memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
+	  array<short,6> vecTmpShort;
+	  memcpy(&vecTmpShort, &vecTmp, sizeof(vecTmpShort));
 
           // now copy into output and scale
 #pragma unroll
           //for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
-          for (int i = 0; i < len; i++) copy_and_scale(v_[i], elem(vecTmp, i), nrm);
+          //for (int i = 0; i < len; i++) copy_and_scale(v_[i], elem(vecTmp, i), nrm);
+          for (int i = 0; i < len; i++) copy_and_scale(v_[i], vecTmpShort[i], nrm);
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -325,9 +328,12 @@ namespace quda
 
           Vector vecTmp;
           memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
+	  array<short,6> vecTmpShort;
 #pragma unroll
           //for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
-          for (int i = 0; i < len; i++) copy_scaled(elem(vecTmp, i), v_[i]);
+          //for (int i = 0; i < len; i++) copy_scaled(elem(vecTmp, i), v_[i]);
+          for (int i = 0; i < len; i++) copy_scaled(vecTmpShort[i], v_[i]);
+	  memcpy(&vecTmp, &vecTmpShort, sizeof(vecTmpShort));
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }
