@@ -108,7 +108,12 @@ CloverField *cloverEigensolver = nullptr;
 GaugeField momResident;
 GaugeField *extendedGaugeResident = nullptr;
 
-std::vector<ColorSpinorField> solutionResident;
+namespace quda
+{
+
+  std::vector<ColorSpinorField> solutionResident;
+
+}
 
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
@@ -302,8 +307,8 @@ namespace quda {
 
   void distanceReweight(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool inverse);
 
-  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
-             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param);
+  void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
+             const GaugeField &u);
 }
 
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
@@ -3009,82 +3014,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // check the gauge fields have been created
   GaugeField *cudaGauge = checkGauge(param);
 
-  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
-  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
-  // for now, though, so here we factorize everything for convenience.
-
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
-    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-
-  param->iter = 0;
-
-  Dirac *dirac = nullptr;
-  Dirac *diracSloppy = nullptr;
-  Dirac *diracPre = nullptr;
-  Dirac *diracEig = nullptr;
-
-  // Create the dirac operator and operators for sloppy, precondition,
-  // and an eigensolver
-  createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, *param, pc_solve);
-
-  // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_b, *param, cudaGauge->X(), pc_solution, param->input_location);
-  ColorSpinorField h_b(cpuParam);
-
-  cpuParam.v = hp_x;
-  cpuParam.location = param->output_location;
-  ColorSpinorField h_x(cpuParam);
-
-  // download source
-  ColorSpinorParam cudaParam(cpuParam, *param, QUDA_CUDA_FIELD_LOCATION);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  cudaParam.field = &h_b;
-  ColorSpinorField b(cudaParam);
-
-  // now check if we need to invalidate the solutionResident vectors
-  ColorSpinorField x;
-  if (param->use_resident_solution == 1) {
-    for (auto &v : solutionResident) {
-      if (b.Precision() != v.Precision() || b.SiteSubset() != v.SiteSubset()) {
-        solutionResident.clear();
-        break;
-      }
-    }
-
-    if (!solutionResident.size()) {
-      cudaParam.create = QUDA_NULL_FIELD_CREATE;
-      solutionResident = std::vector<ColorSpinorField>(1, cudaParam);
-    }
-    x = solutionResident[0].create_alias(cudaParam);
-  } else {
-    cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    x = ColorSpinorField(cudaParam);
-  }
-
-  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES && !param->chrono_use_resident) { // download initial guess
-    // initial guess only supported for single-pass solvers
-    if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
-        (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
-      errorQuda("Initial guess not supported for two-pass solver");
-    }
-
-    x = h_x; // solution
-  } else { // zero initial guess
-    blas::zero(x);
-  }
-
-  solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, *param);
-
-  if (!param->make_resident_solution) h_x = x;
+  solve({hp_x}, {hp_b}, *param, *cudaGauge);
 
   if (param->use_resident_solution && !param->make_resident_solution) solutionResident.clear();
-
-  delete dirac;
-  delete diracSloppy;
-  delete diracPre;
-  delete diracEig;
 
   profilerStop(__func__);
   popVerbosity();
@@ -3165,7 +3097,10 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
   if (num_sub_partition == 1) { // In this case we don't split the grid.
 
-    for (int n = 0; n < param->num_src; n++) { op(_hp_x[n], _hp_b[n], param, args...); }
+    std::vector<void *> x(param->num_src), b(param->num_src);
+    for (auto i = 0u; i < x.size(); i++) x[i] = _hp_x[i];
+    for (auto i = 0u; i < b.size(); i++) b[i] = _hp_b[i];
+    op(x, b, *param, args...);
 
   } else {
 
@@ -3381,17 +3316,19 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // Since input fields are in Native order now
     param_copy.dirac_order = QUDA_INTERNAL_DIRAC_ORDER;
 
-		// We need to set the cpu_prec in the param_copy, because the op() passed in
-		// to us will try to create wrappers to the pointers we pass in. They expect
-		// the input spinors to be on the host, and will use param_copy.cpu_prec to set
-		// the precision. We want to avoid the situation, where the internal prec and the
-		// cpu_prec are somehow different. 
-		param_copy.cpu_prec = _collect_b[0].Precision();
+    // We need to set the cpu_prec in the param_copy, because the op() passed in
+    // to us will try to create wrappers to the pointers we pass in. They expect
+    // the input spinors to be on the host, and will use param_copy.cpu_prec to set
+    // the precision. We want to avoid the situation, where the internal prec and the
+    // cpu_prec are somehow different.
+    param_copy.cpu_prec = _collect_b[0].Precision();
 
     // Do the solves
-    for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-      op(_collect_x[n].data(), _collect_b[n].data(), &param_copy, args...);
-    }
+    std::vector<void *> x_raw(param->num_src_per_sub_partition);
+    std::vector<void *> b_raw(param->num_src_per_sub_partition);
+    for (auto i = 0u; i < x_raw.size(); i++) x_raw[i] = _collect_x[i].data();
+    for (auto i = 0u; i < b_raw.size(); i++) b_raw[i] = _collect_b[i].data();
+    op(x_raw, b_raw, param_copy, args...);
 
     profileInvertMultiSrc.TPSTART(QUDA_PROFILE_EPILOGUE);
     push_communicator(default_comm_key);
@@ -3457,14 +3394,19 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
 void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
-  auto op = [](void *_x, void *_b, QudaInvertParam *param) { invertQuda(_x, _b, param); };
+  auto op = [](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param) {
+    // check the gauge fields have been created
+    GaugeField *gauge = checkGauge(&param);
+    solve(_x, _b, param, *gauge);
+  };
   callMultiSrcQuda(_hp_x, _hp_b, param, op);
 }
 
-
 void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity)
 {
-  auto op = [](void *_x, void *_b, QudaInvertParam *param, QudaParity parity) { dslashQuda(_x, _b, param, parity); };
+  auto op = [](const std::vector<void *> &_x, const std::vector<void *> &_b, QudaInvertParam &param, QudaParity parity) {
+    for (auto i = 0u; i < _b.size(); i++) dslashQuda(_x[i], _b[i], &param, parity);
+  };
   callMultiSrcQuda(_hp_x, _hp_b, param, op, parity);
 }
 

@@ -1,15 +1,16 @@
 #include "invert_quda.h"
 
-namespace quda {
+namespace quda
+{
 
   // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
   // each entry is one p
   std::vector<std::vector<ColorSpinorField>> chronoResident(QUDA_MAX_CHRONO);
-  
+
   void massRescale(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool for_multishift)
   {
-    double kappa5 = (0.5/(5.0 + param.m5));
+    double kappa5 = (0.5 / (5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
                     || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
       kappa5 :
@@ -25,16 +26,15 @@ namespace quda {
     // staggered dslash uses mass normalization internally
     if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
       switch (param.solution_type) {
-        case QUDA_MAT_SOLUTION:
-        case QUDA_MATPC_SOLUTION:
-          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(2.0*param.mass, b);
-          break;
-        case QUDA_MATDAG_MAT_SOLUTION:
-        case QUDA_MATPCDAG_MATPC_SOLUTION:
-          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(4.0*param.mass*param.mass, b);
-          break;
-        default:
-          errorQuda("Not implemented");
+      case QUDA_MAT_SOLUTION:
+      case QUDA_MATPC_SOLUTION:
+        if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(2.0 * param.mass, b);
+        break;
+      case QUDA_MATDAG_MAT_SOLUTION:
+      case QUDA_MATPCDAG_MATPC_SOLUTION:
+        if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(4.0 * param.mass * param.mass, b);
+        break;
+      default: errorQuda("Not implemented");
       }
       return;
     }
@@ -42,46 +42,45 @@ namespace quda {
     // multiply the source to compensate for normalization of the Dirac operator, if necessary
     // you are responsible for restoring what's in param.offset
     switch (param.solution_type) {
-      case QUDA_MAT_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
-            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(2.0*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
-        }
-        break;
-      case QUDA_MATDAG_MAT_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
-            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
-        }
-        break;
-      case QUDA_MATPC_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
-        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(2.0*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
-        }
-        break;
-      case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(16.0*std::pow(kappa,4), b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 16.0 * std::pow(kappa, 4);
-        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	  blas::ax(4.0*kappa*kappa, b);
-          if (for_multishift)
-            for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
-        }
-        break;
-      default:
-        errorQuda("Solution type %d not supported", param.solution_type);
+    case QUDA_MAT_SOLUTION:
+      if (param.mass_normalization == QUDA_MASS_NORMALIZATION
+          || param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        blas::ax(2.0 * kappa, b);
+        if (for_multishift)
+          for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
+      }
+      break;
+    case QUDA_MATDAG_MAT_SOLUTION:
+      if (param.mass_normalization == QUDA_MASS_NORMALIZATION
+          || param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        blas::ax(4.0 * kappa * kappa, b);
+        if (for_multishift)
+          for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
+      }
+      break;
+    case QUDA_MATPC_SOLUTION:
+      if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+        blas::ax(4.0 * kappa * kappa, b);
+        if (for_multishift)
+          for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
+      } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        blas::ax(2.0 * kappa, b);
+        if (for_multishift)
+          for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 2.0 * kappa;
+      }
+      break;
+    case QUDA_MATPCDAG_MATPC_SOLUTION:
+      if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+        blas::ax(16.0 * std::pow(kappa, 4), b);
+        if (for_multishift)
+          for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 16.0 * std::pow(kappa, 4);
+      } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        blas::ax(4.0 * kappa * kappa, b);
+        if (for_multishift)
+          for (int i = 0; i < param.num_offset; i++) param.offset[i] *= 4.0 * kappa * kappa;
+      }
+      break;
+    default: errorQuda("Solution type %d not supported", param.solution_type);
     }
 
     if (getVerbosity() > QUDA_DEBUG_VERBOSE) {
@@ -106,7 +105,7 @@ namespace quda {
 
       if (param.cuda_prec != QUDA_DOUBLE_PRECISION || param.cuda_prec_sloppy != QUDA_DOUBLE_PRECISION) {
         warningQuda(
-                    "Using single or half (sloppy) precision in distance preconditioning sometimes makes the solver diverge");
+          "Using single or half (sloppy) precision in distance preconditioning sometimes makes the solver diverge");
       }
 
       if (inverse)
@@ -116,18 +115,14 @@ namespace quda {
     }
   }
 
-  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b,
-             Dirac &dirac, Dirac &diracSloppy, Dirac &diracPre, Dirac &diracEig,
-             QudaInvertParam &param)
+  void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
+             Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param)
   {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    bool mat_solution = (param.solution_type == QUDA_MAT_SOLUTION) ||
-      (param.solution_type ==  QUDA_MATPC_SOLUTION);
-    bool direct_solve = (param.solve_type == QUDA_DIRECT_SOLVE) ||
-      (param.solve_type == QUDA_DIRECT_PC_SOLVE);
-    bool norm_error_solve = (param.solve_type == QUDA_NORMERR_SOLVE) ||
-      (param.solve_type == QUDA_NORMERR_PC_SOLVE);
+    bool mat_solution = (param.solution_type == QUDA_MAT_SOLUTION) || (param.solution_type == QUDA_MATPC_SOLUTION);
+    bool direct_solve = (param.solve_type == QUDA_DIRECT_SOLVE) || (param.solve_type == QUDA_DIRECT_PC_SOLVE);
+    bool norm_error_solve = (param.solve_type == QUDA_NORMERR_SOLVE) || (param.solve_type == QUDA_NORMERR_PC_SOLVE);
 
     auto nb = blas::norm2(b);
     for (auto &bi : nb) {
@@ -258,23 +253,23 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
-      auto x_norm = blas::norm2(out);      
+      auto x_norm = blas::norm2(out);
       for (auto i = 0u; i < x.size(); i++) printfQuda("Solution = %g\n", x_norm[i]);
     }
 
     getProfile().TPSTART(QUDA_PROFILE_EPILOGUE);
     if (param.chrono_make_resident) {
       const int i = param.chrono_index;
-      if (i >= QUDA_MAX_CHRONO)
-        errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
+      if (i >= QUDA_MAX_CHRONO) errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
 
       auto &basis = chronoResident[i];
 
       if (param.chrono_max_dim < (int)basis.size()) {
-        errorQuda("Requested chrono_max_dim %i is smaller than already existing chronology %lu", param.chrono_max_dim, basis.size());
+        errorQuda("Requested chrono_max_dim %i is smaller than already existing chronology %lu", param.chrono_max_dim,
+                  basis.size());
       }
 
-      if(not param.chrono_replace_last){
+      if (not param.chrono_replace_last) {
         // if we have not filled the space yet just augment
         if ((int)basis.size() < param.chrono_max_dim) {
           ColorSpinorParam cs_param(out[0]);
@@ -299,7 +294,7 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
-      auto x_norm = blas::norm2(x);      
+      auto x_norm = blas::norm2(x);
       for (auto i = 0u; i < x.size(); i++) printfQuda("Reconstructed Solution = %g\n", x_norm[i]);
     }
 
@@ -312,4 +307,100 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
-}
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
+                          const bool pc_solve);
+
+  extern std::vector<ColorSpinorField> solutionResident;
+
+  void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
+             const GaugeField &u)
+  {
+    if (hp_b.size() != hp_x.size())
+      errorQuda("Number of solutions %lu != number of solves %lu", hp_x.size(), hp_b.size());
+    int n_src = hp_b.size();
+
+    // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
+    // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
+    // for now, though, so here we factorize everything for convenience.
+
+    bool pc_solution
+      = (param.solution_type == QUDA_MATPC_SOLUTION) || (param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+    bool pc_solve = (param.solve_type == QUDA_DIRECT_PC_SOLVE) || (param.solve_type == QUDA_NORMOP_PC_SOLVE)
+      || (param.solve_type == QUDA_NORMERR_PC_SOLVE);
+
+    param.iter = 0;
+
+    Dirac *dirac = nullptr;
+    Dirac *diracSloppy = nullptr;
+    Dirac *diracPre = nullptr;
+    Dirac *diracEig = nullptr;
+
+    // Create the dirac operator and operators for sloppy, precondition,
+    // and an eigensolver
+    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, param, pc_solve);
+
+    // wrap CPU host side pointers
+    ColorSpinorParam cpuParam(hp_b[0], param, u.X(), pc_solution, param.input_location);
+    std::vector<ColorSpinorField> h_b(n_src);
+    for (auto i = 0u; i < h_b.size(); i++) {
+      cpuParam.v = hp_b[i];
+      h_b[i] = ColorSpinorField(cpuParam);
+    }
+
+    std::vector<ColorSpinorField> h_x(n_src);
+    cpuParam.location = param.output_location;
+    for (auto i = 0u; i < h_x.size(); i++) {
+      cpuParam.v = hp_x[i];
+      h_x[i] = ColorSpinorField(cpuParam);
+    }
+
+    // download source
+    ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    std::vector<ColorSpinorField> b;
+    resize(b, n_src, cudaParam);
+    blas::copy(b, h_b);
+
+    // now check if we need to invalidate the solutionResident vectors
+    std::vector<ColorSpinorField> x;
+    resize(x, n_src, cudaParam);
+    if (param.use_resident_solution == 1) {
+      for (auto &v : solutionResident) {
+        if (b[0].Precision() != v.Precision() || b[0].SiteSubset() != v.SiteSubset()) {
+          solutionResident.clear();
+          break;
+        }
+      }
+
+      if (!solutionResident.size()) {
+        cudaParam.create = QUDA_NULL_FIELD_CREATE;
+        solutionResident = std::vector<ColorSpinorField>(1, cudaParam);
+      }
+      x[0] = solutionResident[0].create_alias(cudaParam);
+    } else {
+      cudaParam.create = QUDA_NULL_FIELD_CREATE;
+      x[0] = ColorSpinorField(cudaParam);
+    }
+
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES && !param.chrono_use_resident) { // download initial guess
+      // initial guess only supported for single-pass solvers
+      if ((param.solution_type == QUDA_MATDAG_MAT_SOLUTION || param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION)
+          && (param.solve_type == QUDA_DIRECT_SOLVE || param.solve_type == QUDA_DIRECT_PC_SOLVE)) {
+        errorQuda("Initial guess not supported for two-pass solver");
+      }
+
+      blas::copy(x, h_x); // solution
+    } else {              // zero initial guess
+      blas::zero(x);
+    }
+
+    solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, param);
+
+    if (!param.make_resident_solution) blas::copy(h_x, x);
+
+    delete dirac;
+    delete diracSloppy;
+    delete diracPre;
+    delete diracEig;
+  }
+} // namespace quda
