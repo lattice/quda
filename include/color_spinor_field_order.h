@@ -1363,7 +1363,7 @@ namespace quda
 #pragma unroll
         //for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
         //for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], elem(vecTmp, i), nrm);
-        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], vecTempShort[i], nrm);
+        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], vecTmpShort[i], nrm);
 
 #pragma unroll
         for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);

@@ -601,10 +601,14 @@ protected:
 
     case Kernel::axpbyz:
       xD = xH;
-      yoD = yH;
-      blas::axpbyz(a, xD, b, yoD, zoD);
-      blas::axy(a, xH, zH);
-      blas::axpy(b, yH, zH);
+      zoD = zH;
+      //yoD = yH;
+      //blas::axpbyz(a, xD, b, yoD, zoD);
+      //blas::axy(a, xH, zH);
+      //blas::axpy(b, yH, zH);
+      //error = ERROR(zo);
+      blas::axpy(a, xD, zoD);
+      blas::axpy(a, xH, zH);
       error = ERROR(zo);
       break;
 
