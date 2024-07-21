@@ -1357,10 +1357,13 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
+	array<short,6> vecTmpShort;
+	memcpy(&vecTmpShort, &vecTmp, sizeof(vecTmpShort));
 
 #pragma unroll
         //for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
-        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], elem(vecTmp, i), nrm);
+        //for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], elem(vecTmp, i), nrm);
+        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], vecTempShort[i], nrm);
 
 #pragma unroll
         for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
@@ -1393,11 +1396,14 @@ namespace quda
 
         GhostVector vecTmp;
         memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
+	array<short,6> vecTmpShort;
 
         // pack the spinor elements
 #pragma unroll
         //for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
-        for (int i = 0; i < length_ghost; i++) copy_scaled(elem(vecTmp,i), v[i]);
+        //for (int i = 0; i < length_ghost; i++) copy_scaled(elem(vecTmp,i), v[i]);
+        for (int i = 0; i < length_ghost; i++) copy_scaled(vecTmpShort[i], v[i]);
+	memcpy(&vecTmp, &vecTmpShort, sizeof(vecTmpShort));
         vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
 
