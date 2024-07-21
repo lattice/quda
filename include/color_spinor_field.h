@@ -471,7 +471,7 @@ namespace quda
     template <typename T = void *> auto data() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return reinterpret_cast<T>(v.data());
+      return static_cast<T>(v.data());
     }
 
     /**

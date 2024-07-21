@@ -240,7 +240,8 @@ namespace quda
             Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
             // now copy into output and scale
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
+            //for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
+            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], elem(vecTmp, j), nrm);
           }
 
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -259,7 +260,8 @@ namespace quda
 
           // now copy into output and scale
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
+          //for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
+          for (int i = 0; i < len; i++) copy_and_scale(v_[i], elem(vecTmp, i), nrm);
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -303,7 +305,8 @@ namespace quda
             Vector vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+            //for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(elem(vecTmp, j), v_[i * N + j]);
             // second do vectorized copy into memory
             vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
           }
@@ -323,7 +326,8 @@ namespace quda
           Vector vecTmp;
           memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
+          //for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
+          for (int i = 0; i < len; i++) copy_scaled(elem(vecTmp, i), v_[i]);
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }

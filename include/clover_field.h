@@ -307,7 +307,7 @@ namespace quda {
 
     template <typename T = void *> auto data(bool inverse = false) const
     {
-      return inverse ? reinterpret_cast<T>(cloverInv.data()) : reinterpret_cast<T>(clover.data());
+      return inverse ? static_cast<T>(cloverInv.data()) : static_cast<T>(clover.data());
     }
 
     /**
