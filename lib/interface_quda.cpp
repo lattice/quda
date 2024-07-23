@@ -424,7 +424,6 @@ static void init_default_comms()
 #endif
 }
 
-
 extern char* gitversion;
 
 /*
@@ -1394,6 +1393,8 @@ void endQuda(void)
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
+    GaugeFixFFTQuda.Print();
+    GaugeFixOVRQuda.Print();
     profileCloverForce.Print();
     profileTMCloverForce.Print();
     profileStaggeredForce.Print();
@@ -5616,6 +5617,84 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   }
 
   return 0;
+}
+
+void computeGaugeFixingOVR2Quda(void *gauge, void *rotation, double tol, int maxiter, int dir_ignore,
+                                double relax_boost, int verbose_interval, int use_theta, QudaGaugeParam *param)
+{
+  auto profile = pushProfile(GaugeFixOVRQuda);
+  checkGaugeParam(param);
+
+  GaugeFieldParam gParam(*param);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.gauge = rotation;
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  GaugeField cpuRotation(gParam);
+  gParam.gauge = gauge;
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  GaugeField cpuGauge(gParam);
+
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.link_type = param->type;
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(gParam.Precision(), true);
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  GaugeField cudaRotation(gParam);
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  GaugeField cudaInGauge(gParam);
+  GaugeField cudaOutGauge(gParam);
+
+  cudaRotation.copy(cpuRotation);
+  cudaInGauge.copy(cpuGauge);
+
+  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R, GaugeFixOVRQuda);
+  GaugeField *cudaInGaugeEx = createExtendedGauge(cudaInGauge, R, GaugeFixOVRQuda);
+  GaugeField *cudaOutGaugeEx = createExtendedGauge(cudaOutGauge, R, GaugeFixOVRQuda);
+
+  int iter = 0;
+  double functional_old = DBL_EPSILON, functional, theta, diff, criterion;
+  bool compute_theta = use_theta ? true : false;
+  double2 quality = gaugeFixingQuality(*cudaInGaugeEx, dir_ignore, compute_theta);
+  functional = quality.x;
+  theta = quality.y;
+  diff = (functional - functional_old) / functional_old;
+  criterion = use_theta ? theta : diff;
+  while (iter < maxiter && criterion > tol) {
+    gaugeFixingOVR2(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx, relax_boost, dir_ignore);
+    gaugeRotation(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx);
+    quality = gaugeFixingQuality(*cudaOutGaugeEx, dir_ignore, compute_theta);
+    functional_old = functional;
+    functional = quality.x;
+    theta = quality.y;
+    diff = (functional - functional_old) / functional_old;
+    criterion = use_theta ? theta : diff;
+    iter++;
+    if (iter % verbose_interval == 0) {
+      logQuda(QUDA_SUMMARIZE, "%d iter: old=%.15f, new=%.15f, diff=%le, theta=%le\n", iter, functional_old, functional,
+              diff, theta);
+    }
+  }
+  if (iter % verbose_interval != 0) {
+    logQuda(QUDA_SUMMARIZE, "%d iter: old=%.15f, new=%.15f, diff=%le, theta=%le\n", iter, functional_old, functional,
+            diff, theta);
+  }
+
+  // copy the rotation field back to the host
+  cpuRotation.copy(*cudaRotationEx);
+
+  if (param->make_resident_gauge) {
+    copyExtendedGauge(cudaOutGauge, *cudaOutGaugeEx, QUDA_CUDA_FIELD_LOCATION);
+    freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+    gaugePrecise = new GaugeField();
+    std::exchange(*gaugePrecise, cudaOutGauge);
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaOutGaugeEx;
+  } else {
+    delete cudaOutGaugeEx;
+  }
+  delete cudaRotationEx;
+  delete cudaInGaugeEx;
 }
 
 int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,

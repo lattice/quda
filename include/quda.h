@@ -1743,6 +1743,9 @@ extern "C" {
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
 
+  void computeGaugeFixingOVR2Quda(void *gauge, void *rotation, double tol, int maxiter, int dir_ignore,
+                                  double relax_boost, int verbose_interval, int use_theta, QudaGaugeParam *param);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed

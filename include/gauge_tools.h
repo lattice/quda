@@ -161,6 +161,12 @@ namespace quda
   void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
                       const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
+  void gaugeRotation(GaugeField &out, GaugeField &in, GaugeField &rot);
+
+  void gaugeFixingOVR2(GaugeField &out, GaugeField &in, GaugeField &rot, double relax_boost, int dir_ignore);
+
+  double2 gaugeFixingQuality(const GaugeField &u, int dir_ignore, bool compute_theta);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
