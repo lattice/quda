@@ -56,7 +56,6 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      int dx[4] = {0, 0, 0, 0};
       Link g, U;
       U = arg.in(dir, linkIndex(x, X), parity);
       g = arg.rot(0, linkIndex(x, X), parity);
