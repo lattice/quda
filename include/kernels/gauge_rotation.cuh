@@ -58,15 +58,13 @@ namespace quda
 
       int dx[4] = {0, 0, 0, 0};
       Link g, U;
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
-      g = arg.rot(0, linkIndexShift(x, dx, X), parity);
+      U = arg.in(dir, linkIndex(x, X), parity);
+      g = arg.rot(0, linkIndex(x, X), parity);
       U = g * U;
-      dx[dir]++;
-      g = arg.rot(0, linkIndexShift(x, dx, X), 1 - parity);
+      g = arg.rot(0, linkIndexP1(x, X, dir), 1 - parity);
       U = U * conj(g);
-      dx[dir]--;
 
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+      arg.out(dir, linkIndex(x, X), parity) = U;
     }
   };
 } // namespace quda

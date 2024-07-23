@@ -40,12 +40,22 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (parity == 0) {
-        GaugeFixArg<Float, nColor, recon, 0> arg(u, rot, relax_boost, dir_ignore);
-        launch<GaugeFix>(tp, stream, arg);
-      } else if (parity == 1) {
-        GaugeFixArg<Float, nColor, recon, 1> arg(u, rot, relax_boost, dir_ignore);
-        launch<GaugeFix>(tp, stream, arg);
+      if (relax_boost == 1.0) {
+        if (parity == 0) {
+          GaugeFixArg<Float, nColor, recon, 0, false> arg(u, rot, relax_boost, dir_ignore);
+          launch<GaugeFix>(tp, stream, arg);
+        } else if (parity == 1) {
+          GaugeFixArg<Float, nColor, recon, 1, false> arg(u, rot, relax_boost, dir_ignore);
+          launch<GaugeFix>(tp, stream, arg);
+        }
+      } else {
+        if (parity == 0) {
+          GaugeFixArg<Float, nColor, recon, 0, true> arg(u, rot, relax_boost, dir_ignore);
+          launch<GaugeFix>(tp, stream, arg);
+        } else if (parity == 1) {
+          GaugeFixArg<Float, nColor, recon, 1, true> arg(u, rot, relax_boost, dir_ignore);
+          launch<GaugeFix>(tp, stream, arg);
+        }
       }
     }
 

@@ -8,12 +8,14 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int parity_> struct GaugeFixArg : kernel_param<> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int parity_, bool over_relaxation_>
+  struct GaugeFixArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int parity = parity_;
+    static constexpr bool over_relaxation = over_relaxation_;
     typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     const Gauge u;
@@ -41,8 +43,8 @@ namespace quda
   };
 
   // g' = \frac{K^\dagger g^\dagger}{\sqrt{\det(K^\dagger g^\dagger)}} g = \frac{K^\dagger}{\sqrt{\det(K^\dagger)}}
-  template <int su2_index, typename Link, typename Float>
-  __device__ __host__ inline void minimize_gK(Link &g, Link &gK, Float versors[4])
+  template <int su2_index, bool over_relaxation, typename Link, typename Float>
+  __device__ __host__ inline void minimize_gK(Link &g, Link &gK, Float versors[4], Float relax_boost)
   {
     int i1, i2;
     switch (su2_index) {
@@ -62,6 +64,15 @@ namespace quda
     versors[0] /= norm;
 #pragma unroll
     for (int i = 1; i < 4; ++i) { versors[i] /= -norm; }
+
+    if constexpr (over_relaxation) {
+      Float angle = acos(versors[0]);
+      Float angle_new = angle * relax_boost;
+      Float coeff = sin(angle_new) / sin(angle);
+      versors[0] = cos(angle_new);
+#pragma unroll
+      for (int i = 1; i < 4; ++i) { versors[i] *= coeff; }
+    }
 
     setIdentity(&gK);
     gK(i1, i1) = complex(versors[0], versors[1]);
@@ -96,21 +107,16 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      int dx[4] = {0, 0, 0, 0};
       Link g, K, tmp, tmp2;
-      g = arg.rot(0, linkIndexShift(x, dx, X), parity);
+      g = arg.rot(0, linkIndex(x, X), parity);
 #pragma unroll
       for (int dir = 0; dir < 4; ++dir) {
         if (dir != arg.dir_ignore) {
-          tmp = arg.u(dir, linkIndexShift(x, dx, X), parity);
-          dx[dir]++;
-          tmp2 = arg.rot(0, linkIndexShift(x, dx, X), 1 - parity);
-          dx[dir]--;
+          tmp = arg.u(dir, linkIndex(x, X), parity);
+          tmp2 = arg.rot(0, linkIndexP1(x, X, dir), 1 - parity);
           K += tmp * conj(tmp2);
-          dx[dir]--;
-          tmp = arg.u(dir, linkIndexShift(x, dx, X), 1 - parity);
-          tmp2 = arg.rot(0, linkIndexShift(x, dx, X), 1 - parity);
-          dx[dir]++;
+          tmp = arg.u(dir, linkIndexM1(x, X, dir), 1 - parity);
+          tmp2 = arg.rot(0, linkIndexM1(x, X, dir), 1 - parity);
           K += conj(tmp2 * tmp);
         }
       }
@@ -118,14 +124,14 @@ namespace quda
       real versors[4];
       // loop over SU(2) subgroup indices
       tmp = g * K;
-      minimize_gK<0>(g, tmp, versors);
+      minimize_gK<0, Arg::over_relaxation>(g, tmp, versors, arg.relax_boost);
       tmp = g * K;
-      minimize_gK<1>(g, tmp, versors);
+      minimize_gK<1, Arg::over_relaxation>(g, tmp, versors, arg.relax_boost);
       tmp = g * K;
-      minimize_gK<2>(g, tmp, versors);
+      minimize_gK<2, Arg::over_relaxation>(g, tmp, versors, arg.relax_boost);
       polarSu3(g, arg.tolerance);
 
-      arg.rot(0, linkIndexShift(x, dx, X), parity) = g;
+      arg.rot(0, linkIndex(x, X), parity) = g;
     }
   };
 } // namespace quda
