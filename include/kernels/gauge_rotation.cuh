@@ -32,12 +32,9 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct GaugeRotate : computeStapleOps {
+  template <typename Arg> struct GaugeRotate {
     const Arg &arg;
-    template <typename... OpsArgs>
-    constexpr GaugeRotate(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr GaugeRotate(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

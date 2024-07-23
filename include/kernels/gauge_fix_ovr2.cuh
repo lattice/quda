@@ -18,8 +18,8 @@ namespace quda
     static constexpr bool over_relaxation = over_relaxation_;
     typedef typename gauge_mapper<Float, recon>::type Gauge;
 
-    const Gauge u;
     Gauge rot;
+    const Gauge u;
 
     int X[4]; // grid dimensions
     int border[4];
@@ -27,10 +27,10 @@ namespace quda
     const int dir_ignore;
     const Float tolerance;
 
-    GaugeFixArg(const GaugeField &u, GaugeField &rot, double relax_boost, int dir_ignore) :
+    GaugeFixArg(GaugeField &rot, const GaugeField &u, double relax_boost, int dir_ignore) :
       kernel_param(dim3(u.LocalVolumeCB())),
-      u(u),
       rot(rot),
+      u(u),
       relax_boost(relax_boost),
       dir_ignore(dir_ignore),
       tolerance(u.toleranceSU3())
@@ -66,10 +66,11 @@ namespace quda
     for (int i = 1; i < 4; ++i) { versors[i] /= -norm; }
 
     if constexpr (over_relaxation) {
+      Float sin_angle, cos_angle;
       Float angle = acos(versors[0]);
-      Float angle_new = angle * relax_boost;
-      Float coeff = sin(angle_new) / sin(angle);
-      versors[0] = cos(angle_new);
+      sincos(angle * relax_boost, &sin_angle, &cos_angle);
+      Float coeff = sin_angle / sin(angle);
+      versors[0] = cos_angle;
 #pragma unroll
       for (int i = 1; i < 4; ++i) { versors[i] *= coeff; }
     }
@@ -83,12 +84,9 @@ namespace quda
     g = gK * g;
   }
 
-  template <typename Arg> struct GaugeFix : computeStapleOps {
+  template <typename Arg> struct GaugeFix {
     const Arg &arg;
-    template <typename... OpsArgs>
-    constexpr GaugeFix(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr GaugeFix(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

@@ -5619,7 +5619,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   return 0;
 }
 
-void computeGaugeFixingOVR2Quda(void *gauge, void *rotation, double tol, int maxiter, int dir_ignore,
+void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore,
                                 double relax_boost, int verbose_interval, int use_theta, QudaGaugeParam *param)
 {
   auto profile = pushProfile(GaugeFixOVRQuda);
@@ -5661,7 +5661,7 @@ void computeGaugeFixingOVR2Quda(void *gauge, void *rotation, double tol, int max
   diff = (functional - functional_old) / functional_old;
   criterion = use_theta ? theta : diff;
   while (iter < maxiter && criterion > tol) {
-    gaugeFixingOVR2(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx, relax_boost, dir_ignore);
+    gaugeFixingOVR2(*cudaRotationEx, *cudaInGaugeEx, relax_boost, dir_ignore);
     gaugeRotation(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx);
     quality = gaugeFixingQuality(*cudaOutGaugeEx, dir_ignore, compute_theta);
     functional_old = functional;

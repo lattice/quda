@@ -1743,7 +1743,19 @@ extern "C" {
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
 
-  void computeGaugeFixingOVR2Quda(void *gauge, void *rotation, double tol, int maxiter, int dir_ignore,
+  /**
+   * @brief Gauge fixing with over-relaxation.
+   * @param[in,out] rotation Rotation field g(x) to fix the gauge
+   * @param[in] gauge Gauge field U_\mu(x)
+   * @param[in] tol Torelance of the gauge fixing quality
+   * @param[in] maxiter Maximum number of iterations to perform the gauge fixing
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are usually used
+   * @param[in] relax_boost The over-relaxation parameter, most common value is 1.5 or 1.7
+   * @param[in] verbose_interval Number of iterations to print gauge fixing info
+   * @param[in] compute_theta 0 to use the relative difference of functional and 1 to use the theta as the convergence criterion
+   * @param[in] param Parameters of the external fields
+   */
+  void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore,
                                   double relax_boost, int verbose_interval, int use_theta, QudaGaugeParam *param);
 
   /**

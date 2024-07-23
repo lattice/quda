@@ -161,10 +161,30 @@ namespace quda
   void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
                       const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
-  void gaugeRotation(GaugeField &out, GaugeField &in, GaugeField &rot);
+  /**
+   * @brief Rotate gauge U_\mu(x) with rotation field g(x).
+   * @param[in,out] out Rotated gauge field U'_\mu(x) = g(x)U_\mu(x)g^\dagger(x+\hat{\mu})
+   * @param[in] in Gauge field U_\mu(x)
+   * @param[in] rot Rotation field g(x)
+   */
+  void gaugeRotation(GaugeField &out, const GaugeField &in, const GaugeField &rot);
 
-  void gaugeFixingOVR2(GaugeField &out, GaugeField &in, GaugeField &rot, double relax_boost, int dir_ignore);
+  /**
+   * @brief Gauge fixing with over-relaxation.
+   * @param[in,out] rot Rotation field to fix the gauge
+   * @param[in] u Gauge field
+   * @param[in] relax_boost The over-relaxation parameter, most common value is 1.5 or 1.7
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are usually used
+   */
+  void gaugeFixingOVR2(GaugeField &rot, const GaugeField &u, double relax_boost, int dir_ignore);
 
+  /**
+   * @brief Compute the gauge fixing quality, functional and theta are considered.
+   * @param[in] u Fixed gauge field
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are usually used
+   * @param[in] compute_theta Set to true to compute the theta value as the criterion
+   * @return A double2 struct in which x is the functional and y is the theta value
+   */
   double2 gaugeFixingQuality(const GaugeField &u, int dir_ignore, bool compute_theta);
 
   /**

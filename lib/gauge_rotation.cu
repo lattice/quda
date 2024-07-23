@@ -17,7 +17,6 @@ namespace quda
     const GaugeField &rot;
 
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     GaugeRotation(GaugeField &out, const GaugeField &in, const GaugeField &rot) :
@@ -46,7 +45,7 @@ namespace quda
 
   }; // GaugeRotate
 
-  void gaugeRotation(GaugeField &out, GaugeField &in, GaugeField &rot)
+  void gaugeRotation(GaugeField &out, const GaugeField &in, const GaugeField &rot)
   {
     checkPrecision(out, in, rot);
     checkReconstruct(out, in, rot);

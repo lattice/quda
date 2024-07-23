@@ -18,7 +18,6 @@ namespace quda
     const int fixDim;
     const bool compute_theta;
     unsigned int minThreads() const { return u.LocalVolumeCB(); }
-    unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     GaugeFixingQuality(const GaugeField &u, array<double, 2> &quality, int dir_ignore, bool compute_theta) :
