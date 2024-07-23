@@ -179,13 +179,13 @@ namespace quda
   void gaugeFixingOVR2(GaugeField &rot, const GaugeField &u, double relax_boost, int dir_ignore);
 
   /**
-   * @brief Compute the gauge fixing quality, functional and theta are considered.
+   * @brief Compute the gauge fixing quality, functional or theta is considered as the criterion.
+   * @param[in,out] quality The functional and theta value
    * @param[in] u Fixed gauge field
    * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are usually used
    * @param[in] compute_theta Set to true to compute the theta value as the criterion
-   * @return A double2 struct in which x is the functional and y is the theta value
    */
-  double2 gaugeFixingQuality(const GaugeField &u, int dir_ignore, bool compute_theta);
+  void gaugeFixingQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

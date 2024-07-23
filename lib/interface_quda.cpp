@@ -5653,20 +5653,20 @@ void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int max
   GaugeField *cudaOutGaugeEx = createExtendedGauge(cudaOutGauge, R, GaugeFixOVRQuda);
 
   int iter = 0;
-  double functional_old = DBL_EPSILON, functional, theta, diff, criterion;
+  double functional_old = DBL_EPSILON, functional, theta, diff, criterion, quality[2];
   bool compute_theta = use_theta ? true : false;
-  double2 quality = gaugeFixingQuality(*cudaInGaugeEx, dir_ignore, compute_theta);
-  functional = quality.x;
-  theta = quality.y;
+  gaugeFixingQuality(quality, *cudaInGaugeEx, dir_ignore, compute_theta);
+  functional = quality[0];
+  theta = quality[1];
   diff = (functional - functional_old) / functional_old;
   criterion = use_theta ? theta : diff;
   while (iter < maxiter && criterion > tol) {
     gaugeFixingOVR2(*cudaRotationEx, *cudaInGaugeEx, relax_boost, dir_ignore);
     gaugeRotation(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx);
-    quality = gaugeFixingQuality(*cudaOutGaugeEx, dir_ignore, compute_theta);
+    gaugeFixingQuality(quality, *cudaOutGaugeEx, dir_ignore, compute_theta);
     functional_old = functional;
-    functional = quality.x;
-    theta = quality.y;
+    functional = quality[0];
+    theta = quality[1];
     diff = (functional - functional_old) / functional_old;
     criterion = use_theta ? theta : diff;
     iter++;
