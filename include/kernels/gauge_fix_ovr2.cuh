@@ -23,15 +23,15 @@ namespace quda
 
     int X[4]; // grid dimensions
     int border[4];
-    const Float relax_boost;
+    const Float omega;
     const int dir_ignore;
     const Float tolerance;
 
-    GaugeFixArg(GaugeField &rot, const GaugeField &u, double relax_boost, int dir_ignore) :
+    GaugeFixArg(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore) :
       kernel_param(dim3(u.LocalVolumeCB())),
       rot(rot),
       u(u),
-      relax_boost(relax_boost),
+      omega(omega),
       dir_ignore(dir_ignore),
       tolerance(u.toleranceSU3())
     {
@@ -44,7 +44,7 @@ namespace quda
 
   // g' = \frac{K^\dagger g^\dagger}{\sqrt{\det(K^\dagger g^\dagger)}} g = \frac{K^\dagger}{\sqrt{\det(K^\dagger)}}
   template <int su2_index, bool over_relaxation, typename Link, typename Float>
-  __device__ __host__ inline void minimize_gK(Link &g, Link &gK, Float versors[4], Float relax_boost)
+  __device__ __host__ inline void minimize_gK(Link &g, Link &gK, Float versors[4], Float omega)
   {
     int i1, i2;
     switch (su2_index) {
@@ -68,7 +68,7 @@ namespace quda
     if constexpr (over_relaxation) {
       Float sin_angle, cos_angle;
       Float angle = acos(versors[0]);
-      sincos(angle * relax_boost, &sin_angle, &cos_angle);
+      sincos(omega * angle, &sin_angle, &cos_angle);
       Float coeff = sin_angle / sin(angle);
       versors[0] = cos_angle;
 #pragma unroll
@@ -122,11 +122,11 @@ namespace quda
       real versors[4];
       // loop over SU(2) subgroup indices
       tmp = g * K;
-      minimize_gK<0, Arg::over_relaxation>(g, tmp, versors, arg.relax_boost);
+      minimize_gK<0, Arg::over_relaxation>(g, tmp, versors, arg.omega);
       tmp = g * K;
-      minimize_gK<1, Arg::over_relaxation>(g, tmp, versors, arg.relax_boost);
+      minimize_gK<1, Arg::over_relaxation>(g, tmp, versors, arg.omega);
       tmp = g * K;
-      minimize_gK<2, Arg::over_relaxation>(g, tmp, versors, arg.relax_boost);
+      minimize_gK<2, Arg::over_relaxation>(g, tmp, versors, arg.omega);
       polarSu3(g, arg.tolerance);
 
       arg.rot(0, linkIndex(x, X), parity) = g;

@@ -5619,8 +5619,8 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   return 0;
 }
 
-void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore,
-                                double relax_boost, int verbose_interval, int use_theta, QudaGaugeParam *param)
+void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore, double omega,
+                                QudaGaugeParam *param)
 {
   auto profile = pushProfile(GaugeFixOVRQuda);
   checkGaugeParam(param);
@@ -5652,16 +5652,19 @@ void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int max
   GaugeField *cudaInGaugeEx = createExtendedGauge(cudaInGauge, R, GaugeFixOVRQuda);
   GaugeField *cudaOutGaugeEx = createExtendedGauge(cudaOutGauge, R, GaugeFixOVRQuda);
 
-  int iter = 0;
   double functional_old = DBL_EPSILON, functional, theta, diff, criterion, quality[2];
-  bool compute_theta = use_theta ? true : false;
+  bool compute_theta = param->gauge_fix_compute_theta ? true : false;
+  bool use_theta = param->gauge_fix_use_theta ? true : false;
+  if (use_theta && !compute_theta) { errorQuda("gauge_fix_compute_theta must be true if gauge_fix_use_theta is true"); }
   gaugeFixingQuality(quality, *cudaInGaugeEx, dir_ignore, compute_theta);
   functional = quality[0];
   theta = quality[1];
   diff = (functional - functional_old) / functional_old;
   criterion = use_theta ? theta : diff;
+  int iter = 0;
+  logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
   while (iter < maxiter && criterion > tol) {
-    gaugeFixingOVR2(*cudaRotationEx, *cudaInGaugeEx, relax_boost, dir_ignore);
+    gaugeFixingOVR2(*cudaRotationEx, *cudaInGaugeEx, omega, dir_ignore);
     gaugeRotation(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx);
     gaugeFixingQuality(quality, *cudaOutGaugeEx, dir_ignore, compute_theta);
     functional_old = functional;
@@ -5670,14 +5673,7 @@ void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int max
     diff = (functional - functional_old) / functional_old;
     criterion = use_theta ? theta : diff;
     iter++;
-    if (iter % verbose_interval == 0) {
-      logQuda(QUDA_SUMMARIZE, "%d iter: old=%.15f, new=%.15f, diff=%le, theta=%le\n", iter, functional_old, functional,
-              diff, theta);
-    }
-  }
-  if (iter % verbose_interval != 0) {
-    logQuda(QUDA_SUMMARIZE, "%d iter: old=%.15f, new=%.15f, diff=%le, theta=%le\n", iter, functional_old, functional,
-            diff, theta);
+    logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
   }
 
   // copy the rotation field back to the host

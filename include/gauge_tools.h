@@ -173,16 +173,16 @@ namespace quda
    * @brief Gauge fixing with over-relaxation.
    * @param[in,out] rot Rotation field to fix the gauge
    * @param[in] u Gauge field
-   * @param[in] relax_boost The over-relaxation parameter, most common value is 1.5 or 1.7
-   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are usually used
+   * @param[in] omega The over-relaxation parameter, most common value is 1.5 or 1.7
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
    */
-  void gaugeFixingOVR2(GaugeField &rot, const GaugeField &u, double relax_boost, int dir_ignore);
+  void gaugeFixingOVR2(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore);
 
   /**
    * @brief Compute the gauge fixing quality, functional or theta is considered as the criterion.
    * @param[in,out] quality The functional and theta value
    * @param[in] u Fixed gauge field
-   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are usually used
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
    * @param[in] compute_theta Set to true to compute the theta value as the criterion
    */
   void gaugeFixingQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta);
