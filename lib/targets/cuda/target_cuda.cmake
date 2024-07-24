@@ -325,6 +325,14 @@ target_compile_options(
           -fsanitize=undefined>
           >)
 
+if(QUDA_OPENMP)
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+    "-Xcompiler=${OpenMP_CXX_FLAGS}"
+    >)
+endif()
+
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
 target_link_libraries(quda PUBLIC CUDA::cuda_driver)
 target_link_libraries(quda PUBLIC CUDA::nvml)
