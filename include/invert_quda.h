@@ -307,8 +307,8 @@ namespace quda {
       tol_restart(param.tol_restart),
       tol_hq(param.tol_hq),
       compute_true_res(param.compute_true_res),
-      true_res(param.true_res),
-      true_res_hq(param.true_res_hq),
+      true_res(param.num_src, 0.0),
+      true_res_hq(param.num_src, 0.0),
       maxiter(param.maxiter),
       iter(param.iter),
       precision(param.cuda_prec),
@@ -374,8 +374,8 @@ namespace quda {
        @param param the QudaInvertParam to be updated
      */
     void updateInvertParam(QudaInvertParam &param, int offset=-1) {
-      param.true_res = static_cast<double>(true_res);
-      param.true_res_hq = static_cast<double>(true_res_hq);
+      for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
+      for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
       param.iter += iter;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];

@@ -145,8 +145,8 @@ extern "C" {
     double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
 
     int compute_true_res; /** Whether to compute the true residual post solve */
-    double true_res; /**< Actual L2 residual norm achieved in solver */
-    double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
+    double true_res[QUDA_MAX_MULTI_SRC];    /**< Actual L2 residual norm achieved in the solver */
+    double true_res_hq[QUDA_MAX_MULTI_SRC]; /**< Actual heavy quark residual norm achieved in the solver */
     int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
     double reliable_delta_refinement; /**< Reliable update tolerance used in post multi-shift solver refinement */

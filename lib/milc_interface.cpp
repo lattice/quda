@@ -1209,8 +1209,8 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
@@ -1426,8 +1426,9 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  // FIXME MILC seems to only care about a single residual?
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
@@ -1521,8 +1522,8 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge && last_rhs_flag) invalidateGaugeQuda();
 
@@ -2707,8 +2708,8 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
@@ -3004,8 +3005,8 @@ void qudaCloverInvert(int external_precision,
   invertQuda(solution, source, &invertParam);
 
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (clover || cloverInverse) qudaFreeCloverField();
   if (link) qudaFreeGaugeField();
@@ -3083,8 +3084,8 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   if (last_rhs_flag) destroyDeflationQuda(df_preconditioner);
 
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
@@ -3151,7 +3152,7 @@ void qudaCloverMultishiftInvert(int external_precision, int quda_precision, int 
     }
 
     invertQuda(solutionArray[0], source, &invertParam);
-    *final_residual = invertParam.true_res;
+    *final_residual = invertParam.true_res[0];
   } else {
     invertMultiShiftQuda(solutionArray, source, &invertParam);
     for (int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];

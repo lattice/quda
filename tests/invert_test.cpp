@@ -47,6 +47,7 @@ void display_test_info()
     printfQuda(" - number of levels %d\n", mg_levels);
     for (int i = 0; i < mg_levels - 1; i++) {
       printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d null-space vector batch size %d\n", i + 1, nvec_batch[i]);
       printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
       printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
     }
@@ -304,7 +305,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
     verifySpinorDistanceReweight(in[0], distance_pc_alpha0, distance_pc_t0);
   }
 
-  if (!use_split_grid) {
+  if (!use_split_grid && Nsrc == 1) {
 
     for (int i = 0; i < Nsrc; i++) {
       // If deflating, preserve the deflation space between solves
@@ -333,8 +334,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
       _hp_x[i] = out[i].data();
       _hp_b[i] = in[i].data();
     }
-    
-		// Run split grid
+
+    // Run split grid
     invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
     quda::comm_allreduce_int(inv_param.iter);
@@ -360,7 +361,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
       res[i] = verifyInversion(out[i].data(), _hp_multi_x[i].data(), in[i].data(), check.data(), gauge_param, inv_param,
-                               gauge.data(), clover.data(), clover_inv.data());
+                               gauge.data(), clover.data(), clover_inv.data(), i);
     }
   }
   return res;

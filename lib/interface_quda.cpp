@@ -3095,6 +3095,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     errorQuda("split_key = [%d,%d,%d,%d] is not valid", split_key[0], split_key[1], split_key[2], split_key[3]);
   }
 
+  checkInvertParam(param, _hp_x[0], _hp_b[0]);
+
   if (num_sub_partition == 1) { // In this case we don't split the grid.
 
     std::vector<void *> x(param->num_src), b(param->num_src);
@@ -3117,8 +3119,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Doesn't work for MG yet.
     if (param->inv_type_precondition == QUDA_MG_INVERTER) errorQuda("Split Grid does NOT work with MG yet");
-
-    checkInvertParam(param, _hp_x[0], _hp_b[0]);
 
     bool is_staggered = false;
     bool is_asqtad = false;

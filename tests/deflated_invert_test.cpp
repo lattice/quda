@@ -277,7 +277,7 @@ int main(int argc, char **argv)
   double l2r = sqrt(nrm2 / src2);
 
   printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", inv_param.tol,
-             inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
+             inv_param.true_res[0], l2r, inv_param.tol_hq, inv_param.true_res_hq[0]);
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
