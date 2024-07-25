@@ -21,6 +21,7 @@ QudaInvertParam mg_inv_param;
 QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
 bool use_split_grid = false;
+bool use_multi_src = false;
 
 std::vector<char> gauge_;
 std::array<void *, 4> gauge;
@@ -226,6 +227,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
   use_split_grid = num_sub_partition > 1;
+  use_multi_src = use_split_grid || (Nsrc_tile > 1);
 
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
@@ -239,6 +241,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
+  if (Nsrc > QUDA_MAX_MULTI_SRC)
+    errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
   std::vector<quda::ColorSpinorField> in(Nsrc);
   std::vector<quda::ColorSpinorField> out(Nsrc);
   std::vector<quda::ColorSpinorField> out_multishift(multishift * Nsrc);
@@ -305,7 +309,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
     verifySpinorDistanceReweight(in[0], distance_pc_alpha0, distance_pc_t0);
   }
 
-  if (!use_split_grid && Nsrc == 1) {
+  if (!use_multi_src) {
 
     for (int i = 0; i < Nsrc; i++) {
       // If deflating, preserve the deflation space between solves
@@ -317,34 +321,47 @@ std::vector<std::array<double, 2>> solve(test_t param)
         invertQuda(out[i].data(), in[i].data(), &inv_param);
       }
 
+      // move residuals to i^th location for verification after solves have finised
+      inv_param.true_res[i] = inv_param.true_res[0];
+      inv_param.true_res_hq[i] = inv_param.true_res_hq[0];
+
       time[i] = inv_param.secs;
       gflops[i] = inv_param.gflops / inv_param.secs;
       iter[i] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
     }
+
   } else {
 
-    inv_param.num_src = Nsrc;
-    inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
+    inv_param.num_src = Nsrc_tile;
+    inv_param.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
     // Host arrays for solutions, sources, and check
-    std::vector<void *> _hp_x(Nsrc);
-    std::vector<void *> _hp_b(Nsrc);
-    for (int i = 0; i < Nsrc; i++) {
-      _hp_x[i] = out[i].data();
-      _hp_b[i] = in[i].data();
+    std::vector<void *> _hp_x(Nsrc_tile);
+    std::vector<void *> _hp_b(Nsrc_tile);
+
+    for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+      for (int i = 0; i < Nsrc_tile; i++) {
+        _hp_x[i] = out[j + i].data();
+        _hp_b[i] = in[j + i].data();
+      }
+
+      invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
+
+      // move residuals to (i+j)^th location for verification after solves have finished
+      for (int i = 0; i < Nsrc_tile; i++) {
+        inv_param.true_res[j + i] = inv_param.true_res[i];
+        inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
+      }
+
+      quda::comm_allreduce_int(inv_param.iter);
+      inv_param.iter /= quda::comm_size() / num_sub_partition;
+      quda::comm_allreduce_sum(inv_param.gflops);
+      inv_param.gflops /= quda::comm_size() / num_sub_partition;
+      quda::comm_allreduce_max(inv_param.secs);
+      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n", num_sub_partition, inv_param.iter,
+                 inv_param.secs, inv_param.gflops / inv_param.secs);
     }
-
-    // Run split grid
-    invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
-
-    quda::comm_allreduce_int(inv_param.iter);
-    inv_param.iter /= quda::comm_size() / num_sub_partition;
-    quda::comm_allreduce_sum(inv_param.gflops);
-    inv_param.gflops /= quda::comm_size() / num_sub_partition;
-    quda::comm_allreduce_max(inv_param.secs);
-    printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n", num_sub_partition, inv_param.iter,
-               inv_param.secs, inv_param.gflops / inv_param.secs);
   }
 
   // QUDA invert test COMPLETE
@@ -354,7 +371,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute performance statistics
-  if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
+  if (!use_multi_src) performanceStats(time, gflops, iter);
 
   std::vector<std::array<double, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
