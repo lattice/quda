@@ -135,14 +135,14 @@ namespace quda
         if (r_coarse.empty()) {
           r_coarse.resize(1);
           r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                              param.mg_global.location[param.level + 1]);
+                                                 param.mg_global.location[param.level + 1]);
         }
 
         // create coarse solution vector if not already created in verify()
         if (x_coarse.empty()) {
           x_coarse.resize(1);
           x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                              param.mg_global.location[param.level + 1]);
+                                                 param.mg_global.location[param.level + 1]);
         }
 
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
@@ -765,7 +765,8 @@ namespace quda
     pushLevel(param.level);
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < r[0].Precision()) ?
-      param.mg_global.precision_null[param.level] : r[0].Precision();
+      param.mg_global.precision_null[param.level] :
+      r[0].Precision();
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
@@ -831,7 +832,7 @@ namespace quda
 
         for (int i = 0; i < param.Nvec; i++) {
           transfer->R(r_coarse[0], param.B[i]);
-          (*coarse_solver)(x_coarse[0], r_coarse[0]);   // this needs to be an exact solve to pass
+          (*coarse_solver)(x_coarse[0], r_coarse[0]); // this needs to be an exact solve to pass
           setOutputPrefix(prefix);                // restore prefix after return from coarse grid
           transfer->P(tmp2, x_coarse[0]);
           (*param.matResidual)(tmp1, tmp2);
@@ -865,7 +866,7 @@ namespace quda
     if (r_coarse.empty()) {
       r_coarse.resize(1);
       r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                          param.mg_global.location[param.level + 1]);
+                                             param.mg_global.location[param.level + 1]);
     }
 
     // create coarse solution vector if not already created in verify()
@@ -884,8 +885,8 @@ namespace quda
       auto r2 = norm2(r_coarse[0]);
       auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
       auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
-      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n", norm2(x_coarse[0]),
-              r2, norm2(tmp2), l2_deviation, max_deviation[0]);
+      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
+              norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol))
         errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
       if (check_deviation(max_deviation[0], tol))
@@ -1117,7 +1118,7 @@ namespace quda
             logQuda(QUDA_SUMMARIZE, "Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for vector %d\n", i);
 
             transfer->R(r_coarse[0], param.B[i]);
-            (*coarse_solver)(x_coarse[0], r_coarse[0]);   // this needs to be an exact solve to pass
+            (*coarse_solver)(x_coarse[0], r_coarse[0]); // this needs to be an exact solve to pass
             setOutputPrefix(prefix);                // restore prefix after return from coarse grid
             transfer->P(tmp2, x_coarse[0]);
             (*param.matResidual)(tmp1, tmp2);
@@ -1164,24 +1165,14 @@ namespace quda
     QudaSolutionType outer_solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
     QudaSolutionType inner_solution_type = param.coarse_grid_solution_type;
 
-    if constexpr (debug) printfQuda("outer_solution_type = %d, inner_solution_type = %d\n", outer_solution_type, inner_solution_type);
-
     if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
 
     if ( inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
-    if constexpr ( debug ) for (auto i = 0u; i < b.size(); i++)
-                   printfQuda("entering V-cycle with x2=%e, r2=%e\n", norm2(x[i]), norm2(b[i]));
-
     if (param.level < param.Nlevel-1) {
-      //transfer->setTransferGPU(false); // use this to force location of transfer (need to check if still works for multi-level)
-
       // do the pre smoothing
-      if constexpr (debug) for (auto i = 0u; i < b.size(); i++)
-                   printfQuda("pre-smoothing b2=%e site subset %d\n", norm2(b[i]), b.SiteSubset());
-
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
 
@@ -1203,17 +1194,17 @@ namespace quda
         false;
 
       // FIXME this is currently borked if inner solver is preconditioned
-      const auto &residual = !presmoother ? b :
-        use_solver_residual                           ? presmoother->get_residual() :
-        b.SiteSubset() == QUDA_FULL_SITE_SUBSET       ? cvector_ref<const ColorSpinorField>(r) :
-        cvector_ref<const ColorSpinorField>(r).Even();
+      const auto &residual = !presmoother       ? b :
+        use_solver_residual                     ? presmoother->get_residual() :
+        b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<const ColorSpinorField>(r) :
+                                                  cvector_ref<const ColorSpinorField>(r).Even();
 
       if (!use_solver_residual && presmoother) {
-        auto &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<ColorSpinorField>(r) : cvector_ref<ColorSpinorField>(r).Even();
+        auto &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<ColorSpinorField>(r) :
+                                                                   cvector_ref<ColorSpinorField>(r).Even();
         (*param.matResidual)(residual, x);
         axpby(1.0, b, -1.0, residual);
       }
-      auto r2 = debug ? norm2(residual) : 0.0;
 
       // We need this to ensure that the coarse level has been created.
       // e.g. in case of iterative setup with MG we use just pre- and post-smoothing at the first iteration.
@@ -1221,27 +1212,16 @@ namespace quda
 
         // restrict to the coarse grid
         transfer->R(r_coarse, residual);
-        if constexpr (debug)
-          for (auto i = 0u; i < b.size(); i++)
-            printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", norm2(x[i]), r2[i], norm2(r_coarse[i]));
 
         // recurse to the next lower level
         (*coarse_solver)(x_coarse, r_coarse);
-        if constexpr (debug)
-          for (auto i = 0u; i < b.size(); i++)
-            printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(x_coarse[i]), norm2(r_coarse[i]));
 
         // prolongate back to this grid
-        auto &x_coarse_2_fine
-          = inner_solution_type == QUDA_MAT_SOLUTION ? cvector_ref<ColorSpinorField>(r) : cvector_ref<ColorSpinorField>(r).Even(); // define according to inner solution type
+        auto &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ?
+          cvector_ref<ColorSpinorField>(r) :
+          cvector_ref<ColorSpinorField>(r).Even();                   // define according to inner solution type
         transfer->P(x_coarse_2_fine, x_coarse);                      // repurpose residual storage
         xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
-        if constexpr ( debug ) {
-          for (auto i = 0u; i < b.size(); i++) {
-            printfQuda("Prolongated coarse solution y2 = %e\n", norm2(r[i]));
-            printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", norm2(x[i]), norm2(r[i]));
-          }
-        }
       }
 
       // we should keep a copy of the prepared right hand side as we've already destroyed it
@@ -1258,13 +1238,7 @@ namespace quda
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
       if (presmoother) (*presmoother)(out, in);
       diracSmoother->reconstruct(x, b, outer_solution_type);
-    }
 
-    // FIXME on subset check
-    if (debug && b.SiteSubset() == cvector_ref<ColorSpinorField>(r).SiteSubset()) {
-      (*param.matResidual)(r, x);
-      auto r2 = xmyNorm(b, r);
-      for (auto i = 0u; i < r2.size(); i++) printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x[i]), r2[i]);
     }
 
     popOutputPrefix();
@@ -1356,7 +1330,7 @@ namespace quda
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
     ColorSpinorParam csParam(B[0]);                             // Create spinor field parameters:
-    csParam.setPrecision(r[0].Precision(), r[0].Precision(), true);   // ensure native ordering
+    csParam.setPrecision(r[0].Precision(), r[0].Precision(), true); // ensure native ordering
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
     csParam.gammaBasis = B[0].Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
                                              QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
