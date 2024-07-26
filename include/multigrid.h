@@ -299,14 +299,14 @@ namespace quda {
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField> B_coarse;
 
-    /** Residual vector */
-    ColorSpinorField r;
+    /** Residual vector set */
+    std::vector<ColorSpinorField> r;
 
-    /** Coarse residual vector */
-    ColorSpinorField r_coarse;
+    /** Coarse residual vector set */
+    std::vector<ColorSpinorField> r_coarse;
 
-    /** Coarse solution vector */
-    ColorSpinorField x_coarse;
+    /** Coarse solution vector set */
+    std::vector<ColorSpinorField> x_coarse;
 
     /** Kahler-Dirac Xinv */
     std::shared_ptr<GaugeField> xInvKD;
@@ -445,12 +445,7 @@ namespace quda {
        @param out The solution vector
        @param in The residual vector (or equivalently the right hand side vector)
      */
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
 
     /**
        @brief Load the null space vectors in from file
