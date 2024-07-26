@@ -528,7 +528,7 @@ namespace quda {
   {
     // FIXME emulated for now
     Dslash(out, in, parity);
-    for (auto i = 0u; i < x.size(); i++) blas::xpay(x[i], k, out[i]);
+    blas::xpay(x, k, out);
   }
 
   void DiracCoarsePC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
@@ -545,14 +545,14 @@ namespace quda {
       // DiracCoarse::DslashXpay applies (A - D) // FIXME this ignores the -1
       DiracCoarse::Dslash(out, tmp, QUDA_EVEN_PARITY);
       Clover(tmp, in, QUDA_EVEN_PARITY);
-      for (auto i = 0u; i < in.size(); i++) blas::xpay(tmp[i], -1.0, out[i]);
+      blas::xpay(tmp, -1.0, out);
     } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // DiracCoarsePC::Dslash applies A^{-1}Dslash
       Dslash(tmp, in, QUDA_EVEN_PARITY);
       // DiracCoarse::DslashXpay applies (A - D) // FIXME this ignores the -1
       DiracCoarse::Dslash(out, tmp, QUDA_ODD_PARITY);
       Clover(tmp, in, QUDA_ODD_PARITY);
-      for (auto i = 0u; i < in.size(); i++) blas::xpay(tmp[i], -1.0, out[i]);
+      blas::xpay(tmp, -1.0, out);
     } else if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
       DslashXpay(out, tmp, QUDA_EVEN_PARITY, in, -1.0);
