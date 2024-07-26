@@ -670,10 +670,8 @@ namespace quda {
        @brief Compute power iterations on a Dirac matrix
        @param[in] diracm Dirac matrix used for power iterations
        @param[in] start Starting rhs for power iterations; value preserved unless it aliases tempvec1 or tempvec2
-       @param[in,out] tempvec1 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
-       can be used on ColorSpinorField)
-       @param[in,out] tempvec2 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
-       can be used on ColorSpinorField)
+       @param[in,out] tempvec1 Temporary vector used for power iterations
+       @param[in,out] tempvec2 Temporary vector used for power iterations
        @param[in] niter Total number of power iteration iterations
        @param[in] normalize_freq Frequency with which intermediate vector gets normalized
        @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
@@ -687,8 +685,8 @@ namespace quda {
     /**
        @brief Generate a Krylov space in a given basis
        @param[in] diracm Dirac matrix used to generate the Krylov space
-       @param[out] Ap dirac matrix times the Krylov basis vectors
-       @param[in,out] p Krylov basis vectors; assumes p[0] is in place
+       @param[out] Ap dirac matrix times the Krylov basis vector sets
+       @param[in,out] p Krylov basis vector sets; assumes p[0] is in place
        @param[in] n_krylov Size of krylov space
        @param[in] basis Basis type
        @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
@@ -696,9 +694,32 @@ namespace quda {
        @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
     */
     template <typename... Args>
-    static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                                     std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
-                                     double b_map, Args &&...args);
+    static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
+                                     std::vector<std::vector<ColorSpinorField>> &p, int n_krylov, QudaCABasis basis,
+                                     double m_map, double b_map, Args &&...args);
+
+    // FIXME delete this variant once CA-CG is MRHS aware
+    template <typename... Args>
+    void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
+                              std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
+                              double b_map, Args &&...args)
+    {
+      std::vector<std::vector<ColorSpinorField>> p2(p.size());
+      for (auto i = 0u; i < p.size(); i++) {
+        p2[i].resize(1);
+        p2[i][0] = std::move(p[i]);
+      }
+      std::vector<std::vector<ColorSpinorField>> Ap2(Ap.size());
+      for (auto i = 0u; i < Ap.size(); i++) {
+        Ap2[i].resize(1);
+        Ap2[i][0] = std::move(Ap[i]);
+      }
+
+      computeCAKrylovSpace(diracm, Ap2, p2, n_krylov, basis, m_map, b_map, args...);
+
+      for (auto i = 0u; i < p.size(); i++) p[i] = std::move(p2[i][0]);
+      for (auto i = 0u; i < Ap.size(); i++) Ap[i] = std::move(Ap2[i][0]);
+    }
   };
 
   /**
@@ -1200,36 +1221,36 @@ namespace quda {
      */
     int n_krylov;
 
-    std::vector<Complex> alpha;
-    std::vector<Complex> beta;
-    std::vector<double> gamma;
+    std::vector<std::vector<Complex>> alpha;
+    std::vector<std::vector<Complex>> beta;
+    std::vector<std::vector<double>> gamma;
 
     /**
        Solver uses lazy allocation: this flag to determine whether we have allocated.
      */
     bool init = false;
 
-    ColorSpinorField r;       //! residual vector
-    ColorSpinorField r_sloppy; //! sloppy residual vector
+    std::vector<ColorSpinorField> r;        //! residual vector
+    std::vector<ColorSpinorField> r_sloppy; //! sloppy residual vector
 
     int k_break = 0;                  //! track when the solver converged
-    std::vector<ColorSpinorField> p;  // GCR direction vectors
-    std::vector<ColorSpinorField> Ap; // mat * direction vectors
+    std::vector<std::vector<ColorSpinorField>> p;  // GCR direction vectors
+    std::vector<std::vector<ColorSpinorField>> Ap; // mat * direction vectors
 
-    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k);
-    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int begin, int size, int k);
-    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int k, int pipeline);
+    void computeBeta(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int i, int N, int k);
+    void updateAp(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int begin, int size, int k);
+    void orthoDir(std::vector<Complex> &beta, cvector_ref<ColorSpinorField> &Ap, int k, int pipeline);
     void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta, const std::vector<double> &gamma,
                   std::vector<Complex> &delta, int n);
     void updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
-                        std::vector<double> &gamma, int k, std::vector<ColorSpinorField> &p);
+                        std::vector<double> &gamma, int k, cvector_ref<ColorSpinorField> &p);
 
     /**
        @brief Initiate the fields needed by the solver
-       @param[in] x Solution vector
-       @param[in] b Source vector
+       @param[in] x Solution vector set
+       @param[in] b Source vector set
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
     GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -1242,10 +1263,7 @@ namespace quda {
         const DiracMatrix &matEig, SolverParam &param);
     virtual ~GCR();
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
@@ -1279,13 +1297,7 @@ namespace quda {
     MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param);
 
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
-#if 0
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
-#endif
     /**
        @return Return the residual vector from the prior solve
     */
@@ -1467,19 +1479,19 @@ namespace quda {
     bool lambda_init;  // whether or not lambda_max has been initialized
     QudaCABasis basis; // CA basis
 
-    std::vector<Complex> alpha; // Solution coefficient vectors
+    std::vector<std::vector<Complex>> alpha; // Solution coefficient vectors
 
-    ColorSpinorField r;
+    std::vector<ColorSpinorField> r;
 
-    std::vector<ColorSpinorField> p; // GCR direction vectors
-    std::vector<ColorSpinorField> q; // mat * direction vectors
+    std::vector<std::vector<ColorSpinorField>> p; // GCR direction vectors
+    std::vector<std::vector<ColorSpinorField>> q; // mat * direction vectors
 
     /**
        @brief Initiate the fields needed by the solver
        @param[in] x Solution vector
        @param[in] b Source vector
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
     /**
        @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
@@ -1488,19 +1500,14 @@ namespace quda {
        @param[in] q Search direction vectors with the operator applied
        @param[in] b Source vector against which we are solving
     */
-    void solve(std::vector<Complex> &psi, std::vector<ColorSpinorField> &q, ColorSpinorField &b);
+    void solve(std::vector<Complex> &psi, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b);
 
   public:
     CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
           SolverParam &param);
     virtual ~CAGCR();
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     /**
        @return Return the residual vector from the prior solve
@@ -1561,12 +1568,13 @@ public:
 
     void operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b) override
     {
+      if (x.size() != b.size()) errorQuda("Mismatched set sizes %lu != %lu", x.size(), b.size());
       pushOutputPrefix(prefix);
 
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
 
-      ColorSpinorField out;
-      ColorSpinorField in;
+      std::vector<ColorSpinorField> out(b.size());
+      std::vector<ColorSpinorField> in(b.size());
 
       if (dirac.hasSpecialMG()) {
         dirac.prepareSpecialMG(out, in, x, b, solution_type);

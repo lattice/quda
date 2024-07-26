@@ -51,8 +51,8 @@ namespace quda
   /**
      @brief Generate a Krylov space in a given basis
      @param[in] diracm Dirac matrix used to generate the Krylov space
-     @param[out] Ap dirac matrix times the Krylov basis vectors
-     @param[in,out] p Krylov basis vectors; assumes p[0] is in place
+     @param[out] Ap dirac matrix times the Krylov basis vector sets
+     @param[in,out] p Krylov basis vector sest; assumes p[0] is in place
      @param[in] n_krylov Size of krylov space
      @param[in] basis Basis type
      @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
@@ -60,9 +60,9 @@ namespace quda
      @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
   */
   template <typename... Args>
-  void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                                    std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
-                                    double b_map, Args &&...args)
+  void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
+                                    std::vector<std::vector<ColorSpinorField>> &p, int n_krylov,
+                                    QudaCABasis basis, double m_map, double b_map, Args &&...args)
   {
     // in some cases p or Ap may be larger
     if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);
