@@ -315,6 +315,8 @@ namespace quda
   void solve(const std::vector<void *> &hp_x, const std::vector<void *> &hp_b, QudaInvertParam &param,
              const GaugeField &u)
   {
+    pushVerbosity(param.verbosity);
+
     if (hp_b.size() != hp_x.size())
       errorQuda("Number of solutions %lu != number of solves %lu", hp_x.size(), hp_b.size());
     int n_src = hp_b.size();
@@ -402,5 +404,7 @@ namespace quda
     delete diracSloppy;
     delete diracPre;
     delete diracEig;
+
+    popVerbosity();
   }
 } // namespace quda
