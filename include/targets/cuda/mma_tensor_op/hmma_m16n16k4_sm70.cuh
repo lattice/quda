@@ -150,6 +150,11 @@ namespace quda
           for (int i = 0; i < 8; i++) { reg[i] *= alpha; }
         }
 
+        __device__ inline void axpy(float alpha, OperandC x) {
+#pragma unroll
+          for (int i = 0; i < 8; i++) { reg[i] += alpha * x.reg[i]; }
+        }
+
         template <int ldc>
         __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
         {

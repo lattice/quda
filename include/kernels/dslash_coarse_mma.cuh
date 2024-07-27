@@ -198,7 +198,8 @@ namespace quda
       }
     };
 
-    auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
+    auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) -> float {
+      float rescale_factor;
       if (forward_exterior[d]) {
         if constexpr (doHalo<Arg::type>()) {
           constexpr bool a_dagger = false;
@@ -213,11 +214,12 @@ namespace quda
 
           pipe.consumer_wait();
           __syncthreads();
-          a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
+          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
                                                           smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
+          rescale_factor = rescale_factor_a * rescale_factor_b;
         }
       } else if constexpr (doBulk<Arg::type>()) {
 
@@ -231,16 +233,18 @@ namespace quda
 
         pipe.consumer_wait();
         __syncthreads();
-        a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-        b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
         pipe.consumer_release();
         __syncthreads();
+        rescale_factor = rescale_factor_a * rescale_factor_b;
       }
+      return rescale_factor;
     };
 
-    auto dslash_forward_compute = [&](int d) {
+    auto dslash_forward_compute = [&](int d, float rescale_factor) {
       if (forward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
-        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+        accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor);
       }
     };
 
@@ -281,7 +285,8 @@ namespace quda
       }
     };
 
-    auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
+    auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) -> float {
+      float rescale_factor;
       if (backward_exterior[d]) {
         if constexpr (doHalo<Arg::type>()) {
           constexpr bool a_dagger = true;
@@ -296,11 +301,12 @@ namespace quda
 
           pipe.consumer_wait();
           __syncthreads();
-          a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
+          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
                                                           smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
+          rescale_factor = rescale_factor_a * rescale_factor_b;
         }
       } else if constexpr (doBulk<Arg::type>()) {
         constexpr bool a_dagger = true;
@@ -313,16 +319,18 @@ namespace quda
 
         pipe.consumer_wait();
         __syncthreads();
-        a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-        b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
         pipe.consumer_release();
         __syncthreads();
+        rescale_factor = rescale_factor_a * rescale_factor_b;
       }
+      return rescale_factor;
     };
 
-    auto dslash_backward_compute = [&](int d) {
+    auto dslash_backward_compute = [&](int d, float rescale_factor) {
       if (backward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
-        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+        accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor);
       }
     };
 
@@ -341,7 +349,7 @@ namespace quda
       pipe.producer_commit();
     };
 
-    auto clover_consumer = [&](float scale_inv_a, float scale_inv_b) {
+    auto clover_consumer = [&](float scale_inv_a, float scale_inv_b) -> float {
       constexpr bool a_dagger = Arg::dagger;
       constexpr bool b_dagger = false;
 
@@ -352,13 +360,14 @@ namespace quda
 
       pipe.consumer_wait();
       __syncthreads();
-      a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-      b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+      float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+      float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
       pipe.consumer_release();
       __syncthreads();
+      return rescale_factor_a * rescale_factor_b;
     };
 
-    auto clover_compute = [&]() { accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag); };
+    auto clover_compute = [&](float rescale_factor) { accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor); };
 
     float scale_inv_a;
     float scale_inv_b;
@@ -373,19 +382,19 @@ namespace quda
 #pragma unroll
         for (int d = 0; d < Arg::nDim; d++) // loop over dimension
         {
-          dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
+          float rescale_factor = dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
           if (d < 3) {
             dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
           } else {
             dslash_backward_producer(0, scale_inv_a, scale_inv_b, k_offset);
           }
-          dslash_forward_compute(d);
+          dslash_forward_compute(d, rescale_factor);
         } // nDim
 
         // Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
         for (int d = 0; d < Arg::nDim; d++) {
-          dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
+          float rescale_factor = dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
           if (d < 3) {
             dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
           } else if (k_offset + Arg::bK < K) {
@@ -393,7 +402,7 @@ namespace quda
           } else if constexpr (doBulk<Arg::type>() && Arg::clover) {
             clover_producer(scale_inv_a, scale_inv_b, 0);
           }
-          dslash_backward_compute(d);
+          dslash_backward_compute(d, rescale_factor);
         } // nDim
       }
 
@@ -407,9 +416,9 @@ namespace quda
     if constexpr (doBulk<Arg::type>() && Arg::clover) {
       if constexpr (!Arg::dslash) { clover_producer(scale_inv_a, scale_inv_b, 0); }
       for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
-        clover_consumer(scale_inv_a, scale_inv_b);
+        float rescale_factor = clover_consumer(scale_inv_a, scale_inv_b);
         if (k_offset + Arg::bK < K) { clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK); }
-        clover_compute();
+        clover_compute(rescale_factor);
       }
     }
 

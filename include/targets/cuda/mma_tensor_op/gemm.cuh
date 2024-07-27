@@ -6,6 +6,8 @@
 #include <pipeline.cuh>
 #include <register_traits.h>
 
+#include <cub/block/block_reduce.cuh>
+
 namespace quda
 {
   namespace mma
@@ -45,6 +47,10 @@ namespace quda
       reg_imag = 0;
     }
 
+    inline __device__ float abs_max(float a, float max) {
+      return fmaxf(fabsf(a), max);
+    }
+
     /**
       @brief Load from global memory and store data in registers.
      */
@@ -78,6 +84,80 @@ namespace quda
           reg_imag = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
         }
       }
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, class T>
+    inline __device__ void convert_x_rescale(float &reg_real, float &reg_imag, complex<T> *p, int m_idx, int n_idx,
+                                             float scale_inv, float rescale)
+    {
+      if (x) {
+        auto xx = p[m_idx * ld + n_idx];
+
+        if (fixed) {
+          reg_real = scale_inv * xx.real() * rescale;
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          reg_imag = scale_inv_conj * xx.imag() * rescale;
+        } else {
+          reg_real = +xx.real() * rescale;
+          reg_imag = (dagger ? -xx.imag() : +xx.imag()) * rescale;
+        }
+      } else {
+        auto xx = p[n_idx * ld + m_idx];
+        using store_type = T;
+        using store_array = typename VectorType<store_type, 2>::type;
+        store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
+
+        if (fixed) {
+          reg_real = scale_inv * xx.real() * rescale;
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          reg_imag = scale_inv_conj * xx.imag() * rescale;
+        } else {
+          reg_real = xx.real() * rescale;
+          reg_imag = (dagger ? -xx.imag() : xx.imag()) * rescale;
+        }
+      }
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, class T>
+    inline __device__ float find_abs_max(complex<T> *p, int m_idx, int n_idx,
+                                         float scale_inv)
+    {
+      float this_max = 0.0f;
+
+      if (x) {
+        auto xx = p[m_idx * ld + n_idx];
+
+        if (fixed) {
+          this_max = abs_max(scale_inv * xx.real(), this_max);
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          this_max = abs_max(scale_inv_conj * xx.imag(), this_max);
+        } else {
+          this_max = abs_max(+xx.real(), this_max);
+          this_max = abs_max(dagger ? -xx.imag() : +xx.imag(), this_max);
+        }
+      } else {
+        auto xx = p[n_idx * ld + m_idx];
+        using store_type = T;
+        using store_array = typename VectorType<store_type, 2>::type;
+        store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
+
+        if (fixed) {
+          this_max = abs_max(scale_inv * xx.real(), this_max);
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          this_max = abs_max(scale_inv_conj * xx.imag(), this_max);
+        } else {
+          this_max = abs_max(xx.real(), this_max);
+          this_max = abs_max(dagger ? -xx.imag() : xx.imag(), this_max);
+        }
+      }
+
+      return this_max;
     }
 
     /**
@@ -194,6 +274,94 @@ namespace quda
           thread_id += blockDim.x * blockDim.y * blockDim.z;
         }
         return gmem.get_scale_inv();
+      }
+
+      template <int ld, bool dagger, bool fixed, class T, class smem_accessor_t>
+      __device__ inline float tmp2s_rescale(complex<T> *smem_ptr, float scale_inv, smem_accessor_t &smem_real,
+                                            smem_accessor_t &smem_imag)
+      {
+        // for each iteration, each warp loads a tile
+        int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+        int warp_id = thread_id / 32;
+        int lane_id = thread_id % 32;
+        int thread_in_group = lane_id % 4;
+        int group_id = lane_id / 4;
+        constexpr int w_m = 8 * batch;
+        constexpr int w_k = 4;
+        static_assert(bM % w_m == 0, "bM %% w_m");
+        static_assert(bN % w_k == 0, "bN %% w_k");
+
+        constexpr int tile_dim_m = bM / w_m;
+        constexpr int tile_dim_k = bN / w_k;
+
+        constexpr int total_tiles = tile_dim_k * tile_dim_m;
+        constexpr int n_warp = block_y * block_z / 32;
+        constexpr int warp_cycle = (total_tiles + n_warp - 1) / n_warp;
+
+        float thread_max = 0.0f;
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+          int logical_warp_index = c * n_warp + warp_id;
+          if (logical_warp_index < total_tiles) {
+            int warp_m = (c * n_warp + warp_id) % tile_dim_m;
+            int warp_k = (c * n_warp + warp_id) / tile_dim_m;
+
+            int smem_m_offset = warp_m * w_m + group_id * batch;
+            int smem_k_offset = warp_k * w_k + thread_in_group;
+
+            int gmem_m_offset = smem_m_offset;
+            int gmem_k_offset = smem_k_offset;
+
+            constexpr bool x = (transpose == dagger);
+            float this_max = find_abs_max<x, fixed, dagger, x ? bN + 4 : bM + 4>(smem_ptr, gmem_m_offset, gmem_k_offset,
+                                                             scale_inv);
+            thread_max = fmaxf(this_max, thread_max);
+          }
+        }
+
+        __syncthreads();
+        // block all-reduce thread_max
+        using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
+        __shared__ typename block_reduce_t::TempStorage temp_storage;
+        float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+
+        __shared__ float block_max_all;
+        if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
+          if (block_max > 0.0f) {
+            block_max_all = block_max;
+          } else {
+            block_max_all = 1.0f;
+          }
+        }
+        __syncthreads();
+        float block_rescale_factor = 1e4f / block_max_all;
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+          int logical_warp_index = c * n_warp + warp_id;
+          if (logical_warp_index < total_tiles) {
+            int warp_m = (c * n_warp + warp_id) % tile_dim_m;
+            int warp_k = (c * n_warp + warp_id) / tile_dim_m;
+
+            int smem_m_offset = warp_m * w_m + group_id * batch;
+            int smem_k_offset = warp_k * w_k + thread_in_group;
+
+            int gmem_m_offset = smem_m_offset;
+            int gmem_k_offset = smem_k_offset;
+
+            load_t real;
+            load_t imag;
+
+            constexpr bool x = (transpose == dagger);
+            convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4>(real, imag, smem_ptr, gmem_m_offset, gmem_k_offset,
+                                                                     scale_inv, block_rescale_factor);
+            smem_real.vector_load(smem_m_offset, smem_k_offset, real);
+            smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
+          }
+        }
+
+        return 1.0f / block_rescale_factor;
       }
 
       template <int ld, bool dagger, bool fixed, class T, class smem_accessor_t>
@@ -371,6 +539,37 @@ namespace quda
         for (int c = 0; c < warp_cycle; c++) {
           op_c_real[c].ax(alpha);
           op_c_imag[c].ax(alpha);
+        }
+      }
+
+      template <class SmemObjA, class SmemObjB>
+      __device__ inline void mma_rescale(const SmemObjA &smem_obj_a_real, const SmemObjA &smem_obj_a_imag,
+                                 const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag,
+                                 float rescale)
+      {
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+          typename mma_t::OperandC op_c_real_tmp;
+          op_c_real_tmp.zero();
+          typename mma_t::OperandC op_c_imag_tmp;
+          op_c_imag_tmp.zero();
+
+#pragma unroll 1
+          for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+
+            // The logical warp assigned to each part of the matrix.
+            const int logical_warp_index = wrm.warp_id * warp_cycle + c;
+            if (logical_warp_index < tile_row_dim * tile_col_dim) {
+              const int warp_row = logical_warp_index / tile_col_dim;
+              const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+              complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real_tmp,
+                                 op_c_imag_tmp, warp_row, warp_col, tile_k, wrm);
+            }
+          }
+          op_c_real[c].axpy(rescale, op_c_real_tmp);
+          op_c_imag[c].axpy(rescale, op_c_imag_tmp);
         }
       }
 
