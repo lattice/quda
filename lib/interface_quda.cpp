@@ -1384,10 +1384,10 @@ void endQuda(void)
 
     assertAllMemFree();
     device::destroy();
-
-    comm_finalize();
-    comms_initialized = false;
   }
+
+  comm_finalize();
+  comms_initialized = false;
 
   profileInit2End.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -1719,8 +1719,7 @@ namespace quda {
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
-  auto profile = pushProfile(profileDslash, inv_param->secs, inv_param->gflops);
-
+  auto profile = pushProfile(profileDslash, inv_param);
   const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
 
   if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
@@ -1796,8 +1795,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileCovDev, param->secs, param->gflops);
-
+  auto profile = pushProfile(profileCovDev, param);
   const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
 
   QudaInvertParam &inv_param = *param;
@@ -1866,8 +1864,7 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
 
 void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileCovDev, param->secs, param->gflops);
-
+  auto profile = pushProfile(profileCovDev, param);
   const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
 
   QudaInvertParam &inv_param = *param;
@@ -2177,10 +2174,9 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
 void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileCovDev, param->secs, param->gflops);
+  auto profile = pushProfile(profileCovDev, param);
 
   QudaInvertParam &inv_param = *param;
-
   const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -2544,7 +2540,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // This will define the operator to be eigensolved.
   QudaInvertParam *inv_param = eig_param->invert_param;
 
-  auto profile = pushProfile(profileEigensolve, inv_param->secs, inv_param->gflops);
+  auto profile = pushProfile(profileEigensolve, inv_param);
 
   // QUDA can employ even-odd preconditioning to an operator.
   // For the eigensolver the solution type must match
@@ -2787,7 +2783,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
 void *newMultigridQuda(QudaMultigridParam *mg_param)
 {
   profilerStart(__func__);
-  auto profile = pushProfile(profileInvert, mg_param->secs, mg_param->gflops);
+  auto profile = pushProfile(profileInvert, mg_param->invert_param);
   pushVerbosity(mg_param->invert_param->verbosity);
 
   auto *mg = new multigrid_solver(*mg_param);
@@ -2804,7 +2800,7 @@ void destroyMultigridQuda(void *mg) {
 void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 {
   profilerStart(__func__);
-  auto profile = pushProfile(profileInvert, mg_param->secs, mg_param->gflops);
+  auto profile = pushProfile(profileInvert, mg_param->invert_param);
   pushVerbosity(mg_param->invert_param->verbosity);
 
   profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -2913,7 +2909,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 {
   profilerStart(__func__);
-  auto profile = pushProfile(profileInvert, mg_param->secs, mg_param->gflops);
+  auto profile = pushProfile(profileInvert, mg_param->invert_param);
   pushVerbosity(mg_param->invert_param->verbosity);
 
   auto *mg = static_cast<multigrid_solver*>(mg_);
@@ -2988,7 +2984,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 }
 
 void* newDeflationQuda(QudaEigParam *eig_param) {
-  auto profile = pushProfile(profileInvert, eig_param->secs, eig_param->gflops);
+  auto profile = pushProfile(profileInvert, eig_param->invert_param);
   auto *defl = new deflated_solver(*eig_param, profileInvert);
   saveProfile(__func__);
   flushProfile();
@@ -3001,7 +2997,7 @@ void destroyDeflationQuda(void *df) {
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileInvert, param->secs, param->gflops);
+  auto profile = pushProfile(profileInvert, param);
   profilerStart(__func__);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -3086,7 +3082,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
   */
 
   profilerStart(__func__);
-  auto profile = pushProfile(profileInvertMultiSrc, param->secs, param->gflops);
+  auto profile = pushProfile(profileInvertMultiSrc, param);
 
   CommKey split_key = {param->split_grid[0], param->split_grid[1], param->split_grid[2], param->split_grid[3]};
   int num_sub_partition = quda::product(split_key);
@@ -3424,7 +3420,7 @@ void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Quda
  */
 void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileMulti, param->secs, param->gflops);
+  auto profile = pushProfile(profileMulti, param);
   profilerStart(__func__);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -4561,7 +4557,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
                             QudaInvertParam *inv_param)
 {
   using namespace quda;
-  auto profile = pushProfile(profileCloverForce, inv_param->secs, inv_param->gflops);
+  auto profile = pushProfile(profileCloverForce, inv_param);
 
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
@@ -4633,7 +4629,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
                               QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
 {
   using namespace quda;
-  auto profile = pushProfile(profileTMCloverForce, inv_param->secs, inv_param->gflops);
+  auto profile = pushProfile(profileTMCloverForce, inv_param);
 
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
@@ -5015,7 +5011,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
 {
   if (smear_param->n_steps == 0) return;
-  auto profile = pushProfile(profileGaussianSmear, smear_param->secs, smear_param->gflops);
+  auto profile = pushProfile(profileGaussianSmear, smear_param);
 
   QudaInvertParam *inv_param = smear_param->inv_param;
 
@@ -5487,7 +5483,7 @@ static void check_param(double _Complex *host_sinks, void **host_quark, int n_qu
 void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
                      int n_evec, int tile_evec, QudaInvertParam *inv_param, const int X[4])
 {
-  auto profile = pushProfile(profileSinkProject, inv_param->secs, inv_param->gflops);
+  auto profile = pushProfile(profileSinkProject, inv_param);
 
   // check parameters are valid
   check_param(host_sinks, host_quark, n_quark, tile_quark, host_evec, n_evec, tile_evec, inv_param, X);

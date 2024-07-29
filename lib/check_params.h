@@ -1031,14 +1031,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   }
 
 #ifdef INIT_PARAM
-  P(gflops, 0.0);
-  P(secs, 0.0);
-#elif defined(PRINT_PARAM)
-  P(gflops, INVALID_DOUBLE);
-  P(secs, INVALID_DOUBLE);
-#endif
-
-#ifdef INIT_PARAM
   P(allow_truncation, QUDA_BOOLEAN_FALSE);
 #else
   P(allow_truncation, QUDA_BOOLEAN_INVALID);

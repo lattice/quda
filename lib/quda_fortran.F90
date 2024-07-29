@@ -219,6 +219,10 @@ module quda_fortran
      integer(4) :: iter
      real(8) :: gflops
      real(8) :: secs
+     real(8) :: energy
+     real(8) :: power
+     real(8) :: temp
+     real(8) :: clock
 
      ! Enable auto-tuning?
      QudaTune :: tune
