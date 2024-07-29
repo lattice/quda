@@ -794,7 +794,9 @@ namespace quda
     auto &tmp2 = fine_tmp[1];
     auto &tmp_coarse = coarse_tmp[0];
 
-    auto B_norm = norm2(param.B);
+    vector<double> B_norm;
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) B_norm = norm2(param.B);
+
     // No need to check (projector) v_k for staggered case
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
 

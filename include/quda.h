@@ -278,6 +278,10 @@ extern "C" {
     int iter;                              /**< The number of iterations performed by the solver */
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
+    double energy;                         /**< The energy consumed by the solver */
+    double power;                          /**< The mean power of the solver */
+    double temp;                           /**< The mean temperature of the device for the duration of the solve */
+    double clock;                          /**< The mean clock frequency of the device for the duration of the solve */
 
     QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
@@ -602,12 +606,6 @@ extern "C" {
     /** Whether to save eigenvectors in QIO singlefile or partfile format */
     QudaBoolean partfile;
 
-    /** The Gflops rate of the eigensolver setup */
-    double gflops;
-
-    /**< The time taken by the eigensolver setup */
-    double secs;
-
     /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
@@ -807,12 +805,6 @@ extern "C" {
 
     /** Whether to preserve the deflation space during MG update */
     QudaBoolean preserve_deflation;
-
-    /** The Gflops rate of the multigrid solver setup */
-    double gflops;
-
-    /**< The time taken by the multigrid solver setup */
-    double secs;
 
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
@@ -1822,6 +1814,10 @@ extern "C" {
     double secs;
     /** Flops count for the smearing operations **/
     double gflops;
+    double energy; /**< The energy consumed by the smearing operations */
+    double power;  /**< The mean power of the smearing operations */
+    double temp;   /**< The mean temperature of the device for the duration of the smearing operations */
+    double clock;  /**< The mean clock frequency of the device for the duration of the smearing operations */
 
   } QudaQuarkSmearParam;
 

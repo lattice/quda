@@ -624,10 +624,11 @@ namespace quda
     blas::block::cDotProduct(s, {evecs.begin(), evecs.begin() + n_defl}, {src.begin(), src.end()});
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+    for (auto j = 0u; j < src.size(); j++)
+      for (int i = 0; i < n_defl; i++) { s[i * src.size() + j] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    if (!accumulate) for (auto &x : sol) blas::zero(x);
+    if (!accumulate) blas::zero(sol);
 
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }

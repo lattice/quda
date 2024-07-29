@@ -281,7 +281,11 @@ std::vector<std::array<double, 2>> solve(test_t param)
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
 
-    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.secs, mg_param.gflops / mg_param.secs);
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.invert_param->secs,
+               mg_param.invert_param->gflops / mg_param.invert_param->secs);
+    printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n",
+               mg_param.invert_param->energy, mg_param.invert_param->power,
+               mg_param.invert_param->temp, mg_param.invert_param->clock);
   }
 
   // Staggered vector construct START
@@ -384,8 +388,10 @@ std::vector<std::array<double, 2>> solve(test_t param)
       time[n] = inv_param.secs;
       gflops[n] = inv_param.gflops / inv_param.secs;
       iter[n] = inv_param.iter;
-      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
+      printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                 inv_param.energy, inv_param.power, inv_param.temp, inv_param.clock);
     }
   } else {
 
@@ -401,6 +407,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
         _hp_b[i] = in[j + i].data();
       }
 
+      if (inv_deflate)
+        eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
       // move residuals to (i+j)^th location for verification after solves have finished
@@ -414,8 +422,12 @@ std::vector<std::array<double, 2>> solve(test_t param)
       quda::comm_allreduce_sum(inv_param.gflops);
       inv_param.gflops /= comm_size() / num_sub_partition;
       quda::comm_allreduce_max(inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
-                 inv_param.secs, inv_param.gflops / inv_param.secs);
+      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n",
+                 num_sub_partition, inv_param.iter,
+                 inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
+      printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                 inv_param.energy, inv_param.energy / Nsrc_tile,
+                 inv_param.power, inv_param.temp, inv_param.clock);
     }
   }
 
