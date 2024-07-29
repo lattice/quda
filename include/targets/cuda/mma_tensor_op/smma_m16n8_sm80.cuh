@@ -314,6 +314,11 @@ namespace quda
           for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] *= alpha; }
         }
 
+        __device__ inline void axpy(float alpha, OperandC x) {
+#pragma unroll
+          for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] += alpha * x.reg[i]; }
+        }
+
         template <int ldc> __device__ void store(void *ptr, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
         {
           // This method is only used for the mobius preconditioner where shuffle_t = half.
