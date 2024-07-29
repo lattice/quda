@@ -410,7 +410,7 @@ void initComms(int, char **, int *const commDims)
 
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_FUNNELED, &tl);
 
   // make sure the QMP logical ordering matches QUDA's
   if (rank_order == 0) {
@@ -421,7 +421,7 @@ void initComms(int, char **, int *const commDims)
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
 #elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED);
 #endif
 
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
