@@ -47,9 +47,7 @@ namespace quda
       reg_imag = 0;
     }
 
-    inline __device__ float abs_max(float a, float max) {
-      return fmaxf(fabsf(a), max);
-    }
+    inline __device__ float abs_max(float a, float max) { return fmaxf(fabsf(a), max); }
 
     /**
       @brief Load from global memory and store data in registers.
@@ -87,7 +85,7 @@ namespace quda
     }
 
     /**
-      @brief Load from global memory and store data in registers.
+      @brief Load from global memory and store data in registers while also applying a rescaling
      */
     template <bool x, bool fixed, bool dagger, int ld, class T>
     inline __device__ void convert_x_rescale(float &reg_real, float &reg_imag, complex<T> *p, int m_idx, int n_idx,
@@ -125,8 +123,7 @@ namespace quda
       @brief Load from global memory and store data in registers.
      */
     template <bool x, bool fixed, bool dagger, int ld, class T>
-    inline __device__ float find_abs_max(complex<T> *p, int m_idx, int n_idx,
-                                         float scale_inv)
+    inline __device__ float find_abs_max(complex<T> *p, int m_idx, int n_idx, float scale_inv)
     {
       float this_max = 0.0f;
 
@@ -135,11 +132,10 @@ namespace quda
 
         if (fixed) {
           this_max = abs_max(scale_inv * xx.real(), this_max);
-          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-          this_max = abs_max(scale_inv_conj * xx.imag(), this_max);
+          this_max = abs_max(scale_inv * xx.imag(), this_max);
         } else {
-          this_max = abs_max(+xx.real(), this_max);
-          this_max = abs_max(dagger ? -xx.imag() : +xx.imag(), this_max);
+          this_max = abs_max(xx.real(), this_max);
+          this_max = abs_max(xx.imag(), this_max);
         }
       } else {
         auto xx = p[n_idx * ld + m_idx];
@@ -149,11 +145,10 @@ namespace quda
 
         if (fixed) {
           this_max = abs_max(scale_inv * xx.real(), this_max);
-          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-          this_max = abs_max(scale_inv_conj * xx.imag(), this_max);
+          this_max = abs_max(scale_inv * xx.imag(), this_max);
         } else {
           this_max = abs_max(xx.real(), this_max);
-          this_max = abs_max(dagger ? -xx.imag() : xx.imag(), this_max);
+          this_max = abs_max(xx.imag(), this_max);
         }
       }
 
@@ -314,13 +309,12 @@ namespace quda
             int gmem_k_offset = smem_k_offset;
 
             constexpr bool x = (transpose == dagger);
-            float this_max = find_abs_max<x, fixed, dagger, x ? bN + 4 : bM + 4>(smem_ptr, gmem_m_offset, gmem_k_offset,
-                                                             scale_inv);
+            float this_max = find_abs_max < x, fixed, dagger,
+                  x ? bN + 4 : bM + 4 > (smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
             thread_max = fmaxf(this_max, thread_max);
           }
         }
 
-        __syncthreads();
         // block all-reduce thread_max
         using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
         __shared__ typename block_reduce_t::TempStorage temp_storage;
@@ -335,7 +329,8 @@ namespace quda
           }
         }
         __syncthreads();
-        float block_rescale_factor = 1e4f / block_max_all;
+
+        float block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
 
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
@@ -542,10 +537,10 @@ namespace quda
         }
       }
 
+      /** @brief Apply MMA, but doing a rescaling before accumulate into the final accumulator */
       template <class SmemObjA, class SmemObjB>
       __device__ inline void mma_rescale(const SmemObjA &smem_obj_a_real, const SmemObjA &smem_obj_a_imag,
-                                 const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag,
-                                 float rescale)
+                                         const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag, float rescale)
       {
 
 #pragma unroll
@@ -573,6 +568,7 @@ namespace quda
         }
       }
 
+      /** @brief Apply MMA */
       template <class SmemObjA, class SmemObjB>
       __device__ inline void mma(const SmemObjA &smem_obj_a_real, const SmemObjA &smem_obj_a_imag,
                                  const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag)
