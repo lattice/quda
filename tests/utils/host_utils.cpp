@@ -421,7 +421,15 @@ void initComms(int, char **, int *const commDims)
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
 #elif defined(MPI_COMMS)
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED);
+  int provided = 0;
+  int required = MPI_THREAD_FUNNELED;
+  int flag = MPI_Init_thread(&argc, &argv, required, &provided);
+
+  if (provided != required) {
+    printf("%s: required thread-safety level %d can't be provided %d\n", __func__, required, provided);
+    fflush(stdout);
+    exit(flag);
+  }
 #endif
 
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
