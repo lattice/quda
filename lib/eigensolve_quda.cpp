@@ -563,9 +563,11 @@ namespace quda
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
     //    vec_defl = Sum_i (R_i)^{-1} * A_i
-    if (!accumulate) for (auto &x : sol) blas::zero(x);
-    for (int i = 0; i < n_defl; i++) s[i] /= evals[i].real();
+    for (auto j = 0u; j < src.size(); j++)
+      for (int i = 0; i < n_defl; i++) { s[i * src.size() + j] /= evals[i].real(); }
 
+    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    if (!accumulate) blas::zero(sol);
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
@@ -629,7 +631,6 @@ namespace quda
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate) blas::zero(sol);
-
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
