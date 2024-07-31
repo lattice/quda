@@ -91,6 +91,11 @@ namespace quda
 
       static constexpr bool use_intermediate_accumulator() { return true; };
 
+      static constexpr bool do_rescale()
+      {
+        return std::is_same_v<shuffle_t, half> ? true : false; // true if we use FP16
+      }
+
       static constexpr int warp_m = warp_m_;
       static constexpr int warp_n = warp_n_;
 

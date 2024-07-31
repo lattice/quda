@@ -22,6 +22,11 @@ namespace quda
 
       static __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 
+      static constexpr bool do_rescale()
+      {
+        return true; // true because we use FP16
+      }
+
       static constexpr int MMA_M = 16;
       static constexpr int MMA_N = 16;
       static constexpr int MMA_K = 4;
@@ -150,7 +155,8 @@ namespace quda
           for (int i = 0; i < 8; i++) { reg[i] *= alpha; }
         }
 
-        __device__ inline void axpy(float alpha, OperandC x) {
+        __device__ inline void axpy(float alpha, OperandC x)
+        {
 #pragma unroll
           for (int i = 0; i < 8; i++) { reg[i] += alpha * x.reg[i]; }
         }

@@ -123,6 +123,8 @@ namespace quda
     using mma_t = typename Arg::mma_t;
     using Config = mma::MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
+    constexpr bool do_rescale = mma_t::do_rescale();
+
     static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
     static_assert(N % Arg::bN == 0, "N %% Arg::bN != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
@@ -162,119 +164,191 @@ namespace quda
       backward_idx[d] = linkIndexHop(coord, arg.dim, d, -arg.nFace);
     }
 
-    auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
-      const int fwd_idx = forward_idx[d];
+    if constexpr (do_rescale) {
+      auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
+        const int fwd_idx = forward_idx[d];
 
-      if (forward_exterior[d]) {
-        if constexpr (doHalo<Arg::type>()) {
-          int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+        if (forward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+
+            auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
+            auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
+
+            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+
+            __syncthreads();
+            pipe.producer_acquire();
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
+            pipe.producer_commit();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
 
           auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
-          auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
+          auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
           constexpr bool a_dagger = false;
           constexpr bool b_dagger = false;
-
-          using store_b_ghost_t = complex<typename decltype(b)::store_type>;
-          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
           __syncthreads();
           pipe.producer_acquire();
           scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
           pipe.producer_commit();
         }
-      } else if constexpr (doBulk<Arg::type>()) {
+      };
 
-        auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
-        auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
-        constexpr bool a_dagger = false;
-        constexpr bool b_dagger = false;
+      auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) -> float {
+        float rescale_factor;
+        if (forward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
 
-        __syncthreads();
-        pipe.producer_acquire();
-        scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-        scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
-        pipe.producer_commit();
-      }
-    };
+            using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+            constexpr bool a_fixed = a_wrapper_t::fixed;
+            constexpr bool b_fixed = b_wrapper_t::fixed;
 
-    auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) -> float {
-      float rescale_factor;
-      if (forward_exterior[d]) {
-        if constexpr (doHalo<Arg::type>()) {
+            pipe.consumer_wait();
+            __syncthreads();
+            float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+              smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+            float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+              smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+            pipe.consumer_release();
+            __syncthreads();
+            rescale_factor = rescale_factor_a * rescale_factor_b;
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+
           constexpr bool a_dagger = false;
           constexpr bool b_dagger = false;
 
           using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
-          using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
-          using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
-          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
           constexpr bool a_fixed = a_wrapper_t::fixed;
           constexpr bool b_fixed = b_wrapper_t::fixed;
 
           pipe.consumer_wait();
           __syncthreads();
-          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
-                                                          smem_obj_b_imag);
+          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+            smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+            smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
           rescale_factor = rescale_factor_a * rescale_factor_b;
         }
-      } else if constexpr (doBulk<Arg::type>()) {
+        return rescale_factor;
+      };
 
-        constexpr bool a_dagger = false;
-        constexpr bool b_dagger = false;
+      auto dslash_forward_compute = [&](int d, float rescale_factor) {
+        if (forward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+          accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor);
+        }
+      };
 
-        using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
-        using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
-        constexpr bool a_fixed = a_wrapper_t::fixed;
-        constexpr bool b_fixed = b_wrapper_t::fixed;
+      auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
+        const int back_idx = backward_idx[d];
 
-        pipe.consumer_wait();
-        __syncthreads();
-        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
-        pipe.consumer_release();
-        __syncthreads();
-        rescale_factor = rescale_factor_a * rescale_factor_b;
-      }
-      return rescale_factor;
-    };
+        if (backward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
-    auto dslash_forward_compute = [&](int d, float rescale_factor) {
-      if (forward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
-        accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor);
-      }
-    };
+            auto a = arg.Y.Ghost(Arg::dagger ? d + 4 : d, 1 - parity, ghost_idx, 0, 0);
+            auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
+            constexpr bool a_dagger = true;
+            constexpr bool b_dagger = false;
 
-    auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
-      const int back_idx = backward_idx[d];
+            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
-      if (backward_exterior[d]) {
-        if constexpr (doHalo<Arg::type>()) {
-          const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+            __syncthreads();
+            pipe.producer_acquire();
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
+            pipe.producer_commit();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+          const int gauge_idx = back_idx;
 
-          auto a = arg.Y.Ghost(Arg::dagger ? d + 4 : d, 1 - parity, ghost_idx, 0, 0);
-          auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
+          auto a = arg.Y(Arg::dagger ? d + 4 : d, 1 - parity, gauge_idx, 0, 0);
+          auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
           constexpr bool a_dagger = true;
           constexpr bool b_dagger = false;
-
-          using store_b_ghost_t = complex<typename decltype(b)::store_type>;
-          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
           __syncthreads();
           pipe.producer_acquire();
           scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
           pipe.producer_commit();
         }
-      } else if constexpr (doBulk<Arg::type>()) {
-        const int gauge_idx = back_idx;
+      };
 
-        auto a = arg.Y(Arg::dagger ? d + 4 : d, 1 - parity, gauge_idx, 0, 0);
-        auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
-        constexpr bool a_dagger = true;
+      auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) -> float {
+        float rescale_factor;
+        if (backward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            constexpr bool a_dagger = true;
+            constexpr bool b_dagger = false;
+
+            using a_wrapper_t = decltype(arg.Y.Ghost(0, 0, 0, 0, 0));
+            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+            constexpr bool a_fixed = a_wrapper_t::fixed;
+            constexpr bool b_fixed = b_wrapper_t::fixed;
+
+            pipe.consumer_wait();
+            __syncthreads();
+            float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+              smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+            float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+              smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+            pipe.consumer_release();
+            __syncthreads();
+            rescale_factor = rescale_factor_a * rescale_factor_b;
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+          constexpr bool a_dagger = true;
+          constexpr bool b_dagger = false;
+
+          using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          constexpr bool a_fixed = a_wrapper_t::fixed;
+          constexpr bool b_fixed = b_wrapper_t::fixed;
+
+          pipe.consumer_wait();
+          __syncthreads();
+          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+            smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+            smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          pipe.consumer_release();
+          __syncthreads();
+          rescale_factor = rescale_factor_a * rescale_factor_b;
+        }
+        return rescale_factor;
+      };
+
+      auto dslash_backward_compute = [&](int d, float rescale_factor) {
+        if (backward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+          accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor);
+        }
+      };
+
+      auto clover_producer = [&](float &scale_inv_a, float &scale_inv_b, int k_offset) {
+        const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+
+        auto a = arg.X(0, parity, x_cb, 0, 0);
+        auto b = arg.inB(spinor_parity, x_cb, 0, 0);
+        constexpr bool a_dagger = Arg::dagger;
         constexpr bool b_dagger = false;
 
         __syncthreads();
@@ -282,146 +356,339 @@ namespace quda
         scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
         scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
         pipe.producer_commit();
-      }
-    };
+      };
 
-    auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) -> float {
-      float rescale_factor;
-      if (backward_exterior[d]) {
-        if constexpr (doHalo<Arg::type>()) {
-          constexpr bool a_dagger = true;
-          constexpr bool b_dagger = false;
-
-          using a_wrapper_t = decltype(arg.Y.Ghost(0, 0, 0, 0, 0));
-          using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
-          using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
-          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
-          constexpr bool a_fixed = a_wrapper_t::fixed;
-          constexpr bool b_fixed = b_wrapper_t::fixed;
-
-          pipe.consumer_wait();
-          __syncthreads();
-          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
-                                                          smem_obj_b_imag);
-          pipe.consumer_release();
-          __syncthreads();
-          rescale_factor = rescale_factor_a * rescale_factor_b;
-        }
-      } else if constexpr (doBulk<Arg::type>()) {
-        constexpr bool a_dagger = true;
+      auto clover_consumer = [&](float scale_inv_a, float scale_inv_b) -> float {
+        constexpr bool a_dagger = Arg::dagger;
         constexpr bool b_dagger = false;
 
-        using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
-        using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+        using a_wrapper_t = decltype(arg.X(0, 0, 0, 0, 0));
+        using b_wrapper_t = decltype(arg.inB(0, 0, 0, 0));
         constexpr bool a_fixed = a_wrapper_t::fixed;
         constexpr bool b_fixed = b_wrapper_t::fixed;
 
         pipe.consumer_wait();
         __syncthreads();
-        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+          smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+          smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
         pipe.consumer_release();
         __syncthreads();
-        rescale_factor = rescale_factor_a * rescale_factor_b;
-      }
-      return rescale_factor;
-    };
+        return rescale_factor_a * rescale_factor_b;
+      };
 
-    auto dslash_backward_compute = [&](int d, float rescale_factor) {
-      if (backward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+      auto clover_compute = [&](float rescale_factor) {
         accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor);
-      }
-    };
+      };
 
-    auto clover_producer = [&](float &scale_inv_a, float &scale_inv_b, int k_offset) {
-      const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+      float scale_inv_a;
+      float scale_inv_b;
 
-      auto a = arg.X(0, parity, x_cb, 0, 0);
-      auto b = arg.inB(spinor_parity, x_cb, 0, 0);
-      constexpr bool a_dagger = Arg::dagger;
-      constexpr bool b_dagger = false;
+      if constexpr (Arg::dslash) {
 
-      __syncthreads();
-      pipe.producer_acquire();
-      scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-      scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
-      pipe.producer_commit();
-    };
+        dslash_forward_producer(0, scale_inv_a, scale_inv_b, 0);
 
-    auto clover_consumer = [&](float scale_inv_a, float scale_inv_b) -> float {
-      constexpr bool a_dagger = Arg::dagger;
-      constexpr bool b_dagger = false;
+        for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
 
-      using a_wrapper_t = decltype(arg.X(0, 0, 0, 0, 0));
-      using b_wrapper_t = decltype(arg.inB(0, 0, 0, 0));
-      constexpr bool a_fixed = a_wrapper_t::fixed;
-      constexpr bool b_fixed = b_wrapper_t::fixed;
-
-      pipe.consumer_wait();
-      __syncthreads();
-      float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-      float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
-      pipe.consumer_release();
-      __syncthreads();
-      return rescale_factor_a * rescale_factor_b;
-    };
-
-    auto clover_compute = [&](float rescale_factor) { accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, rescale_factor); };
-
-    float scale_inv_a;
-    float scale_inv_b;
-
-    if constexpr (Arg::dslash) {
-
-      dslash_forward_producer(0, scale_inv_a, scale_inv_b, 0);
-
-      for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
-
-        // Forward gather - compute fwd offset for spinor fetch
+          // Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
-        for (int d = 0; d < Arg::nDim; d++) // loop over dimension
-        {
-          float rescale_factor = dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
-          if (d < 3) {
-            dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
-          } else {
-            dslash_backward_producer(0, scale_inv_a, scale_inv_b, k_offset);
-          }
-          dslash_forward_compute(d, rescale_factor);
-        } // nDim
+          for (int d = 0; d < Arg::nDim; d++) // loop over dimension
+          {
+            float rescale_factor = dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
+            if (d < 3) {
+              dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
+            } else {
+              dslash_backward_producer(0, scale_inv_a, scale_inv_b, k_offset);
+            }
+            dslash_forward_compute(d, rescale_factor);
+          } // nDim
 
-        // Backward gather - compute back offset for spinor and gauge fetch
+          // Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
-        for (int d = 0; d < Arg::nDim; d++) {
-          float rescale_factor = dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
-          if (d < 3) {
-            dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
-          } else if (k_offset + Arg::bK < K) {
-            dslash_forward_producer(0, scale_inv_a, scale_inv_b, k_offset + Arg::bK);
-          } else if constexpr (doBulk<Arg::type>() && Arg::clover) {
-            clover_producer(scale_inv_a, scale_inv_b, 0);
+          for (int d = 0; d < Arg::nDim; d++) {
+            float rescale_factor = dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
+            if (d < 3) {
+              dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
+            } else if (k_offset + Arg::bK < K) {
+              dslash_forward_producer(0, scale_inv_a, scale_inv_b, k_offset + Arg::bK);
+            } else if constexpr (doBulk<Arg::type>() && Arg::clover) {
+              clover_producer(scale_inv_a, scale_inv_b, 0);
+            }
+            dslash_backward_compute(d, rescale_factor);
+          } // nDim
+        }
+
+        accumulator.ax(-arg.kappa);
+      }
+
+      /**
+         Applies the coarse clover matrix on a given parity and
+         checkerboard site index
+       */
+      if constexpr (doBulk<Arg::type>() && Arg::clover) {
+        if constexpr (!Arg::dslash) { clover_producer(scale_inv_a, scale_inv_b, 0); }
+        for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+          float rescale_factor = clover_consumer(scale_inv_a, scale_inv_b);
+          if (k_offset + Arg::bK < K) { clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK); }
+          clover_compute(rescale_factor);
+        }
+      }
+
+    } else {
+
+      auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
+        const int fwd_idx = forward_idx[d];
+
+        if (forward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+
+            auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
+            auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
+
+            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+
+            __syncthreads();
+            pipe.producer_acquire();
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
+            pipe.producer_commit();
           }
-          dslash_backward_compute(d, rescale_factor);
-        } // nDim
+        } else if constexpr (doBulk<Arg::type>()) {
+
+          auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
+          auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
+          constexpr bool a_dagger = false;
+          constexpr bool b_dagger = false;
+
+          __syncthreads();
+          pipe.producer_acquire();
+          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+          pipe.producer_commit();
+        }
+      };
+
+      auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
+        if (forward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
+
+            using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+            constexpr bool a_fixed = a_wrapper_t::fixed;
+            constexpr bool b_fixed = b_wrapper_t::fixed;
+
+            pipe.consumer_wait();
+            __syncthreads();
+            a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
+                                                            smem_obj_b_imag);
+            pipe.consumer_release();
+            __syncthreads();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+
+          constexpr bool a_dagger = false;
+          constexpr bool b_dagger = false;
+
+          using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          constexpr bool a_fixed = a_wrapper_t::fixed;
+          constexpr bool b_fixed = b_wrapper_t::fixed;
+
+          pipe.consumer_wait();
+          __syncthreads();
+          a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          pipe.consumer_release();
+          __syncthreads();
+        }
+      };
+
+      auto dslash_forward_compute = [&](int d) {
+        if (forward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+        }
+      };
+
+      auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
+        const int back_idx = backward_idx[d];
+
+        if (backward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+
+            auto a = arg.Y.Ghost(Arg::dagger ? d + 4 : d, 1 - parity, ghost_idx, 0, 0);
+            auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
+            constexpr bool a_dagger = true;
+            constexpr bool b_dagger = false;
+
+            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+
+            __syncthreads();
+            pipe.producer_acquire();
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
+            pipe.producer_commit();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+          const int gauge_idx = back_idx;
+
+          auto a = arg.Y(Arg::dagger ? d + 4 : d, 1 - parity, gauge_idx, 0, 0);
+          auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
+          constexpr bool a_dagger = true;
+          constexpr bool b_dagger = false;
+
+          __syncthreads();
+          pipe.producer_acquire();
+          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+          pipe.producer_commit();
+        }
+      };
+
+      auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
+        if (backward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            constexpr bool a_dagger = true;
+            constexpr bool b_dagger = false;
+
+            using a_wrapper_t = decltype(arg.Y.Ghost(0, 0, 0, 0, 0));
+            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+            constexpr bool a_fixed = a_wrapper_t::fixed;
+            constexpr bool b_fixed = b_wrapper_t::fixed;
+
+            pipe.consumer_wait();
+            __syncthreads();
+            a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
+                                                            smem_obj_b_imag);
+            pipe.consumer_release();
+            __syncthreads();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+          constexpr bool a_dagger = true;
+          constexpr bool b_dagger = false;
+
+          using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          constexpr bool a_fixed = a_wrapper_t::fixed;
+          constexpr bool b_fixed = b_wrapper_t::fixed;
+
+          pipe.consumer_wait();
+          __syncthreads();
+          a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          pipe.consumer_release();
+          __syncthreads();
+        }
+      };
+
+      auto dslash_backward_compute = [&](int d) {
+        if (backward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+        }
+      };
+
+      auto clover_producer = [&](float &scale_inv_a, float &scale_inv_b, int k_offset) {
+        const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+
+        auto a = arg.X(0, parity, x_cb, 0, 0);
+        auto b = arg.inB(spinor_parity, x_cb, 0, 0);
+        constexpr bool a_dagger = Arg::dagger;
+        constexpr bool b_dagger = false;
+
+        __syncthreads();
+        pipe.producer_acquire();
+        scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+        scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+        pipe.producer_commit();
+      };
+
+      auto clover_consumer = [&](float scale_inv_a, float scale_inv_b) {
+        constexpr bool a_dagger = Arg::dagger;
+        constexpr bool b_dagger = false;
+
+        using a_wrapper_t = decltype(arg.X(0, 0, 0, 0, 0));
+        using b_wrapper_t = decltype(arg.inB(0, 0, 0, 0));
+        constexpr bool a_fixed = a_wrapper_t::fixed;
+        constexpr bool b_fixed = b_wrapper_t::fixed;
+
+        pipe.consumer_wait();
+        __syncthreads();
+        a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+        pipe.consumer_release();
+        __syncthreads();
+      };
+
+      auto clover_compute
+        = [&]() { accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag); };
+
+      float scale_inv_a;
+      float scale_inv_b;
+
+      if constexpr (Arg::dslash) {
+
+        dslash_forward_producer(0, scale_inv_a, scale_inv_b, 0);
+
+        for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+
+          // Forward gather - compute fwd offset for spinor fetch
+#pragma unroll
+          for (int d = 0; d < Arg::nDim; d++) // loop over dimension
+          {
+            dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
+            if (d < 3) {
+              dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
+            } else {
+              dslash_backward_producer(0, scale_inv_a, scale_inv_b, k_offset);
+            }
+            dslash_forward_compute(d);
+          } // nDim
+
+          // Backward gather - compute back offset for spinor and gauge fetch
+#pragma unroll
+          for (int d = 0; d < Arg::nDim; d++) {
+            dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
+            if (d < 3) {
+              dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
+            } else if (k_offset + Arg::bK < K) {
+              dslash_forward_producer(0, scale_inv_a, scale_inv_b, k_offset + Arg::bK);
+            } else if constexpr (doBulk<Arg::type>() && Arg::clover) {
+              clover_producer(scale_inv_a, scale_inv_b, 0);
+            }
+            dslash_backward_compute(d);
+          } // nDim
+        }
+
+        accumulator.ax(-arg.kappa);
       }
 
-      accumulator.ax(-arg.kappa);
-    }
-
-    /**
-       Applies the coarse clover matrix on a given parity and
-       checkerboard site index
-     */
-    if constexpr (doBulk<Arg::type>() && Arg::clover) {
-      if constexpr (!Arg::dslash) { clover_producer(scale_inv_a, scale_inv_b, 0); }
-      for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
-        float rescale_factor = clover_consumer(scale_inv_a, scale_inv_b);
-        if (k_offset + Arg::bK < K) { clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK); }
-        clover_compute(rescale_factor);
+      /**
+         Applies the coarse clover matrix on a given parity and
+         checkerboard site index
+       */
+      if constexpr (doBulk<Arg::type>() && Arg::clover) {
+        if constexpr (!Arg::dslash) { clover_producer(scale_inv_a, scale_inv_b, 0); }
+        for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+          clover_consumer(scale_inv_a, scale_inv_b);
+          if (k_offset + Arg::bK < K) { clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK); }
+          clover_compute();
+        }
       }
     }
-
     return accumulator;
   }
 
