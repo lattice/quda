@@ -43,6 +43,22 @@ namespace quda {
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
+  /**
+     @brief Return a string encoding the QUDA version
+   */
+  const std::string get_quda_version();
+
+  /**
+     @brief Return a string encoding the git hash
+   */
+  const std::string get_quda_hash();
+
+  /**
+     @brief Return the resource path (directory where QUDA read/write
+     tunecache and other internal info
+  */
+  const std::string get_resource_path();
+
   class Tunable {
 
     friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);
@@ -298,7 +314,6 @@ namespace quda {
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
-
 	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
@@ -458,6 +473,17 @@ namespace quda {
    * @brief Query whether we are tuning an uber kernel
    */
   bool uberTuning();
+
+  /**
+   * @brief Helper for setting the rhs string
+   */
+  inline void setRHSstring(char *str, int size)
+  {
+    strcat(str, ",n_rhs=");
+    char rhs_str[16];
+    i32toa(rhs_str, size);
+    strcat(str, rhs_str);
+  }
 
 } // namespace quda
 

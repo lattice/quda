@@ -91,10 +91,8 @@ std::tuple<int, double> clover_force_test(test_t param)
   if (inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.epsilon = epsilon;
     inv_param.evmax = evmax;
-    if (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      for (int i = 0; i < nvector; i++) inv_param.offset[i] = 0.06 + i * i * 0.1;
-    }
   }
+  for (int i = 0; i < nvector; i++) inv_param.offset[i] = 0.06 + i * i * 0.1;
   bool detratio = ::testing::get<2>(param);
 
   std::vector<quda::ColorSpinorField> out_nvector(nvector);
@@ -307,14 +305,12 @@ INSTANTIATE_TEST_SUITE_P(CloverForceTest, CloverForceTest,
 #endif
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
+// twisted clover singlet
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_TwistedClover, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_TWISTED_CLOVER_DSLASH),
                                  Values(false, true), Values(1, 8), Values(QUDA_TWIST_SINGLET)),
                          gettestname);
 
-#endif
-
-#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
 // twisted clover non degenerate doublet
 INSTANTIATE_TEST_SUITE_P(CloverForceTest_ndeg_TwistedClover, CloverForceTest,
                          Combine(Values(QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION), Values(QUDA_TWISTED_CLOVER_DSLASH),

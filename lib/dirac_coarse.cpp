@@ -354,7 +354,7 @@ namespace quda {
     }
   }
 
-  bool DiracCoarse::apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma) { return (f.size() > 1) && use_mma; }
+  bool DiracCoarse::apply_mma(cvector_ref<ColorSpinorField> &f, bool use_mma) { return (f.size() > 1) && use_mma; }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
     calculateYhat(Yhat, Xinv, Y, X, setup_use_mma);
@@ -543,9 +543,9 @@ namespace quda {
   {
     auto tmp = getFieldTmp(out);
 
-    if (in[0].SiteSubset() == QUDA_FULL_SITE_SUBSET || out[0].SiteSubset() == QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot apply preconditioned operator to full field (subsets = %d %d)", in[0].SiteSubset(),
-                out[0].SiteSubset());
+    if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot apply preconditioned operator to full field (subsets = %d %d)", in.SiteSubset(),
+                out.SiteSubset());
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // DiracCoarsePC::Dslash applies A^{-1}Dslash

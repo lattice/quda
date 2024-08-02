@@ -500,6 +500,20 @@ namespace quda
     return blacklist;
   }
 
+  bool comm_zero_copy_enabled()
+  {
+    static bool zero_copy_enabled = false;
+#ifdef MULTI_GPU
+    static bool zero_copy_init = false;
+    if (!zero_copy_init) {
+      char *enable_zero_copy_env = getenv("QUDA_ENABLE_ZERO_COPY");
+      if (enable_zero_copy_env && strcmp(enable_zero_copy_env, "1") == 0) { zero_copy_enabled = true; }
+      zero_copy_init = true;
+    }
+#endif
+    return zero_copy_enabled;
+  }
+
   bool comm_nvshmem_enabled()
   {
 #if (defined MULTI_GPU) && (defined NVSHMEM_COMMS)

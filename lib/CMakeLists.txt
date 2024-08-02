@@ -17,7 +17,7 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cpp
+  monitor.cpp dirac_coarse.cpp dslash_coarse.cpp
   coarse_op.cpp coarsecoarse_op.cpp
   coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
@@ -52,7 +52,7 @@ set (QUDA_OBJS
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
-  contract.cu comm_common.cpp communicator_stack.cpp
+  contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
@@ -114,7 +114,7 @@ set(QUDA_DSLASH_OBJS
   dslash_domain_wall_4d_m5inv_m5inv.cu
   dslash_domain_wall_4d_m5mob.cu
   dslash_domain_wall_4d_m5pre_m5mob.cu
-  dslash_pack2.cu laplace.cu covDev.cu staggered_quark_smearing.cu)
+  dslash_pack2.cu laplace.cu covariant_derivative.cu staggered_quark_smearing.cu)
 
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
@@ -296,6 +296,12 @@ if(${QUDA_TARGET_TYPE} STREQUAL "OMPTARGET")
 	include(targets/omptarget/target_omptarget.cmake)
 endif()
 
+# Set the maximum multi-RHS per kernel if not already set by the target
+if(NOT DEFINED QUDA_MAX_MULTI_RHS)
+  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+  message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+endif()
+
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
@@ -347,13 +353,13 @@ add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
 
-# ignore any unkown pragmas
+# ignore any unknown pragmas
 target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
   $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
   $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
   >)
 
-# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+# add some definitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")

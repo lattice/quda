@@ -156,3 +156,28 @@ void errorQuda_(const char *func, const char *file, int line, ...)
   quda::saveTuneCache(true);
   comm_abort(1);
 }
+
+namespace quda
+{
+
+  unsigned int get_max_multi_rhs()
+  {
+    static bool init = false;
+    static int max = MAX_MULTI_RHS;
+
+    if (!init) {
+      char *max_str = getenv("QUDA_MAX_MULTI_RHS");
+      if (max_str) {
+        max = atoi(max_str);
+        if (max <= 0) errorQuda("QUDA_MAX_MULTI_RHS=%d cannot be negative", max);
+        if (max > MAX_MULTI_RHS)
+          errorQuda("QUDA_MAX_MULTI_RHS=%d cannot be greater than CMake set value %u", max, MAX_MULTI_RHS);
+        printfQuda("QUDA_MAX_MULTI_RHS set to %d\n", max);
+      }
+      init = true;
+    }
+
+    return max;
+  }
+
+} // namespace quda

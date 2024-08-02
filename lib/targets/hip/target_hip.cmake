@@ -34,7 +34,7 @@ find_package(rocprim REQUIRED)
 
 
 # ######################################################################################################################
-# define CUDA flags
+# define HIP flags
 set(CMAKE_HIP_HOST_COMPILER
     "${CMAKE_CXX_COMPILER}"
     CACHE FILEPATH "Host compiler to be used by hip")
@@ -44,13 +44,13 @@ mark_as_advanced(CMAKE_HIP_HOST_COMPILER)
 
 set(CMAKE_HIP_FLAGS_DEVEL
     "-g -O3 "
-    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
+    CACHE STRING "Flags used by the HIP compiler during regular development builds.")
 set(CMAKE_HIP_FLAGS_STRICT
     "-g -O3"
-    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
+    CACHE STRING "Flags used by the HIP compiler during strict jenkins builds.")
 set(CMAKE_HIP_FLAGS_RELEASE
     "-O3 -w"
-    CACHE STRING "Flags used by the CUDA compiler during release builds.")
+    CACHE STRING "Flags used by the HIP compiler during release builds.")
 set(CMAKE_HIP_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
@@ -72,12 +72,14 @@ message(STATUS "HIP Compiler is" ${CMAKE_HIP_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_HIP_COMPILER_ID})
 
 # ######################################################################################################################
-# CUDA specific QUDA options options
+# CUDA specific QUDA options
 set(QUDA_HETEROGENEOUS_ATOMIC OFF)
+set(QUDA_LARGE_KERNEL_ARG OFF)
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
 
 # ######################################################################################################################
-# CUDA specific variables
+# HIP specific variables
 set_target_properties(quda PROPERTIES HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
 
 # QUDA_HASH for tunecache
@@ -87,7 +89,7 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 
 # ######################################################################################################################
-# cuda specific compile options
+# HIP specific compile options
 
 target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/hip)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/hip>

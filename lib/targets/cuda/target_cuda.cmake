@@ -79,12 +79,21 @@ elseif(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
 endif()
 
 # ######################################################################################################################
-# CUDA specific QUDA options options
+# CUDA specific QUDA options
 include(CMakeDependentOption)
 
 # large arg support requires CUDA 12.1
-cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" OFF "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1" OFF )
+cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1" OFF )
+message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
 mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# Set the maximum multi-RHS per kernel
+if(QUDA_LARGE_KERNEL_ARG)
+  set(QUDA_MAX_MULTI_RHS "64" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+else()
+  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+endif()
+message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
 
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
@@ -315,6 +324,14 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-fsanitize=address
           -fsanitize=undefined>
           >)
+
+if(QUDA_OPENMP)
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+    "-Xcompiler=${OpenMP_CXX_FLAGS}"
+    >)
+endif()
 
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
 target_link_libraries(quda PUBLIC CUDA::cuda_driver)

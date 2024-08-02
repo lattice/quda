@@ -38,11 +38,9 @@ namespace quda {
       = FieldOrderCB<real, coarseSpin, coarseColor, 1, colorspinor::getNative<out_t>(coarseSpin), out_t, out_t, true>;
     using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, colorspinor::getNative<v_t>(fineSpin), v_t>;
 
-    static constexpr unsigned int max_n_src = MAX_MULTI_RHS;
     const int_fastdiv n_src;
-
-    C out[max_n_src];
-    F in[max_n_src];
+    C out[MAX_MULTI_RHS];
+    F in[MAX_MULTI_RHS];
     const V v;
     const int aggregate_size;    // number of sites that form a single aggregate
     const int_fastdiv aggregate_size_cb; // number of checkerboard sites that form a single aggregate
@@ -65,20 +63,22 @@ namespace quda {
     dim3 block_dim;
 
     RestrictArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
-		const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      kernel_param(dim3(in[0].Volume() / out[0].Volume(), 1, out.size() * (coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()))),
+                const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
+      kernel_param(dim3(in.Volume() / out.Volume(), 1,
+                        out.size() * (coarseColor / coarse_colors_per_thread<fineColor, coarseColor>()))),
       n_src(out.size()),
       v(v),
-      aggregate_size(in[0].Volume() / out[0].Volume()),
-      aggregate_size_cb(in[0].VolumeCB() / out[0].Volume()),
+      aggregate_size(in.Volume() / out.Volume()),
+      aggregate_size_cb(in.VolumeCB() / out.Volume()),
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
       spin_map(),
       parity(parity),
-      nParity(in[0].SiteSubset()),
+      nParity(in.SiteSubset()),
       swizzle_factor(1)
     {
-      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
+      if (out.size() > get_max_multi_rhs())
+        errorQuda("vector set size %lu greater than max size %d", out.size(), get_max_multi_rhs());
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];

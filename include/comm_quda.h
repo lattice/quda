@@ -338,6 +338,17 @@ namespace quda
   bool comm_gdr_enabled();
 
   /**
+     @brief Return if zero-copy policy kernels have been enabled.  By
+     default kernels that read their communication halos directly from
+     host memory are disabled to reduce tuning time, since on
+     PCIe-based architectures, these kernels underperform and can take
+     excessive tuning time.  They can be enabled with the environment
+     variable QUDA_ENABLE_ZERO_COPY=1
+     @return Return if zero-copy policy halos are enabled
+   */
+  bool comm_zero_copy_enabled();
+
+  /**
      @brief Query if NVSHMEM communication is enabled (global setting)
   */
   bool comm_nvshmem_enabled();
