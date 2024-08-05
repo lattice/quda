@@ -105,6 +105,8 @@ namespace quda
       omp_set_default_device(device_id);
     }
 
+    state_t get_state() { return {}; }
+
     int get_device_count()
     {
       static int device_count = -1;
