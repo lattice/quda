@@ -487,6 +487,8 @@ void initQudaMemory()
 
   device::create_context();
 
+  loadTuneCache();
+
   // initalize the memory pool allocators
   pool::init();
 
