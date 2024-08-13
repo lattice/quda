@@ -65,8 +65,7 @@ bool skip_test(test_t test_param)
     case QUDA_EIG_IR_ARNOLDI:
       // if (spectrum == QUDA_SPECTRUM_LI_EIG || spectrum == QUDA_SPECTRUM_SI_EIG) return true;
       return true; // we skip this because it takes an unnecessarily long time and it's covered elsewhere
-      break;
-    default: return true; break;
+    default: return true;
     }
   } else if (combo_solve_type == QUDA_DIRECT_SOLVE) {
     // mat
@@ -94,10 +93,10 @@ bool skip_test(test_t test_param)
       case QUDA_EIG_IR_ARNOLDI:
         if (spectrum == QUDA_SPECTRUM_LI_EIG || spectrum == QUDA_SPECTRUM_SI_EIG) return true;
         break;
-      default: return true; break;
+      default: return true;
       }
       break;
-    default: return true; break;
+    default: return true;
     }
   }
   return false;
