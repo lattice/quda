@@ -2,6 +2,7 @@
 
 #include <CL/sycl.hpp>
 #include <cstddef>
+#include <sstream>
 #include <sycl/ext/oneapi/experimental/builtins.hpp>
 
 #ifdef __SYCL_DEVICE_ONLY__
