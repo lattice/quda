@@ -87,13 +87,7 @@ namespace quda
                     const lat_dim_t &local_block, IntList<Nc, N...>)
   {
     if (src.Ncolor() == Nc) {
-      if constexpr (Nc <= 32) {
-        SpinorDilute<real, Ns, Nc>(src, v, type, local_block);
-      } else {
-        errorQuda(
-          "nColor = %d is too large to compile, see QUDA issue #1422 (https://github.com/lattice/quda/issues/1422)",
-          src.Ncolor());
-      }
+      SpinorDilute<real, Ns, Nc>(src, v, type, local_block);
     } else {
       if constexpr (sizeof...(N) > 0)
         spinorDilute<real, Ns>(src, v, type, local_block, IntList<N...>());
