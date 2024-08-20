@@ -4,7 +4,6 @@
 #include <cstring>
 #include <iostream>
 #include <sys/time.h>
-#include <complex.h>
 
 #include <quda.h>
 #include <quda_internal.h>
