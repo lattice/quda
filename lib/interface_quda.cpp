@@ -5627,7 +5627,6 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
 
   int parity = 0;
 
-  // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
   // initialize a and b for Laplace operator
   double a = 1.;
   double b = -8.;
@@ -5736,7 +5735,7 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
 
   popOutputPrefix();
 
-} /* end of performGFlownStep */
+}  /* end of performGFlowQuda */
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
