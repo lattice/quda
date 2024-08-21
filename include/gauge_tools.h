@@ -137,9 +137,9 @@ namespace quda
      extended, with the input field being exchanged prior to calling
      this function.  On exit from this routine, the output field will
      have been exchanged.
-     @param[out] dataDs Output smeared field
-     @param[in] dataTemp Temp space
-     @param[in] dataOr Input gauge field
+     @param[out] out Output smeared field
+     @param[in] temp Temp space
+     @param[in] in Input gauge field
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
   */
@@ -151,9 +151,9 @@ namespace quda
      extended, with the input field being exchanged prior to calling
      this function.  On exit from this routine, the output field will
      have been exchanged.
-     @param[out] dataDs Output smeared field
-     @param[in] dataTemp Temp space
-     @param[in] dataOr Input gauge field
+     @param[out] out Output smeared field
+     @param[in] temp Temp space
+     @param[in] in Input gauge field
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
      @param[in] step_type Which intermediary Wilson Flow step (W1, W2 or Vt) to perform

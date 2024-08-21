@@ -5616,21 +5616,21 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   GaugeField &gout = gaugeAux;
 
   // helper gauge field for Laplace operator
-  GaugeField *precise = nullptr;
+  GaugeField precise;
   GaugeFieldParam gParam_helper(*gaugePrecise);
   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-  precise = new GaugeField(gParam_helper);
+  precise = GaugeField(gParam_helper);
 
   // spinor fields
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
   ColorSpinorField fin_h(cpuParam);
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField fin(cudaParam);
+  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField fin(deviceParam);
   fin = fin_h;
 
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField fout(cudaParam);
+  deviceParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField fout(deviceParam);
 
   int parity = 0;
 
@@ -5646,11 +5646,11 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   }
       
   // auxilliary fermion fields [0], [1], [2] and [3]
-  ColorSpinorField f_temp0 ( cudaParam );
-  ColorSpinorField f_temp1 ( cudaParam );
-  ColorSpinorField f_temp2 ( cudaParam );
-  ColorSpinorField f_temp3 ( cudaParam );
-  ColorSpinorField f_temp4 ( cudaParam );
+  ColorSpinorField f_temp0 ( deviceParam );
+  ColorSpinorField f_temp1 ( deviceParam );
+  ColorSpinorField f_temp2 ( deviceParam );
+  ColorSpinorField f_temp3 ( deviceParam );
+  ColorSpinorField f_temp4 ( deviceParam );
   
   // set [3] = input spinor
   f_temp3 = fin;
@@ -5674,9 +5674,9 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
  
     // STEP 1
     // [4] = Laplace [0]
-    copyExtendedGauge(*precise, gin, QUDA_CUDA_FIELD_LOCATION);
-    precise->exchangeGhost();
-    ApplyLaplace ( f_temp4, f_temp0, *precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow );
+    copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();
+    ApplyLaplace ( f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow );
 
     // [0] = [4] = Laplace [0] = Laplace [3]
     f_temp0 = f_temp4;
@@ -5692,9 +5692,9 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     f_temp3 = f_temp1;
     
     // [4] <- Laplace [1]
-    copyExtendedGauge(*precise, gout, QUDA_CUDA_FIELD_LOCATION);
-    precise->exchangeGhost();
-    ApplyLaplace ( f_temp4, f_temp1, *precise, 4, a, b, f_temp1, parity, false, comm_dim, profileGFlow );
+    copyExtendedGauge(precise, gout, QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();
+    ApplyLaplace ( f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, false, comm_dim, profileGFlow );
 
     // [1] <- [4]
     f_temp1 =  f_temp4;
@@ -5710,9 +5710,9 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
 
     // STEP 3
     // [4] <- Laplace [2]
-    copyExtendedGauge(*precise, gin, QUDA_CUDA_FIELD_LOCATION);
-    precise->exchangeGhost();
-    ApplyLaplace ( f_temp4, f_temp2, *precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow );
+    copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();
+    ApplyLaplace ( f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow );
     
     // [2] <- [4] = Laplace [2]
     f_temp2 = f_temp4;
