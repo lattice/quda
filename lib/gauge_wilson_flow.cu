@@ -32,7 +32,8 @@ namespace quda {
     }
 
   public:
-    GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const double epsilon, const QudaGaugeSmearType wflow_type, const QudaWFlowStepType step_type) :
+    GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const double epsilon,
+                   const QudaGaugeSmearType wflow_type, const QudaWFlowStepType step_type) :
       TunableKernel3D(in, 2, wflow_dim),
       out(out),
       temp(temp),
@@ -59,8 +60,8 @@ namespace quda {
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 
-    template <QudaGaugeSmearType wflow_type, QudaWFlowStepType step_type> using Arg =
-      GaugeWFlowArg<Float, nColor, recon, wflow_dim, wflow_type, step_type>;
+    template <QudaGaugeSmearType wflow_type, QudaWFlowStepType step_type>
+    using Arg = GaugeWFlowArg<Float, nColor, recon, wflow_dim, wflow_type, step_type>;
 
     void apply(const qudaStream_t &stream)
     {
@@ -151,7 +152,8 @@ namespace quda {
     out.exchangeExtendedGhost(out.R(), false);
   }
 
-  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type, const QudaWFlowStepType step_type)
+  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon,
+                 const QudaGaugeSmearType smear_type, const QudaWFlowStepType step_type)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
@@ -159,9 +161,8 @@ namespace quda {
     if (temp.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Temporary vector must not use reconstruct");
     if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
       errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
-    
+
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, step_type);
     out.exchangeExtendedGhost(out.R(), false);
   }
-
 }

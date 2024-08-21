@@ -5579,7 +5579,8 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
 // perform forward gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246 (Appendix D)
 // the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)
-void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
+void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                      QudaGaugeObservableParam *obs_param)
 {
 
   auto profile = pushProfile(profileGFlow);
@@ -5628,22 +5629,20 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
 
   // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
   // initialize a and b for Laplace operator
-  double a =  1.;
+  double a = 1.;
   double b = -8.;
 
-  int comm_dim[4] = { };
+  int comm_dim[4] = {};
   // only switch on comms needed for directions with a derivative
-  for (int i = 0; i < 4; i++) {
-    comm_dim[i] = comm_dim_partitioned(i);
-  }
-      
+  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+
   // auxilliary fermion fields [0], [1], [2] and [3]
-  ColorSpinorField f_temp0 ( deviceParam );
-  ColorSpinorField f_temp1 ( deviceParam );
-  ColorSpinorField f_temp2 ( deviceParam );
-  ColorSpinorField f_temp3 ( deviceParam );
-  ColorSpinorField f_temp4 ( deviceParam );
-  
+  ColorSpinorField f_temp0(deviceParam);
+  ColorSpinorField f_temp1(deviceParam);
+  ColorSpinorField f_temp2(deviceParam);
+  ColorSpinorField f_temp3(deviceParam);
+  ColorSpinorField f_temp4(deviceParam);
+
   // set [3] = input spinor
   f_temp3 = fin;
 
@@ -5657,66 +5656,66 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   // loop, iterations of gf
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
 
-    if ( i > 0 ) std::swap ( gin, gout ); // output from prior step becomes input for next step
+    if (i > 0) std::swap(gin, gout); // output from prior step becomes input for next step
 
     // init auxilliary fields [0], [1] and [2] as [3]
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
- 
+
     // STEP 1
     // [4] = Laplace [0]
     copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace ( f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow );
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow);
 
     // [0] = [4] = Laplace [0] = Laplace [3]
     f_temp0 = f_temp4;
 
     // [1] <- epsilon/4 x [0] + [1] = [3] + epsilon /4 x Laplace [3]
-    blas::axpy( smear_param->epsilon/4., f_temp0, f_temp1);
+    blas::axpy(smear_param->epsilon / 4., f_temp0, f_temp1);
 
     // apply step W1 of gauge field flow part
-    GFlowStep ( gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
+    GFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
 
     // STEP 2
     // [3] <- [1]
     f_temp3 = f_temp1;
-    
+
     // [4] <- Laplace [1]
     copyExtendedGauge(precise, gout, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace ( f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, false, comm_dim, profileGFlow );
+    ApplyLaplace(f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, false, comm_dim, profileGFlow);
 
     // [1] <- [4]
-    f_temp1 =  f_temp4;
+    f_temp1 = f_temp4;
 
     // [2] <- 8/9 x epsilon x [1] + [2]
-    blas::axpy (  smear_param->epsilon*8./9., f_temp1, f_temp2 );
+    blas::axpy(smear_param->epsilon * 8. / 9., f_temp1, f_temp2);
 
     // [2] <- -2/9 x epsilon x [0] + [2]
-    blas::axpy ( -smear_param->epsilon*2./9., f_temp0, f_temp2 );
+    blas::axpy(-smear_param->epsilon * 2. / 9., f_temp0, f_temp2);
 
     // apply step W2 of gauge field flow part
-    GFlowStep ( gin, gaugeTemp, gout, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
+    GFlowStep(gin, gaugeTemp, gout, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
 
     // STEP 3
     // [4] <- Laplace [2]
     copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace ( f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow );
-    
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow);
+
     // [2] <- [4] = Laplace [2]
     f_temp2 = f_temp4;
-    
+
     // [3] <- 3/4 x epsilon x [2] + [3]
-    blas::axpy ( smear_param->epsilon*3./4., f_temp2, f_temp3 );
-    
+    blas::axpy(smear_param->epsilon * 3. / 4., f_temp2, f_temp3);
+
     // set output spinor = [3]
     fout = f_temp3;
 
     // apply step W3 (Vt) of gauge field flow part
-    GFlowStep ( gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
+    GFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
 
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.
@@ -5724,11 +5723,11 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
       logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
               obs_param[measurement_n].plaquette[0], blas::norm2(fout));
     }
-  }  /* end of one iteration of GF application */
+  } /* end of one iteration of GF application */
 
-  // copy gout to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
+  // copy gout to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted
   copyExtendedGauge(*gaugeSmeared, gout, QUDA_CUDA_FIELD_LOCATION);
-  gaugeSmeared->exchangeExtendedGhost( gaugeSmeared->R() );
+  gaugeSmeared->exchangeExtendedGhost(gaugeSmeared->R());
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
@@ -5737,7 +5736,7 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
 
   popOutputPrefix();
 
-}  /* end of performGFlownStep */
+} /* end of performGFlownStep */
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
