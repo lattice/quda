@@ -5735,7 +5735,7 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
 
   popOutputPrefix();
 
-}  /* end of performGFlowQuda */
+} /* end of performGFlowQuda */
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
