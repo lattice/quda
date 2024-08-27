@@ -323,6 +323,10 @@ namespace quda {
   void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
+  template <int fineColor, int coarseColor, int nVec>
+  void ProlongateMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                     const int *fine_to_coarse, const int *const *spin_map, int parity);
+
   /**
      @brief Apply the restriction operator
      @param[out] out Resulting coarsened field
