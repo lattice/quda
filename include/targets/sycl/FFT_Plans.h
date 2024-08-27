@@ -1,53 +1,16 @@
 #pragma once
 
+#ifndef NATIVE_FFT_LIB
+#include "../generic/FFT_Plans.h"
+#else
+
 #include <quda_internal.h>
 #include <quda_sycl_api.h>
+#include <oneapi/mkl/dfti.hpp>
+using namespace oneapi::mkl::dft;
 
 #define FFT_FORWARD 0
 #define FFT_INVERSE 1
-
-#ifndef NATIVE_FFT_LIB
-
-namespace quda
-{
-
-  typedef struct {
-    bool isDouble;
-  } FFTPlanHandle;
-
-  inline static constexpr bool HaveFFT() { return false; }
-
-  inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
-  {
-    errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
-  {
-    errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
-  {
-    errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
-  {
-    errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void FFTDestroyPlan(FFTPlanHandle &)
-  {
-    errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-}
-
-#else
-
-#include <oneapi/mkl/dfti.hpp>
-using namespace oneapi::mkl::dft;
 
 namespace quda
 {
@@ -123,7 +86,7 @@ namespace quda
   inline void SetPlanFFTMany(FFTPlanHandle &, int4 , int dim, QudaPrecision precision)
   {
     warningQuda("SetPlanFFTMany %i %i : unimplemented", dim, precision);
-  #if 0
+#if 0
     auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
     switch (dim) {
     case 1: {
@@ -136,7 +99,7 @@ namespace quda
     } break;
     }
     CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
-  #endif
+#endif
   }
 
   /**
@@ -196,7 +159,7 @@ namespace quda
 	plan.d->commit(q);
       }
     }
-  #if 0
+#if 0
     auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
     switch (dim) {
     case 0: {
@@ -209,7 +172,7 @@ namespace quda
     } break;
     }
     CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
-  #endif
+#endif
   }
 
   inline void FFTDestroyPlan(FFTPlanHandle &plan) {
@@ -224,4 +187,4 @@ namespace quda
 
 }
 
-#endif
+#endif // ifndef NATIVE_FFT_LIB

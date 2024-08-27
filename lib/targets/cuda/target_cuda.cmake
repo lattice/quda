@@ -432,7 +432,9 @@ if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
 endif()
 
-target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+if(${QUDA_BUILD_NATIVE_FFT} STREQUAL "ON")
+  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+endif()
 
 if(QUDA_JITIFY)
   target_compile_definitions(quda PRIVATE JITIFY)
