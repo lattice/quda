@@ -64,7 +64,9 @@ namespace quda
       apply(device::get_default_stream());
     }
 
-    using mma_t = simt::simt_t<float, 4, 8, 2, 2>;
+    // using mma_t = simt::simt_t<float, 8, 4, 2, 2>;
+    // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>;  // 3xTF32
+    using mma_t = typename mma::smma_dispatch<Float>::type;
     static constexpr int n_atom_size = nVec;
     static constexpr int m_atom_size = fineColor;
     static constexpr int k_atom_size = coarseColor;
@@ -86,11 +88,11 @@ namespace quda
       tp.block.y = 16;
       tp.block.z = 8;
 
-      int bN = nVec;
-      int bM = fineColor;
+      int bN = fineColor;
+      int bM = nVec;
       int bK = coarseColor;
 
-      tp.grid = dim3(out.SiteSubset() * out.VolumeCB() * fineSpin, fineColor / bM, nVec / bN);
+      tp.grid = dim3(out.SiteSubset() * out.VolumeCB() * fineSpin, nVec / bM, fineColor / bN);
       tp.set_max_shared_bytes = true;
 
       int shared_bytes = shared_bytes_per_block(bM, bN, bK);
@@ -125,8 +127,8 @@ namespace quda
     {
       constexpr int block_y = 16;
       constexpr int block_z = 8;
-      constexpr int bN = nVec;
-      constexpr int bM = fineColor;
+      constexpr int bN = fineColor;
+      constexpr int bM = nVec;
       constexpr int bK = coarseColor;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch_mma<bN, bM, bK, block_y, block_z>(tp, stream);
@@ -184,9 +186,11 @@ namespace quda
     }
   }
 
-  constexpr int fineColor = @QUDA_MULTIGRID_NC_NVEC @;
-  constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2 @;
-  constexpr int nVec = @QUDA_MULTIGRID_MRHS @;
+  // clang-format on
+  constexpr int fineColor = @QUDA_MULTIGRID_NC_NVEC@;
+  constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
+  constexpr int nVec = @QUDA_MULTIGRID_MRHS@;
+  // clang-format off
 
   template <>
   void ProlongateMma<fineColor, coarseColor, nVec>(ColorSpinorField &out, const ColorSpinorField &in,

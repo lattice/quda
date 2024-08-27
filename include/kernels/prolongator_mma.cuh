@@ -83,13 +83,15 @@ namespace quda
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
     int v_parity = (arg.v.Nparity() == 2) ? parity : 0;
 
-    constexpr int M = Arg::fineColor;
-    constexpr int N = Arg::nVec;
+    // Everything is dagger'ed since coarseColor >= fineColor
+
+    constexpr int M = Arg::nVec;
+    constexpr int N = Arg::fineColor;
     constexpr int K = Arg::coarseColor;
 
-    constexpr int lda = K;
-    constexpr int ldb = N;
-    constexpr int ldc = N;
+    constexpr int lda = M;
+    constexpr int ldb = K;
+    constexpr int ldc = M;
 
     using mma_t = typename Arg::mma_t;
     using Config = mma::MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
@@ -105,8 +107,8 @@ namespace quda
     typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * Arg::bK);
     typename Config::SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + Config::smem_ldb * Arg::bK);
 
-    using store_a_t = complex<typename Arg::vFloat>;
-    using store_b_t = complex<typename Arg::Float>;
+    using store_a_t = complex<typename Arg::Float>;
+    using store_b_t = complex<typename Arg::vFloat>;
     store_a_t *smem_tmp_a = reinterpret_cast<store_a_t *>(smem_obj_b_imag.ptr + Config::smem_ldb * Arg::bK);
     store_b_t *smem_tmp_b = reinterpret_cast<store_b_t *>(smem_tmp_a + (Arg::bK + 4) * (Arg::bM + 4));
 
@@ -118,10 +120,10 @@ namespace quda
     typename Config::Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
     auto producer = [&](float &scale_inv_a, float &scale_inv_b, int k_offset) {
-      auto a = arg.v(v_parity, x_cb, spin, 0, 0);
-      auto b = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(spin, parity), 0, 0);
-      constexpr bool a_dagger = false;
-      constexpr bool b_dagger = false;
+      auto a = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(spin, parity), 0, 0);
+      auto b = arg.v(v_parity, x_cb, spin, 0, 0);
+      constexpr bool a_dagger = true;
+      constexpr bool b_dagger = true;
 
       __syncthreads();
       pipe.producer_acquire();
@@ -131,11 +133,11 @@ namespace quda
     };
 
     auto consumer = [&](float scale_inv_a, float scale_inv_b) {
-      constexpr bool a_dagger = false;
-      constexpr bool b_dagger = false;
+      constexpr bool a_dagger = true;
+      constexpr bool b_dagger = true;
 
-      using a_wrapper_t = decltype(arg.v(0, 0, 0, 0, 0));
-      using b_wrapper_t = decltype(arg.in(0, 0, 0, 0, 0));
+      using a_wrapper_t = decltype(arg.in(0, 0, 0, 0, 0));
+      using b_wrapper_t = decltype(arg.v(0, 0, 0, 0, 0));
       constexpr bool a_fixed = a_wrapper_t::fixed;
       constexpr bool b_fixed = b_wrapper_t::fixed;
 
@@ -165,7 +167,8 @@ namespace quda
     // }
 
     auto c = arg.out(spinor_parity, x_cb, spin, 0, 0);
-    accumulator.template store<M, N, ldc, false>(c, m_offset, n_offset, assign_t());
+    constexpr bool c_dagger = true;
+    accumulator.template store<M, N, ldc, c_dagger>(c, m_offset, n_offset, assign_t());
   }
 
   template <typename Arg> struct ProlongatorMma {
