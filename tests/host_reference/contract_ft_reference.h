@@ -183,15 +183,16 @@ int contractionFT_reference(void **spinorX, void **spinorY, const double *const 
   const int ntol = 7;
   auto epsilon = std::numeric_limits<Float>::epsilon();
   auto fact = epsilon;
-  fact *= sqrt((double)nSpin * 6 * V * 2 / reduction_slices); // account for repeated roundoff in float ops
-  fact *= 10;                                                 // account for variation in phase computation
-  std::array<double, ntol> tolerance {1.0e-5 * fact, 1.0e-4 * fact, 1.0e-3 * fact, 1.0e-2 * fact,
-                                      1.0e-1 * fact, 1.0e+0 * fact, 1.0e+1 * fact};
+  fact *= sqrt((double)nSpin * 6 * V * comm_size() * 2 / reduction_slices); // account for repeated roundoff in float ops
+  fact *= 10; // account for variation in phase computation
+  std::vector<double> tolerance(ntol);
+  std::generate(tolerance.begin(), tolerance.end(), [step = 1e-6 * fact]() mutable { return step *= 10; });
+
   int check_tol = 5;
-  std::array<int, ntol> fails = {};
+  std::vector<int> fails(ntol, 0.0);
 
   for (size_t idx = 0; idx < n_floats; ++idx) {
-    double rel = abs(d_result[idx] - h_result[idx]) / (abs(h_result[idx]) + epsilon);
+    double rel = abs(d_result[idx] - h_result[idx]);
     // printfQuda("%5ld: %10.3e %10.3e: %10.3e\n", idx, d_result[idx], h_result[idx], rel);
     for (int d = 0; d < ntol; ++d)
       if (rel > tolerance[d]) ++fails[d];

@@ -67,22 +67,16 @@ namespace quda
     void preTune() { out.backup(); }
     void postTune() { out.restore(); }
 
-    long long flops() const { return 0; }
     long long bytes() const { return 2 * in.Bytes(); }
   };
 
-#ifdef GPU_STAGGERED_DIRAC
   void applySpinTaste(ColorSpinorField &out, const ColorSpinorField &in, QudaSpinTasteGamma gamma)
   {
-    instantiate<SpinTastePhase_>(out, in, gamma);
-    //// ensure that ghosts are updated if needed
-    // if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) u.exchangeGhost();
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      instantiate<SpinTastePhase_>(out, in, gamma);
+    } else {
+      errorQuda("Staggered operator has not been built");
+    }
   }
-#else
-  void applySpinTaste(ColorSpinorField &out, const ColorSpinorField &in, QudaSpinTasteGamma gamma)
-  {
-    errorQuda("Gauge tools are not build");
-  }
-#endif
 
 } // namespace quda
