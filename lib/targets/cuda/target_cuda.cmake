@@ -64,7 +64,7 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 enable_language(CUDA)
-message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+message(STATUS "CUDA Compiler is " ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 # TODO: Do we stil use that?
 if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
