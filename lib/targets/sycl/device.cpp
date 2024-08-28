@@ -180,6 +180,8 @@ namespace quda
     {
     }
 
+    state_t get_state() { return {}; }
+
     int get_device_count()
     {
       //printf("get_device_count\n");
