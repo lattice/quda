@@ -59,7 +59,6 @@ namespace quda
       {
         Arg<true, vAccessor, bAccessor> arg(V, B, tp.block.x, tp.block.y);
         tp.set_max_shared_bytes = true;
-        resizeVector(tp.block.y * tp.grid.y); // We need a full threadblock
         launch_device<BlockTransposeKernel>(tp, stream, arg);
       }
 
@@ -135,7 +134,7 @@ namespace quda
       if constexpr (sizeof...(N) > 0) {
         launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nVecs);
       } else {
-        errorQuda("nColor = %d not instantiated", V.Ncolor());
+        errorQuda("nColor = %d not instantiated", B.Ncolor());
       }
     }
   }
@@ -147,7 +146,7 @@ namespace quda
       errorQuda("V.Ncolor() / V.Nvec() (=%d) != B.Ncolor() (=%d)", V.Ncolor() / V.Nvec(), B[0].Ncolor());
     }
 
-    IntList<@QUDA_MULTIGRID_NVEC_LIST@> nColors;
+    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> nColors;
     launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nColors);
   }
 

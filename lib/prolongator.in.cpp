@@ -61,7 +61,7 @@ namespace quda
           BlockTransposeBackward(v_out, out);
 #if 0
           std::vector<ColorSpinorField> v_cmp(out.size());
-          for (int i = 0; i < out.size(); i++) {
+          for (size_t i = 0; i < out.size(); i++) {
             ColorSpinorParam param(out[i]);
             param.create = QUDA_NULL_FIELD_CREATE;
             v_cmp[i] = ColorSpinorField(param);
@@ -72,7 +72,7 @@ namespace quda
           blas::mxpy(out, v_cmp);
           auto vn = blas::norm2(vv_cmp);
           printf("n = ");
-          for (int i = 0; i < vn.size(); i++) {
+          for (size_t i = 0; i < vn.size(); i++) {
             printf("%f ", vn[i]);
           }
           printf("\n");
@@ -121,7 +121,7 @@ namespace quda
       // clang-format off
       IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
       // clang-format on
-      if (out[0].Ncolor() != 3) {
+      if (1) {
         // use MMA
         Prolongate<true>(out, in, v, fine_to_coarse, spin_map, parity, fineColors);
       } else {

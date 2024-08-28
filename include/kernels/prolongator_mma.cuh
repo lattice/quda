@@ -63,7 +63,7 @@ namespace quda
       parity(parity),
       nParity(out.SiteSubset())
     {
-      if (out.Nvec() > get_max_multi_rhs())
+      if (out.Nvec() > static_cast<int>(get_max_multi_rhs()))
         errorQuda("vector set size %d greater than max size %d", out.Nvec(), get_max_multi_rhs());
       if (out.Nvec() != nVec) { errorQuda("out.Nvec() (%d) != nVec (%d)", out.Nvec(), nVec); }
       if (in.Nvec() != nVec) { errorQuda("in.Nvec() (%d) != nVec (%d)", in.Nvec(), nVec); }
@@ -97,7 +97,6 @@ namespace quda
     using Config = mma::MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
     static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
-    static_assert(N % Arg::bN == 0, "N %% Arg::bN != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
     extern __shared__ typename mma_t::compute_t smem_ptr[];
@@ -119,46 +118,21 @@ namespace quda
 
     typename Config::Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
-    auto producer = [&](float &scale_inv_a, float &scale_inv_b, int k_offset) {
-      auto a = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(spin, parity), 0, 0);
-      auto b = arg.v(v_parity, x_cb, spin, 0, 0);
-      constexpr bool a_dagger = true;
-      constexpr bool b_dagger = true;
-
-      __syncthreads();
-      pipe.producer_acquire();
-      scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-      scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
-      pipe.producer_commit();
-    };
-
-    auto consumer = [&](float scale_inv_a, float scale_inv_b) {
-      constexpr bool a_dagger = true;
-      constexpr bool b_dagger = true;
-
-      using a_wrapper_t = decltype(arg.in(0, 0, 0, 0, 0));
-      using b_wrapper_t = decltype(arg.v(0, 0, 0, 0, 0));
-      constexpr bool a_fixed = a_wrapper_t::fixed;
-      constexpr bool b_fixed = b_wrapper_t::fixed;
-
-      pipe.consumer_wait();
-      __syncthreads();
-      a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-      b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
-      pipe.consumer_release();
-      __syncthreads();
-    };
-
-    auto compute = [&]() { accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag); };
-
     accumulator.zero();
 
-    float scale_inv_a;
-    float scale_inv_b;
+    auto a = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(spin, parity), 0, 0);
+    auto b = arg.v(v_parity, x_cb, spin, 0, 0);
+    constexpr bool a_dagger = true;
+    constexpr bool b_dagger = true;
+
     for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
-      producer(scale_inv_a, scale_inv_b, k_offset);
-      consumer(scale_inv_a, scale_inv_b);
-      compute();
+      __syncthreads();
+      a_loader.template g2r<lda, a_dagger>(a, m_offset, k_offset);
+      b_loader.template g2r<ldb, b_dagger>(b, n_offset, k_offset);
+      a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+      b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+      __syncthreads();
+      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
     }
 
     // if constexpr (Arg::fineSpin == 4 && Arg::to_non_rel) {
