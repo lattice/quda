@@ -142,6 +142,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   // Use 3D or 4D laplace
   inv_param.laplace3D = laplace3D;
 
+  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
+    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
+
   // Some fermion specific parameters
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -932,6 +935,9 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
   inv_param.laplace3D = laplace3D;              // for Laplace operator
 
+  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
+    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
+
   // outer solver parameters
   inv_param.inv_type = inv_type;
   inv_param.tol = tol;
@@ -943,7 +949,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
 
-  inv_param.Ls = 1; // Nsrc
+  inv_param.Ls = 1;
 
   if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");
