@@ -121,7 +121,7 @@ const char *get_dslash_str(QudaDslashType type)
 
 std::vector<const char *> get_dslash_str_list()
 {
-  static std::vector<const char*> dslash_str_list;
+  static std::vector<const char *> dslash_str_list;
   bool populated = false;
 
   if (!populated) {
@@ -143,12 +143,13 @@ std::vector<const char *> get_dslash_str_list()
   return dslash_str_list;
 }
 
-QudaDslashType get_dslash_from_str(const char* str)
+QudaDslashType get_dslash_from_str(const char *str)
 {
   std::string d_type(str);
   if (!d_type.compare("wilson")) return QUDA_WILSON_DSLASH;
   if (!d_type.compare("clover")) return QUDA_CLOVER_WILSON_DSLASH;
-  if (!d_type.compare("clover_hasenbusch_twist") || !d_type.compare("clover-hasenbusch-twist")) return QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+  if (!d_type.compare("clover_hasenbusch_twist") || !d_type.compare("clover-hasenbusch-twist"))
+    return QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
   if (!d_type.compare("twisted_mass") || !d_type.compare("twisted-mass")) return QUDA_TWISTED_MASS_DSLASH;
   if (!d_type.compare("twisted_clover") || !d_type.compare("twisted-clover")) return QUDA_TWISTED_CLOVER_DSLASH;
   if (!d_type.compare("staggered")) return QUDA_STAGGERED_DSLASH;
