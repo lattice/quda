@@ -119,6 +119,49 @@ const char *get_dslash_str(QudaDslashType type)
   return ret;
 }
 
+std::vector<const char *> get_dslash_str_list()
+{
+  static std::vector<const char*> dslash_str_list;
+  bool populated = false;
+
+  if (!populated) {
+    dslash_str_list.push_back("wilson");
+    dslash_str_list.push_back("clover");
+    dslash_str_list.push_back("clover-hasenbusch-twist");
+    dslash_str_list.push_back("twisted-mass");
+    dslash_str_list.push_back("twisted-clover");
+    dslash_str_list.push_back("staggered");
+    dslash_str_list.push_back("asqtad");
+    dslash_str_list.push_back("hisq");
+    dslash_str_list.push_back("domain_wall");
+    dslash_str_list.push_back("domain_wall_4d");
+    dslash_str_list.push_back("mobius");
+    dslash_str_list.push_back("mobius_eofa");
+    dslash_str_list.push_back("laplace");
+    populated = true;
+  }
+  return dslash_str_list;
+}
+
+QudaDslashType get_dslash_from_str(const char* str)
+{
+  std::string d_type(str);
+  if (!d_type.compare("wilson")) return QUDA_WILSON_DSLASH;
+  if (!d_type.compare("clover")) return QUDA_CLOVER_WILSON_DSLASH;
+  if (!d_type.compare("clover_hasenbusch_twist") || !d_type.compare("clover-hasenbusch-twist")) return QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+  if (!d_type.compare("twisted_mass") || !d_type.compare("twisted-mass")) return QUDA_TWISTED_MASS_DSLASH;
+  if (!d_type.compare("twisted_clover") || !d_type.compare("twisted-clover")) return QUDA_TWISTED_CLOVER_DSLASH;
+  if (!d_type.compare("staggered")) return QUDA_STAGGERED_DSLASH;
+  if (!d_type.compare("asqtad")) return QUDA_ASQTAD_DSLASH;
+  if (!d_type.compare("hisq")) return QUDA_ASQTAD_DSLASH;
+  if (!d_type.compare("domain_wall") || !d_type.compare("domain-wall")) return QUDA_DOMAIN_WALL_DSLASH;
+  if (!d_type.compare("domain_wall_4d") || !d_type.compare("domain-wall-4d")) return QUDA_DOMAIN_WALL_4D_DSLASH;
+  if (!d_type.compare("mobius")) return QUDA_MOBIUS_DWF_DSLASH;
+  if (!d_type.compare("mobius_eofa") || !d_type.compare("mobius-eofa")) return QUDA_MOBIUS_DWF_EOFA_DSLASH;
+  if (!d_type.compare("laplace")) return QUDA_LAPLACE_DSLASH;
+  return QUDA_INVALID_DSLASH;
+}
+
 const char *get_contract_str(QudaContractType type)
 {
   const char *ret;

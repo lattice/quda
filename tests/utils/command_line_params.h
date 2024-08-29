@@ -3,6 +3,7 @@
 #include <CLI11.hpp>
 #include <array>
 #include <quda.h>
+#include "misc.h"
 
 // for compatibility while porting - remove later
 extern void usage(char **);
