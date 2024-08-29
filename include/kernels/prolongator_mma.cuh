@@ -44,6 +44,8 @@ namespace quda
     using v_accessor_t =
       typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat>;
 
+    static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
+
     out_accessor_t out;
     const in_accessor_t in;
     const v_accessor_t v;
@@ -86,7 +88,7 @@ namespace quda
     // Everything is dagger'ed since coarseColor >= fineColor
 
     constexpr int M = Arg::nVec;
-    constexpr int N = Arg::fineColor;
+    constexpr int N = Arg::fineColor * Arg::spin_block_factor;
     constexpr int K = Arg::coarseColor;
 
     constexpr int lda = M;
@@ -106,13 +108,6 @@ namespace quda
     typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * Arg::bK);
     typename Config::SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + Config::smem_ldb * Arg::bK);
 
-    using store_a_t = complex<typename Arg::Float>;
-    using store_b_t = complex<typename Arg::vFloat>;
-    store_a_t *smem_tmp_a = reinterpret_cast<store_a_t *>(smem_obj_b_imag.ptr + Config::smem_ldb * Arg::bK);
-    store_b_t *smem_tmp_b = reinterpret_cast<store_b_t *>(smem_tmp_a + (Arg::bK + 4) * (Arg::bM + 4));
-
-    pipeline_t pipe = make_pipeline();
-
     typename Config::ALoader a_loader;
     typename Config::BLoader b_loader;
 
@@ -120,8 +115,8 @@ namespace quda
 
     accumulator.zero();
 
-    auto a = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(spin, parity), 0, 0);
-    auto b = arg.v(v_parity, x_cb, spin, 0, 0);
+    auto a = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(spin * Arg::spin_block_factor, parity), 0, 0);
+    auto b = arg.v(v_parity, x_cb, spin * Arg::spin_block_factor, 0, 0);
     constexpr bool a_dagger = true;
     constexpr bool b_dagger = true;
 
@@ -135,12 +130,7 @@ namespace quda
       accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
     }
 
-    // if constexpr (Arg::fineSpin == 4 && Arg::to_non_rel) {
-    //   out.toNonRel();
-    //   out *= rsqrt(static_cast<typename Arg::real>(2.0));
-    // }
-
-    auto c = arg.out(spinor_parity, x_cb, spin, 0, 0);
+    auto c = arg.out(spinor_parity, x_cb, spin * Arg::spin_block_factor, 0, 0);
     constexpr bool c_dagger = true;
     accumulator.template store<M, N, ldc, c_dagger>(c, m_offset, n_offset, assign_t());
   }
@@ -156,8 +146,8 @@ namespace quda
       int m_offset = target::block_idx().y * Arg::bM;
 
       int parity_x_cb_spin = target::block_idx().x;
-      int spin = parity_x_cb_spin % Arg::fineSpin;
-      int parity_x_cb = parity_x_cb_spin / Arg::fineSpin;
+      int spin = parity_x_cb_spin % (Arg::fineSpin / Arg::spin_block_factor);
+      int parity_x_cb = parity_x_cb_spin / (Arg::fineSpin / Arg::spin_block_factor);
       int parity = (arg.nParity == 2) ? parity_x_cb % 2 : arg.parity;
       int x_cb = (arg.nParity == 2) ? parity_x_cb / 2 : parity_x_cb;
 

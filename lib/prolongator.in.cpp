@@ -58,7 +58,8 @@ namespace quda
           IntList<@QUDA_MULTIGRID_MRHS_LIST@> nvecs;
           ProlongateMma2<fineColor, coarseColor>(v_out, v_in, V, fine_to_coarse, spin_map, parity, nvecs);
 
-          BlockTransposeBackward(v_out, out);
+          bool to_non_rel = (out.Nspin() == 4) && (out[0].GammaBasis() == QUDA_UKQCD_GAMMA_BASIS);
+          BlockTransposeBackward(v_out, out, to_non_rel);
 #if 0
           std::vector<ColorSpinorField> v_cmp(out.size());
           for (size_t i = 0; i < out.size(); i++) {

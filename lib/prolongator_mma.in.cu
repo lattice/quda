@@ -91,7 +91,8 @@ namespace quda
       strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
-      if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",to_non_rel");
+
+      strcat(aux, mma_t::get_type_name().c_str());
 
       apply(device::get_default_stream());
     }
@@ -100,8 +101,10 @@ namespace quda
     // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>;  // 3xTF32
     using mma_t = typename mma::smma_dispatch<Float>::type;
 
+    static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
+
     static constexpr int m = nVec;
-    static constexpr int n = fineColor;
+    static constexpr int n = fineColor * spin_block_factor;
     static constexpr int k = coarseColor;
 
     static constexpr int n_atom_size = mma_t::MMA_N;
@@ -121,8 +124,7 @@ namespace quda
 
     static constexpr int shared_bytes_per_block(int bM, int bN, int bK)
     {
-      return mma::shared_memory_bytes<mma_t>(bM, bN, bK) + (bM + 4) * (bK + 4) * 2 * sizeof(vFloat)
-        + (bK + 4) * (bN + 4) * 2 * sizeof(Float);
+      return mma::shared_memory_bytes<mma_t>(bM, bN, bK);
     }
 
     bool set_mma_param(TuneParam &tp) const
@@ -137,7 +139,7 @@ namespace quda
       int bN = n_atom_size * get_int_factor_array((n + n_atom_size - 1) / n_atom_size)[tp.aux.y];
       int bM = m_atom_size * get_int_factor_array((m + m_atom_size - 1) / m_atom_size)[tp.aux.z];
 
-      tp.grid = dim3(out.SiteSubset() * out.VolumeCB() * fineSpin, (m + bM - 1) / bM, (n + bN - 1) / bN);
+      tp.grid = dim3(out.SiteSubset() * out.VolumeCB() * fineSpin / spin_block_factor, (m + bM - 1) / bM, (n + bN - 1) / bN);
       tp.set_max_shared_bytes = true;
 
       int bK = k_atom_size * get_int_factor_array(k / k_atom_size)[tp.aux.w];
