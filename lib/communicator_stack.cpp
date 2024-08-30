@@ -28,7 +28,7 @@ namespace quda
   {
     auto search = communicator_stack.find(default_comm_key);
     if (search == communicator_stack.end()) {
-      fprintf(getOutputFile(), "Current communicator can't be found\n");
+      fprintf(getOutputFile(), "Default communicator can't be found\n");
       fflush(getOutputFile());
       comm_abort(1);
     }
