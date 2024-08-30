@@ -520,7 +520,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option(
       "--dslash-type",
       [](std::vector<std::string> val) {
-        if (val.size() == 1) return false;
+        if (val.size() != 1) return false;
         dslash_type = get_dslash_from_str(val[0].c_str());
         if (!val[0].compare("hisq")) compute_fatlong = true;
         if (dslash_type == QUDA_INVALID_DSLASH) return false;
