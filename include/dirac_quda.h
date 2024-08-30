@@ -727,7 +727,8 @@ namespace quda {
     virtual void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
     virtual void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
-    virtual int getStencilSteps() const {
+    virtual int getStencilSteps() const
+    {
       // implemented as separate even, odd D_{eo} D_{oe}
       return 2;
     }
@@ -985,11 +986,11 @@ namespace quda {
       virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                                const QudaSolutionType solType) const;
 
-    virtual int getStencilSteps() const { return 1; }
+      virtual int getStencilSteps() const { return 1; }
       virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
       virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
+      virtual bool isStaggered() const { return false; }
+      virtual bool isDwf() const { return true; }
   };
 
   // 4d even-odd preconditioned Mobius domain wall
