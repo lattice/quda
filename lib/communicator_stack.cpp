@@ -27,14 +27,20 @@ namespace quda
   static Communicator &get_default_communicator()
   {
     auto search = communicator_stack.find(default_comm_key);
-    if (search == communicator_stack.end()) { errorQuda("Default communicator can't be found."); }
+    if (search == communicator_stack.end()) {
+      fprintf(getOutputFile(), "Default communicator can't be found\n");
+      comm_abort(1);
+    }
     return search->second;
   }
 
   Communicator &get_current_communicator()
   {
     auto search = communicator_stack.find(current_key);
-    if (search == communicator_stack.end()) { errorQuda("Current communicator can't be found."); }
+    if (search == communicator_stack.end()) {
+      fprintf(getOutputFile(), "Current communicator can't be found\n");
+      comm_abort(1);
+    }
     return search->second;
   }
 

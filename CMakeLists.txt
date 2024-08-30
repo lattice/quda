@@ -425,6 +425,15 @@ if(QUDA_DOWNLOAD_EIGEN)
     SYSTEM YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
   install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
+
+  # Eigen 3.4 needs to be patched on Neon with nvc++
+  if (${CMAKE_CXX_COMPILER_ID} MATCHES "NVHPC")
+    set(CMAKE_PATCH_EIGEN OFF CACHE BOOL "Internal use only; do not modify")
+    if (NOT CMAKE_PATCH_EIGEN)
+      execute_process(COMMAND patch -N "${Eigen_SOURCE_DIR}/Eigen/src/Core/arch/NEON/Complex.h" "${CMAKE_SOURCE_DIR}/cmake/eigen34_neon.diff")
+      set(CMAKE_PATCH_EIGEN ON CACHE BOOL "Internal use only; do not modify" FORCE)
+    endif()
+  endif()
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)

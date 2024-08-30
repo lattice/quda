@@ -5,7 +5,6 @@
 #include <iostream>
 #include <utility>
 #include <sys/time.h>
-#include <complex.h>
 
 #include <quda.h>
 #include <quda_internal.h>
