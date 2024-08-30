@@ -261,6 +261,14 @@ namespace quda
       return this_max;
     }
 
+    template <class T> constexpr int get_mn_batch(int internal_batch, int register_dim, int block)
+    {
+      return (internal_batch > 1) ? 1 :
+                                    ((register_dim % 4 == 0 && block % 4 == 0 && sizeof(T) * 8 <= 16) ?
+                                       4 :
+                                       ((register_dim % 2 == 0 && block % 2 == 0 && sizeof(T) * 4 <= 16) ? 2 : 1));
+    }
+
     /**
      * A loader object that loads data from global memory to registers (g2r), and then to shared memory (r2s)
      * M, N: the global memory matrix size, for bound check only
@@ -480,8 +488,7 @@ namespace quda
         constexpr bool check_shared_bound = !(bM % m_stride == 0 && bN % n_stride == 0);
 
         if constexpr (x) {
-          constexpr int n_batch = (n_dim % 2 == 0 && batch == 1) ? 2 : 1;
-          static_assert(bN % n_batch == 0, "bN % n_batch == 0");
+          constexpr int n_batch = get_mn_batch<load_t>(batch, n_dim, bN);
 #pragma unroll
           for (int n = 0; n < n_dim / n_batch; n++) {
 
@@ -509,8 +516,7 @@ namespace quda
             }
           }
         } else {
-          constexpr int m_batch = (m_dim % 2 == 0 && batch == 1) ? 2 : 1;
-          static_assert(bM % m_batch == 0, "bN % n_batch == 0");
+          constexpr int m_batch = get_mn_batch<load_t>(batch, m_dim, bM);
 #pragma unroll
           for (int n = 0; n < n_dim; n++) {
 
@@ -559,7 +565,7 @@ namespace quda
         constexpr int m_dim = (bM + m_stride - 1) / m_stride;
 
         if constexpr (x) {
-          constexpr int n_batch = (n_dim % 2 == 0 && batch == 1) ? 2 : 1;
+          constexpr int n_batch = get_mn_batch<load_t>(batch, n_dim, bN);
 #pragma unroll
           for (int n = 0; n < n_dim / n_batch; n++) {
 #pragma unroll
@@ -567,7 +573,7 @@ namespace quda
               const int n_idx = (n * n_stride + n_thread_offset) * n_batch;
               const int m_idx = m * m_stride + m_thread_offset;
               if (m_idx < bM && n_idx < bN) {
-                if constexpr (SmemObj::ldn == 1) {
+                if constexpr (SmemObj::ldn == 1 && SmemObj::ldm % n_batch == 0) {
                   smem_real.vector_load(m_idx, n_idx,
                                         make_vector_t<load_t, n_batch>::get(&reg_real[m * n_dim + n * n_batch]));
                   smem_imag.vector_load(m_idx, n_idx,
@@ -583,7 +589,7 @@ namespace quda
             }
           }
         } else {
-          constexpr int m_batch = (m_dim % 2 == 0 && batch == 1) ? 2 : 1;
+          constexpr int m_batch = get_mn_batch<load_t>(batch, m_dim, bM);
 #pragma unroll
           for (int n = 0; n < n_dim; n++) {
 #pragma unroll
@@ -591,7 +597,7 @@ namespace quda
               const int n_idx = n * n_stride + n_thread_offset;
               const int m_idx = (m * m_stride + m_thread_offset) * m_batch;
               if (m_idx < bM && n_idx < bN) {
-                if constexpr (SmemObj::ldm == 1) {
+                if constexpr (SmemObj::ldm == 1 && SmemObj::ldn % m_batch == 0) {
                   static_assert(SmemObj::ldm == 1, "SmemObj::ldm == 1");
                   load_t v_real[m_batch];
                   load_t v_imag[m_batch];
