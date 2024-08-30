@@ -206,6 +206,21 @@ namespace quda {
     virtual bool isCoarse() const { return false; }
 
     /**
+      @brief return if the operator is a Wilson-type 4-d operator
+     */
+    virtual bool isWilsonType() const = 0;
+
+    /**
+      @brief return if the operator is a staggered operator
+     */
+    virtual bool isStaggered() const = 0;
+
+    /**
+      @brief return if the operator is a domain wall operator, that is, 5-dimensional
+     */
+    virtual bool isDwf() const = 0;
+
+    /**
         @brief Check parity spinors are usable (check geometry ?)
     */
     virtual void checkParitySpinor(cvector_ref<const ColorSpinorField> &, cvector_ref<const ColorSpinorField> &) const;
@@ -488,6 +503,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_WILSON_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse Wilson operator.
@@ -531,6 +549,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_WILSONPC_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
   };
 
   // Full clover
@@ -563,6 +584,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -645,6 +669,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVERPC_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned clover
@@ -697,6 +724,9 @@ namespace quda {
     virtual void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse clover operator
@@ -748,6 +778,9 @@ namespace quda {
     void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned clover
@@ -802,6 +835,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // 5d Even-odd preconditioned domain wall
@@ -825,6 +861,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // Full domain wall, but with 4-d parity ordered fields
@@ -854,6 +893,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4D_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // 4d Even-odd preconditioned domain wall
@@ -880,6 +922,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // Full Mobius
@@ -928,6 +973,9 @@ namespace quda {
                                const QudaSolutionType solType) const;
 
       virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
+      virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // 4d even-odd preconditioned Mobius domain wall
@@ -977,6 +1025,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // Full Mobius EOFA
@@ -1013,6 +1064,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   // 4d Even-odd preconditioned Mobius domain wall with EOFA
@@ -1039,6 +1093,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return true; }
   };
 
   void gamma5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
@@ -1082,6 +1139,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASS_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     double Mu() const { return mu; }
 
@@ -1135,6 +1195,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASSPC_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned twisted-mass
@@ -1187,6 +1250,9 @@ namespace quda {
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVER_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     double Mu() const { return mu; }
 
@@ -1279,6 +1345,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVERPC_DIRAC; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned twisted-clover
@@ -1335,6 +1404,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return true; }
+    virtual bool isDwf() const { return false; }
 
     /**
        @brief Return the one-hop field for staggered operators for MG setup
@@ -1402,6 +1474,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return true; }
+    virtual bool isDwf() const { return false; }
 
     virtual bool hermitian() const { return true; }
 
@@ -1470,6 +1545,9 @@ public:
     virtual bool hasSpecialMG() const { return true; }
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return true; }
+    virtual bool isDwf() const { return false; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1544,6 +1622,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return true; }
+    virtual bool isDwf() const { return false; }
 
     /**
         @brief Return the one-hop field for staggered operators for MG setup
@@ -1644,6 +1725,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return true; }
+    virtual bool isDwf() const { return false; }
 
     virtual bool hermitian() const { return true; }
 
@@ -1711,6 +1795,9 @@ public:
     virtual bool hasSpecialMG() const { return true; }
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return true; }
+    virtual bool isDwf() const { return false; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1918,6 +2005,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *)
     {
@@ -2044,6 +2134,9 @@ public:
                              const QudaSolutionType solType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_COARSEPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned coarse
@@ -2103,6 +2196,9 @@ public:
     virtual bool hermitian() const { return true; }
 
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
   };
 
   /**
@@ -2127,6 +2223,9 @@ public:
     virtual bool hermitian() const { return true; }
 
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACEPC_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
   };
 
   /**
@@ -2164,6 +2263,9 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_COVDEV_DIRAC; }
+    virtual bool isWilsonType() const { return false; }
+    virtual bool isStaggered() const { return false; }
+    virtual bool isDwf() const { return false; }
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
@@ -2199,42 +2301,17 @@ public:
     /**
        @brief return if the operator is a Wilson-type 4-d operator
     */
-    bool isWilsonType() const
-    {
-      return (Type() == typeid(DiracWilson).name() || Type() == typeid(DiracWilsonPC).name()
-              || Type() == typeid(DiracClover).name() || Type() == typeid(DiracCloverPC).name()
-              || Type() == typeid(DiracCloverHasenbuschTwist).name()
-              || Type() == typeid(DiracCloverHasenbuschTwistPC).name() || Type() == typeid(DiracTwistedMass).name()
-              || Type() == typeid(DiracTwistedMassPC).name() || Type() == typeid(DiracTwistedClover).name()
-              || Type() == typeid(DiracTwistedCloverPC).name()) ?
-        true :
-        false;
-    }
+    bool isWilsonType() const { return dirac->isWilsonType(); }
 
     /**
        @brief return if the operator is a staggered operator
     */
-    bool isStaggered() const
-    {
-      return (Type() == typeid(DiracStaggeredPC).name() || Type() == typeid(DiracStaggered).name()
-              || Type() == typeid(DiracImprovedStaggeredPC).name() || Type() == typeid(DiracImprovedStaggered).name()
-              || Type() == typeid(DiracStaggeredKD).name() || Type() == typeid(DiracImprovedStaggeredKD).name()) ?
-        true :
-        false;
-    }
+    bool isStaggered() const { return dirac->isStaggered(); }
 
     /**
        @brief return if the operator is a domain wall operator, that is, 5-dimensional
     */
-    bool isDwf() const
-    {
-      return (Type() == typeid(DiracDomainWall).name() || Type() == typeid(DiracDomainWallPC).name()
-              || Type() == typeid(DiracDomainWall4D).name() || Type() == typeid(DiracDomainWall4DPC).name()
-              || Type() == typeid(DiracMobius).name() || Type() == typeid(DiracMobiusPC).name()
-              || Type() == typeid(DiracMobiusEofa).name() || Type() == typeid(DiracMobiusEofaPC).name()) ?
-        true :
-        false;
-    }
+    bool isDwf() const { return dirac->isDwf(); }
 
     /**
        @brief return if the operator is a coarse operator
