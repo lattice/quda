@@ -383,9 +383,9 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return matpcType; }
 
     /**
-       @brief  I have no idea what this does
+       @brief returns the number of stencil applications per dslash application; 1 for fused operators, generally 2 otherwise
     */
-    int getStencilSteps() const;
+    virtual int getStencilSteps() const = 0;
 
     /**
        @brief sets whether operator is daggered or not
@@ -502,6 +502,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_WILSON_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -548,6 +549,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_WILSONPC_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -583,6 +585,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -668,6 +671,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVERPC_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -723,6 +727,10 @@ namespace quda {
     virtual void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
     virtual void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
+    virtual int getStencilSteps() const {
+      // implemented as separate even, odd D_{eo} D_{oe}
+      return 2;
+    }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -777,6 +785,7 @@ namespace quda {
     // squared op
     void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -834,6 +843,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -860,6 +870,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -892,6 +903,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4D_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -921,6 +933,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -972,6 +985,7 @@ namespace quda {
       virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                                const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
       virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
       virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -1024,6 +1038,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -1063,6 +1078,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -1092,6 +1108,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -1138,6 +1155,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASS_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -1177,7 +1195,7 @@ namespace quda {
     DiracTwistedMassPC(const DiracParam &param, const int nDim);
 
     virtual ~DiracTwistedMassPC();
-    DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
+    DiracTwistedMassPC &operator=(const DiracTwistedMassPC &dirac);
 
     void TwistInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
@@ -1194,6 +1212,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASSPC_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -1232,7 +1251,7 @@ namespace quda {
     DiracTwistedClover(const DiracTwistedClover &dirac);
     DiracTwistedClover(const DiracParam &param, const int nDim);
     virtual ~DiracTwistedClover();
-    DiracTwistedClover& operator=(const DiracTwistedClover &dirac);
+    DiracTwistedClover &operator=(const DiracTwistedClover &dirac);
 
     void TwistClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
@@ -1249,6 +1268,7 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVER_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -1344,6 +1364,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVERPC_DIRAC; }
     virtual bool isWilsonType() const { return true; }
     virtual bool isStaggered() const { return false; }
@@ -1383,7 +1404,6 @@ public:
   class DiracStaggered : public Dirac {
 
   protected:
-
   public:
     DiracStaggered(const DiracParam &param);
     DiracStaggered(const DiracStaggered &dirac);
@@ -1403,6 +1423,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return true; }
@@ -1454,7 +1475,8 @@ public:
   };
 
   // Even-odd preconditioned staggered
-  class DiracStaggeredPC : public DiracStaggered {
+  class DiracStaggeredPC : public DiracStaggered
+  {
 
   protected:
 
@@ -1473,6 +1495,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return true; }
@@ -1544,6 +1567,7 @@ public:
 
     virtual bool hasSpecialMG() const { return true; }
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return true; }
@@ -1621,6 +1645,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return true; }
@@ -1724,6 +1749,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return true; }
@@ -1794,6 +1820,7 @@ public:
 
     virtual bool hasSpecialMG() const { return true; }
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return true; }
@@ -2004,6 +2031,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -2133,6 +2161,7 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_COARSEPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -2166,7 +2195,6 @@ public:
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
-
   /**
      @brief Full Gauge Laplace operator.  Although not a Dirac
      operator per se, it's a linear operator so it's conventient to
@@ -2195,6 +2223,7 @@ public:
                              const QudaSolutionType solType) const;
     virtual bool hermitian() const { return true; }
 
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -2222,6 +2251,7 @@ public:
                              const QudaSolutionType solType) const;
     virtual bool hermitian() const { return true; }
 
+    virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACEPC_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -2233,7 +2263,8 @@ public:
      operator per se, it's a linear operator so it's conventient to
      put in the Dirac operator abstraction.
   */
-  class GaugeCovDev : public Dirac {
+  class GaugeCovDev : public Dirac
+  {
 
   protected:
     int covdev_mu;
@@ -2262,6 +2293,8 @@ public:
                          const QudaSolutionType solType) const;
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const;
+
+    virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_COVDEV_DIRAC; }
     virtual bool isWilsonType() const { return false; }
     virtual bool isStaggered() const { return false; }
@@ -2273,7 +2306,8 @@ public:
   // and provides for several operator() operations to apply it, perhaps to apply
   // AXPYs etc. Once we have this, further classes diracM diracMdag etc
   // can implement the operator()-s as needed to apply the operator, MdagM etc etc.
-  class DiracMatrix {
+  class DiracMatrix
+  {
 
   protected:
     const Dirac *dirac;
