@@ -34,19 +34,19 @@ namespace quda
         }
       };
 
-      if (advancer(param.aux.x, 2)) {
+      if (advancer(param.aux.x, numFactors((k + block_atom_size - 1) / block_atom_size) - 1)) {
         return true;
       } else {
         param.aux.x = 0;
-        if (advancer(param.aux.y, numFactors(n / n_atom_size) - 1)) {
+        if (advancer(param.aux.y, numFactors((n + n_atom_size - 1) / n_atom_size) - 1)) {
           return true;
         } else {
           param.aux.y = 0;
-          if (advancer(param.aux.z, numFactors(m / m_atom_size) - 1)) {
+          if (advancer(param.aux.z, numFactors((m + m_atom_size - 1) / m_atom_size) - 1)) {
             return true;
           } else {
             param.aux.z = 0;
-            if (advancer(param.aux.w, numFactors(k / k_atom_size) - 1)) {
+            if (advancer(param.aux.w, numFactors((k + k_atom_size - 1) / k_atom_size) - 1)) {
               return true;
             } else {
               param.aux.w = 0;
@@ -109,7 +109,8 @@ namespace quda
 
     static constexpr int n_atom_size = mma_t::MMA_N;
     static constexpr int m_atom_size = mma_t::MMA_M;
-    static constexpr int k_atom_size = k / 2;
+    static constexpr int k_atom_size = mma_t::MMA_K;
+    static constexpr int block_atom_size = 32 / 8;
 
     long long flops() const
     {
@@ -133,7 +134,7 @@ namespace quda
       static_assert(k % k_atom_size == 0, "k modulo k_atom_size == 0");
 
       tp.block.x = 1;
-      tp.block.y = k / (1 << tp.aux.x);
+      tp.block.y = block_atom_size * get_int_factor_array((k + block_atom_size - 1) / block_atom_size)[tp.aux.x];
       tp.block.z = 8;
 
       int bN = n_atom_size * get_int_factor_array((n + n_atom_size - 1) / n_atom_size)[tp.aux.y];
@@ -212,16 +213,26 @@ namespace quda
       }
     }
 
+    template <size_t d, size_t... Ds>
+    void launch_mma_span_block(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>)
+    {
+      if (tp.aux.x == d) {
+        constexpr IntFactorArray<(k + block_atom_size - 1) / block_atom_size> block_factors;
+        std::make_index_sequence<IntFactorArray<(n + n_atom_size - 1) / n_atom_size>().size()> n_indices;
+        launch_mma_span_n<block_factors[d] * block_atom_size, 8>(tp, stream, n_indices);
+      } else {
+        if constexpr (sizeof...(Ds) > 0) {
+          launch_mma_span_block(tp, stream, std::index_sequence<Ds...>());
+        } else {
+          errorQuda("Invalid tp.aux.x.");
+        }
+      }
+    }
+
     void launch_mma(TuneParam &tp, const qudaStream_t &stream)
     {
-      std::make_index_sequence<IntFactorArray<(n + n_atom_size - 1) / n_atom_size>().size()> n_indices;
-
-      switch (tp.aux.x) {
-      case 0: launch_mma_span_n<k / 1, 8>(tp, stream, n_indices); break;
-      case 1: launch_mma_span_n<k / 2, 8>(tp, stream, n_indices); break;
-      case 2: launch_mma_span_n<k / 4, 8>(tp, stream, n_indices); break;
-      default: errorQuda("tp.aux.x = %d not supported", tp.aux.x);
-      }
+      std::make_index_sequence<IntFactorArray<(k + block_atom_size - 1) / block_atom_size>().size()> block_indices;
+      launch_mma_span_block(tp, stream, block_indices);
     }
 
     void apply(const qudaStream_t &stream)
