@@ -18,7 +18,7 @@ namespace quda
   template <> struct vector_load_impl<true> {
     template <typename T> __device__ inline void operator()(T &value, const void *ptr, int idx)
     {
-      value = reinterpret_cast<const T *>(ptr)[idx];
+      memcpy(&value, reinterpret_cast<const T *>(ptr) + idx, sizeof(T));
     }
 
     __device__ inline void operator()(short8 &value, const void *ptr, int idx)
@@ -43,22 +43,22 @@ namespace quda
   template <> struct vector_store_impl<true> {
     template <typename T> __device__ inline void operator()(void *ptr, int idx, const T &value)
     {
-      reinterpret_cast<T *>(ptr)[idx] = value;
+      memcpy(reinterpret_cast<T *>(ptr) + idx, &value, sizeof(T));
     }
 
     __device__ inline void operator()(void *ptr, int idx, const short8 &value)
     {
-      this->operator()(ptr, idx, *reinterpret_cast<const float4 *>(&value));
+      memcpy(reinterpret_cast<float4 *>(ptr) + idx, &value, sizeof(float4));
     }
 
     __device__ inline void operator()(void *ptr, int idx, const char8 &value)
     {
-      this->operator()(ptr, idx, *reinterpret_cast<const float2 *>(&value));
+      memcpy(reinterpret_cast<float2 *>(ptr) + idx, &value, sizeof(float2));
     }
 
     __device__ inline void operator()(void *ptr, int idx, const char4 &value)
     {
-      this->operator()(ptr, idx, *reinterpret_cast<const short2 *>(&value)); // A char4 is the same as a short2
+      memcpy(reinterpret_cast<short2 *>(ptr) + idx, &value, sizeof(short2));
     }
   };
 
