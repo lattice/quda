@@ -506,9 +506,10 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_WILSON_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    // neither isWilsonType nor isDwf are final because DiracDomainWall inherits from DiracWilson
+    virtual bool isWilsonType() const override { return true; }
+    virtual bool isDwf() const override { return false; }
+    bool isStaggered() const final { return false; }
 
     /**
      * @brief Create the coarse Wilson operator.
@@ -553,9 +554,8 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_WILSONPC_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return DiracWilson::isWilsonType(); }
+    bool isDwf() const final { return DiracWilson::isDwf(); }
   };
 
   // Full clover
@@ -589,9 +589,8 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return DiracWilson::isWilsonType(); }
+    bool isDwf() const final { return DiracWilson::isDwf(); }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -675,9 +674,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVERPC_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned clover
@@ -735,9 +731,6 @@ namespace quda {
       return 2;
     }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse clover operator
@@ -790,9 +783,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned clover
@@ -848,9 +838,8 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
+    bool isWilsonType() const final { return false; }
+    bool isDwf() const final { return true; }
   };
 
   // 5d Even-odd preconditioned domain wall
@@ -875,9 +864,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALLPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
   };
 
   // Full domain wall, but with 4-d parity ordered fields
@@ -908,9 +894,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4D_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
   };
 
   // 4d Even-odd preconditioned domain wall
@@ -938,9 +921,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
   };
 
   // Full Mobius
@@ -990,9 +970,6 @@ namespace quda {
 
       virtual int getStencilSteps() const { return 1; }
       virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
-      virtual bool isWilsonType() const { return false; }
-      virtual bool isStaggered() const { return false; }
-      virtual bool isDwf() const { return true; }
   };
 
   // 4d even-odd preconditioned Mobius domain wall
@@ -1043,9 +1020,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
   };
 
   // Full Mobius EOFA
@@ -1083,9 +1057,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
   };
 
   // 4d Even-odd preconditioned Mobius domain wall with EOFA
@@ -1113,9 +1084,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return true; }
   };
 
   void gamma5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
@@ -1160,9 +1128,8 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASS_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return DiracWilson::isWilsonType(); }
+    bool isDwf() const final { return DiracWilson::isDwf(); }
 
     double Mu() const { return mu; }
 
@@ -1217,9 +1184,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASSPC_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned twisted-mass
@@ -1273,9 +1237,6 @@ namespace quda {
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVER_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     double Mu() const { return mu; }
 
@@ -1369,9 +1330,6 @@ public:
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVERPC_DIRAC; }
-    virtual bool isWilsonType() const { return true; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned twisted-clover
@@ -1429,9 +1387,9 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return true; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return false; }
+    bool isStaggered() const final { return true; }
+    bool isDwf() const final { return false; }
 
     /**
        @brief Return the one-hop field for staggered operators for MG setup
@@ -1501,9 +1459,6 @@ public:
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return true; }
-    virtual bool isDwf() const { return false; }
 
     virtual bool hermitian() const { return true; }
 
@@ -1573,9 +1528,6 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDKD_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return true; }
-    virtual bool isDwf() const { return false; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1651,9 +1603,9 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return true; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return false; }
+    bool isStaggered() const final { return true; }
+    bool isDwf() const final { return false; }
 
     /**
         @brief Return the one-hop field for staggered operators for MG setup
@@ -1755,9 +1707,6 @@ public:
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return true; }
-    virtual bool isDwf() const { return false; }
 
     virtual bool hermitian() const { return true; }
 
@@ -1826,9 +1775,6 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADKD_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return true; }
-    virtual bool isDwf() const { return false; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -2037,9 +1983,9 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return false; }
+    bool isStaggered() const final { return false; }
+    bool isDwf() const final { return false; }
 
     virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *)
     {
@@ -2167,9 +2113,6 @@ public:
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_COARSEPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
 
     /**
      * @brief Create the coarse even-odd preconditioned coarse
@@ -2229,9 +2172,9 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return false; }
+    bool isStaggered() const final { return false; }
+    bool isDwf() const final { return false; }
   };
 
   /**
@@ -2257,9 +2200,6 @@ public:
 
     virtual int getStencilSteps() const { return 2; }
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACEPC_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
   };
 
   /**
@@ -2300,9 +2240,9 @@ public:
 
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_COVDEV_DIRAC; }
-    virtual bool isWilsonType() const { return false; }
-    virtual bool isStaggered() const { return false; }
-    virtual bool isDwf() const { return false; }
+    bool isWilsonType() const final { return false; }
+    bool isStaggered() const final { return false; }
+    bool isDwf() const final { return false; }
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
