@@ -116,7 +116,7 @@ public:
 
 TEST_P(DslashTest, verify)
 {
-  dslash_test_wrapper.dslashRef();
+  if (not dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.dslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();
@@ -211,7 +211,7 @@ INSTANTIATE_TEST_SUITE_P(Regular, DslashTest,
                                  Range(0, N_PARTITIONS), ::testing::Values(0), ::testing::Values(0)),
                          getdslashtestname);
 
-#ifdef GPU_DD_DIRAC
+#if QUDA_DOMAIN_DECOMPOSITION > 0
 #define N_DD_TESTS 3
 
 // DD tests

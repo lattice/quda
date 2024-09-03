@@ -110,14 +110,11 @@
 #define GPU_LAPLACE
 #endif
 
-#cmakedefine QUDA_DIRAC_DOMAIN_DECOMPOSITION
-#ifdef QUDA_DIRAC_DOMAIN_DECOMPOSITION
 /**
- * @def   GPU_DD_DIRAC
- * @brief This macro is set when we have Domain Decomposition (DD)-aware Dirac operator enabled
+ * @def   QUDA_DOMAIN_DECOMPOSITION
+ * @brief This macro sets the type of Domain Decomposition (DD)-aware Dirac operator enabled
  */
-#define GPU_DD_DIRAC
-#endif
+#define QUDA_DOMAIN_DECOMPOSITION @QUDA_DOMAIN_DECOMPOSITION@
 
 #cmakedefine QUDA_DIRAC_DISTANCE_PRECONDITIONING
 #ifdef QUDA_DIRAC_DISTANCE_PRECONDITIONING

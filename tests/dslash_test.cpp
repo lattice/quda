@@ -69,7 +69,7 @@ TEST_F(DslashTest, verify)
 {
   if (!verify_results) GTEST_SKIP();
 
-  dslash_test_wrapper.dslashRef();
+  if (not dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.dslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();

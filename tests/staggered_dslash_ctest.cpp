@@ -203,7 +203,7 @@ std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<i
 #define N_PARTITIONS 1
 #endif
 
-#ifdef GPU_DD_DIRAC
+#if QUDA_DOMAIN_DECOMPOSITION > 0
 #define N_DD_TESTS 3
 #define N_DD_COLS 4
 #else
