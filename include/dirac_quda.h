@@ -822,7 +822,8 @@ namespace quda {
     virtual ~DiracDomainWall();
     DiracDomainWall& operator=(const DiracDomainWall &dirac);
 
-    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const override;
+    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                QudaParity parity) const override;
 
     void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
                     cvector_ref<const ColorSpinorField> &x, double k) const override;
@@ -876,7 +877,8 @@ namespace quda {
     virtual ~DiracDomainWall4D();
     DiracDomainWall4D &operator=(const DiracDomainWall4D &dirac);
 
-    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const override;
+    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 QudaParity parity) const override;
     void Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
     void Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
                      cvector_ref<const ColorSpinorField> &x, double k) const;
@@ -948,25 +950,26 @@ namespace quda {
     // virtual ~DiracMobius();
     // DiracMobius& operator=(const DiracMobius &dirac);
 
-    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const override;
+    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 QudaParity parity) const override;
     void Dslash4pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
     void Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     void Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
-                      cvector_ref<const ColorSpinorField> &x, double k) const;
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
     void Dslash4preXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                         cvector_ref<const ColorSpinorField> &x, double k) const;
     void Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                      cvector_ref<const ColorSpinorField> &x, double k) const;
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
 
     virtual void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
     virtual void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
 
     virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
-                          cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
-                          const QudaSolutionType solType) const override;
+                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                         const QudaSolutionType solType) const override;
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
-                              const QudaSolutionType solType) const override;
+                             const QudaSolutionType solType) const override;
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
@@ -2078,7 +2081,8 @@ public:
        @param[in] in Input field
        @param[parity] parity Parity which we are applying the operator to
      */
-    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const override;
+    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                QudaParity parity) const override;
 
     /**
        @brief Apply preconditioned DslashXpay out = (x + k * D * in)
@@ -2323,10 +2327,7 @@ public:
         if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
-    int getStencilSteps() const override
-    {
-      return dirac->getStencilSteps();
-    }
+    int getStencilSteps() const override { return dirac->getStencilSteps(); }
   };
 
   /* Gloms onto a DiracOp and provides an operator() which applies its MdagM */
@@ -2427,10 +2428,7 @@ public:
         if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
-    int getStencilSteps() const override
-    {
-      return dirac->getStencilSteps();
-    }
+    int getStencilSteps() const override { return dirac->getStencilSteps(); }
   };
 
   /* Gloms onto a dirac matrix and gives back the dagger of whatever that was originally.
@@ -2456,10 +2454,7 @@ public:
       dirac->flipDagger();
     }
 
-    int getStencilSteps() const override
-    {
-      return mat.getStencilSteps();
-    }
+    int getStencilSteps() const override { return mat.getStencilSteps(); }
   };
 
   /**
