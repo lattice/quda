@@ -25,7 +25,7 @@ namespace quda
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       alpha.resize(b.size());

@@ -140,7 +140,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
       ColorSpinorParam csParam(x[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;

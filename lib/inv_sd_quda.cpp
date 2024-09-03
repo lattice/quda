@@ -15,7 +15,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       resize(r, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
       resize(Ar, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
       init = true;
