@@ -383,7 +383,9 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return matpcType; }
 
     /**
-       @brief returns the number of stencil applications per dslash application; 1 for fused operators, generally 2 otherwise
+       @brief returns the number of stencil applications per dslash application; 1 for operators with
+              a single hopping term (generally full operators), 2 for composite operators
+              that consist of two hopping terms (generally PC operators)
     */
     virtual int getStencilSteps() const = 0;
 
@@ -1402,7 +1404,8 @@ public:
   };
 
   // Full staggered
-  class DiracStaggered : public Dirac {
+  class DiracStaggered : public Dirac
+  {
 
   protected:
   public:
