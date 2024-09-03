@@ -43,6 +43,9 @@ namespace quda
     WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double alpha0, int t0,
                 int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
+#ifdef SIGNATURE_ONLY
+      ;
+#else
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
@@ -51,6 +54,7 @@ namespace quda
       Wilson<decltype(arg)> wilson(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }
+#endif
   };
 
 } // namespace quda

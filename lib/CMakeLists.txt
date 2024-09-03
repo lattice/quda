@@ -186,6 +186,75 @@ configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
 configure_file(dslash_coarse_mma.in.hpp dslash_coarse_mma.hpp @ONLY)
 configure_file(block_transpose.in.cu block_transpose.cu @ONLY)
 
+# Function to check if a specific bit is set
+function(check_bit number bit)
+  # Perform bitwise AND with (1 << bit) to check if the bit is set
+  math(EXPR result "${number} & (1 << ${bit})")
+  set(BIT_CHECK "${result}" PARENT_SCOPE)
+endfunction()
+
+set(QUDA_DSLASH_PREC_LIST "")
+set(QUDA_DSLASH_NCOLOR_LIST "3")
+set(QUDA_DSLASH_DDARG_LIST "DDNo")
+set(QUDA_DSLASH_RECONI_LIST "")
+
+check_bit(${QUDA_PRECISION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "QUARTER")
+endif()
+
+check_bit(${QUDA_PRECISION} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "HALF")
+endif()
+
+check_bit(${QUDA_PRECISION} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "SINGLE")
+endif()
+
+check_bit(${QUDA_PRECISION} 3)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "DOUBLE")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "2")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "1")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "0")
+endif()
+
+check_bit(${QUDA_DOMAIN_DECOMPOSITION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_DDARG_LIST "DDRedBlack")
+endif()
+
+message(STATUS "QUDA_DSLASH_PREC_LIST=${QUDA_DSLASH_PREC_LIST}")
+message(STATUS "QUDA_DSLASH_NCOLOR_LIST=${QUDA_DSLASH_NCOLOR_LIST}")
+message(STATUS "QUDA_DSLASH_DDARG_LIST=${QUDA_DSLASH_DDARG_LIST}")
+message(STATUS "QUDA_DSLASH_RECONI_LIST=${QUDA_DSLASH_RECONI_LIST}")
+
+foreach(QUDA_DSLASH_PREC ${QUDA_DSLASH_PREC_LIST})
+  foreach(QUDA_DSLASH_NCOLOR ${QUDA_DSLASH_NCOLOR_LIST})
+    foreach(QUDA_DSLASH_DDARG ${QUDA_DSLASH_DDARG_LIST})
+      foreach(QUDA_DSLASH_RECONI ${QUDA_DSLASH_RECONI_LIST})
+        configure_file(dslash_wilson.in.cu "dslash_wilson_${QUDA_DSLASH_PREC}_${QUDA_DSLASH_NCOLOR}_${QUDA_DSLASH_DDARG}_${QUDA_DSLASH_RECONI}.cu" @ONLY)
+        list(PREPEND QUDA_CU_OBJS "dslash_wilson_${QUDA_DSLASH_PREC}_${QUDA_DSLASH_NCOLOR}_${QUDA_DSLASH_DDARG}_${QUDA_DSLASH_RECONI}.cu")
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
+
+
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
