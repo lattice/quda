@@ -507,8 +507,8 @@ namespace quda {
     virtual int getStencilSteps() const { return 1; }
     virtual QudaDiracType getDiracType() const { return QUDA_WILSON_DIRAC; }
     // neither isWilsonType nor isDwf are final because DiracDomainWall inherits from DiracWilson
-    virtual bool isWilsonType() const override { return true; }
-    virtual bool isDwf() const override { return false; }
+    virtual bool isWilsonType() const { return true; }
+    virtual bool isDwf() const { return false; }
     bool isStaggered() const final { return false; }
 
     /**
