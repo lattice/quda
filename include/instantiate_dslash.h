@@ -56,10 +56,11 @@ namespace quda
   {
     if (out.DD().type == QUDA_DD_NO and in.DD().type == QUDA_DD_NO) {
       instantiate<Apply, Recon, Float, 3, DDNo>(out, in, x, U, args...);
-#ifdef GPU_DD_DIRAC
     } else if (out.DD().type == QUDA_DD_RED_BLACK or in.DD().type == QUDA_DD_RED_BLACK) {
-      instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, x, U, args...);
-#endif
+      if constexpr (is_enabled(QUDA_DD_RED_BLACK))
+        instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, x, U, args...);
+      else
+        errorQuda("QUDA_DOMAIN_DECOMPOSITION=%d does not enable RedBlack", QUDA_DOMAIN_DECOMPOSITION);
     } else {
       errorQuda("Unsupported DD type %d\n", out.DD().type);
     }
