@@ -491,6 +491,17 @@ namespace quda
     vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) { }
 
     /**
+       Constructor from pair of iterators
+       @param[in] first Begin iterator
+       @param[in] last End iterator
+     */
+    template <class U, std::enable_if_t<is_iterator_v<U>> * = nullptr> vector(U first, U last)
+    {
+      std::vector<T>::reserve(last - first);
+      for (auto it = first; it != last; it++) std::vector<T>::push_back(*it);
+    }
+
+    /**
        @brief Constructor using std::vector initialization
        @param[in] u Vector we are copying from
     */
