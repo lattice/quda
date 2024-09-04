@@ -217,7 +217,7 @@ namespace quda
     void launch_mma_span_block(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>)
     {
       if (tp.aux.x == d) {
-        constexpr IntFactorArray<(k + block_atom_size - 1) / block_atom_size> block_factors;
+        constexpr IntFactorArray<(block_limit + block_atom_size - 1) / block_atom_size> block_factors;
         std::make_index_sequence<IntFactorArray<(n + n_atom_size - 1) / n_atom_size>().size()> n_indices;
         launch_mma_span_n<block_factors[d] * block_atom_size, 8>(tp, stream, n_indices);
       } else {
@@ -286,13 +286,17 @@ namespace quda
             RestrictMma<store_t, store_t, 4, fineColor, coarseColor, nVec, aggregate_size>(
               out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
           } else if (in.Precision() == QUDA_HALF_PRECISION) {
-            // if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-            //   RestrictMma<store_t, short, 4, fineColor, coarseColor, nVec, aggregate_size>(out, in, v,
-            //   fine_to_coarse, coarse_to_fine, spin_map,
-            //                                                       parity);
-            // } else {
-            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-            // }
+#if 0
+            if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
+              RestrictMma<store_t, short, 4, fineColor, coarseColor, nVec, aggregate_size>(out, in, v,
+              fine_to_coarse, coarse_to_fine, spin_map,
+                                                                  parity);
+            } else {
+#endif
+              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#if 0
+            }
+#endif
           } else {
             errorQuda("Unsupported precision %d", in.Precision());
           }
@@ -337,9 +341,20 @@ namespace quda
   {
     int aggregate_size = in.Volume() / out.Volume();
     if (aggregate_size == 128) {
-      RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
-                                                              parity);
-    } else {
+      if constexpr (fineColor == 3 && coarseColor == 24) {
+        RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                                parity);
+      } else {
+        errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
+      }
+    } else if (aggregate_size == 16) {
+      if constexpr (fineColor == 24 && coarseColor == 32) {
+        RestrictMma<store_t, fineColor, coarseColor, nVec, 16>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                               parity);
+      } else {
+        errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
+      }
+    } else{
       errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
     }
   }

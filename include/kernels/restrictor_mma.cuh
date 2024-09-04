@@ -82,7 +82,8 @@ namespace quda
 
   template <int contiguous_dim, bool dagger, class smem_obj_t, class gmem_obj_t, class Arg>
   inline void __device__ load_g2s(smem_obj_t &smem_real, smem_obj_t &smem_imag, const gmem_obj_t &gmem, int x_coarse,
-                                  int coarse_spin, int contiguous_dim_offset, int aggregate_k_offset, const Arg &arg)
+                                  int coarse_spin, int contiguous_dim_offset, int aggregate_k_offset,
+                                  int *coarse_to_fine, const Arg &arg)
   { // v as a
     constexpr int elements_per_thread = 16 / (sizeof(typename gmem_obj_t::store_type) * 2);
     static_assert(contiguous_dim % elements_per_thread == 0, "contiguous_dim %% elements_per_thread == 0");
@@ -104,8 +105,7 @@ namespace quda
 
       // look-up map is ordered as (coarse-block-id + fine-point-id),
       // with fine-point-id parity ordered
-      const int x_fine_site_id = (x_coarse * 2 + parity) * arg.aggregate_size_cb + x_fine_cb_offset;
-      const int x_fine = arg.coarse_to_fine[x_fine_site_id];
+      const int x_fine = coarse_to_fine[parity * arg.aggregate_size_cb + x_fine_cb_offset];
       const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
 
       const int v_parity = (gmem.Nparity() == 2) ? parity : 0;
@@ -161,6 +161,14 @@ namespace quda
     static_assert(N % Arg::bN == 0, "N %% Arg::bN != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
+    __shared__ int coarse_to_fine[Arg::aggregate_size];
+    int index = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
+    while (index < Arg::aggregate_size) {
+      coarse_to_fine[index] = arg.coarse_to_fine[x_coarse * 2 * arg.aggregate_size_cb + index];
+      index += Arg::block_y * Arg::block_z;
+    }
+    __syncthreads();
+
     extern __shared__ typename mma_t::compute_t smem_ptr[];
 
     typename Config::SmemObjA smem_obj_a_real(smem_ptr);
@@ -181,11 +189,11 @@ namespace quda
 
       constexpr bool a_dagger = true;
       load_g2s<Arg::bM, a_dagger>(smem_obj_a_real, smem_obj_a_imag, arg.in, x_coarse, coarse_spin, m_offset,
-                                  aggregate_k_offset, arg);
+                                  aggregate_k_offset, coarse_to_fine, arg);
 
       constexpr bool b_dagger = false;
       load_g2s<Arg::bN, b_dagger>(smem_obj_b_real, smem_obj_b_imag, arg.v, x_coarse, coarse_spin, n_offset,
-                                  aggregate_k_offset, arg);
+                                  aggregate_k_offset, coarse_to_fine, arg);
 
       __syncthreads();
       accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
