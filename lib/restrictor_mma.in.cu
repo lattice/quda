@@ -4,6 +4,7 @@
 #include <tunable_block_reduction.h>
 #include <kernels/restrictor_mma.cuh>
 #include <device.hpp>
+#include <int_factor_array.hpp>
 
 namespace quda
 {
@@ -23,7 +24,39 @@ namespace quda
 
     unsigned int sharedBytesPerThread() const { return 0; }
 
-    bool advanceTuneParam(TuneParam &) const { return false; }
+    bool advanceTuneParam(TuneParam &param) const
+    {
+      auto advancer = [&](int &i, int limit) -> bool {
+        if (i < limit) {
+          i++;
+          return set_mma_param(param);
+        } else {
+          return false;
+        }
+      };
+
+      if (advancer(param.aux.x, numFactors((block_limit + block_atom_size - 1) / block_atom_size) - 1)) {
+        return true;
+      } else {
+        param.aux.x = 0;
+        if (advancer(param.aux.y, numFactors((n + n_atom_size - 1) / n_atom_size) - 1)) {
+          return true;
+        } else {
+          param.aux.y = 0;
+          if (advancer(param.aux.z, numFactors((m + m_atom_size - 1) / m_atom_size) - 1)) {
+            return true;
+          } else {
+            param.aux.z = 0;
+            if (advancer(param.aux.w, numFactors((k + k_atom_size - 1) / k_atom_size) - 1)) {
+              return true;
+            } else {
+              param.aux.w = 0;
+              return false;
+            }
+          }
+        }
+      }
+    }
 
     void initTuneParam(TuneParam &param) const
     {
@@ -61,6 +94,8 @@ namespace quda
       strcat(aux, out.AuxString().c_str());
       setRHSstring(aux, in.Nvec());
 
+      strcat(aux, mma_t::get_type_name().c_str());
+
       apply(device::get_default_stream());
     }
 
@@ -77,6 +112,7 @@ namespace quda
     static constexpr int m_atom_size = mma_t::MMA_M;
     static constexpr int k_atom_size = fineColor * spin_block_factor * 4;
     static constexpr int block_atom_size = 32 / 8;
+    static constexpr int block_limit = 32;
 
     long long flops() const { return nVec * 8 * fineSpin * fineColor * coarseColor * in.SiteSubset() * in.VolumeCB(); }
 
@@ -93,30 +129,31 @@ namespace quda
 
     bool set_mma_param(TuneParam &tp) const
     {
+      static_assert(m % m_atom_size == 0, "m modulo m_atom_size == 0");
+      static_assert(n % n_atom_size == 0, "n modulo n_atom_size == 0");
+      static_assert(k % k_atom_size == 0, "k modulo k_atom_size == 0");
+
       tp.block.x = 1;
-      tp.block.y = 16;
+      tp.block.y
+        = block_atom_size * get_int_factor_array((block_limit + block_atom_size - 1) / block_atom_size)[tp.aux.x];
       tp.block.z = 8;
 
-      int bN = n; // n_atom_size;
-      int bM = m;
+      int bN = n_atom_size * get_int_factor_array((n + n_atom_size - 1) / n_atom_size)[tp.aux.y];
+      int bM = m_atom_size * get_int_factor_array((m + m_atom_size - 1) / m_atom_size)[tp.aux.z];
 
       tp.grid = dim3(out.Volume() * coarseSpin, (m + bM - 1) / bM, (n + bN - 1) / bN);
       tp.set_max_shared_bytes = true;
 
-      int bK = k_atom_size;
+      int bK = k_atom_size * get_int_factor_array(k / k_atom_size)[tp.aux.w];
       int shared_bytes = shared_bytes_per_block(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
       return shared_bytes <= device::maximum_dynamic_shared_memory();
     }
 
+    template <int bN, int bM, int bK, int block_y, int block_z>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream)
     {
-      constexpr int bN = n; // n_atom_size;
-      constexpr int bM = m;
-      constexpr int bK = k_atom_size;
-      constexpr int block_y = 16;
-      constexpr int block_z = 8;
       constexpr int shared_bytes = shared_bytes_per_block(bM, bN, bK);
       if constexpr (shared_bytes <= device::maximum_dynamic_shared_memory()) {
         using Arg = RestrictMmaArg<mma_t, out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec,
@@ -127,6 +164,75 @@ namespace quda
       } else {
         errorQuda("Using too many shared memory bytes per block: %d", shared_bytes);
       }
+    }
+
+    template <int bN, int bM, int block_y, int block_z, size_t d, size_t... Ds>
+    void launch_mma_span_k(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>)
+    {
+      if (tp.aux.w == d) {
+        constexpr IntFactorArray<k / k_atom_size> k_factors;
+        launch_mma<bN, bM, k_factors[d] * k_atom_size, block_y, block_z>(tp, stream);
+      } else {
+        if constexpr (sizeof...(Ds) > 0) {
+          launch_mma_span_k<bN, bM, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+        } else {
+          errorQuda("Invalid tp.aux.z.");
+        }
+      }
+    }
+
+    template <int bN, int block_y, int block_z, size_t d, size_t... Ds>
+    void launch_mma_span_m(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>)
+    {
+      if (tp.aux.z == d) {
+        constexpr IntFactorArray<(m + m_atom_size - 1) / m_atom_size> m_factors;
+        std::make_index_sequence<IntFactorArray<k / k_atom_size>().size()> k_indices;
+        launch_mma_span_k<bN, m_factors[d] * m_atom_size, block_y, block_z>(tp, stream, k_indices);
+      } else {
+        if constexpr (sizeof...(Ds) > 0) {
+          launch_mma_span_m<bN, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+        } else {
+          errorQuda("Invalid tp.aux.z.");
+        }
+      }
+    }
+
+    template <int block_y, int block_z, size_t d, size_t... Ds>
+    void launch_mma_span_n(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>)
+    {
+      if (tp.aux.y == d) {
+        constexpr IntFactorArray<(n + n_atom_size - 1) / n_atom_size> n_factors;
+        std::make_index_sequence<IntFactorArray<(m + m_atom_size - 1) / m_atom_size>().size()> m_indices;
+        launch_mma_span_m<n_factors[d] * n_atom_size, block_y, block_z>(tp, stream, m_indices);
+      } else {
+        if constexpr (sizeof...(Ds) > 0) {
+          launch_mma_span_n<block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+        } else {
+          errorQuda("Invalid tp.aux.y.");
+        }
+      }
+    }
+
+    template <size_t d, size_t... Ds>
+    void launch_mma_span_block(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>)
+    {
+      if (tp.aux.x == d) {
+        constexpr IntFactorArray<(k + block_atom_size - 1) / block_atom_size> block_factors;
+        std::make_index_sequence<IntFactorArray<(n + n_atom_size - 1) / n_atom_size>().size()> n_indices;
+        launch_mma_span_n<block_factors[d] * block_atom_size, 8>(tp, stream, n_indices);
+      } else {
+        if constexpr (sizeof...(Ds) > 0) {
+          launch_mma_span_block(tp, stream, std::index_sequence<Ds...>());
+        } else {
+          errorQuda("Invalid tp.aux.x.");
+        }
+      }
+    }
+
+    void launch_mma(TuneParam &tp, const qudaStream_t &stream)
+    {
+      std::make_index_sequence<IntFactorArray<(block_limit + block_atom_size - 1) / block_atom_size>().size()> block_indices;
+      launch_mma_span_block(tp, stream, block_indices);
     }
 
     void apply(const qudaStream_t &stream)
@@ -227,19 +333,21 @@ namespace quda
 
   template <typename store_t, int fineColor, int coarseColor, int nVec>
   void RestrictMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
+                   const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
     int aggregate_size = in.Volume() / out.Volume();
     if (aggregate_size == 128) {
-      RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                              parity);
     } else {
       errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
     }
   }
 
   template <>
-  void RestrictMma<fineColor, coarseColor, nVec>(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                                        const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
+  void RestrictMma<fineColor, coarseColor, nVec>(ColorSpinorField &out, const ColorSpinorField &in,
+                                                 const ColorSpinorField &v, const int *fine_to_coarse,
+                                                 const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
     if constexpr (is_enabled_multigrid()) {
 
@@ -250,7 +358,8 @@ namespace quda
       if (precision == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())
           RestrictMma<double, fineColor, coarseColor, nVec>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-        else errorQuda("Double precision multigrid has not been enabled");
+        else
+          errorQuda("Double precision multigrid has not been enabled");
       } else if (precision == QUDA_SINGLE_PRECISION) {
         RestrictMma<float, fineColor, coarseColor, nVec>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
       } else {
