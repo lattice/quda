@@ -346,6 +346,10 @@ namespace quda {
   void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                 const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
+  template <int coarseColor, int fineColor, int nVec>
+  void RestrictMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                   const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+
   /**
      @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning
      @param[out] out Resulting fine grid field

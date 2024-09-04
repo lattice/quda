@@ -32,7 +32,7 @@ namespace quda
     return ColorSpinorField(param);
   }
 
-  auto create_color_spinor_copy(const ColorSpinorField &f, QudaFieldOrder order)
+  static auto create_color_spinor_copy(const ColorSpinorField &f, QudaFieldOrder order)
   {
     ColorSpinorParam param(f);
     param.create = QUDA_NULL_FIELD_CREATE;

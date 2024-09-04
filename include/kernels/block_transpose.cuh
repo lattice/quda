@@ -126,6 +126,10 @@ namespace quda
           int x_ = thread_idx / arg.block_y;
           if (x_ + x_offset < arg.volume_cb && v_ + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor = cache.load(x_, v_);
+            if constexpr (Arg::nSpin == 4 && Arg::from_to_non_rel) {
+              color_spinor.toRel();
+              color_spinor *= rsqrt(static_cast<typename Arg::real>(2.0));
+            }
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
               arg.V(parity, x_ + x_offset, spin, color, v_ + v_offset) = color_spinor(spin, 0);

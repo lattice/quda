@@ -858,6 +858,8 @@ namespace quda
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
 
+      using store_type = storeFloat;
+
       field<Float, storeFloat, fixed, block_float> v;
       unsigned int volumeCB = 0;
 
