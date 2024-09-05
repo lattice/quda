@@ -201,9 +201,9 @@ namespace quda {
     }
 
     /**
-      @brief static function that returns if a Dirac type is staggered-type depending on a QudaDiracType
-     */
-    static bool is_staggered(QudaDiracType);
+      @brief Whether the Dirac object is the DiracCoarse.
+    */
+    virtual bool isCoarse() const { return false; }
 
     /**
       @brief static function that returns if a Dirac type is staggered-type depending on a QudaDiracType
@@ -211,14 +211,9 @@ namespace quda {
     static bool is_wilson_type(QudaDiracType);
 
     /**
-      @brief static function that returns if a Dirac type is a domain wall operator (5-dimensional) depending on a QudaDiracType
+      @brief static function that returns if a Dslash type is staggered-type depending on a QudaDslashType
      */
-    static bool is_dwf(QudaDiracType);
-
-    /**
-      @brief Whether the Dirac object is the DiracCoarse.
-    */
-    virtual bool isCoarse() const { return false; }
+    static bool is_wilson_type(QudaDslashType);
 
     /**
       @brief return if the operator is a Wilson-type 4-d operator
@@ -226,14 +221,34 @@ namespace quda {
     bool isWilsonType() const { return Dirac::is_wilson_type(getDiracType()); }
 
     /**
+      @brief static function that returns if a Dirac type is staggered-type depending on a QudaDiracType
+     */
+    static bool is_staggered_type(QudaDiracType);
+
+    /**
+      @brief static function that returns if a Dslash type is staggered-type depending on a QudaDslashType
+     */
+    static bool is_staggered_type(QudaDslashType);
+
+    /**
       @brief return if the operator is a staggered operator
      */
-    virtual bool isStaggered() const { return Dirac::is_staggered(getDiracType()); }
+    bool isStaggered() const { return Dirac::is_staggered_type(getDiracType()); }
+
+    /**
+      @brief static function that returns if a Dirac type is a domain wall operator (5-dimensional) depending on a QudaDiracType
+     */
+    static bool is_dwf(QudaDiracType);
+
+    /**
+      @brief static function that returns if a Dslash type is a domain wall operator (5-dimensional) depending on a QudaDslashType
+     */
+    static bool is_dwf(QudaDslashType);
 
     /**
       @brief return if the operator is a domain wall operator, that is, 5-dimensional
      */
-    virtual bool isDwf() const { return Dirac::is_dwf(getDiracType()); }
+    bool isDwf() const { return Dirac::is_dwf(getDiracType()); }
 
     /**
         @brief Check parity spinors are usable (check geometry ?)
@@ -424,6 +439,17 @@ namespace quda {
         @return Dirac type
      */
     virtual QudaDiracType getDiracType() const = 0;
+
+    /** @brief returns the Dslash type
+
+        @return Dslash type
+     */
+    QudaDslashType getDslashType() const { return dirac_to_dslash_type(getDiracType()); }
+
+    /**
+      @brief static function that returns the QudaDslashType corresponding to a QudaDiracType
+     */
+    static QudaDslashType dirac_to_dslash_type(QudaDiracType);
 
     /**
         @brief Return the one-hop field for staggered operators for MG setup

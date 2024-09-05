@@ -267,7 +267,7 @@ namespace quda {
     case QUDA_TWISTED_CLOVERPC_DIRAC:
     case QUDA_TWISTED_MASS_DIRAC:
     case QUDA_TWISTED_MASSPC_DIRAC:
-      return true;
+      return true; break;
     case QUDA_DOMAIN_WALL_DIRAC:
     case QUDA_DOMAIN_WALLPC_DIRAC:
     case QUDA_DOMAIN_WALL_4D_DIRAC:
@@ -287,14 +287,37 @@ namespace quda {
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC:
-      return false;
+      return false; break;
     default:
-      errorQuda("Invalid QudaDiracType %d", type);
+      errorQuda("Invalid QudaDiracType %d", type); break;
     }
     return false;
   }
 
-  bool Dirac::is_staggered(QudaDiracType type) {
+  bool Dirac::is_wilson_type(QudaDslashType type) {
+    switch (type) {
+    case QUDA_WILSON_DSLASH:
+    case QUDA_CLOVER_WILSON_DSLASH:
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
+    case QUDA_TWISTED_MASS_DSLASH:
+    case QUDA_TWISTED_CLOVER_DSLASH:
+      return true; break;
+    case QUDA_DOMAIN_WALL_DSLASH:
+    case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_MOBIUS_DWF_DSLASH:
+    case QUDA_MOBIUS_DWF_EOFA_DSLASH:
+    case QUDA_STAGGERED_DSLASH:
+    case QUDA_ASQTAD_DSLASH:
+    case QUDA_LAPLACE_DSLASH:
+    case QUDA_COVDEV_DSLASH:
+      return false; break;
+    default:
+      errorQuda("Invalid QudaDslashType %d", type); break;
+    }
+    return false;
+  }
+
+  bool Dirac::is_staggered_type(QudaDiracType type) {
     switch (type) {
     case QUDA_STAGGERED_DIRAC:
     case QUDA_STAGGEREDPC_DIRAC:
@@ -302,7 +325,7 @@ namespace quda {
     case QUDA_ASQTAD_DIRAC:
     case QUDA_ASQTADPC_DIRAC:
     case QUDA_ASQTADKD_DIRAC:
-      return true;
+      return true; break;
     case QUDA_WILSON_DIRAC:
     case QUDA_WILSONPC_DIRAC:
     case QUDA_CLOVER_DIRAC:
@@ -326,9 +349,32 @@ namespace quda {
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC:
-      return false;
+      return false; break;
     default:
-      errorQuda("Invalid QudaDiracType %d", type);
+      errorQuda("Invalid QudaDiracType %d", type); break;
+    }
+    return false;
+  }
+
+  bool Dirac::is_staggered_type(QudaDslashType type) {
+    switch (type) {
+    case QUDA_STAGGERED_DSLASH:
+    case QUDA_ASQTAD_DSLASH:
+      return true; break;
+    case QUDA_WILSON_DSLASH:
+    case QUDA_CLOVER_WILSON_DSLASH:
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
+    case QUDA_TWISTED_MASS_DSLASH:
+    case QUDA_TWISTED_CLOVER_DSLASH:
+    case QUDA_DOMAIN_WALL_DSLASH:
+    case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_MOBIUS_DWF_DSLASH:
+    case QUDA_MOBIUS_DWF_EOFA_DSLASH:
+    case QUDA_LAPLACE_DSLASH:
+    case QUDA_COVDEV_DSLASH:
+      return false; break;
+    default:
+      errorQuda("Invalid QudaDslashType %d", type); break;
     }
     return false;
   }
@@ -343,7 +389,7 @@ namespace quda {
     case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
-      return true;
+      return true; break;
     case QUDA_WILSON_DIRAC:
     case QUDA_WILSONPC_DIRAC:
     case QUDA_CLOVER_DIRAC:
@@ -365,11 +411,85 @@ namespace quda {
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC:
-      return false;
+      return false; break;
     default:
-      errorQuda("Invalid QudaDiracType %d", type);
+      errorQuda("Invalid QudaDiracType %d", type); break;
     }
     return false;
+  }
+
+  bool Dirac::is_dwf(QudaDslashType type) {
+    switch (type) {
+    case QUDA_DOMAIN_WALL_DSLASH:
+    case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_MOBIUS_DWF_DSLASH:
+    case QUDA_MOBIUS_DWF_EOFA_DSLASH:
+      return true; break;
+    case QUDA_WILSON_DSLASH:
+    case QUDA_CLOVER_WILSON_DSLASH:
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
+    case QUDA_TWISTED_MASS_DSLASH:
+    case QUDA_TWISTED_CLOVER_DSLASH:
+    case QUDA_STAGGERED_DSLASH:
+    case QUDA_ASQTAD_DSLASH:
+    case QUDA_LAPLACE_DSLASH:
+    case QUDA_COVDEV_DSLASH:
+      return false; break;
+    default:
+      errorQuda("Invalid QudaDslashType %d", type); break;
+    }
+    return false;
+  }
+
+  QudaDslashType Dirac::dirac_to_dslash_type(QudaDiracType type) {
+    switch (type) {
+    case QUDA_WILSON_DIRAC:
+    case QUDA_WILSONPC_DIRAC:
+      return QUDA_WILSON_DSLASH; break;
+    case QUDA_CLOVER_DIRAC:
+    case QUDA_CLOVERPC_DIRAC:
+      return QUDA_CLOVER_WILSON_DSLASH; break;
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
+      return QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH; break;
+    case QUDA_TWISTED_CLOVER_DIRAC:
+    case QUDA_TWISTED_CLOVERPC_DIRAC:
+      return QUDA_TWISTED_CLOVER_DSLASH; break;
+    case QUDA_TWISTED_MASS_DIRAC:
+    case QUDA_TWISTED_MASSPC_DIRAC:
+      return QUDA_TWISTED_MASS_DSLASH; break;
+    case QUDA_DOMAIN_WALL_DIRAC:
+    case QUDA_DOMAIN_WALLPC_DIRAC:
+      return QUDA_DOMAIN_WALL_DSLASH; break;
+    case QUDA_DOMAIN_WALL_4D_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+      return QUDA_DOMAIN_WALL_4D_DSLASH; break;
+    case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      return QUDA_MOBIUS_DWF_DSLASH; break;
+    case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
+      return QUDA_MOBIUS_DWF_EOFA_DSLASH; break;
+    case QUDA_STAGGERED_DIRAC:
+    case QUDA_STAGGEREDPC_DIRAC:
+    case QUDA_STAGGEREDKD_DIRAC:
+      return QUDA_STAGGERED_DSLASH; break;
+    case QUDA_ASQTAD_DIRAC:
+    case QUDA_ASQTADPC_DIRAC:
+    case QUDA_ASQTADKD_DIRAC:
+      return QUDA_ASQTAD_DSLASH; break;
+    case QUDA_GAUGE_COVDEV_DIRAC:
+      return QUDA_COVDEV_DSLASH; break;
+    case QUDA_GAUGE_LAPLACE_DIRAC:
+    case QUDA_GAUGE_LAPLACEPC_DIRAC:
+      return QUDA_LAPLACE_DSLASH; break;
+    case QUDA_COARSE_DIRAC:
+    case QUDA_COARSEPC_DIRAC:
+      return QUDA_INVALID_DSLASH; break;
+    default:
+      errorQuda("Invalid QudaDiracType %d", type); break;
+    }
+    return QUDA_INVALID_DSLASH;
   }
 
   void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
