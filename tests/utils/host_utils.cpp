@@ -370,15 +370,9 @@ bool is_normal_residual(QudaInverterType type)
   }
 }
 
-bool is_staggered(QudaDslashType type)
-{
-  return Dirac::is_staggered_type(type);
-}
+bool is_staggered(QudaDslashType type) { return Dirac::is_staggered_type(type); }
 
-bool is_chiral(QudaDslashType type)
-{
-  return Dirac::is_dwf(type);
-}
+bool is_chiral(QudaDslashType type) { return Dirac::is_dwf(type); }
 
 bool is_laplace(QudaDslashType type)
 {

@@ -3484,11 +3484,9 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       long_links_bkup.backup(gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition, gaugeLongRefinement,
                              gaugeLongEigensolver, gaugeLongExtended);
     } else {
-      if (!gaugePrecise)
-        errorQuda("h_gauge is null for a Wilson-type or naive staggered dslash");
+      if (!gaugePrecise) errorQuda("h_gauge is null for a Wilson-type or naive staggered dslash");
       thin_links_bkup.backup(gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
                              gaugeExtended);
-
     }
 
     // Deal with Spinors
