@@ -554,6 +554,8 @@ extern "C" {
     int batched_rotate;
     /** For block method solvers, the block size **/
     int block_size;
+    /** The block size when computing eigenvalues **/
+    int eval_block_size;
     /** For block method solvers, quit after n attempts at block orthonormalisation **/
     int max_ortho_attempts;
     /** For hybrid modifeld Gram-Schmidt orthonormalisations **/
