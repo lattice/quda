@@ -236,6 +236,21 @@ namespace quda {
     bool isStaggered() const { return Dirac::is_staggered_type(getDiracType()); }
 
     /**
+      @brief static function that returns if a Dirac type is asqtad depending on a QudaDiracType
+     */
+    static bool is_asqtad(QudaDiracType);
+
+    /**
+      @brief static function that returns if a Dslash type is asqtaddepending on a QudaDslashType
+     */
+    static bool is_asqtad(QudaDslashType);
+
+    /**
+      @brief return if the operator is a staggered operator
+     */
+    bool isAsqtad() const { return Dirac::is_asqtad(getDiracType()); }
+
+    /**
       @brief static function that returns if a Dirac type is a domain wall operator (5-dimensional) depending on a QudaDiracType
      */
     static bool is_dwf(QudaDiracType);
