@@ -347,6 +347,9 @@ std::vector<std::array<double, 2>> solve(test_t param)
     std::vector<void *> _hp_b(Nsrc_tile);
 
     for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+      // If deflating, preserve the deflation space between solves
+      if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
       for (int i = 0; i < Nsrc_tile; i++) {
         _hp_x[i] = out[j + i].data();
         _hp_b[i] = in[j + i].data();
