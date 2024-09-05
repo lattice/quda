@@ -255,6 +255,123 @@ namespace quda {
     return nullptr;
   }
 
+  bool Dirac::is_wilson_type(QudaDiracType type) {
+    switch (type) {
+    case QUDA_WILSON_DIRAC:
+    case QUDA_WILSONPC_DIRAC:
+    case QUDA_CLOVER_DIRAC:
+    case QUDA_CLOVERPC_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
+    case QUDA_TWISTED_CLOVER_DIRAC:
+    case QUDA_TWISTED_CLOVERPC_DIRAC:
+    case QUDA_TWISTED_MASS_DIRAC:
+    case QUDA_TWISTED_MASSPC_DIRAC:
+      return true;
+    case QUDA_DOMAIN_WALL_DIRAC:
+    case QUDA_DOMAIN_WALLPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4D_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
+    case QUDA_STAGGERED_DIRAC:
+    case QUDA_STAGGEREDPC_DIRAC:
+    case QUDA_STAGGEREDKD_DIRAC:
+    case QUDA_ASQTAD_DIRAC:
+    case QUDA_ASQTADPC_DIRAC:
+    case QUDA_ASQTADKD_DIRAC:
+    case QUDA_COARSE_DIRAC:
+    case QUDA_COARSEPC_DIRAC:
+    case QUDA_GAUGE_COVDEV_DIRAC:
+    case QUDA_GAUGE_LAPLACE_DIRAC:
+    case QUDA_GAUGE_LAPLACEPC_DIRAC:
+      return false;
+    default:
+      errorQuda("Invalid QudaDiracType %d", type);
+    }
+    return false;
+  }
+
+  bool Dirac::is_staggered(QudaDiracType type) {
+    switch (type) {
+    case QUDA_STAGGERED_DIRAC:
+    case QUDA_STAGGEREDPC_DIRAC:
+    case QUDA_STAGGEREDKD_DIRAC:
+    case QUDA_ASQTAD_DIRAC:
+    case QUDA_ASQTADPC_DIRAC:
+    case QUDA_ASQTADKD_DIRAC:
+      return true;
+    case QUDA_WILSON_DIRAC:
+    case QUDA_WILSONPC_DIRAC:
+    case QUDA_CLOVER_DIRAC:
+    case QUDA_CLOVERPC_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
+    case QUDA_TWISTED_CLOVER_DIRAC:
+    case QUDA_TWISTED_CLOVERPC_DIRAC:
+    case QUDA_TWISTED_MASS_DIRAC:
+    case QUDA_TWISTED_MASSPC_DIRAC:
+    case QUDA_DOMAIN_WALL_DIRAC:
+    case QUDA_DOMAIN_WALLPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4D_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
+    case QUDA_COARSE_DIRAC:
+    case QUDA_COARSEPC_DIRAC:
+    case QUDA_GAUGE_COVDEV_DIRAC:
+    case QUDA_GAUGE_LAPLACE_DIRAC:
+    case QUDA_GAUGE_LAPLACEPC_DIRAC:
+      return false;
+    default:
+      errorQuda("Invalid QudaDiracType %d", type);
+    }
+    return false;
+  }
+
+  bool Dirac::is_dwf(QudaDiracType type) {
+    switch (type) {
+    case QUDA_DOMAIN_WALL_DIRAC:
+    case QUDA_DOMAIN_WALLPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4D_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
+    case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
+      return true;
+    case QUDA_WILSON_DIRAC:
+    case QUDA_WILSONPC_DIRAC:
+    case QUDA_CLOVER_DIRAC:
+    case QUDA_CLOVERPC_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
+    case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
+    case QUDA_TWISTED_CLOVER_DIRAC:
+    case QUDA_TWISTED_CLOVERPC_DIRAC:
+    case QUDA_TWISTED_MASS_DIRAC:
+    case QUDA_TWISTED_MASSPC_DIRAC:
+    case QUDA_STAGGERED_DIRAC:
+    case QUDA_STAGGEREDPC_DIRAC:
+    case QUDA_STAGGEREDKD_DIRAC:
+    case QUDA_ASQTAD_DIRAC:
+    case QUDA_ASQTADPC_DIRAC:
+    case QUDA_ASQTADKD_DIRAC:
+    case QUDA_COARSE_DIRAC:
+    case QUDA_COARSEPC_DIRAC:
+    case QUDA_GAUGE_COVDEV_DIRAC:
+    case QUDA_GAUGE_LAPLACE_DIRAC:
+    case QUDA_GAUGE_LAPLACEPC_DIRAC:
+      return false;
+    default:
+      errorQuda("Invalid QudaDiracType %d", type);
+    }
+    return false;
+  }
+
   void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     if (gauge) gauge->prefetch(mem_space, stream);

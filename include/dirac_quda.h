@@ -201,6 +201,21 @@ namespace quda {
     }
 
     /**
+      @brief static function that returns if a Dirac type is staggered-type depending on a QudaDiracType
+     */
+    static bool is_staggered(QudaDiracType);
+
+    /**
+      @brief static function that returns if a Dirac type is staggered-type depending on a QudaDiracType
+     */
+    static bool is_wilson_type(QudaDiracType);
+
+    /**
+      @brief static function that returns if a Dirac type is a domain wall operator (5-dimensional) depending on a QudaDiracType
+     */
+    static bool is_dwf(QudaDiracType);
+
+    /**
       @brief Whether the Dirac object is the DiracCoarse.
     */
     virtual bool isCoarse() const { return false; }
@@ -208,17 +223,17 @@ namespace quda {
     /**
       @brief return if the operator is a Wilson-type 4-d operator
      */
-    virtual bool isWilsonType() const = 0;
+    bool isWilsonType() const { return Dirac::is_wilson_type(getDiracType()); }
 
     /**
       @brief return if the operator is a staggered operator
      */
-    virtual bool isStaggered() const = 0;
+    virtual bool isStaggered() const { return Dirac::is_staggered(getDiracType()); }
 
     /**
       @brief return if the operator is a domain wall operator, that is, 5-dimensional
      */
-    virtual bool isDwf() const = 0;
+    virtual bool isDwf() const { return Dirac::is_dwf(getDiracType()); }
 
     /**
         @brief Check parity spinors are usable (check geometry ?)
@@ -506,10 +521,6 @@ namespace quda {
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_WILSON_DIRAC; }
-    // neither isWilsonType nor isDwf are final because DiracDomainWall inherits from DiracWilson
-    virtual bool isWilsonType() const override { return true; }
-    virtual bool isDwf() const override { return false; }
-    bool isStaggered() const final { return false; }
 
     /**
      * @brief Create the coarse Wilson operator.
@@ -554,8 +565,6 @@ namespace quda {
 
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_WILSONPC_DIRAC; }
-    bool isWilsonType() const final { return DiracWilson::isWilsonType(); }
-    bool isDwf() const final { return DiracWilson::isDwf(); }
   };
 
   // Full clover
@@ -589,8 +598,6 @@ namespace quda {
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_CLOVER_DIRAC; }
-    bool isWilsonType() const final { return DiracWilson::isWilsonType(); }
-    bool isDwf() const final { return DiracWilson::isDwf(); }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -839,8 +846,6 @@ namespace quda {
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_DIRAC; }
-    bool isWilsonType() const final { return false; }
-    bool isDwf() const final { return true; }
   };
 
   // 5d Even-odd preconditioned domain wall
@@ -1131,8 +1136,6 @@ namespace quda {
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_TWISTED_MASS_DIRAC; }
-    bool isWilsonType() const final { return DiracWilson::isWilsonType(); }
-    bool isDwf() const final { return DiracWilson::isDwf(); }
 
     double Mu() const override { return mu; }
 
@@ -1390,9 +1393,6 @@ public:
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_STAGGERED_DIRAC; }
-    bool isWilsonType() const final { return false; }
-    bool isStaggered() const final { return true; }
-    bool isDwf() const final { return false; }
 
     /**
        @brief Return the one-hop field for staggered operators for MG setup
@@ -1606,9 +1606,6 @@ public:
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_ASQTAD_DIRAC; }
-    bool isWilsonType() const final { return false; }
-    bool isStaggered() const final { return true; }
-    bool isDwf() const final { return false; }
 
     /**
         @brief Return the one-hop field for staggered operators for MG setup
@@ -1986,9 +1983,6 @@ public:
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_COARSE_DIRAC; }
-    bool isWilsonType() const final { return false; }
-    bool isStaggered() const final { return false; }
-    bool isDwf() const final { return false; }
 
     virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *) override
     {
@@ -2176,9 +2170,6 @@ public:
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_GAUGE_LAPLACE_DIRAC; }
-    bool isWilsonType() const final { return false; }
-    bool isStaggered() const final { return false; }
-    bool isDwf() const final { return false; }
   };
 
   /**
@@ -2244,9 +2235,6 @@ public:
 
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_GAUGE_COVDEV_DIRAC; }
-    bool isWilsonType() const final { return false; }
-    bool isStaggered() const final { return false; }
-    bool isDwf() const final { return false; }
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
