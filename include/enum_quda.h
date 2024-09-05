@@ -89,6 +89,8 @@ typedef enum QudaGaugeFixed_s {
 // Types used in QudaInvertParam
 //
 
+// Note: make sure QudaDslashType has corresponding entries in
+// tests/utils/misc.cpp
 typedef enum QudaDslashType_s {
   QUDA_WILSON_DSLASH,
   QUDA_CLOVER_WILSON_DSLASH,
