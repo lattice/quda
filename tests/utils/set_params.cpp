@@ -335,7 +335,7 @@ void setEigParam(QudaEigParam &eig_param)
   }
 
   eig_param.ortho_block_size = eig_ortho_block_size;
-  eig_param.eval_block_size = eig_eval_block_size;
+  eig_param.compute_evals_batch_size = eig_evals_batch_size;
   eig_param.block_size
     = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
@@ -787,7 +787,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   }
 
   mg_eig_param.ortho_block_size = mg_eig_ortho_block_size[level];
-  mg_eig_param.eval_block_size = mg_eig_eval_block_size[level];
+  mg_eig_param.compute_evals_batch_size = mg_eig_evals_batch_size[level];
   mg_eig_param.block_size
     = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
     1 :

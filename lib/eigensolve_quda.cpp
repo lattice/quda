@@ -496,14 +496,14 @@ namespace quda
   {
     logQuda(QUDA_SUMMARIZE, "Computing SVD of M\n");
 
-    auto block_size = eig_param->eval_block_size;
+    auto batch_size = eig_param->compute_evals_batch_size;
     int n_conv = eig_param->n_conv;
     if (evecs.size() < (unsigned int)(2 * n_conv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_conv);
 
-    for (int i = 0; i < n_conv; i += block_size) {
+    for (int i = 0; i < n_conv; i += batch_size) {
       auto lower = i;
-      auto upper = i + block_size < n_conv ? i + block_size : n_conv;
+      auto upper = i + batch_size < n_conv ? i + batch_size : n_conv;
 
       // This function assumes that you have computed the eigenvectors
       // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
@@ -580,22 +580,22 @@ namespace quda
   void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    auto block_size = eig_param->eval_block_size;
+    auto batch_size = eig_param->compute_evals_batch_size;
 
     if (size > static_cast<int>(evecs.size()))
       errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
 
     // allocate space if needed for computing the evals
-    if (size + block_size > static_cast<int>(evecs.size())) resize(evecs, size + block_size, QUDA_NULL_FIELD_CREATE);
+    if (size + batch_size > static_cast<int>(evecs.size())) resize(evecs, size + batch_size, QUDA_NULL_FIELD_CREATE);
 
     // we make sure that we have enough space for eigenvalues
     // required for coarse-grid deflated solver used from within tmLQCD or PLEGMA with
     // `preserve_deflation` enabled
     if (size > (int)evals.size()) evals.resize(size);
 
-    for (int i = 0; i < size; i += block_size) {
+    for (int i = 0; i < size; i += batch_size) {
       auto lower = i;
-      auto upper = i + block_size < size ? i + block_size : size;
+      auto upper = i + batch_size < size ? i + batch_size : size;
 
       auto temp = {evecs.begin() + size, evecs.begin() + size + upper - lower};
 

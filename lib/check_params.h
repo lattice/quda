@@ -196,7 +196,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
-  P(eval_block_size, 4);
+  P(compute_evals_batch_size, 4);
   P(ortho_block_size, 0);
   P(partfile, QUDA_BOOLEAN_FALSE);
 #else
@@ -227,7 +227,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
-  P(eval_block_size, INVALID_INT);
+  P(compute_evals_batch_size, INVALID_INT);
   P(ortho_block_size, INVALID_INT);
   P(partfile, QUDA_BOOLEAN_INVALID);
 #endif
