@@ -407,4 +407,5 @@ namespace quda
 
     popVerbosity();
   }
+
 } // namespace quda

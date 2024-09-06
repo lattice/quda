@@ -255,19 +255,9 @@ namespace quda {
     vector<double> b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      bool zero_src = true;
-      for (auto i = 0u; i < b.size(); i++) {
-        if (b2[i] == 0) {
-          warningQuda("inverting on zero-field source");
-          x[i] = b[i];
-          param.true_res[i] = 0.0;
-          param.true_res_hq[i] = 0.0;
-        } else {
-          zero_src = false;
-        }
-      }
-      if (zero_src) return;
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
     create(x, b);
@@ -622,19 +612,9 @@ namespace quda {
     bool heavy_quark_restart = false;
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      bool zero_src = true;
-      for (auto i = 0u; i < b.size(); i++) {
-        if (b2[i] == 0) {
-          warningQuda("inverting on zero-field source");
-          x[i] = b[i];
-          param.true_res[i] = 0.0;
-          param.true_res_hq[i] = 0.0;
-        } else {
-          zero_src = false;
-        }
-      }
-      if (zero_src) return;
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
     create(x, b);

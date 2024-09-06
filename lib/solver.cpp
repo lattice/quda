@@ -544,4 +544,24 @@ namespace quda {
     }
   }
 
+  // check we're not solving on a zero-valued source
+  bool Solver::is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<double> &b2)
+  {
+    // if computing null vectors then zero sources are fine
+    if (param.compute_null_vector != QUDA_COMPUTE_NULL_VECTOR_NO) return false;
+
+    bool zero_src = true;
+    for (auto i = 0u; i < b.size(); i++) {
+      if (b2[i] == 0) {
+        warningQuda("source %d is zero", i);
+        x[i] = b[i];
+        param.true_res[i] = 0.0;
+        param.true_res_hq[i] = 0.0;
+      } else {
+        zero_src = false;
+      }
+    }
+    return zero_src;
+  }
+
 } // namespace quda

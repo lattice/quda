@@ -424,6 +424,19 @@ namespace quda {
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
+    /**
+       @brief Check the support of each source field, and return true
+       if all fields in the set have zero support.  If we are doing
+       null-space finding, this function always returns false.  If a
+       given source vector does have zero support, then we set the
+       matching solution vector to match.
+       @param[in] x Solution vector set
+       @param[in] b Source vector set
+       @param[in] b2 Vector of norms
+       @return boolean if all vectors have zero support
+    */
+    bool is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<double> &b2);
+
   public:
     Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param);
@@ -551,7 +564,7 @@ namespace quda {
     }
 
     /**
-       @briefTest for solver convergence
+       @brief Test for solver convergence
        @param[in] r2 L2 norm squared of the residual
        @param[in] hq2 Heavy quark residual
        @param[in] r2_tol Solver L2 tolerance
