@@ -894,7 +894,7 @@ namespace quda {
   public:
     CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
+    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
       for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
     }
@@ -969,7 +969,7 @@ namespace quda {
   public:
     CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    void operator()(cvector<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in)
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
       for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
     }
