@@ -43,6 +43,22 @@ namespace quda {
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
+  /**
+     @brief Return a string encoding the QUDA version
+   */
+  const std::string get_quda_version();
+
+  /**
+     @brief Return a string encoding the git hash
+   */
+  const std::string get_quda_hash();
+
+  /**
+     @brief Return the resource path (directory where QUDA read/write
+     tunecache and other internal info
+  */
+  const std::string get_resource_path();
+
   class Tunable {
 
     friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);

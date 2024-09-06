@@ -17,7 +17,7 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cpp
+  monitor.cpp dirac_coarse.cpp dslash_coarse.cpp
   coarse_op.cpp coarsecoarse_op.cpp
   coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp
@@ -351,13 +351,13 @@ add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
 
-# ignore any unkown pragmas
+# ignore any unknown pragmas
 target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
   $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
   $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
   >)
 
-# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+# add some definitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
