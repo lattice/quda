@@ -11,10 +11,8 @@
 
 #include <math.h>
 
-#define GCC_COMPILER (defined(__GNUC__) && !defined(__clang__))
-
 // hide annoying warning
-#ifdef GCC_COMPILER
+#if !defined(__clang__) && !defined(_NVHPC_CUDA)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
@@ -23,10 +21,8 @@
 #include <Eigen/Dense>
 #include <Eigen/LU>
 
-#ifdef GCC_COMPILER
+#if !defined(__clang__) && !defined(_NVHPC_CUDA)
 #pragma GCC diagnostic pop
 #endif
-
-#undef GCC_COMPILER
 
 using namespace Eigen;

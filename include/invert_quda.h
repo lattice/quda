@@ -979,7 +979,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    cvector_ref<const ColorSpinorField> get_residual();
+    cvector_ref<const ColorSpinorField> get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CG3NR is for any system */
 
