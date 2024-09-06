@@ -130,11 +130,11 @@ void setInvertParam(QudaInvertParam &inv_param)
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / (8 + mass);
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / ((laplace3D == 3 ? 6 : 8) + mass);
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 8.0;
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - (laplace3D == 3 ? 6 : 8);
   }
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
     printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
@@ -928,7 +928,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   // Solver params
   inv_param.verbosity = verbosity;
   inv_param.mass = mass;
-  inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
+  inv_param.kappa = 1.0 / ((laplace3D == 3 ? 6 : 8) + mass); // for Laplace operator
   inv_param.laplace3D = laplace3D;              // for Laplace operator
 
   // outer solver parameters
