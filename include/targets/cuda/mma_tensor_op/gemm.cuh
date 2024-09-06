@@ -259,10 +259,10 @@ namespace quda
 
         __syncthreads();
         a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
-        a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        a_loader.template r2s<A, a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
         b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
-        b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        b_loader.template r2s<B, b_dagger>(smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
 #pragma unroll 1
@@ -279,8 +279,8 @@ namespace quda
                              // to smem.
             __syncthreads();
 
-            a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
-            b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+            a_loader.template r2s<A, a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template r2s<B, b_dagger>(smem_obj_b_real, smem_obj_b_imag);
 
             __syncthreads();
           }
@@ -322,10 +322,10 @@ namespace quda
 
         __syncthreads();
         a_loader.template g2r<lda, a_dagger>(a, m_offset, 0);
-        a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        a_loader.template r2s<A, a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
         b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0);
-        b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        b_loader.template r2s<B, b_dagger>(smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
 #pragma unroll 1
@@ -390,10 +390,10 @@ namespace quda
 
         __syncthreads();
         a_loader.template g2r<lda, a_dagger>(a, 0, 0);
-        a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        a_loader.template r2s<A, a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
         b_loader.template g2r<ldb, b_dagger>(b, 0, 0);
-        b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        b_loader.template r2s<B, b_dagger>(smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
 #pragma unroll 1
@@ -435,7 +435,7 @@ namespace quda
 
           if (a_m + bM < M) {
             __syncthreads();
-            a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+            a_loader.template r2s<A, a_dagger>(smem_obj_a_real, smem_obj_a_imag);
             __syncthreads();
           }
         }

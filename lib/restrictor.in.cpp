@@ -59,7 +59,7 @@ namespace quda
           RestrictMma2<fineColor, coarseColor>(v_out, v_in, V, fine_to_coarse, coarse_to_fine, spin_map, parity, nvecs);
 
           BlockTransposeBackward(v_out, out);
-#if 1
+#if 0
           std::vector<ColorSpinorField> v_cmp(out.size());
           for (size_t i = 0; i < out.size(); i++) {
             ColorSpinorParam param(out[i]);
@@ -70,10 +70,10 @@ namespace quda
           Restrict<fineColor, coarseColor>(vv_cmp, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
           blas::mxpy(out, v_cmp);
-          auto vn = blas::norm2(vv_cmp);
-          printf("n = ");
+          auto vn = blas::max(vv_cmp);
+          printf("restrictor %d->%d = ", fineColor, coarseColor);
           for (size_t i = 0; i < vn.size(); i++) {
-            printf("%f ", vn[i]);
+            printf("%4.2e ", vn[i]);
           }
           printf("\n");
 #endif

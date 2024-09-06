@@ -110,7 +110,7 @@ namespace quda
 
     static constexpr int n_atom_size = mma_t::MMA_N;
     static constexpr int m_atom_size = mma_t::MMA_M;
-    static constexpr int k_atom_size = fineColor * spin_block_factor * 4;
+    static constexpr int k_atom_size = fineColor * spin_block_factor * mma_t::MMA_K;
     static constexpr int block_atom_size = 32 / 8;
     static constexpr int block_limit = 32;
 
@@ -130,7 +130,6 @@ namespace quda
     bool set_mma_param(TuneParam &tp) const
     {
       static_assert(m % m_atom_size == 0, "m modulo m_atom_size == 0");
-      static_assert(n % n_atom_size == 0, "n modulo n_atom_size == 0");
       static_assert(k % k_atom_size == 0, "k modulo k_atom_size == 0");
 
       tp.block.x = 1;

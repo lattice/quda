@@ -71,10 +71,10 @@ namespace quda
           Prolongate<fineColor, coarseColor>(vv_cmp, in, v, fine_to_coarse, spin_map, parity);
 
           blas::mxpy(out, v_cmp);
-          auto vn = blas::norm2(vv_cmp);
-          printf("n = ");
+          auto vn = blas::max(vv_cmp);
+          printf("prolongator %d->%d = ", coarseColor, fineColor);
           for (size_t i = 0; i < vn.size(); i++) {
-            printf("%f ", vn[i]);
+            printf("%4.2e ", vn[i]);
           }
           printf("\n");
 #endif

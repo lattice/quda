@@ -80,7 +80,7 @@ namespace quda
     }
   };
 
-  template <int contiguous_dim, bool dagger, class smem_obj_t, class gmem_obj_t, class Arg>
+  template <int contiguous_dim, bool dagger, int contiguous_limit, class smem_obj_t, class gmem_obj_t, class Arg>
   inline void __device__ load_g2s(smem_obj_t &smem_real, smem_obj_t &smem_imag, const gmem_obj_t &gmem, int x_coarse,
                                   int coarse_spin, int contiguous_dim_offset, int aggregate_k_offset,
                                   int *coarse_to_fine, const Arg &arg)
@@ -92,6 +92,8 @@ namespace quda
              * Arg::aggregate_per_block) {
       int thread_idx = thread;
       int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
+    constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
+    if (!check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit) {
       thread_idx /= (contiguous_dim / elements_per_thread);
       int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
       thread_idx /= Arg::spin_block_factor;
@@ -138,6 +140,7 @@ namespace quda
       static_assert(smem_obj_t::ldm == 1, "smem_obj_t::ldm == 1");
       smem_real.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_real));
       smem_imag.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_imag));
+    }
 
       thread += Arg::block_y * Arg::block_z;
     }
@@ -158,7 +161,6 @@ namespace quda
     using Config = mma::MmaConfig<mma_t, M, N, K, ldc, ldc, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
     static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
-    static_assert(N % Arg::bN == 0, "N %% Arg::bN != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
     __shared__ int coarse_to_fine[Arg::aggregate_size];
@@ -188,11 +190,11 @@ namespace quda
       __syncthreads();
 
       constexpr bool a_dagger = true;
-      load_g2s<Arg::bM, a_dagger>(smem_obj_a_real, smem_obj_a_imag, arg.in, x_coarse, coarse_spin, m_offset,
+      load_g2s<Arg::bM, a_dagger, M>(smem_obj_a_real, smem_obj_a_imag, arg.in, x_coarse, coarse_spin, m_offset,
                                   aggregate_k_offset, coarse_to_fine, arg);
 
       constexpr bool b_dagger = false;
-      load_g2s<Arg::bN, b_dagger>(smem_obj_b_real, smem_obj_b_imag, arg.v, x_coarse, coarse_spin, n_offset,
+      load_g2s<Arg::bN, b_dagger, N>(smem_obj_b_real, smem_obj_b_imag, arg.v, x_coarse, coarse_spin, n_offset,
                                   aggregate_k_offset, coarse_to_fine, arg);
 
       __syncthreads();

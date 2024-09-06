@@ -36,6 +36,11 @@ namespace quda
       using compute_t = T;
       using load_t = T;
 
+      static constexpr bool do_rescale()
+      {
+        return false;
+      }
+
       static std::string get_type_name()
       {
         char s[TuneKey::aux_n] = ",simt,m";
