@@ -950,6 +950,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.use_sloppy_partial_accumulator = false;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
+  inv_param.max_res_increase = max_res_increase;
+  inv_param.max_res_increase_total = max_res_increase_total;
 
   inv_param.Ls = 1;
 
