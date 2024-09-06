@@ -77,9 +77,6 @@ namespace quda
     // Override any user input for block size.
     block_size = 1;
 
-    // For the 3D solver, we must ensure the eval array is the correct size
-    evals.resize(ortho_dim_size * comm_dim(3) * n_conv, 0.0);
-
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     queryPrec(kSpace[0].Precision());
@@ -229,7 +226,7 @@ namespace quda
       // those processes have converged
       int all_converged_int = all_converged;
       comm_allreduce_int(all_converged_int);
-      all_converged = all_converged_int;
+      all_converged = (static_cast<size_t>(all_converged_int) == comm_size());
 
       if (all_converged) {
         reorder3D(kSpace);
@@ -637,6 +634,8 @@ namespace quda
 
     // If size = n_conv, this routine is called post sort
     if (size == n_conv) {
+      evals.resize(ortho_dim_size * comm_dim(ortho_dim) * n_conv, 0.0);
+
       int t_offset = ortho_dim_size * comm_coord(3);      
       for (int t = 0; t < ortho_dim_size; t++)
         for (int i = 0; i < size; i++) {
@@ -648,9 +647,9 @@ namespace quda
 	  }
 	  
           // Transfer evals to eval array
-          evals.resize(size * evecs[0].X()[3]);
-          evals[t * size + i] = evals_t[i][t];
+          evals[(t_offset + t) * size + i] = evals_t[i][t];
         }
+      comm_allreduce_sum(evals);
     }
   }
 

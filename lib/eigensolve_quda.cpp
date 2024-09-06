@@ -240,7 +240,7 @@ namespace quda
     int n_eig = n_conv;
     if (compute_svd) n_eig *= 2;
     kSpace.resize(n_eig);
-    evals.resize(n_conv);
+    if (eig_param->eig_type != QUDA_EIG_TR_LANCZOS_3D) evals.resize(n_conv);
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
