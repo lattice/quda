@@ -246,11 +246,8 @@ namespace quda
        @param[in] first Begin iterator
        @param[in] last End iterator
      */
-    template <class U, std::enable_if_t<is_iterator_v<U>>* = nullptr>
-    vector_ref(U first, U last)
+    template <class U, std::enable_if_t<is_iterator_v<U>> * = nullptr> vector_ref(U first, U last) : vector(first, last)
     {
-      vector::reserve(last - first);
-      for (auto it = first; it != last; it++) vector::push_back(*it);
     }
 
     /**
@@ -495,10 +492,9 @@ namespace quda
        @param[in] first Begin iterator
        @param[in] last End iterator
      */
-    template <class U, std::enable_if_t<is_iterator_v<U>> * = nullptr> vector(U first, U last)
+    template <class U, std::enable_if_t<is_iterator_v<U>> * = nullptr>
+    vector(U first, U last) : std::vector<T>(first, last)
     {
-      std::vector<T>::reserve(last - first);
-      for (auto it = first; it != last; it++) std::vector<T>::push_back(*it);
     }
 
     /**
