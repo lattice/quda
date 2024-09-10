@@ -25,6 +25,14 @@ namespace quda
       static constexpr int value = 1;
     };
 
+    inline __device__ void zero(float2 &reg_real, float2 &reg_imag)
+    {
+      reg_real.x = 0;
+      reg_real.y = 0;
+      reg_imag.x = 0;
+      reg_imag.y = 0;
+    }
+
     inline __device__ void zero(half2 &reg_real, half2 &reg_imag)
     {
       reg_real = __half2half2(0);
@@ -38,6 +46,8 @@ namespace quda
     }
 
     inline __device__ float abs_max(float a, float max) { return fmaxf(fabsf(a), max); }
+
+    inline __device__ float abs_max(float2 a, float max) { return fmaxf(fabsf(a.y), fmaxf(fabsf(a.x), max)); }
 
     template <class T, int batch> struct batch_load_t {
     };
@@ -124,6 +134,56 @@ namespace quda
       @brief Load from global memory and store data in registers.
      */
     template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
+    inline __device__ void convert_x(float2 reg_real[batch], float2 reg_imag[batch], complex<T> *p, int m_idx,
+                                     int n_idx, float scale_inv)
+    {
+      if constexpr (x) {
+        complex<T> vx[batch];
+        complex<T> vy[batch];
+        batch_load_t<complex<T>, batch>::load(vx, &p[(m_idx + 0) * ld + n_idx]);
+        batch_load_t<complex<T>, batch>::load(vy, &p[(m_idx + 1) * ld + n_idx]);
+
+#pragma unroll
+        for (int b = 0; b < batch; b++) {
+          if constexpr (fixed) {
+            reg_real[b].x = scale_inv * vx[b].real();
+            reg_real[b].y = scale_inv * vy[b].real();
+            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+            reg_imag[b].x = scale_inv_conj * vx[b].imag();
+            reg_imag[b].y = scale_inv_conj * vy[b].imag();
+          } else {
+            reg_real[b].x = +vx[b].real();
+            reg_real[b].y = +vy[b].real();
+            reg_imag[b].x = dagger ? -vx[b].imag() : +vx[b].imag();
+            reg_imag[b].y = dagger ? -vy[b].imag() : +vy[b].imag();
+          }
+        }
+      } else {
+        complex<T> v[batch * 2];
+        batch_load_t<complex<T>, batch * 2>::load(v, &p[n_idx * ld + m_idx]);
+
+#pragma unroll
+        for (int b = 0; b < batch; b++) {
+          if constexpr (fixed) {
+            reg_real[b].x = scale_inv * v[b * 2 + 0].real();
+            reg_real[b].y = scale_inv * v[b * 2 + 1].real();
+            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+            reg_imag[b].x = scale_inv_conj * v[b * 2 + 0].imag();
+            reg_imag[b].y = scale_inv_conj * v[b * 2 + 1].imag();
+          } else {
+            reg_real[b].x = +v[b * 2 + 0].real();
+            reg_real[b].y = +v[b * 2 + 1].real();
+            reg_imag[b].x = dagger ? -v[b * 2 + 0].imag() : +v[b * 2 + 0].imag();
+            reg_imag[b].y = dagger ? -v[b * 2 + 1].imag() : +v[b * 2 + 1].imag();
+          }
+        }
+      }
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
     inline __device__ void convert_x(half2 reg_real[batch], half2 reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
                                      float scale_inv)
     {
@@ -135,13 +195,14 @@ namespace quda
 
 #pragma unroll
         for (int b = 0; b < batch; b++) {
-          if (fixed) {
+          if constexpr (fixed) {
             reg_real[b] = __floats2half2_rn(scale_inv * vx[b].real(), scale_inv * vy[b].real());
             auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
             reg_imag[b] = __floats2half2_rn(scale_inv_conj * vx[b].imag(), scale_inv_conj * vy[b].imag());
           } else {
             reg_real[b] = __floats2half2_rn(+vx[b].real(), +vy[b].real());
-            reg_imag[b] = __floats2half2_rn(dagger ? -vx[b].imag() : +vx[b].imag(), dagger ? -vy[b].imag() : +vy[b].imag());
+            reg_imag[b]
+              = __floats2half2_rn(dagger ? -vx[b].imag() : +vx[b].imag(), dagger ? -vy[b].imag() : +vy[b].imag());
           }
         }
       } else {
@@ -150,13 +211,60 @@ namespace quda
 
 #pragma unroll
         for (int b = 0; b < batch; b++) {
-          if (fixed) {
+          if constexpr (fixed) {
             reg_real[b] = __floats2half2_rn(scale_inv * v[b * 2].real(), scale_inv * v[b * 2 + 1].real());
             auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
             reg_imag[b] = __floats2half2_rn(scale_inv_conj * v[b * 2].imag(), scale_inv_conj * v[b * 2 + 1].imag());
           } else {
             reg_real[b] = __floats2half2_rn(+v[b * 2].real(), +v[b * 2 + 1].real());
-            reg_imag[b] = __floats2half2_rn(dagger ? -v[b * 2].imag() : +v[b * 2].imag(), dagger ? -v[b * 2 + 1].imag() : +v[b * 2 + 1].imag());
+            reg_imag[b] = __floats2half2_rn(dagger ? -v[b * 2].imag() : +v[b * 2].imag(),
+                                            dagger ? -v[b * 2 + 1].imag() : +v[b * 2 + 1].imag());
+          }
+        }
+      }
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
+    inline __device__ void convert_x_rescale(half2 reg_real[batch], half2 reg_imag[batch], complex<T> *p, int m_idx,
+                                             int n_idx, float scale_inv, float rescale)
+    {
+      if constexpr (x) {
+        complex<T> vx[batch];
+        complex<T> vy[batch];
+        batch_load_t<complex<T>, batch>::load(vx, &p[(m_idx + 0) * ld + n_idx]);
+        batch_load_t<complex<T>, batch>::load(vy, &p[(m_idx + 1) * ld + n_idx]);
+
+#pragma unroll
+        for (int b = 0; b < batch; b++) {
+          if constexpr (fixed) {
+            float scale_inv_rescale = scale_inv * rescale;
+            reg_real[b] = __floats2half2_rn(scale_inv_rescale * vx[b].real(), scale_inv_rescale * vy[b].real());
+            auto scale_inv_conj = dagger ? -scale_inv_rescale : scale_inv_rescale;
+            reg_imag[b] = __floats2half2_rn(scale_inv_conj * vx[b].imag(), scale_inv_conj * vy[b].imag());
+          } else {
+            reg_real[b] = __floats2half2_rn(+vx[b].real() * rescale, +vy[b].real() * rescale);
+            reg_imag[b] = __floats2half2_rn((dagger ? -vx[b].imag() : +vx[b].imag()) * rescale,
+                                            (dagger ? -vy[b].imag() : +vy[b].imag()) * rescale);
+          }
+        }
+      } else {
+        complex<T> v[batch * 2];
+        batch_load_t<complex<T>, batch * 2>::load(v, &p[n_idx * ld + m_idx]);
+
+#pragma unroll
+        for (int b = 0; b < batch; b++) {
+          if constexpr (fixed) {
+            float scale_inv_rescale = scale_inv * rescale;
+            reg_real[b] = __floats2half2_rn(scale_inv_rescale * v[b * 2].real(), scale_inv_rescale * v[b * 2 + 1].real());
+            auto scale_inv_conj = dagger ? -scale_inv_rescale : scale_inv_rescale;
+            reg_imag[b] = __floats2half2_rn(scale_inv_conj * v[b * 2].imag(), scale_inv_conj * v[b * 2 + 1].imag());
+          } else {
+            reg_real[b] = __floats2half2_rn(+v[b * 2].real() * rescale, +v[b * 2 + 1].real() * rescale);
+            reg_imag[b] = __floats2half2_rn((dagger ? -v[b * 2].imag() : +v[b * 2].imag()) * rescale,
+                                            (dagger ? -v[b * 2 + 1].imag() : +v[b * 2 + 1].imag()) * rescale);
           }
         }
       }
@@ -175,7 +283,7 @@ namespace quda
 #pragma unroll
         for (int b = 0; b < batch; b++) {
           // auto xx = p[m_idx * ld + n_idx];
-          if (fixed) {
+          if constexpr (fixed) {
             reg_real[b] = scale_inv * v[b].real();
             auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
             reg_imag[b] = scale_inv_conj * v[b].imag();
@@ -190,7 +298,7 @@ namespace quda
 #pragma unroll
         for (int b = 0; b < batch; b++) {
           // auto xx = p[n_idx * ld + m_idx];
-          if (fixed) {
+          if constexpr (fixed) {
             reg_real[b] = scale_inv * v[b].real();
             auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
             reg_imag[b] = scale_inv_conj * v[b].imag();
@@ -212,7 +320,7 @@ namespace quda
       if (x) {
         auto xx = p[m_idx * ld + n_idx];
 
-        if (fixed) {
+        if constexpr (fixed) {
           reg_real = scale_inv * xx.real() * rescale;
           auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
           reg_imag = scale_inv_conj * xx.imag() * rescale;
@@ -223,7 +331,7 @@ namespace quda
       } else {
         auto xx = p[n_idx * ld + m_idx];
 
-        if (fixed) {
+        if constexpr (fixed) {
           reg_real = scale_inv * xx.real() * rescale;
           auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
           reg_imag = scale_inv_conj * xx.imag() * rescale;
@@ -242,10 +350,10 @@ namespace quda
     {
       float this_max = 0.0f;
 
-      if (x) {
+      if constexpr (x) {
         auto xx = p[m_idx * ld + n_idx];
 
-        if (fixed) {
+        if constexpr (fixed) {
           this_max = abs_max(scale_inv * xx.real(), this_max);
           this_max = abs_max(scale_inv * xx.imag(), this_max);
         } else {
@@ -255,7 +363,7 @@ namespace quda
       } else {
         auto xx = p[n_idx * ld + m_idx];
 
-        if (fixed) {
+        if constexpr (fixed) {
           this_max = abs_max(scale_inv * xx.real(), this_max);
           this_max = abs_max(scale_inv * xx.imag(), this_max);
         } else {
@@ -269,9 +377,13 @@ namespace quda
 
     template <class T> constexpr int get_mn_batch(int internal_batch, int register_dim, int block)
     {
-      return ((register_dim % (internal_batch * 4) == 0 && block % (internal_batch * 4) == 0 && sizeof(T) * internal_batch * 8 <= 16) ?
-               4 :
-               ((register_dim % (internal_batch * 2) == 0 && block % (internal_batch * 2) == 0 && sizeof(T) * internal_batch * 4 <= 16) ? 2 : 1));
+      return ((register_dim % (internal_batch * 4) == 0 && block % (internal_batch * 4) == 0
+               && sizeof(T) * internal_batch * 8 <= 16) ?
+                4 :
+                ((register_dim % (internal_batch * 2) == 0 && block % (internal_batch * 2) == 0
+                  && sizeof(T) * internal_batch * 4 <= 16) ?
+                   2 :
+                   1));
     }
 
     /**
@@ -472,8 +584,8 @@ namespace quda
        * ld: leading dimension of global memory
        * dagger: if we need to store daggered (tranpose and hermision conjugate)
        */
-      template <int ld, bool dagger, class GmemAccessor>
-      __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
+      template <int ld, bool dagger, bool rescale, class GmemAccessor>
+      __device__ inline float g2r_rescale(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
         auto p = gmem.data();
         auto scale_inv = gmem.get_scale_inv();
@@ -494,6 +606,11 @@ namespace quda
         constexpr bool check_global_bound = !(M % bM == 0 && N % bN == 0);
         constexpr bool check_shared_bound = !(bM % m_stride == 0 && bN % n_stride == 0);
 
+        using store_array_t = typename VectorType<float, batch>::type;
+
+        store_array_t f_real[register_count];
+        store_array_t f_imag[register_count];
+
         if constexpr (x) {
           constexpr int n_batch = get_mn_batch<store_t>(1, n_dim, bN);
 #pragma unroll
@@ -505,19 +622,19 @@ namespace quda
               int n_idx_blk = (n * n_stride + n_thread_offset) * n_batch;
               int m_idx_blk = m * m_stride + m_thread_offset;
 
-              if (!check_shared_bound || (m_idx_blk < bM && n_idx_blk < bN)) {
+              int n_idx = n_idx_blk + n_offset;
+              int m_idx = m_idx_blk + m_offset;
 
-                int n_idx = n_idx_blk + n_offset;
-                int m_idx = m_idx_blk + m_offset;
+              bool b1 = !check_shared_bound || (m_idx_blk < bM && n_idx_blk < bN);
+              bool b2 = !check_global_bound || (n_idx < N && m_idx < M);
 
-                if (!check_global_bound || (n_idx < N && m_idx < M)) {
-                  convert_x<x, fixed, dagger, ld, n_batch>(
-                    &reg_real[m * n_dim + n * n_batch], &reg_imag[m * n_dim + n * n_batch], p, m_idx, n_idx, scale_inv);
-                } else {
+              if (b1 && b2) {
+                convert_x<x, fixed, dagger, ld, n_batch>(&f_real[m * n_dim + n * n_batch],
+                                                         &f_imag[m * n_dim + n * n_batch], p, m_idx, n_idx, scale_inv);
+              } else {
 #pragma unroll
-                  for (int b = 0; b < n_batch; b++) {
-                    zero(reg_real[m * n_dim + n * n_batch + b], reg_imag[m * n_dim + n * n_batch + b]);
-                  }
+                for (int b = 0; b < n_batch; b++) {
+                  zero(f_real[m * n_dim + n * n_batch + b], f_imag[m * n_dim + n * n_batch + b]);
                 }
               }
             }
@@ -533,33 +650,99 @@ namespace quda
               int n_idx_blk = n * n_stride + n_thread_offset;
               int m_idx_blk = (m * m_stride + m_thread_offset) * m_batch;
 
-              if (!check_shared_bound || (m_idx_blk < bM && n_idx_blk < bN)) {
+              int n_idx = n_idx_blk + n_offset;
+              int m_idx = m_idx_blk + m_offset;
 
-                int n_idx = n_idx_blk + n_offset;
-                int m_idx = m_idx_blk + m_offset;
+              bool b1 = !check_shared_bound || (m_idx_blk < bM && n_idx_blk < bN);
+              bool b2 = !check_global_bound || (n_idx < N && m_idx < M);
 
-                if (!check_global_bound || (n_idx < N && m_idx < M)) {
-                  load_t v_real[m_batch];
-                  load_t v_imag[m_batch];
-                  convert_x<x, fixed, dagger, ld, m_batch>(v_real, v_imag, p, m_idx, n_idx, scale_inv);
+              if (b1 && b2) {
+                store_array_t v_real[m_batch];
+                store_array_t v_imag[m_batch];
+                convert_x<x, fixed, dagger, ld, m_batch>(v_real, v_imag, p, m_idx, n_idx, scale_inv);
 #pragma unroll
-                  for (int b = 0; b < m_batch; b++) {
-                    reg_real[(m * m_batch + b) * n_dim + n] = v_real[b];
-                    reg_imag[(m * m_batch + b) * n_dim + n] = v_imag[b];
-                  }
-                } else {
+                for (int b = 0; b < m_batch; b++) {
+                  f_real[(m * m_batch + b) * n_dim + n] = v_real[b];
+                  f_imag[(m * m_batch + b) * n_dim + n] = v_imag[b];
+                }
+              } else {
 #pragma unroll
-                  for (int b = 0; b < m_batch; b++) {
-                    zero(reg_real[(m * m_batch + b) * n_dim + n], reg_imag[(m * m_batch + b) * n_dim + n]);
-                  }
+                for (int b = 0; b < m_batch; b++) {
+                  zero(f_real[(m * m_batch + b) * n_dim + n], f_imag[(m * m_batch + b) * n_dim + n]);
                 }
               }
             }
           }
         }
+
+        float block_rescale_factor = 1.0f;
+        if constexpr (rescale) {
+          float thread_max = 0;
+#pragma unroll
+          for (int n = 0; n < n_dim; n++) {
+#pragma unroll
+            for (int m = 0; m < m_dim; m++) {
+              thread_max = abs_max(f_real[m * n_dim + n], thread_max);
+              thread_max = abs_max(f_imag[m * n_dim + n], thread_max);
+            }
+          }
+
+          // block all-reduce thread_max
+          using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
+          __shared__ typename block_reduce_t::TempStorage temp_storage;
+          float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+
+          __shared__ float block_max_all;
+          if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
+            if (block_max > 0.0f) {
+              block_max_all = block_max;
+            } else {
+              block_max_all = 1.0f;
+            }
+          }
+          __syncthreads();
+
+          block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
+        }
+
+        if constexpr (std::is_same_v<load_t, half2>) {
+#pragma unroll
+          for (int n = 0; n < n_dim; n++) {
+#pragma unroll
+            for (int m = 0; m < m_dim; m++) {
+              reg_real[m * n_dim + n] = __floats2half2_rn(f_real[m * n_dim + n].x * block_rescale_factor,
+                                                          f_real[m * n_dim + n].y * block_rescale_factor);
+              reg_imag[m * n_dim + n] = __floats2half2_rn(f_imag[m * n_dim + n].x * block_rescale_factor,
+                                                          f_imag[m * n_dim + n].y * block_rescale_factor);
+            }
+          }
+        } else {
+#pragma unroll
+          for (int n = 0; n < n_dim; n++) {
+#pragma unroll
+            for (int m = 0; m < m_dim; m++) {
+              reg_real[m * n_dim + n] = f_real[m * n_dim + n] * block_rescale_factor;
+              reg_imag[m * n_dim + n] = f_imag[m * n_dim + n] * block_rescale_factor;
+            }
+          }
+        }
+
+        return 1.0f / block_rescale_factor;
       }
 
-      template <class GmemAccessor, bool dagger, class SmemObj> __device__ inline void r2s(SmemObj &smem_real, SmemObj &smem_imag)
+      /**
+       * ld: leading dimension of global memory
+       * dagger: if we need to store daggered (tranpose and hermision conjugate)
+       */
+      template <int ld, bool dagger, class GmemAccessor>
+      __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
+      {
+        constexpr bool rescale = false;
+        g2r_rescale<ld, dagger, rescale>(gmem, m_offset, n_offset);
+      }
+
+      template <class GmemAccessor, bool dagger, class SmemObj>
+      __device__ inline void r2s(SmemObj &smem_real, SmemObj &smem_imag)
       {
         constexpr bool x = (transpose == dagger);
 

@@ -120,14 +120,27 @@ namespace quda
     constexpr bool a_dagger = true;
     constexpr bool b_dagger = true;
 
-    for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
-      __syncthreads();
-      a_loader.template g2r<lda, a_dagger>(a, m_offset, k_offset);
-      b_loader.template g2r<ldb, b_dagger>(b, n_offset, k_offset);
-      a_loader.template r2s<decltype(a), a_dagger>(smem_obj_a_real, smem_obj_a_imag);
-      b_loader.template r2s<decltype(b), b_dagger>(smem_obj_b_real, smem_obj_b_imag);
-      __syncthreads();
-      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+    if constexpr (Arg::mma_t::do_rescale()) {
+      for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+        __syncthreads();
+        constexpr bool rescale = true;
+        float a_rescale = a_loader.template g2r_rescale<lda, a_dagger, rescale>(a, m_offset, k_offset);
+        float b_rescale = b_loader.template g2r_rescale<ldb, b_dagger, rescale>(b, n_offset, k_offset);
+        a_loader.template r2s<decltype(a), a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template r2s<decltype(b), b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        __syncthreads();
+        accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, a_rescale * b_rescale);
+      }
+    } else {
+      for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+        __syncthreads();
+        a_loader.template g2r<lda, a_dagger>(a, m_offset, k_offset);
+        b_loader.template g2r<ldb, b_dagger>(b, n_offset, k_offset);
+        a_loader.template r2s<decltype(a), a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template r2s<decltype(b), b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        __syncthreads();
+        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+      }
     }
 
     auto c = arg.out(spinor_parity, x_cb, spin * Arg::spin_block_factor, 0, 0);
