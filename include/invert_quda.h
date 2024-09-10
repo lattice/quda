@@ -877,14 +877,14 @@ namespace quda {
   {
 
   private:
-    ColorSpinorField y;
-    ColorSpinorField r;
-    ColorSpinorField tmp;
-    ColorSpinorField ArS;
-    ColorSpinorField rS;
-    ColorSpinorField xS;
-    ColorSpinorField xS_old;
-    ColorSpinorField rS_old;
+    std::vector<ColorSpinorField> y;
+    std::vector<ColorSpinorField> r;
+    std::vector<ColorSpinorField> tmp;
+    std::vector<ColorSpinorField> ArS;
+    std::vector<ColorSpinorField> rS;
+    std::vector<ColorSpinorField> xS;
+    std::vector<ColorSpinorField> xS_old;
+    std::vector<ColorSpinorField> rS_old;
     bool init = false;
 
     /**
@@ -892,17 +892,12 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
     CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     /**
        @return Return the residual vector from the prior solve

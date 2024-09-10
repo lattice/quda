@@ -73,7 +73,7 @@ namespace quda {
   void CGNE::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
-    if (!init) {
+    if (!init || xe.size() != b.size()) {
       ColorSpinorParam csParam(x[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;
       resize(xe, b.size(), csParam);
@@ -164,7 +164,7 @@ namespace quda {
   void CGNR::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
-    if (!init) {
+    if (!init || br.size() != b.size()) {
       ColorSpinorParam csParam(b[0]);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       resize(br, b.size(), csParam);
