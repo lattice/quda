@@ -497,8 +497,8 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
 //   M_{ee}^{-1} D_{eo} (parity == 0)
 //   M_{oo}^{-1} D_{oe} (parity == 1)
 //
-void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *clover_inverse, double kappa, double mu,
-                     double epsilon, int parity, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision,
+void tmc_ndeg_dslash(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
+                     double epsilon, QudaMatPCType matpc_type, int parity, int dagger_bit, QudaPrecision precision,
                      QudaGaugeParam &gauge_param)
 {
   // V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
@@ -540,7 +540,7 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *clov
 }
 
 // Apply the even-odd preconditioned non-degenerate twisted clover Dirac operator
-void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *clover_inverse, double kappa, double mu,
+void tmc_ndeg_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                     double epsilon, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                     QudaGaugeParam &gauge_param)
 {
@@ -640,8 +640,8 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *clove
 //   for now   [  A             -k D            ]
 //             [ -k D    A(1 - i mu gamma_5 A)  ]
 
-void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, int dagger,
-                              QudaPrecision precision, QudaGaugeParam &gauge_param, QudaMatPCType matpc_type)
+void clover_ht_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, int dagger,
+                   QudaPrecision precision, QudaGaugeParam &gauge_param, QudaMatPCType matpc_type)
 {
   // out = CloverMat in
   clover_mat(out, gauge, clover, in, kappa, dagger, precision, gauge_param);
@@ -692,9 +692,8 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 }
 
 // Apply the even-odd preconditioned Dirac operator
-void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover, void *clover_inverse, double kappa,
-                                 double mu, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
-                                 QudaGaugeParam &gauge_param)
+void clover_ht_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
+                     QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
   clover_matpc(out, gauge, clover, clover_inverse, in, kappa, matpc_type, dagger, precision, gauge_param);
 

@@ -1040,8 +1040,8 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
                      inv_param->mu, inv_param->twist_flavor, myMatPCType, parity, QUDA_DAG_YES, inv_param->cpu_prec,
                      *gauge_param);
         } else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-          tmc_ndeg_dslash(x[i].Even().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(),
-                          inv_param->kappa, inv_param->mu, inv_param->epsilon, parity, myMatPCType, QUDA_DAG_YES,
+          tmc_ndeg_dslash(x[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(),
+                          inv_param->kappa, inv_param->mu, inv_param->epsilon, myMatPCType, parity, QUDA_DAG_YES,
                           inv_param->cpu_prec, *gauge_param);
         }
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -1056,7 +1056,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
           tmc_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa,
                     inv_param->mu, inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
         } else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-          tmc_ndeg_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+          tmc_ndeg_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa,
                          inv_param->mu, inv_param->epsilon, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
         }
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -1095,8 +1095,8 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
                      inv_param->kappa, inv_param->mu, inv_param->twist_flavor, myMatPCType, parity, QUDA_DAG_NO,
                      inv_param->cpu_prec, *gauge_param);
         else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)
-          tmc_ndeg_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(),
-                          inv_param->kappa, inv_param->mu, inv_param->epsilon, parity, myMatPCType, QUDA_DAG_YES,
+          tmc_ndeg_dslash(p[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), p[i].Odd().data(),
+                          inv_param->kappa, inv_param->mu, inv_param->epsilon, myMatPCType, parity, QUDA_DAG_YES,
                           inv_param->cpu_prec, *gauge_param);
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_dslash(p[i].Even().data(), gauge.data(), clover_inv.data(), p[i].Odd().data(), parity, QUDA_DAG_NO,

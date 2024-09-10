@@ -420,8 +420,8 @@ void ndeg_twist_gamma5(void *outf1, void *outf2, void *inf1, void *inf2, const i
   }
 }
 
-void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int parity, int dagger,
-                    QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
+                    int parity, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
   void *out1 = out;
   void *out2 = (char *)out1 + Vh * spinor_site_size * precision;
