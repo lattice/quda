@@ -4,6 +4,7 @@
 #include <kernels/prolongator_mma.cuh>
 #include <device.hpp>
 #include <int_factor_array.hpp>
+#include <mma_tensor_op/smma_m16n8k8_sm70.cuh>
 
 namespace quda
 {
@@ -97,9 +98,11 @@ namespace quda
       apply(device::get_default_stream());
     }
 
+    // using mma_t = typename mma::smma_dispatch<Float>::type;
     // using mma_t = simt::simt_t<float, 8, 4, 2, 2>;
-    // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>;  // 3xTF32
-    using mma_t = typename mma::smma_dispatch<Float>::type;
+    // using mma_t = smma::smma_x_t<mma::half, 8, 1, 1>;
+    using mma_t = hmma::hmma_x_t<16, 8, 8, mma::half, mma::half2>;
+    // using mma_t = hmma::hmma_t<16, 16, 4, mma::half, mma::half2>;
 
     static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
 
