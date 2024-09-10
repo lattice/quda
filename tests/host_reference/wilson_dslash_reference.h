@@ -102,20 +102,20 @@ void tm_matpc(void *out, void **gauge, void *in, double kappa, double mu, QudaTw
  *
  * @param out Host output rhs
  * @param gauge Gauge links
- * @param in Host input spinor
  * @param clover Host input clover
- * @param cInv Host input clover inverse
+ * @param clover_inverse Host input clover inverse
+ * @param in Host input spinor
  * @param kappa Kappa value for the Wilson operator
  * @param mu Mu parameter for the twist
  * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
- * @param parity 0 for D_eo, 1 for D_oe
  * @param matpc_type Matrix preconditioning type
+ * @param parity 0 for D_eo, 1 for D_oe
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
  * @param param Gauge field parameters
  */
-void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
-                QudaTwistFlavorType flavor, int parity, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+void tmc_dslash(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
+                QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision,
                 QudaGaugeParam &gauge_param);
 
 /**
@@ -140,9 +140,9 @@ void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, doub
  *
  * @param out Host output rhs
  * @param gauge Gauge links
- * @param in Host input spinor
  * @param clover Host input clover
- * @param cInv Host input clover inverse
+ * @param clover_inverse Host input clover inverse
+ * @param in Host input spinor
  * @param kappa Kappa value for the Wilson operator
  * @param mu Mu parameter for the twist
  * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
@@ -151,7 +151,7 @@ void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, doub
  * @param precision Single or double precision
  * @param param Gauge field parameters
  */
-void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
+void tmc_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                QudaGaugeParam &gauge_param);
 
@@ -162,7 +162,7 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
  * @param gauge Gauge links
  * @param in Host input spinor
  * @param clover Host input clover
- * @param cInv Host input clover inverse
+ * @param clover_inverse Host input clover inverse
  * @param kappa Kappa value for the Wilson operator
  * @param mu Mu parameter for the twist
  * @param epsilon Epsilon parameter for the non-degenerate term
@@ -172,7 +172,7 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
  * @param precision Single or double precision
  * @param param Gauge field parameters
  */
-void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
+void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *clover_inverse, double kappa, double mu,
                      double epsilon, int parity, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                      QudaGaugeParam &gauge_param);
 
@@ -200,7 +200,7 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
  * @param gauge Gauge links
  * @param in Host input spinor
  * @param clover Host input clover
- * @param cInv Host input clover inverse
+ * @param clover_inverse Host input clover inverse
  * @param kappa Kappa value for the Wilson operator
  * @param mu Mu parameter for the twist
  * @param epsilon Epsilon parameter for the non-degenerate term
@@ -210,8 +210,9 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
  * @param precision Single or double precision
  * @param param Gauge field parameters
  */
-void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, double epsilon,
-                    QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
+void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *clover_inverse, double kappa, double mu,
+                    double epsilon, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+                    QudaGaugeParam &gauge_param);
 
 /**
  * @brief Apply the even-odd or odd-even component of the non-degenerate twisted mass dslash
@@ -264,6 +265,15 @@ void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, dou
 void tm_ndeg_matpc(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
                    int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the clover to a single-parity spinor
+ *
+ * @param out Host output rhs
+ * @param clover Host input clover
+ * @param in Host input spinor
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param precision Single or double precision
+ */
 void apply_clover(void *out, void *clover, void *in, int parity, QudaPrecision precision);
 
 /**
@@ -337,7 +347,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
  * @param gauge Gauge links
  * @param in Host input spinor
  * @param clover Host input clover
- * @param cInv Host input clover inverse
+ * @param clover_inverse Host input clover inverse
  * @param kappa Kappa value for the Wilson operator
  * @param mu Mu parameter for the twis
  * @param matpc_type Matrix preconditioning typet
@@ -345,6 +355,6 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
  * @param precision Single or double precision
  * @param param Gauge field parameters
  */
-void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
-                                 QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover, void *clover_inverse, double kappa,
+                                 double mu, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                                  QudaGaugeParam &gauge_param);

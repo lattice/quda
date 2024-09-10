@@ -528,8 +528,8 @@ struct DslashTestWrapper {
         switch (dtest_type) {
         case dslash_test_type::Dslash:
           if (inv_param.twist_flavor == QUDA_TWIST_SINGLET)
-            tmc_dslash(spinorRef[i].data(), hostGauge, spinor[i].data(), hostClover, hostCloverInv, inv_param.kappa,
-                       inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, inv_param.dagger,
+            tmc_dslash(spinorRef[i].data(), hostGauge, hostClover, hostCloverInv, spinor[i].data(), inv_param.kappa,
+                       inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, parity, inv_param.dagger,
                        inv_param.cpu_prec, gauge_param);
           else
             tmc_ndeg_dslash(spinorRef[i].data(), hostGauge, spinor[i].data(), hostClover, hostCloverInv,
@@ -538,7 +538,7 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::MatPC:
           if (inv_param.twist_flavor == QUDA_TWIST_SINGLET)
-            tmc_matpc(spinorRef[i].data(), hostGauge, spinor[i].data(), hostClover, hostCloverInv, inv_param.kappa,
+            tmc_matpc(spinorRef[i].data(), hostGauge, hostClover, hostCloverInv, spinor[i].data(), inv_param.kappa,
                       inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, inv_param.dagger, inv_param.cpu_prec,
                       gauge_param);
           else
@@ -556,10 +556,10 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::MatPCDagMatPC:
           if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
-            tmc_matpc(spinorTmp[i].data(), hostGauge, spinor[i].data(), hostClover, hostCloverInv, inv_param.kappa,
+            tmc_matpc(spinorTmp[i].data(), hostGauge, hostClover, hostCloverInv, spinor[i].data(), inv_param.kappa,
                       inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, inv_param.dagger, inv_param.cpu_prec,
                       gauge_param);
-            tmc_matpc(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), hostClover, hostCloverInv, inv_param.kappa,
+            tmc_matpc(spinorRef[i].data(), hostGauge, hostClover, hostCloverInv, spinorTmp[i].data(), inv_param.kappa,
                       inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, not_dagger, inv_param.cpu_prec,
                       gauge_param);
           } else {
