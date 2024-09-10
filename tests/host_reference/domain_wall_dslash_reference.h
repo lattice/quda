@@ -1,12 +1,7 @@
-#ifndef _DOMAIN_WALL_DSLASH_REFERENCE_H
-#define _DOMAIN_WALL_DSLASH_REFERENCE_H
+#pragma once
 
-#include <enum_quda.h>
-#include <quda.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <quda_internal.h>
+#include <color_spinor_field.h>
 
 void dw_dslash(void *res, void *const *gaugeFull, void *spinorField, int oddBit, int dagger, QudaPrecision precision,
                QudaGaugeParam &param, double mferm);
@@ -68,9 +63,3 @@ void mdw_eofa_mat(void *out, void *const *gauge, void *in, int dagger, QudaPreci
 void mdw_eofa_matpc(void *out, void *const *gauge, void *in, QudaMatPCType matpc_type, int dagger,
                     QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c,
                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // _DSLASH_REFERENCE_H

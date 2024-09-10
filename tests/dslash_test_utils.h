@@ -470,7 +470,7 @@ struct DslashTestWrapper {
         case dslash_test_type::Dslash:
           if (inv_param.twist_flavor == QUDA_TWIST_SINGLET)
             tm_dslash(spinorRef[i].data(), hostGauge, spinor[i].data(), inv_param.kappa, inv_param.mu,
-                      inv_param.twist_flavor, parity, inv_param.matpc_type, inv_param.dagger, inv_param.cpu_prec,
+                      inv_param.twist_flavor, inv_param.matpc_type, parity, inv_param.dagger, inv_param.cpu_prec,
                       gauge_param);
           else {
             tm_ndeg_dslash(spinorRef[i].data(), hostGauge, spinor[i].data(), inv_param.kappa, inv_param.mu,

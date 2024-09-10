@@ -1,81 +1,350 @@
-#ifndef _WILSON_DSLASH_REFERENCE_H
-#define _WILSON_DSLASH_REFERENCE_H
+#pragma once
 
-#include <enum_quda.h>
-#include <quda.h>
+#include <quda_internal.h>
+#include <color_spinor_field.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/**
+ * @brief Apply even-odd or odd-even component of the Wilson dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param gauge_param Gauge field parameters
+ */
+void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaPrecision precision,
+                QudaGaugeParam &gauge_param);
 
-void wil_dslash(void *res, void **gauge, void *spinorField, int oddBit, int daggerBit, QudaPrecision precision,
-                QudaGaugeParam &param);
+/**
+ * @brief Apply the full-parity Wilson dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger, QudaPrecision precision,
+             QudaGaugeParam &gauge_param);
 
-void wil_mat(void *out, void **gauge, void *in, double kappa, int daggerBit, QudaPrecision precision,
-             QudaGaugeParam &param);
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned Wilson dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void wil_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger,
+               QudaPrecision precision, QudaGaugeParam &gauge_param);
 
-void wil_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int daggerBit,
-               QudaPrecision precision, QudaGaugeParam &param);
+/**
+ * @brief Apply the even-odd or odd-even component of the twisted mass dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param matpc_type Matrix preconditioning type
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tm_dslash(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
+               QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
-void tm_dslash(void *res, void **gauge, void *spinorField, double kappa, double mu, QudaTwistFlavorType flavor,
-               int oddBit, QudaMatPCType matpc_type, int daggerBit, QudaPrecision sprecision, QudaGaugeParam &param);
+/**
+ * @brief Apply the full parity twisted mass operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor, int dagger,
+            QudaPrecision precision, QudaGaugeParam &gauge_param);
 
-void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor, int daggerBit,
-            QudaPrecision precision, QudaGaugeParam &param);
-
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned twisted mass operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void tm_matpc(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
-              QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &param);
+              QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the even-odd or odd-even component of the twisted clover dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param clover Host input clover
+ * @param cInv Host input clover inverse
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
-                QudaTwistFlavorType flavor, int oddBit, QudaMatPCType matpc_type, int daggerBit,
-                QudaPrecision sprecision, QudaGaugeParam &param);
+                QudaTwistFlavorType flavor, int parity, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+                QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the full parity twisted clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param clover Host input clover
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
              int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned twisted clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param clover Host input clover
+ * @param cInv Host input clover inverse
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
                QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                QudaGaugeParam &gauge_param);
 
-void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon,
-                  int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param);
+/**
+ * @brief Apply the even-odd or odd-even component of the non-degenerate twisted clover dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param clover Host input clover
+ * @param cInv Host input clover inverse
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param epsilon Epsilon parameter for the non-degenerate term
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
+                     double epsilon, int parity, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+                     QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the full parity non-degenerate twisted clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param clover Host input clover
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param epsilon Epsilon parameter for the non-degenerate term
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon, int dagger,
+                  QudaPrecision precision, QudaGaugeParam &gauge_param);
+
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned non-degenerate twisted clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param clover Host input clover
+ * @param cInv Host input clover inverse
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param epsilon Epsilon parameter for the non-degenerate term
+ * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, double epsilon,
                     QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
-void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
-                     double epsilon, int oddBit, QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision,
-                     QudaGaugeParam &gauge_param);
+/**
+ * @brief Apply the even-odd or odd-even component of the non-degenerate twisted mass dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param epsilon Epsilon parameter for the non-degenerate term
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param matpc_type Matrix preconditioning type
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int parity, int dagger,
+                    QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
-void tm_ndeg_dslash(void *out, void **gaugeFull, void *in, double kappa, double mu, double epsilon, int oddBit,
-                    int daggerBit, QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param);
-
-void tm_ndeg_matpc(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
-                   int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param);
-
-void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int dagger_bit,
+/**
+ * @brief Apply the full-parity non-degenerate twisted mass dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param epsilon Epsilon parameter for the non-degenerate term
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int dagger,
                  QudaPrecision precision, QudaGaugeParam &gauge_param);
+
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned non-degenerate twisted mass operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param epsilon Epsilon parameter for the non-degenerate term
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void tm_ndeg_matpc(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
+                   int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
 void apply_clover(void *out, void *clover, void *in, int parity, QudaPrecision precision);
 
-void clover_dslash(void *res, void **gauge, void *clover, void *spinorField, int oddBit, int daggerBit,
-                   QudaPrecision precision, QudaGaugeParam &param);
+/**
+ * @brief Apply the even-odd or odd-even component of the clover dslash
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param clover Host input clover
+ * @param in Host input spinor
+ * @param parity 0 for D_eo, 1 for D_oe
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
+void clover_dslash(void *out, void **gauge, void *clover, void *in, int parity, int dagger, QudaPrecision precision,
+                   QudaGaugeParam &param);
 
+/**
+ * @brief Apply the full parity clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param clover Host input clover
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void clover_mat(void *out, void **gauge, void *clover, void *in, double kappa, int dagger, QudaPrecision precision,
                 QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param clover Host input clover
+ * @param clover_inverse Host input clover inverse
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param matpc_type Matrix preconditioning type
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void *in, double kappa,
                   QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
+/**
+ * @brief Apply the full parity Hasenbusch-twisted clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param clover Host input clover
+ * @param in Host input spinor
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twist
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ * @param matpc_type Matrix preconditioning type
+ */
 void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, int dagger,
                               QudaPrecision precision, QudaGaugeParam &gauge_param, QudaMatPCType matpc_type);
 
+/**
+ * @brief Apply the even-even or odd-odd symmetric or asymmetric preconditioned Hasenbusch-twisted clover operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param clover Host input clover
+ * @param cInv Host input clover inverse
+ * @param kappa Kappa value for the Wilson operator
+ * @param mu Mu parameter for the twis
+ * @param matpc_type Matrix preconditioning typet
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param param Gauge field parameters
+ */
 void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
                                  QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
                                  QudaGaugeParam &gauge_param);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // _WILSON_DSLASH_REFERENCE_H

@@ -420,7 +420,7 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
 
 // apply the full non-degenerate twisted-clover operator
 void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon,
-                  int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param)
+                  int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
   // V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
   void *inEven1 = in;
@@ -442,16 +442,16 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
   void *tmpOdd2 = safe_malloc(Vh * spinor_site_size * precision);
 
   // full dslash operator:
-  wil_dslash(outOdd1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
-  wil_dslash(outOdd2, gauge, inEven2, 1, daggerBit, precision, gauge_param);
+  wil_dslash(outOdd1, gauge, inEven1, 1, dagger_bit, precision, gauge_param);
+  wil_dslash(outOdd2, gauge, inEven2, 1, dagger_bit, precision, gauge_param);
   // apply the twisted clover term
-  ndegTwistCloverGamma5(tmpEven1, tmpEven2, inEven1, inEven2, clover, NULL, daggerBit, kappa, mu, epsilon, 0,
+  ndegTwistCloverGamma5(tmpEven1, tmpEven2, inEven1, inEven2, clover, NULL, dagger_bit, kappa, mu, epsilon, 0,
                         QUDA_TWIST_GAMMA5_DIRECT, precision);
 
-  wil_dslash(outEven1, gauge, inOdd1, 0, daggerBit, precision, gauge_param);
-  wil_dslash(outEven2, gauge, inOdd2, 0, daggerBit, precision, gauge_param);
+  wil_dslash(outEven1, gauge, inOdd1, 0, dagger_bit, precision, gauge_param);
+  wil_dslash(outEven2, gauge, inOdd2, 0, dagger_bit, precision, gauge_param);
   // apply the twisted clover term
-  ndegTwistCloverGamma5(tmpOdd1, tmpOdd2, inOdd1, inOdd2, clover, NULL, daggerBit, kappa, mu, epsilon, 1,
+  ndegTwistCloverGamma5(tmpOdd1, tmpOdd2, inOdd1, inOdd2, clover, NULL, dagger_bit, kappa, mu, epsilon, 1,
                         QUDA_TWIST_GAMMA5_DIRECT, precision);
 
   // combine
@@ -468,23 +468,23 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
   host_free(tmpEven2);
 }
 
-// daggerBit && (QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || QUDA_MATPC_ODD_ODD_ASYMMETRIC)
+// dagger_bit && (QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || QUDA_MATPC_ODD_ODD_ASYMMETRIC)
 //
-//   M_{ee}^{-1}^\dagger (D_{eo})^\dagger M_{oo}^{-1}^\dagger  (oddBit == 0)
-//   M_{oo}^{-1}^\dagger (D_{oe})^\dagger M_{ee}^{-1}^\dagger  (oddBit == 1)
+//   M_{ee}^{-1}^\dagger (D_{eo})^\dagger M_{oo}^{-1}^\dagger  (parity == 0)
+//   M_{oo}^{-1}^\dagger (D_{oe})^\dagger M_{ee}^{-1}^\dagger  (parity == 1)
 //
-// daggerBit && (QUDA_MATPC_EVEN_EVEN || QUDA_MATPC_ODD_ODD)
+// dagger_bit && (QUDA_MATPC_EVEN_EVEN || QUDA_MATPC_ODD_ODD)
 //
-//   (D_{oe})^\dagger M_{oo}^{-1}^\dagger (oddBit == 0)
-//   (D_{eo})^\dagger M_{ee}^{-1}^\dagger (oddBit == 1)
+//   (D_{oe})^\dagger M_{oo}^{-1}^\dagger (parity == 0)
+//   (D_{eo})^\dagger M_{ee}^{-1}^\dagger (parity == 1)
 //
-// !daggerBit
+// !dagger_bit
 //
-//   M_{ee}^{-1} D_{eo} (oddBit == 0)
-//   M_{oo}^{-1} D_{oe} (oddBit == 1)
+//   M_{ee}^{-1} D_{eo} (parity == 0)
+//   M_{oo}^{-1} D_{oe} (parity == 1)
 //
 void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
-                     double epsilon, int oddBit, QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision,
+                     double epsilon, int parity, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision,
                      QudaGaugeParam &gauge_param)
 {
   // V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
@@ -497,28 +497,28 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv
   void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
   void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
-  if (daggerBit) {
-    ndegTwistCloverGamma5(tmp1, tmp2, in1, in2, clover, cInv, daggerBit, kappa, mu, epsilon, 1 - oddBit,
+  if (dagger_bit) {
+    ndegTwistCloverGamma5(tmp1, tmp2, in1, in2, clover, cInv, dagger_bit, kappa, mu, epsilon, 1 - parity,
                           QUDA_TWIST_GAMMA5_INVERSE, precision);
     if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       void *tmptmp1 = safe_malloc(Vh * spinor_site_size * precision);
       void *tmptmp2 = safe_malloc(Vh * spinor_site_size * precision);
-      wil_dslash(tmptmp1, gauge, in1, oddBit, daggerBit, precision, gauge_param);
-      wil_dslash(tmptmp2, gauge, in2, oddBit, daggerBit, precision, gauge_param);
-      ndegTwistCloverGamma5(out1, out2, tmptmp1, tmptmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
+      wil_dslash(tmptmp1, gauge, in1, parity, dagger_bit, precision, gauge_param);
+      wil_dslash(tmptmp2, gauge, in2, parity, dagger_bit, precision, gauge_param);
+      ndegTwistCloverGamma5(out1, out2, tmptmp1, tmptmp2, clover, cInv, dagger_bit, kappa, mu, epsilon, parity,
                             QUDA_TWIST_GAMMA5_INVERSE, precision);
       host_free(tmptmp1);
       host_free(tmptmp2);
     } else {
-      ndegTwistCloverGamma5(tmp1, tmp2, in1, in2, clover, cInv, daggerBit, kappa, mu, epsilon, 1 - oddBit,
+      ndegTwistCloverGamma5(tmp1, tmp2, in1, in2, clover, cInv, dagger_bit, kappa, mu, epsilon, 1 - parity,
                             QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(out1, gauge, tmp1, oddBit, daggerBit, precision, gauge_param);
-      wil_dslash(out2, gauge, tmp2, oddBit, daggerBit, precision, gauge_param);
+      wil_dslash(out1, gauge, tmp1, parity, dagger_bit, precision, gauge_param);
+      wil_dslash(out2, gauge, tmp2, parity, dagger_bit, precision, gauge_param);
     }
   } else {
-    wil_dslash(tmp1, gauge, in1, oddBit, daggerBit, precision, gauge_param);
-    wil_dslash(tmp2, gauge, in2, oddBit, daggerBit, precision, gauge_param);
-    ndegTwistCloverGamma5(out1, out2, tmp1, tmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
+    wil_dslash(tmp1, gauge, in1, parity, dagger_bit, precision, gauge_param);
+    wil_dslash(tmp2, gauge, in2, parity, dagger_bit, precision, gauge_param);
+    ndegTwistCloverGamma5(out1, out2, tmp1, tmp2, clover, cInv, dagger_bit, kappa, mu, epsilon, parity,
                           QUDA_TWIST_GAMMA5_INVERSE, precision);
   }
   host_free(tmp1);
