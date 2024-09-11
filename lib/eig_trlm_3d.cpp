@@ -35,31 +35,21 @@ namespace quda
 
     residua_3D.resize(ortho_dim_size);
     ritz_mat_3D.resize(ortho_dim_size);
-    converged_3D.resize(ortho_dim_size);
-    active_3D.resize(ortho_dim_size);
+    converged_3D.resize(ortho_dim_size, false);
+    active_3D.resize(ortho_dim_size, false);
 
-    iter_locked_3D.resize(ortho_dim_size);
-    iter_keep_3D.resize(ortho_dim_size);
-    iter_converged_3D.resize(ortho_dim_size);
+    iter_locked_3D.resize(ortho_dim_size, 0);
+    iter_keep_3D.resize(ortho_dim_size, 0);
+    iter_converged_3D.resize(ortho_dim_size, 0);
 
-    num_locked_3D.resize(ortho_dim_size);
-    num_keep_3D.resize(ortho_dim_size);
-    num_converged_3D.resize(ortho_dim_size);
+    num_locked_3D.resize(ortho_dim_size, 0);
+    num_keep_3D.resize(ortho_dim_size, 0);
+    num_converged_3D.resize(ortho_dim_size, 0);
 
     for (int i = 0; i < ortho_dim_size; i++) {
       alpha_3D[i].resize(n_kr, 0.0);
       beta_3D[i].resize(n_kr, 0.0);
       residua_3D[i].resize(n_kr, 0.0);
-      converged_3D[i] = false;
-      active_3D[i] = false;
-
-      iter_locked_3D[i] = 0;
-      iter_keep_3D[i] = 0;
-      iter_converged_3D[i] = 0;
-
-      num_locked_3D[i] = 0;
-      num_keep_3D[i] = 0;
-      num_converged_3D[i] = 0;
     }
 
     // 3D thick restart specific checks
