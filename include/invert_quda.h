@@ -1247,56 +1247,53 @@ namespace quda {
     bool lambda_init;
     QudaCABasis basis;
 
-    std::vector<double> Q_AQandg; // Fused inner product matrix
-    std::vector<double> Q_AS;     // inner product matrix
-    std::vector<double> alpha;    // QAQ^{-1} g
-    std::vector<double> beta;     // QAQ^{-1} QpolyS
+    std::vector<std::vector<double>> Q_AQandg; // Fused inner product matrix
+    std::vector<std::vector<double>> Q_AS;     // inner product matrix
+    std::vector<std::vector<double>> alpha;    // QAQ^{-1} g
+    std::vector<std::vector<double>> beta;     // QAQ^{-1} QpolyS
 
-    ColorSpinorField r;
+    std::vector<ColorSpinorField> r;
 
-    std::vector<ColorSpinorField> S;    // residual vectors
-    std::vector<ColorSpinorField> AS;   // mat * residual vectors. Can be replaced by a single temporary.
-    std::vector<ColorSpinorField> Q;    // CG direction vectors
-    std::vector<ColorSpinorField> Qtmp; // CG direction vectors for pointer swap
-    std::vector<ColorSpinorField> AQ;   // mat * CG direction vectors.
-                                        // it's possible to avoid carrying these
-                                        // around, but there's a stability penalty,
-                                        // and computing QAQ becomes a pain (though
-                                        // it does let you fuse the reductions...)
+    std::vector<std::vector<ColorSpinorField>> S;    // residual vectors
+    std::vector<std::vector<ColorSpinorField>> AS;   // mat * residual vectors. Can be replaced by a single temporary.
+    std::vector<std::vector<ColorSpinorField>> Q;    // CG direction vectors
+    std::vector<std::vector<ColorSpinorField>> Qtmp; // CG direction vectors for pointer swap
+    std::vector<std::vector<ColorSpinorField>> AQ;   // mat * CG direction vectors.
+                                                     // it's possible to avoid carrying these
+                                                     // around, but there's a stability penalty,
+                                                     // and computing QAQ becomes a pain (though
+                                                     // it does let you fuse the reductions...)
 
     /**
        @brief Initiate the fields needed by the solver
        @param[in] x Solution vector
        @param[in] b Source vector
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
     /**
        @brief Compute the alpha coefficients
+       @param[in] b batch number
     */
-    void compute_alpha();
+    void compute_alpha(int b);
 
     /**
        @brief Compute the beta coefficients
+       @param[in] b batch number
     */
-    void compute_beta();
+    void compute_beta(int b);
 
     /**
-       @ brief Check if it's time for a reliable update
+       @brief Check if it's time for a reliable update
     */
-    int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
+    int reliable(double &rNorm, double &maxrr, int &rUpdate, const double &r2, const double &delta);
 
   public:
     CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param);
     virtual ~CACG();
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     /**
        @return Return the residual vector from the prior solve
