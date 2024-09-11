@@ -279,8 +279,6 @@ extern "C" {
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
-    QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
-
     /** Number of steps in s-step algorithms */
     int Nsteps;
 

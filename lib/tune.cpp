@@ -355,7 +355,7 @@ namespace quda
    */
   void loadTuneCache()
   {
-    if (getTuning() == QUDA_TUNE_NO) {
+    if (!getTuning()) {
       warningQuda("Autotuning disabled");
       return;
     }
@@ -857,7 +857,7 @@ namespace quda
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
+  TuneParam tuneLaunch(Tunable &tunable, bool enabled, QudaVerbosity verbosity)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -878,7 +878,7 @@ namespace quda
     it = tunecache.find(key);
 
     // first check if we have the tuned value and return if we have it
-    if (enabled == QUDA_TUNE_YES && it != tunecache.end()) {
+    if (enabled && it != tunecache.end()) {
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -924,7 +924,7 @@ namespace quda
 
     static TuneParam param;
 
-    if (enabled == QUDA_TUNE_NO) {
+    if (!enabled) {
       TuneParam param_default;
       param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);

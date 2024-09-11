@@ -220,9 +220,6 @@ module quda_fortran
      real(8) :: gflops
      real(8) :: secs
 
-     ! Enable auto-tuning?
-     QudaTune :: tune
-
      ! Number of steps in s-step algorithms
      integer(4) :: nsteps
 

@@ -61,7 +61,7 @@ namespace quda {
 
   class Tunable {
 
-    friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);
+    friend TuneParam tuneLaunch(Tunable &, bool, QudaVerbosity);
     static inline uint64_t _flops_global = 0;
     static inline uint64_t _bytes_global = 0;
 
@@ -417,7 +417,7 @@ namespace quda {
    * @param[in] verbosity What verbosity to use during tuning?
    * @return The tuned launch parameters
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
+  TuneParam tuneLaunch(Tunable &tunable, bool enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
 
   /**
    * @brief Post an event in the trace, recording where it was posted

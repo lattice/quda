@@ -278,8 +278,6 @@ typedef enum QudaVerbosity_s {
   QUDA_INVALID_VERBOSITY = QUDA_INVALID_ENUM
 } QudaVerbosity;
 
-typedef enum QudaTune_s { QUDA_TUNE_NO, QUDA_TUNE_YES, QUDA_TUNE_INVALID = QUDA_INVALID_ENUM } QudaTune;
-
 typedef enum QudaPreserveDirac_s {
   QUDA_PRESERVE_DIRAC_NO,
   QUDA_PRESERVE_DIRAC_YES,

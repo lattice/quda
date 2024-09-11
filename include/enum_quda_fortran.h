@@ -248,11 +248,6 @@
 #define QUDA_DEBUG_VERBOSE 3
 #define QUDA_INVALID_VERBOSITY QUDA_INVALID_ENUM
 
-#define QudaTune integer(4)
-#define QUDA_TUNE_NO 0
-#define QUDA_TUNE_YES 1
-#define QUDA_TUNE_INVALID QUDA_INVALID_ENUM
-
 #define QudaPreserveDirac integer(4)
 #define QUDA_PRESERVE_DIRAC_NO 0
 #define QUDA_PRESERVE_DIRAC_YES 1
