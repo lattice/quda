@@ -804,14 +804,14 @@ namespace quda {
     void hqsolve(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
   };
 
-  class CGNE : public CG
+  class CGNE : public Solver
   {
 
-  private:
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
     DiracMMdag mmdagPrecon;
     DiracMMdag mmdagEig;
+    std::unique_ptr<Solver> cg;
     std::vector<ColorSpinorField> xe;
     std::vector<ColorSpinorField> ye;
     bool init = false;
@@ -839,14 +839,14 @@ namespace quda {
     virtual QudaInverterType getInverterType() const final { return QUDA_CGNE_INVERTER; }
   };
 
-  class CGNR : public CG
+  class CGNR : public Solver
   {
 
-  private:
     DiracMdagM mdagm;
     DiracMdagM mdagmSloppy;
     DiracMdagM mdagmPrecon;
     DiracMdagM mdagmEig;
+    std::unique_ptr<Solver> cg;
     std::vector<ColorSpinorField> br;
     bool init = false;
 
@@ -907,81 +907,6 @@ namespace quda {
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
     virtual QudaInverterType getInverterType() const override { return QUDA_CG3_INVERTER; }
-  };
-
-  class CG3NE : public CG3
-  {
-
-  private:
-    DiracMMdag mmdag;
-    DiracMMdag mmdagSloppy;
-    DiracMMdag mmdagPrecon;
-    ColorSpinorField xp;
-    ColorSpinorField yp;
-    bool init = false;
-
-    /**
-       @brief Initiate the fields needed by the solver
-       @param[in] x Solution vector
-       @param[in] b Source vector
-    */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
-
-  public:
-    CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
-
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
-
-    /**
-       @return Return the residual vector from the prior solve
-    */
-    cvector_ref<const ColorSpinorField> get_residual() override;
-
-    virtual bool hermitian() const final { return false; } /** CG3NE is for any system */
-
-    virtual QudaInverterType getInverterType() const final { return QUDA_CG3NE_INVERTER; }
-  };
-
-  class CG3NR : public CG3
-  {
-
-  private:
-    DiracMdagM mdagm;
-    DiracMdagM mdagmSloppy;
-    DiracMdagM mdagmPrecon;
-    ColorSpinorField br;
-    bool init = false;
-
-    /**
-       @brief Initiate the fields needed by the solver
-       @param[in] x Solution vector
-       @param[in] b Source vector
-    */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
-
-  public:
-    CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
-
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
-
-    /**
-       @return Return the residual vector from the prior solve
-    */
-    cvector_ref<const ColorSpinorField> get_residual() override;
-
-    virtual bool hermitian() const final { return false; } /** CG3NR is for any system */
-
-    virtual QudaInverterType getInverterType() const final { return QUDA_CG3NR_INVERTER; }
   };
 
   class PreconCG : public Solver {
@@ -1381,84 +1306,6 @@ namespace quda {
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
     virtual QudaInverterType getInverterType() const override { return QUDA_CA_CG_INVERTER; }
-  };
-
-  class CACGNE : public CACG {
-
-  private:
-    DiracMMdag mmdag;
-    DiracMMdag mmdagSloppy;
-    DiracMMdag mmdagPrecon;
-    DiracMMdag mmdagEig;
-    ColorSpinorField xp;
-    ColorSpinorField yp;
-    bool init = false;
-
-    /**
-       @brief Initiate the fields needed by the solver
-       @param[in] x Solution vector
-       @param[in] b Source vector
-    */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
-
-  public:
-    CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           const DiracMatrix &matEig, SolverParam &param);
-
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
-
-    /**
-       @return Return the residual vector from the prior solve
-    */
-    cvector_ref<const ColorSpinorField> get_residual() override;
-
-    virtual bool hermitian() const final { return false; } /** CA-CGNE is for any linear system */
-
-    virtual QudaInverterType getInverterType() const final { return QUDA_CA_CGNE_INVERTER; }
-  };
-
-  class CACGNR : public CACG
-  {
-
-  private:
-    DiracMdagM mdagm;
-    DiracMdagM mdagmSloppy;
-    DiracMdagM mdagmPrecon;
-    DiracMdagM mdagmEig;
-    ColorSpinorField br;
-    bool init = false;
-
-    /**
-       @brief Initiate the fields needed by the solver
-       @param[in] x Solution vector
-       @param[in] b Source vector
-    */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
-
-  public:
-    CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-           const DiracMatrix &matEig, SolverParam &param);
-
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
-
-    /**
-       @return Return the residual vector from the prior solve
-    */
-    cvector_ref<const ColorSpinorField> get_residual() override;
-
-    virtual bool hermitian() const final { return false; } /** CA-CGNR is for any linear system */
-
-    virtual QudaInverterType getInverterType() const final { return QUDA_CA_CGNR_INVERTER; }
   };
 
   /**

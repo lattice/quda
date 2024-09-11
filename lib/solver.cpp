@@ -81,11 +81,11 @@ namespace quda {
       break;
     case QUDA_CA_CGNE_INVERTER:
       report("CA-CGNE");
-      solver = new CACGNE(mat, matSloppy, matPrecon, matEig, param);
+      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_CGNR_INVERTER:
       report("CA-CGNR");
-      solver = new CACGNR(mat, matSloppy, matPrecon, matEig, param);
+      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
@@ -148,11 +148,11 @@ namespace quda {
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");
-      solver = new CG3NE(mat, matSloppy, matPrecon, param);
+      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CG3NR_INVERTER:
       report("CG3NR");
-      solver = new CG3NR(mat, matSloppy, matPrecon, param);
+      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
