@@ -253,9 +253,11 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    std::vector<double> heavy_quark_res(b.size()); // heavy quark residual
-    if (use_heavy_quark_res)
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x, r)[i].z);
+    std::vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    if (use_heavy_quark_res) {
+      auto hq = blas::HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+    }
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -330,8 +332,10 @@ namespace quda
           maxr_deflate = sqrt(r2[0]);
         }
 
-        if (use_heavy_quark_res)
-          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x, r)[i].z);
+        if (use_heavy_quark_res) {
+          auto hq = blas::HeavyQuarkResidualNorm(x, r);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+        }
 
         // break-out check if we have reached the limit of the precision
         if (r2 > r2_old) {
