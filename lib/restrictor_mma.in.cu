@@ -101,9 +101,9 @@ namespace quda
     }
 
     // using mma_t = typename mma::smma_dispatch<out_t>::type;
-    using mma_t = simt::simt_t<float, 8, 4, 2, 2>;
+    // using mma_t = simt::simt_t<float, 8, 4, 2, 2>;
     // using mma_t = smma::smma_x_t<mma::half, 8, 1, 1>;
-    // using mma_t = hmma::hmma_x_t<16, 8, 8, mma::half, mma::half2>;
+    using mma_t = hmma::hmma_x_t<16, 8, 8, mma::half, mma::half2>;
 
     static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
 

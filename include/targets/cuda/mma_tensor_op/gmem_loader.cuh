@@ -130,6 +130,16 @@ namespace quda
       static auto __device__ get(half2 v[]) { return v[0]; }
     };
 
+    template <> struct make_vector_t<half2, 2> {
+      static auto __device__ get(half2 v[])
+      {
+        uint2 ret_value;
+        ret_value.x = reinterpret_cast<unsigned int *>(v)[0];
+        ret_value.y = reinterpret_cast<unsigned int *>(v)[1];
+        return ret_value;
+      }
+    };
+
     /**
       @brief Load from global memory and store data in registers.
      */

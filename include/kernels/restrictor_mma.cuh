@@ -80,70 +80,164 @@ namespace quda
     }
   };
 
-  template <int contiguous_dim, bool dagger, int contiguous_limit, class smem_obj_t, class gmem_obj_t, class Arg>
-  inline void __device__ load_g2s(smem_obj_t &smem_real, smem_obj_t &smem_imag, const gmem_obj_t &gmem, int x_coarse,
-                                  int coarse_spin, int contiguous_dim_offset, int aggregate_k_offset,
-                                  int *coarse_to_fine, const Arg &arg)
-  { // v as a
+  template <int contiguous_dim, bool dagger, int contiguous_limit, bool rescale, class smem_obj_t, class gmem_obj_t, class Arg>
+  inline float __device__ load_g2s(smem_obj_t &smem_real, smem_obj_t &smem_imag, const gmem_obj_t &gmem, int x_coarse,
+                                   int coarse_spin, int contiguous_dim_offset, int aggregate_k_offset,
+                                   int *coarse_to_fine, const Arg &arg)
+  {
     constexpr int elements_per_thread = 16 / (sizeof(typename gmem_obj_t::store_type) * 2);
     static_assert(contiguous_dim % elements_per_thread == 0, "contiguous_dim %% elements_per_thread == 0");
+    float block_rescale_factor = 1.0f;
+
+    if constexpr (rescale) {
+      float thread_max = 0;
+      int thread = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
+      while (thread < (contiguous_dim / elements_per_thread) * Arg::spin_block_factor * Arg::fineColor
+               * Arg::aggregate_per_block) {
+        int thread_idx = thread;
+        int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
+        constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
+        if (!check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit) {
+          thread_idx /= (contiguous_dim / elements_per_thread);
+          int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
+          thread_idx /= Arg::spin_block_factor;
+          int fine_color = thread_idx % Arg::fineColor;
+          thread_idx /= Arg::fineColor;
+          int x_fine_offset = thread_idx + aggregate_k_offset;
+
+          const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
+          const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
+          const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
+
+          // look-up map is ordered as (coarse-block-id + fine-point-id),
+          // with fine-point-id parity ordered
+          const int x_fine = coarse_to_fine[parity * arg.aggregate_size_cb + x_fine_cb_offset];
+          const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
+
+          const int v_parity = (gmem.Nparity() == 2) ? parity : 0;
+
+          int fine_spin = fine_spin_block + coarse_spin * Arg::spin_block_factor;
+          auto a_gmem = gmem(v_parity, x_fine_cb, fine_spin, fine_color, contiguous + contiguous_dim_offset);
+          complex<typename gmem_obj_t::store_type> a[elements_per_thread];
+          mma::batch_load_t<complex<typename gmem_obj_t::store_type>, elements_per_thread>::load(a, a_gmem.data());
+
+          if constexpr (decltype(a_gmem)::fixed) {
+            auto scale_inv = a_gmem.get_scale_inv();
+#pragma unroll
+            for (int e = 0; e < elements_per_thread; e++) {
+              thread_max = mma::abs_max(a[e].real() * scale_inv, thread_max);
+              thread_max = mma::abs_max(a[e].imag() * scale_inv, thread_max);
+            }
+          } else {
+#pragma unroll
+            for (int e = 0; e < elements_per_thread; e++) {
+              thread_max = mma::abs_max(a[e].real(), thread_max);
+              thread_max = mma::abs_max(a[e].imag(), thread_max);
+            }
+          }
+        }
+
+        thread += Arg::block_y * Arg::block_z;
+      }
+
+      // block all-reduce thread_max
+      using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, Arg::block_y, Arg::block_z>;
+      __shared__ typename block_reduce_t::TempStorage temp_storage;
+      float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+
+      __shared__ float block_max_all;
+      if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
+        if (block_max > 0.0f) {
+          block_max_all = block_max;
+        } else {
+          block_max_all = 1.0f;
+        }
+      }
+      __syncthreads();
+
+      block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
+    }
+
     int thread = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
     while (thread < (contiguous_dim / elements_per_thread) * Arg::spin_block_factor * Arg::fineColor
              * Arg::aggregate_per_block) {
       int thread_idx = thread;
       int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
-    constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
-    if (!check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit) {
-      thread_idx /= (contiguous_dim / elements_per_thread);
-      int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
-      thread_idx /= Arg::spin_block_factor;
-      int fine_color = thread_idx % Arg::fineColor;
-      thread_idx /= Arg::fineColor;
-      int x_fine_offset = thread_idx + aggregate_k_offset;
+      constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
+      if (!check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit) {
+        thread_idx /= (contiguous_dim / elements_per_thread);
+        int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
+        thread_idx /= Arg::spin_block_factor;
+        int fine_color = thread_idx % Arg::fineColor;
+        thread_idx /= Arg::fineColor;
+        int x_fine_offset = thread_idx + aggregate_k_offset;
 
-      const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
-      const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
-      const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
+        const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
+        const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
+        const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
 
-      // look-up map is ordered as (coarse-block-id + fine-point-id),
-      // with fine-point-id parity ordered
-      const int x_fine = coarse_to_fine[parity * arg.aggregate_size_cb + x_fine_cb_offset];
-      const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
+        // look-up map is ordered as (coarse-block-id + fine-point-id),
+        // with fine-point-id parity ordered
+        const int x_fine = coarse_to_fine[parity * arg.aggregate_size_cb + x_fine_cb_offset];
+        const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
 
-      const int v_parity = (gmem.Nparity() == 2) ? parity : 0;
+        const int v_parity = (gmem.Nparity() == 2) ? parity : 0;
 
-      int fine_spin = fine_spin_block + coarse_spin * Arg::spin_block_factor;
-      auto a_gmem = gmem(v_parity, x_fine_cb, fine_spin, fine_color, contiguous + contiguous_dim_offset);
-      complex<typename gmem_obj_t::store_type> a[elements_per_thread];
-      mma::batch_load_t<complex<typename gmem_obj_t::store_type>, elements_per_thread>::load(a, a_gmem.data());
+        int fine_spin = fine_spin_block + coarse_spin * Arg::spin_block_factor;
+        auto a_gmem = gmem(v_parity, x_fine_cb, fine_spin, fine_color, contiguous + contiguous_dim_offset);
+        complex<typename gmem_obj_t::store_type> a[elements_per_thread];
+        mma::batch_load_t<complex<typename gmem_obj_t::store_type>, elements_per_thread>::load(a, a_gmem.data());
 
-      int smem_m = contiguous;
-      int smem_k = (thread_idx * Arg::spin_block_factor + fine_spin_block) * Arg::fineColor + fine_color;
+        int smem_m = contiguous;
+        int smem_k = (thread_idx * Arg::spin_block_factor + fine_spin_block) * Arg::fineColor + fine_color;
 
-      typename Arg::real a_real[elements_per_thread];
-      typename Arg::real a_imag[elements_per_thread];
-      if constexpr (decltype(a_gmem)::fixed) {
-        auto scale_inv = a_gmem.get_scale_inv();
+        typename Arg::real a_real[elements_per_thread];
+        typename Arg::real a_imag[elements_per_thread];
+        if constexpr (decltype(a_gmem)::fixed) {
+          auto scale_inv = a_gmem.get_scale_inv() * block_rescale_factor;
 #pragma unroll
-        for (int e = 0; e < elements_per_thread; e++) {
-          a_real[e] = +a[e].real() * scale_inv;
-          a_imag[e] = dagger ? -a[e].imag() * scale_inv : +a[e].imag() * scale_inv;
+          for (int e = 0; e < elements_per_thread; e++) {
+            a_real[e] = +a[e].real() * scale_inv;
+            a_imag[e] = dagger ? -a[e].imag() * scale_inv : +a[e].imag() * scale_inv;
+          }
+        } else {
+#pragma unroll
+          for (int e = 0; e < elements_per_thread; e++) {
+            a_real[e] = +a[e].real() * block_rescale_factor;
+            a_imag[e] = (dagger ? -a[e].imag() : +a[e].imag()) * block_rescale_factor;
+          }
         }
-      } else {
+
+        static_assert(smem_obj_t::ldm == 1, "smem_obj_t::ldm == 1");
+        if constexpr (std::is_same_v<typename Arg::mma_t::load_t, mma::half2>) {
+          static_assert(elements_per_thread % 2 == 0, "elements_per_thread %% 2 == 0");
+          typename Arg::mma_t::load_t h2_real[elements_per_thread / 2];
+          typename Arg::mma_t::load_t h2_imag[elements_per_thread / 2];
 #pragma unroll
-        for (int e = 0; e < elements_per_thread; e++) {
-          a_real[e] = +a[e].real();
-          a_imag[e] = dagger ? -a[e].imag() : +a[e].imag();
+          for (int b = 0; b < elements_per_thread / 2; b++) {
+            h2_real[b] = __floats2half2_rn(a_real[2 * b + 0], a_real[2 * b + 1]);
+            h2_imag[b] = __floats2half2_rn(a_imag[2 * b + 0], a_imag[2 * b + 1]);
+          }
+          if constexpr (smem_obj_t::ldn % elements_per_thread == 0) {
+            smem_real.vector_load(smem_m, smem_k, mma::make_vector_t<mma::half2, elements_per_thread / 2>::get(h2_real));
+            smem_imag.vector_load(smem_m, smem_k, mma::make_vector_t<mma::half2, elements_per_thread / 2>::get(h2_imag));
+          } else {
+#pragma unroll
+            for (int b = 0; b < elements_per_thread / 2; b++) {
+              smem_real.vector_load(smem_m + b * 2, smem_k, h2_real[b]);
+              smem_imag.vector_load(smem_m + b * 2, smem_k, h2_imag[b]);
+            }
+          }
+        } else {
+          smem_real.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_real));
+          smem_imag.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_imag));
         }
       }
 
-      static_assert(smem_obj_t::ldm == 1, "smem_obj_t::ldm == 1");
-      smem_real.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_real));
-      smem_imag.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_imag));
-    }
-
       thread += Arg::block_y * Arg::block_z;
     }
+
+    return 1.0f / block_rescale_factor;
   }
 
   template <typename Arg>
@@ -185,20 +279,30 @@ namespace quda
 
     accumulator.zero();
 
+    constexpr bool rescale = mma_t::do_rescale();
+
     for (int aggregate_k_offset = 0; aggregate_k_offset < Arg::aggregate_size;
          aggregate_k_offset += Arg::aggregate_per_block) {
       __syncthreads();
 
       constexpr bool a_dagger = true;
-      load_g2s<Arg::bM, a_dagger, M>(smem_obj_a_real, smem_obj_a_imag, arg.in, x_coarse, coarse_spin, m_offset,
-                                  aggregate_k_offset, coarse_to_fine, arg);
+      float a_rescale
+        = load_g2s<Arg::bM, a_dagger, M, rescale>(smem_obj_a_real, smem_obj_a_imag, arg.in, x_coarse, coarse_spin,
+                                                  m_offset, aggregate_k_offset, coarse_to_fine, arg);
 
       constexpr bool b_dagger = false;
-      load_g2s<Arg::bN, b_dagger, N>(smem_obj_b_real, smem_obj_b_imag, arg.v, x_coarse, coarse_spin, n_offset,
-                                  aggregate_k_offset, coarse_to_fine, arg);
+      float b_rescale
+        = load_g2s<Arg::bN, b_dagger, N, rescale>(smem_obj_b_real, smem_obj_b_imag, arg.v, x_coarse, coarse_spin,
+                                                  n_offset, aggregate_k_offset, coarse_to_fine, arg);
 
       __syncthreads();
-      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+
+      if constexpr (rescale) {
+        accumulator.mma_rescale(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag,
+                                a_rescale * b_rescale);
+      } else {
+        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+      }
     }
 
     const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
