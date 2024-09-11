@@ -114,8 +114,7 @@ namespace quda
     while (restart_iter < max_restarts && !converged) {
 
       // Get min step
-      int step_min = getArrayMinMax3D(num_locked_3D, n_kr, MIN);
-      printfQuda("step min = %d\n", step_min);
+      int step_min = getArrayMinMax3D<MIN>(num_locked_3D);
       for (int step = step_min; step < n_kr; step++) lanczosStep3D(kSpace, step);
       iter += (n_kr - step_min);
 
@@ -190,7 +189,7 @@ namespace quda
           num_locked_3D[t] += iter_locked_3D[t];
 
 	  // Use printf to get data from t dim only
-          if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
             printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t],
                    t_offset + t, restart_iter + 1);
             printf("iter Conv[%d] = %d\n", t_offset + t, iter_converged_3D[t]);
@@ -199,11 +198,9 @@ namespace quda
             printf("num_converged[%d] = %d\n", t_offset + t, num_converged_3D[t]);
             printf("num_keep[%d] = %d\n", t_offset + t, num_keep_3D[t]);
             printf("num_locked[%d] = %d\n", t_offset + t, num_locked_3D[t]);
-            if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-              for (int i = 0; i < n_kr; i++) {
-                printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, alpha_3D[t][i], i,
-                       residua_3D[t][i]);
-              }
+            for (int i = 0; i < n_kr; i++) {
+              printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, alpha_3D[t][i], i,
+                     residua_3D[t][i]);
             }
           }
         }
@@ -217,9 +214,12 @@ namespace quda
         } else {
           all_converged = false;
         }
-	if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
-	  printf("t=%d converged = %s from rank %d\n", t, converged_3D[t] ? "true" : "false", comm_rank());
-	}
+      }
+
+      if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+        printf("iter = %d rank = %d converged = ", restart_iter + 1, comm_rank());
+        for (int t = 0; t < ortho_dim_size; t++) printf("%d", (int)converged_3D[t]);
+        printf("\n");
       }
 
       // ensure that all processes partake even if all eigenvalues in
@@ -228,7 +228,16 @@ namespace quda
       comm_allreduce_int(all_converged_int);
       all_converged = (static_cast<size_t>(all_converged_int) == comm_size());
 
+      // at least one subset has converged but not all
+      // disable autotuning for now
+      static bool tuning_disable = false;
+      if (all_converged_int > 0 && !all_converged) {
+        pushTuning(false);
+        tuning_disable = true;
+      }
+
       if (all_converged) {
+        if (tuning_disable) popTuning(); // renable tuning since processes are now converged
         reorder3D(kSpace);
         converged = true;
       }
@@ -340,7 +349,9 @@ namespace quda
           }
 
           // r[t] = r[t] - beta[t]{j-1} * v[t]{j-1}
+          pushTuning(false);
           blas::block::axpy(beta_t, {vecs_t.begin(), vecs_t.begin() + j - start}, r_t);
+          popTuning();
 
           // Copy residual back to 4D vector
           blas3d::copy(t, blas3d::COPY_FROM_3D, r_t, r[0]);
@@ -508,8 +519,10 @@ namespace quda
         for (int i = 0; i < dim; i++) blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[i], vecs_locked[i]);
 
         // Compute the axpy
+        pushTuning(false);
         blas::block::axpy(ritz_mat_keep[t], {vecs_t.begin(), vecs_t.begin() + dim},
                           {kSpace_t.begin(), kSpace_t.begin() + keep});
+        popTuning();
 
         // Copy back to the 4D workspace array
 
@@ -584,7 +597,7 @@ namespace quda
     // Compute spectral radius estimate
     std::vector<double> inner_products(ortho_dim_size, 0.0);
     blas3d::reDotProduct(inner_products, out, in);    
-    double result = getArrayMinMax3D(inner_products, 0.0, MAX);    
+    double result = getArrayMinMax3D<MAX>(inner_products);
     logQuda(QUDA_VERBOSE, "Chebyshev max %e\n", result);
     
     // Increase final result by 10% for safety
@@ -667,26 +680,18 @@ namespace quda
     computeEvals3D(mat, kSpace, evals);
   }
 
-  template <typename T> T TRLM3D::getArrayMinMax3D(const std::vector<T> &array, const T limit, const arrayExtremumType min_max)
+  template <extremumType min_max, typename T>
+  T TRLM3D::getArrayMinMax3D(const std::vector<T> &array)
   {
-    T ret_val = limit;
-    // QUDA reduction done in double, hence copy to double array
-    std::vector<double> array_cpy(array.size(), 0);
-    for (int t = 0; t < ortho_dim_size; t++) array_cpy[t] = array[t];
-    switch (min_max) {
-    case MIN:
-      for (int t = 0; t < ortho_dim_size; t++) {
-	if(array_cpy[t] < ret_val) ret_val = array_cpy[t];
-      }
+    T ret_val;
+    if constexpr (min_max == MIN) {
+      ret_val = *std::min_element(array.begin(), array.end());
       comm_allreduce_min(ret_val);
-      break;
-    case MAX:
-      for (int t = 0; t < ortho_dim_size; t++) {
-	if(array_cpy[t] > ret_val) ret_val = array_cpy[t];
-      }
+    } else if constexpr (min_max == MAX) {
+      ret_val = *std::max_element(array.begin(), array.end());
       comm_allreduce_max(ret_val);
-      break;
-    default: errorQuda("Unknown arrayExtremumType %d", min_max);
+    } else {
+      errorQuda("Unknown extremumType %d", min_max);
     }
     
     return ret_val;
