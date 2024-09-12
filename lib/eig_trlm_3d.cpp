@@ -640,7 +640,7 @@ namespace quda
       evals.resize(ortho_dim_size * comm_dim(ortho_dim) * n_conv, 0.0);
 
       int t_offset = ortho_dim_size * comm_coord(3);      
-      for (int t = 0; t < ortho_dim_size; t++)
+      for (int t = 0; t < ortho_dim_size; t++) {
         for (int i = 0; i < size; i++) {
 
 	  // Use printf to get data from t dim only
@@ -652,7 +652,11 @@ namespace quda
           // Transfer evals to eval array
           evals[(t_offset + t) * size + i] = evals_t[i][t];
         }
+      }
       comm_allreduce_sum(evals);
+
+      double XYZ_inv = 1.0 / (comm_dim(0) * comm_dim(1) * comm_dim(2));
+      for (auto &e : evals) e *= XYZ_inv;
     }
   }
 
