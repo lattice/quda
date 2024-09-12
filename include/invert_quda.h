@@ -897,7 +897,7 @@ namespace quda {
   public:
     CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param);
 
-    virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     /**
        @return Return the residual vector from the prior solve
@@ -981,14 +981,14 @@ namespace quda {
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
 
-    ColorSpinorField y;        // Full precision solution accumulator
-    ColorSpinorField r;        // Full precision residual vector
-    ColorSpinorField p;        // Sloppy precision search direction
-    ColorSpinorField v;        // Sloppy precision A * p
-    ColorSpinorField t;        // Sloppy precision vector used for minres step
-    ColorSpinorField r0;       // Bi-orthogonalization vector
-    ColorSpinorField r_sloppy; // Slopy precision residual vector
-    ColorSpinorField x_sloppy; // Sloppy solution accumulator vector
+    std::vector<ColorSpinorField> y;        // Full precision solution accumulator
+    std::vector<ColorSpinorField> r;        // Full precision residual vector
+    std::vector<ColorSpinorField> p;        // Sloppy precision search direction
+    std::vector<ColorSpinorField> v;        // Sloppy precision A * p
+    std::vector<ColorSpinorField> t;        // Sloppy precision vector used for minres step
+    std::vector<ColorSpinorField> r0;       // Bi-orthogonalization vector
+    std::vector<ColorSpinorField> r_sloppy; // Slopy precision residual vector
+    std::vector<ColorSpinorField> x_sloppy; // Sloppy solution accumulator vector
     bool init = false;
 
     /**
@@ -996,19 +996,14 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
     */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
     BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param);
     virtual ~BiCGstab();
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     /**
        @return Return the residual vector from the prior solve
@@ -1187,8 +1182,6 @@ namespace quda {
     virtual ~GCR();
 
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @return Return the residual vector from the prior solve
