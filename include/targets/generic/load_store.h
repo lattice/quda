@@ -36,7 +36,7 @@ namespace quda
     template <typename T> __device__ __host__ inline void operator()(void *ptr, int idx, const T &value)
     {
       //reinterpret_cast<T *>(ptr)[idx] = value;
-      memcpy(static_cast<VectorType *>(ptr)+idx, &value, sizeof(value));
+      memcpy(static_cast<T *>(ptr)+idx, &value, sizeof(value));
     }
   };
 
