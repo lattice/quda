@@ -1,6 +1,6 @@
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <cstddef>
 #include <sstream>
 #include <sycl/ext/oneapi/experimental/builtins.hpp>
@@ -67,11 +67,13 @@ static inline auto getGroup()
 {
   //return sycl::this_group<3>();
   return sycl::ext::oneapi::experimental::this_group<3>();
+  //return sycl::ext::oneapi::this_work_item::get_work_group();
 }
 static inline auto getNdItem()
 {
   //return sycl::this_nd_item<3>();
   return sycl::ext::oneapi::experimental::this_nd_item<3>();
+  //return sycl::ext::oneapi::this_work_item::get_nd_item();
 }
 
 static inline unsigned int globalRange(int d) { return getNdItem().get_global_range(d); }

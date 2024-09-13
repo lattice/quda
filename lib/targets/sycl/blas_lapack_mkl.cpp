@@ -1,9 +1,9 @@
-#include <complex.h>
 #include <blas_lapack.h>
 #include <timer.h>
-#include <quda_sycl_api.h>
 
 #ifdef NATIVE_LAPACK_LIB
+#include <quda_sycl_api.h>
+//#include <complex>
 #include <oneapi/mkl.hpp>
 #include <malloc_quda.h>
 using namespace oneapi::mkl;
@@ -120,7 +120,7 @@ namespace quda
 	  } catch(oneapi::mkl::lapack::exception const& e) {
 	    // Handle LAPACK related exceptions happened during synchronous call
 	    errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld", e.what(), e.info());
-	  } catch(cl::sycl::exception const& e) {
+	  } catch(sycl::exception const& e) {
 	    // Handle not LAPACK related exceptions happened during synchronous call
 	    errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
 	  }
@@ -173,7 +173,7 @@ namespace quda
 	  } catch(oneapi::mkl::lapack::exception const& e) {
 	    // Handle LAPACK related exceptions happened during synchronous call
 	    errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld", e.what(), e.info());
-	  } catch(cl::sycl::exception const& e) {
+	  } catch(sycl::exception const& e) {
 	    // Handle not LAPACK related exceptions happened during synchronous call
 	    errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
 	  }

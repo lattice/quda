@@ -39,7 +39,7 @@ namespace quda
     if(plan.isDouble) {
       errorQuda("Called single precision FFT with double precision plan\n");
     }
-    cl::sycl::event e;
+    sycl::event e;
     if(direction == FFT_FORWARD) {
       //warningQuda("Forward FFT");
       e = compute_forward(*plan.s, (float *)data_in, (float *)data_out);
@@ -64,7 +64,7 @@ namespace quda
     if(!plan.isDouble) {
       errorQuda("Called double precision FFT with single precision plan\n");
     }
-    cl::sycl::event e;
+    sycl::event e;
     if(direction == FFT_FORWARD) {
       e = compute_forward(*plan.d, (double *)data_in, (double *)data_out);
     } else {
