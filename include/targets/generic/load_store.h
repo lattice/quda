@@ -17,7 +17,8 @@ namespace quda
   template <bool is_device> struct vector_load_impl {
     template <typename T> __device__ __host__ inline void operator()(T &value, const void *ptr, int idx)
     {
-      value = reinterpret_cast<const T *>(ptr)[idx];
+      //value = reinterpret_cast<const T *>(ptr)[idx];
+      memcpy(&value, static_cast<const T *>(ptr)+idx, sizeof(value));
     }
   };
 
@@ -34,7 +35,8 @@ namespace quda
   template <bool is_device> struct vector_store_impl {
     template <typename T> __device__ __host__ inline void operator()(void *ptr, int idx, const T &value)
     {
-      reinterpret_cast<T *>(ptr)[idx] = value;
+      //reinterpret_cast<T *>(ptr)[idx] = value;
+      memcpy(static_cast<VectorType *>(ptr)+idx, &value, sizeof(value));
     }
   };
 
