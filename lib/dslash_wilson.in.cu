@@ -8,7 +8,7 @@ namespace quda
   constexpr int reconI = @QUDA_DSLASH_RECONI@;
   constexpr bool distance_pc = false;
 
-  typedef @QUDA_DSLASH_DDARG@DDArg;
+  typedef @QUDA_DSLASH_DDARG@ DDArg;
   typedef precision_type_mapper<precision>::type Float;
 
   template struct WilsonApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
