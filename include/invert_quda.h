@@ -1021,7 +1021,6 @@ namespace quda {
    */
   class BiCGstabL : public Solver {
 
-  private:
     const DiracMdagM matMdagM; // used by the eigensolver
 
     /**
@@ -1031,41 +1030,46 @@ namespace quda {
     int pipeline; // pipelining factor for legacyGramSchmidt
 
     // Various coefficients and params needed on each iteration.
-    Complex rho0, rho1, alpha, omega, beta;           // Various coefficients for the BiCG part of BiCGstab-L.
-    std::vector<Complex> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
-    std::vector<Complex> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
-    std::vector<double> sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
+    vector<Complex> rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
+    vector<vector<Complex>> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    vector<vector<Complex>> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    vector<vector<double>>
+      sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
 
-    ColorSpinorField r_full; //! Full precision residual.
-    ColorSpinorField y;      //! Full precision temporary.
+    std::vector<ColorSpinorField> r_full; //! Full precision residual.
+    std::vector<ColorSpinorField> y;      //! Full precision temporary.
 
     // sloppy precision fields
-    ColorSpinorField temp; //! Sloppy temporary vector.
-    std::vector<ColorSpinorField> r; // Current residual + intermediate residual values, along the MR.
-    std::vector<ColorSpinorField> u; // Search directions.
+    std::vector<ColorSpinorField> temp;           //! Sloppy temporary vector.
+    std::vector<std::vector<ColorSpinorField>> r; // Current residual + intermediate residual values, along the MR.
+    std::vector<std::vector<ColorSpinorField>> u; // Search directions.
 
-    ColorSpinorField x_sloppy;  //! Sloppy solution vector.
-    ColorSpinorField r0;        //! Shadow residual, in BiCG language.
+    std::vector<ColorSpinorField> x_sloppy; //! Sloppy solution vector.
+    std::vector<ColorSpinorField> r0;       //! Shadow residual, in BiCG language.
 
     /**
        @brief Allocate persistent fields and parameter checking
-       @param[in] x Solution vector
-       @param[in] b Source vector
+       @param[in] x Solution vector set
+       @param[in] b Source vector set
      */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
     /**
-     @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
+       @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
     int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
 
     /**
      * @brief Internal routine for performing the MR part of BiCGstab-L
      *
-     * @param x_sloppy [out] sloppy accumulator for x
-     * @param fixed_iteration [in] whether or not this is for a fixed iteration solver
+     * @param[in,out] x_sloppy sloppy accumulator for x
+     * @param[in,out] u search directions
+     * @param[in,out] residual vectors
+     * @param[in] fixed_iteration whether or not this is for a fixed iteration solver
+     * @param[in] src_idx which src we are presently working on
      */
-    void computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration);
+    void computeMR(ColorSpinorField &x_sloppy, cvector_ref<ColorSpinorField> &u, cvector_ref<ColorSpinorField> &r,
+                   bool fixed_iteration, int src_idx);
 
     /**
        Legacy routines that encapsulate the original pipelined Gram-Schmit.
@@ -1079,29 +1083,36 @@ namespace quda {
      * @brief Internal routine that comptues the "tau" matrix as described in
      *        the original BiCGstab-L paper, supporting pipelining
      *
-     * @param begin [in] begin offset for pipelining
-     * @param size [in] length of pipelining
-     * @param j [in] row of tau being computed
+     * @param[in] begin begin offset for pipelining
+     * @param[in] size length of pipelining
+     * @param[in] j row of tau being computed
+     * @param[in] src_idx which src we are presently working on
      */
-    void computeTau(int begin, int size, int j);
+    void computeTau(int begin, int size, int j, cvector_ref<ColorSpinorField> &r, int src_idx);
 
     /**
      * @brief Internal routine that updates R as described in
      *        the original BiCGstab-L paper, supporting pipelining.
      *
-     * @param begin [in] begin offset for pipelining
-     * @param size [in] length of pipelining
-     * @param j [in] row of tau being computed
+     * @param[in] begin begin offset for pipelining
+     * @param[in] size length of pipelining
+     * @param[in] j row of tau being computed
+     * @param[in,out] r Residual vector set
+     * @param[in] src_idx which src we are presently working on
      */
-    void updateR(int begin, int size, int j);
+    void updateR(int begin, int size, int j, cvector_ref<ColorSpinorField> &r, int src_idx);
 
     /**
      * @brief Internal legacy routine for performing the MR part of BiCGstab-L
      *        which more closely matches the paper
      *
-     * @param x_sloppy [out] sloppy accumulator for x
+     * @param[in,out] x_sloppy sloppy accumulator for x
+     * @param[in,out] u Direction vector set
+     * @param[in,out] r Residual vector set
+     * @param[in] src_idx which src we are presently working on
      */
-    void legacyComputeMR(ColorSpinorField &x_sloppy);
+    void legacyComputeMR(ColorSpinorField &x_sloppy, cvector_ref<ColorSpinorField> &u, cvector_ref<ColorSpinorField> &r,
+                         int src_idx);
 
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
@@ -1114,12 +1125,7 @@ namespace quda {
     BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param);
     virtual ~BiCGstabL();
 
-    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
-    {
-      for (auto i = 0u; i < in.size(); i++) operator()(out[i], in[i]);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override;
 
     virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
 
