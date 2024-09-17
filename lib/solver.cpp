@@ -81,11 +81,11 @@ namespace quda {
       break;
     case QUDA_CA_CGNE_INVERTER:
       report("CA-CGNE");
-      solver = new CACGNE(mat, matSloppy, matPrecon, matEig, param);
+      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_CGNR_INVERTER:
       report("CA-CGNR");
-      solver = new CACGNR(mat, matSloppy, matPrecon, matEig, param);
+      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
@@ -148,11 +148,11 @@ namespace quda {
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");
-      solver = new CG3NE(mat, matSloppy, matPrecon, param);
+      solver = new CGNE(mat, matSloppy, matPrecon, matEig, param);
       break;
     case QUDA_CG3NR_INVERTER:
       report("CG3NR");
-      solver = new CG3NR(mat, matSloppy, matPrecon, param);
+      solver = new CGNR(mat, matSloppy, matPrecon, matEig, param);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
@@ -542,6 +542,26 @@ namespace quda {
     case QUDA_CA_CGNE_INVERTER: return true;
     default: return false;
     }
+  }
+
+  // check we're not solving on a zero-valued source
+  bool Solver::is_zero_src(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, cvector<double> &b2)
+  {
+    // if computing null vectors then zero sources are fine
+    if (param.compute_null_vector != QUDA_COMPUTE_NULL_VECTOR_NO) return false;
+
+    bool zero_src = true;
+    for (auto i = 0u; i < b.size(); i++) {
+      if (b2[i] == 0) {
+        warningQuda("source %d is zero", i);
+        x[i] = b[i];
+        param.true_res[i] = 0.0;
+        param.true_res_hq[i] = 0.0;
+      } else {
+        zero_src = false;
+      }
+    }
+    return zero_src;
   }
 
 } // namespace quda

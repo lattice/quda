@@ -25,7 +25,7 @@ namespace quda
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       alpha.resize(b.size());
@@ -237,22 +237,9 @@ namespace quda
     double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      bool zero_src = true;
-      for (auto i = 0u; i < b.size(); i++) {
-        if (b2[i] == 0) {
-          warningQuda("inverting on zero-field source");
-          x[i] = b[i];
-          param.true_res[i] = 0.0;
-          param.true_res_hq[i] = 0.0;
-        } else {
-          zero_src = false;
-        }
-      }
-      if (zero_src) {
-        getProfile().TPSTOP(QUDA_PROFILE_INIT);
-        return;
-      }
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
     auto stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) :
@@ -266,9 +253,11 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    std::vector<double> heavy_quark_res(b.size()); // heavy quark residual
-    if (use_heavy_quark_res)
-      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x, r)[i].z);
+    std::vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    if (use_heavy_quark_res) {
+      auto hq = blas::HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+    }
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -343,8 +332,10 @@ namespace quda
           maxr_deflate = sqrt(r2[0]);
         }
 
-        if (use_heavy_quark_res)
-          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x, r)[i].z);
+        if (use_heavy_quark_res) {
+          auto hq = blas::HeavyQuarkResidualNorm(x, r);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+        }
 
         // break-out check if we have reached the limit of the precision
         if (r2 > r2_old) {

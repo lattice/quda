@@ -13,8 +13,6 @@ namespace quda
 
   using namespace blas;
 
-  static constexpr bool debug = false;
-
   MG::MG(MGParam &param) :
     Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, param),
     param(param),

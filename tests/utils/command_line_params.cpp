@@ -213,6 +213,7 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
 int eig_ortho_block_size = 0;
+int eig_evals_batch_size = 4;
 int eig_block_size = 4;
 int eig_n_ev = 16;
 int eig_n_kr = 32;
@@ -250,6 +251,7 @@ bool eig_partfile = false;
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_ortho_block_size = {};
+quda::mgarray<int> mg_eig_evals_batch_size = {};
 quda::mgarray<int> mg_eig_block_size = {};
 quda::mgarray<int> mg_eig_n_ev_deflate = {};
 quda::mgarray<int> mg_eig_n_ev = {};
@@ -514,8 +516,22 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
-  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type (default wilson or asqtad as appropriate)")
-    ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
+  // Instead of using an enum transformer we create a custom lambda that handles transforming a string
+  // to a QudaDslashType. We take this approach to support a custom string "hisq" that corresponds to
+  // the ASQTAD dslash plus automatically building the fat/long links
+  quda_app
+    ->add_option(
+      "--dslash-type",
+      [](std::vector<std::string> val) {
+        if (val.size() != 1) return false;
+        dslash_type = get_dslash_from_str(val[0].c_str());
+        if (!val[0].compare("hisq")) compute_fatlong = true;
+        if (dslash_type == QUDA_INVALID_DSLASH) return false;
+        return true;
+      },
+      "Set the dslash type (default wilson or asqtad as appropriate)")
+    ->expected(1)
+    ->check(CLI::IsMember(get_dslash_str_list()));
 
   quda_app->add_option(
     "--distance-pc-alpha0", distance_pc_alpha0,
@@ -775,6 +791,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-ortho-block-size", eig_ortho_block_size,
                       "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt"
                       "0 for always Classical, 1 for Modified, n > 1 for Hybrid)");
+  opgroup->add_option("--eig-evals-batch-size", eig_evals_batch_size, "The batch size used when computing eigenvalues in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
@@ -919,6 +936,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   quda_app->add_mgoption(opgroup, "--mg-eig-ortho-block-size", mg_eig_ortho_block_size, CLI::Validator(),
                          "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt");
+  quda_app->add_mgoption(opgroup, "--mg-eig-evals-batch-size", mg_eig_evals_batch_size, CLI::Validator(),
+                         "The block size used when computing eigenvalues in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),

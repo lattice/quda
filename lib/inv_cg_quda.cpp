@@ -31,7 +31,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       resize(r, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
@@ -58,159 +58,6 @@ namespace quda {
 
     // need to reset x_sloppy every solve
     if (!param.use_sloppy_partial_accumulator) create_alias(x_sloppy, x);
-  }
-
-  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param),
-    mmdag(mat.Expose()),
-    mmdagSloppy(matSloppy.Expose()),
-    mmdagPrecon(matPrecon.Expose()),
-    mmdagEig(matEig.Expose())
-  {
-  }
-
-  void CGNE::create(ColorSpinorField &x, const ColorSpinorField &b)
-  {
-    Solver::create(x, b);
-    if (!init) {
-      ColorSpinorParam csParam(x);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      xp = ColorSpinorField(csParam);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField(csParam);
-      init = true;
-    }
-  }
-
-  cvector_ref<const ColorSpinorField> CGNE::get_residual()
-  {
-    if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
-    // CG residual will match the CGNE residual (FIXME: but only with zero initial guess?)
-    return param.use_init_guess ? xp : CG::get_residual();
-  }
-
-  // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
-  void CGNE::operator()(ColorSpinorField &x, const ColorSpinorField &b)
-  {
-    if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
-      return;
-    }
-
-    create(x, b);
-
-    const int iter0 = param.iter;
-    double b2 = param.compute_true_res ? blas::norm2(b) : 0.0;
-
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      // compute initial residual
-      mmdag.Expose()->M(xp, x);
-      if (param.compute_true_res && b2 == 0.0)
-        b2 = blas::xmyNorm(b, xp);
-      else
-        blas::xpay(b, -1.0, xp);
-
-      // compute solution to residual equation
-      CG::operator()(yp, xp);
-
-      mmdag.Expose()->Mdag(xp, yp);
-
-      // compute full solution
-      blas::xpy(xp, x);
-    } else {
-      CG::operator()(yp, b);
-      mmdag.Expose()->Mdag(x, yp);
-    }
-
-    if (param.compute_true_res || (param.use_init_guess && param.return_residual)) {
-      // compute the true residual
-      mmdag.Expose()->M(xp, x);
-      blas::xpay(b, -1.0, xp); // xp now holds the residual
-
-      double r2;
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        double3 h3 = blas::HeavyQuarkResidualNorm(x, xp);
-        r2 = h3.y;
-        param.true_res_hq = sqrt(h3.z);
-      } else {
-        r2 = blas::norm2(xp);
-      }
-      param.true_res = sqrt(r2 / b2);
-      PrintSummary("CA-CGNE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
-    }
-  }
-
-  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param),
-    mdagm(mat.Expose()),
-    mdagmSloppy(matSloppy.Expose()),
-    mdagmPrecon(matPrecon.Expose()),
-    mdagmEig(matEig.Expose())
-  {
-  }
-
-  void CGNR::create(ColorSpinorField &x, const ColorSpinorField &b)
-  {
-    Solver::create(x, b);
-    if (!init) {
-      ColorSpinorParam csParam(b);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      br = ColorSpinorField(csParam);
-      init = true;
-    }
-  }
-
-  cvector_ref<const ColorSpinorField> CGNR::get_residual()
-  {
-    if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
-    return br;
-  }
-
-  // CGNR: Mdag M x = Mdag b is solved.
-  void CGNR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
-  {
-    if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
-      return;
-    }
-
-    create(x, b);
-
-    const int iter0 = param.iter;
-    double b2 = 0.0;
-    if (param.compute_true_res) {
-      b2 = blas::norm2(b);
-      if (b2 == 0.0) { // compute initial residual vector
-        mdagm.Expose()->M(br, x);
-        b2 = blas::norm2(br);
-      }
-    }
-
-    mdagm.Expose()->Mdag(br, b);
-    CG::operator()(x, br);
-
-    if (param.compute_true_res || param.return_residual) {
-      // compute the true residual
-      mdagm.Expose()->M(br, x);
-      blas::xpay(b, -1.0, br); // br now holds the residual
-
-      if (param.compute_true_res) {
-        double r2;
-        if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          double3 h3 = blas::HeavyQuarkResidualNorm(x, br);
-          r2 = h3.y;
-          param.true_res_hq = sqrt(h3.z);
-        } else {
-          r2 = blas::norm2(br);
-        }
-        param.true_res = sqrt(r2 / b2);
-        PrintSummary("CGNR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
-      }
-    }
   }
 
   void CG::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
@@ -255,19 +102,9 @@ namespace quda {
     vector<double> b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      bool zero_src = true;
-      for (auto i = 0u; i < b.size(); i++) {
-        if (b2[i] == 0) {
-          warningQuda("inverting on zero-field source");
-          x[i] = b[i];
-          param.true_res[i] = 0.0;
-          param.true_res_hq[i] = 0.0;
-        } else {
-          zero_src = false;
-        }
-      }
-      if (zero_src) return;
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
     create(x, b);
@@ -622,19 +459,9 @@ namespace quda {
     bool heavy_quark_restart = false;
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      bool zero_src = true;
-      for (auto i = 0u; i < b.size(); i++) {
-        if (b2[i] == 0) {
-          warningQuda("inverting on zero-field source");
-          x[i] = b[i];
-          param.true_res[i] = 0.0;
-          param.true_res_hq[i] = 0.0;
-        } else {
-          zero_src = false;
-        }
-      }
-      if (zero_src) return;
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
     create(x, b);
