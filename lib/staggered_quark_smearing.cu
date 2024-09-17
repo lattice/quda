@@ -36,14 +36,15 @@ namespace quda
     void apply(const qudaStream_t &stream) override
     {
       if (arg.is_t0_kernel) {
-        arg.exterior_threads = 2
+        arg.exterior_threads = this->Nface()
           * (halo.GhostFaceCB()[0] + halo.GhostFaceCB()[1] + halo.GhostFaceCB()[2] + halo.GhostFaceCB()[3])
           / (in.X(3) * in.size());
         switch (arg.kernel_type) {
         case EXTERIOR_KERNEL_X:
         case EXTERIOR_KERNEL_Y:
         case EXTERIOR_KERNEL_Z:
-        case EXTERIOR_KERNEL_T: arg.threads = 2 * halo.GhostFaceCB()[arg.kernel_type] / (in.X(3) * in.size()); break;
+        case EXTERIOR_KERNEL_T:
+          arg.threads = this->Nface() * halo.GhostFaceCB()[arg.kernel_type] / (in.X(3) * in.size()); break;
         case EXTERIOR_KERNEL_ALL: arg.threads = arg.exterior_threads; break;
         case INTERIOR_KERNEL:
         case UBER_KERNEL: arg.threads = in.VolumeCB() / in.X(3); break;

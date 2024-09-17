@@ -142,6 +142,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   // Use 3D or 4D laplace
   inv_param.laplace3D = laplace3D;
 
+  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
+    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
+
   // Some fermion specific parameters
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -332,6 +335,7 @@ void setEigParam(QudaEigParam &eig_param)
   }
 
   eig_param.ortho_block_size = eig_ortho_block_size;
+  eig_param.compute_evals_batch_size = eig_evals_batch_size;
   eig_param.block_size
     = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
@@ -783,6 +787,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   }
 
   mg_eig_param.ortho_block_size = mg_eig_ortho_block_size[level];
+  mg_eig_param.compute_evals_batch_size = mg_eig_evals_batch_size[level];
   mg_eig_param.block_size
     = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
     1 :
@@ -932,6 +937,9 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
   inv_param.laplace3D = laplace3D;              // for Laplace operator
 
+  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
+    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
+
   // outer solver parameters
   inv_param.inv_type = inv_type;
   inv_param.tol = tol;
@@ -942,8 +950,10 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.use_sloppy_partial_accumulator = false;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
+  inv_param.max_res_increase = max_res_increase;
+  inv_param.max_res_increase_total = max_res_increase_total;
 
-  inv_param.Ls = 1; // Nsrc
+  inv_param.Ls = 1;
 
   if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");

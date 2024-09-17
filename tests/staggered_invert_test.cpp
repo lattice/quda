@@ -49,6 +49,7 @@ void display_test_info()
     printfQuda(" - number of levels %d\n", mg_levels);
     for (int i = 0; i < mg_levels - 1; i++) {
       printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d null-space vector batch size %d\n", i + 1, nvec_batch[i]);
       printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
       printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
     }

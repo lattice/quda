@@ -69,7 +69,7 @@ namespace quda
      * @param null Solver to solve for null vectors.
      * @param in meta color spinor field.
      */
-    virtual void train_param(Solver &null, const ColorSpinorField &in)
+    virtual void train_param(Solver &null, const ColorSpinorField &in) override
     {
       if (!active_training && !transformer.trained) {
         active_training = true;

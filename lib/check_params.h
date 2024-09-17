@@ -196,6 +196,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(compute_evals_batch_size, 4);
   P(ortho_block_size, 0);
   P(partfile, QUDA_BOOLEAN_FALSE);
 #else
@@ -226,6 +227,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(compute_evals_batch_size, INVALID_INT);
   P(ortho_block_size, INVALID_INT);
   P(partfile, QUDA_BOOLEAN_INVALID);
 #endif
@@ -450,6 +452,17 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
   for (int d = 0; d < 4; d++) { P(split_grid[d], INVALID_INT); } /**< Grid of sub-partitions */
   P(num_src_per_sub_partition, INVALID_INT);                     /**< Number of sources per sub-partitions */
+#ifdef CHECK_PARAM
+  int split_grid_size = 1;
+  for (int d = 0; d < 4; d++) split_grid_size *= param->split_grid[d];
+  if (split_grid_size > 1) {
+    if (param->num_src_per_sub_partition < 1)
+      errorQuda("Invalid num_src_per_subpartition = %d", param->num_src_per_sub_partition);
+    if (param->num_src % param->num_src_per_sub_partition != 0)
+      errorQuda("num_src %d not compatible with num_src_per_sub_partition %d",
+                param->num_src, param->num_src_per_sub_partition);
+  }
+#endif
 #endif
 
 #ifdef INIT_PARAM

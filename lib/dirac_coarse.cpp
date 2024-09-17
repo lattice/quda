@@ -616,7 +616,7 @@ namespace quda {
 
     checkFullSpinor(x, b);
     auto tmp = getFieldTmp(x.Even());
-#if 1
+#if 0
     // x_o = A_oo^-1 (b_o - D_oe x_e)
     DiracCoarse::Dslash(tmp, x(this_parity), other_parity);
     blas::xpay(b(other_parity), -1.0, tmp);

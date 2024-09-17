@@ -30,6 +30,7 @@ namespace quda {
 
     inline void copy(cvector_ref<ColorSpinorField> &dst, cvector_ref<const ColorSpinorField> &src)
     {
+      if (dst.size() != src.size()) errorQuda("Mismatched vector sets %lu != %lu", dst.size(), src.size());
       for (auto i = 0u; i < src.size(); i++) { dst[i].copy(src[i]); }
     }
 
