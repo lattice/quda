@@ -949,12 +949,13 @@ endif()
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    # Test setting `--dslash-type hisq`, which implies `--dslash-type asqtad --compute-fat-long true`
+    set(DIRAC_NAME hisq)
     add_test(NAME dslash_${DIRAC_NAME}_build_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type asqtad
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPC
                      --dim 6 8 10 12
-                     --compute-fat-long true
                      --epsilon-naik -0.01
                      --tadpole-coeff 0.9
         --gtest_output=xml:dslash_${DIRAC_NAME}_build_test_pol${pol2}.xml)
