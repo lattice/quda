@@ -27,6 +27,7 @@ namespace quda {
       value = f(value, idx, j);
       if (grid_stride) idx += globalRangeX; else break;
     }
+    if constexpr (needsSharedMem<Functor<Arg>>) group_barrier(ndi.get_group());
     // perform final inter-block reduction and write out result
     reduce(arg, f, value, 0, rso);
   }
@@ -190,6 +191,7 @@ namespace quda {
 	if (grid_stride) idx += globalRangeX; else break;
       }
     }
+    if constexpr (needsSharedMem<Functor<Arg>>) group_barrier(ndi.get_group());
 
     // perform final inter-block reduction and write out result
     reduce(arg, f, value, j, rso);
@@ -197,7 +199,7 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
     using KernelOpsT = combineOps<getKernelOps<Functor<Arg>>,
-				   typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops>;
+				  typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops>;
     template <typename... T>
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
