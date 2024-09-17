@@ -10,7 +10,7 @@ namespace quda {
 
 #ifndef HIGH_LEVEL_REDUCTIONS
   template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename S>
-  void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &, S smem)
+  void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S smem)
   {
     Functor<Arg> f(arg);
 #if 0
