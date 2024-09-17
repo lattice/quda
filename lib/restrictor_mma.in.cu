@@ -11,7 +11,7 @@ namespace quda
 {
 
   template <typename out_t, typename in_t, typename v_t, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-            int nVec, int aggregate_size>
+            int nVec>
   class RestrictMmaLaunch : public TunableKernel
   {
     ColorSpinorField &out;
@@ -20,6 +20,7 @@ namespace quda
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int parity;
+    int aggregate_size;
 
     // using mma_t = typename mma::smma_dispatch<out_t>::type;
     // using mma_t = simt::simt_t<float, 8, 4, 2, 2>;
@@ -31,10 +32,11 @@ namespace quda
 #endif
 
     static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
+    static constexpr int aggregate_size_block_max = 16;
 
     static constexpr int m = nVec;
     static constexpr int n = coarseColor;
-    static constexpr int k = fineColor * spin_block_factor * aggregate_size;
+    static constexpr int k = fineColor * spin_block_factor * aggregate_size_block_max;
 
     static constexpr int n_atom_size = mma_t::MMA_N;
     static constexpr int m_atom_size = mma_t::MMA_M;
@@ -42,7 +44,7 @@ namespace quda
     static constexpr int block_atom_size = 32 / 8;
     static constexpr int block_limit = 32;
 
-    using this_t = RestrictMmaLaunch<out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec, aggregate_size>;
+    using this_t = RestrictMmaLaunch<out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec>;
     expand_aux_t<this_t, block_limit, block_atom_size, n, n_atom_size, m, m_atom_size, k, k_atom_size> expand;
 
     bool checkParam(const TuneParam &param) const { return true; }
@@ -77,6 +79,7 @@ namespace quda
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
       parity(parity),
+      aggregate_size(in.Volume() / out.Volume()),
       expand(*this)
     {
       strcat(vol, ",");
@@ -86,6 +89,8 @@ namespace quda
       setRHSstring(aux, in.Nvec());
 
       strcat(aux, mma_t::get_type_name().c_str());
+      strcat(aux, ",aggregate_size_block_max=");
+      i32toa(aux + strlen(aux), aggregate_size_block_max);
 
       apply(device::get_default_stream());
     }
@@ -98,9 +103,9 @@ namespace quda
       return nVec * (in.Bytes() + out.Bytes() + v_bytes + in.SiteSubset() * in.VolumeCB() * sizeof(int));
     }
 
-    static constexpr int shared_bytes_per_block(int bM, int bN, int bK)
+    int shared_bytes_per_block(int bM, int bN, int bK) const
     {
-      return mma::shared_memory_bytes<mma_t>(bM, bN, bK);
+      return mma::shared_memory_bytes<mma_t>(bM, bN, bK) + aggregate_size * sizeof(int);
     }
 
     bool set_mma_param(TuneParam &tp) const
@@ -128,11 +133,11 @@ namespace quda
     template <int block_y, int bN, int bM, int bK>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream)
     {
-      constexpr int shared_bytes = shared_bytes_per_block(bM, bN, bK);
+      constexpr int shared_bytes = mma::shared_memory_bytes<mma_t>(bM, bN, bK);
       if constexpr (shared_bytes <= device::maximum_dynamic_shared_memory()) {
         constexpr int block_z = 8;
         using Arg = RestrictMmaArg<mma_t, out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec,
-                                   aggregate_size, bN, bM, bK, block_y, block_z>;
+                                   bN, bM, bK, block_y, block_z>;
         Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         tp.set_max_shared_bytes = true;
         launch_cuda<RestrictorMma>(tp, stream, arg);
@@ -153,7 +158,7 @@ namespace quda
     }
   };
 
-  template <typename store_t, typename in_t, int fineSpin, int fineColor, int coarseColor, int nVec, int aggregate_size>
+  template <typename store_t, typename in_t, int fineSpin, int fineColor, int coarseColor, int nVec>
   void RestrictMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
@@ -168,38 +173,38 @@ namespace quda
 
     if (v.Precision() == QUDA_HALF_PRECISION) {
       if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-        RestrictMmaLaunch<store_t, in_t, short, fineSpin, fineColor, coarseSpin, coarseColor, nVec, aggregate_size> restrictor(
+        RestrictMmaLaunch<store_t, in_t, short, fineSpin, fineColor, coarseSpin, coarseColor, nVec> restrictor(
           out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
     } else if (v.Precision() == in.Precision()) {
-      RestrictMmaLaunch<store_t, in_t, store_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec, aggregate_size> restrictor(
+      RestrictMmaLaunch<store_t, in_t, store_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec> restrictor(
         out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
   }
 
-  template <typename store_t, int fineColor, int coarseColor, int nVec, int aggregate_size>
+  template <typename store_t, int fineColor, int coarseColor, int nVec>
   void RestrictMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
     if (!is_enabled_spin(in.Nspin())) errorQuda("nSpin %d has not been built", in.Nspin());
 
     if (in.Nspin() == 2) {
-      RestrictMma<store_t, store_t, 2, fineColor, coarseColor, nVec, aggregate_size>(out, in, v, fine_to_coarse,
+      RestrictMma<store_t, store_t, 2, fineColor, coarseColor, nVec>(out, in, v, fine_to_coarse,
                                                                                      coarse_to_fine, spin_map, parity);
     } else if constexpr (fineColor == 3) {
       if (in.Nspin() == 4) {
         if constexpr (is_enabled_spin(4)) {
           if (in.Precision() == out.Precision()) {
-            RestrictMma<store_t, store_t, 4, fineColor, coarseColor, nVec, aggregate_size>(
+            RestrictMma<store_t, store_t, 4, fineColor, coarseColor, nVec>(
               out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
           } else if (in.Precision() == QUDA_HALF_PRECISION) {
 #if 0
             if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-              RestrictMma<store_t, short, 4, fineColor, coarseColor, nVec, aggregate_size>(out, in, v,
+              RestrictMma<store_t, short, 4, fineColor, coarseColor, nVec>(out, in, v,
               fine_to_coarse, coarse_to_fine, spin_map,
                                                                   parity);
             } else {
@@ -245,25 +250,6 @@ namespace quda
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
   constexpr int nVec = @QUDA_MULTIGRID_MRHS@;
   // clang-format on
-
-  template <typename store_t, int fineColor, int coarseColor, int nVec>
-  void RestrictMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                   const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
-  {
-    int aggregate_size = in.Volume() / out.Volume();
-    if (aggregate_size == 16) {
-      RestrictMma<store_t, fineColor, coarseColor, nVec, 16>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
-                                                             parity);
-    } else if (aggregate_size == 128) {
-      RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
-                                                              parity);
-    } else if (aggregate_size == 512) {
-      RestrictMma<store_t, fineColor, coarseColor, nVec, 512>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
-                                                              parity);
-    } else {
-      errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
-    }
-  }
 
   template <>
   void RestrictMma<fineColor, coarseColor, nVec>(ColorSpinorField &out, const ColorSpinorField &in,

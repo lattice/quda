@@ -13,7 +13,7 @@ namespace quda
       Kernel argument struct
   */
   template <typename mma_t_, typename out_t_, typename in_t_, typename v_t_, int fineSpin_, int fineColor_, int coarseSpin_,
-            int coarseColor_, int nVec_, int aggregate_size_, int bN_, int bM_, int bK_, int block_y_, int block_z_>
+            int coarseColor_, int nVec_, int bN_, int bM_, int bK_, int block_y_, int block_z_>
   struct RestrictMmaArg : kernel_param<> {
 
     static constexpr int block_dim = block_z_ * block_y_;
@@ -30,7 +30,7 @@ namespace quda
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int coarseColor = coarseColor_;
     static constexpr int nVec = nVec_;
-    static constexpr int aggregate_size = aggregate_size_;
+    // static constexpr int aggregate_size = aggregate_size_;
     static constexpr int bN = bN_;
     static constexpr int bM = bM_;
     static constexpr int bK = bK_;
@@ -48,11 +48,11 @@ namespace quda
     static_assert(bK % (fineColor * spin_block_factor) == 0, "K %% Arg::bK != 0.\n");
 
     static constexpr int aggregate_per_block = bK / (fineColor * spin_block_factor);
-    static_assert(aggregate_size % aggregate_per_block == 0, "aggregate_size %% aggregate_per_block");
 
     out_accessor_t out;
     in_accessor_t in;
     const v_accessor_t v;
+    const int aggregate_size;
     const int_fastdiv aggregate_size_cb; // number of checkerboard sites that form a single aggregate
     const int *fine_to_coarse;
     const int *coarse_to_fine;
@@ -66,6 +66,7 @@ namespace quda
       out(out),
       in(in),
       v(v),
+      aggregate_size(in.Volume() / out.Volume()),
       aggregate_size_cb(in.VolumeCB() / out.Volume()),
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
@@ -97,13 +98,14 @@ namespace quda
         int thread_idx = thread;
         int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
         constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
-        if (!check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit) {
+        bool b = !check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit;
           thread_idx /= (contiguous_dim / elements_per_thread);
           int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
           thread_idx /= Arg::spin_block_factor;
           int fine_color = thread_idx % Arg::fineColor;
           thread_idx /= Arg::fineColor;
           int x_fine_offset = thread_idx + aggregate_k_offset;
+        if (x_fine_offset < arg.aggregate_size && b) {
 
           const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
           const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
@@ -164,13 +166,14 @@ namespace quda
       int thread_idx = thread;
       int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
       constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
-      if (!check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit) {
+      bool b = !check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit;
         thread_idx /= (contiguous_dim / elements_per_thread);
         int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
         thread_idx /= Arg::spin_block_factor;
         int fine_color = thread_idx % Arg::fineColor;
         thread_idx /= Arg::fineColor;
         int x_fine_offset = thread_idx + aggregate_k_offset;
+      if (x_fine_offset < arg.aggregate_size && b) {
 
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
         const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
@@ -229,6 +232,7 @@ namespace quda
             }
           }
         } else {
+          static_assert(smem_obj_t::ldn % elements_per_thread == 0);
           smem_real.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_real));
           smem_imag.vector_load(smem_m, smem_k, mma::make_vector_t<typename Arg::real, elements_per_thread>::get(a_imag));
         }
@@ -246,7 +250,7 @@ namespace quda
 
     constexpr int M = Arg::nVec;
     constexpr int N = Arg::coarseColor;
-    constexpr int K = Arg::fineColor * Arg::spin_block_factor * Arg::aggregate_size;
+    constexpr int K = 0; // K is dummy here since it is a runtime variable;
 
     constexpr int ldc = M;
 
@@ -257,14 +261,6 @@ namespace quda
     static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
-    __shared__ int coarse_to_fine[Arg::aggregate_size];
-    int index = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
-    while (index < Arg::aggregate_size) {
-      coarse_to_fine[index] = arg.coarse_to_fine[x_coarse * 2 * arg.aggregate_size_cb + index];
-      index += Arg::block_y * Arg::block_z;
-    }
-    __syncthreads();
-
     extern __shared__ typename mma_t::compute_t smem_ptr[];
 
     typename Config::SmemObjA smem_obj_a_real(smem_ptr);
@@ -272,8 +268,13 @@ namespace quda
     typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * Arg::bK);
     typename Config::SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + Config::smem_ldb * Arg::bK);
 
-    typename Config::ALoader a_loader;
-    typename Config::BLoader b_loader;
+    int *coarse_to_fine = reinterpret_cast<int *>(smem_obj_b_imag.ptr + Config::smem_ldb * Arg::bK);
+    int index = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
+    while (index < arg.aggregate_size) {
+      coarse_to_fine[index] = arg.coarse_to_fine[x_coarse * 2 * arg.aggregate_size_cb + index];
+      index += Arg::block_y * Arg::block_z;
+    }
+    __syncthreads();
 
     typename Config::Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
@@ -281,7 +282,7 @@ namespace quda
 
     constexpr bool rescale = mma_t::do_rescale();
 
-    for (int aggregate_k_offset = 0; aggregate_k_offset < Arg::aggregate_size;
+    for (int aggregate_k_offset = 0; aggregate_k_offset < arg.aggregate_size;
          aggregate_k_offset += Arg::aggregate_per_block) {
       __syncthreads();
 
