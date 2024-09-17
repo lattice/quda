@@ -251,21 +251,16 @@ namespace quda
                    const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
   {
     int aggregate_size = in.Volume() / out.Volume();
-    if (aggregate_size == 128) {
-      if constexpr (fineColor == 3 && coarseColor == 24) {
-        RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
-                                                                parity);
-      } else {
-        errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
-      }
-    } else if (aggregate_size == 16) {
-      if constexpr (fineColor == 24 && coarseColor == 32) {
-        RestrictMma<store_t, fineColor, coarseColor, nVec, 16>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
-                                                               parity);
-      } else {
-        errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
-      }
-    } else{
+    if (aggregate_size == 16) {
+      RestrictMma<store_t, fineColor, coarseColor, nVec, 16>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                             parity);
+    } else if (aggregate_size == 128) {
+      RestrictMma<store_t, fineColor, coarseColor, nVec, 128>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                              parity);
+    } else if (aggregate_size == 512) {
+      RestrictMma<store_t, fineColor, coarseColor, nVec, 512>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map,
+                                                              parity);
+    } else {
       errorQuda("Unexpected aggregate_size = %d\n", aggregate_size);
     }
   }
