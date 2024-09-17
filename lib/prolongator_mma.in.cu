@@ -48,10 +48,7 @@ namespace quda
 
     unsigned int sharedBytesPerThread() const { return 0; }
 
-    bool advanceTuneParam(TuneParam &param) const
-    {
-      return expand.advance_aux(param);
-    }
+    bool advanceTuneParam(TuneParam &param) const { return expand.advance_aux(param); }
 
     void initTuneParam(TuneParam &param) const
     {
@@ -116,7 +113,8 @@ namespace quda
       int bN = expand.get_y(tp);
       int bM = expand.get_z(tp);
 
-      tp.grid = dim3(out.SiteSubset() * out.VolumeCB() * fineSpin / spin_block_factor, (m + bM - 1) / bM, (n + bN - 1) / bN);
+      tp.grid
+        = dim3(out.SiteSubset() * out.VolumeCB() * fineSpin / spin_block_factor, (m + bM - 1) / bM, (n + bN - 1) / bN);
       tp.set_max_shared_bytes = true;
 
       int bK = expand.get_w(tp);
@@ -126,8 +124,7 @@ namespace quda
       return shared_bytes <= device::maximum_dynamic_shared_memory();
     }
 
-    template <int block_y, int bN, int bM, int bK>
-    void launch_mma(TuneParam &tp, const qudaStream_t &stream)
+    template <int block_y, int bN, int bM, int bK> void launch_mma(TuneParam &tp, const qudaStream_t &stream)
     {
       constexpr int shared_bytes = shared_bytes_per_block(bM, bN, bK);
       if constexpr (shared_bytes <= device::maximum_dynamic_shared_memory()) {
@@ -143,10 +140,7 @@ namespace quda
       }
     }
 
-    void launch_mma(TuneParam &tp, const qudaStream_t &stream)
-    {
-      expand.expand(tp, stream);
-    }
+    void launch_mma(TuneParam &tp, const qudaStream_t &stream) { expand.expand(tp, stream); }
 
     void apply(const qudaStream_t &stream)
     {
@@ -206,11 +200,11 @@ namespace quda
     }
   }
 
-  // clang-format on
+  // clang-format off
   constexpr int fineColor = @QUDA_MULTIGRID_NC_NVEC@;
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
   constexpr int nVec = @QUDA_MULTIGRID_MRHS@;
-  // clang-format off
+  // clang-format on
 
   template <>
   void ProlongateMma<fineColor, coarseColor, nVec>(ColorSpinorField &out, const ColorSpinorField &in,

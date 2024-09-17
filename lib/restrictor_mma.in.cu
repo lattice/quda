@@ -10,8 +10,7 @@
 namespace quda
 {
 
-  template <typename out_t, typename in_t, typename v_t, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-            int nVec>
+  template <typename out_t, typename in_t, typename v_t, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int nVec>
   class RestrictMmaLaunch : public TunableKernel
   {
     ColorSpinorField &out;
@@ -51,10 +50,7 @@ namespace quda
 
     unsigned int sharedBytesPerThread() const { return 0; }
 
-    bool advanceTuneParam(TuneParam &param) const
-    {
-      return expand.advance_aux(param);
-    }
+    bool advanceTuneParam(TuneParam &param) const { return expand.advance_aux(param); }
 
     void initTuneParam(TuneParam &param) const
     {
@@ -130,14 +126,13 @@ namespace quda
       return shared_bytes <= device::maximum_dynamic_shared_memory();
     }
 
-    template <int block_y, int bN, int bM, int bK>
-    void launch_mma(TuneParam &tp, const qudaStream_t &stream)
+    template <int block_y, int bN, int bM, int bK> void launch_mma(TuneParam &tp, const qudaStream_t &stream)
     {
       constexpr int shared_bytes = mma::shared_memory_bytes<mma_t>(bM, bN, bK);
       if constexpr (shared_bytes <= device::maximum_dynamic_shared_memory()) {
         constexpr int block_z = 8;
-        using Arg = RestrictMmaArg<mma_t, out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec,
-                                   bN, bM, bK, block_y, block_z>;
+        using Arg = RestrictMmaArg<mma_t, out_t, in_t, v_t, fineSpin, fineColor, coarseSpin, coarseColor, nVec, bN, bM,
+                                   bK, block_y, block_z>;
         Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         tp.set_max_shared_bytes = true;
         launch_cuda<RestrictorMma>(tp, stream, arg);
@@ -146,10 +141,7 @@ namespace quda
       }
     }
 
-    void launch_mma(TuneParam &tp, const qudaStream_t &stream)
-    {
-      expand.expand(tp, stream);
-    }
+    void launch_mma(TuneParam &tp, const qudaStream_t &stream) { expand.expand(tp, stream); }
 
     void apply(const qudaStream_t &stream)
     {
@@ -193,14 +185,14 @@ namespace quda
     if (!is_enabled_spin(in.Nspin())) errorQuda("nSpin %d has not been built", in.Nspin());
 
     if (in.Nspin() == 2) {
-      RestrictMma<store_t, store_t, 2, fineColor, coarseColor, nVec>(out, in, v, fine_to_coarse,
-                                                                                     coarse_to_fine, spin_map, parity);
+      RestrictMma<store_t, store_t, 2, fineColor, coarseColor, nVec>(out, in, v, fine_to_coarse, coarse_to_fine,
+                                                                     spin_map, parity);
     } else if constexpr (fineColor == 3) {
       if (in.Nspin() == 4) {
         if constexpr (is_enabled_spin(4)) {
           if (in.Precision() == out.Precision()) {
-            RestrictMma<store_t, store_t, 4, fineColor, coarseColor, nVec>(
-              out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+            RestrictMma<store_t, store_t, 4, fineColor, coarseColor, nVec>(out, in, v, fine_to_coarse, coarse_to_fine,
+                                                                           spin_map, parity);
           } else if (in.Precision() == QUDA_HALF_PRECISION) {
 #if 0
             if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
@@ -209,7 +201,7 @@ namespace quda
                                                                   parity);
             } else {
 #endif
-              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #if 0
             }
 #endif

@@ -12,8 +12,8 @@ namespace quda
   /**
       Kernel argument struct
   */
-  template <typename mma_t_, typename out_t_, typename in_t_, typename v_t_, int fineSpin_, int fineColor_, int coarseSpin_,
-            int coarseColor_, int nVec_, int bN_, int bM_, int bK_, int block_y_, int block_z_>
+  template <typename mma_t_, typename out_t_, typename in_t_, typename v_t_, int fineSpin_, int fineColor_,
+            int coarseSpin_, int coarseColor_, int nVec_, int bN_, int bM_, int bK_, int block_y_, int block_z_>
   struct RestrictMmaArg : kernel_param<> {
 
     static constexpr int block_dim = block_z_ * block_y_;
@@ -99,12 +99,12 @@ namespace quda
         int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
         constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
         bool b = !check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit;
-          thread_idx /= (contiguous_dim / elements_per_thread);
-          int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
-          thread_idx /= Arg::spin_block_factor;
-          int fine_color = thread_idx % Arg::fineColor;
-          thread_idx /= Arg::fineColor;
-          int x_fine_offset = thread_idx + aggregate_k_offset;
+        thread_idx /= (contiguous_dim / elements_per_thread);
+        int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
+        thread_idx /= Arg::spin_block_factor;
+        int fine_color = thread_idx % Arg::fineColor;
+        thread_idx /= Arg::fineColor;
+        int x_fine_offset = thread_idx + aggregate_k_offset;
         if (x_fine_offset < arg.aggregate_size && b) {
 
           const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
@@ -167,12 +167,12 @@ namespace quda
       int contiguous = thread_idx % (contiguous_dim / elements_per_thread) * elements_per_thread;
       constexpr bool check_contiguous_bound = !(contiguous_limit % contiguous_dim == 0);
       bool b = !check_contiguous_bound || contiguous + contiguous_dim_offset < contiguous_limit;
-        thread_idx /= (contiguous_dim / elements_per_thread);
-        int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
-        thread_idx /= Arg::spin_block_factor;
-        int fine_color = thread_idx % Arg::fineColor;
-        thread_idx /= Arg::fineColor;
-        int x_fine_offset = thread_idx + aggregate_k_offset;
+      thread_idx /= (contiguous_dim / elements_per_thread);
+      int fine_spin_block = thread_idx % Arg::spin_block_factor; // fineSpin / coarseSpin
+      thread_idx /= Arg::spin_block_factor;
+      int fine_color = thread_idx % Arg::fineColor;
+      thread_idx /= Arg::fineColor;
+      int x_fine_offset = thread_idx + aggregate_k_offset;
       if (x_fine_offset < arg.aggregate_size && b) {
 
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
