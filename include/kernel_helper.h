@@ -14,8 +14,10 @@ namespace quda
 
   enum class use_kernel_arg_p { FALSE, TRUE, ALWAYS };
 
-  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE> struct kernel_param {
+  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true>
+  struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
+    static constexpr bool check_bounds = check_bounds_;
     dim3 threads;          /** number of active threads required */
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */

@@ -13,7 +13,7 @@ namespace quda
   */
   template <class v_t_, class b_t_, bool is_device_, typename vFloat, typename vAccessor, typename bFloat,
             typename bAccessor, int nSpin_, int nColor_, int nVec_, bool from_to_non_rel_>
-  struct BlockTransposeArg : kernel_param<> {
+  struct BlockTransposeArg : kernel_param<use_kernel_arg_p::TRUE, false> { // no bound checks
     using real = typename mapper<vFloat>::type;
     static constexpr bool is_device = is_device_;
     static constexpr int nSpin = nSpin_;
