@@ -98,7 +98,6 @@ namespace quda
     using mma_t = typename Arg::mma_t;
     using Config = mma::MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
-    // static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
     extern __shared__ typename mma_t::compute_t smem_ptr[];

@@ -30,7 +30,6 @@ namespace quda
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int coarseColor = coarseColor_;
     static constexpr int nVec = nVec_;
-    // static constexpr int aggregate_size = aggregate_size_;
     static constexpr int bN = bN_;
     static constexpr int bM = bM_;
     static constexpr int bK = bK_;
@@ -258,7 +257,6 @@ namespace quda
     // The first two ldc's are dummy
     using Config = mma::MmaConfig<mma_t, M, N, K, ldc, ldc, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
-    static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
     extern __shared__ typename mma_t::compute_t smem_ptr[];

@@ -103,7 +103,6 @@ namespace quda
 
     bool set_mma_param(TuneParam &tp) const
     {
-      static_assert(m % m_atom_size == 0, "m modulo m_atom_size == 0");
       static_assert(k % k_atom_size == 0, "k modulo k_atom_size == 0");
 
       tp.block.x = 1;

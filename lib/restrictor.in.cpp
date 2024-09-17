@@ -122,7 +122,7 @@ namespace quda
       IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
       // clang-format on
 
-      if (in.size() % 16 == 0) {
+      if (in.size() % 8 == 0) {
         Restrict<true>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity, fineColors);
       } else {
         Restrict<false>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity, fineColors);

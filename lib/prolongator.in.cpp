@@ -122,7 +122,7 @@ namespace quda
       // clang-format off
       IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
       // clang-format on
-      if (in.size() % 16 == 0) {
+      if (in.size() % 8 == 0) {
         // use MMA
         Prolongate<true>(out, in, v, fine_to_coarse, spin_map, parity, fineColors);
       } else {
