@@ -217,9 +217,9 @@ namespace quda
 
             pipe.consumer_wait();
             __syncthreads();
-            float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+            float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed, do_rescale>(
               smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-            float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+            float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed, do_rescale>(
               smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
             pipe.consumer_release();
             __syncthreads();
@@ -237,9 +237,9 @@ namespace quda
 
           pipe.consumer_wait();
           __syncthreads();
-          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed, do_rescale>(
             smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed, do_rescale>(
             smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
@@ -307,9 +307,9 @@ namespace quda
 
             pipe.consumer_wait();
             __syncthreads();
-            float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+            float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed, do_rescale>(
               smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-            float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+            float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed, do_rescale>(
               smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
             pipe.consumer_release();
             __syncthreads();
@@ -326,9 +326,9 @@ namespace quda
 
           pipe.consumer_wait();
           __syncthreads();
-          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+          float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed, do_rescale>(
             smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+          float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed, do_rescale>(
             smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
@@ -369,9 +369,9 @@ namespace quda
 
         pipe.consumer_wait();
         __syncthreads();
-        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed>(
+        float rescale_factor_a = a_loader.template tmp2s_rescale<lda, a_dagger, a_fixed, do_rescale>(
           smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed>(
+        float rescale_factor_b = b_loader.template tmp2s_rescale<ldb, b_dagger, b_fixed, do_rescale>(
           smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
         pipe.consumer_release();
         __syncthreads();
