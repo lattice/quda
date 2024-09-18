@@ -42,14 +42,14 @@ namespace quda
 
     // using mma_t = smma::smma_t<mma::bfloat16, 8, 1, 1>;  // 3xBF16
     // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>;  // 3xTF32
-    // using mma_t = smma::smma_x_t<mma::half, 8, 1, 1>;    // 1xFP16 - m16n8k8 variant for sm70
+    // using mma_t = smma::smma_x_t<mma::half, 8, 1, 1>;    // 3xFP16 - m16n8k8 variant for sm70
     // using mma_t = hmma::hmma_tfloat32_t<4, 1, 1>;        // 1xTF32
     // using mma_t = mma::smma_half_t;                      // 3xFP16
     // using mma_t = mma::hmma_t;                           // 1xFP16
 #if (__COMPUTE_CAPABILITY__ >= 800)
-    using mma_t = typename mma::smma_dispatch<yFloat>::type;
+    using mma_t = hmma::hmma_tfloat32_t<4, 1, 1>;
 #else
-    using mma_t = typename simt::simt_t<float, 8, 4, 2, 2>;
+    using mma_t = mma::hmma_t;
 #endif
     static constexpr int n_atom_size = mma_t::MMA_N;
     static constexpr int m_atom_size = mma_t::MMA_M;

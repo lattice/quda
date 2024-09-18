@@ -321,33 +321,40 @@ namespace quda
     }
 
     /**
-      @brief Load from global memory and store data in registers while also applying a rescaling
+      @brief Load from global memory and store data in registers.
      */
-    template <bool x, bool fixed, bool dagger, int ld, class T>
-    inline __device__ void convert_x_rescale(float &reg_real, float &reg_imag, complex<T> *p, int m_idx, int n_idx,
+    template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
+    inline __device__ void convert_x_rescale(float reg_real[batch], float reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
                                              float scale_inv, float rescale)
     {
-      if (x) {
-        auto xx = p[m_idx * ld + n_idx];
-
-        if constexpr (fixed) {
-          reg_real = scale_inv * xx.real() * rescale;
-          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-          reg_imag = scale_inv_conj * xx.imag() * rescale;
-        } else {
-          reg_real = +xx.real() * rescale;
-          reg_imag = (dagger ? -xx.imag() : +xx.imag()) * rescale;
+      complex<T> v[batch];
+      scale_inv *= rescale;
+      if constexpr (x) {
+        batch_load_t<complex<T>, batch>::load(v, &p[m_idx * ld + n_idx]);
+#pragma unroll
+        for (int b = 0; b < batch; b++) {
+          if constexpr (fixed) {
+            reg_real[b] = scale_inv * v[b].real();
+            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+            reg_imag[b] = scale_inv_conj * v[b].imag();
+          } else {
+            reg_real[b] = v[b].real() * rescale;
+            reg_imag[b] = (dagger ? -v[b].imag() : v[b].imag()) * rescale;
+          }
         }
       } else {
-        auto xx = p[n_idx * ld + m_idx];
-
-        if constexpr (fixed) {
-          reg_real = scale_inv * xx.real() * rescale;
-          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-          reg_imag = scale_inv_conj * xx.imag() * rescale;
-        } else {
-          reg_real = xx.real() * rescale;
-          reg_imag = (dagger ? -xx.imag() : xx.imag()) * rescale;
+        complex<T> v[batch];
+        batch_load_t<complex<T>, batch>::load(v, &p[n_idx * ld + m_idx]);
+#pragma unroll
+        for (int b = 0; b < batch; b++) {
+          if constexpr (fixed) {
+            reg_real[b] = scale_inv * v[b].real();
+            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+            reg_imag[b] = scale_inv_conj * v[b].imag();
+          } else {
+            reg_real[b] = v[b].real() * rescale;
+            reg_imag[b] = (dagger ? -v[b].imag() : v[b].imag()) * rescale;
+          }
         }
       }
     }
@@ -356,7 +363,50 @@ namespace quda
       @brief Load from global memory and store data in registers.
      */
     template <bool x, bool fixed, bool dagger, int ld, class T>
-    inline __device__ float find_abs_max(complex<T> *p, int m_idx, int n_idx, float scale_inv)
+    inline __device__ float find_abs_max(half2, complex<T> *p, int m_idx, int n_idx, float scale_inv)
+    {
+      float this_max = 0.0f;
+
+      if constexpr (x) {
+        auto xx = p[m_idx * ld + n_idx];
+        auto yy = p[(m_idx + 1) * ld + n_idx];
+
+        if constexpr (fixed) {
+          this_max = abs_max(scale_inv * xx.real(), this_max);
+          this_max = abs_max(scale_inv * xx.imag(), this_max);
+          this_max = abs_max(scale_inv * yy.real(), this_max);
+          this_max = abs_max(scale_inv * yy.imag(), this_max);
+        } else {
+          this_max = abs_max(xx.real(), this_max);
+          this_max = abs_max(xx.imag(), this_max);
+          this_max = abs_max(yy.real(), this_max);
+          this_max = abs_max(yy.imag(), this_max);
+        }
+      } else {
+        auto xx = p[n_idx * ld + m_idx];
+        auto yy = p[n_idx * ld + m_idx + 1];
+
+        if constexpr (fixed) {
+          this_max = abs_max(scale_inv * xx.real(), this_max);
+          this_max = abs_max(scale_inv * xx.imag(), this_max);
+          this_max = abs_max(scale_inv * yy.real(), this_max);
+          this_max = abs_max(scale_inv * yy.imag(), this_max);
+        } else {
+          this_max = abs_max(xx.real(), this_max);
+          this_max = abs_max(xx.imag(), this_max);
+          this_max = abs_max(yy.real(), this_max);
+          this_max = abs_max(yy.imag(), this_max);
+        }
+      }
+
+      return this_max;
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, class T>
+    inline __device__ float find_abs_max(float, complex<T> *p, int m_idx, int n_idx, float scale_inv)
     {
       float this_max = 0.0f;
 
@@ -458,8 +508,6 @@ namespace quda
       __device__ inline float tmp2s_rescale(complex<T> *smem_ptr, float scale_inv, smem_accessor_t &smem_real,
                                             smem_accessor_t &smem_imag)
       {
-        static_assert(batch == 1, "For now batch needs to be 1 for the rescale kernel.");
-
         // for each iteration, each warp loads a tile
         int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
         int warp_id = thread_id / 32;
@@ -495,7 +543,7 @@ namespace quda
 
             constexpr bool x = (transpose == dagger);
             float this_max
-              = find_abs_max<x, fixed, dagger, (x ? bN + 4 : bM + 4)>(smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
+              = find_abs_max<x, fixed, dagger, (x ? bN + 4 : bM + 4)>(load_t{}, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
             thread_max = fmaxf(this_max, thread_max);
           }
         }
@@ -534,8 +582,13 @@ namespace quda
             load_t imag;
 
             constexpr bool x = (transpose == dagger);
-            convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4>(real, imag, smem_ptr, gmem_m_offset, gmem_k_offset,
-                                                                     scale_inv, block_rescale_factor);
+            // if constexpr (std::is_same_v<load_t, float>) {
+            //   convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4>(real, imag, smem_ptr, gmem_m_offset, gmem_k_offset,
+            //                                                            scale_inv, block_rescale_factor);
+            // } else {
+              convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4, 1>(&real, &imag, smem_ptr, gmem_m_offset, gmem_k_offset,
+                                                                          scale_inv, block_rescale_factor);
+            // }
             smem_real.vector_load(smem_m_offset, smem_k_offset, real);
             smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
           }
