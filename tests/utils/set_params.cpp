@@ -795,6 +795,8 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.n_ev = mg_eig_n_ev[level];
   mg_eig_param.n_kr = mg_eig_n_kr[level];
   mg_eig_param.n_conv = nvec[level];
+  mg_eig_param.compute_evals_batch_size
+    = mg_eig_evals_batch_size[level] ? mg_eig_evals_batch_size[level] : eig_evals_batch_size;
 
   // Inverters will deflate only this number of vectors.
   if (mg_eig_n_ev_deflate[level] > 0 && mg_eig_n_ev_deflate[level] < mg_eig_param.n_conv)
