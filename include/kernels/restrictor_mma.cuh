@@ -119,17 +119,13 @@ namespace quda
 
           int fine_spin = fine_spin_block + coarse_spin * Arg::spin_block_factor;
           auto a_gmem = gmem(v_parity, x_fine_cb, fine_spin, fine_color, contiguous + contiguous_dim_offset);
-          complex<typename gmem_obj_t::store_type> a[elements_per_thread];
-          mma::batch_load_t<complex<typename gmem_obj_t::store_type>, elements_per_thread>::load(a, a_gmem.data());
 
+          using store_t = typename gmem_obj_t::store_type;
           if constexpr (decltype(a_gmem)::fixed) {
-            auto scale_inv = a_gmem.get_scale_inv();
-#pragma unroll
-            for (int e = 0; e < elements_per_thread; e++) {
-              thread_max = mma::abs_max(a[e].real() * scale_inv, thread_max);
-              thread_max = mma::abs_max(a[e].imag() * scale_inv, thread_max);
-            }
+            thread_max = fmaxf(fixedMaxValue<store_t>::value * a_gmem.get_scale_inv(), thread_max);
           } else {
+            complex<typename gmem_obj_t::store_type> a[elements_per_thread];
+            mma::batch_load_t<complex<store_t>, elements_per_thread>::load(a, a_gmem.data());
 #pragma unroll
             for (int e = 0; e < elements_per_thread; e++) {
               thread_max = mma::abs_max(a[e].real(), thread_max);

@@ -443,7 +443,7 @@ namespace quda
         return gmem.get_scale_inv();
       }
 
-      template <int ld, bool dagger, bool fixed, class T, class smem_accessor_t>
+      template <int ld, bool dagger, bool fixed, bool rescale, class T, class smem_accessor_t>
       __device__ inline float tmp2s_rescale(complex<T> *smem_ptr, float scale_inv, smem_accessor_t &smem_real,
                                             smem_accessor_t &smem_imag)
       {
@@ -465,44 +465,50 @@ namespace quda
         constexpr int n_warp = block_y * block_z / 32;
         constexpr int warp_cycle = (total_tiles + n_warp - 1) / n_warp;
 
-        float thread_max = 0.0f;
-
-#pragma unroll
-        for (int c = 0; c < warp_cycle; c++) {
-          int logical_warp_index = c * n_warp + warp_id;
-          if (logical_warp_index < total_tiles) {
-            int warp_m = (c * n_warp + warp_id) % tile_dim_m;
-            int warp_k = (c * n_warp + warp_id) / tile_dim_m;
-
-            int smem_m_offset = warp_m * w_m + group_id * batch;
-            int smem_k_offset = warp_k * w_k + thread_in_group;
-
-            int gmem_m_offset = smem_m_offset;
-            int gmem_k_offset = smem_k_offset;
-
-            constexpr bool x = (transpose == dagger);
-            float this_max
-              = find_abs_max<x, fixed, dagger, (x ? bN + 4 : bM + 4)>(load_t{}, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
-            thread_max = fmaxf(this_max, thread_max);
-          }
-        }
-
-        // block all-reduce thread_max
-        using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
-        __shared__ typename block_reduce_t::TempStorage temp_storage;
-        float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
-
-        __shared__ float block_max_all;
-        if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
-          if (block_max > 0.0f) {
-            block_max_all = block_max;
+        float block_rescale_factor = 1.0f;
+        if constexpr (rescale) {
+          if constexpr (fixed) {
+            block_rescale_factor = scale_inv > 0 ? 65504.0f / (scale_inv * fixedMaxValue<T>::value) : 1.0f;
           } else {
-            block_max_all = 1.0f;
+            float thread_max = 0.0f;
+#pragma unroll
+            for (int c = 0; c < warp_cycle; c++) {
+              int logical_warp_index = c * n_warp + warp_id;
+              if (logical_warp_index < total_tiles) {
+                int warp_m = (c * n_warp + warp_id) % tile_dim_m;
+                int warp_k = (c * n_warp + warp_id) / tile_dim_m;
+
+                int smem_m_offset = warp_m * w_m + group_id * batch;
+                int smem_k_offset = warp_k * w_k + thread_in_group;
+
+                int gmem_m_offset = smem_m_offset;
+                int gmem_k_offset = smem_k_offset;
+
+                constexpr bool x = (transpose == dagger);
+                float this_max
+                  = find_abs_max<x, fixed, dagger, (x ? bN + 4 : bM + 4)>(load_t{}, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
+                thread_max = fmaxf(this_max, thread_max);
+              }
+            }
+
+            // block all-reduce thread_max
+            using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
+            __shared__ typename block_reduce_t::TempStorage temp_storage;
+            float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+
+            __shared__ float block_max_all;
+            if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
+              if (block_max > 0.0f) {
+                block_max_all = block_max;
+              } else {
+                block_max_all = 1.0f;
+              }
+            }
+            __syncthreads();
+
+            block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
           }
         }
-        __syncthreads();
-
-        float block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
 
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
@@ -521,13 +527,8 @@ namespace quda
             load_t imag;
 
             constexpr bool x = (transpose == dagger);
-            // if constexpr (std::is_same_v<load_t, float>) {
-            //   convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4>(real, imag, smem_ptr, gmem_m_offset, gmem_k_offset,
-            //                                                            scale_inv, block_rescale_factor);
-            // } else {
-              convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4, 1>(&real, &imag, smem_ptr, gmem_m_offset, gmem_k_offset,
-                                                                          scale_inv, block_rescale_factor);
-            // }
+            convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4, 1>(&real, &imag, smem_ptr, gmem_m_offset, gmem_k_offset,
+                                                                        scale_inv, block_rescale_factor);
             smem_real.vector_load(smem_m_offset, smem_k_offset, real);
             smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
           }
@@ -679,32 +680,36 @@ namespace quda
 
         float block_rescale_factor = 1.0f;
         if constexpr (rescale) {
-          float thread_max = 0;
+          if constexpr (fixed) {
+            block_rescale_factor = scale_inv > 0 ? 65504.0f / (scale_inv * fixedMaxValue<store_t>::value) : 1.0f;
+          } else {
+            float thread_max = 0;
 #pragma unroll
-          for (int n = 0; n < n_dim; n++) {
+            for (int n = 0; n < n_dim; n++) {
 #pragma unroll
-            for (int m = 0; m < m_dim; m++) {
-              thread_max = abs_max(f_real[m * n_dim + n], thread_max);
-              thread_max = abs_max(f_imag[m * n_dim + n], thread_max);
+              for (int m = 0; m < m_dim; m++) {
+                thread_max = abs_max(f_real[m * n_dim + n], thread_max);
+                thread_max = abs_max(f_imag[m * n_dim + n], thread_max);
+              }
             }
-          }
 
-          // block all-reduce thread_max
-          using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
-          __shared__ typename block_reduce_t::TempStorage temp_storage;
-          float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+            // block all-reduce thread_max
+            using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, block_z>;
+            __shared__ typename block_reduce_t::TempStorage temp_storage;
+            float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
 
-          __shared__ float block_max_all;
-          if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
-            if (block_max > 0.0f) {
-              block_max_all = block_max;
-            } else {
-              block_max_all = 1.0f;
+            __shared__ float block_max_all;
+            if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {
+              if (block_max > 0.0f) {
+                block_max_all = block_max;
+              } else {
+                block_max_all = 1.0f;
+              }
             }
-          }
-          __syncthreads();
+            __syncthreads();
 
-          block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
+            block_rescale_factor = 65504.0f / block_max_all; // 65504 = the maximum FP16 number
+          }
         }
 
         if constexpr (std::is_same_v<load_t, half2>) {
