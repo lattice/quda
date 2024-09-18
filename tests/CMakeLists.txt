@@ -1032,7 +1032,7 @@ if(QUDA_DIRAC_TWISTED_MASS)
     --matpc even-even --enable-testing true
     --gtest_output=xml:invert_test_twisted_mass_sym.xml)
 
-  add_test(NAME invert_test_twisted_mass_asym}
+  add_test(NAME invert_test_twisted_mass_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-mass
     --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
