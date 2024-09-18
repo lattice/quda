@@ -212,8 +212,11 @@ namespace quda {
       const int flavor = src_flavor % 2;
 
       int my_flavor_idx = x_cb + flavor * arg.volumeCB;
-      fermion in = arg.in[src_idx](my_flavor_idx, spinor_parity);
-      in.toRel(); // change to chiral basis here
+      fermion in;
+      if (!allthreads || active) {
+	in = arg.in[src_idx](my_flavor_idx, spinor_parity);
+	in.toRel(); // change to chiral basis here
+      }
 
       int chirality = flavor; // relabel flavor as chirality
       // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
@@ -269,11 +272,13 @@ namespace quda {
         }
       }
 
-      swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
-      fermion out = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
-      out.toNonRel(); // change basis back
+      if (!allthreads || active) {
+	swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
+	fermion out = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
+	out.toNonRel(); // change basis back
 
-      arg.out[src_idx](my_flavor_idx, spinor_parity) = out;
+	arg.out[src_idx](my_flavor_idx, spinor_parity) = out;
+      }
     }
   };
 
