@@ -141,7 +141,7 @@ namespace quda
     };
 
     /**
-      @brief Load from global memory and store data in registers.
+      @brief Load from global memory and store data in registers: specialized for float2.
      */
     template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
     inline __device__ void convert_x(float2 reg_real[batch], float2 reg_imag[batch], complex<T> *p, int m_idx,
@@ -191,51 +191,7 @@ namespace quda
     }
 
     /**
-      @brief Load from global memory and store data in registers.
-     */
-    template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
-    inline __device__ void convert_x(half2 reg_real[batch], half2 reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
-                                     float scale_inv)
-    {
-      if constexpr (x) {
-        complex<T> vx[batch];
-        complex<T> vy[batch];
-        batch_load_t<complex<T>, batch>::load(vx, &p[(m_idx + 0) * ld + n_idx]);
-        batch_load_t<complex<T>, batch>::load(vy, &p[(m_idx + 1) * ld + n_idx]);
-
-#pragma unroll
-        for (int b = 0; b < batch; b++) {
-          if constexpr (fixed) {
-            reg_real[b] = __floats2half2_rn(scale_inv * vx[b].real(), scale_inv * vy[b].real());
-            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-            reg_imag[b] = __floats2half2_rn(scale_inv_conj * vx[b].imag(), scale_inv_conj * vy[b].imag());
-          } else {
-            reg_real[b] = __floats2half2_rn(+vx[b].real(), +vy[b].real());
-            reg_imag[b]
-              = __floats2half2_rn(dagger ? -vx[b].imag() : +vx[b].imag(), dagger ? -vy[b].imag() : +vy[b].imag());
-          }
-        }
-      } else {
-        complex<T> v[batch * 2];
-        batch_load_t<complex<T>, batch * 2>::load(v, &p[n_idx * ld + m_idx]);
-
-#pragma unroll
-        for (int b = 0; b < batch; b++) {
-          if constexpr (fixed) {
-            reg_real[b] = __floats2half2_rn(scale_inv * v[b * 2].real(), scale_inv * v[b * 2 + 1].real());
-            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-            reg_imag[b] = __floats2half2_rn(scale_inv_conj * v[b * 2].imag(), scale_inv_conj * v[b * 2 + 1].imag());
-          } else {
-            reg_real[b] = __floats2half2_rn(+v[b * 2].real(), +v[b * 2 + 1].real());
-            reg_imag[b] = __floats2half2_rn(dagger ? -v[b * 2].imag() : +v[b * 2].imag(),
-                                            dagger ? -v[b * 2 + 1].imag() : +v[b * 2 + 1].imag());
-          }
-        }
-      }
-    }
-
-    /**
-      @brief Load from global memory and store data in registers.
+      @brief Load from global memory and store data in registers: specialized for half2.
      */
     template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
     inline __device__ void convert_x_rescale(half2 reg_real[batch], half2 reg_imag[batch], complex<T> *p, int m_idx,
@@ -284,44 +240,15 @@ namespace quda
       @brief Load from global memory and store data in registers.
      */
     template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
-    inline __device__ void convert_x(float reg_real[batch], float reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
+    inline __device__ void convert_x(half2 reg_real[batch], half2 reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
                                      float scale_inv)
     {
-      complex<T> v[batch];
-      if constexpr (x) {
-        batch_load_t<complex<T>, batch>::load(v, &p[m_idx * ld + n_idx]);
-#pragma unroll
-        for (int b = 0; b < batch; b++) {
-          // auto xx = p[m_idx * ld + n_idx];
-          if constexpr (fixed) {
-            reg_real[b] = scale_inv * v[b].real();
-            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-            reg_imag[b] = scale_inv_conj * v[b].imag();
-          } else {
-            reg_real[b] = v[b].real();
-            reg_imag[b] = dagger ? -v[b].imag() : v[b].imag();
-          }
-        }
-      } else {
-        complex<T> v[batch];
-        batch_load_t<complex<T>, batch>::load(v, &p[n_idx * ld + m_idx]);
-#pragma unroll
-        for (int b = 0; b < batch; b++) {
-          // auto xx = p[n_idx * ld + m_idx];
-          if constexpr (fixed) {
-            reg_real[b] = scale_inv * v[b].real();
-            auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-            reg_imag[b] = scale_inv_conj * v[b].imag();
-          } else {
-            reg_real[b] = v[b].real();
-            reg_imag[b] = dagger ? -v[b].imag() : v[b].imag();
-          }
-        }
-      }
+      constexpr float rescale = 1.0f;
+      convert_x_rescale<x, fixed, dagger, ld, batch, T>(reg_real, reg_imag, p, m_idx, n_idx, scale_inv, rescale);
     }
 
     /**
-      @brief Load from global memory and store data in registers.
+      @brief Load from global memory and store data in registers: specialized for float.
      */
     template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
     inline __device__ void convert_x_rescale(float reg_real[batch], float reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
@@ -361,6 +288,18 @@ namespace quda
 
     /**
       @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, int batch, class T>
+    inline __device__ void convert_x(float reg_real[batch], float reg_imag[batch], complex<T> *p, int m_idx, int n_idx,
+                                     float scale_inv)
+    {
+      constexpr float rescale = 1.0f;
+      convert_x_rescale<x, fixed, dagger, ld, batch, T>(reg_real, reg_imag, p, m_idx, n_idx, scale_inv, rescale);
+    }
+
+
+    /**
+      @brief Load from global memory and find the absolute maximum value: specialized for half2.
      */
     template <bool x, bool fixed, bool dagger, int ld, class T>
     inline __device__ float find_abs_max(half2, complex<T> *p, int m_idx, int n_idx, float scale_inv)
@@ -403,7 +342,7 @@ namespace quda
     }
 
     /**
-      @brief Load from global memory and store data in registers.
+      @brief Load from global memory and find the absolute maximum value: specialized for float.
      */
     template <bool x, bool fixed, bool dagger, int ld, class T>
     inline __device__ float find_abs_max(float, complex<T> *p, int m_idx, int n_idx, float scale_inv)
