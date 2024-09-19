@@ -117,10 +117,7 @@ void contractFTHost(Float **h_prop_array_flavor_1, Float **h_prop_array_flavor_2
       for (int dir = 0; dir < 4; ++dir) {
         double theta = 2. * M_PI / L[dir];
         theta *= (sink[dir] - source_position[dir]) * mom_modes[4 * mom_idx + dir];
-        double z[2];
-        z[0] = phase[2 * mom_idx];
-        z[1] = phase[2 * mom_idx + 1];
-        FourierPhase<double>(z, theta, fft_type[4 * mom_idx + dir]);
+        FourierPhase<double>(phase.data() + 2 * mom_idx, theta, fft_type[4 * mom_idx + dir]);
       }
     }
 
