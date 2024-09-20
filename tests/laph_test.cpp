@@ -105,17 +105,17 @@ auto laph_test(test_t param)
   comm_allreduce_sum(hostRes);
 
   // QUDA proper
-  void *snkPtr[nSink];
+  std::vector<void *> snkPtr(nSink);
   for (int iSink = 0; iSink < nSink; ++iSink) snkPtr[iSink] = sinkList[iSink].data();
 
-  void *evPtr[nEv];
+  std::vector<void *> evPtr(nEv);
   for (int iEv = 0; iEv < nEv; ++iEv) evPtr[iEv] = evList[iEv].data();
 
   std::vector<Complex> qudaRes(nSink * nEv * Lt * nSpin, 0.);
 
   int X[4] = {xdim, ydim, zdim, tdim};
-  laphSinkProject((__complex__ double *)qudaRes.data(), (void **)snkPtr, nSink, tileSink,
-                  (void **)evPtr, nEv, tileEv, &invParam, X);
+  laphSinkProject((__complex__ double *)qudaRes.data(), (void **)snkPtr.data(), nSink, tileSink,
+                  (void **)evPtr.data(), nEv, tileEv, &invParam, X);
   printfQuda("laphSinkProject Done: %g secs, %g Gflops\n", invParam.secs, invParam.gflops / invParam.secs);
 
   auto tol = getTolerance(cuda_prec);
