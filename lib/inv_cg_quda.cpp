@@ -501,6 +501,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop_hq = std::vector(b.size(), param.tol_hq);
 
     auto get_hq_res = [](cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &r) {
       auto hq_nrm = blas::HeavyQuarkResidualNorm(x, r);
@@ -529,7 +530,7 @@ namespace quda {
 
     PrintStats("CG", k, r2, b2, hq_res);
 
-    bool converged = convergence(r2, hq_res, stop, param.tol_hq);
+    bool converged = convergence(r2, hq_res, stop, stop_hq);
 
     // Various parameters related to restarts
 
@@ -601,7 +602,7 @@ namespace quda {
       // we're still checking the L2 norm, or if that has converged/broken down and we're
       // now looking at the HQ residual.
 
-      if (!L2breakdown && (L2_required || convergenceL2(hq_res, param.tol_hq))) {
+      if (!L2breakdown && (L2_required || convergenceL2(r2, stop))) {
         // L2 based reliable update
 
         // If the iterated residual norm has gone above the most recent "baseline" norm,
@@ -633,10 +634,10 @@ namespace quda {
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if (convergence(r2, hq_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = true;
+      if (convergence(r2, hq_res, stop, stop_hq) && param.delta >= param.tol) updateX = true;
 
       // force a reliable update based on the HQ residual if L2 breakdown has already happened
-      if (L2breakdown && (convergenceHQ(hq_res, param.tol_hq) || (r2[0] / b2[0]) < hq_res_stall_check)
+      if (L2breakdown && (convergenceHQ(hq_res, stop_hq) || (r2[0] / b2[0]) < hq_res_stall_check)
           && param.delta >= param.tol)
         updateX = true;
 
@@ -812,14 +813,14 @@ namespace quda {
 
       PrintStats("CG", k, r2, b2, hq_res);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-      converged = convergence(r2, hq_res, stop, param.tol_hq);
+      converged = convergence(r2, hq_res, stop, stop_hq);
 
       // check for recent enough reliable updates of the HQ residual if we use it
 
       // L2 is converged or precision maxed out for L2
       bool L2done = L2breakdown || convergenceL2(r2, stop);
       // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-      bool HQdone = (steps_since_reliable == 0 && param.delta > 0) && convergenceHQ(hq_res, param.tol_hq);
+      bool HQdone = (steps_since_reliable == 0 && param.delta > 0) && convergenceHQ(hq_res, stop_hq);
       converged = L2done && HQdone;
     }
 
@@ -846,7 +847,7 @@ namespace quda {
       }
     }
 
-    PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
+    PrintSummary("CG", k, r2, b2, stop, stop_hq);
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
