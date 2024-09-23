@@ -1424,11 +1424,19 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   host_free(sln_pointer);
   host_free(src_pointer);
 
-  // return the number of iterations taken by the inverter
+  // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
+  // convention in `generic_ks/d_congrad5_fn_milc.c` (commit 414fb31). Here, a block solve
+  // is emulated as a series of sequential solves. Each individual solve overrides the
+  // final tolerance and iteration counts from the previous solve. Therefore, num_iters
+  // as well as the tolerances come from the last solve.
+
+  // invertParam.iter is the total number of iterations for the block solver, which is ~=
+  // to the number of iterations the last rhs would take.
   *num_iters = invertParam.iter;
-  // FIXME MILC seems to only care about a single residual?
-  *final_residual = invertParam.true_res[0];
-  *final_fermilab_residual = invertParam.true_res_hq[0];
+
+  // MILC only cares about a single residual, which happens to be the last one as described above.
+  *final_residual = invertParam.true_res[num_src - 1];
+  *final_fermilab_residual = invertParam.true_res_hq[num_src - 1];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
