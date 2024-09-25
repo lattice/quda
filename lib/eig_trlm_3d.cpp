@@ -99,6 +99,7 @@ namespace quda
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    int t_offset = ortho_dim_size * comm_coord(3);
 
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
@@ -131,11 +132,11 @@ namespace quda
       for (int t = 0; t < ortho_dim_size; t++) {
         if (!converged_3D[t]) {
           iter_locked_3D[t] = 0;
-          for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
+          for (int i = 0; i < (n_kr - num_locked_3D[t]); i++) {
             if (residua_3D[t][i + num_locked_3D[t]] < epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
 	      logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i,
 		      residua_3D[t][i + num_locked_3D[t]], epsilon * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
-	      iter_locked_3D[t] = i;
+	      iter_locked_3D[t] = i+1;
 	    } else {
 	      // Unlikely to find new locked pairs
 	      break;
@@ -148,11 +149,11 @@ namespace quda
       for (int t = 0; t < ortho_dim_size; t++) {
         if (!converged_3D[t]) {
           iter_converged_3D[t] = iter_locked_3D[t];
-          for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
+          for (int i = iter_locked_3D[t]; i < n_kr - num_locked_3D[t]; i++) {
             if (residua_3D[t][i + num_locked_3D[t]] < tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t)) {
               logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i,
                       residua_3D[t][i + num_locked_3D[t]], tol * check_norm(alpha_3D[t][i + num_locked_3D[t]], t));
-              iter_converged_3D[t] = i;
+              iter_converged_3D[t] = i+1;
             } else {
               // Unlikely to find new converged pairs
               break;
@@ -171,12 +172,19 @@ namespace quda
       computeKeptRitz3D(kSpace);
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
-      int t_offset = ortho_dim_size * comm_coord(3);
+      int min_nconv = n_kr+1;
+      int min_nlock = n_kr+1;
+      int min_nkeep = n_kr+1;
+
       for (int t = 0; t < ortho_dim_size; t++) {
         if (!converged_3D[t]) {
           num_converged_3D[t] = num_locked_3D[t] + iter_converged_3D[t];
           num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
           num_locked_3D[t] += iter_locked_3D[t];
+
+          if (num_converged_3D[t]<min_nconv) min_nconv=num_converged_3D[t];
+          if (num_locked_3D[t]<min_nlock) min_nlock=num_locked_3D[t];
+          if (num_keep_3D[t]<min_nkeep) min_nkeep=num_keep_3D[t];
 
 	  // Use printf to get data from t dim only
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
@@ -200,7 +208,7 @@ namespace quda
       bool all_converged = true;
       for (int t = 0; t < ortho_dim_size; t++) {
         if (num_converged_3D[t] >= n_conv) {
-          converged_3D[t] = true;          
+          converged_3D[t] = true; 
         } else {
           all_converged = false;
         }
@@ -209,7 +217,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
         printf("iter = %d rank = %d converged = ", restart_iter + 1, comm_rank());
         for (int t = 0; t < ortho_dim_size; t++) printf("%d", (int)converged_3D[t]);
-        printf("\n");
+        printf(" min nlock %3d nconv %3d nkeep %3d\n",min_nlock,min_nconv,min_nkeep);
       }
 
       // ensure that all processes partake even if all eigenvalues in
@@ -350,7 +358,7 @@ namespace quda
     }
 
     // Orthogonalise r against the Krylov space
-    for (int k = 0; k < 1; k++) blockOrthogonalize3D(v, r, j + 1);
+    for (int k = 0; k < 1; k++) blockOrthogonalize3D(v, r, j + 1);    //  future work: up to 4 times???
 
     // b_j[t] = ||r[t]||
     blas3d::reDotProduct(beta_j, r[0], r[0]);
@@ -398,6 +406,7 @@ namespace quda
     }
   }
 
+
   void TRLM3D::eigensolveFromArrowMat3D()
   {
     getProfile().TPSTART(QUDA_PROFILE_EIGEN);
@@ -406,7 +415,9 @@ namespace quda
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for (int t = 0; t < ortho_dim_size; t++) {
+    for (int t = 0; t < ortho_dim_size; t++){
+      if (!converged_3D[t]){
+
       int dim = n_kr - num_locked_3D[t];
       int arrow_pos = num_keep_3D[t] - num_locked_3D[t];
 
@@ -463,7 +474,7 @@ namespace quda
       if (reverse) {
         for (int i = num_locked_3D[t]; i < n_kr; i++) { alpha_3D[t][i] *= -1.0; }
       }
-    }
+    }}
 
     getProfile().TPSTOP(QUDA_PROFILE_EIGEN);
   }
@@ -533,6 +544,7 @@ namespace quda
 
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
+
 
   // Orthogonalise r[t][0:] against V_[t][0:j]
   void TRLM3D::blockOrthogonalize3D(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int j)
