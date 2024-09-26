@@ -106,9 +106,9 @@ namespace quda {
                                          static_cast<multigrid_solver *>(param.preconditioner)->mg;
         // FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
         if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
-        solver = new PreconCG(mat, *(mg), matSloppy, matPrecon, matEig, param);
+        solver = new PCG(mat, *(mg), matSloppy, matPrecon, matEig, param);
       } else {
-        solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param);
+        solver = new PCG(mat, matSloppy, matPrecon, matEig, param);
       }
       break;
     case QUDA_BICGSTABL_INVERTER:
@@ -399,6 +399,10 @@ namespace quda {
 
   bool Solver::convergence(cvector<double> &r2, cvector<double> &hq2, cvector<double> &r2_tol, cvector<double> &hq_tol)
   {
+    if (r2.size() != hq2.size() || r2.size() != r2_tol.size() || r2.size() != hq_tol.size())
+      errorQuda("Mismatched vector lengths r2 = %lu hq2 = %lu r2_tol = %lu hq_tol = %lu", r2.size(), hq2.size(),
+                r2_tol.size(), hq_tol.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       // check the heavy quark residual norm if necessary
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
@@ -418,6 +422,9 @@ namespace quda {
 
   bool Solver::convergenceHQ(cvector<double> &hq2, cvector<double> &hq_tol)
   {
+    if (hq2.size() != hq_tol.size())
+      errorQuda("Mismatched vector lengths hq2 = %lu hq_tol = %lu", hq2.size(), hq_tol.size());
+
     for (auto i = 0u; i < hq2.size(); i++) {
       // check the heavy quark residual norm if necessary
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
@@ -431,6 +438,9 @@ namespace quda {
 
   bool Solver::convergenceL2(cvector<double> &r2, cvector<double> &r2_tol)
   {
+    if (r2.size() != r2_tol.size())
+      errorQuda("Mismatched vector lengths r2 = %lu r2_tol = %lu", r2.size(), r2_tol.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       // check the L2 relative residual norm if necessary
       if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
@@ -448,7 +458,12 @@ namespace quda {
     return rhs_str;
   }
 
-  void Solver::PrintStats(const char* name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2) {
+  void Solver::PrintStats(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2_)
+  {
+    auto hq2 = hq2_.size() == 0 ? vector<double>(r2.size(), 0.0) : hq2_;
+    if (r2.size() != b2.size() || r2.size() != hq2.size())
+      errorQuda("Mismatched vector lengths r2 = %lu b2 = %lu hq2 = %lu", r2.size(), b2.size(), hq2.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       auto rhs_str = set_rhs_str(i, r2.size());
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
@@ -462,8 +477,14 @@ namespace quda {
     }
   }
 
-  void Solver::PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2,
-                            cvector<double> &r2_tol, cvector<double> &hq_tol) {
+  void Solver::PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &r2_tol,
+                            cvector<double> &hq_tol_)
+  {
+    auto hq_tol = hq_tol_.size() == 0 ? vector<double>(r2.size(), 0.0) : hq_tol_;
+    if (r2.size() != b2.size() || r2.size() != r2_tol.size() || r2.size() != hq_tol.size())
+      errorQuda("Mismatched vector lengths r2 = %lu b2 = %lu r2_tol = %lu hq_tol = %lu", r2.size(), b2.size(),
+                r2_tol.size(), hq_tol.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       auto rhs_str = set_rhs_str(i, r2.size());
       if (param.compute_true_res) {

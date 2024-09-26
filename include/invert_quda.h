@@ -14,21 +14,6 @@
 
 namespace quda {
 
-// temporary addition until multi-RHS for all Dirac operator functions
-#ifdef __CUDACC__
-#ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
-#pragma nv_diag_suppress 611
-#pragma nv_diag_suppress 997
-#else
-#pragma diag_suppress 611
-#pragma diag_suppress 997
-#endif
-#endif
-
-#ifdef __NVCOMPILER
-#pragma diag_suppress partial_override
-#endif
-
   /**
      SolverParam is the meta data used to define linear solvers.
    */
@@ -473,10 +458,10 @@ namespace quda {
       @brief a virtual method that performs the inversion and collect some vectors.
         The default here is a no-op and should not be called.
      */
-    virtual void solve_and_collect(ColorSpinorField &, const ColorSpinorField &, cvector_ref<ColorSpinorField> &, int,
-                                   double)
+    virtual void solve_and_collect(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                   cvector_ref<ColorSpinorField> &, int, double)
     {
-      errorQuda("NOT implemented.");
+      errorQuda("Not implemented.");
     }
 
     void set_tol(double tol) { param.tol = tol; }
@@ -909,21 +894,19 @@ namespace quda {
     virtual QudaInverterType getInverterType() const override { return QUDA_CG3_INVERTER; }
   };
 
-  class PreconCG : public Solver {
-    private:
+  class PCG : public Solver
+  {
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorField r;
-    ColorSpinorField y;
-    ColorSpinorField Ap;
-    ColorSpinorField x_sloppy;
-    ColorSpinorField r_sloppy;
-    ColorSpinorField minvr;
-    ColorSpinorField minvr_sloppy;
-    ColorSpinorField minvr_pre;
-    ColorSpinorField r_pre;
-    XUpdateBatch x_update_batch;
+    std::vector<ColorSpinorField> r;
+    std::vector<ColorSpinorField> y;
+    std::vector<ColorSpinorField> Ap;
+    std::vector<ColorSpinorField> x_sloppy;
+    std::vector<ColorSpinorField> r_sloppy;
+    std::vector<ColorSpinorField> minvr_sloppy;
+    std::vector<ColorSpinorField> minvr_pre;
+    std::vector<ColorSpinorField> r_pre;
     int Np; /** the size of the accumulator pipeline */
 
     bool init = false;
@@ -933,11 +916,11 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
      */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
-    PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param);
+    PCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+        SolverParam &param);
 
     /**
      * @brief Preconditioned CG supporting a pre-existing preconditioner K.
@@ -948,15 +931,14 @@ namespace quda {
      * @param matEig Deflation precision Dirac matrix
      * @param param Solver parameters
      */
-    PreconCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param);
+    PCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matoPrecon,
+        const DiracMatrix &matEig, SolverParam &param);
 
-    virtual ~PreconCG();
+    virtual ~PCG();
 
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      for (auto i = 0u; i < in.size(); i++)
-        this->solve_and_collect(out[i], in[i], cvector_ref<ColorSpinorField>(), 0, 0);
+      solve_and_collect(out, in, {}, 0, 0);
     }
 
     /**
@@ -967,14 +949,13 @@ namespace quda {
        @param collect_miniter minimal iteration start from which the r vectors are to be collected
        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
     */
-    virtual void solve_and_collect(ColorSpinorField &out, const ColorSpinorField &in,
+    virtual void solve_and_collect(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                    cvector_ref<ColorSpinorField> &v_r, int collect_miniter, double collect_tol) override;
 
     virtual bool hermitian() const override { return true; } /** PCG is only Hermitian system */
 
     virtual QudaInverterType getInverterType() const final { return QUDA_PCG_INVERTER; }
   };
-
 
   class BiCGstab : public Solver {
 
