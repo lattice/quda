@@ -75,6 +75,20 @@ namespace quda {
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
+  __device__ inline void load_cached_float4(float4 &a, const float4* addr)
+  {
+    float x, y, z, w;
+    asm("ld.ca.global.v4.f32 {%0, %1, %2, %3}, [%4+0];" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : __PTR(addr));
+    a.x = x; a.y = y; a.z = z; a.w = w;
+  }
+
+  __device__ inline void load_cached_double2(double2 &a, const double2* addr)
+  {
+    double x, y;
+    asm("ld.ca.global.v2.f64 {%0, %1}, [%2+0];" : "=d"(x), "=d"(y) : __PTR(addr));
+    a.x = x; a.y = y;
+  }
+
   __device__ inline void store_streaming_float4(float4* addr, float x, float y, float z, float w)
   {
     asm("st.cs.global.v4.f32 [%0+0], {%1, %2, %3, %4};" :: __PTR(addr), "f"(x), "f"(y), "f"(z), "f"(w));

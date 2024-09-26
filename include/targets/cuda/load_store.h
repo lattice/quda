@@ -22,6 +22,16 @@ namespace quda
       value = reinterpret_cast<const T *>(ptr)[idx];
     }
 
+    __device__ inline void operator()(float4 &value, const void *ptr, int idx)
+    {
+      load_cached_float4(value, reinterpret_cast<const float4 *>(ptr) + idx);
+    }
+
+    __device__ inline void operator()(double2 &value, const void *ptr, int idx)
+    {
+      load_cached_double2(value, reinterpret_cast<const double2 *>(ptr) + idx);
+    }
+
     __device__ inline void operator()(short8 &value, const void *ptr, int idx)
     {
       float4 tmp;
