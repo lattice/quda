@@ -82,6 +82,13 @@ namespace quda {
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
+  __device__ inline void load_cached_float2(float2 &a, const float2* addr)
+  {
+    float x, y;
+    asm("ld.ca.global.v2.f32 {%0, %1}, [%2+0];" : "=f"(x), "=f"(y) : __PTR(addr));
+    a.x = x; a.y = y;
+  }
+
   __device__ inline void load_cached_double2(double2 &a, const double2* addr)
   {
     double x, y;
