@@ -26,6 +26,7 @@
 
 #include <color_spinor_field.h>
 #include <tune_quda.h>
+#include "test.h"
 
 using namespace quda;
 

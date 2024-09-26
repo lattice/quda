@@ -10,6 +10,7 @@
 #include <dslash_reference.h>
 #include <contract_ft_reference.h>
 #include "misc.h"
+#include "test.h"
 
 // google test
 #include <contract_ft_test_gtest.hpp>

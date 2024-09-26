@@ -13,6 +13,7 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
+#include "test.h"
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;

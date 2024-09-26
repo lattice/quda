@@ -1,3 +1,4 @@
+#include "test.h"
 #include "staggered_gsmear_test_utils.h"
 
 using namespace quda;

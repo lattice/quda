@@ -17,6 +17,7 @@
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
+#include "test.h"
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
