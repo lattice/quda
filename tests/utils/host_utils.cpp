@@ -13,6 +13,7 @@
 // QUDA headers
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
+#include <dirac_quda.h>
 
 // External headers
 #include <llfat_utils.h>
@@ -369,25 +370,9 @@ bool is_normal_residual(QudaInverterType type)
   }
 }
 
-bool is_staggered(QudaDslashType type)
-{
-  switch (type) {
-  case QUDA_STAGGERED_DSLASH:
-  case QUDA_ASQTAD_DSLASH: return true;
-  default: return false;
-  }
-}
+bool is_staggered(QudaDslashType type) { return Dirac::is_staggered_type(type); }
 
-bool is_chiral(QudaDslashType type)
-{
-  switch (type) {
-  case QUDA_DOMAIN_WALL_DSLASH:
-  case QUDA_DOMAIN_WALL_4D_DSLASH:
-  case QUDA_MOBIUS_DWF_DSLASH:
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
-  default: return false;
-  }
-}
+bool is_chiral(QudaDslashType type) { return Dirac::is_dwf(type); }
 
 bool is_laplace(QudaDslashType type)
 {
