@@ -614,7 +614,7 @@ namespace quda
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
         int parity = nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
-#ifdef QUDA_DSLASH_FAST_COMPILE
+#ifdef QUDA_FAST_COMPILE_DSLASH
         dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
 #else
         switch (parity) {
@@ -697,7 +697,7 @@ namespace quda
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
         if (x_cb >= arg.threads) return;
 
-#ifdef QUDA_DSLASH_FAST_COMPILE
+#ifdef QUDA_FAST_COMPILE_DSLASH
         dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
 #else
         switch (parity) {
