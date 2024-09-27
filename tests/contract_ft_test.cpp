@@ -114,7 +114,6 @@ inline void fill_buffers(std::array<std::vector<Float>, N> &buffs, const std::ar
 
           srand(l);
           for (int i = 0; i < dofs; i++) {
-#pragma unroll
             for (int n = 0; n < N; n++) { buffs[n][ll * dofs + i] = 2. * (rand() / (Float)RAND_MAX) - 1.; }
           }
         }
