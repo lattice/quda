@@ -60,7 +60,7 @@ mark_as_advanced(QUDA_SYCL_TARGETS)
 # define SYCL flags
 
 set(CMAKE_SYCL_FLAGS_DEVEL
-    "-O3 -Wall -Wextra"
+    "-O3 -gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_SYCL_FLAGS_STRICT
     "-O3 -Wall -Wextra -Werror"
@@ -69,16 +69,14 @@ set(CMAKE_SYCL_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT}"
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_SYCL_FLAGS_HOSTDEBUG
-    "-Wall -Wextra"
+    "-gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_SYCL_FLAGS_DEBUG
-    "-Wall -Wextra"
+    "-gline-directives-only -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_SYCL_FLAGS_SANITIZE
-    "-fno-inline -Wall -Wextra"
+    "-gline-directives-only -fno-inline -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
-
-#-gline-directives-only
 
 mark_as_advanced(CMAKE_SYCL_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_SYCL_FLAGS_STRICT)
@@ -128,6 +126,9 @@ if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM" OR "x${CMAKE_SYCL_COMPILER
   target_compile_options(quda PRIVATE -Wno-division-by-zero)
   target_compile_options(quda PRIVATE -Wno-pass-failed)
   #target_compile_options(quda PRIVATE -Wno-sign-compare)
+  if("x${CMAKE_BUILD_TYPE}" STREQUAL "xDEVEL")
+    target_link_options(quda PUBLIC -gline-directives-only)
+  endif()
 endif()
 
 if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM")

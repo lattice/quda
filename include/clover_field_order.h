@@ -895,8 +895,8 @@ namespace quda {
           if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          offdiag = clover_ ? static_cast<Float **>(clover_)[0] : clover.data<Float **>(inverse)[0];
-          diag = clover_ ? static_cast<Float **>(clover_)[1] : clover.data<Float **>(inverse)[1];
+          offdiag = clover_ ? reinterpret_cast<Float **>(clover_)[0] : clover.data<Float **>(inverse)[0];
+          diag = clover_ ? reinterpret_cast<Float **>(clover_)[1] : clover.data<Float **>(inverse)[1];
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
