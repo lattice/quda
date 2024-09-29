@@ -347,11 +347,13 @@ namespace quda
   void Communicator::comm_start(MsgHandle *mh)
   {
 #ifdef QUDA_COMM_CHECKSUM
-    if (mh->isSend) {
-      mh->chksum = chksum(mh->buffer, mh->nbytes);
+    if (mh->nbytes>0) {
+      if (mh->isSend) {
+	mh->chksum = chksum(mh->buffer, mh->nbytes);
+      }
+      MPI_CHECK(MPI_Start(&(mh->chkreq)));
+      MPI_CHECK(MPI_Wait(&(mh->chkreq), MPI_STATUS_IGNORE));
     }
-    MPI_CHECK(MPI_Start(&(mh->chkreq)));
-    MPI_CHECK(MPI_Wait(&(mh->chkreq), MPI_STATUS_IGNORE));
 #endif
     MPI_CHECK(MPI_Start(&(mh->request)));
   }
@@ -359,10 +361,12 @@ namespace quda
   void Communicator::comm_wait(MsgHandle *mh) {
     MPI_CHECK(MPI_Wait(&(mh->request), MPI_STATUS_IGNORE));
 #ifdef QUDA_COMM_CHECKSUM
-    if (!mh->isSend) {
-      auto cs = chksum(mh->buffer, mh->nbytes);
-      if (cs != mh->chksum) {
+    if (mh->nbytes>0) {
+      if (!mh->isSend) {
+	auto cs = chksum(mh->buffer, mh->nbytes);
+	if (cs != mh->chksum) {
 	errorQuda("comm_wait checksum failure got %lu expeted %lu\n", cs, mh->chksum);
+	}
       }
     }
 #endif
