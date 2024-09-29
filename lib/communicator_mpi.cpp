@@ -1,7 +1,7 @@
 #include <communicator_quda.h>
 
-#define QUDA_COMM_CHECKHANG
-#define QUDA_COMM_CHECKSUM
+//#define QUDA_COMM_CHECKHANG
+//#define QUDA_COMM_CHECKSUM
 
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \
