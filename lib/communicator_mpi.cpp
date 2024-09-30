@@ -40,8 +40,10 @@ namespace quda
 #ifdef QUDA_COMM_CHECKHANG
     double startTime;
 #endif
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     bool isSend;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     void *buffer;
     size_t nbytes;
     uint64_t chksum;
@@ -186,8 +188,10 @@ namespace quda
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = true;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
     mh->nbytes = nbytes;
     MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
@@ -203,8 +207,10 @@ namespace quda
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = false;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
     mh->nbytes = nbytes;
     MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
@@ -230,8 +236,10 @@ namespace quda
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = true;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
     mh->nbytes = nbytes;
     MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
@@ -258,8 +266,10 @@ namespace quda
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = false;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
     mh->nbytes = nbytes;
     MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
@@ -292,8 +302,10 @@ namespace quda
     mh->custom = true;
 
     MPI_CHECK(MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = true;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
     mh->nbytes = 0;  // strides not supported yet
     //MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
@@ -326,8 +338,10 @@ namespace quda
     mh->custom = true;
 
     MPI_CHECK(MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
-#ifdef QUDA_COMM_CHECKSUM
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = false;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
     mh->nbytes = 0;  // strides not supported yet
     //MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
@@ -379,6 +393,16 @@ namespace quda
   }
 
 #ifdef QUDA_COMM_CHECKHANG
+  void hangwarn(bool isSend) {
+    char name[MPI_MAX_PROCESSOR_NAME];
+    int resultlen;
+    MPI_Get_processor_name(name, &resultlen);
+    if (isSend) {
+      warningQuda("%s stuck send in MPI_Test\n", name);
+    } else {
+      warningQuda("%s stuck receive in MPI_Test\n", name);
+    }
+  }
   void hang(int, siginfo_t *, void *) {
     char name[MPI_MAX_PROCESSOR_NAME];
     int resultlen;
@@ -409,6 +433,9 @@ namespace quda
     double endTime = MPI_Wtime();
     if (endTime-mh->startTime>120.0) {
       hang(0, nullptr, nullptr);
+    }
+    if (endTime-mh->startTime>60.0) {
+      hangwarn(mh->isSend);
     }
 #endif
     return query;
