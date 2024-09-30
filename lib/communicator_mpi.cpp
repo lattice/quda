@@ -37,6 +37,9 @@ namespace quda
      */
     bool custom;
 
+#ifdef QUDA_COMM_CHECKHANG
+    double startTime;
+#endif
 #ifdef QUDA_COMM_CHECKSUM
     bool isSend;
     void *buffer;
@@ -355,6 +358,9 @@ namespace quda
       MPI_CHECK(MPI_Start(&(mh->chkreq)));
     }
 #endif
+#ifdef QUDA_COMM_CHECKHANG
+    mh->startTime = MPI_Wtime();
+#endif
   }
 
   void Communicator::comm_wait(MsgHandle *mh) {
@@ -400,6 +406,10 @@ namespace quda
     MPI_CHECK(MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE));
 #ifdef QUDA_COMM_CHECKHANG
     alarm(0);
+    double endTime = MPI_Wtime();
+    if (endTime-mh->startTime>120.0) {
+      hang(0, nullptr, nullptr);
+    }
 #endif
     return query;
   }
