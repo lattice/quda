@@ -149,7 +149,7 @@ namespace quda
         for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
         converged = (step < param.Nsteps && r2 > stop) ? false : true;
         if (!converged) blas::copy(r_sloppy, r);
-        PrintStats("MR (restart)", iter, r2, b2, 0.0);
+        PrintStats("MR (restart)", iter, r2, b2);
       } else {
         blas::ax(scale, r_sloppy);
         r2 = blas::norm2(r_sloppy);

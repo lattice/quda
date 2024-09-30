@@ -156,8 +156,8 @@ namespace quda
       }
     }
 
-    virtual int blockStep() const override { return 16; }
-    virtual int blockMin() const override { return 16; }
+    virtual int blockStep() const override { return (arg.shmem & 64) ? 8 : 16; }
+    virtual int blockMin() const override { return (arg.shmem & 64) ? 8 : 16; }
 
     unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
@@ -207,13 +207,12 @@ namespace quda
 
     virtual void initTuneParam(TuneParam &param) const override
     {
-      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+      /* for nvshmem uber kernels the current synchronization requires us to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly */
-      if (arg.shmem & 64) {
-        step_y = vector_length_y;
-        step_z = vector_length_z;
-      }
+      step_y = arg.shmem & 64 ? vector_length_y : 1;
+      step_z = arg.shmem & 64 ? vector_length_z : 1;
+
       TunableKernel3D::initTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
@@ -225,10 +224,9 @@ namespace quda
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly. */
-      if (arg.shmem & 64) {
-        step_y = vector_length_y;
-        step_z = vector_length_z;
-      }
+      step_y = arg.shmem & 64 ? vector_length_y : 1;
+      step_z = arg.shmem & 64 ? vector_length_z : 1;
+
       TunableKernel3D::defaultTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction

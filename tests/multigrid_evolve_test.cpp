@@ -152,7 +152,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaEigParam mg_eig_param[mg_levels];
+  std::vector<QudaEigParam> mg_eig_param(mg_levels);
 
   if (inv_multigrid) {
     setQudaMgSolveTypes();

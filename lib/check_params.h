@@ -386,6 +386,19 @@ void printQudaInvertParam(QudaInvertParam *param) {
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
+#ifdef PRINT_PARAM
+    // for MDWF, add b5, c5 to param print
+    for (int i = 0; i < param->Ls; i++) {
+      std::complex<double> b5;
+      memcpy(&b5, param->b_5, sizeof(std::complex<double>));
+      printfQuda("s = %2d b5 = (%16.15e %16.15e)\n", i, b5.real(), b5.imag());
+    }
+    for (int i = 0; i < param->Ls; i++) {
+      std::complex<double> c5;
+      memcpy(&c5, param->c_5, sizeof(std::complex<double>));
+      printfQuda("s = %2d c5 = (%16.15e %16.15e)\n", i, c5.real(), c5.imag());
+    }
+#endif
   }
   if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     P(mu, INVALID_DOUBLE);
