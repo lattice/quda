@@ -453,9 +453,9 @@ namespace quda
     if (endTime-mh->startTime>120.0) {
       hang(0, nullptr, nullptr);
     }
-    if (endTime-mh->startTime>60.0) {
-      hangwarn(mh->isSend);
-    }
+    //if (endTime-mh->startTime>60.0) {
+    //  hangwarn(mh->isSend);
+    //}
 #endif
     return query;
   }
