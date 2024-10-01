@@ -373,7 +373,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // QUDA invert test
   //----------------------------------------------------------------------------
 
-  if (!use_multi_src) {
+  if (!use_multi_src || multishift > 1) {
 
     for (int n = 0; n < Nsrc; n++) {
       // If deflating, preserve the deflation space between solves

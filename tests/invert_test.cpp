@@ -316,7 +316,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
     verifySpinorDistanceReweight(in[0], distance_pc_alpha0, distance_pc_t0);
   }
 
-  if (!use_multi_src) {
+  if (!use_multi_src || multishift > 1) {
 
     for (int i = 0; i < Nsrc; i++) {
       // If deflating, preserve the deflation space between solves
