@@ -675,10 +675,18 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(iter, 0);
   P(gflops, 0.0);
   P(secs, 0.0);
+  P(energy, 0.0);
+  P(power, 0.0);
+  P(temp, 0.0);
+  P(clock, 0.0);
 #elif defined(PRINT_PARAM)
   P(iter, INVALID_INT);
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
+  P(energy, INVALID_DOUBLE);
+  P(power, INVALID_DOUBLE);
+  P(temp, INVALID_DOUBLE);
+  P(clock, INVALID_DOUBLE);
 #endif
 
 
