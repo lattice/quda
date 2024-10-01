@@ -115,11 +115,6 @@ namespace quda
 
 }
 
-// vector of spinors used for forecasting solutions in HMC
-#define QUDA_MAX_CHRONO 12
-// each entry is one p
-std::vector<std::vector<ColorSpinorField>> chronoResident(QUDA_MAX_CHRONO);
-
 // Mapped memory buffer used to hold unitarization failures
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
@@ -302,6 +297,8 @@ static void profilerStop(const char *f) {
 
 namespace quda {
   void printLaunchTimer();
+
+  void flushChrono(int i = -1);
 
   void massRescale(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool for_multishift);
 
@@ -1334,13 +1331,7 @@ void freeCloverQuda(void)
   cloverPrecise = nullptr;
 }
 
-void flushChronoQuda(int i)
-{
-  if (i >= QUDA_MAX_CHRONO)
-    errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
-
-  chronoResident[i].clear();
-}
+void flushChronoQuda(int i) { flushChrono(i); }
 
 void endQuda(void)
 {
@@ -1352,7 +1343,7 @@ void endQuda(void)
     freeGaugeQuda();
     freeCloverQuda();
 
-    for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
+    flushChrono();
 
     solutionResident.clear();
     momResident = GaugeField();
