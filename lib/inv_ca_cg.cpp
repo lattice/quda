@@ -570,7 +570,7 @@ namespace quda
       param.iter += total_iter;
     }
 
-    PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary("CA-CG", total_iter, r2, b2, stop);
 
     if (param.is_preconditioner) commGlobalReductionPop();
   }

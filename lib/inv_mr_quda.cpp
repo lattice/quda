@@ -159,7 +159,7 @@ namespace quda
       step++;
     }
 
-    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type));
 
     if (!param.is_preconditioner) {
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
