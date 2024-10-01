@@ -394,7 +394,7 @@ namespace quda
     blas::copy(S[0], r); // no op if uni-precision
 
     PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov, assumes S[0] is in place
       computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map);

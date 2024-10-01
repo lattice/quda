@@ -151,6 +151,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop_hq = std::vector(b.size(), param.tol_hq);
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -187,7 +188,7 @@ namespace quda {
     rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
     blas::copy(p, r_sloppy);
 
-    bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+    bool converged = convergence(r2, heavy_quark_res, stop, stop_hq);
 
     // track if we just performed an exact recalculation of y, r, r2
     bool just_updated = false;
@@ -299,7 +300,7 @@ namespace quda {
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
-      converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+      converged = convergence(r2, heavy_quark_res, stop, stop_hq);
 
       if (converged) {
         // make sure we've truly converged
@@ -336,7 +337,7 @@ namespace quda {
         }
 
         // Update convergence check
-        converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+        converged = convergence(r2, heavy_quark_res, stop, stop_hq);
       }
 
       // update p
@@ -374,7 +375,7 @@ namespace quda {
         param.true_res[i] = sqrt(r2[i] / b2[i]);
         param.true_res_hq[i] = sqrt(hq[i].z);
       }
-      PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
+      PrintSummary("BiCGstab", k, r2, b2, stop, stop_hq);
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);

@@ -282,7 +282,7 @@ namespace quda
     };
 
     PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
       computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map);
@@ -356,7 +356,7 @@ namespace quda
       }
 
       // No matter what, if we haven't converged, we do a restart.
-      if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+      if (!convergenceL2(r2, stop)) {
         restart++; // restarting if residual is still too great
 
         PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);

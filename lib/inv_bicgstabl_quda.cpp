@@ -603,7 +603,7 @@ namespace quda {
     double maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
 
     PrintStats(solver_name.c_str(), total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, 0.0, stop, 0.0) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // rho0 = -omega*rho0;
       for (auto i = 0u; i < b.size(); i++) rho0[i] *= -omega[i];
@@ -754,7 +754,7 @@ namespace quda {
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop);
   }
 
 } // namespace quda
