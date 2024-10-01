@@ -42,6 +42,7 @@ namespace quda
 #endif
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     bool isSend;
+    int otherRank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     void *buffer;
@@ -190,6 +191,7 @@ namespace quda
     mh->custom = false;
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = true;
+    mh->otherRank = rank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
@@ -209,6 +211,7 @@ namespace quda
     mh->custom = false;
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = false;
+    mh->otherRank = rank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
@@ -238,6 +241,7 @@ namespace quda
     mh->custom = false;
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = true;
+    mh->otherRank = rank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
@@ -268,6 +272,7 @@ namespace quda
     mh->custom = false;
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = false;
+    mh->otherRank = rank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
@@ -304,6 +309,7 @@ namespace quda
     MPI_CHECK(MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = true;
+    mh->otherRank = rank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
@@ -340,6 +346,7 @@ namespace quda
     MPI_CHECK(MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
 #if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
     mh->isSend = false;
+    mh->otherRank = rank;
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
@@ -403,11 +410,20 @@ namespace quda
       warningQuda("%s stuck receive in MPI_Test\n", name);
     }
   }
+  MPI_Comm MPI_COMM;
+  bool isSend;
+  int otherRank;
   void hang(int, siginfo_t *, void *) {
     char name[MPI_MAX_PROCESSOR_NAME];
     int resultlen;
     MPI_Get_processor_name(name, &resultlen);
-    errorQuda("%s stuck in MPI_Test for 120 seconds\n", name);
+    int rank;
+    MPI_CHECK(MPI_Comm_rank(MPI_COMM, &rank));
+    if (isSend) {
+      errorQuda("%s rank %i send to %i stuck in MPI_Test for 120 seconds\n", name, rank, otherRank);
+    } else {
+      errorQuda("%s rank %i receive from %i stuck in MPI_Test for 120 seconds\n", name, rank, otherRank);
+    }
   }
 #endif
 
@@ -424,6 +440,9 @@ namespace quda
       sigemptyset(&sig_action.sa_mask);
       sigaction(SIGALRM, &sig_action, 0);
     }
+    MPI_COMM = MPI_COMM_HANDLE;
+    isSend = mh->isSend;
+    otherRank = mh->otherRank;
     alarm(120);  // 120 seconds
 #endif
     int query;
