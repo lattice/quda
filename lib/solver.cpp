@@ -585,4 +585,72 @@ namespace quda {
     return zero_src;
   }
 
+  void SolverParam::updateInvertParam(QudaInvertParam &param, int offset)
+  {
+    for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
+    for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
+    param.iter += iter;
+    if (offset >= 0) {
+      param.true_res_offset[offset] = true_res_offset[offset];
+      param.iter_res_offset[offset] = iter_res_offset[offset];
+      param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
+    } else {
+      for (int i = 0; i < num_offset; i++) {
+        param.true_res_offset[i] = true_res_offset[i];
+        param.iter_res_offset[i] = iter_res_offset[i];
+        param.true_res_hq_offset[i] = true_res_hq_offset[i];
+      }
+    }
+    // for incremental eigCG:
+    param.rhs_idx = rhs_idx;
+
+    param.ca_lambda_min = ca_lambda_min;
+    param.ca_lambda_max = ca_lambda_max;
+
+    param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+    param.ca_lambda_max_precondition = ca_lambda_max_precondition;
+
+    if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
+  }
+
+  void joinInvertParam(QudaInvertParam &out, const QudaInvertParam &in, const CommKey &split_key, int split_rank)
+  {
+    auto num_sub_partition = quda::product(split_key);
+
+    int sub_partition_dims[]
+      = {comm_dim(0) / split_key[0], comm_dim(1) / split_key[1], comm_dim(2) / split_key[2], comm_dim(3) / split_key[3]};
+
+    int sub_partition_coords[] = {comm_coord(0) / sub_partition_dims[0], comm_coord(1) / sub_partition_dims[1],
+                                  comm_coord(2) / sub_partition_dims[2], comm_coord(3) / sub_partition_dims[3]};
+
+    auto j = sub_partition_coords[3];
+    for (auto d = 2; d >= 0; d--) j = j * split_key[d] + sub_partition_coords[d];
+
+    std::vector<double> true_res(in.num_src, 0.0);
+    std::vector<double> true_res_hq(in.num_src, 0.0);
+    if (split_rank == 0) { // only rank 0 in each sub partition sets the residuals
+      for (auto i = 0; i < in.num_src_per_sub_partition; i++) {
+        true_res[i * num_sub_partition + j] = in.true_res[i];
+        true_res_hq[i * num_sub_partition + j] = in.true_res_hq[i];
+      }
+    }
+
+    // communicate to all ranks
+    comm_allreduce_sum(true_res_hq);
+    comm_allreduce_sum(true_res);
+    memcpy(out.true_res, true_res.data(), true_res.size() * sizeof(double));
+    memcpy(out.true_res_hq, true_res_hq.data(), true_res_hq.size() * sizeof(double));
+
+    out.iter = in.iter;
+    comm_allreduce_int(out.iter);
+
+    out.ca_lambda_min = in.ca_lambda_min;
+    out.ca_lambda_max = in.ca_lambda_max;
+    out.ca_lambda_min_precondition = in.ca_lambda_min_precondition;
+    out.ca_lambda_max_precondition = in.ca_lambda_max_precondition;
+
+    // now broadcast from global rank 0 to ensure uniformity
+    comm_broadcast(&out, sizeof(QudaInvertParam));
+  }
+
 } // namespace quda

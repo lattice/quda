@@ -355,35 +355,12 @@ namespace quda {
     SolverParam(const SolverParam &param) = default;
 
     /**
-       Update the QudaInvertParam with the data from this
-       @param param the QudaInvertParam to be updated
+       @brief Update the QudaInvertParam with the data from this
+       instance (update the true residuals, and other observables).
+       @param[in,out] param the QudaInvertParam to be updated
+       @param[in] offset offset applied to the
      */
-    void updateInvertParam(QudaInvertParam &param, int offset=-1) {
-      for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
-      for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
-      param.iter += iter;
-      if (offset >= 0) {
-	param.true_res_offset[offset] = true_res_offset[offset];
-        param.iter_res_offset[offset] = iter_res_offset[offset];
-	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
-      } else {
-	for (int i=0; i<num_offset; i++) {
-	  param.true_res_offset[i] = true_res_offset[i];
-          param.iter_res_offset[i] = iter_res_offset[i];
-	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
-	}
-      }
-      //for incremental eigCG:
-      param.rhs_idx = rhs_idx;
-
-      param.ca_lambda_min = ca_lambda_min;
-      param.ca_lambda_max = ca_lambda_max;
-
-      param.ca_lambda_min_precondition = ca_lambda_min_precondition;
-      param.ca_lambda_max_precondition = ca_lambda_max_precondition;
-
-      if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
-    }
+    void updateInvertParam(QudaInvertParam &param, int offset = -1);
 
     // for incremental eigCG:
     void updateRhsIndex(QudaInvertParam &param) { rhs_idx = param.rhs_idx; }
@@ -1674,5 +1651,19 @@ public:
    @return true if CA, false otherwise
  */
  bool is_ca_solver(QudaInverterType type);
+
+ /**
+    @brief Join the separate split-grid instances of
+    QudaInvertParam.  This function places the computed residuals
+    for each solve from the split grids in the expected order.
+    This function expects we are using the default (global)
+    communuicator.
+
+    @param[in, out] out The global joined instance of QudaInvertParam
+    @param[in] in The local split-grid instance of QudaInvertParam
+    @param[in] comm_key The CommKey that defines the split grid used
+    @param[in] split_rank The rank of the process when in split grid
+ */
+ void joinInvertParam(QudaInvertParam &out, const QudaInvertParam &in, const CommKey &comm_key, int split_rank);
 
 } // namespace quda
