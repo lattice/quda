@@ -210,8 +210,8 @@ namespace quda
       /* for nvshmem uber kernels the current synchronization requires us to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly */
-      step_y = arg.shmem & 64 ? vector_length_y : 1;
-      step_z = arg.shmem & 64 ? vector_length_z : 1;
+      step_y = arg.shmem & 64 ? vector_length_y : step_y_bkup;
+      step_z = arg.shmem & 64 ? vector_length_z : step_z_bkup;
 
       TunableKernel3D::initTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
@@ -224,8 +224,8 @@ namespace quda
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly. */
-      step_y = arg.shmem & 64 ? vector_length_y : 1;
-      step_z = arg.shmem & 64 ? vector_length_z : 1;
+      step_y = arg.shmem & 64 ? vector_length_y : step_y_bkup;
+      step_z = arg.shmem & 64 ? vector_length_z : step_z_bkup;
 
       TunableKernel3D::defaultTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
