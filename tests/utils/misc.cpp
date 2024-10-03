@@ -133,10 +133,10 @@ std::vector<const char *> get_dslash_str_list()
     dslash_str_list.push_back("staggered");
     dslash_str_list.push_back("asqtad");
     dslash_str_list.push_back("hisq");
-    dslash_str_list.push_back("domain_wall");
-    dslash_str_list.push_back("domain_wall_4d");
+    dslash_str_list.push_back("domain-wall");
+    dslash_str_list.push_back("domain-wall-4d");
     dslash_str_list.push_back("mobius");
-    dslash_str_list.push_back("mobius_eofa");
+    dslash_str_list.push_back("mobius-eofa");
     dslash_str_list.push_back("laplace");
     populated = true;
   }
