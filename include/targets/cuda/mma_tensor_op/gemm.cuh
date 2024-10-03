@@ -287,7 +287,7 @@ namespace quda
         }
 
         // wrap up!
-        if (compute_max_only) {
+        if constexpr (compute_max_only) {
           accumulator.abs_max(max);
         } else {
           accumulator.template store<M, N, ldc, false>(c, m_offset, n_offset, assign_t());
@@ -346,7 +346,7 @@ namespace quda
                                warp_row, warp_col, tile_k, wrm);
           }
 
-          if (compute_max_only) {
+          if constexpr (compute_max_only) {
 
             op_c_real.abs_max(max);
             op_c_imag.abs_max(max);
@@ -418,7 +418,7 @@ namespace quda
                                  op_c_imag, warp_row, warp_col, tile_k, wrm);
             }
 
-            if (compute_max_only) {
+            if constexpr (compute_max_only) {
 
               op_c_real.abs_max(max);
               op_c_imag.abs_max(max);
@@ -461,7 +461,7 @@ namespace quda
       {
 
         // The typical streaming K MMA type: needs registers to hold all accumulates.
-        if (bK < K) {
+        if constexpr (bK < K) {
           return perform_mma_divide_k_yes<a_dagger, b_dagger, compute_max_only>(a, b, c, m_offset, n_offset);
         } else {
           // Shared memory can hold the whole of operand B: we don't need to store all accumulates: save registers.

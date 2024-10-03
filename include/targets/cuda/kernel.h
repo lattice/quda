@@ -224,7 +224,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool dummy = false>
-  __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
+  __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(const __grid_constant__ Arg arg)
   {
     Functor<Arg> f(arg);
     f();

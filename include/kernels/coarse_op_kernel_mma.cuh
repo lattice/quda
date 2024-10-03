@@ -47,7 +47,7 @@ namespace quda
         Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
        */
       template <typename Wtype, typename Arg>
-      __device__ __host__ inline auto computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int m_offset,
+      __device__ __host__ inline auto computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int m_offset,
                                                 int n_offset)
       {
         using real = typename Arg::Float;
@@ -126,8 +126,8 @@ namespace quda
     } // namespace impl
 
     template <typename Arg> struct ComputeUVMMA {
-      Arg &arg;
-      constexpr ComputeUVMMA(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr ComputeUVMMA(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()
@@ -170,7 +170,7 @@ namespace quda
     namespace impl
     {
 
-      template <typename Arg> __device__ void computeVUV(Arg &arg, int parity, int x_cb, int m_offset, int n_offset)
+      template <typename Arg> __device__ void computeVUV(const Arg &arg, int parity, int x_cb, int m_offset, int n_offset)
       {
         constexpr int fineSpin = Arg::fineSpin;
         constexpr int coarseSpin = Arg::coarseSpin;
@@ -331,8 +331,8 @@ namespace quda
     } // namespace impl
 
     template <typename Arg> struct ComputeVUVMMA {
-      Arg &arg;
-      constexpr ComputeVUVMMA(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr ComputeVUVMMA(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()

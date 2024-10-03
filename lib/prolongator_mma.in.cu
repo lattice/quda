@@ -79,6 +79,7 @@ namespace quda
       strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
+      setRHSstring(aux, in.Nvec());
 
       strcat(aux, mma_t::get_type_name().c_str());
 
