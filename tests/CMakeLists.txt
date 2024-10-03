@@ -1204,7 +1204,7 @@ foreach(prec IN LISTS TEST_PRECS)
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
       --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --enable-testing true
+      --enable-testing true --nsrc 4 --nsrc-tile 4
       --gtest_output=xml:invert_test_asqtad_${prec}.xml)
 
     if(DEFINED ENV{QUDA_ENABLE_TUNING})
