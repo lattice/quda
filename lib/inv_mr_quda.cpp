@@ -64,7 +64,7 @@ namespace quda
     if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     vector<double> b2 = blas::norm2(b); // Save norm of b
-    vector<double> r2;            // if zero source then we will exit immediately doing no work
+    vector<double> r2;
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
@@ -125,7 +125,7 @@ namespace quda
           } else {
             // doing local reductions so can make it asynchronous
             commAsyncReductionSet(true);
-            blas::cDotProductNormA(Ar, r_sloppy);
+            blas::cDotProductNormAB(Ar, r_sloppy);
 
             // omega*alpha is done in the kernel
             blas::caxpyXmazMR(param.omega, r_sloppy, x_sloppy, Ar);
