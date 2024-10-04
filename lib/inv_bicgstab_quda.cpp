@@ -368,7 +368,7 @@ namespace quda {
 
     logQuda(QUDA_VERBOSE, "BiCGstab: Reliable updates = %d\n", rUpdate);
 
-    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
+    if (!param.is_preconditioner) { // do not do the below if this is an inner solver
       // r2 was freshly computed
       auto hq = use_heavy_quark_res ? blas::HeavyQuarkResidualNorm(x, r) : vector<double3>(b.size(), {});
       for (auto i = 0u; i < b.size(); i++) {
