@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <gtest/gtest.h>
 #include <tune_quda.h>
+#include "test.h"
 
 using namespace quda;
 

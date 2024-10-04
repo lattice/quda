@@ -394,7 +394,7 @@ namespace quda
     blas::copy(S[0], r); // no op if uni-precision
 
     PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov, assumes S[0] is in place
       computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map);
@@ -535,7 +535,7 @@ namespace quda
           resIncreaseTotal++;
           warningQuda(
             "CA-CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            sqrt(r2[0]), sqrt(r2_old[9]), resIncreaseTotal);
+            sqrt(r2[0]), sqrt(r2_old[0]), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-CG: solver exiting due to too many true residual norm increases");
             break;
@@ -570,7 +570,7 @@ namespace quda
       param.iter += total_iter;
     }
 
-    PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary("CA-CG", total_iter, r2, b2, stop);
 
     if (param.is_preconditioner) commGlobalReductionPop();
   }

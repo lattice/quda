@@ -64,7 +64,7 @@ namespace quda
     if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     vector<double> b2 = blas::norm2(b); // Save norm of b
-    vector<double> r2;            // if zero source then we will exit immediately doing no work
+    vector<double> r2;
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
@@ -125,7 +125,7 @@ namespace quda
           } else {
             // doing local reductions so can make it asynchronous
             commAsyncReductionSet(true);
-            blas::cDotProductNormA(Ar, r_sloppy);
+            blas::cDotProductNormAB(Ar, r_sloppy);
 
             // omega*alpha is done in the kernel
             blas::caxpyXmazMR(param.omega, r_sloppy, x_sloppy, Ar);
@@ -149,7 +149,7 @@ namespace quda
         for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
         converged = (step < param.Nsteps && r2 > stop) ? false : true;
         if (!converged) blas::copy(r_sloppy, r);
-        PrintStats("MR (restart)", iter, r2, b2, 0.0);
+        PrintStats("MR (restart)", iter, r2, b2);
       } else {
         blas::ax(scale, r_sloppy);
         r2 = blas::norm2(r_sloppy);
@@ -159,7 +159,7 @@ namespace quda
       step++;
     }
 
-    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type));
 
     if (!param.is_preconditioner) {
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);

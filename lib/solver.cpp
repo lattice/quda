@@ -106,9 +106,9 @@ namespace quda {
                                          static_cast<multigrid_solver *>(param.preconditioner)->mg;
         // FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
         if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
-        solver = new PreconCG(mat, *(mg), matSloppy, matPrecon, matEig, param);
+        solver = new PCG(mat, *(mg), matSloppy, matPrecon, matEig, param);
       } else {
-        solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param);
+        solver = new PCG(mat, matSloppy, matPrecon, matEig, param);
       }
       break;
     case QUDA_BICGSTABL_INVERTER:
@@ -399,6 +399,10 @@ namespace quda {
 
   bool Solver::convergence(cvector<double> &r2, cvector<double> &hq2, cvector<double> &r2_tol, cvector<double> &hq_tol)
   {
+    if (r2.size() != hq2.size() || r2.size() != r2_tol.size() || r2.size() != hq_tol.size())
+      errorQuda("Mismatched vector lengths r2 = %lu hq2 = %lu r2_tol = %lu hq_tol = %lu", r2.size(), hq2.size(),
+                r2_tol.size(), hq_tol.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       // check the heavy quark residual norm if necessary
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
@@ -418,6 +422,9 @@ namespace quda {
 
   bool Solver::convergenceHQ(cvector<double> &hq2, cvector<double> &hq_tol)
   {
+    if (hq2.size() != hq_tol.size())
+      errorQuda("Mismatched vector lengths hq2 = %lu hq_tol = %lu", hq2.size(), hq_tol.size());
+
     for (auto i = 0u; i < hq2.size(); i++) {
       // check the heavy quark residual norm if necessary
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
@@ -431,6 +438,9 @@ namespace quda {
 
   bool Solver::convergenceL2(cvector<double> &r2, cvector<double> &r2_tol)
   {
+    if (r2.size() != r2_tol.size())
+      errorQuda("Mismatched vector lengths r2 = %lu r2_tol = %lu", r2.size(), r2_tol.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       // check the L2 relative residual norm if necessary
       if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
@@ -448,7 +458,12 @@ namespace quda {
     return rhs_str;
   }
 
-  void Solver::PrintStats(const char* name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2) {
+  void Solver::PrintStats(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &hq2_)
+  {
+    auto hq2 = hq2_.size() == 0 ? vector<double>(r2.size(), 0.0) : hq2_;
+    if (r2.size() != b2.size() || r2.size() != hq2.size())
+      errorQuda("Mismatched vector lengths r2 = %lu b2 = %lu hq2 = %lu", r2.size(), b2.size(), hq2.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       auto rhs_str = set_rhs_str(i, r2.size());
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
@@ -462,8 +477,14 @@ namespace quda {
     }
   }
 
-  void Solver::PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2,
-                            cvector<double> &r2_tol, cvector<double> &hq_tol) {
+  void Solver::PrintSummary(const char *name, int k, cvector<double> &r2, cvector<double> &b2, cvector<double> &r2_tol,
+                            cvector<double> &hq_tol_)
+  {
+    auto hq_tol = hq_tol_.size() == 0 ? vector<double>(r2.size(), 0.0) : hq_tol_;
+    if (r2.size() != b2.size() || r2.size() != r2_tol.size() || r2.size() != hq_tol.size())
+      errorQuda("Mismatched vector lengths r2 = %lu b2 = %lu r2_tol = %lu hq_tol = %lu", r2.size(), b2.size(),
+                r2_tol.size(), hq_tol.size());
+
     for (auto i = 0u; i < r2.size(); i++) {
       auto rhs_str = set_rhs_str(i, r2.size());
       if (param.compute_true_res) {
@@ -562,6 +583,74 @@ namespace quda {
       }
     }
     return zero_src;
+  }
+
+  void SolverParam::updateInvertParam(QudaInvertParam &param, int offset)
+  {
+    for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
+    for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
+    param.iter += iter;
+    if (offset >= 0) {
+      param.true_res_offset[offset] = true_res_offset[offset];
+      param.iter_res_offset[offset] = iter_res_offset[offset];
+      param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
+    } else {
+      for (int i = 0; i < num_offset; i++) {
+        param.true_res_offset[i] = true_res_offset[i];
+        param.iter_res_offset[i] = iter_res_offset[i];
+        param.true_res_hq_offset[i] = true_res_hq_offset[i];
+      }
+    }
+    // for incremental eigCG:
+    param.rhs_idx = rhs_idx;
+
+    param.ca_lambda_min = ca_lambda_min;
+    param.ca_lambda_max = ca_lambda_max;
+
+    param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+    param.ca_lambda_max_precondition = ca_lambda_max_precondition;
+
+    if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
+  }
+
+  void joinInvertParam(QudaInvertParam &out, const QudaInvertParam &in, const CommKey &split_key, int split_rank)
+  {
+    auto num_sub_partition = quda::product(split_key);
+
+    int sub_partition_dims[]
+      = {comm_dim(0) / split_key[0], comm_dim(1) / split_key[1], comm_dim(2) / split_key[2], comm_dim(3) / split_key[3]};
+
+    int sub_partition_coords[] = {comm_coord(0) / sub_partition_dims[0], comm_coord(1) / sub_partition_dims[1],
+                                  comm_coord(2) / sub_partition_dims[2], comm_coord(3) / sub_partition_dims[3]};
+
+    auto j = sub_partition_coords[3];
+    for (auto d = 2; d >= 0; d--) j = j * split_key[d] + sub_partition_coords[d];
+
+    std::vector<double> true_res(in.num_src, 0.0);
+    std::vector<double> true_res_hq(in.num_src, 0.0);
+    if (split_rank == 0) { // only rank 0 in each sub partition sets the residuals
+      for (auto i = 0; i < in.num_src_per_sub_partition; i++) {
+        true_res[i * num_sub_partition + j] = in.true_res[i];
+        true_res_hq[i * num_sub_partition + j] = in.true_res_hq[i];
+      }
+    }
+
+    // communicate to all ranks
+    comm_allreduce_sum(true_res_hq);
+    comm_allreduce_sum(true_res);
+    memcpy(out.true_res, true_res.data(), true_res.size() * sizeof(double));
+    memcpy(out.true_res_hq, true_res_hq.data(), true_res_hq.size() * sizeof(double));
+
+    out.iter = in.iter;
+    comm_allreduce_int(out.iter);
+
+    out.ca_lambda_min = in.ca_lambda_min;
+    out.ca_lambda_max = in.ca_lambda_max;
+    out.ca_lambda_min_precondition = in.ca_lambda_min_precondition;
+    out.ca_lambda_max_precondition = in.ca_lambda_max_precondition;
+
+    // now broadcast from global rank 0 to ensure uniformity
+    comm_broadcast(&out, sizeof(QudaInvertParam));
   }
 
 } // namespace quda

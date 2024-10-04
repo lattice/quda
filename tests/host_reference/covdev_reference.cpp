@@ -183,14 +183,14 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
     const sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, static_cast<const sFloat *>(in.data()),
                                                  fwd_nbr_spinor, back_nbr_spinor, 1, 1, my_spinor_site_size);
 
-    sFloat gaugedSpinor[my_spinor_site_size];
+    std::vector<sFloat> gaugedSpinor(my_spinor_site_size);
 
     if (daggerBit) {
       for (int s = 0; s < in.Nspin(); s++) su3Tmul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
     } else {
       for (int s = 0; s < in.Nspin(); s++) su3Mul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
     }
-    sum(&res[offset], &res[offset], gaugedSpinor, spinor_site_size);
+    sum(&res[offset], &res[offset], gaugedSpinor.data(), spinor_site_size);
   } // 4-d volume
 }
 

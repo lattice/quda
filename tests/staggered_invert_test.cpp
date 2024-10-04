@@ -17,6 +17,7 @@
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
+#include "test.h"
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -284,9 +285,11 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
     printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.invert_param->secs,
                mg_param.invert_param->gflops / mg_param.invert_param->secs);
-    printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n",
-               mg_param.invert_param->energy, mg_param.invert_param->power,
-               mg_param.invert_param->temp, mg_param.invert_param->clock);
+    if (mg_param.invert_param->energy > 0) {
+      printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n",
+                 mg_param.invert_param->energy, mg_param.invert_param->power,
+                 mg_param.invert_param->temp, mg_param.invert_param->clock);
+    }
   }
 
   // Staggered vector construct START
@@ -370,7 +373,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // QUDA invert test
   //----------------------------------------------------------------------------
 
-  if (!use_multi_src) {
+  if (!use_multi_src || multishift > 1) {
 
     for (int n = 0; n < Nsrc; n++) {
       // If deflating, preserve the deflation space between solves
@@ -391,8 +394,10 @@ std::vector<std::array<double, 2>> solve(test_t param)
       iter[n] = inv_param.iter;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
-      printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
-                 inv_param.energy, inv_param.power, inv_param.temp, inv_param.clock);
+      if (inv_param.energy > 0) {
+        printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                   inv_param.energy, inv_param.power, inv_param.temp, inv_param.clock);
+      }
     }
   } else {
 
@@ -426,9 +431,11 @@ std::vector<std::array<double, 2>> solve(test_t param)
       printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n",
                  num_sub_partition, inv_param.iter,
                  inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
-      printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
-                 inv_param.energy, inv_param.energy / Nsrc_tile,
-                 inv_param.power, inv_param.temp, inv_param.clock);
+      if (inv_param.energy > 0) {
+        printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                   inv_param.energy, inv_param.energy / Nsrc_tile,
+                   inv_param.power, inv_param.temp, inv_param.clock);
+      }
     }
   }
 

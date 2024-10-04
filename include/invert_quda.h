@@ -14,21 +14,6 @@
 
 namespace quda {
 
-// temporary addition until multi-RHS for all Dirac operator functions
-#ifdef __CUDACC__
-#ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
-#pragma nv_diag_suppress 611
-#pragma nv_diag_suppress 997
-#else
-#pragma diag_suppress 611
-#pragma diag_suppress 997
-#endif
-#endif
-
-#ifdef __NVCOMPILER
-#pragma diag_suppress partial_override
-#endif
-
   /**
      SolverParam is the meta data used to define linear solvers.
    */
@@ -370,35 +355,12 @@ namespace quda {
     SolverParam(const SolverParam &param) = default;
 
     /**
-       Update the QudaInvertParam with the data from this
-       @param param the QudaInvertParam to be updated
+       @brief Update the QudaInvertParam with the data from this
+       instance (update the true residuals, and other observables).
+       @param[in,out] param the QudaInvertParam to be updated
+       @param[in] offset offset applied to the
      */
-    void updateInvertParam(QudaInvertParam &param, int offset=-1) {
-      for (auto i = 0u; i < true_res.size(); i++) param.true_res[i] = true_res[i];
-      for (auto i = 0u; i < true_res_hq.size(); i++) param.true_res_hq[i] = true_res_hq[i];
-      param.iter += iter;
-      if (offset >= 0) {
-	param.true_res_offset[offset] = true_res_offset[offset];
-        param.iter_res_offset[offset] = iter_res_offset[offset];
-	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
-      } else {
-	for (int i=0; i<num_offset; i++) {
-	  param.true_res_offset[i] = true_res_offset[i];
-          param.iter_res_offset[i] = iter_res_offset[i];
-	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
-	}
-      }
-      //for incremental eigCG:
-      param.rhs_idx = rhs_idx;
-
-      param.ca_lambda_min = ca_lambda_min;
-      param.ca_lambda_max = ca_lambda_max;
-
-      param.ca_lambda_min_precondition = ca_lambda_min_precondition;
-      param.ca_lambda_max_precondition = ca_lambda_max_precondition;
-
-      if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
-    }
+    void updateInvertParam(QudaInvertParam &param, int offset = -1);
 
     // for incremental eigCG:
     void updateRhsIndex(QudaInvertParam &param) { rhs_idx = param.rhs_idx; }
@@ -473,10 +435,10 @@ namespace quda {
       @brief a virtual method that performs the inversion and collect some vectors.
         The default here is a no-op and should not be called.
      */
-    virtual void solve_and_collect(ColorSpinorField &, const ColorSpinorField &, cvector_ref<ColorSpinorField> &, int,
-                                   double)
+    virtual void solve_and_collect(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                   cvector_ref<ColorSpinorField> &, int, double)
     {
-      errorQuda("NOT implemented.");
+      errorQuda("Not implemented.");
     }
 
     void set_tol(double tol) { param.tol = tol; }
@@ -909,21 +871,19 @@ namespace quda {
     virtual QudaInverterType getInverterType() const override { return QUDA_CG3_INVERTER; }
   };
 
-  class PreconCG : public Solver {
-    private:
+  class PCG : public Solver
+  {
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorField r;
-    ColorSpinorField y;
-    ColorSpinorField Ap;
-    ColorSpinorField x_sloppy;
-    ColorSpinorField r_sloppy;
-    ColorSpinorField minvr;
-    ColorSpinorField minvr_sloppy;
-    ColorSpinorField minvr_pre;
-    ColorSpinorField r_pre;
-    XUpdateBatch x_update_batch;
+    std::vector<ColorSpinorField> r;
+    std::vector<ColorSpinorField> y;
+    std::vector<ColorSpinorField> Ap;
+    std::vector<ColorSpinorField> x_sloppy;
+    std::vector<ColorSpinorField> r_sloppy;
+    std::vector<ColorSpinorField> minvr_sloppy;
+    std::vector<ColorSpinorField> minvr_pre;
+    std::vector<ColorSpinorField> r_pre;
     int Np; /** the size of the accumulator pipeline */
 
     bool init = false;
@@ -933,11 +893,11 @@ namespace quda {
        @param[in] x Solution vector
        @param[in] b Source vector
      */
-    void create(ColorSpinorField &x, const ColorSpinorField &b);
+    void create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b);
 
   public:
-    PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param);
+    PCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+        SolverParam &param);
 
     /**
      * @brief Preconditioned CG supporting a pre-existing preconditioner K.
@@ -948,15 +908,14 @@ namespace quda {
      * @param matEig Deflation precision Dirac matrix
      * @param param Solver parameters
      */
-    PreconCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param);
+    PCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matoPrecon,
+        const DiracMatrix &matEig, SolverParam &param);
 
-    virtual ~PreconCG();
+    virtual ~PCG();
 
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) override
     {
-      for (auto i = 0u; i < in.size(); i++)
-        this->solve_and_collect(out[i], in[i], cvector_ref<ColorSpinorField>(), 0, 0);
+      solve_and_collect(out, in, {}, 0, 0);
     }
 
     /**
@@ -967,14 +926,13 @@ namespace quda {
        @param collect_miniter minimal iteration start from which the r vectors are to be collected
        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
     */
-    virtual void solve_and_collect(ColorSpinorField &out, const ColorSpinorField &in,
+    virtual void solve_and_collect(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                    cvector_ref<ColorSpinorField> &v_r, int collect_miniter, double collect_tol) override;
 
     virtual bool hermitian() const override { return true; } /** PCG is only Hermitian system */
 
     virtual QudaInverterType getInverterType() const final { return QUDA_PCG_INVERTER; }
   };
-
 
   class BiCGstab : public Solver {
 
@@ -1693,5 +1651,19 @@ public:
    @return true if CA, false otherwise
  */
  bool is_ca_solver(QudaInverterType type);
+
+ /**
+    @brief Join the separate split-grid instances of
+    QudaInvertParam.  This function places the computed residuals
+    for each solve from the split grids in the expected order.
+    This function expects we are using the default (global)
+    communuicator.
+
+    @param[in, out] out The global joined instance of QudaInvertParam
+    @param[in] in The local split-grid instance of QudaInvertParam
+    @param[in] comm_key The CommKey that defines the split grid used
+    @param[in] split_rank The rank of the process when in split grid
+ */
+ void joinInvertParam(QudaInvertParam &out, const QudaInvertParam &in, const CommKey &comm_key, int split_rank);
 
 } // namespace quda

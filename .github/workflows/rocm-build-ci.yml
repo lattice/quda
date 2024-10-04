@@ -31,6 +31,8 @@ jobs:
             -DQUDA_DIRAC_LAPLACE=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
             -DQUDA_COVDEV=ON \
+            -DQUDA_FAST_COMPILE_REDUCE=ON \
+            -DQUDA_FAST_COMPILE_DSLASH=ON \
             -DQUDA_QDPJIT=OFF \
             -DQUDA_INTERFACE_QDPJIT=OFF \
             -DQUDA_INTERFACE_MILC=ON \

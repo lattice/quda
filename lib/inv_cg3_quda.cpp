@@ -68,6 +68,7 @@ namespace quda {
     create(x, b);
 
     auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop_hq = vector(b.size(), param.tol_hq);
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -117,7 +118,7 @@ namespace quda {
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
-    if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) return;
+    if (convergence(r2, heavy_quark_res, stop, stop_hq)) return;
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
     auto r2_old = r2;
@@ -133,7 +134,7 @@ namespace quda {
     vector<double> rho(b.size(), 1.0);
     vector<double> gamma(b.size(), 1.0);
 
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
+    while ( !convergence(r2, heavy_quark_res, stop, stop_hq) && k < param.maxiter) {
 
       matSloppy(ArS, rS);
       auto gamma_old = gamma;
@@ -173,10 +174,10 @@ namespace quda {
         update = ( update || (rNorm < delta*maxrr && r0Norm <= maxrr)); // condition for r
 
         // force a reliable update if we are within target tolerance (only if doing reliable updates)
-        if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) update = true;
+        if (convergence(r2, heavy_quark_res, stop, stop_hq) && param.delta >= param.tol) update = true;
 
         // For heavy-quark inversion force a reliable update if we continue after
-        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(heavy_quark_res, param.tol_hq) and param.delta >= param.tol ) {
+        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(heavy_quark_res, stop_hq) and param.delta >= param.tol ) {
           update = true;
         }
 
@@ -197,7 +198,7 @@ namespace quda {
           maxrr = rNorm;
           maxrx = rNorm;
           // we update sloppy and old fields
-          if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+          if (!convergence(r2, heavy_quark_res, stop, stop_hq)) {
             blas::copy(rS, r);
             blas::axpy(-1., xS, xS_old);
             // we preserve the orthogonality between the previous residual and the new
@@ -246,12 +247,12 @@ namespace quda {
           }
         }
       } else {
-        if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+        if (convergence(r2, heavy_quark_res, stop, stop_hq)) {
           mat(r, x);
           r2 = blas::xmyNorm(b, r);
           r0Norm = sqrt(r2[0]);
           // we update sloppy and old fields
-          if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+          if (!convergence(r2, heavy_quark_res, stop, stop_hq)) {
             // we preserve the orthogonality between the previous residual and the new
             auto rr_old = blas::cDotProduct(rS, rS_old);
             for (auto i = 0u; i < r2.size(); i++) rr_old[i] /= r2[i];
@@ -295,7 +296,7 @@ namespace quda {
       }
     }
 
-    PrintSummary("CG3", k, r2, b2, stop, param.tol_hq);
+    PrintSummary("CG3", k, r2, b2, stop, stop_hq);
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
