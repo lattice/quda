@@ -408,7 +408,8 @@ namespace quda
       diracParam.type = QUDA_COARSE_DIRAC;
       diracParam.halo_precision = param.mg_global.precision_null[param.level];
       diracParam.setup_use_mma = param.mg_global.setup_use_mma[param.level];
-      diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level];
+      // level + 1 since this is for the coarse grid
+      diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level + 1];
       diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
 
       diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
