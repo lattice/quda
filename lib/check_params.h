@@ -472,8 +472,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
     if (param->num_src_per_sub_partition < 1)
       errorQuda("Invalid num_src_per_subpartition = %d", param->num_src_per_sub_partition);
     if (param->num_src % param->num_src_per_sub_partition != 0)
-      errorQuda("num_src %d not compatible with num_src_per_sub_partition %d",
-                param->num_src, param->num_src_per_sub_partition);
+      errorQuda("num_src %d not compatible with num_src_per_sub_partition %d", param->num_src,
+                param->num_src_per_sub_partition);
   }
 #endif
 #endif

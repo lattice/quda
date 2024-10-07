@@ -61,8 +61,8 @@ namespace quda
   */
   template <typename... Args>
   void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<std::vector<ColorSpinorField>> &Ap,
-                                    std::vector<std::vector<ColorSpinorField>> &p, int n_krylov,
-                                    QudaCABasis basis, double m_map, double b_map, Args &&...args)
+                                    std::vector<std::vector<ColorSpinorField>> &p, int n_krylov, QudaCABasis basis,
+                                    double m_map, double b_map, Args &&...args)
   {
     // in some cases p or Ap may be larger
     if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);

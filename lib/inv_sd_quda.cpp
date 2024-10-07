@@ -44,7 +44,8 @@ namespace quda {
       // Compute the true residual
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
-      for (auto i = 0u; i < b.size(); i++) if (b2[i] == 0) b2[i] = r2[i];
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
     } else {
       blas::zero(x);
       blas::copy(r, b);

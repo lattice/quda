@@ -1115,7 +1115,7 @@ namespace quda {
     std::vector<ColorSpinorField> r;        //! residual vector
     std::vector<ColorSpinorField> r_sloppy; //! sloppy residual vector
 
-    int k_break = 0;                  //! track when the solver converged
+    int k_break = 0;                               //! track when the solver converged
     std::vector<std::vector<ColorSpinorField>> p;  // GCR direction vectors
     std::vector<std::vector<ColorSpinorField>> Ap; // mat * direction vectors
 

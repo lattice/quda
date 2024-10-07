@@ -69,7 +69,8 @@ namespace quda
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r); // r = b - Ax0
-      for (auto i = 0u; i < b.size(); i++) if (b2[i] == 0) b2[i] = r2[i];
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
     } else {
       r2 = b2;
       blas::copy(r, b);
