@@ -213,7 +213,7 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
 int eig_ortho_block_size = 0;
-int eig_evals_batch_size = 4;
+int eig_evals_batch_size = 16;
 int eig_block_size = 4;
 int eig_n_ev = 16;
 int eig_n_kr = 32;
