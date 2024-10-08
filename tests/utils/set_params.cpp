@@ -787,7 +787,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   }
 
   mg_eig_param.ortho_block_size = mg_eig_ortho_block_size[level];
-  mg_eig_param.compute_evals_batch_size = mg_eig_evals_batch_size[level];
   mg_eig_param.block_size
     = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
     1 :
