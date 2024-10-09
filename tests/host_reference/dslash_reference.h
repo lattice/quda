@@ -556,7 +556,7 @@ Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, Float *
   case 9: j = neighborIndex_5d<type>(i, oddBit, -nb, 0, 0, 0, 0); break;
   default:
     j = -1;
-    errorQuda("ERROR: wrong dir\n");
+    errorQuda("ERROR: wrong dir");
   }
 
   return &spinorField[j * site_size];

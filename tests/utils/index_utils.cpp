@@ -40,6 +40,18 @@ int fullLatticeIndex(int dim[4], int index, int oddBit)
   return 2 * index + ((x2 + x3 + x4 + oddBit) & 1);
 }
 
+int fullLatticeIndex_5d(int i, int oddBit)
+{
+  int boundaryCrossings = i / (Z[0] / 2) + i / (Z[1] * Z[0] / 2) + i / (Z[2] * Z[1] * Z[0] / 2) + i / (Z[3] * Z[2] * Z[1] * Z[0] / 2);
+  return 2 * i + (boundaryCrossings + oddBit) % 2;
+}
+
+int fullLatticeIndex_5d_4dpc(int i, int oddBit)
+{
+  int boundaryCrossings = i / (Z[0] / 2) + i / (Z[1] * Z[0] / 2) + i / (Z[2] * Z[1] * Z[0] / 2);
+  return 2 * i + (boundaryCrossings + oddBit) % 2;
+}
+
 int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
   int Y = fullLatticeIndex(i, oddBit);
   int x4 = Y / (Z[2] * Z[1] * Z[0]);
