@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include <gauge_field.h>
+#include <index_utils.hpp>
 #include <host_utils.h>
 #include <llfat_utils.h>
 #include <unitarization_links.h>

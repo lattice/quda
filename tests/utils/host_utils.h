@@ -40,6 +40,16 @@ extern QudaPrecision &cuda_prec_eigensolver;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
+// Determine if we're running in multi-GPU mode
+constexpr bool is_multi_gpu()
+{
+#ifdef MULTI_GPU
+  return true;
+#else
+  return false;
+#endif
+}
+
 // Determine if the Laplace operator has been defined
 constexpr bool is_enabled_laplace()
 {
@@ -162,12 +172,6 @@ int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4]);
 void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const int shrinked_dim[4],
                                     const int shift[4], int parity);
 
-int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
-int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
-
-int neighborIndex(int dim[4], int index, int oddBit, int dx[4]);
-int neighborIndexFullLattice(int dim[4], int index, int dx[4]);
-
 int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1);
 
@@ -175,8 +179,6 @@ void printSpinorElement(void *spinor, int X, QudaPrecision precision);
 void printGaugeElement(void *gauge, int X, QudaPrecision precision);
 template <typename Float> void printVector(Float *v);
 
-int fullLatticeIndex(int i, int oddBit);
-int fullLatticeIndex(int dim[4], int index, int oddBit);
 int getOddBit(int X);
 
 // Custom "sitelink" enum used to create unphased, MILC phased, or continuous U(1) phased links

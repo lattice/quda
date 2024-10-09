@@ -5,6 +5,7 @@
 #include <util_quda.h>
 
 #include <host_utils.h>
+#include <index_utils.hpp>
 #include <wilson_dslash_reference.h>
 
 #include <gauge_field.h>
@@ -12,29 +13,9 @@
 
 #include <dslash_reference.h>
 #include <string.h>
-#include "gamma_reference.h"
+#include <gamma_reference.h>
 
 using namespace quda;
-
-// todo pass projector
-template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
-{
-  for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
-
-  for (int s = 0; s < 4; s++) {
-    for (int t = 0; t < 4; t++) {
-      Float projRe = projector[projIdx][s][t][0];
-      Float projIm = projector[projIdx][s][t][1];
-
-      for (int m = 0; m < 3; m++) {
-        Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
-        Float spinorIm = spinorIn[t * (3 * 2) + m * (2) + 1];
-        res[s * (3 * 2) + m * (2) + 0] += projRe * spinorRe - projIm * spinorIm;
-        res[s * (3 * 2) + m * (2) + 1] += projRe * spinorIm + projIm * spinorRe;
-      }
-    }
-  }
-}
 
 //
 // dslashReference()
@@ -103,8 +84,8 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
   for (int i = 0; i < Vh; i++) {
 
     for (int dir = 0; dir < 8; dir++) {
-      gFloat *gauge = gaugeLink_mg4dir(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      gFloat *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
 
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <host_utils.h>
+#include <index_utils.hpp>
 #include <misc.h>
 #include <covdev_reference.h>
 #include <dslash_reference.h>
@@ -179,8 +180,8 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
   for (int sid = 0; sid < Vh; sid++) {
     int offset = my_spinor_site_size * sid;
 
-    gFloat *lnk = gaugeLink_mg4dir(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
-    const sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, static_cast<const sFloat *>(in.data()),
+    gFloat *lnk = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
+    const sFloat *spinor = spinorNeighbor(sid, mu, oddBit, static_cast<const sFloat *>(in.data()),
                                                  fwd_nbr_spinor, back_nbr_spinor, 1, 1, my_spinor_site_size);
 
     sFloat gaugedSpinor[my_spinor_site_size];

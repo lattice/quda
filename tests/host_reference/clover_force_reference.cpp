@@ -4,60 +4,21 @@
 #include <cstring>
 #include <type_traits>
 
-#include "gauge_field.h"
-#include "quda.h"
-#include "color_spinor_field.h" // convenient quark field container
+// QUDA headers
+#include <gauge_field.h>
+#include <color_spinor_field.h> // convenient quark field container
 
-#include "clover_force_reference.h"
-#include "host_utils.h"
-#include "misc.h"
-#include "dslash_reference.h"
-#include "wilson_dslash_reference.h"
-#include "gauge_force_reference.h"
-#include "host_utils.h"
-#include "gamma_reference.h"
+#include <clover_force_reference.h>
+#include <host_utils.h>
+#include <index_utils.hpp>
+#include <misc.h>
+#include <dslash_reference.h>
+#include <wilson_dslash_reference.h>
+#include <gauge_force_reference.h>
+#include <gamma_reference.h>
 
 #include <Eigen/Dense>
 
-// todo pass projector
-template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
-{
-  for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
-
-  for (int s = 0; s < 4; s++) {
-    for (int t = 0; t < 4; t++) {
-      Float projRe = projector[projIdx][s][t][0];
-      Float projIm = projector[projIdx][s][t][1];
-
-      for (int m = 0; m < 3; m++) {
-        Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
-        Float spinorIm = spinorIn[t * (3 * 2) + m * (2) + 1];
-        res[s * (3 * 2) + m * (2) + 0] += projRe * spinorRe - projIm * spinorIm;
-        res[s * (3 * 2) + m * (2) + 1] += projRe * spinorIm + projIm * spinorRe;
-      }
-    }
-  }
-}
-
-// todo pass gamma
-template <typename Float> void multiplySpinorByDiracgamma(Float *res, int gammaIdx, const Float *spinorIn)
-{
-  for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
-
-  for (int s = 0; s < 4; s++) {
-    for (int t = 0; t < 4; t++) {
-      Float projRe = local_gamma[gammaIdx][s][t][0];
-      Float projIm = local_gamma[gammaIdx][s][t][1];
-
-      for (int m = 0; m < 3; m++) {
-        Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
-        Float spinorIm = spinorIn[t * (3 * 2) + m * (2) + 1];
-        res[s * (3 * 2) + m * (2) + 0] += projRe * spinorRe - projIm * spinorIm;
-        res[s * (3 * 2) + m * (2) + 1] += projRe * spinorIm + projIm * spinorRe;
-      }
-    }
-  }
-}
 template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gauge, sFloat *x, sFloat *y)
 {
 
@@ -202,7 +163,7 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
 #else
       sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
       sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
-      const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
 #endif
       sFloat projectedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (projSign + 1) / 2; //+ (dir + daggerBit) % 2;
@@ -875,11 +836,11 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
           for (int flavor = 0; flavor < flavors; ++flavor) {
 
             sFloat temp[spinor_site_size], temp_munu[spinor_site_size], temp_numu[spinor_site_size];
-            multiplySpinorByDiracgamma(temp, nu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
-            multiplySpinorByDiracgamma(temp_munu, mu, temp);
+            multiplySpinorByDiracGamma(temp, nu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
+            multiplySpinorByDiracGamma(temp_munu, mu, temp);
 
-            multiplySpinorByDiracgamma(temp, mu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
-            multiplySpinorByDiracgamma(temp_numu, nu, temp);
+            multiplySpinorByDiracGamma(temp, mu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
+            multiplySpinorByDiracGamma(temp_numu, nu, temp);
             for (int s = 0; s < 4; s++) {
               for (int t = 0; t < 3; t++) {
                 temp[s * (3 * 2) + t * (2) + 0]

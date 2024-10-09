@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include <host_utils.h>
+#include <index_utils.hpp>
 #include <misc.h>
 #include <hisq_force_reference.h>
 

@@ -349,8 +349,8 @@ void clover_ht_mat(void *out, void **gauge, void *clover, void *in, double kappa
  * @param clover_inverse Host input clover inverse
  * @param in Host input spinor
  * @param kappa Kappa value for the Wilson operator
- * @param mu Mu parameter for the twis
- * @param matpc_type Matrix preconditioning typet
+ * @param mu Mu parameter for the twist
+ * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
  * @param param Gauge field parameters

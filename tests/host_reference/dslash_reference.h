@@ -2,6 +2,7 @@
 
 #include <array>
 #include <host_utils.h>
+#include <index_utils.hpp>
 #include <comm_quda.h>
 #include <gauge_field.h>
 
@@ -179,126 +180,22 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
  */
 double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha0, int t0);
 
-// i represents a "half index" into an even or odd "half lattice".
-// when oddBit={0,1} the half lattice is {even,odd}.
-//
-// the displacements, such as dx, refer to the full lattice coordinates.
-//
-// neighborIndex() takes a "half index", displaces it, and returns the
-// new "half index", which can be an index into either the even or odd lattices.
-// displacements of magnitude one always interchange odd and even lattices.
-//
-
+/**
+ * @brief Return the pointer to a gauge link as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param gaugeEven The even gauge fields stored in a QDP layout
+ * @param gaugeOdd The odd gauge fields stored in a QDP layout
+ * @param ghostGaugeEven The even-parity gauge ghost fields
+ * @param ghostGaugeOdd The odd-parity gauge ghost fields
+ * @param n_ghost_faces The depth of the ghost fields
+ * @param nbr_distance Displacement distance
+ * @return A pointer to the offset gauge link
+ */
 template <typename Float>
-static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
-{
-  Float **gaugeField;
-  int j;
-  int d = nbr_distance;
-  if (dir % 2 == 0) {
-    j = i;
-    gaugeField = (oddBit ? gaugeOdd : gaugeEven);
-  } else {
-    switch (dir) {
-    case 1: j = neighborIndex(i, oddBit, 0, 0, 0, -d); break;
-    case 3: j = neighborIndex(i, oddBit, 0, 0, -d, 0); break;
-    case 5: j = neighborIndex(i, oddBit, 0, -d, 0, 0); break;
-    case 7: j = neighborIndex(i, oddBit, -d, 0, 0, 0); break;
-    default: j = -1; break;
-    }
-    gaugeField = (oddBit ? gaugeEven : gaugeOdd);
-  }
-
-  return &gaugeField[dir / 2][j * (3 * 3 * 2)];
-}
-
-template <typename Float>
-static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, int neighbor_distance,
-                                          int site_size = 24)
-{
-  int j;
-  int nb = neighbor_distance;
-  switch (dir) {
-  case 0: j = neighborIndex(i, oddBit, 0, 0, 0, +nb); break;
-  case 1: j = neighborIndex(i, oddBit, 0, 0, 0, -nb); break;
-  case 2: j = neighborIndex(i, oddBit, 0, 0, +nb, 0); break;
-  case 3: j = neighborIndex(i, oddBit, 0, 0, -nb, 0); break;
-  case 4: j = neighborIndex(i, oddBit, 0, +nb, 0, 0); break;
-  case 5: j = neighborIndex(i, oddBit, 0, -nb, 0, 0); break;
-  case 6: j = neighborIndex(i, oddBit, +nb, 0, 0, 0); break;
-  case 7: j = neighborIndex(i, oddBit, -nb, 0, 0, 0); break;
-  default: j = -1; break;
-  }
-
-  return &spinorField[j * site_size];
-}
-
-// i represents a "half index" into an even or odd "half lattice".
-// when oddBit={0,1} the half lattice is {even,odd}.
-//
-// the displacements, such as dx, refer to the full lattice coordinates.
-//
-// neighborIndex() takes a "half index", displaces it, and returns the
-// new "half index", which can be an index into either the even or odd lattices.
-// displacements of magnitude one always interchange odd and even lattices.
-//
-//
-template <QudaPCType type> int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
-{
-  // fullLatticeIndex was modified for fullLatticeIndex_4d.  It is in util_quda.cpp.
-  // This code bit may not properly perform 5dPC.
-  int X = type == QUDA_5D_PC ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
-  // Checked that this matches code in dslash_core_ante.h.
-  int xs = X / (Z[3] * Z[2] * Z[1] * Z[0]);
-  int x4 = (X / (Z[2] * Z[1] * Z[0])) % Z[3];
-  int x3 = (X / (Z[1] * Z[0])) % Z[2];
-  int x2 = (X / Z[0]) % Z[1];
-  int x1 = X % Z[0];
-  // Displace and project back into domain 0,...,Ls-1.
-  // Note that we add Ls to avoid the negative problem
-  // of the C % operator.
-  xs = (xs + dxs + Ls) % Ls;
-  // Etc.
-  x4 = (x4 + dx4 + Z[3]) % Z[3];
-  x3 = (x3 + dx3 + Z[2]) % Z[2];
-  x2 = (x2 + dx2 + Z[1]) % Z[1];
-  x1 = (x1 + dx1 + Z[0]) % Z[0];
-  // Return linear half index.  Remember that integer division
-  // rounds down.
-  return (xs * (Z[3] * Z[2] * Z[1] * Z[0]) + x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
-}
-
-template <QudaPCType type, typename Float>
-Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int site_size = 24)
-{
-  int nb = neighbor_distance;
-  int j;
-  switch (dir) {
-  case 0: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, 0, +nb); break;
-  case 1: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, 0, -nb); break;
-  case 2: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, +nb, 0); break;
-  case 3: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, -nb, 0); break;
-  case 4: j = neighborIndex_5d<type>(i, oddBit, 0, 0, +nb, 0, 0); break;
-  case 5: j = neighborIndex_5d<type>(i, oddBit, 0, 0, -nb, 0, 0); break;
-  case 6: j = neighborIndex_5d<type>(i, oddBit, 0, +nb, 0, 0, 0); break;
-  case 7: j = neighborIndex_5d<type>(i, oddBit, 0, -nb, 0, 0, 0); break;
-  case 8: j = neighborIndex_5d<type>(i, oddBit, +nb, 0, 0, 0, 0); break;
-  case 9: j = neighborIndex_5d<type>(i, oddBit, -nb, 0, 0, 0, 0); break;
-  default: j = -1; break;
-  }
-  return &spinorField[j * site_size];
-}
-
-#ifdef MULTI_GPU
-inline int x4_mg(int i, int oddBit)
-{
-  int Y = fullLatticeIndex(i, oddBit);
-  int x4 = Y / (Z[2] * Z[1] * Z[0]);
-  return x4;
-}
-
-template <typename Float>
-static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
+static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
                                       Float **ghostGaugeEven, Float **ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
 {
   Float **gaugeField;
@@ -364,8 +261,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
 
     default:
       j = -1;
-      printf("ERROR: wrong dir \n");
-      exit(1);
+      errorQuda("wrong dir");
     }
     gaugeField = (oddBit ? gaugeEven : gaugeOdd);
   }
@@ -373,10 +269,49 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
   return &gaugeField[dir / 2][j * (3 * 3 * 2)];
 }
 
+
+/**
+ * @brief Return the pointer to a gauge link as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param gaugeEven The even gauge fields stored in a QDP layout
+ * @param gaugeOdd The odd gauge fields stored in a QDP layout
+ * @param nbr_distance Displacement distance
+ * @return A pointer to the offset gauge link
+ */
 template <typename Float>
-static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, const Float *spinorField,
-                                                 Float **fwd_nbr_spinor, Float **back_nbr_spinor, int neighbor_distance,
-                                                 int nFace, int site_size = 24)
+static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
+{
+  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<Float**>(nullptr), static_cast<Float**>(nullptr), 0, 1);
+}
+
+inline int x4_mg(int i, int oddBit)
+{
+  int Y = fullLatticeIndex(i, oddBit);
+  int x4 = Y / (Z[2] * Z[1] * Z[0]);
+  return x4;
+}
+
+/**
+ * @brief Return the pointer to a fermion field as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param spinorField The spinor field
+ * @param fwd_nbr_spinor The forward ghost region for the spinor field
+ * @param back_nbr_spinor The backward ghost region for the spinor field
+ * @param neighbor_distance Displacement distance
+ * @param nFace The depth of the ghost fields
+ * @param site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
+template <typename Float>
+static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField,
+                                          Float **fwd_nbr_spinor, Float **back_nbr_spinor, int neighbor_distance,
+                                          int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -473,39 +408,29 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
   }
   default:
     j = -1;
-    printf("ERROR: wrong dir\n");
-    exit(1);
+    errorQuda("ERROR: wrong dir");
   }
 
   return &spinorField[j * site_size];
 }
 
-template <QudaPCType type> int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
+/**
+ * @brief Return the pointer to a fermion field as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param spinorField The spinor field
+ * @param neighbor_distance Displacement distance
+ * @param site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
+template <typename Float>
+static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, int neighbor_distance,
+                                          int site_size = 24)
 {
-  int ret;
-
-  int Y = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
-
-  int xs = Y / (Z[3] * Z[2] * Z[1] * Z[0]);
-  int x4 = (Y / (Z[2] * Z[1] * Z[0])) % Z[3];
-  int x3 = (Y / (Z[1] * Z[0])) % Z[2];
-  int x2 = (Y / Z[0]) % Z[1];
-  int x1 = Y % Z[0];
-  int ghost_x4 = x4 + dx4;
-
-  xs = (xs + dxs + Ls) % Ls;
-  x4 = (x4 + dx4 + Z[3]) % Z[3];
-  x3 = (x3 + dx3 + Z[2]) % Z[2];
-  x2 = (x2 + dx2 + Z[1]) % Z[1];
-  x1 = (x1 + dx1 + Z[0]) % Z[0];
-
-  if ((ghost_x4 >= 0 && ghost_x4) < Z[3] || !quda::comm_dim_partitioned(3)) {
-    ret = (xs * Z[3] * Z[2] * Z[1] * Z[0] + x4 * Z[2] * Z[1] * Z[0] + x3 * Z[1] * Z[0] + x2 * Z[0] + x1) >> 1;
-  } else {
-    ret = (xs * Z[2] * Z[1] * Z[0] + x3 * Z[1] * Z[0] + x2 * Z[0] + x1) >> 1;
-  }
-
-  return ret;
+  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<Float**>(nullptr),
+                        static_cast<Float**>(nullptr), neighbor_distance, 0, site_size);
 }
 
 template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
@@ -514,9 +439,23 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
   return (Y / (Z[2] * Z[1] * Z[0])) % Z[3];
 }
 
+/**
+ * @brief Return the pointer to a 5-d fermion field as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param spinorField The spinor field
+ * @param fwd_nbr_spinor The forward ghost region for the spinor field
+ * @param back_nbr_spinor The backward ghost region for the spinor field
+ * @param neighbor_distance Displacement distance
+ * @param nFace The depth of the ghost fields
+ * @param site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
 template <QudaPCType type, typename Float>
-Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
-                              Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
+                         Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -600,7 +539,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
       int offset = ((x4 + nb - Z[3]) * Ls * X3 * X2 * X1 + xs * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
       return fwd_nbr_spinor[3] + offset * site_size;
     }
-    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, +nb, 0, 0, 0);
+    j = neighborIndex_5d<type>(i, oddBit, 0, +nb, 0, 0, 0);
     break;
   }
   case 7: //-T
@@ -610,16 +549,35 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
       int offset = ((x4 - nb + nFace) * Ls * X3 * X2 * X1 + xs * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
       return back_nbr_spinor[3] + offset * site_size;
     }
-    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, -nb, 0, 0, 0);
+    j = neighborIndex_5d<type>(i, oddBit, 0, -nb, 0, 0, 0);
     break;
   }
+  case 8: j = neighborIndex_5d<type>(i, oddBit, +nb, 0, 0, 0, 0); break;
+  case 9: j = neighborIndex_5d<type>(i, oddBit, -nb, 0, 0, 0, 0); break;
   default:
     j = -1;
-    printf("ERROR: wrong dir\n");
-    exit(1);
+    errorQuda("ERROR: wrong dir\n");
   }
 
   return &spinorField[j * site_size];
 }
 
-#endif // MULTI_GPU
+/**
+ * @brief Return the pointer to a 5-d fermion field as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param spinorField The spinor field
+ * @param neighbor_distance Displacement distance
+ * @param site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
+template <QudaPCType type, typename Float>
+Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int site_size = 24)
+{
+  return spinorNeighbor_5d<type>(i, dir, oddBit, spinorField, static_cast<Float **>(nullptr),
+                         static_cast<Float**>(nullptr), neighbor_distance, 0, site_size);
+}
+
+

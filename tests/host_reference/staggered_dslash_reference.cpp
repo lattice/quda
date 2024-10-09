@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <host_utils.h>
+#include <index_utils.hpp>
 #include <quda_internal.h>
 #include <quda.h>
 #include <util_quda.h>
@@ -76,14 +77,14 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
 #ifdef MULTI_GPU
       const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
       real_t *fatlnk
-        = gaugeLink_mg4dir(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+        = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
       real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
-        gaugeLink_mg4dir(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
+        gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
         nullptr;
-      real_t *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(
+      real_t *first_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(
         sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, stag_spinor_site_size);
       real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
-        spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
+        spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
                                            stag_spinor_site_size) :
         nullptr;
 #else
