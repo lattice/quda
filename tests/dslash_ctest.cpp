@@ -7,6 +7,7 @@ int argc_copy;
 char **argv_copy;
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 bool ctest_all_partitions = false;
+bool ctest_domain_decomposition = false;
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
@@ -17,10 +18,10 @@ using ::testing::Range;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, int, int>>
 {
 protected:
-  ::testing::tuple<int, int, int> param;
+  ::testing::tuple<int, int, int, int, int> param;
 
   bool skip()
   {
@@ -40,6 +41,9 @@ protected:
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
+
+    if (::testing::get<3>(GetParam()) == 0 && ::testing::get<4>(GetParam()) > 0) return true;
+    if (!ctest_domain_decomposition && ::testing::get<3>(GetParam())>0) return true;
 
     return false;
   }
@@ -61,6 +65,12 @@ protected:
       printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
                  grid_partition[3]);
     }
+
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
@@ -77,7 +87,9 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon);
+    int dd_value = ::testing::get<3>(GetParam());
+    int dd_color = ::testing::get<4>(GetParam());
+    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon, dd_value, dd_color);
     display_test_info(prec, recon);
   }
 
@@ -90,7 +102,6 @@ public:
 
   static void SetUpTestCase()
   {
-    initQuda(device_ordinal);
     DslashTestWrapper::dtest_type = dtest_type;
   }
 
@@ -100,13 +111,12 @@ public:
   static void TearDownTestCase()
   {
     DslashTestWrapper::destroy();
-    endQuda();
   }
 };
 
 TEST_P(DslashTest, verify)
 {
-  dslash_test_wrapper.dslashRef();
+  if (not dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.dslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();
@@ -131,6 +141,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
+  app->add_option("--domain-decomposition", ctest_domain_decomposition, "Test domain decomposition");
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
@@ -139,6 +150,7 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+  initQuda(device_ordinal);
 
   // The 'SetUp()' method of the Google Test class from which DslashTest
   // in derived has no arguments, but QUDA's implementation requires the
@@ -153,34 +165,63 @@ int main(int argc, char **argv)
 
   int test_rc = RUN_ALL_TESTS();
 
+  endQuda();
   finalizeComms();
   return test_rc;
 }
 
-std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, int, int>> param)
 {
   const int prec = ::testing::get<0>(param.param);
   const int recon = ::testing::get<1>(param.param);
   const int part = ::testing::get<2>(param.param);
+  const int dd = ::testing::get<3>(param.param);
+  const int col = ::testing::get<4>(param.param);
   std::stringstream ss;
-  // std::cout << "getdslashtestname" << get_dslash_str(dslash_type) << "_" << prec_str[prec] << "_r" << recon <<
-  // "_partition" << part << std::endl; ss << get_dslash_str(dslash_type) << "_";
   ss << get_prec_str(getPrecision(prec));
   ss << "_r" << recon;
   ss << "_partition" << part;
+  if (dd > 0) {
+    switch (dd) {
+    case 1: ss << "_dd_local"; break;
+    case 2: ss << "_dd_global"; break;
+    }
+    switch (col) {
+    case 0: ss << "_red_red"; break;
+    case 1: ss << "_black_red"; break;
+    case 2: ss << "_red_black"; break;
+    case 3: ss << "_black_black"; break;
+    }
+  } else if (col > 0) {
+    ss << "_skipped" << col;
+  }
   return ss.str();
 }
 
 #ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
-                         Combine(Range(0, 4),
-                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, 16)),
-                         getdslashtestname);
+#define N_PARTITIONS 16
 #else
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
+#define N_PARTITIONS 1
+#endif
+
+// regular tests
+INSTANTIATE_TEST_SUITE_P(Regular, DslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 ::testing::Values(0)),
+                                 Range(0, N_PARTITIONS), ::testing::Values(0), ::testing::Values(0)),
                          getdslashtestname);
+
+#if QUDA_DOMAIN_DECOMPOSITION > 0
+#define N_DD_TESTS 3
+
+// DD tests
+INSTANTIATE_TEST_SUITE_P(DD, DslashTest,
+                         Combine(Range(0, 4),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                 Range(0, N_PARTITIONS), Range(1, N_DD_TESTS), Range(0, 4)),
+                         getdslashtestname);
+
 #endif
+
+#undef N_PARTITIONS
+#undef N_DD_TESTS

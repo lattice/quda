@@ -72,7 +72,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistApply {
 
     WilsonCloverHasenbuschTwistApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
@@ -81,8 +82,8 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, recon> arg(out, in, halo, U, A, a, b, x, parity, dagger,
-                                                                     comm_override);
+      WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, x, parity,
+                                                                            dagger, comm_override);
       WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }

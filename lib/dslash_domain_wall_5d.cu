@@ -64,7 +64,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall5DApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall5DApply {
 
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
@@ -72,8 +72,8 @@ namespace quda
     {
       constexpr int nDim = 5;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger,
-                                                      comm_override);
+      DomainWall5DArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger,
+                                                             comm_override);
       DomainWall5D<decltype(arg)> dwf(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
     }

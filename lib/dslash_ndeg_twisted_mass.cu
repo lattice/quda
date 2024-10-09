@@ -52,7 +52,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct NdegTwistedMassApply {
 
     NdegTwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, double c,
@@ -60,7 +60,8 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, b, c, x, parity, dagger, comm_override);
+      NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, b, c, x, parity, dagger,
+                                                                comm_override);
       NdegTwistedMass<decltype(arg)> twisted(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
     }

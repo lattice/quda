@@ -51,7 +51,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedMassApply {
 
     TwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, int parity,
@@ -59,7 +59,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, halo, U, a, b, x, parity, dagger, comm_override);
+      TwistedMassArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, b, x, parity, dagger, comm_override);
       TwistedMass<decltype(arg)> twisted(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
     }

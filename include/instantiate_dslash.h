@@ -5,6 +5,7 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <instantiate.h>
+#include <domain_decomposition_helper.cuh>
 
 namespace quda
 {
@@ -16,28 +17,52 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
+            int nColor, typename DDArg, typename... Args>
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
       if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
-        Apply<Float, nColor, Recon::recon[0]>(out, in, x, U, args...);
+        Apply<Float, nColor, DDArg, Recon::recon[0]>(out, in, x, U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
     } else if (U.Reconstruct() == Recon::recon[1]) {
       if constexpr (is_enabled<QUDA_RECONSTRUCT_12>())
-        Apply<Float, nColor, Recon::recon[1]>(out, in, x, U, args...);
+        Apply<Float, nColor, DDArg, Recon::recon[1]>(out, in, x, U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
     } else if (U.Reconstruct() == Recon::recon[2]) {
       if constexpr (is_enabled<QUDA_RECONSTRUCT_8>())
-        Apply<Float, nColor, Recon::recon[2]>(out, in, x, U, args...);
+        Apply<Float, nColor, DDArg, Recon::recon[2]>(out, in, x, U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
     } else {
       errorQuda("Unsupported reconstruct type %d", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the domain decomposition type
+     @param[out] out Output result field
+     @param[in] in Input field
+     @param[in] U Gauge field
+     @param[in] args Additional arguments for different dslash kernels
+  */
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float,
+            int nColor, typename... Args>
+  inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
+  {
+    if (out.DD().type == QUDA_DD_NO and in.DD().type == QUDA_DD_NO) {
+      instantiate<Apply, Recon, Float, 3, DDNo>(out, in, x, U, args...);
+    } else if (out.DD().type == QUDA_DD_RED_BLACK or in.DD().type == QUDA_DD_RED_BLACK) {
+      if constexpr (is_enabled(QUDA_DD_RED_BLACK))
+        instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, x, U, args...);
+      else
+        errorQuda("QUDA_DOMAIN_DECOMPOSITION=%d does not enable RedBlack", QUDA_DOMAIN_DECOMPOSITION);
+    } else {
+      errorQuda("Unsupported DD type %d\n", out.DD().type);
     }
   }
 
@@ -48,7 +73,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
@@ -66,7 +91,8 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
@@ -104,7 +130,8 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
   void instantiatePreconditioner(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {

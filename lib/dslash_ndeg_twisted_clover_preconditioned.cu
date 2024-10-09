@@ -93,35 +93,36 @@ namespace quda
         return bytes;
       }
     };
-  
-  template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedCloverPreconditionedApply {
 
-    NdegTwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                         cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
-                                         const CloverField &A, double a, double b, double c, bool xpay, int parity,
-                                         bool dagger, const int *comm_override, TimeProfile &profile)
+    template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+    struct NdegTwistedCloverPreconditionedApply {
+
+      NdegTwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                           cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
+                                           const CloverField &A, double a, double b, double c, bool xpay, int parity,
+                                           bool dagger, const int *comm_override, TimeProfile &profile)
+      {
+        constexpr int nDim = 4;
+        auto halo = ColorSpinorField::create_comms_batch(in);
+        NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, c, xpay, x,
+                                                                                  parity, dagger, comm_override);
+        NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      }
+    };
+
+    void ApplyNdegTwistedCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                              const GaugeField &U, const CloverField &A, double a, double b, double c,
+                                              bool xpay, cvector_ref<const ColorSpinorField> &x, int parity,
+                                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
-      constexpr int nDim = 4;
-      auto halo = ColorSpinorField::create_comms_batch(in);
-      NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, recon> arg(out, in, halo, U, A, a, b, c, xpay, x, parity,
-                                                                         dagger, comm_override);
-      NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
+        instantiate<NdegTwistedCloverPreconditionedApply>(out, in, x, U, A, a, b, c, xpay, parity, dagger,
+                                                          comm_override, profile);
+      } else {
+        errorQuda("Non-degenerate preconditioned twisted-clover operator has not been built");
+      }
     }
-  };
 
-  void ApplyNdegTwistedCloverPreconditioned(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                            const GaugeField &U, const CloverField &A, double a, double b, double c,
-                                            bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-                                            const int *comm_override, TimeProfile &profile)
-  {
-    if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
-      instantiate<NdegTwistedCloverPreconditionedApply>(out, in, x, U, A, a, b, c, xpay, parity, dagger, comm_override,
-                                                        profile);
-    } else {
-      errorQuda("Non-degenerate preconditioned twisted-clover operator has not been built");
-    }
-  }
-  
 } // namespace quda
 

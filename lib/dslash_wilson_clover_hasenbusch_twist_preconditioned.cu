@@ -117,7 +117,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
 
     WilsonCloverHasenbuschTwistPCNoClovInvApply(cvector_ref<ColorSpinorField> &out,
                                                 cvector_ref<const ColorSpinorField> &in,
@@ -127,7 +128,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, false>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, false>;
       ArgType arg(out, in, halo, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in, halo);
 
@@ -265,7 +266,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistPCClovInvApply {
 
     WilsonCloverHasenbuschTwistPCClovInvApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                               cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
@@ -274,7 +276,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, true>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, true>;
       ArgType arg(out, in, halo, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);

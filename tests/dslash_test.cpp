@@ -30,6 +30,12 @@ protected:
       printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
                  grid_partition[3]);
     }
+
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
@@ -63,7 +69,7 @@ TEST_F(DslashTest, verify)
 {
   if (!verify_results) GTEST_SKIP();
 
-  dslash_test_wrapper.dslashRef();
+  if (not dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.dslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();
@@ -89,6 +95,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   add_eofa_option_group(app);
+  add_dd_option_group(app);
   add_comms_option_group(app);
 
   try {

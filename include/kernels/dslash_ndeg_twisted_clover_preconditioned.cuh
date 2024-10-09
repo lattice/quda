@@ -7,10 +7,10 @@
 
 namespace quda
 {
-  
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-    struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
     
@@ -27,7 +27,8 @@ namespace quda
                                        const ColorSpinorField &halo, const GaugeField &U, const CloverField &A,
                                        double a, double b, double c, bool xpay, cvector_ref<const ColorSpinorField> &x,
                                        int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
+                                                          comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a),
@@ -37,7 +38,7 @@ namespace quda
     {
       checkPrecision(U, A);
       checkLocation(U, A);
-      }
+    }
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -70,12 +71,15 @@ namespace quda
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
+      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        return;
+      }
 
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-
-      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
@@ -142,7 +146,7 @@ namespace quda
         Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         tmp.toNonRel(); // switch back to non-chiral basis
 
-        if (xpay) {
+        if (xpay and not arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {

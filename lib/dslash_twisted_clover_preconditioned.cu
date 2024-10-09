@@ -112,7 +112,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct TwistedCloverPreconditionedApply {
 
     TwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C,
@@ -121,7 +122,8 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      TwistedCloverArg<Float, nColor, nDim, recon> arg(out, in, halo, U, C, a, b, xpay, x, parity, dagger, comm_override);
+      TwistedCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, C, a, b, xpay, x, parity, dagger,
+                                                              comm_override);
       TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
     }

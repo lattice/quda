@@ -48,7 +48,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_u> struct StaggeredApply {
     StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, int parity, bool dagger,
                    const int *comm_override, TimeProfile &profile)
@@ -60,7 +60,7 @@ namespace quda
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC
           || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
         if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
-          StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
+          StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
@@ -70,7 +70,7 @@ namespace quda
         }
       } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
         if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
-          StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
+          StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 

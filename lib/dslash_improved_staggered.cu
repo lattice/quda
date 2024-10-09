@@ -151,7 +151,7 @@ namespace quda
 
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
     ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                            cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
@@ -161,8 +161,8 @@ namespace quda
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity, dagger,
-                                                                        comm_override);
+      StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity,
+                                                                               dagger, comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
       dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
     }

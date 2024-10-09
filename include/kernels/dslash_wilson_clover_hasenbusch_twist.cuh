@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct WilsonCloverHasenbuschTwistArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct WilsonCloverHasenbuschTwistArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
 
     typedef typename clover_mapper<Float, length>::type C;
@@ -23,7 +23,7 @@ namespace quda
                                    const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a,
                                    double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                    const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
@@ -60,10 +60,17 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
+
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (mykernel_type == INTERIOR_KERNEL) {
+      if (mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         x.toRel(); // switch to chiral basis
 
