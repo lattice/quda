@@ -51,8 +51,8 @@ namespace quda
   /**
      @brief Generate a Krylov space in a given basis
      @param[in] diracm Dirac matrix used to generate the Krylov space
-     @param[out] Ap dirac matrix times the Krylov basis vector sets
-     @param[in,out] p Krylov basis vector sest; assumes p[0] is in place
+     @param[out] Ap Dirac matrix times the Krylov basis vector sets
+     @param[in,out] p Krylov basis vector set; assumes p[0] is in place
      @param[in] n_krylov Size of krylov space
      @param[in] basis Basis type
      @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
