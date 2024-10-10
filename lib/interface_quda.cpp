@@ -1427,7 +1427,7 @@ void endQuda(void)
 
 namespace quda {
 
-  void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     double kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -1542,7 +1542,7 @@ namespace quda {
     diracParam.use_mobius_fused_kernel = inv_param->use_mobius_fused_kernel;
   }
 
-  void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1560,7 +1560,7 @@ namespace quda {
                 inv_param->cuda_prec_sloppy);
   }
 
-  void setDiracRefineParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracRefineParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1579,7 +1579,7 @@ namespace quda {
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
-  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc, bool comms)
+  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc, bool comms)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1610,7 +1610,7 @@ namespace quda {
                 inv_param->cuda_prec_precondition);
   }
 
-  void setDiracEigParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracEigParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc, bool use_smeared_gauge)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1618,6 +1618,20 @@ namespace quda {
       diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatExtended : gaugeExtended;
       diracParam.fatGauge = gaugeFatExtended;
       diracParam.longGauge = gaugeLongExtended;
+    } else if (use_smeared_gauge) {
+      if (!gaugeSmeared) errorQuda("No smeared gauge field present");
+      if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) {
+        if (gaugeSmeared->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {
+          GaugeFieldParam gauge_param(*gaugePrecise);
+          GaugeField gaugeEig(gauge_param);
+          copyExtendedGauge(gaugeEig, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+          gaugeEig.exchangeGhost();
+          std::swap(gaugeEig, *gaugeSmeared);
+        }
+        diracParam.gauge = gaugeSmeared;
+      } else {
+        errorQuda("Smeared gauge field not supported for operator %d", inv_param->dslash_type);
+      }
     } else {
       diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatEigensolver : gaugeEigensolver;
       diracParam.fatGauge = gaugeFatEigensolver;
@@ -1639,7 +1653,7 @@ namespace quda {
                 inv_param->cuda_prec_eigensolver);
   }
 
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, bool pc_solve)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1656,8 +1670,7 @@ namespace quda {
     dPre = Dirac::create(diracPreParam);
   }
 
-  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
-                             const bool pc_solve)
+  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, bool pc_solve)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1677,8 +1690,8 @@ namespace quda {
     dRef = Dirac::create(diracRefParam);
   }
 
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
-                          const bool pc_solve)
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, bool pc_solve,
+                          bool use_smeared_gauge)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1689,7 +1702,7 @@ namespace quda {
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
     setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
-    setDiracEigParam(diracEigParam, &param, pc_solve);
+    setDiracEigParam(diracEigParam, &param, pc_solve, use_smeared_gauge);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -2682,7 +2695,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // Create the dirac operator with a sloppy and a precon.
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
-  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve);
+  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve, eig_param->use_smeared_gauge);
   Dirac &dirac = *dEig;
   //------------------------------------------------------
 
@@ -3135,7 +3148,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // Create the dirac operator and operators for sloppy, precondition,
   // and an eigensolver
-  createDiracWithEig(d, dSloppy, dPre, dEig, *param, pc_solve);
+  createDiracWithEig(d, dSloppy, dPre, dEig, *param, pc_solve,
+                     static_cast<QudaEigParam *>(param->eig_param)->use_smeared_gauge);
 
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;

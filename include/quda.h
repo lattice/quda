@@ -9,6 +9,7 @@
  * as the Fortran interface in lib/quda_fortran.F90.
  */
 
+#include <stdbool.h> // bool support
 #include <enum_quda.h>
 #include <stdio.h> /* for FILE */
 #include <quda_define.h>
@@ -490,7 +491,7 @@ extern "C" {
     QudaBoolean preserve_deflation;
 
     /** This is where we store the deflation space.  This will point
-        to an instance of deflation_space. When a deflated solver is enabled, the deflation space will be obtained from this.  */
+        to an instance of deflation_space. When a deflated solver is enabled, the deflation space will be obtained from this. */
     void *preserve_deflation_space;
 
     /** If we restore the deflation space, this boolean indicates
@@ -499,6 +500,10 @@ extern "C" {
         than the one used to generate the space, then this should be
         false, but preserve_deflation would be true */
     QudaBoolean preserve_evals;
+
+    /** Whether to use the smeared gauge field for the Dirac operator
+        for whose eigenvalues are are computing. */
+    bool use_smeared_gauge;
 
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
