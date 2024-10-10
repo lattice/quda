@@ -950,7 +950,7 @@ namespace quda
      functionality is useful for the case where we have multiple
      temporaries in different precisions, but do not need them
      simultaneously.  Use this functionality with caution.
-     @param[out] alias The vector of aliased fields 
+     @param[out] alias The vector of aliased fields
      @param[in] v The vector of fields to alias
      @param[in] param Parameters for the alias field
   */
@@ -966,7 +966,7 @@ namespace quda
      variant is used with std::vector as opposed to vector_ref, and
      allows for correct resizing.  Use this functionality with
      caution.
-     @param[out] alias The vector of aliased fields 
+     @param[out] alias The vector of aliased fields
      @param[in] v The vector of fields to alias
      @param[in] param Parameters for the alias field
   */

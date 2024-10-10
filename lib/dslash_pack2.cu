@@ -341,7 +341,7 @@ public:
 #endif
 
     } else {
-        errorQuda("Unsupported nSpin = %d", in.Nspin());
+      errorQuda("Unsupported nSpin = %d", in.Nspin());
       }
     }
 

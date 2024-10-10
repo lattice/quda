@@ -66,7 +66,7 @@ namespace quda {
 	for (int i=0; i<k-(N-1); i+=N) {
           computeBeta(beta, Ap, i, N, k);
           updateAp(beta, Ap, i, N, k);
-	}
+        }
 
 	if (k%N != 0) { // need to update the remainder
 	  for (int r = N-1; r>0; r--) {
@@ -261,6 +261,7 @@ namespace quda {
     }
 
     auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop_hq = vector(b.size(), param.tol_hq);
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -301,7 +302,7 @@ namespace quda {
     k_break = 0;
 
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergence(r2, heavy_quark_res, stop, stop_hq) && total_iter < param.maxiter) {
 
       if (K) {
 	pushVerbosity(param.verbosity_precondition);
@@ -388,7 +389,7 @@ namespace quda {
         k_break = k;
         k = 0;
 
-        if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+        if (!convergence(r2, heavy_quark_res, stop, stop_hq)) {
           restart++; // restarting if residual is still too great
 
           PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
@@ -397,7 +398,7 @@ namespace quda {
           r2_old = r2;
 
           // prevent ending the Krylov space prematurely if other convergence criteria not met 
-          if (r2 < stop) l2_converge = true; 
+          if (r2 < stop) l2_converge = true;
         }
 
         r2_old = r2;
@@ -426,7 +427,7 @@ namespace quda {
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary("GCR", total_iter, r2, b2, stop, stop_hq);
   }
 
 } // namespace quda

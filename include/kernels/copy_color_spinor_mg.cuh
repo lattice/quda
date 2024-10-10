@@ -16,9 +16,7 @@ namespace quda {
 
     template <typename T1, typename T2>
     CopyArg(ColorSpinorField &out, const ColorSpinorField &in, T1 *Out, T2 *In) :
-      kernel_param(in.VolumeCB()),
-      out(out, 1, Out),
-      in(in, 1, In)
+      kernel_param(dim3(in.VolumeCB(), nSpin, nColor)), out(out, 1, Out), in(in, 1, In)
     {}
   };
 
@@ -27,13 +25,9 @@ namespace quda {
     constexpr CopySpinor_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb)
+    __device__ __host__ inline void operator()(int x_cb, int s, int c)
     {
-      for (int s=0; s<Arg::nSpin; s++) {
-        for (int c=0; c<Arg::nColor; c++) {
-          arg.out(0, x_cb, s, c) = arg.in(0, x_cb, s, c);
-        }
-      }
+      arg.out(0, x_cb, s, c) = arg.in(0, x_cb, s, c);
     }
   };
 

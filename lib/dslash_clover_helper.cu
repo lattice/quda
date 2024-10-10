@@ -125,7 +125,7 @@ namespace quda {
     long long bytes() const {
       long long rtn = out.Bytes() + in.Bytes() + in.size() * clover.Bytes() / (3 - in.SiteSubset());
       if (twist == QUDA_TWIST_GAMMA5_INVERSE && !clover::dynamic_inverse())
-	rtn += in.size() * clover.Bytes() / (3 - in.SiteSubset());
+        rtn += in.size() * clover.Bytes() / (3 - in.SiteSubset());
       return rtn;
     }
   };

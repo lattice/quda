@@ -18,8 +18,8 @@ namespace quda
 
   using namespace blas;
 
-  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param) :
+  PCG::PCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           const DiracMatrix &matEig, SolverParam &param) :
     Solver(mat, matSloppy, matPrecon, matEig, param), K(nullptr), Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
@@ -30,8 +30,8 @@ namespace quda
     K = createPreconditioner(matPrecon, matPrecon, matPrecon, matEig, param, Kparam);
   }
 
-  PreconCG::PreconCG(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param) :
+  PCG::PCG(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+           const DiracMatrix &matEig, SolverParam &param) :
     Solver(mat, matSloppy, matPrecon, matEig, param), K(nullptr), Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
@@ -39,7 +39,7 @@ namespace quda
     K = wrapExternalPreconditioner(K_);
   }
 
-  PreconCG::~PreconCG()
+  PCG::~PCG()
   {
     getProfile().TPSTART(QUDA_PROFILE_FREE);
 
@@ -49,84 +49,80 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::create(ColorSpinorField &x, const ColorSpinorField &b)
+  void PCG::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
-      ColorSpinorParam csParam(b);
+      ColorSpinorParam csParam(b[0]);
 
-      r = ColorSpinorField(b);
-      if (K) minvr = ColorSpinorField(b);
+      resize(r, b.size(), csParam);
 
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      y = ColorSpinorField(csParam);
+      resize(y, b.size(), csParam);
 
       // create sloppy fields
       csParam.setPrecision(param.precision_sloppy);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      Ap = ColorSpinorField(csParam);
+      resize(Ap, b.size(), csParam);
 
-      x_sloppy = (!mixed() || !param.use_sloppy_partial_accumulator) ?
-        x.create_alias() : ColorSpinorField(csParam);
+      if (!mixed() || !param.use_sloppy_partial_accumulator) {
+        create_alias(x_sloppy, x);
+      } else {
+        resize(x_sloppy, b.size(), csParam);
+      }
 
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      csParam.field = &r;
-      r_sloppy = !mixed() ? r.create_alias() : ColorSpinorField(csParam);
+      if (!mixed()) {
+        create_alias(r_sloppy, r);
+      } else {
+        resize(r_sloppy, b.size(), csParam);
+      }
 
       if (K) {
-        csParam.field = &minvr;
-        minvr_sloppy = !mixed() ? minvr.create_alias() : ColorSpinorField(csParam);
+        resize(minvr_sloppy, b.size(), csParam);
 
         // create preconditioner intermediates
-        csParam.create = QUDA_NULL_FIELD_CREATE;
         csParam.setPrecision(Kparam.precision);
-        r_pre = ColorSpinorField(csParam);
+        resize(r_pre, b.size(), csParam);
         // Create minvr_pre
-        minvr_pre = ColorSpinorField(csParam);
+        resize(minvr_pre, b.size(), csParam);
       }
 
       Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
       if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline", Np);
-
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-      x_update_batch = XUpdateBatch(Np, K ? minvr_sloppy : r_sloppy, csParam);
 
       getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     }
   }
 
-  void PreconCG::solve_and_collect(ColorSpinorField &x, const ColorSpinorField &b, cvector_ref<ColorSpinorField> &v_r,
-                                   int collect_miniter, double collect_tol)
+  void PCG::solve_and_collect(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                              cvector_ref<ColorSpinorField> &v_r, int collect_miniter, double collect_tol)
   {
-    if (K) K->train_param(*this, b);
+    if (K) K->train_param(*this, b[0]);
 
-    create(x, b);
+    if (v_r.size() && x.size() > 1) errorQuda("Collect not supported for multi-RHS PCG");
 
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
-    double b2 = blas::norm2(b);
+    auto b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+    if (is_zero_src(x, b, b2)) {
       getProfile().TPSTOP(QUDA_PROFILE_INIT);
-      warningQuda("Warning: inverting on zero-field source");
-      x = b;
-      param.true_res = 0.0;
-      param.true_res_hq = 0.0;
       return;
     }
 
+    create(x, b);
+
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matEig);
+      constructDeflationSpace(b[0], matEig);
       if (deflate_compute) {
         // compute the deflation space.
         (*eig_solve)(evecs, evals);
@@ -138,22 +134,23 @@ namespace quda
       }
     }
 
-    double Anorm = 0;
+    double Anorm = 0.0;
 
     // for alternative reliable updates
     if (alternative_reliable) {
       // estimate norm for reliable updates
-      mat(r, b);
-      Anorm = sqrt(blas::norm2(r) / b2);
+      mat(r[0], b[0]);
+      Anorm = sqrt(norm2(r[0]) / b2[0]);
     }
 
     // compute initial residual
-    double r2 = 0.0;
+    vector<double> r2(b.size(), 0.0);
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // Compute r = b - A * x
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
-      if (b2 == 0) b2 = r2;
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
       // y contains the original guess.
       blas::copy(y, x);
     } else {
@@ -170,34 +167,44 @@ namespace quda
     }
 
     blas::zero(x);
-    if (&x != &x_sloppy) blas::zero(x_sloppy);
+    if (param.use_sloppy_partial_accumulator) blas::zero(x_sloppy);
+    if (r_sloppy[0].Precision() != r[0].Precision()) blas::copy(r_sloppy, r);
+
+    auto csParam(r_sloppy[0]);
+    std::vector<XUpdateBatch> x_update_batch(b.size());
+    for (auto i = 0u; i < b.size(); i++)
+      x_update_batch[i] = XUpdateBatch(Np, K ? minvr_sloppy[i] : r_sloppy[i], csParam);
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
     if (K) {
-      r_pre = r_sloppy;
+      blas::copy(r_pre, r_sloppy);
       pushVerbosity(param.verbosity_precondition);
       (*K)(minvr_pre, r_pre);
       popVerbosity();
-      minvr_sloppy = minvr_pre;
+      blas::copy(minvr_sloppy, minvr_pre);
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
-    double heavy_quark_res = 0.0;                               // heavy quark residual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x, r).z);
+    auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop_hq = std::vector(b.size(), param.tol_hq);
 
-    double beta = 0.0;
-    double pAp;
-    double rMinvr = 0;
-    double rMinvr_old = 0.0;
-    double r_new_Minvr_old = 0.0;
-    double r2_old = 0;
-    r2 = norm2(r);
+    std::vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    if (use_heavy_quark_res) {
+      auto hq = HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+    }
 
-    if (K) rMinvr = reDotProduct(r_sloppy, minvr_sloppy);
+    std::vector<double> beta(b.size(), 0.0);
+    std::vector<double> pAp(b.size(), 0.0);
+    std::vector<double> rMinvr(b.size(), 0.0);
+    std::vector<double> rMinvr_old(b.size(), 0.0);
+    std::vector<double> r_new_Minvr_old(b.size(), 0.0);
+    std::vector<double> r2_old(b.size(), 0.0);
+
+    if (K) { rMinvr = reDotProduct(r_sloppy, minvr_sloppy); }
 
     getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
@@ -221,44 +228,62 @@ namespace quda
     ru_params.hqmaxresIncrease = param.max_hq_res_increase;
     ru_params.hqmaxresRestartTotal = param.max_hq_res_restart_total;
 
-    ReliableUpdates ru(ru_params, r2);
+    ReliableUpdates ru(ru_params, r2[0]);
 
-    bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+    bool converged = convergence(r2, heavy_quark_res, stop, stop_hq);
+
+    auto get_p = [](std::vector<XUpdateBatch> &x_update_batch, bool next = false) {
+      vector_ref<ColorSpinorField> p;
+      p.reserve(x_update_batch.size());
+      for (auto &x : x_update_batch) p.push_back(next ? x.get_next_field() : x.get_current_field());
+      return p;
+    };
+
+    auto get_alpha = [](std::vector<XUpdateBatch> &x_update_batch) {
+      vector<double> alpha;
+      alpha.reserve(x_update_batch.size());
+      for (auto &x : x_update_batch) alpha.push_back(x.get_current_alpha());
+      return alpha;
+    };
 
     while (!converged && k < param.maxiter) {
+      auto p = get_p(x_update_batch);
+      auto p_next = get_p(x_update_batch, true);
+      matSloppy(Ap, p);
 
-      matSloppy(Ap, x_update_batch.get_current_field());
-
-      double sigma;
       // alternative reliable updates,
       if (alternative_reliable) {
-        double3 pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
-        pAp = pAppp.x;
-        ru.update_ppnorm(pAppp.z);
+        auto pAppp = blas::cDotProductNormA(p, Ap);
+        for (auto i = 0u; i < b.size(); i++) pAp[i] = pAppp[i].x;
+        ru.update_ppnorm(pAppp[0].z);
       } else {
-        pAp = reDotProduct(x_update_batch.get_current_field(), Ap);
+        pAp = reDotProduct(p, Ap);
       }
 
-      x_update_batch.get_current_alpha() = (K) ? rMinvr / pAp : r2 / pAp;
-      double2 cg_norm = axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, r_sloppy);
+      for (auto i = 0u; i < b.size(); i++)
+        x_update_batch[i].get_current_alpha() = K ? rMinvr[i] / pAp[i] : r2[i] / pAp[i];
+
+      auto cg_norm = axpyCGNorm(-get_alpha(x_update_batch), Ap, r_sloppy);
       // r --> r - alpha*A*p
       r2_old = r2;
-      r2 = cg_norm.x;
 
-      sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2; // use r2 if (r_k+1, r_k-1 - r_k) breaks
+      vector<double> sigma(b.size());
+      for (auto i = 0u; i < b.size(); i++) {
+        r2[i] = cg_norm[i].x;
+        sigma[i] = cg_norm[i].y >= 0.0 ? cg_norm[i].y : r2[i]; // use r2 if (r_k+1, r_k-1 - r_k) breaks
+      }
 
       if (K) rMinvr_old = rMinvr;
 
-      ru.update_rNorm(sqrt(r2));
-
-      ru.evaluate(r2_old);
+      ru.update_rNorm(sqrt(r2[0]));
+      ru.evaluate(r2_old[0]);
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) ru.set_updateX();
+      if (convergence(r2, heavy_quark_res, stop, stop_hq) && param.delta >= param.tol) ru.set_updateX();
 
-      if (collect > 0 && k > collect_miniter && r2 < collect_tol * collect_tol * b2) {
-        v_r[v_r.size() - collect] = r_sloppy;
-        logQuda(QUDA_VERBOSE, "Collecting r %2d: r2 / b2 = %12.8e, k = %5d\n", collect, sqrt(r2 / b2), k);
+      if (collect > 0 && k > collect_miniter && r2[0] < collect_tol * collect_tol * b2[0]) {
+        blas::copy(v_r[v_r.size() - collect], r_sloppy);
+        logQuda(QUDA_VERBOSE, "Collecting r %2d: r2 / b2 = %12.8e, k = %5d\n", collect, sqrt(r2[0] / b2[0]), k);
         collect--;
       }
 
@@ -277,35 +302,36 @@ namespace quda
           minvr_sloppy = minvr_pre;
           rMinvr = reDotProduct(r_sloppy, minvr_sloppy);
 
-          beta = (rMinvr - r_new_Minvr_old) / rMinvr_old;
+          for (auto i = 0u; i < b.size(); i++) beta[i] = (rMinvr[i] - r_new_Minvr_old[i]) / rMinvr_old[i];
         } else {
-          beta = sigma / r2_old; // use the alternative beta computation
+          for (auto i = 0u; i < b.size(); i++) beta[i] = sigma[i] / r2_old[i]; // use the alternative beta computation
         }
 
         if (Np == 1) {
-          axpyZpbx(x_update_batch.get_current_alpha(), x_update_batch.get_current_field(), x_sloppy,
-                   K ? minvr_sloppy : r_sloppy, beta);
+          axpyZpbx(get_alpha(x_update_batch), p, x_sloppy, K ? minvr_sloppy : r_sloppy, beta);
         } else {
-          if (x_update_batch.is_container_full()) { x_update_batch.accumulate_x(x_sloppy); }
-          blas::xpayz(K ? minvr_sloppy : r_sloppy, beta, x_update_batch.get_current_field(),
-                      x_update_batch.get_next_field());
+          for (auto i = 0u; i < b.size(); i++) {
+            if (x_update_batch[i].is_container_full()) x_update_batch[i].accumulate_x(x_sloppy[i]);
+          }
+          blas::xpayz(K ? minvr_sloppy : r_sloppy, beta, p, p_next);
         }
 
-        ru.accumulate_norm(x_update_batch.get_current_alpha());
+        ru.accumulate_norm(get_alpha(x_update_batch)[0]);
 
       } else { // reliable update
 
         // Now that we are performing reliable update, need to update x with the p's that have
         // not been used yet
-        x_update_batch.accumulate_x(x_sloppy);
-        x_update_batch.reset_next();
-
+        for (auto i = 0u; i < b.size(); i++) {
+          x_update_batch[i].accumulate_x(x_sloppy[i]);
+          x_update_batch[i].reset_next();
+        }
         xpy(x_sloppy, y);          // y += x
         // Now compute r
         mat(r, y);
         r2 = xmyNorm(b, r);
 
-        if (param.deflate && sqrt(r2) < ru.maxr_deflate * param.tol_restart) {
+        if (param.deflate && sqrt(r2[0]) < ru.maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
           eig_solve->deflate(y, r, evecs, evals, true);
 
@@ -313,7 +339,7 @@ namespace quda
           mat(r, y);
           r2 = blas::xmyNorm(b, r);
 
-          ru.update_maxr_deflate(r2);
+          ru.update_maxr_deflate(r2[0]);
         }
 
         copy(r_sloppy, r);
@@ -321,11 +347,13 @@ namespace quda
 
         bool L2breakdown = false;
         double L2breakdown_eps = 0;
-        if (ru.reliable_break(r2, stop, L2breakdown, L2breakdown_eps)) { break; }
+        if (ru.reliable_break(r2[0], stop[0], L2breakdown, L2breakdown_eps)) { break; }
 
-        ru.update_norm(r2, y);
+        ru.update_norm(r2[0], y[0]);
+        ru.reset(r2[0]);
 
-        ru.reset(r2);
+        auto p = get_p(x_update_batch);
+        auto p_next = get_p(x_update_batch, true);
 
         if (K) {
           // can fuse these two kernels
@@ -340,31 +368,35 @@ namespace quda
           minvr_sloppy = minvr_pre;
           rMinvr = reDotProduct(r_sloppy, minvr_sloppy);
 
-          beta = (rMinvr - r_new_Minvr_old) / rMinvr_old;
+          for (auto i = 0u; i < b.size(); i++) beta[i] = (rMinvr[i] - r_new_Minvr_old[i]) / rMinvr_old[i];
         } else {                        // standard CG - no preconditioning
 
           // explicitly restore the orthogonality of the gradient vector
-          double rp = reDotProduct(r_sloppy, x_update_batch.get_current_field()) / (r2);
-          axpy(-rp, r_sloppy, x_update_batch.get_current_field());
+          auto rp = cDotProduct(r_sloppy, p);
+          for (auto i = 0u; i < b.size(); i++) rp[i] /= r2[i];
+          caxpy(-rp, r_sloppy, p);
 
-          beta = r2 / r2_old;
+          for (auto i = 0u; i < b.size(); i++) beta[i] = r2[i] / r2_old[i];
         }
-        xpayz(K ? minvr_sloppy : r_sloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
+        xpayz(K ? minvr_sloppy : r_sloppy, beta, p, p_next);
       }
 
-      ++k;
+      k++;
       PrintStats("PCG", k, r2, b2, heavy_quark_res);
 
-      converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
-      // if we have converged and need to update any trailing solutions
-      if ((converged || k == param.maxiter) && ru.steps_since_reliable > 0 && !x_update_batch.is_container_full()) {
-        x_update_batch.accumulate_x(x_sloppy);
-      }
+      converged = convergence(r2, heavy_quark_res, stop, stop_hq);
 
-      if (ru.steps_since_reliable == 0) {
-        x_update_batch.reset();
-      } else {
-        ++x_update_batch;
+      // if we have converged and need to update any trailing solutions
+      for (auto i = 0u; i < b.size(); i++) {
+        if ((converged || k == param.maxiter) && ru.steps_since_reliable > 0 && !x_update_batch[i].is_container_full()) {
+          x_update_batch[i].accumulate_x(x_sloppy[i]);
+        }
+
+        if (ru.steps_since_reliable == 0) {
+          x_update_batch[i].reset();
+        } else {
+          ++x_update_batch[i];
+        }
       }
     }
 
@@ -383,8 +415,8 @@ namespace quda
 
     // compute the true residual
     mat(r, x);
-    double true_res = xmyNorm(b, r);
-    param.true_res = sqrt(true_res / b2);
+    auto true_res = xmyNorm(b, r);
+    for (auto i = 0u; i < b.size(); i++) param.true_res[i] = sqrt(true_res[i] / b2[i]);
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }

@@ -570,7 +570,6 @@ namespace quda
       for (auto &v : multiplied) v *= u;
       return multiplied;
     }
-
   };
 
   template <class T, class U> vector<U> operator*(const T &a, const vector<U> &b) { return b * a; }

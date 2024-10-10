@@ -9,6 +9,7 @@
 #include "host_utils.h"
 #include <command_line_params.h>
 #include "misc.h"
+#include "test.h"
 #include "util_quda.h"
 #include "llfat_quda.h"
 #include <unitarization_links.h>

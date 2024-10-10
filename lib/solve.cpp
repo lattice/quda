@@ -8,6 +8,16 @@ namespace quda
   // each entry is one p
   std::vector<std::vector<ColorSpinorField>> chronoResident(QUDA_MAX_CHRONO);
 
+  void flushChrono(int i)
+  {
+    if (i >= QUDA_MAX_CHRONO) errorQuda("Requested chrono index %d is outside of max %d", i, QUDA_MAX_CHRONO);
+
+    if (i >= 0)
+      chronoResident[i].clear();
+    else
+      for (auto i = 0; i < QUDA_MAX_CHRONO; i++) chronoResident[i].clear();
+  }
+
   void massRescale(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool for_multishift)
   {
     double kappa5 = (0.5 / (5.0 + param.m5));

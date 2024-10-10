@@ -60,175 +60,6 @@ namespace quda {
     if (!param.use_sloppy_partial_accumulator) create_alias(x_sloppy, x);
   }
 
-  CGNE::CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param),
-    mmdag(mat.Expose()),
-    mmdagSloppy(matSloppy.Expose()),
-    mmdagPrecon(matPrecon.Expose()),
-    mmdagEig(matEig.Expose())
-  {
-  }
-
-  void CGNE::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
-  {
-    Solver::create(x, b);
-    if (!init) {
-      ColorSpinorParam csParam(x[0]);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      resize(xe, b.size(), csParam);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      resize(ye, b.size(), csParam);
-      init = true;
-    }
-  }
-
-  cvector_ref<const ColorSpinorField> CGNE::get_residual()
-  {
-    if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
-    // CG residual will match the CGNE residual (FIXME: but only with zero initial guess?)
-    return param.use_init_guess ? xe : CG::get_residual();
-  }
-
-  // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
-  void CGNE::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
-  {
-    if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
-      return;
-    }
-
-    create(x, b);
-
-    const int iter0 = param.iter;
-    auto b2 = param.compute_true_res ? blas::norm2(b) : vector<double>(b.size(), 0.0);
-
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      // compute initial residual
-      mmdag.Expose()->M(xe, x);
-
-      if (param.compute_true_res) {
-        bool is_zero = true;
-        for (auto i = 0u; i < b2.size(); i++) {
-          is_zero = is_zero || b2[i] == 0.0;
-          if (b2[i] == 0.0 && !is_zero) errorQuda("Mixture of zero and non-zero sources not supported");
-        }
-        if (is_zero) b2 = blas::xmyNorm(b, xe);
-      } else {
-        blas::xpay(b, -1.0, xe);
-      }
-
-      // compute solution to residual equation
-      CG::operator()(ye, xe);
-
-      mmdag.Expose()->Mdag(xe, ye);
-
-      // compute full solution
-      blas::xpy(xe, x);
-    } else {
-      CG::operator()(ye, b);
-      mmdag.Expose()->Mdag(x, ye);
-    }
-
-    if (param.compute_true_res || (param.use_init_guess && param.return_residual)) {
-      // compute the true residual
-      mmdag.Expose()->M(xe, x);
-      blas::xpay(b, -1.0, xe); // xe now holds the residual
-
-      vector<double> r2(b2.size());
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        auto hq = blas::HeavyQuarkResidualNorm(x, xe);
-        for (auto i = 0u; i < b.size(); i++) {
-          param.true_res_hq[i] = sqrt(hq[i].z);
-          r2[i] = hq[i].y;
-        }
-      } else {
-        r2 = blas::norm2(xe);
-      }
-      for (auto i = 0u; i < b.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
-      PrintSummary("CGNE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
-    }
-  }
-
-  CGNR::CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-             const DiracMatrix &matEig, SolverParam &param) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param),
-    mdagm(mat.Expose()),
-    mdagmSloppy(matSloppy.Expose()),
-    mdagmPrecon(matPrecon.Expose()),
-    mdagmEig(matEig.Expose())
-  {
-  }
-
-  void CGNR::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
-  {
-    Solver::create(x, b);
-    if (!init) {
-      ColorSpinorParam csParam(b[0]);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      resize(br, b.size(), csParam);
-      init = true;
-    }
-  }
-
-  cvector_ref<const ColorSpinorField> CGNR::get_residual()
-  {
-    if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
-    return br;
-  }
-
-  // CGNR: Mdag M x = Mdag b is solved.
-  void CGNR::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
-  {
-    if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
-      return;
-    }
-
-    create(x, b);
-
-    const int iter0 = param.iter;
-    vector<double> b2(b.size(), 0.0);
-    if (param.compute_true_res) {
-      b2 = blas::norm2(b);
-      bool is_zero = true;
-      for (auto i = 0u; i < b2.size(); i++) {
-        is_zero = is_zero && b2[i] == 0.0;
-        if (b2[i] == 0.0 && !is_zero) errorQuda("Mixture of zero and non-zero sources not supported");
-      }
-      if (is_zero) { // compute initial residual vector
-        mdagm.Expose()->M(br, x);
-        b2 = blas::norm2(br);
-      }
-    }
-
-    mdagm.Expose()->Mdag(br, b);
-    CG::operator()(x, br);
-
-    if (param.compute_true_res || param.return_residual) {
-      // compute the true residual
-      mdagm.Expose()->M(br, x);
-      blas::xpay(b, -1.0, br); // br now holds the residual
-
-      if (param.compute_true_res) {
-        vector<double> r2(b.size());
-        if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          auto hq = blas::HeavyQuarkResidualNorm(x, br);
-          for (auto i = 0u; i < b.size(); i++) {
-            param.true_res_hq[i] = sqrt(hq[i].z);
-            r2[i] = hq[i].y;
-          }
-        } else {
-          r2 = blas::norm2(br);
-        }
-        for (auto i = 0u; i < b.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
-        PrintSummary("CGNR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
-      }
-    }
-  }
-
   void CG::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                       cvector_ref<const ColorSpinorField> &p_init, cvector<double> &r2_old_init)
   {
@@ -240,7 +71,7 @@ namespace quda {
     }
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
-    if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
+    if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline", Np);
 
     // Determine whether or not we're doing a heavy quark residual
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -255,8 +86,6 @@ namespace quda {
     // just in case HQ residual solves are split into a separate file
     if (use_heavy_quark_res) errorQuda("The \"vanilla\" CG solver does not support HQ residual solves");
 
-    // whether to select alternative reliable updates
-    bool alternative_reliable = param.use_alternative_reliable;
     /**
       When CG is used as a preconditioner, and we disable the `advanced features`, these features are turned off:
       - Reliable updates
@@ -268,7 +97,10 @@ namespace quda {
 
     if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
-    vector<double> b2 = blas::norm2(b);
+    // whether to select alternative reliable updates
+    bool alternative_reliable = param.use_alternative_reliable;
+
+    auto b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) {
@@ -334,8 +166,7 @@ namespace quda {
     if (param.use_sloppy_partial_accumulator) blas::zero(x_sloppy);
     blas::copy(r_sloppy, r);
 
-    ColorSpinorParam csParam(r_sloppy[0]);
-    csParam.create = QUDA_NULL_FIELD_CREATE;
+    auto csParam(r_sloppy[0]);
     std::vector<XUpdateBatch> x_update_batch(b.size());
     for (auto i = 0u; i < b.size(); i++)
       x_update_batch[i] = XUpdateBatch(Np, !p_init[i].empty() ? p_init[i] : r_sloppy[i], csParam);
@@ -368,7 +199,7 @@ namespace quda {
 
     int k = 0;
 
-    PrintStats("CG", k, r2, b2, 0.0);
+    PrintStats("CG", k, r2, b2);
 
     bool converged = convergenceL2(r2, stop);
 
@@ -406,7 +237,6 @@ namespace quda {
       matSloppy(Ap, p);
 
       vector<double> sigma(b.size());
-      ;
 
       bool breakdown = false;
       if (advanced_feature && param.pipeline) {
@@ -481,13 +311,15 @@ namespace quda {
             errorQuda("Not implemented pipelined CG with Np > 1");
           }
         } else {
+
           if (Np == 1) {
             // with Np=1 we just run regular fusion between x and p updates
             blas::axpyZpbx(get_alpha(x_update_batch), p, x_sloppy, r_sloppy, beta);
           } else {
 
-            for (auto i = 0u; i < b.size(); i++)
-              if (x_update_batch[i].is_container_full()) { x_update_batch[i].accumulate_x(x_sloppy[i]); }
+            for (auto i = 0u; i < b.size(); i++) {
+              if (x_update_batch[i].is_container_full()) x_update_batch[i].accumulate_x(x_sloppy[i]);
+            }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
             blas::xpayz(r_sloppy, beta, p, p_next);
@@ -502,9 +334,8 @@ namespace quda {
           x_update_batch[i].accumulate_x(x_sloppy[i]);
           x_update_batch[i].reset_next();
         }
-        blas::copy(x, x_sloppy); // nop when these pointers alias
+        blas::xpy(x_sloppy, y); // swap these around?
 
-        blas::xpy(x, y); // swap these around?
         mat(r, y);       //  here we can use x as tmp
         r2 = blas::xmyNorm(b, r);
 
@@ -547,7 +378,7 @@ namespace quda {
       breakdown = false;
       k++;
 
-      PrintStats("CG", k, r2, b2, 0.0);
+      PrintStats("CG", k, r2, b2);
       // check convergence
       converged = convergenceL2(r2, stop);
 
@@ -590,7 +421,7 @@ namespace quda {
       }
     }
 
-    PrintSummary("CG", k, r2, b2, stop, 0.0);
+    PrintSummary("CG", k, r2, b2, stop);
 
     if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -670,6 +501,7 @@ namespace quda {
     getProfile().TPSTART(QUDA_PROFILE_PREAMBLE);
 
     auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop_hq = std::vector(b.size(), param.tol_hq);
 
     auto get_hq_res = [](cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &r) {
       auto hq_nrm = blas::HeavyQuarkResidualNorm(x, r);
@@ -698,7 +530,7 @@ namespace quda {
 
     PrintStats("CG", k, r2, b2, hq_res);
 
-    bool converged = convergence(r2, hq_res, stop, param.tol_hq);
+    bool converged = convergence(r2, hq_res, stop, stop_hq);
 
     // Various parameters related to restarts
 
@@ -770,7 +602,7 @@ namespace quda {
       // we're still checking the L2 norm, or if that has converged/broken down and we're
       // now looking at the HQ residual.
 
-      if (!L2breakdown && (L2_required || convergenceL2(hq_res, param.tol_hq))) {
+      if (!L2breakdown && (L2_required || convergenceL2(r2, stop))) {
         // L2 based reliable update
 
         // If the iterated residual norm has gone above the most recent "baseline" norm,
@@ -802,10 +634,10 @@ namespace quda {
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if (convergence(r2, hq_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = true;
+      if (convergence(r2, hq_res, stop, stop_hq) && param.delta >= param.tol) updateX = true;
 
       // force a reliable update based on the HQ residual if L2 breakdown has already happened
-      if (L2breakdown && (convergenceHQ(hq_res, param.tol_hq) || (r2[0] / b2[0]) < hq_res_stall_check)
+      if (L2breakdown && (convergenceHQ(hq_res, stop_hq) || (r2[0] / b2[0]) < hq_res_stall_check)
           && param.delta >= param.tol)
         updateX = true;
 
@@ -981,14 +813,14 @@ namespace quda {
 
       PrintStats("CG", k, r2, b2, hq_res);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-      converged = convergence(r2, hq_res, stop, param.tol_hq);
+      converged = convergence(r2, hq_res, stop, stop_hq);
 
       // check for recent enough reliable updates of the HQ residual if we use it
 
       // L2 is converged or precision maxed out for L2
       bool L2done = L2breakdown || convergenceL2(r2, stop);
       // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-      bool HQdone = (steps_since_reliable == 0 && param.delta > 0) && convergenceHQ(hq_res, param.tol_hq);
+      bool HQdone = (steps_since_reliable == 0 && param.delta > 0) && convergenceHQ(hq_res, stop_hq);
       converged = L2done && HQdone;
     }
 
@@ -1015,7 +847,7 @@ namespace quda {
       }
     }
 
-    PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
+    PrintSummary("CG", k, r2, b2, stop, stop_hq);
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
@@ -1169,7 +1001,7 @@ namespace quda {
 
     int k = 0;
 
-    PrintStats("CG", k, r2avg / param.num_src, b2avg, 0.);
+    PrintStats("CG", k, r2avg / param.num_src, b2avg);
     bool allconverged = true;
     bool converged[QUDA_MAX_MULTI_SHIFT];
     for (int i = 0; i < param.num_src; i++) {
@@ -1299,7 +1131,7 @@ namespace quda {
       }
 
       k++;
-      PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);
+      PrintStats("CG", k, r2avg / param.num_src, b2avg);
       // check convergence
       allconverged = true;
       for (int i = 0; i < param.num_src; i++) {
@@ -1327,7 +1159,7 @@ namespace quda {
       param.true_res_offset[i] = param.true_res;
       param.true_res_hq_offset[i] = param.true_res_hq;
 
-      PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i], 0.0);
+      PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i]);
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
@@ -1885,7 +1717,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
+    PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i]);
   }
 
   getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
