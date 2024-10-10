@@ -37,10 +37,12 @@ template <typename real_t>
 #ifdef MULTI_GPU
 void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **ghostFatlink,
                               real_t **ghostLonglink, real_t *spinorField, real_t **fwd_nbr_spinor,
-                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
+                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type,
+                              int laplace3D)
 #else
 void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **, real_t **, real_t *spinorField,
-                              real_t **, real_t **, int oddBit, int daggerBit, QudaDslashType dslash_type)
+                              real_t **, real_t **, int oddBit, int daggerBit, QudaDslashType dslash_type,
+                              int laplace3D)
 #endif
 {
 #pragma omp parallel for
@@ -73,6 +75,7 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
     int offset = stag_spinor_site_size * sid;
 
     for (int dir = 0; dir < 8; dir++) {
+      if (laplace3D == dir / 2) continue; // skip dimensions if needed
 #ifdef MULTI_GPU
       const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
       real_t *fatlnk
@@ -126,7 +129,8 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
 }
 
 void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type)
+                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type,
+                 int laplace3D)
 {
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) {
@@ -161,23 +165,20 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
                              reinterpret_cast<double **>(qdp_longlink), reinterpret_cast<double **>(ghost_fatlink),
                              reinterpret_cast<double **>(ghost_longlink), static_cast<double *>(in.data()),
                              reinterpret_cast<double **>(in.fwdGhostFaceBuffer),
-                             reinterpret_cast<double **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
+                             reinterpret_cast<double **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type, laplace3D);
   } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
     staggeredDslashReference(static_cast<float *>(out.data()), reinterpret_cast<float **>(qdp_fatlink),
                              reinterpret_cast<float **>(qdp_longlink), reinterpret_cast<float **>(ghost_fatlink),
                              reinterpret_cast<float **>(ghost_longlink), static_cast<float *>(in.data()),
                              reinterpret_cast<float **>(in.fwdGhostFaceBuffer),
-                             reinterpret_cast<float **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
+                             reinterpret_cast<float **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type, laplace3D);
   }
 }
 
 void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
+              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type, int laplace3D)
 {
-  // assert sPrecision and gPrecision must be the same
-  if (in.Precision() != fat_link.Precision()) {
-    errorQuda("The spinor precision and gauge precision are not the same");
-  }
+  checkPrecision(in, fat_link);
 
   // assert we have full-parity spinors
   if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
@@ -187,11 +188,11 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
   // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
   // have the minus sign. Inverting the expected dagger convention
   // solves this discrepancy.
-  stag_dslash(out.Even(), fat_link, long_link, in.Odd(), QUDA_EVEN_PARITY, 1 - daggerBit, dslash_type);
-  stag_dslash(out.Odd(), fat_link, long_link, in.Even(), QUDA_ODD_PARITY, 1 - daggerBit, dslash_type);
+  stag_dslash(out.Even(), fat_link, long_link, in.Odd(), QUDA_EVEN_PARITY, 1 - daggerBit, dslash_type, laplace3D);
+  stag_dslash(out.Odd(), fat_link, long_link, in.Even(), QUDA_ODD_PARITY, 1 - daggerBit, dslash_type, laplace3D);
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    double kappa = 1.0 / (8 + mass);
+    double kappa = 1.0 / ((laplace3D == 3 ? 6 : 8) + mass);
     xpay(in.data(), kappa, out.data(), out.Length(), out.Precision());
   } else {
     axpy(2 * mass, in.data(), out.data(), out.Length(), out.Precision());
@@ -199,12 +200,9 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
 }
 
 void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
+                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type, int laplace3D)
 {
-  // assert sPrecision and gPrecision must be the same
-  if (in.Precision() != fat_link.Precision()) {
-    errorQuda("The spinor precision and gauge precision are not the same");
-  }
+  checkPrecision(in, fat_link);
 
   // assert we have full-parity spinors
   if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
@@ -215,15 +213,15 @@ void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const Ga
   quda::ColorSpinorField tmp(csParam);
 
   // Apply mat in sequence
-  stag_mat(tmp, fat_link, long_link, in, mass, daggerBit, dslash_type);
-  stag_mat(out, fat_link, long_link, tmp, mass, 1 - daggerBit, dslash_type);
+  stag_mat(tmp, fat_link, long_link, in, mass, daggerBit, dslash_type, laplace3D);
+  stag_mat(out, fat_link, long_link, tmp, mass, 1 - daggerBit, dslash_type, laplace3D);
 }
 
 void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                const ColorSpinorField &in, double mass, int, QudaParity parity, QudaDslashType dslash_type)
+                const ColorSpinorField &in, double mass, int, QudaParity parity, QudaDslashType dslash_type,
+                int laplace3D)
 {
-  // assert sPrecision and gPrecision must be the same
-  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precison are not the same"); }
+  checkPrecision(in, fat_link);
 
   // assert we have single-parity spinors
   if (out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || in.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
@@ -243,8 +241,8 @@ void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFi
   quda::ColorSpinorField tmp(csParam);
 
   // dagger bit does not matter
-  stag_dslash(tmp, fat_link, long_link, in, otherparity, 0, dslash_type);
-  stag_dslash(out, fat_link, long_link, tmp, parity, 0, dslash_type);
+  stag_dslash(tmp, fat_link, long_link, in, otherparity, 0, dslash_type, laplace3D);
+  stag_dslash(out, fat_link, long_link, tmp, parity, 0, dslash_type, laplace3D);
 
   double msq_x4 = mass * mass * 4;
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {

@@ -30,7 +30,8 @@ void setDims(int *);
 template <typename real_t>
 void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **ghostFatlink,
                               real_t **ghostLonglink, real_t *spinorField, real_t **fwd_nbr_spinor,
-                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type);
+                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type,
+                              int laplace3D);
 
 /**
  * @brief Apply even-odd or odd-even component of a staggered-type dslash
@@ -44,7 +45,7 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
  * @param dslash_type Dslash type
  */
 void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type);
+                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type, int laplace3D);
 
 /**
  * @brief Apply the full parity staggered-type dslash
@@ -58,7 +59,7 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
  * @param dslash_type Dslash type
  */
 void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type);
+              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type, int laplace3D);
 
 /**
  * @brief Apply the full parity staggered-type matdag_mat
@@ -72,7 +73,7 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
  * @param dslash_type Dslash type
  */
 void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type);
+                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type, int laplace3D);
 
 /**
  * @brief Apply the even-even or odd-odd preconditioned staggered dslash
@@ -87,4 +88,5 @@ void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const Ga
  * @param dslash_type Dslash type
  */
 void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                const ColorSpinorField &in, double mass, int dagger_bit, QudaParity parity, QudaDslashType dslash_type);
+                const ColorSpinorField &in, double mass, int dagger_bit, QudaParity parity, QudaDslashType dslash_type,
+                int laplace3D);

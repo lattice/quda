@@ -3149,7 +3149,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // Create the dirac operator and operators for sloppy, precondition,
   // and an eigensolver
   createDiracWithEig(d, dSloppy, dPre, dEig, *param, pc_solve,
-                     static_cast<QudaEigParam *>(param->eig_param)->use_smeared_gauge);
+                     param->eig_param ? static_cast<QudaEigParam *>(param->eig_param)->use_smeared_gauge : false);
 
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;

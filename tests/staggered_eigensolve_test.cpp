@@ -74,12 +74,6 @@ void init()
   gauge_param = newQudaGaugeParam();
   setStaggeredGaugeParam(gauge_param);
 
-  QudaGaugeSmearParam smear_param;
-  if (gauge_smear) {
-    smear_param = newQudaGaugeSmearParam();
-    setGaugeSmearParam(smear_param);
-  }
-
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator.
@@ -167,6 +161,9 @@ std::vector<double> eigensolve(test_t test_param)
 
   eig_inv_param.solution_type = eig_param.use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
+  // whether we are using the resident smeared gauge or not
+  eig_param.use_smeared_gauge = gauge_smear;
+
   if (laplace3D == 3) {
     eig_inv_param.laplace3D = laplace3D;
     eig_param.ortho_dim = laplace3D;
@@ -194,24 +191,75 @@ std::vector<double> eigensolve(test_t test_param)
 
   if (!enable_testing || (enable_testing && getVerbosity() >= QUDA_VERBOSE)) display_test_info(eig_param);
 
+  // Gauge Smearing Routines
+  if (gauge_smear) {
+    quda::host_timer_t host_timer;
+    host_timer.start(); // start the timer
+
+    QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[gauge_smear_steps / measurement_interval + 1];
+    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+      obs_param[i] = newQudaGaugeObservableParam();
+      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+      obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    }
+
+    // We here set all the problem parameters for all possible smearing types.
+    QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+    smear_param.smear_type = gauge_smear_type;
+    smear_param.n_steps = gauge_smear_steps;
+    smear_param.meas_interval = measurement_interval;
+    smear_param.alpha = gauge_smear_alpha;
+    smear_param.rho = gauge_smear_rho;
+    smear_param.epsilon = gauge_smear_epsilon;
+    smear_param.alpha1 = gauge_smear_alpha1;
+    smear_param.alpha2 = gauge_smear_alpha2;
+    smear_param.alpha3 = gauge_smear_alpha3;
+    smear_param.dir_ignore = gauge_smear_dir_ignore;
+
+    switch (smear_param.smear_type) {
+    case QUDA_GAUGE_SMEAR_APE:
+    case QUDA_GAUGE_SMEAR_STOUT:
+    case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
+    case QUDA_GAUGE_SMEAR_HYP: {
+      performGaugeSmearQuda(&smear_param, obs_param);
+      break;
+    }
+
+      // Here we use a typical use case which is different from simple smearing in that
+      // the user will want to compute the plaquette values to compute the gauge energy.
+    case QUDA_GAUGE_SMEAR_WILSON_FLOW:
+    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: {
+      for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+        obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+      }
+      performWFlowQuda(&smear_param, obs_param);
+      break;
+    }
+    default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
+    }
+
+    host_timer.stop();
+    printfQuda("Time for gauge smearing = %f\n", host_timer.last());
+  }
+
   // Vector construct START
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
   int n_eig = eig_n_conv;
   if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
-  std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
-  for (int i = 0; i < n_eig; i++) {
-    evecs[i] = quda::ColorSpinorField(cs_param);
-    host_evecs_ptr[i] = evecs[i].data();
-  }
+  std::vector<quda::ColorSpinorField> evecs(n_eig, cs_param);
+  for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
 
   // Complex eigenvalues
-  std::vector<__complex__ double> evals(eig_n_conv);
+  int n_batch = laplace3D == 3 ? eig_param.ortho_dim_size_local * comm_dim(3) : 1;
+  std::vector<__complex__ double> evals(eig_n_conv * n_batch);
   // Vector construct END
   //----------------------------------------------------------------------------
 
@@ -228,19 +276,20 @@ std::vector<double> eigensolve(test_t test_param)
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
 
   // Perform host side verification of eigenvector if requested.
-  // ...
 
   std::vector<double> residua(eig_n_conv, 0.0);
   // Perform host side verification of eigenvector if requested.
   if (verify_results) {
     for (int i = 0; i < eig_n_conv; i++) {
       if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
-        double _Complex sigma = evals[i];
+        std::vector<double _Complex> sigma(n_batch);
+        for (auto b = 0; b < n_batch; b++) sigma[b] = evals[b * eig_n_conv + i];
         residua[i] = verifyStaggeredTypeSingularVector(evecs[i], evecs[i + eig_n_conv], sigma, i, eig_param, cpuFatQDP,
-                                                       cpuLongQDP);
+                                                       cpuLongQDP, laplace3D);
       } else {
-        double _Complex lambda = evals[i];
-        residua[i] = verifyStaggeredTypeEigenvector(evecs[i], lambda, i, eig_param, cpuFatQDP, cpuLongQDP);
+        std::vector<double _Complex> lambda(n_batch);
+        for (auto b = 0; b < n_batch; b++) lambda[b] = evals[b * eig_n_conv + i];
+        residua[i] = verifyStaggeredTypeEigenvector(evecs[i], lambda, i, eig_param, cpuFatQDP, cpuLongQDP, laplace3D);
       }
     }
   }
