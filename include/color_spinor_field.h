@@ -943,6 +943,36 @@ namespace quda
   void resize(std::vector<ColorSpinorField> &v, size_t new_size, QudaFieldCreate create,
               const ColorSpinorField &src = ColorSpinorField());
 
+  /**
+     @brief Create a vector of fields that aliases another vector of
+     fields' storage.  The alias field can use a different precision
+     than this field, though it cannot be greater.  This
+     functionality is useful for the case where we have multiple
+     temporaries in different precisions, but do not need them
+     simultaneously.  Use this functionality with caution.
+     @param[out] alias The vector of aliased fields
+     @param[in] v The vector of fields to alias
+     @param[in] param Parameters for the alias field
+  */
+  void create_alias(cvector_ref<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param = ColorSpinorParam());
+
+  /**
+     @brief Create a vector of fields that aliases another vector of
+     fields' storage.  The alias field can use a different precision
+     than this field, though it cannot be greater.  This functionality
+     is useful for the case where we have multiple temporaries in
+     different precisions, but do not need them simultaneously.  This
+     variant is used with std::vector as opposed to vector_ref, and
+     allows for correct resizing.  Use this functionality with
+     caution.
+     @param[out] alias The vector of aliased fields
+     @param[in] v The vector of fields to alias
+     @param[in] param Parameters for the alias field
+  */
+  void create_alias(std::vector<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param = ColorSpinorParam());
+
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
                               void *Dst = nullptr, const void *Src = nullptr);
 

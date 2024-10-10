@@ -339,6 +339,7 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
 
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
@@ -413,6 +414,7 @@ namespace quda {
   void Transfer::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
 
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;

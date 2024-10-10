@@ -26,6 +26,7 @@
 
 #include <color_spinor_field.h>
 #include <tune_quda.h>
+#include "test.h"
 
 using namespace quda;
 
@@ -319,8 +320,10 @@ struct DslashTestWrapper {
       dirac = Dirac::create(diracParam);
 
     } else {
-      double cpu_norm = blas::norm2(spinor);
-      printfQuda("Source: CPU = %e\n", cpu_norm);
+      for (int i = 0; i < Nsrc; i++) {
+        double cpu_norm = blas::norm2(spinor[i]);
+        printfQuda("Source %d: CPU = %e\n", i, cpu_norm);
+      }
     }
   }
 

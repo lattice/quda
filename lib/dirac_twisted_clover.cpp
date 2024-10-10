@@ -125,10 +125,8 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-      sol[i] = x[i].create_alias();
-    }
+    create_alias(src, b);
+    create_alias(sol, x);
   }
 
   void DiracTwistedClover::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
@@ -295,31 +293,27 @@ namespace quda {
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      for (auto i = 0u; i < b.size(); i++) {
-        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-        sol[i] = x[i].create_alias();
-      }
+      create_alias(src, b);
+      create_alias(sol, x);
       return;
     }
 
     // we desire solution to full system
-    auto tmp = getFieldTmp(x[0].Even());
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = x[i][other_parity].create_alias();
-      sol[i] = x[i][this_parity].create_alias();
+    auto tmp = getFieldTmp(x.Even());
+    create_alias(src, x(other_parity));
+    create_alias(sol, x(this_parity));
 
-      TwistCloverInv(!symmetric ? static_cast<ColorSpinorField &>(tmp) : src[i], b[i][other_parity], other_parity);
+    TwistCloverInv(!symmetric ? tmp : src, b(other_parity), other_parity);
 
-      if (symmetric) {
-        // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
-        WilsonDslashXpay(tmp, src[i], this_parity, b[i][this_parity], kappa);
-      } else {
-        // src = b_e + k D_eo A_oo^-1 b_o
-        WilsonDslashXpay(src[i], tmp, this_parity, b[i][this_parity], kappa);
-      }
-
-      if (symmetric) TwistCloverInv(src[i], tmp, this_parity);
+    if (symmetric) {
+      // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
+      WilsonDslashXpay(tmp, src, this_parity, b(this_parity), kappa);
+    } else {
+      // src = b_e + k D_eo A_oo^-1 b_o
+      WilsonDslashXpay(src, tmp, this_parity, b(this_parity), kappa);
     }
+
+    if (symmetric) TwistCloverInv(src, tmp, this_parity);
   }
 
   void DiracTwistedCloverPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
@@ -327,13 +321,11 @@ namespace quda {
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    auto tmp = getFieldTmp(x[0].Even());
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
-      // x_o = A_oo^-1 (b_o + k D_oe x_e)
-      WilsonDslashXpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa);
-      TwistCloverInv(x[i][other_parity], tmp, other_parity);
-    }
+    auto tmp = getFieldTmp(x.Even());
+    checkFullSpinor(x, b);
+    // x_o = A_oo^-1 (b_o + k D_oe x_e)
+    WilsonDslashXpay(tmp, x(this_parity), other_parity, b(other_parity), kappa);
+    TwistCloverInv(x(other_parity), tmp, other_parity);
   }
 
   void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,

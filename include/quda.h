@@ -145,8 +145,8 @@ extern "C" {
     double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
 
     int compute_true_res; /** Whether to compute the true residual post solve */
-    double true_res; /**< Actual L2 residual norm achieved in solver */
-    double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
+    double true_res[QUDA_MAX_MULTI_SRC];    /**< Actual L2 residual norm achieved in the solver */
+    double true_res_hq[QUDA_MAX_MULTI_SRC]; /**< Actual heavy quark residual norm achieved in the solver */
     int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
     double reliable_delta_refinement; /**< Reliable update tolerance used in post multi-shift solver refinement */
@@ -278,6 +278,10 @@ extern "C" {
     int iter;                              /**< The number of iterations performed by the solver */
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
+    double energy;                         /**< The energy consumed by the solver */
+    double power;                          /**< The mean power of the solver */
+    double temp;                           /**< The mean temperature of the device for the duration of the solve */
+    double clock;                          /**< The mean clock frequency of the device for the duration of the solve */
 
     QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
@@ -550,6 +554,8 @@ extern "C" {
     int batched_rotate;
     /** For block method solvers, the block size **/
     int block_size;
+    /** The batch size used when computing eigenvalues **/
+    int compute_evals_batch_size;
     /** For block method solvers, quit after n attempts at block orthonormalisation **/
     int max_ortho_attempts;
     /** For hybrid modifeld Gram-Schmidt orthonormalisations **/
@@ -602,12 +608,6 @@ extern "C" {
     /** Whether to save eigenvectors in QIO singlefile or partfile format */
     QudaBoolean partfile;
 
-    /** The Gflops rate of the eigensolver setup */
-    double gflops;
-
-    /**< The time taken by the eigensolver setup */
-    double secs;
-
     /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
@@ -654,6 +654,9 @@ extern "C" {
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
+
+    /** Solver batch size to use in the setup phase */
+    int n_vec_batch[QUDA_MAX_MG_LEVEL];
 
     /** Number of setup iterations */
     int num_setup_iter[QUDA_MAX_MG_LEVEL];
@@ -804,12 +807,6 @@ extern "C" {
 
     /** Whether to preserve the deflation space during MG update */
     QudaBoolean preserve_deflation;
-
-    /** The Gflops rate of the multigrid solver setup */
-    double gflops;
-
-    /**< The time taken by the multigrid solver setup */
-    double secs;
 
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
@@ -1819,6 +1816,10 @@ extern "C" {
     double secs;
     /** Flops count for the smearing operations **/
     double gflops;
+    double energy; /**< The energy consumed by the smearing operations */
+    double power;  /**< The mean power of the smearing operations */
+    double temp;   /**< The mean temperature of the device for the duration of the smearing operations */
+    double clock;  /**< The mean clock frequency of the device for the duration of the smearing operations */
 
   } QudaQuarkSmearParam;
 
