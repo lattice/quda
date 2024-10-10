@@ -26,7 +26,7 @@ void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaP
  * @param kappa Kappa value for the Wilson operator
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger, QudaPrecision precision,
              QudaGaugeParam &gauge_param);
@@ -41,7 +41,7 @@ void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger, QudaPr
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void wil_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger,
                QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -59,7 +59,7 @@ void wil_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType ma
  * @param parity 0 for D_eo, 1 for D_oe
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tm_dslash(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
                QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -75,7 +75,7 @@ void tm_dslash(void *out, void **gauge, void *in, double kappa, double mu, QudaT
  * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor, int dagger,
             QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -92,7 +92,7 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwis
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tm_matpc(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
               QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -112,7 +112,7 @@ void tm_matpc(void *out, void **gauge, void *in, double kappa, double mu, QudaTw
  * @param parity 0 for D_eo, 1 for D_oe
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tmc_dslash(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                 QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision,
@@ -130,7 +130,7 @@ void tmc_dslash(void *out, void **gauge, void *clover, void *clover_inverse, voi
  * @param flavor Twist flavor type dictating whether or not the twist or inverse twist is being applied
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, QudaTwistFlavorType flavor,
              int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -149,7 +149,7 @@ void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, doub
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tmc_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
@@ -170,7 +170,7 @@ void tmc_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void
  * @param parity 0 for D_eo, 1 for D_oe
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tmc_ndeg_dslash(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                      double epsilon, QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision,
@@ -188,7 +188,7 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *clover, void *clover_inverse
  * @param epsilon Epsilon parameter for the non-degenerate term
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon, int dagger,
                   QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -208,7 +208,7 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tmc_ndeg_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                     double epsilon, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
@@ -227,7 +227,7 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *clover, void *clover_inverse,
  * @param parity 0 for D_eo, 1 for D_oe
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
                     int parity, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -243,7 +243,7 @@ void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, 
  * @param epsilon Epsilon parameter for the non-degenerate term
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int dagger,
                  QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -260,7 +260,7 @@ void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, dou
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void tm_ndeg_matpc(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
                    int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -286,7 +286,7 @@ void apply_clover(void *out, void *clover, void *in, int parity, QudaPrecision p
  * @param parity 0 for D_eo, 1 for D_oe
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void clover_dslash(void *out, void **gauge, void *clover, void *in, int parity, int dagger, QudaPrecision precision,
                    QudaGaugeParam &param);
@@ -301,7 +301,7 @@ void clover_dslash(void *out, void **gauge, void *clover, void *in, int parity, 
  * @param kappa Kappa value for the Wilson operator
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void clover_mat(void *out, void **gauge, void *clover, void *in, double kappa, int dagger, QudaPrecision precision,
                 QudaGaugeParam &gauge_param);
@@ -318,7 +318,7 @@ void clover_mat(void *out, void **gauge, void *clover, void *in, double kappa, i
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void *in, double kappa,
                   QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
@@ -334,7 +334,7 @@ void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void 
  * @param mu Mu parameter for the twist
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  * @param matpc_type Matrix preconditioning type
  */
 void clover_ht_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, int dagger,
@@ -353,7 +353,7 @@ void clover_ht_mat(void *out, void **gauge, void *clover, void *in, double kappa
  * @param matpc_type Matrix preconditioning type
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
- * @param param Gauge field parameters
+ * @param gauge_param Gauge field parameters
  */
 void clover_ht_matpc(void *out, void **gauge, void *clover, void *clover_inverse, void *in, double kappa, double mu,
                      QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);

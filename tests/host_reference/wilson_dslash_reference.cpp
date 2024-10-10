@@ -25,6 +25,19 @@ using namespace quda;
 // if dagger is one:  perform hermitian conjugate of dslash
 //
 
+/**
+ * @brief Perform a Wilson dslash operation on a spinor field
+ * 
+ * @tparam Float The floating-point type used for the computation.
+ * @param[out] res The result of the Dslash operation.
+ * @param[in] gaugeFull The full gauge field.
+ * @param[in] ghostGauge The ghost gauge field for multi-GPU computations.
+ * @param[in] spinorField The input spinor field.
+ * @param[in] fwdSpinor The forward ghost region of the spinor field
+ * @param[in] backSpinor The backward ghost region of the spinor field
+ * @param[in] parity The parity of the dslash (0 for even, 1 for odd).
+ * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
+ */
 template <typename Float>
 void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *spinorField, Float **fwdSpinor,
                      Float **backSpinor, int parity, int dagger)
