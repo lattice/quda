@@ -98,6 +98,13 @@ static const double local_gamma[5][4][4][2] = {
 };
 // clang-format on
 
+/**
+ * @brief Multiplies a spinor by a Dirac projector
+ * @tparam Float The floating point type used for the spinor
+ * @param[out] res The resulting spinor after multiplication with the projector
+ * @param[in] projIdx The index of the Dirac projector to use
+ * @param[in] spinorIn The input spinor to be multiplied by the projector
+ */
 template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
 {
   for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
@@ -117,6 +124,13 @@ template <typename Float> void multiplySpinorByDiracProjector(Float *res, int pr
   }
 }
 
+/**
+ * @brief Multiplies a spinor by a Dirac matrix
+ * @tparam Float The floating point type used for the spinor
+ * @param[out] res The resulting spinor after multiplication with the Dirac matrix
+ * @param[in] projIdx The index of the Dirac matrix to use
+ * @param[in] spinorIn The input spinor to be multiplied by the Dirac matrix
+ */
 template <typename Float> void multiplySpinorByDiracGamma(Float *res, int gammaIdx, const Float *spinorIn)
 {
   for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;

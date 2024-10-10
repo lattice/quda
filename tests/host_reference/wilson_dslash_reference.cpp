@@ -1,19 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
-#include <util_quda.h>
-
-#include <host_utils.h>
-#include <index_utils.hpp>
-#include <wilson_dslash_reference.h>
+#include <string.h>
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 
-#include <dslash_reference.h>
-#include <string.h>
-#include <gamma_reference.h>
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "util_quda.h"
+#include "wilson_dslash_reference.h"
+#include "dslash_reference.h"
+#include "gamma_reference.h"
 
 using namespace quda;
 
@@ -27,26 +25,35 @@ using namespace quda;
 // if dagger is one:  perform hermitian conjugate of dslash
 //
 
-#ifndef MULTI_GPU
-
-template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int parity, int dagger)
+template <typename Float>
+void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *spinorField, Float **fwdSpinor,
+                     Float **backSpinor, int parity, int dagger)
 {
+#pragma omp parallel for
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
-  gFloat *gaugeEven[4], *gaugeOdd[4];
+  Float *gaugeEven[4], *gaugeOdd[4];
+  Float *ghostGaugeEven[4] = { nullptr, nullptr, nullptr, nullptr };
+  Float *ghostGaugeOdd[4] = { nullptr, nullptr, nullptr, nullptr };
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
+
+    if (is_multi_gpu()) {
+      ghostGaugeEven[dir] = ghostGauge[dir];
+      ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
+    }
+
   }
 
 #pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
-    for (int dir = 0; dir < 8; dir++) {
-      gFloat *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, 1);
-      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, 1);
 
-      sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+    for (int dir = 0; dir < 8; dir++) {
+      Float *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+      const Float *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+
+      Float projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
 
@@ -62,64 +69,9 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int p
   }
 }
 
-#else
-
-template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField, sFloat **fwdSpinor,
-                     sFloat **backSpinor, int parity, int dagger)
-{
-  for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
-
-  gFloat *gaugeEven[4], *gaugeOdd[4];
-  gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
-  for (int dir = 0; dir < 4; dir++) {
-    gaugeEven[dir] = gaugeFull[dir];
-    gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
-
-    ghostGaugeEven[dir] = ghostGauge[dir];
-    ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-  }
-
-#pragma omp parallel for
-  for (int i = 0; i < Vh; i++) {
-
-    for (int dir = 0; dir < 8; dir++) {
-      gFloat *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
-
-      sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
-      int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
-      multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
-
-      for (int s = 0; s < 4; s++) {
-        if (dir % 2 == 0)
-          su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
-        else
-          su3Tmul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
-      }
-
-      sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
-    }
-  }
-}
-
-#endif
-
-#ifndef MULTI_GPU
-// this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &)
-#else
 void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaPrecision precision,
                 QudaGaugeParam &gauge_param)
-#endif
 {
-#ifndef MULTI_GPU
-  if (precision == QUDA_DOUBLE_PRECISION)
-    dslashReference((double *)out, (double **)gauge, (double *)in, parity, dagger);
-  else
-    dslashReference((float *)out, (float **)gauge, (float *)in, parity, dagger);
-#else
-
   GaugeFieldParam gauge_field_param(gauge_param, gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   gauge_field_param.location = QUDA_CPU_FIELD_LOCATION;
@@ -170,7 +122,6 @@ void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaP
                     (float **)back_nbr_spinor, parity, dagger);
   }
 
-#endif
 }
 
 // applies b*(1 + i*a*gamma_5)

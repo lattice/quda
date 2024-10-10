@@ -5,15 +5,15 @@
 #include <math.h>
 #include <complex.h>
 
-#include <quda.h>
-#include <host_utils.h>
-#include <dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
-
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 
-#include <gamma_reference.h>
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "util_quda.h"
+#include "domain_wall_dslash_reference.h"
+#include "dslash_reference.h"
+#include "gamma_reference.h"
 
 using namespace quda;
 

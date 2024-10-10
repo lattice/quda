@@ -3,16 +3,17 @@
 #include <math.h>
 #include <string.h>
 
-#include <host_utils.h>
-#include <index_utils.hpp>
-#include <misc.h>
-#include <covdev_reference.h>
-#include <dslash_reference.h>
-
 #include <quda_internal.h>
 #include <quda.h>
-#include <util_quda.h>
 #include <blas_quda.h>
+
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "misc.h"
+#include "covdev_reference.h"
+#include "dslash_reference.h"
+#include "util_quda.h"
+
 
 // covdevReference()
 //
@@ -22,17 +23,6 @@
 // if daggerBit is zero: perform ordinary covariant derivative operator
 // if daggerBit is one:  perform hermitian covariant derivative operator
 //
-template <typename Float> void display_link_internal(Float *link)
-{
-  int i, j;
-
-  for (i = 0; i < 3; i++) {
-    for (j = 0; j < 3; j++) { printf("(%10f,%10f) \t", link[i * 3 * 2 + j * 2], link[i * 3 * 2 + j * 2 + 1]); }
-    printf("\n");
-  }
-  printf("\n");
-  return;
-}
 
 template <typename sFloat, typename gFloat>
 void covdevReference(sFloat *res, gFloat **link, const sFloat *spinorField, int oddBit, int daggerBit, int mu)

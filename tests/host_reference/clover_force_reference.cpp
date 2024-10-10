@@ -8,14 +8,14 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h> // convenient quark field container
 
-#include <clover_force_reference.h>
-#include <host_utils.h>
-#include <index_utils.hpp>
-#include <misc.h>
-#include <dslash_reference.h>
-#include <wilson_dslash_reference.h>
-#include <gauge_force_reference.h>
-#include <gamma_reference.h>
+#include "clover_force_reference.h"
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "misc.h"
+#include "dslash_reference.h"
+#include "wilson_dslash_reference.h"
+#include "gauge_force_reference.h"
+#include "gamma_reference.h"
 
 #include <Eigen/Dense>
 

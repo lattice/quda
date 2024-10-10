@@ -284,9 +284,15 @@ static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Fl
 template <typename Float>
 static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
 {
-  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<Float**>(nullptr), static_cast<Float**>(nullptr), 0, 1);
+  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<Float**>(nullptr), static_cast<Float**>(nullptr), 0, nbr_distance);
 }
 
+/**
+ * @brief Compute the 4th dimension index for a given checkerboard index
+ * @param i The checkerboard index
+ * @param oddBit The odd/even bit for the index
+ * @return The 4th dimension index
+ */
 inline int x4_mg(int i, int oddBit)
 {
   int Y = fullLatticeIndex(i, oddBit);
@@ -433,6 +439,13 @@ static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Floa
                         static_cast<Float**>(nullptr), neighbor_distance, 0, site_size);
 }
 
+/**
+ * @brief Compute the 4th dimension index for a given 5-d index with or without 4D-PC
+ * @tparam type The PCType, either QUDA_5D_PC or QUDA_4D_PC
+ * @param i The 5-d index
+ * @param oddBit The odd/even bit for the index
+ * @return The 4th dimension index
+ */
 template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
 {
   int Y = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
