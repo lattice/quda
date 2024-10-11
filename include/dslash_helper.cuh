@@ -241,11 +241,12 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_> struct DslashArg {
+  template <typename Float_, int nDim_, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
     static constexpr int nDim = nDim_;
+    static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -650,8 +651,9 @@ namespace quda
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
-      kernel_param(dim3(threads_x, arg.dc.Ls, arg.nParity)),
-      arg(arg) { }
+      kernel_param(dim3(threads_x, (arg.dc.Ls + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity)), arg(arg)
+    {
+    }
   };
 
   /**
