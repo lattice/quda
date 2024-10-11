@@ -238,8 +238,9 @@ namespace quda
     }
 
     template <KernelType mykernel_type = kernel_type, int n_src_tile = Arg::n_src_tile>
-    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx_block, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx_block_, int parity)
     {
+      int src_idx_block = MAX_MULTI_RHS == 1 ? 0 : src_idx_block_;
       int src_idx = src_idx_block * Arg::n_src_tile;
       if (src_idx + n_src_tile <= arg.n_src) {
         apply<mykernel_type, n_src_tile>(idx, src_idx, parity);
