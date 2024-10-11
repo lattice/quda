@@ -88,7 +88,7 @@ namespace quda
     param.nVec = nVec;
     param.create = QUDA_NULL_FIELD_CREATE;
     param.fieldOrder = order;
-    return ColorSpinorField(param);
+    return getFieldTmp<ColorSpinorField>(param);
   }
 
   // Apply the coarse Dirac matrix to a coarse grid vector
@@ -107,9 +107,9 @@ namespace quda
                            IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
       } else {
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-        ColorSpinorField v_inA = create_color_spinor_copy(inA, csOrder);
-        ColorSpinorField v_inB = create_color_spinor_copy(inB, csOrder);
-        ColorSpinorField v_out = create_color_spinor_copy(out, csOrder);
+        auto v_inA = create_color_spinor_copy(inA, csOrder);
+        auto v_inB = create_color_spinor_copy(inB, csOrder);
+        auto v_out = create_color_spinor_copy(out, csOrder);
 
         if (dslash) { BlockTransposeForward(v_inA, inA); }
         if (clover) { BlockTransposeForward(v_inB, inB); }
