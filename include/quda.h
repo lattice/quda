@@ -61,6 +61,8 @@ extern "C" {
     QudaReconstructType reconstruct_eigensolver; /**< The recontruction type of the eigensolver gauge field */
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
+    QudaBoolean gauge_fix_compute_theta; /**< Compute theta in the gauge fixing algorithm */
+    QudaBoolean gauge_fix_use_theta;     /**< Use theta as the criterion in the gauge fixing algorithm */
 
     int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
@@ -1750,6 +1752,19 @@ extern "C" {
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
+
+  /**
+   * @brief Gauge fixing with over-relaxation.
+   * @param[in,out] rotation Rotation field g(x) to fix the gauge
+   * @param[in] gauge Gauge field U_\mu(x)
+   * @param[in] tol Torelance of the gauge fixing quality
+   * @param[in] maxiter Maximum number of iterations to perform the gauge fixing
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
+   * @param[in] omega The over-relaxation parameter, most common value is 1.5 or 1.7
+   * @param[in] param Parameters of the external fields
+   */
+  void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore, double omega,
+                                  QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

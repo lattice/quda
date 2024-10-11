@@ -106,6 +106,14 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
   P(ga_pad, INVALID_INT);
 
+#ifdef INIT_PARAM
+  P(gauge_fix_compute_theta, QUDA_BOOLEAN_TRUE);
+  P(gauge_fix_use_theta, QUDA_BOOLEAN_FALSE);
+#else
+  P(gauge_fix_compute_theta, QUDA_BOOLEAN_INVALID);
+  P(gauge_fix_use_theta, QUDA_BOOLEAN_INVALID);
+#endif
+
 #if defined INIT_PARAM
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
   P(staggered_phase_applied, 0);
