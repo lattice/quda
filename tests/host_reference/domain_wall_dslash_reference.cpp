@@ -35,6 +35,7 @@ template <QudaPCType type, typename Float>
 void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in, Float **fwdSpinor, Float **backSpinor,
                         int parity, int dagger)
 {
+#pragma omp parallel for
   for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
 
   Float *gaugeEven[4], *gaugeOdd[4];
@@ -49,9 +50,9 @@ void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in
   }
 
   for (int xs = 0; xs < Ls; xs++) {
-    int sp_idx;
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      sp_idx = i + Vh * xs;
+      int sp_idx = i + Vh * xs;
       for (int dir = 0; dir < 8; dir++) {
         int gaugeOddBit = (xs % 2 == 0 || type == QUDA_4D_PC) ? parity : (parity + 1) % 2;
 
@@ -139,6 +140,7 @@ void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm,
   Float kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
 
   constexpr int spinor_size = 4 * 3 * 2;
+#pragma omp parallel for
   for (int i = 0; i < V5h; i++) {
     for (int one_site = 0; one_site < 24; one_site++) { out[i * spinor_size + one_site] = 0.; }
     for (int dir = 8; dir < 10; dir++) {
@@ -178,6 +180,7 @@ void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm,
   }
 
   // The eofa part.
+#pragma omp parallel for
   for (int idx_cb_4d = 0; idx_cb_4d < Vh; idx_cb_4d++) {
     for (int s = 0; s < Ls; s++) {
       if (dagger == 0) {
@@ -225,6 +228,7 @@ void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, doub
 template <QudaPCType type, bool zero_initialize = false, typename Float>
 void dslashReference_5th(Float *out, Float *in, int parity, int dagger, Float mferm)
 {
+#pragma omp parallel for
   for (int i = 0; i < V5h; i++) {
     if (zero_initialize)
       for (int one_site = 0; one_site < 24; one_site++) out[i * (4 * 3 * 2) + one_site] = 0.0;
@@ -277,6 +281,7 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy((Float)(2.0 * kappa[xs]), &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (xs + 1))], 12);
         axpy((Float)Ftr[xs], &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
@@ -286,6 +291,7 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
     for (int xs = 0; xs < Ls; xs++) { Ftr[xs] = -pow(2.0 * kappa[xs], Ls - 1) * mferm * inv_Ftr[xs]; }
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy((Float)Ftr[xs], &out[24 * (i + Vh * (Ls - 1))], &out[24 * (i + Vh * xs)], 12);
         axpy((Float)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * (xs + 1))], &out[12 + 24 * (i + Vh * xs)], 12);
@@ -293,17 +299,20 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax(&out[24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[Ls - 1]), &out[24 * (i + Vh * (Ls - 1))], 12);
     }
   } else {
     // s = 0
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax(&out[24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[0]), &in[24 * (i + Vh * (Ls - 1))], 12);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy((Float)Ftr[xs], &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (Ls - 1))], 12);
         axpy((Float)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (xs + 1))], 12);
@@ -313,6 +322,7 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
     for (int xs = 0; xs < Ls; xs++) { Ftr[xs] = -pow(2.0 * kappa[xs], Ls - 1) * mferm * inv_Ftr[xs]; }
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy((Float)(2.0 * kappa[xs]), &out[24 * (i + Vh * (xs + 1))], &out[24 * (i + Vh * xs)], 12);
         axpy((Float)Ftr[xs], &out[12 + 24 * (i + Vh * (Ls - 1))], &out[12 + 24 * (i + Vh * xs)], 12);
@@ -320,6 +330,7 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[Ls - 1]), &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
     }
@@ -374,12 +385,14 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
   }
   if (dagger == 0) {
     // s = 0
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax((sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[0], (sComplex *)&in[12 + 24 * (i + Vh * (Ls - 1))], 6);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy((2.0 * kappa[xs]), (sComplex *)&out[24 * (i + Vh * xs)], (sComplex *)&out[24 * (i + Vh * (xs + 1))], 6);
         axpy(Ftr[xs], (sComplex *)&out[12 + 24 * (i + Vh * xs)], (sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], 6);
@@ -390,6 +403,7 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
 
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy(Ftr[xs], (sComplex *)&out[24 * (i + Vh * (Ls - 1))], (sComplex *)&out[24 * (i + Vh * xs)], 6);
         axpy((2.0 * kappa[xs]), (sComplex *)&out[12 + 24 * (i + Vh * (xs + 1))],
@@ -398,17 +412,20 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax((sComplex *)&out[24 * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1], (sComplex *)&out[24 * (i + Vh * (Ls - 1))], 6);
     }
   } else {
     // s = 0
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax((sComplex *)&out[24 * (i + Vh * (Ls - 1))], inv_Ftr[0], (sComplex *)&in[24 * (i + Vh * (Ls - 1))], 6);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy(Ftr[xs], (sComplex *)&out[24 * (i + Vh * xs)], (sComplex *)&out[24 * (i + Vh * (Ls - 1))], 6);
         axpy((2.0 * kappa[xs]), (sComplex *)&out[12 + 24 * (i + Vh * xs)],
@@ -420,6 +437,7 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
 
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         axpy((2.0 * kappa[xs]), (sComplex *)&out[24 * (i + Vh * (xs + 1))], (sComplex *)&out[24 * (i + Vh * xs)], 6);
         axpy(Ftr[xs], (sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], (sComplex *)&out[12 + 24 * (i + Vh * xs)], 6);
@@ -427,6 +445,7 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
+#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       ax((sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1],
          (sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], 6);
@@ -518,6 +537,7 @@ void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mfe
   sherman_morrison_fac = -0.5 / (1. + sherman_morrison_fac); // 0.5 for the spin project factor
 
   // The EOFA stuff
+#pragma omp parallel for
   for (int idx_cb_4d = 0; idx_cb_4d < Vh; idx_cb_4d++) {
     for (int s = 0; s < Ls; s++) {
       for (int sp = 0; sp < Ls; sp++) {
