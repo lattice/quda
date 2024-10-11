@@ -195,8 +195,8 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
  * @return A pointer to the offset gauge link
  */
 template <typename Float>
-static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
-                                      Float **ghostGaugeEven, Float **ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
+static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, Float **ghostGaugeEven,
+                               Float **ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
 {
   Float **gaugeField;
   int j;
@@ -259,16 +259,13 @@ static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Fl
       break;
     } // 7
 
-    default:
-      j = -1;
-      errorQuda("wrong dir");
+    default: j = -1; errorQuda("wrong dir");
     }
     gaugeField = (oddBit ? gaugeEven : gaugeOdd);
   }
 
   return &gaugeField[dir / 2][j * (3 * 3 * 2)];
 }
-
 
 /**
  * @brief Return the pointer to a gauge link as a function of an origin and an offset
@@ -284,7 +281,8 @@ static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Fl
 template <typename Float>
 static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
 {
-  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<Float**>(nullptr), static_cast<Float**>(nullptr), 0, nbr_distance);
+  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<Float **>(nullptr), static_cast<Float **>(nullptr),
+                   0, nbr_distance);
 }
 
 /**
@@ -315,9 +313,8 @@ inline int x4_mg(int i, int oddBit)
  * @return A pointer to the offset fermion field
  */
 template <typename Float>
-static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField,
-                                          Float **fwd_nbr_spinor, Float **back_nbr_spinor, int neighbor_distance,
-                                          int nFace, int site_size = 24)
+static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, Float **fwd_nbr_spinor,
+                                          Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -412,9 +409,7 @@ static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Floa
     }
     break;
   }
-  default:
-    j = -1;
-    errorQuda("ERROR: wrong dir");
+  default: j = -1; errorQuda("ERROR: wrong dir");
   }
 
   return &spinorField[j * site_size];
@@ -435,8 +430,8 @@ template <typename Float>
 static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, int neighbor_distance,
                                           int site_size = 24)
 {
-  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<Float**>(nullptr),
-                        static_cast<Float**>(nullptr), neighbor_distance, 0, site_size);
+  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<Float **>(nullptr), static_cast<Float **>(nullptr),
+                        neighbor_distance, 0, site_size);
 }
 
 /**
@@ -567,9 +562,7 @@ Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, Float *
   }
   case 8: j = neighborIndex_5d<type>(i, oddBit, +nb, 0, 0, 0, 0); break;
   case 9: j = neighborIndex_5d<type>(i, oddBit, -nb, 0, 0, 0, 0); break;
-  default:
-    j = -1;
-    errorQuda("ERROR: wrong dir");
+  default: j = -1; errorQuda("ERROR: wrong dir");
   }
 
   return &spinorField[j * site_size];
@@ -590,7 +583,5 @@ template <QudaPCType type, typename Float>
 Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int site_size = 24)
 {
   return spinorNeighbor_5d<type>(i, dir, oddBit, spinorField, static_cast<Float **>(nullptr),
-                         static_cast<Float**>(nullptr), neighbor_distance, 0, site_size);
+                                 static_cast<Float **>(nullptr), neighbor_distance, 0, site_size);
 }
-
-

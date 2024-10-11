@@ -41,10 +41,10 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
   real_t *fatlinkEven[4], *fatlinkOdd[4];
   real_t *longlinkEven[4], *longlinkOdd[4];
 
-  real_t *ghostFatlinkEven[4] = { nullptr, nullptr, nullptr, nullptr };
-  real_t *ghostFatlinkOdd[4] = { nullptr, nullptr, nullptr, nullptr };
-  real_t *ghostLonglinkEven[4] = { nullptr, nullptr, nullptr, nullptr };
-  real_t *ghostLonglinkOdd[4] = { nullptr, nullptr, nullptr, nullptr };
+  real_t *ghostFatlinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  real_t *ghostFatlinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  real_t *ghostLonglinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  real_t *ghostLonglinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
 
   for (int dir = 0; dir < 4; dir++) {
     fatlinkEven[dir] = fatlink[dir];
@@ -66,14 +66,15 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
 
     for (int dir = 0; dir < 8; dir++) {
       const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
-      real_t *fatlnk
-          = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+      real_t *fatlnk = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
       real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
-          gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
-          nullptr;
-      const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, stag_spinor_site_size);
-      const real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ? spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
-                                          stag_spinor_site_size) : nullptr;
+        gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
+        nullptr;
+      const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor,
+                                                           back_nbr_spinor, 1, nFace, stag_spinor_site_size);
+      const real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+        spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace, stag_spinor_site_size) :
+        nullptr;
 
       real_t gaugedSpinor[stag_spinor_site_size];
 

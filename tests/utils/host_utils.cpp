@@ -644,8 +644,6 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision)
   }
 }
 
-
-
 /**
  * For MPI, the default node mapping is lexicographical with t varying fastest.
  */

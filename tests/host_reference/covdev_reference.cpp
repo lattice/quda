@@ -14,7 +14,6 @@
 #include "dslash_reference.h"
 #include "util_quda.h"
 
-
 // covdevReference()
 //
 // if oddBit is zero: calculate even parity spinor elements (using odd parity spinor)
@@ -171,8 +170,8 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
     int offset = my_spinor_site_size * sid;
 
     gFloat *lnk = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
-    const sFloat *spinor = spinorNeighbor(sid, mu, oddBit, static_cast<const sFloat *>(in.data()),
-                                                 fwd_nbr_spinor, back_nbr_spinor, 1, 1, my_spinor_site_size);
+    const sFloat *spinor = spinorNeighbor(sid, mu, oddBit, static_cast<const sFloat *>(in.data()), fwd_nbr_spinor,
+                                          back_nbr_spinor, 1, 1, my_spinor_site_size);
 
     std::vector<sFloat> gaugedSpinor(my_spinor_site_size);
 

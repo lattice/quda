@@ -27,7 +27,7 @@ using namespace quda;
 
 /**
  * @brief Perform a Wilson dslash operation on a spinor field
- * 
+ *
  * @tparam Float The floating-point type used for the computation.
  * @param[out] res The result of the Dslash operation.
  * @param[in] gaugeFull The full gauge field.
@@ -46,8 +46,8 @@ void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *s
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   Float *gaugeEven[4], *gaugeOdd[4];
-  Float *ghostGaugeEven[4] = { nullptr, nullptr, nullptr, nullptr };
-  Float *ghostGaugeOdd[4] = { nullptr, nullptr, nullptr, nullptr };
+  Float *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  Float *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
@@ -56,7 +56,6 @@ void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *s
       ghostGaugeEven[dir] = ghostGauge[dir];
       ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
     }
-
   }
 
 #pragma omp parallel for
@@ -134,7 +133,6 @@ void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaP
     dslashReference((float *)out, (float **)gauge, (float **)ghostGauge, (float *)in, (float **)fwd_nbr_spinor,
                     (float **)back_nbr_spinor, parity, dagger);
   }
-
 }
 
 // applies b*(1 + i*a*gamma_5)

@@ -32,8 +32,8 @@ using namespace quda;
  * @param dagger Whether to apply the original or the Hermitian conjugate operator
  */
 template <QudaPCType type, typename Float>
-void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in,
-                             Float **fwdSpinor, Float **backSpinor, int parity, int dagger)
+void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in, Float **fwdSpinor, Float **backSpinor,
+                        int parity, int dagger)
 {
   for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
 
@@ -128,8 +128,8 @@ void axpby_ssp_project(Float *z, Float a, Float *x, Float b, Float *y, int idx_c
  * @param precision Single or double precision
  */
 template <typename Float>
-void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm, Float m5, Float b,
-                     Float c, Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c, Float mq1,
+                     Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
 {
   Float alpha = b + c;
   Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
@@ -197,15 +197,15 @@ void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm,
   }
 }
 
-void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, double m5, double b, double c,
-                 double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
+void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, double m5, double b, double c, double mq1,
+                 double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
-    mdw_eofa_m5_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3,
-                            eofa_pm, eofa_shift);
+    mdw_eofa_m5_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
+                            eofa_shift);
   } else {
-    mdw_eofa_m5_ref<float>((float *)out, (float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3,
-                           eofa_pm, eofa_shift);
+    mdw_eofa_m5_ref<float>((float *)out, (float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
+                           eofa_shift);
   }
   return;
 }
@@ -267,9 +267,7 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
   for (int xs = 0; xs < Ls; xs++) {
     inv_Ftr[xs] = 1.0 / (1.0 + pow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
-    for (int i = 0; i < Vh; i++) {
-      memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float));
-    }
+    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float)); }
   }
   if (dagger == 0) {
     // s = 0
@@ -372,15 +370,12 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
   for (int xs = 0; xs < Ls; xs++) {
     inv_Ftr[xs] = 1.0 / (1.0 + cpow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
-    for (int i = 0; i < Vh; i++) {
-      memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float));
-    }
+    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float)); }
   }
   if (dagger == 0) {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax((sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[0],
-         (sComplex *)&in[12 + 24 * (i + Vh * (Ls - 1))], 6);
+      ax((sComplex *)&out[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[0], (sComplex *)&in[12 + 24 * (i + Vh * (Ls - 1))], 6);
     }
 
     // s = 1 ... ls-2
@@ -460,8 +455,8 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
  * @param eofa_shift EOFA parameter eofa_shift
  */
 template <typename Float>
-void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mferm, Float m5, Float b,
-                        Float c, Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c,
+                        Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
 {
   Float alpha = b + c;
   Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
@@ -551,11 +546,11 @@ void mdw_eofa_m5inv(void *out, void *in, int parity, int dagger, double mferm, d
                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
-    mdw_eofa_m5inv_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3,
-                               eofa_pm, eofa_shift);
+    mdw_eofa_m5inv_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
+                               eofa_shift);
   } else {
-    mdw_eofa_m5inv_ref<float>((float *)out, (float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3,
-                              eofa_pm, eofa_shift);
+    mdw_eofa_m5inv_ref<float>((float *)out, (float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
+                              eofa_shift);
   }
 }
 
@@ -606,11 +601,11 @@ void dw_dslash(void *out, void *const *gauge, void *in, int parity, int dagger, 
   void **back_nbr_spinor = inField.backGhostFaceBuffer;
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_4d<QUDA_5D_PC>((double *)out, (double **)gauge, (double **)ghostGauge, (double *)in,
-                                        (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, parity, dagger);
+                                   (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, parity, dagger);
     dslashReference_5th<QUDA_5D_PC>((double *)out, (double *)in, parity, dagger, mferm);
   } else {
     dslashReference_4d<QUDA_5D_PC>((float *)out, (float **)gauge, (float **)ghostGauge, (float *)in,
-                                        (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, parity, dagger);
+                                   (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, parity, dagger);
     dslashReference_5th<QUDA_5D_PC>((float *)out, (float *)in, parity, dagger, (float)mferm);
   }
 }
@@ -661,10 +656,10 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int parity, int dagger
   void **back_nbr_spinor = inField.backGhostFaceBuffer;
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_4d<QUDA_4D_PC>((double *)out, (double **)gauge, (double **)ghostGauge, (double *)in,
-                                        (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, parity, dagger);
+                                   (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, parity, dagger);
   } else {
     dslashReference_4d<QUDA_4D_PC>((float *)out, (float **)gauge, (float **)ghostGauge, (float *)in,
-                                        (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, parity, dagger);
+                                   (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, parity, dagger);
   }
 }
 
@@ -684,8 +679,8 @@ void dw_dslash_5_4d(void *out, void *const *, void *in, int parity, int dagger, 
   }
 }
 
-void dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision,
-                  QudaGaugeParam &, double mferm, double *kappa)
+void dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &,
+                  double mferm, double *kappa)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_5th_inv((double *)out, (double *)in, parity, dagger, mferm, kappa);
@@ -704,8 +699,8 @@ void mdw_dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger
   }
 }
 
-void mdw_dslash_5(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision,
-                  QudaGaugeParam &, double mferm, double _Complex *kappa, bool zero_initialize)
+void mdw_dslash_5(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &,
+                  double mferm, double _Complex *kappa, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)

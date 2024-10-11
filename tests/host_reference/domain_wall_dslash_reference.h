@@ -46,8 +46,8 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int parity, int dagger
  * @param mferm Domain wall fermion mass (unused)
  * @param zero_initialize Whether or not to zero initialize or accumulate into the output rhs
  */
-void dw_dslash_5_4d(void *out, void *const *gauge, void *in, int parity, int dagger,
-                    QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, bool zero_initialize);
+void dw_dslash_5_4d(void *out, void *const *gauge, void *in, int parity, int dagger, QudaPrecision precision,
+                    QudaGaugeParam &gauge_param, double mferm, bool zero_initialize);
 
 /**
  * @brief Apply the inverse of the Ls dimension portion of the domain wall dslash in a 4-d data layout
@@ -78,8 +78,8 @@ void dslash_5_inv(void *out, void *const *gauge, void *in, int parity, int dagge
  * @param mferm Domain wall fermion mass
  * @param kappa Kappa values for each 5th dimension slice
  */
-void mdw_dslash_5_inv(void *out, void *const *gauge, void *in, int parity, int dagger,
-                      QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *kappa);
+void mdw_dslash_5_inv(void *out, void *const *gauge, void *in, int parity, int dagger, QudaPrecision precision,
+                      QudaGaugeParam &gauge_param, double mferm, double _Complex *kappa);
 
 /**
  * @brief Apply the Ls dimension portion of the Mobius dslash
@@ -113,9 +113,9 @@ void mdw_dslash_5(void *out, void *const *gauge, void *in, int parity, int dagge
  * @param c5 Array of c5 values for each fifth dimensional slice
  * @param zero_initialize Whether or not to zero initialize or accumulate into the output rhs
  */
-void mdw_dslash_4_pre(void *out, void *const *gauge, void *in, int parity, int dagger,
-                      QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5,
-                      double _Complex *c5, bool zero_initialize);
+void mdw_dslash_4_pre(void *out, void *const *gauge, void *in, int parity, int dagger, QudaPrecision precision,
+                      QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5,
+                      bool zero_initialize);
 
 /**
  * @brief Apply the full-parity 5-d domain wall operator
@@ -163,7 +163,8 @@ void dw_4d_mat(void *out, void *const *gauge, void *in, double kappa, int dagger
  * @param c5 Array of c5 values for each fifth dimensional slice
  */
 void mdw_mat(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
-             QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5);
+             QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5,
+             double _Complex *c5);
 
 /**
  * @brief Apply the M^dag M for the full-parity 5-d domain wall operator
@@ -270,8 +271,8 @@ void mdw_mdagm_local(void *out, void *const *gauge, void *in, double _Complex *k
  * @param eofa_shift EOFA parameter eofa_shift
  * @param precision Single or double precision
  */
-void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, double m5, double b, double c,
-                 double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision);
+void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, double m5, double b, double c, double mq1,
+                 double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision);
 
 /**
  * @brief Apply the inverse of the Ls dimension portion of the eofa Mobius dslash

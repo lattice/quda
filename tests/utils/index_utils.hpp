@@ -103,7 +103,7 @@ int neighborIndexFullLattice(int dim[4], int index, int dx[4]);
  */
 template <QudaPCType type> int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
 {
-  int ret; 
+  int ret;
   // fullLatticeIndex was modified for fullLatticeIndex_4d.  It is in util_quda.cpp.
   // This code bit may not properly perform 5dPC.
   int X = type == QUDA_5D_PC ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
