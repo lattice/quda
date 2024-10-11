@@ -71,19 +71,9 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
       real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
           gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
           nullptr;
-      const real_t *first_neighbor_spinor = (is_multi_gpu()) ?
-        spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, stag_spinor_site_size) :
-        spinorNeighbor(sid, dir, oddBit, spinorField, 1, stag_spinor_site_size);
-      const real_t *third_neighbor_spinor = [&] () -> const real_t* {
-        if (dslash_type != QUDA_ASQTAD_DSLASH)
-          return nullptr;
-
-        if (is_multi_gpu())
-          return spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
-                                          stag_spinor_site_size);
-        else
-          return spinorNeighbor(sid, dir, oddBit, spinorField, 3, stag_spinor_site_size);
-        }();
+      const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, stag_spinor_site_size);
+      const real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ? spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
+                                          stag_spinor_site_size) : nullptr;
 
       real_t gaugedSpinor[stag_spinor_site_size];
 
