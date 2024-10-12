@@ -19,7 +19,8 @@ namespace quda
                           TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
-      instantiate<TwistedCloverApply>(out, in, x, U, C, a, b, parity, dagger, comm_override, profile);
+      auto dummy = DistanceType<false>();
+      instantiate<TwistedCloverApply>(out, in, x, U, C, a, b, parity, dagger, comm_override, dummy, profile);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }
