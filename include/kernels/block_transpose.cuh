@@ -12,13 +12,15 @@ namespace quda
       Kernel argument struct
   */
   template <class v_t_, class b_t_, bool is_device_, typename vFloat, typename vAccessor, typename bFloat,
-            typename bAccessor, int nSpin_, int nColor_, int nVec_>
-  struct BlockTransposeArg : kernel_param<> {
+            typename bAccessor, int nSpin_, int nColor_, int nVec_, bool from_to_non_rel_>
+  struct BlockTransposeArg : kernel_param<use_kernel_arg_p::TRUE, false> { // no bound checks
     using real = typename mapper<vFloat>::type;
     static constexpr bool is_device = is_device_;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int nVec = nVec_;
+
+    static constexpr int from_to_non_rel = from_to_non_rel_;
 
     using v_t = v_t_;
     using b_t = b_t_;
@@ -94,6 +96,10 @@ namespace quda
           int x = target::thread_idx().x;
           if (x_cb < arg.volume_cb && v + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor = cache.load(x, v);
+            if constexpr (Arg::from_to_non_rel && Arg::nSpin == 4) {
+              color_spinor.toNonRel();
+              color_spinor *= rsqrt(static_cast<typename Arg::real>(2.0));
+            }
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
               arg.B[v + v_offset](parity, x_cb, spin, color) = color_spinor(spin, 0);
@@ -120,6 +126,10 @@ namespace quda
           int x_ = thread_idx / arg.block_y;
           if (x_ + x_offset < arg.volume_cb && v_ + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor = cache.load(x_, v_);
+            if constexpr (Arg::nSpin == 4 && Arg::from_to_non_rel) {
+              color_spinor.toRel();
+              color_spinor *= rsqrt(static_cast<typename Arg::real>(2.0));
+            }
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
               arg.V(parity, x_ + x_offset, spin, color, v_ + v_offset) = color_spinor(spin, 0);

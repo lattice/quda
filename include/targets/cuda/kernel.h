@@ -89,14 +89,19 @@ namespace quda
 
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    if (j >= arg.threads.y) return;
 
-    while (i < arg.threads.x) {
+    if constexpr (Arg::check_bounds) {
+      if (j >= arg.threads.y) return;
+
+      while (i < arg.threads.x) {
+        f(i, j);
+        if (grid_stride)
+          i += gridDim.x * blockDim.x;
+        else
+          break;
+      }
+    } else {
       f(i, j);
-      if (grid_stride)
-        i += gridDim.x * blockDim.x;
-      else
-        break;
     }
   }
 

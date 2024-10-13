@@ -246,7 +246,7 @@ namespace quda
 
           __syncthreads();
           a_loader.template g2r<Config::lda, a_dagger>(a, m_offset, 0);
-          a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+          a_loader.template r2s<decltype(a), a_dagger>(smem_obj_a_real, smem_obj_a_imag);
           __syncthreads();
 
           for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
@@ -255,7 +255,7 @@ namespace quda
 
             __syncthreads();
             b_loader.template g2r<Config::ldb, b_dagger>(b, n_offset, 0);
-            b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+            b_loader.template r2s<decltype(b), b_dagger>(smem_obj_b_real, smem_obj_b_imag);
             __syncthreads();
 
 #pragma unroll 1
