@@ -156,7 +156,7 @@ namespace quda {
     QudaFieldLocation location = checkLocation(Y, X);
 
     GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<GaugeField*>(&gauge) : nullptr;
-    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<CloverField*>(clover) : nullptr;
+    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION && clover ? const_cast<CloverField*>(clover) : nullptr;
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
       //First make a cpu gauge field from the cuda gauge field

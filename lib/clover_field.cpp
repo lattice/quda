@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <typeinfo>
+#include <utility>
 
 #include <quda_internal.h>
 #include <clover_field.h>
