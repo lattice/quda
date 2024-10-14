@@ -204,9 +204,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          tmc_ndeg_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_ndeg_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
           tmc_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.mu,
