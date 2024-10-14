@@ -220,16 +220,14 @@ namespace quda
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;
 
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        array<Vector, n_src_tile> x;
         for (auto s = 0; s < n_src_tile; s++) {
-          x[s] = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
-          out[s] = arg.a * x[s] - out[s];
+          Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
+          out[s] = arg.a * x - out[s];
         }
       } else if (mykernel_type != INTERIOR_KERNEL) {
-        array<Vector, n_src_tile> x;
         for (auto s = 0; s < n_src_tile; s++) {
-          x[s] = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
-          out[s] = x[s] + (xpay ? -out[s] : out[s]);
+          Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
+          out[s] = x + (xpay ? -out[s] : out[s]);
         }
       }
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) {
