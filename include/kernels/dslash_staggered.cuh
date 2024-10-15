@@ -226,7 +226,7 @@ namespace quda
         }
       } else if (mykernel_type != INTERIOR_KERNEL) {
         for (auto s = 0; s < n_src_tile; s++) {
-          Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
+          Vector x = arg.out[src_idx + s](coord.x_cb, my_spinor_parity);
           out[s] = x + (xpay ? -out[s] : out[s]);
         }
       }
