@@ -2,11 +2,13 @@
 
 #include <pipeline.cuh>
 #include <cub/block/block_reduce.cuh>
+#include <mma_tensor_op/shared_memory_pattern.cuh>
 
 namespace quda
 {
   namespace mma
   {
+    constexpr int get_tmp_pad() { return 0; }
 
     /**
       @brief Defining how many elements/atoms are there in type T ...
@@ -307,7 +309,7 @@ namespace quda
       float this_max = 0.0f;
 
       if constexpr (x) {
-        auto xx = p[m_idx * ld + n_idx];
+        auto xx = p[(m_idx + 0) * ld + n_idx];
         auto yy = p[(m_idx + 1) * ld + n_idx];
 
         if constexpr (fixed) {
@@ -322,19 +324,19 @@ namespace quda
           this_max = abs_max(yy.imag(), this_max);
         }
       } else {
-        auto xx = p[n_idx * ld + m_idx];
-        auto yy = p[n_idx * ld + m_idx + 1];
+        complex<T> v[2];
+        batch_load_t<complex<T>, 2>::load(v, &p[n_idx * ld + m_idx]);
 
         if constexpr (fixed) {
-          this_max = abs_max(scale_inv * xx.real(), this_max);
-          this_max = abs_max(scale_inv * xx.imag(), this_max);
-          this_max = abs_max(scale_inv * yy.real(), this_max);
-          this_max = abs_max(scale_inv * yy.imag(), this_max);
+          this_max = abs_max(scale_inv * v[0].real(), this_max);
+          this_max = abs_max(scale_inv * v[0].imag(), this_max);
+          this_max = abs_max(scale_inv * v[1].real(), this_max);
+          this_max = abs_max(scale_inv * v[1].imag(), this_max);
         } else {
-          this_max = abs_max(xx.real(), this_max);
-          this_max = abs_max(xx.imag(), this_max);
-          this_max = abs_max(yy.real(), this_max);
-          this_max = abs_max(yy.imag(), this_max);
+          this_max = abs_max(v[0].real(), this_max);
+          this_max = abs_max(v[0].imag(), this_max);
+          this_max = abs_max(v[1].real(), this_max);
+          this_max = abs_max(v[1].imag(), this_max);
         }
       }
 
@@ -425,7 +427,7 @@ namespace quda
             int m = element_per_thread * (thread_id % (bM / element_per_thread));
             int n = thread_id / (bM / element_per_thread);
             if (!check_bounds || (n + n_offset < N && m + m_offset < M)) {
-              auto dst_ptr = reinterpret_cast<float4 *>(&smem_ptr[n * (bM + 4) + m]);
+              auto dst_ptr = reinterpret_cast<float4 *>(&smem_ptr[n * (bM + get_tmp_pad()) + m]);
               auto src_ptr = reinterpret_cast<float4 *>(&p[(n + n_offset) * ld + m + m_offset]);
               memcpy_async(dst_ptr, src_ptr, sizeof(float4), pipe);
             }
@@ -433,7 +435,7 @@ namespace quda
             int m = thread_id / (bN / element_per_thread);
             int n = element_per_thread * (thread_id % (bN / element_per_thread));
             if (!check_bounds || (n + n_offset < N && m + m_offset < M)) {
-              auto dst_ptr = reinterpret_cast<float4 *>(&smem_ptr[m * (bN + 4) + n]);
+              auto dst_ptr = reinterpret_cast<float4 *>(&smem_ptr[m * (bN + get_tmp_pad()) + n]);
               auto src_ptr = reinterpret_cast<float4 *>(&p[(m + m_offset) * ld + n + n_offset]);
               memcpy_async(dst_ptr, src_ptr, sizeof(float4), pipe);
             }
@@ -451,10 +453,11 @@ namespace quda
         int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
         int warp_id = thread_id / 32;
         int lane_id = thread_id % 32;
-        int thread_in_group = lane_id % 4;
-        int group_id = lane_id / 4;
-        constexpr int w_m = 8 * batch;
-        constexpr int w_k = 4;
+        constexpr bool x = transpose == dagger;
+        constexpr int tmp_ld = x ? bN + get_tmp_pad() : bM + get_tmp_pad();
+        tmp2s_smem_t<load_t, x, tmp_ld, 1> pattern; // 1 is dummy here
+        constexpr int w_m = pattern.get_wm();
+        constexpr int w_k = pattern.get_wn();
         static_assert(bM % w_m == 0, "bM %% w_m");
         static_assert(bN % w_k == 0, "bN %% w_k");
 
@@ -475,19 +478,20 @@ namespace quda
             for (int c = 0; c < warp_cycle; c++) {
               int logical_warp_index = c * n_warp + warp_id;
               if (logical_warp_index < total_tiles) {
-                int warp_m = (c * n_warp + warp_id) % tile_dim_m;
-                int warp_k = (c * n_warp + warp_id) / tile_dim_m;
+#pragma unroll
+                for (int p = 0; p < pattern.get_number_phases(); p++) {
+                  int warp_m = (c * n_warp + warp_id) % tile_dim_m;
+                  int warp_k = (c * n_warp + warp_id) / tile_dim_m;
 
-                int smem_m_offset = warp_m * w_m + group_id * batch;
-                int smem_k_offset = warp_k * w_k + thread_in_group;
+                  int smem_m_offset = warp_m * w_m + pattern.get_m(lane_id, p);;
+                  int smem_k_offset = warp_k * w_k + pattern.get_n(lane_id, p);;
 
-                int gmem_m_offset = smem_m_offset;
-                int gmem_k_offset = smem_k_offset;
+                  int gmem_m_offset = smem_m_offset;
+                  int gmem_k_offset = smem_k_offset;
 
-                constexpr bool x = (transpose == dagger);
-                float this_max
-                  = find_abs_max<x, fixed, dagger, (x ? bN + 4 : bM + 4)>(load_t{}, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
-                thread_max = fmaxf(this_max, thread_max);
+                  float this_max = find_abs_max<x, fixed, dagger, tmp_ld>(load_t{}, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
+                  thread_max = fmaxf(this_max, thread_max);
+                }
               }
             }
 
@@ -517,20 +521,21 @@ namespace quda
             int warp_m = (c * n_warp + warp_id) % tile_dim_m;
             int warp_k = (c * n_warp + warp_id) / tile_dim_m;
 
-            int smem_m_offset = warp_m * w_m + group_id * batch;
-            int smem_k_offset = warp_k * w_k + thread_in_group;
+#pragma unroll
+            for (int p = 0; p < pattern.get_number_phases(); p++) {
+              int smem_m_offset = warp_m * w_m + pattern.get_m(lane_id, p);
+              int smem_k_offset = warp_k * w_k + pattern.get_n(lane_id, p);
 
-            int gmem_m_offset = smem_m_offset;
-            int gmem_k_offset = smem_k_offset;
+              int gmem_m_offset = smem_m_offset;
+              int gmem_k_offset = smem_k_offset;
 
-            load_t real;
-            load_t imag;
+              load_t real;
+              load_t imag;
 
-            constexpr bool x = (transpose == dagger);
-            convert_x_rescale<x, fixed, dagger, x ? bN + 4 : bM + 4, 1>(&real, &imag, smem_ptr, gmem_m_offset, gmem_k_offset,
-                                                                        scale_inv, block_rescale_factor);
-            smem_real.vector_load(smem_m_offset, smem_k_offset, real);
-            smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
+              convert_x_rescale<x, fixed, dagger, tmp_ld, 1>(&real, &imag, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv, block_rescale_factor);
+              smem_real.vector_load(smem_m_offset, smem_k_offset, real);
+              smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
+            }
           }
         }
 

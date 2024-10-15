@@ -156,6 +156,9 @@ namespace quda
       if (clover) { strcat(aux, ",clover"); }
 
       strcat(aux, ",n_rhs=");
+#ifdef USE_TENSOR_MEMORY_ACCELERATOR
+      strcat(aux, ",use_tma");
+#endif
       char rhs_str[16];
       i32toa(rhs_str, out[0].Nvec());
       strcat(aux, rhs_str);
@@ -165,8 +168,13 @@ namespace quda
 
     static constexpr int shared_bytes_per_block(int bM, int bN, int bK)
     {
-      return mma::shared_memory_bytes<mma_t>(bM, bN, bK) + (bM + 4) * (bK + 4) * 2 * sizeof(yFloat)
-        + (bK + 4) * (bN + 4) * 2 * sizeof(Float);
+      int bytes = mma::shared_memory_bytes<mma_t>(bM, bN, bK) + (bM + mma::get_tmp_pad()) * (bK + mma::get_tmp_pad()) * 2 * sizeof(yFloat)
+        + (bK + mma::get_tmp_pad()) * (bN + mma::get_tmp_pad()) * 2 * sizeof(Float);
+#ifdef USE_TENSOR_MEMORY_ACCELERATOR
+      return bytes + sizeof(barrier_t);
+#else
+      return bytes;
+#endif
     }
 
     bool set_mma_param(TuneParam &tp) const
