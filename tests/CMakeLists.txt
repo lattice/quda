@@ -1004,7 +1004,7 @@ endif()
 if(QUDA_DIRAC_WILSON)
   add_test(NAME invert_test_wilson
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type wilson --ngcrkrylov 8
+    --dslash-type wilson --ngcrkrylov 8 --nsrc 4 --nsrc-tile 4
     --dim 2 4 6 8 --niter 1000
     --enable-testing true
     --gtest_output=xml:invert_test_wilson.xml)
@@ -1204,7 +1204,7 @@ foreach(prec IN LISTS TEST_PRECS)
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
       --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --enable-testing true
+      --enable-testing true --nsrc 4 --nsrc-tile 4
       --gtest_output=xml:invert_test_asqtad_${prec}.xml)
 
     if(DEFINED ENV{QUDA_ENABLE_TUNING})

@@ -37,7 +37,7 @@ namespace quda
       things and the extension to 4d is trivial.
     */
 
-    auto processor_dim = comm_grid_dim / comm_key; // How many processors are there in a processor grid sub-parititon?
+    auto processor_dim = comm_grid_dim / comm_key; // How many processors are there in a processor grid sub-partition?
     auto partition_dim
       = comm_grid_dim / processor_dim; // How many such sub-partitions are there? partition_dim == comm_key
 

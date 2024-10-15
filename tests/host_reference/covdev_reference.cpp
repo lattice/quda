@@ -183,7 +183,6 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
     const sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, static_cast<const sFloat *>(in.data()),
                                                  fwd_nbr_spinor, back_nbr_spinor, 1, 1, my_spinor_site_size);
 
-    //sFloat gaugedSpinor[my_spinor_site_size];
     std::vector<sFloat> gaugedSpinor(my_spinor_site_size);
 
     if (daggerBit) {

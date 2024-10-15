@@ -197,6 +197,7 @@ namespace quda
   protected:
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
+    mutable unsigned int step_y_bkup;
     bool tune_block_x;
 
     /**
@@ -287,7 +288,11 @@ namespace quda
      */
     TunableKernel2D_base(const LatticeField &field, unsigned int vector_length_y,
                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel1D_base<grid_stride>(field, location), vector_length_y(vector_length_y), step_y(1), tune_block_x(true)
+      TunableKernel1D_base<grid_stride>(field, location),
+      vector_length_y(vector_length_y),
+      step_y(1),
+      step_y_bkup(1),
+      tune_block_x(true)
     {
     }
 
@@ -298,7 +303,11 @@ namespace quda
        @param[in] location Location where the calculation will take place
      */
     TunableKernel2D_base(size_t n_items, unsigned int vector_length_y, QudaFieldLocation location) :
-      TunableKernel1D_base<grid_stride>(n_items, location), vector_length_y(vector_length_y), step_y(1), tune_block_x(true)
+      TunableKernel1D_base<grid_stride>(n_items, location),
+      vector_length_y(vector_length_y),
+      step_y(1),
+      step_y_bkup(1),
+      tune_block_x(true)
     {
     }
 
@@ -373,7 +382,11 @@ namespace quda
        @brief Resize the autotuning step size in the y dimension
        @brief[in] y New step size
     */
-    void resizeStep(int y) const { step_y = y; }
+    void resizeStep(int y) const
+    {
+      step_y = y;
+      step_y_bkup = step_y;
+    }
   };
 
   /**
@@ -466,6 +479,7 @@ namespace quda
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
+    mutable unsigned step_z_bkup;
     bool tune_block_y;
 
     /**
@@ -562,6 +576,7 @@ namespace quda
       TunableKernel2D_base<grid_stride>(field, vector_length_y, location),
       vector_length_z(vector_length_z),
       step_z(1),
+      step_z_bkup(1),
       tune_block_y(true)
     {
     }
@@ -578,6 +593,7 @@ namespace quda
       TunableKernel2D_base<grid_stride>(n_items, vector_length_y, location),
       vector_length_z(vector_length_z),
       step_z(1),
+      step_z_bkup(1),
       tune_block_y(true)
     {
     }
@@ -665,6 +681,7 @@ namespace quda
     void resizeStep(int y, int z) const
     {
       step_z = z;
+      step_z_bkup = step_z;
       TunableKernel2D_base<grid_stride>::resizeStep(y);
     }
   };

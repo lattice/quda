@@ -88,9 +88,7 @@ void contractFTHost(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, 
   int L[4];
   for (int dir = 0; dir < 4; ++dir) L[dir] = X[dir] * comm_dim(dir);
 
-  //double phase[n_mom * 2];
-  std::vector<double> phase(n_mom*2);
-  //Float M[num_out_results * 2];
+  std::vector<double> phase(n_mom * 2);
   std::vector<Float> M(num_out_results * 2);
   // size_t x ;
   int sink[4];
@@ -119,7 +117,7 @@ void contractFTHost(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, 
       for (int dir = 0; dir < 4; ++dir) {
         double theta = 2. * M_PI / L[dir];
         theta *= (sink[dir] - source_position[dir]) * mom_modes[4 * mom_idx + dir];
-        FourierPhase<double>(&phase[2 * mom_idx], theta, fft_type[4 * mom_idx + dir]);
+        FourierPhase<double>(phase.data() + 2 * mom_idx, theta, fft_type[4 * mom_idx + dir]);
       }
     }
 
@@ -129,7 +127,7 @@ void contractFTHost(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, 
           // color contraction
           size_t off = nSpin * 3 * 2 * (Vh * parity + cb_idx);
           contractColors<Float>(static_cast<Float*>(h_prop_array_flavor_1[s1 * src_colors + c1]) + off,
-                                static_cast<Float*>(h_prop_array_flavor_2[s2 * src_colors + c1]) + off, nSpin, &M[0]);
+                                static_cast<Float*>(h_prop_array_flavor_2[s2 * src_colors + c1]) + off, nSpin, M.data());
 
           // apply gamma matrices here
 

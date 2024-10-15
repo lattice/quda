@@ -84,10 +84,8 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-      sol[i] = x[i].create_alias();
-    }
+    create_alias(src, b);
+    create_alias(sol, x);
   }
 
   void DiracDomainWall::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
@@ -152,20 +150,17 @@ namespace quda {
                                   const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      for (auto i = 0u; i < b.size(); i++) {
-        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-        sol[i] = x[i].create_alias();
-      }
+      create_alias(src, b);
+      create_alias(sol, x);
       return;
     }
 
+    create_alias(src, x(other_parity));
+    create_alias(sol, x(this_parity));
+
     // we desire solution to full system
-    for (auto i = 0u; i < b.size(); i++) {
-      // src = b_e + k D_eo b_o
-      DslashXpay(x[i][other_parity], b[i][other_parity], this_parity, b[this_parity], kappa5);
-      src[i] = x[i][other_parity].create_alias();
-      sol[i] = x[i][this_parity].create_alias();
-    }
+    // src = b_e + k D_eo b_o
+    DslashXpay(x(other_parity), b(other_parity), this_parity, b(this_parity), kappa5);
   }
 
   void DiracDomainWallPC::reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
@@ -174,11 +169,9 @@ namespace quda {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
-      // x_o = b_o + k D_oe x_e
-      DslashXpay(x[i][other_parity], x[i][this_parity], other_parity, b[i][other_parity], kappa5);
-    }
+    checkFullSpinor(x, b);
+    // x_o = b_o + k D_oe x_e
+    DslashXpay(x(other_parity), x(this_parity), other_parity, b(other_parity), kappa5);
   }
 
 } // namespace quda

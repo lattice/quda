@@ -105,11 +105,9 @@ auto laph_test(test_t param)
   comm_allreduce_sum(hostRes);
 
   // QUDA proper
-  //void *snkPtr[nSink];
   std::vector<void *> snkPtr(nSink);
   for (int iSink = 0; iSink < nSink; ++iSink) snkPtr[iSink] = sinkList[iSink].data();
 
-  //void *evPtr[nEv];
   std::vector<void *> evPtr(nEv);
   for (int iEv = 0; iEv < nEv; ++iEv) evPtr[iEv] = evList[iEv].data();
 

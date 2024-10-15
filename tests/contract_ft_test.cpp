@@ -10,6 +10,7 @@
 #include <dslash_reference.h>
 #include <contract_ft_reference.h>
 #include "misc.h"
+#include "test.h"
 
 // google test
 #include <contract_ft_test_gtest.hpp>
@@ -113,7 +114,6 @@ inline void fill_buffers(std::array<std::vector<Float>, N> &buffs, const std::ar
 
           srand(l);
           for (int i = 0; i < dofs; i++) {
-#pragma unroll
             for (int n = 0; n < N; n++) { buffs[n][ll * dofs + i] = 2. * (rand() / (Float)RAND_MAX) - 1.; }
           }
         }
@@ -171,9 +171,9 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
 
   fill_buffers<Float, 2>(buffs, X, dof);
 
-  for (int s = 0; s < nprops; ++s, off += spinor_field_floats * sizeof(Float)) {
-    spinorX[s] = static_cast<void *>(reinterpret_cast<char*>(buffs[0].data()) + off);
-    spinorY[s] = static_cast<void *>(reinterpret_cast<char*>(buffs[1].data()) + off);
+  for (int s = 0; s < nprops; ++s, off += spinor_field_floats) {
+    spinorX[s] = static_cast<void *>(buffs[0].data() + off);
+    spinorY[s] = static_cast<void *>(buffs[1].data() + off);
   }
   // Perform GPU contraction:
   void *d_result_ = static_cast<void *>(d_result.data());

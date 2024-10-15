@@ -14,6 +14,7 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
+#include "test.h"
 
 // Place params above "eigensolve_test_gtest.hpp" so they
 // are visible therein.

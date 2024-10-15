@@ -17,6 +17,7 @@
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
+#include "test.h"
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -25,6 +26,7 @@ QudaInvertParam mg_inv_param;
 QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
 bool use_split_grid = false;
+bool use_multi_src = false;
 
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
@@ -48,6 +50,7 @@ void display_test_info()
     printfQuda(" - number of levels %d\n", mg_levels);
     for (int i = 0; i < mg_levels - 1; i++) {
       printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d null-space vector batch size %d\n", i + 1, nvec_batch[i]);
       printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
       printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
     }
@@ -271,6 +274,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
   use_split_grid = num_sub_partition > 1;
+  use_multi_src = use_split_grid || (Nsrc_tile > 1);
 
   // Setup the multigrid preconditioner
   void *mg_preconditioner = nullptr;
@@ -279,11 +283,18 @@ std::vector<std::array<double, 2>> solve(test_t param)
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
 
-    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.secs, mg_param.gflops / mg_param.secs);
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.invert_param->secs,
+               mg_param.invert_param->gflops / mg_param.invert_param->secs);
+    if (mg_param.invert_param->energy > 0) {
+      printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n", mg_param.invert_param->energy,
+                 mg_param.invert_param->power, mg_param.invert_param->temp, mg_param.invert_param->clock);
+    }
   }
 
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
+  if (Nsrc > QUDA_MAX_MULTI_SRC)
+    errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
   std::vector<quda::ColorSpinorField> in(Nsrc);
   std::vector<quda::ColorSpinorField> out(Nsrc);
   std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
@@ -361,7 +372,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // QUDA invert test
   //----------------------------------------------------------------------------
 
-  if (!use_split_grid) {
+  if (!use_multi_src || multishift > 1) {
 
     for (int n = 0; n < Nsrc; n++) {
       // If deflating, preserve the deflation space between solves
@@ -373,39 +384,62 @@ std::vector<std::array<double, 2>> solve(test_t param)
         invertQuda(out[n].data(), in[n].data(), &inv_param);
       }
 
+      // move residuals to n^th location for verification after solves have finished
+      inv_param.true_res[n] = inv_param.true_res[0];
+      inv_param.true_res_hq[n] = inv_param.true_res_hq[0];
+
       time[n] = inv_param.secs;
       gflops[n] = inv_param.gflops / inv_param.secs;
       iter[n] = inv_param.iter;
-      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
+      if (inv_param.energy > 0) {
+        printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n\n", inv_param.energy,
+                   inv_param.power, inv_param.temp, inv_param.clock);
+      }
     }
   } else {
-    inv_param.num_src = Nsrc;
-    inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-    // Host arrays for solutions, sources, and check
-    std::vector<void *> _hp_x(Nsrc);
-    std::vector<void *> _hp_b(Nsrc);
-    for (int n = 0; n < Nsrc; n++) {
-      _hp_x[n] = out[n].data();
-      _hp_b[n] = in[n].data();
-    }
-    // Run split grid
-    invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
 
-    quda::comm_allreduce_int(inv_param.iter);
-    inv_param.iter /= comm_size() / num_sub_partition;
-    quda::comm_allreduce_sum(inv_param.gflops);
-    inv_param.gflops /= comm_size() / num_sub_partition;
-    quda::comm_allreduce_max(inv_param.secs);
-    printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
-               inv_param.secs, inv_param.gflops / inv_param.secs);
+    inv_param.num_src = Nsrc_tile;
+    inv_param.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
+    // Host arrays for solutions, sources, and check
+    std::vector<void *> _hp_x(Nsrc_tile);
+    std::vector<void *> _hp_b(Nsrc_tile);
+
+    for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+      for (int i = 0; i < Nsrc_tile; i++) {
+        _hp_x[i] = out[j + i].data();
+        _hp_b[i] = in[j + i].data();
+      }
+
+      if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param);
+
+      // move residuals to (i+j)^th location for verification after solves have finished
+      for (int i = 0; i < Nsrc_tile; i++) {
+        inv_param.true_res[j + i] = inv_param.true_res[i];
+        inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
+      }
+
+      quda::comm_allreduce_int(inv_param.iter);
+      inv_param.iter /= comm_size() / num_sub_partition;
+      quda::comm_allreduce_sum(inv_param.gflops);
+      inv_param.gflops /= comm_size() / num_sub_partition;
+      quda::comm_allreduce_max(inv_param.secs);
+      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+                 inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
+      if (inv_param.energy > 0) {
+        printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                   inv_param.energy, inv_param.energy / Nsrc_tile, inv_param.power, inv_param.temp, inv_param.clock);
+      }
+    }
   }
 
   // Free the multigrid solver
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute timings
-  if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
+  if (!use_multi_src) performanceStats(time, gflops, iter);
 
   std::vector<std::array<double, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
@@ -418,7 +452,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
           = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
         res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
       } else {
-        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param);
+        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param, n);
       }
     }
   }

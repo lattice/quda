@@ -38,7 +38,7 @@ namespace quda {
 
     long long flops() const { return in.size() * in.Volume() * 504ll; }
 
-    long long bytes() const { return in.size() * (out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset())); }
+    long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
   };
 
   //Apply the clover matrix field to a colorspinor field
@@ -123,10 +123,10 @@ namespace quda {
 
     long long flops() const { return in.size() * (inverse ? 1056ll : 552ll) * in.Volume(); }
     long long bytes() const {
-      long long rtn = out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset());
+      long long rtn = out.Bytes() + in.Bytes() + in.size() * clover.Bytes() / (3 - in.SiteSubset());
       if (twist == QUDA_TWIST_GAMMA5_INVERSE && !clover::dynamic_inverse())
-	rtn += clover.Bytes() / (3 - in.SiteSubset());
-      return in.size() * rtn;
+        rtn += in.size() * clover.Bytes() / (3 - in.SiteSubset());
+      return rtn;
     }
   };
 

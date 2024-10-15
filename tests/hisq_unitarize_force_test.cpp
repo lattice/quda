@@ -7,6 +7,7 @@
 #include <command_line_params.h>
 #include "gauge_field.h"
 #include "misc.h"
+#include "test.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include <sys/time.h>

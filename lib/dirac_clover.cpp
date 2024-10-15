@@ -82,10 +82,8 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-      sol[i] = x[i].create_alias();
-    }
+    create_alias(src, b);
+    create_alias(sol, x);
   }
 
   void DiracClover::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
@@ -225,30 +223,25 @@ namespace quda {
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      for (auto i = 0u; i < b.size(); i++) {
-        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-        sol[i] = x[i].create_alias();
-      }
+      create_alias(src, b);
+      create_alias(sol, x);
       return;
     }
 
+    create_alias(src, x(other_parity));
+    create_alias(sol, x(this_parity));
+
     // we desire solution to full system
-    auto tmp = getFieldTmp(b[0].Even());
-    for (auto i = 0u; i < b.size(); i++) {
-      if (symmetric) {
-        // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
-        src[i] = x[i][other_parity].create_alias();
-        CloverInv(src[i], b[i][other_parity], other_parity);
-        DiracWilson::DslashXpay(tmp, src[i], this_parity, b[i][this_parity], kappa);
-        CloverInv(src[i], tmp, this_parity);
-        sol[i] = x[i][this_parity].create_alias();
-      } else {
-        // src = b_e + k D_eo A_oo^-1 b_o
-        src[i] = x[i][other_parity].create_alias();
-        CloverInv(tmp, b[i][other_parity], other_parity); // safe even when tmp = b.odd
-        DiracWilson::DslashXpay(src[i], tmp, this_parity, b[this_parity], kappa);
-        sol[i] = x[i][this_parity].create_alias();
-      }
+    auto tmp = getFieldTmp(x.Even());
+    if (symmetric) {
+      // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
+      CloverInv(src, b(other_parity), other_parity);
+      DiracWilson::DslashXpay(tmp, src, this_parity, b(this_parity), kappa);
+      CloverInv(src, tmp, this_parity);
+    } else {
+      // src = b_e + k D_eo A_oo^-1 b_o
+      CloverInv(tmp, b(other_parity), other_parity); // safe even when tmp = b.odd
+      DiracWilson::DslashXpay(src, tmp, this_parity, b(this_parity), kappa);
     }
   }
 
@@ -257,13 +250,11 @@ namespace quda {
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
-    auto tmp = getFieldTmp(b[0].Even());
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
-      // x_o = A_oo^-1 (b_o + k D_oe x_e)
-      DiracWilson::DslashXpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa);
-      CloverInv(x[i][other_parity], tmp, other_parity);
-    }
+    auto tmp = getFieldTmp(x.Even());
+    checkFullSpinor(x, b);
+    // x_o = A_oo^-1 (b_o + k D_oe x_e)
+    DiracWilson::DslashXpay(tmp, x(this_parity), other_parity, b(other_parity), kappa);
+    CloverInv(x(other_parity), tmp, other_parity);
   }
 
   void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,

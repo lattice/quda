@@ -86,10 +86,8 @@ namespace quda {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
 
-    for (auto i = 0u; i < b.size(); i++) {
-      src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-      sol[i] = x[i].create_alias();
-    }
+    create_alias(src, b);
+    create_alias(sol, x);
   }
 
   void DiracDomainWall4D::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
@@ -171,30 +169,25 @@ namespace quda {
                                     const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      for (auto i = 0u; i < b.size(); i++) {
-        src[i] = const_cast<ColorSpinorField &>(b[i]).create_alias();
-        sol[i] = x[i].create_alias();
-      }
+      create_alias(src, b);
+      create_alias(sol, x);
       return;
     }
 
+    create_alias(src, x(other_parity));
+    create_alias(sol, x(this_parity));
+
     // we desire solution to full system
-    auto tmp = getFieldTmp(x[0].Even());
-    for (auto i = 0u; i < b.size(); i++) {
-      if (symmetric) {
-        // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
-        src[i] = x[i][other_parity].create_alias();
-        M5inv(src[i], b[i][other_parity]);
-        Dslash4Xpay(tmp, src[i], this_parity, b[i][this_parity], kappa5);
-        M5inv(src[i], tmp);
-        sol[i] = x[i][this_parity].create_alias();
-      } else {
-        // src = b_e + k D4_eo*M5^-1 b_o
-        src[i] = x[i][other_parity].create_alias();
-        M5inv(tmp, b[i][other_parity]);
-        Dslash4Xpay(src[i], tmp, this_parity, b[i][this_parity], kappa5);
-        sol[i] = x[i][this_parity].create_alias();
-      }
+    auto tmp = getFieldTmp(x.Even());
+    if (symmetric) {
+      // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
+      M5inv(src, b(other_parity));
+      Dslash4Xpay(tmp, src, this_parity, b(this_parity), kappa5);
+      M5inv(src, tmp);
+    } else {
+      // src = b_e + k D4_eo*M5^-1 b_o
+      M5inv(tmp, b(other_parity));
+      Dslash4Xpay(src, tmp, this_parity, b(this_parity), kappa5);
     }
   }
 
@@ -204,13 +197,11 @@ namespace quda {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) return;
 
     // create full solution
-    auto tmp = getFieldTmp(x[0].Even());
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
-      // x_o = M5^-1 (b_o + k D4_oe x_e)
-      Dslash4Xpay(tmp, x[i][this_parity], other_parity, b[i][other_parity], kappa5);
-      M5inv(x[i][other_parity], tmp);
-    }
+    auto tmp = getFieldTmp(x.Even());
+    checkFullSpinor(x, b);
+    // x_o = M5^-1 (b_o + k D4_oe x_e)
+    Dslash4Xpay(tmp, x(this_parity), other_parity, b(other_parity), kappa5);
+    M5inv(x(other_parity), tmp);
   }
 
 } // end namespace quda

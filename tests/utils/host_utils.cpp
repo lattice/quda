@@ -395,7 +395,7 @@ void initComms(int, char **, int *const commDims)
 
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_FUNNELED, &tl);
 
   // make sure the QMP logical ordering matches QUDA's
   if (rank_order == 0) {
@@ -406,7 +406,15 @@ void initComms(int, char **, int *const commDims)
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
 #elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
+  int provided = 0;
+  int required = MPI_THREAD_FUNNELED;
+  int flag = MPI_Init_thread(&argc, &argv, required, &provided);
+
+  if (provided != required) {
+    printf("%s: required thread-safety level %d can't be provided %d\n", __func__, required, provided);
+    fflush(stdout);
+    exit(flag);
+  }
 #endif
 
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
@@ -761,16 +769,6 @@ int fullLatticeIndex(int i, int oddBit)
   int X = 2 * sid + x1odd;
 
   return X;
-}
-
-extern "C" {
-/**
-   @brief Set the default ASAN options.  This ensures that QUDA just
-   works when SANITIZE is enabled without requiring ASAN_OPTIONS to be
-   set.  We default disable leak checking, otherwise this will cause
-   ctest to fail with MPI library leaks.
- */
-const char *__asan_default_options() { return "detect_leaks=0,protect_shadow_gap=0"; }
 }
 
 /**

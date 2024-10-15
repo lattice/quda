@@ -55,7 +55,8 @@ namespace quda
     bool reset = false; /** reset the counter post completion (required for multiple calls with the same arg instance */
     using system_atomic_t = typename atomic_type<T>::type; /** heterogeneous atomics must use lock-free atomics -> operate on scalars */
     static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t); /** number of words per reduction variable */
-    cuda::atomic<T, cuda::thread_scope_device> *partial; /** device atomic buffer */
+    // FIXME on Hopper this could be a 128-bit type
+    cuda::atomic<system_atomic_t, cuda::thread_scope_device> *partial;  /** device atomic buffer */
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d; /** device-mapped host atomic buffer */
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h; /** host atomic buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
@@ -78,7 +79,7 @@ namespace quda
       reset(reset),
       consumed(false)
     {
-      reducer::init(n_reduce, sizeof(*partial));
+      reducer::init(n_reduce, n_item * sizeof(*partial));
       // these buffers may be allocated in init, so we can't set the local copies until now
       partial = static_cast<decltype(partial)>(reducer::get_device_buffer());
       result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
@@ -209,7 +210,15 @@ namespace quda
         if (arg.get_output_async_buffer()) {
           arg.get_output_async_buffer()[idx] = sum;
         } else { // write to device memory
-          arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+          // write out the final reduced value
+          if (tid == 0) {
+            atomic_t sum_tmp[n];
+            memcpy(sum_tmp, &sum, sizeof(sum));
+#pragma unroll
+            for (unsigned int i = 0; i < n; i++) {
+              arg.partial[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+            }
+          }
         }
       }
     }
@@ -243,6 +252,8 @@ namespace quda
   template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
+    using atomic_t = typename atomic_type<T>::type;
+    constexpr size_t n = sizeof(T) / sizeof(atomic_t);
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
@@ -257,8 +268,14 @@ namespace quda
 
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
         // need to call placement new constructor since partial is not necessarily constructed
-        new (arg.partial + idx * target::grid_dim().x + target::block_idx().x)
-          cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+        atomic_t aggregate_tmp[n];
+        memcpy(aggregate_tmp, &aggregate, sizeof(aggregate));
+
+#pragma unroll
+        for (int k = 0; k < n; k++) {
+          new (arg.partial + (idx * target::grid_dim().x + target::block_idx().x) * n + k)
+            cuda::atomic<atomic_t, cuda::thread_scope_device> {aggregate_tmp[k]};
+        }
 
         // increment global block counter for this reduction
         auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
@@ -274,7 +291,14 @@ namespace quda
         auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
         T sum = r.init();
         while (i < target::grid_dim().x) {
-          sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
+          atomic_t partial_tmp[n];
+          T partial;
+#pragma unroll
+          for (int k = 0; k < n; k++) {
+            partial_tmp[k] = arg.partial[(idx * target::grid_dim().x + i) * n + k].load(cuda::std::memory_order_relaxed);
+          }
+          memcpy(&partial, partial_tmp, sizeof(partial));
+          sum = r(sum, partial);
           i += target::block_size<2>();
         }
 
