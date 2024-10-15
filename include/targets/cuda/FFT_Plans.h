@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NATIVE_FFT_LIB
+#include "../generic/FFT_Plans.h"
+#else
+
 #include <quda_cuda_api.h>
 #include <quda_internal.h>
 #include <cufft.h>
@@ -123,3 +127,5 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
 inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(plan)); }
 
 } // namespace quda
+
+#endif // ifndef NATIVE_FFT_LIB

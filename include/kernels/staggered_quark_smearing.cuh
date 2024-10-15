@@ -161,7 +161,7 @@ namespace quda
   struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
-    constexpr staggered_qsmear(const Arg &arg) : arg(arg) { }
+    template <typename Ftor> constexpr staggered_qsmear(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

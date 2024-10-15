@@ -11,6 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
+#include <kernel_ops.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
@@ -461,8 +462,8 @@ namespace quda
      classed.
    */
   struct dslash_default {
-    constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
-    constexpr int twist_pack() const { return 0; }
+    static constexpr QudaPCType pc_type() { return QUDA_4D_PC; }
+    static constexpr int twist_pack() { return 0; }
   };
 
   /**
@@ -661,26 +662,36 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-  template <typename Arg> struct dslash_functor {
+  template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
+    //static_assert(explicitKernelOps<typename Arg::D>);
+    //static_assert(!hasKernelOps<typename Arg::template P<Arg::D::pc_type()>>);
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
-    constexpr dslash_functor(const Arg &arg) : arg(arg.arg) { }
+    using typename getKernelOps<typename Arg::D>::KernelOpsT;
+    template <typename ...OpsArgs>
+    constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg) { }
 
-    __forceinline__ __device__ void operator()(int, int s, int parity)
+    template <bool allthreads = false>
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool active = true)
     {
-      typename Arg::D dslash(arg);
+      //typename Arg::D dslash(arg);
+      //if constexpr (hasKernelOps<typename Arg::D>) {
+      //dslash.setKernelOps(*this);
+      //}
+      typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        // first few blocks do packing kernel
-        typename Arg::template P<dslash.pc_type()> packer;
-        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
+	if (!allthreads || active ) {
+	  // first few blocks do packing kernel
+	  typename Arg::template P<dslash.pc_type()> packer;
+	  packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+	}
         // we use that when running the exterior -- this is either
         // * an explicit call to the exterior when not merged with the interior or
         // * the interior with exterior_blocks > 0
@@ -695,21 +706,35 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
+	if (x_cb >= arg.threads) {
+	  if constexpr (allthreads) active = false;
+	  else return;
+	}
 
 #ifdef QUDA_FAST_COMPILE_DSLASH
-        dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
+	if constexpr (allthreads) {
+	  dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, parity, active);
+	} else {
+	  dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
+	}
 #else
-        switch (parity) {
-        case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
-        case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
-        }
+	if constexpr (allthreads) {
+	  switch (parity) {
+	  case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 0, active); break;
+	  case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 1, active); break;
+	  }
+	} else {
+	  switch (parity) {
+	  case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
+	  case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
+	  }
+	}
 #endif
 #ifdef NVSHMEM_COMMS
         if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type>(arg);
 #endif
       }
     }
-  };
+};
 
 } // namespace quda

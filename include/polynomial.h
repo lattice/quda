@@ -88,10 +88,10 @@ namespace quda
 
         if (p < 0) {
           double theta = std::acosh(-1.5 * std::abs(q) / p * std::sqrt(-3.0 / p));
-          t.push_back(-2.0 * std::abs(q) / q * std::sqrt(-p / 3.0) * cosh(theta / 3.0));
+          t.push_back(-2.0 * std::abs(q) / q * std::sqrt(-p / 3.0) * std::cosh(theta / 3.0));
         } else if (p > 0) {
           double theta = std::asinh(+1.5 * q / p * std::sqrt(3.0 / p));
-          t.push_back(-2.0 * std::sqrt(p / 3.0) * sinh(theta / 3.0));
+          t.push_back(-2.0 * std::sqrt(p / 3.0) * std::sinh(theta / 3.0));
         }
       }
     }

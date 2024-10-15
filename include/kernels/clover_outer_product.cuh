@@ -41,7 +41,7 @@ namespace quda {
                    const ColorSpinorField &p_halo, cvector_ref<const ColorSpinorField> &x,
                    const ColorSpinorField &x_halo, const std::vector<double> &coeff) :
       kernel_param(dim3(dim == -1 ? static_cast<uint32_t>(x_halo.getDslashConstant().volume_4d_cb) :
-                                    x_halo.getDslashConstant().ghostFaceCB[dim],
+			x_halo.getDslashConstant().ghostFaceCB[dim==-1?0:dim],
                         x.SiteSubset(), dim == -1 ? 4 : dim)),
       n_src(p.size()),
       force(force),
