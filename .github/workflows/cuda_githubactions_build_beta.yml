@@ -16,7 +16,7 @@ jobs:
     build:
       strategy:
         matrix:
-          compiler: [g++-13, clang++-17]
+          compiler: [g++-13, clang++-18]
       runs-on: ubuntu-24.04
 
       steps:
@@ -25,13 +25,12 @@ jobs:
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update -y
-          # Note CUDA 12.5 does not officially support Ubnutu 24.04
-          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
+          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran cuda-compiler-12-6 cuda-libraries-dev-12-6 cuda-nvml-dev-12-6
       
       # currently deactivated as it cuased build errors - maybe put in again later
       # - uses: awalsh128/cache-apt-pkgs-action@latest
       #   with:
-      #     packages: cuda-compiler-12-5 cuda-libraries-dev-12-5 cuda-nvml-dev-12-5
+      #     packages: cuda-compiler-12-6 cuda-libraries-dev-12-6 cuda-nvml-dev-12-6
       #     execute_install_scripts: true
 
       - uses: actions/checkout@v4
@@ -45,7 +44,7 @@ jobs:
       - name: Configure CMake
         run: >
           cmake 
-          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.5/bin/nvcc
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.6/bin/nvcc
           -DCMAKE_CXX_COMPILER=${{matrix.compiler}}
           -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
