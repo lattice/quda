@@ -66,7 +66,7 @@ namespace quda {
 	for (int i=0; i<k-(N-1); i+=N) {
           computeBeta(beta, Ap, i, N, k);
           updateAp(beta, Ap, i, N, k);
-	}
+        }
 
 	if (k%N != 0) { // need to update the remainder
 	  for (int r = N-1; r>0; r--) {
@@ -302,7 +302,7 @@ namespace quda {
     k_break = 0;
 
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
-    while ( !convergence(r2, heavy_quark_res, stop, stop_hq) && total_iter < param.maxiter) {
+    while (!convergence(r2, heavy_quark_res, stop, stop_hq) && total_iter < param.maxiter) {
 
       if (K) {
 	pushVerbosity(param.verbosity_precondition);
@@ -389,7 +389,7 @@ namespace quda {
         k_break = k;
         k = 0;
 
-        if ( !convergence(r2, heavy_quark_res, stop, stop_hq) ) {
+        if (!convergence(r2, heavy_quark_res, stop, stop_hq)) {
           restart++; // restarting if residual is still too great
 
           PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
@@ -398,7 +398,7 @@ namespace quda {
           r2_old = r2;
 
           // prevent ending the Krylov space prematurely if other convergence criteria not met 
-          if (r2 < stop) l2_converge = true; 
+          if (r2 < stop) l2_converge = true;
         }
 
         r2_old = r2;

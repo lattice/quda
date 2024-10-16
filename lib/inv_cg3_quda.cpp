@@ -134,7 +134,7 @@ namespace quda {
     vector<double> rho(b.size(), 1.0);
     vector<double> gamma(b.size(), 1.0);
 
-    while ( !convergence(r2, heavy_quark_res, stop, stop_hq) && k < param.maxiter) {
+    while (!convergence(r2, heavy_quark_res, stop, stop_hq) && k < param.maxiter) {
 
       matSloppy(ArS, rS);
       auto gamma_old = gamma;
@@ -177,7 +177,7 @@ namespace quda {
         if (convergence(r2, heavy_quark_res, stop, stop_hq) && param.delta >= param.tol) update = true;
 
         // For heavy-quark inversion force a reliable update if we continue after
-        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(heavy_quark_res, stop_hq) and param.delta >= param.tol ) {
+        if (use_heavy_quark_res and L2breakdown and convergenceHQ(heavy_quark_res, stop_hq) and param.delta >= param.tol) {
           update = true;
         }
 

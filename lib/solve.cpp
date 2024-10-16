@@ -10,8 +10,7 @@ namespace quda
 
   void flushChrono(int i)
   {
-    if (i >= QUDA_MAX_CHRONO)
-      errorQuda("Requested chrono index %d is outside of max %d", i, QUDA_MAX_CHRONO);
+    if (i >= QUDA_MAX_CHRONO) errorQuda("Requested chrono index %d is outside of max %d", i, QUDA_MAX_CHRONO);
 
     if (i >= 0)
       chronoResident[i].clear();

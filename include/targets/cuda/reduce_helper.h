@@ -56,7 +56,7 @@ namespace quda
     using system_atomic_t = typename atomic_type<T>::type; /** heterogeneous atomics must use lock-free atomics -> operate on scalars */
     static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t); /** number of words per reduction variable */
     // FIXME on Hopper this could be a 128-bit type
-    cuda::atomic<system_atomic_t, cuda::thread_scope_device> *partial; /** device atomic buffer */
+    cuda::atomic<system_atomic_t, cuda::thread_scope_device> *partial;  /** device atomic buffer */
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d; /** device-mapped host atomic buffer */
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h; /** host atomic buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */

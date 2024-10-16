@@ -472,8 +472,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
     if (param->num_src_per_sub_partition < 1)
       errorQuda("Invalid num_src_per_subpartition = %d", param->num_src_per_sub_partition);
     if (param->num_src % param->num_src_per_sub_partition != 0)
-      errorQuda("num_src %d not compatible with num_src_per_sub_partition %d",
-                param->num_src, param->num_src_per_sub_partition);
+      errorQuda("num_src %d not compatible with num_src_per_sub_partition %d", param->num_src,
+                param->num_src_per_sub_partition);
   }
 #endif
 #endif
@@ -976,12 +976,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-    if (i<QUDA_MAX_MG_LEVEL) {
-          P(n_vec[i], INVALID_INT);
+    if (i < QUDA_MAX_MG_LEVEL) {
+      P(n_vec[i], INVALID_INT);
+      P(n_vec_batch[i], INVALID_INT);
     }
 #else
-    if (i<n_level-1) {
+    if (i < n_level-1) {
       P(n_vec[i], INVALID_INT);
+      P(n_vec_batch[i], INVALID_INT);
     }
 #endif
 

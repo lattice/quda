@@ -2148,6 +2148,7 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   mg_eig_param.n_kr = input_struct.deflate_n_kr; // mg_eig_n_kr[level];
   mg_eig_param.n_conv = input_struct.nvec[level];
   mg_eig_param.n_ev_deflate = -1;  // deflate everything that converged
+  mg_eig_param.compute_evals_batch_size = (input_struct.nvec[level] % 16 == 0) ? 16 : 1; // compute the eigenvalues in appropriate batches
   mg_eig_param.batched_rotate = 0; // mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence
     = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -2328,6 +2329,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
     mg_param.n_vec[i]
       = (i == 0) ? ((input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 24 : 3) : input_struct.nvec[i];
+    mg_param.n_vec_batch[i] = (i == 0) ? 1 : (mg_param.n_vec[i] % 16 == 0 ? 16 : 1);
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
     mg_param.precision_null[i] = input_struct.preconditioner_precision; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i]

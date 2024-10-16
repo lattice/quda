@@ -9,14 +9,8 @@
 namespace quda
 {
 
-  enum WFlowStepType {
-    WFLOW_STEP_W1,
-    WFLOW_STEP_W2,
-    WFLOW_STEP_VT,
-  };
-
   template <typename Float, int nColor_, QudaReconstructType recon_, int wflow_dim_, QudaGaugeSmearType wflow_type_,
-            WFlowStepType step_type_>
+            QudaWFlowStepType step_type_>
   struct GaugeWFlowArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
@@ -24,7 +18,7 @@ namespace quda
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int wflow_dim = wflow_dim_;
     static constexpr QudaGaugeSmearType wflow_type = wflow_type_;
-    static constexpr WFlowStepType step_type = step_type_;
+    static constexpr QudaWFlowStepType step_type = step_type_;
     typedef typename gauge_mapper<Float, recon>::type Gauge;
     typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
 

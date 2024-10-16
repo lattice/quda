@@ -791,7 +791,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-ortho-block-size", eig_ortho_block_size,
                       "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt"
                       "0 for always Classical, 1 for Modified, n > 1 for Hybrid)");
-  opgroup->add_option("--eig-evals-batch-size", eig_evals_batch_size, "The batch size used when computing eigenvalues in the eigensolver");
+  opgroup->add_option("--eig-evals-batch-size", eig_evals_batch_size,
+                      "The batch size used when computing eigenvalues in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
@@ -1014,8 +1015,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The number of pre-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nvec", nvec, CLI::PositiveNumber,
                          "Number of null-space vectors to define the multigrid transfer operator on a given level");
-  quda_app->add_mgoption(opgroup, "--mg-nvec-batch", nvec_batch, CLI::PositiveNumber,
-                         "Batch size to use when computing the null-space vectors to define the multigrid transfer operator on a given level");
+  quda_app->add_mgoption(
+    opgroup, "--mg-nvec-batch", nvec_batch,
+    CLI::PositiveNumber, "Batch size to use when computing the null-space vectors to define the multigrid transfer operator on a given level");
   opgroup->add_option("--mg-oblique-proj-check", oblique_proj_check,
                       "Measure how well the null vector subspace adjusts the low eigenmode subspace (default false)");
   opgroup->add_option("--mg-omega", omega,
