@@ -124,8 +124,8 @@ module quda_fortran
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm
      integer(4) :: compute_true_res ! Whether to compute the true residual post solve
-     real(8) :: true_res ! Actual L2 residual norm achieved in solver
-     real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
+     real(8), dimension(QUDA_MAX_MULTI_SRC) :: true_res ! Actual L2 residual norm achieved in solver
+     real(8), dimension(QUDA_MAX_MULTI_SRC) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
      real(8) :: reliable_delta_refinement ! Reliable update tolerance used in post multi-shift solver refinement
@@ -219,6 +219,10 @@ module quda_fortran
      integer(4) :: iter
      real(8) :: gflops
      real(8) :: secs
+     real(8) :: energy
+     real(8) :: power
+     real(8) :: temp
+     real(8) :: clock
 
      ! Enable auto-tuning?
      QudaTune :: tune

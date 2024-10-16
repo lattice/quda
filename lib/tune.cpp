@@ -105,7 +105,7 @@ namespace quda
 
   const std::string get_resource_path()
   {
-    static std::string resource_path;
+    static std::string resource_path = {};
     static bool init = false;
 
     if (!init) {
@@ -114,10 +114,8 @@ namespace quda
 
       if (!path) {
         warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
-        return {};
       } else if (stat(path, &pstat) || !S_ISDIR(pstat.st_mode)) {
         warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path);
-        return {};
       } else {
         resource_path = path;
       }
@@ -440,7 +438,11 @@ namespace quda
     auto &resource_path = get_resource_path();
 
     if (resource_path.empty()) {
-      warningQuda("Caching of tuned parameters will be disabled");
+      static bool init = false;
+      if (!init) {
+        warningQuda("Caching of tuned parameters will be disabled");
+        init = true;
+      }
       return;
     }
 

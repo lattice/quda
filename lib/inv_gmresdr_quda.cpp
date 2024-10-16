@@ -379,7 +379,7 @@ namespace quda {
     return (j - start_idx);
   }
 
-  void GMResDR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void GMResDR::operator()(ColorSpinorField &x, const ColorSpinorField &b)
   {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
 

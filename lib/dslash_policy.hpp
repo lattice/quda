@@ -1860,8 +1860,12 @@ namespace quda
           }
 
           if (comm_nvshmem_enabled()) {
-            enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
-            enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
+            if (in.size() <= 16) {
+              // FIXME until uber dslash gets fine-grained
+              // synchronization, we cannot use it with large RHS
+              enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
+              enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
+            }
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
             enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH);
           }

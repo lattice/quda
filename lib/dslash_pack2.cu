@@ -53,8 +53,6 @@ namespace quda
 
   template <typename Float, int nColor, bool spin_project> class Pack : TunableKernel3D
   {
-
-protected:
     void **ghost;
     const ColorSpinorField &halo;
     cvector_ref<const ColorSpinorField> &in;
@@ -166,8 +164,11 @@ protected:
       case Device: strcat(aux, ",device-device"); break;
       case Host: strcat(aux, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
       case Shmem: strcat(aux, ",shmem"); break;
-      default: errorQuda("Unknown pack target location %d\n", location);
+      default: errorQuda("Unknown pack target location %d", location);
       }
+#ifdef STRIPED
+      strcat(aux, ",striped");
+#endif
     }
 
 public:
@@ -340,7 +341,7 @@ public:
 #endif
 
     } else {
-        errorQuda("Unsupported nSpin = %d\n", in.Nspin());
+      errorQuda("Unsupported nSpin = %d", in.Nspin());
       }
     }
 

@@ -1209,8 +1209,8 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
@@ -1424,10 +1424,19 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   host_free(sln_pointer);
   host_free(src_pointer);
 
-  // return the number of iterations taken by the inverter
+  // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
+  // convention in `generic_ks/d_congrad5_fn_milc.c` (commit 414fb31). Here, a block solve
+  // is emulated as a series of sequential solves. Each individual solve overrides the
+  // final tolerance and iteration counts from the previous solve. Therefore, num_iters
+  // as well as the tolerances come from the last solve.
+
+  // invertParam.iter is the total number of iterations for the block solver, which is ~=
+  // to the number of iterations the last rhs would take.
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+
+  // MILC only cares about a single residual, which happens to be the last one as described above.
+  *final_residual = invertParam.true_res[num_src - 1];
+  *final_fermilab_residual = invertParam.true_res_hq[num_src - 1];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
@@ -1521,8 +1530,8 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge && last_rhs_flag) invalidateGaugeQuda();
 
@@ -2139,6 +2148,7 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   mg_eig_param.n_kr = input_struct.deflate_n_kr; // mg_eig_n_kr[level];
   mg_eig_param.n_conv = input_struct.nvec[level];
   mg_eig_param.n_ev_deflate = -1;  // deflate everything that converged
+  mg_eig_param.compute_evals_batch_size = (input_struct.nvec[level] % 16 == 0) ? 16 : 1; // compute the eigenvalues in appropriate batches
   mg_eig_param.batched_rotate = 0; // mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence
     = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -2319,6 +2329,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
     mg_param.n_vec[i]
       = (i == 0) ? ((input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 24 : 3) : input_struct.nvec[i];
+    mg_param.n_vec_batch[i] = (i == 0) ? 1 : (mg_param.n_vec[i] % 16 == 0 ? 16 : 1);
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
     mg_param.precision_null[i] = input_struct.preconditioner_precision; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i]
@@ -2707,8 +2718,8 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
@@ -3004,8 +3015,8 @@ void qudaCloverInvert(int external_precision,
   invertQuda(solution, source, &invertParam);
 
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if (clover || cloverInverse) qudaFreeCloverField();
   if (link) qudaFreeGaugeField();
@@ -3083,8 +3094,8 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   if (last_rhs_flag) destroyDeflationQuda(df_preconditioner);
 
   *num_iters = invertParam.iter;
-  *final_residual = invertParam.true_res;
-  *final_fermilab_residual = invertParam.true_res_hq;
+  *final_residual = invertParam.true_res[0];
+  *final_fermilab_residual = invertParam.true_res_hq[0];
 
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
@@ -3151,7 +3162,7 @@ void qudaCloverMultishiftInvert(int external_precision, int quda_precision, int 
     }
 
     invertQuda(solutionArray[0], source, &invertParam);
-    *final_residual = invertParam.true_res;
+    *final_residual = invertParam.true_res[0];
   } else {
     invertMultiShiftQuda(solutionArray, source, &invertParam);
     for (int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];

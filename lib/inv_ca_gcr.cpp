@@ -21,18 +21,19 @@ namespace quda
     destroyDeflationSpace();
   }
 
-  void CAGCR::create(ColorSpinorField &x, const ColorSpinorField &b)
+  void CAGCR::create(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     Solver::create(x, b);
 
-    if (!init) {
+    if (!init || r.size() != b.size()) {
       if (!param.is_preconditioner) getProfile().TPSTART(QUDA_PROFILE_INIT);
 
-      alpha.resize(param.Nkrylov);
+      alpha.resize(b.size());
+      for (auto i = 0u; i < alpha.size(); i++) alpha[i].resize(param.Nkrylov);
 
       bool mixed = param.precision != param.precision_sloppy;
 
-      ColorSpinorParam csParam(b);
+      ColorSpinorParam csParam(b[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
 
@@ -41,27 +42,30 @@ namespace quda
         p.resize(param.Nkrylov + 1);
         q.resize(param.Nkrylov);
         for (int i = 0; i < param.Nkrylov + 1; i++) {
-          p[i] = ColorSpinorField(csParam);
-          if (i > 0) q[i - 1] = p[i].create_alias(csParam);
+          resize(p[i], b.size(), csParam);
+          if (i > 0) create_alias(q[i - 1], p[i]);
         }
       } else {
         p.resize(param.Nkrylov);
         q.resize(param.Nkrylov);
         for (int i = 0; i < param.Nkrylov; i++) {
-          p[i] = ColorSpinorField(csParam);
-          q[i] = ColorSpinorField(csParam);
+          resize(p[i], b.size(), csParam);
+          resize(q[i], b.size(), csParam);
         }
       }
 
       csParam.setPrecision(param.precision);
-      r = mixed ? ColorSpinorField(csParam) : p[0].create_alias(csParam);
+      if (mixed)
+        resize(r, b.size(), csParam);
+      else
+        create_alias(r, p[0]);
 
       if (!param.is_preconditioner) getProfile().TPSTOP(QUDA_PROFILE_INIT);
       init = true;
     } // init
   }
 
-  void CAGCR::solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &q, ColorSpinorField &b)
+  void CAGCR::solve(std::vector<Complex> &psi_, cvector_ref<ColorSpinorField> &q, ColorSpinorField &b)
   {
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
@@ -113,7 +117,7 @@ namespace quda
     }
   }
 
-  ColorSpinorField &CAGCR::get_residual()
+  cvector_ref<const ColorSpinorField> CAGCR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -127,7 +131,7 @@ namespace quda
     3. Update solution and residual vectors
     4. (Optional) restart if convergence or maxiter not reached
   */
-  void CAGCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CAGCR::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     const int n_krylov = param.Nkrylov;
 
@@ -143,16 +147,16 @@ namespace quda
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
-    double r2 = 0.0; // if zero source then we will exit immediately doing no work
+    auto b2 = !fixed_iteration ? blas::norm2(b) : vector<double>(b.size(), 1.0);
+    std::vector<double> r2(b.size(), 0.0); // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
       if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
-        constructDeflationSpace(b, matMdagM);
+        constructDeflationSpace(b[0], matMdagM);
       } else {
         // Use Arnoldi to inspect the space only and turn off deflation
-        constructDeflationSpace(b, mat);
+        constructDeflationSpace(b[0], mat);
         param.deflate = false;
       }
       if (deflate_compute) {
@@ -217,7 +221,7 @@ namespace quda
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
       // and q[0]/q[1] as temporaries for the power iterations. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10);
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r[0], q[0][0], q[1][0], 100, 10);
       logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
@@ -233,19 +237,13 @@ namespace quda
     double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        warningQuda("inverting on zero-field source\n");
-        x = b;
-        param.true_res = 0.0;
-        param.true_res_hq = 0.0;
-        return;
-      } else {
-        b2 = r2;
-      }
+    if (is_zero_src(x, b, b2)) {
+      getProfile().TPSTOP(QUDA_PROFILE_INIT);
+      return;
     }
 
-    double stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver
+    auto stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) :
+                                   std::vector(b.size(), 0.0); // stopping condition of solver
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -255,8 +253,11 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    double heavy_quark_res = 0.0; // heavy quark residual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    std::vector<double> heavy_quark_res(b.size(), 0.0); // heavy quark residual
+    if (use_heavy_quark_res) {
+      auto hq = blas::HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+    }
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -267,29 +268,41 @@ namespace quda
     }
     int total_iter = 0;
     int restart = 0;
-    double r2_old = r2;
-    double maxr_deflate = sqrt(r2);
+    auto r2_old = r2;
+    auto maxr_deflate = sqrt(r2[0]);
     bool l2_converge = false;
 
     blas::copy(p[0], r); // no op if uni-precision
 
+    auto get_i = [](std::vector<std::vector<ColorSpinorField>> &p, int i) {
+      vector_ref<ColorSpinorField> p_i;
+      p_i.reserve(p.size());
+      for (auto &pi : p) p_i.push_back(pi[i]);
+      return p_i;
+    };
+
     PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
-    while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergenceL2(r2, stop) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
       computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map);
 
-      solve(alpha, q, p[0]);
+      for (auto i = 0u; i < b.size(); i++) solve(alpha[i], get_i(q, i), p[0][i]);
 
       // need to make sure P is only length n_krylov
-      blas::block::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
+      for (auto i = 0u; i < b.size(); i++) {
+        auto pi = get_i(p, i);
+        blas::block::caxpy(alpha[i], {pi.begin(), pi.begin() + n_krylov}, {x[i]});
+      }
 
       // no need to compute residual vector if not returning
       // residual vector and only doing a single fixed iteration
       if (!fixed_iteration || param.return_residual) {
-        // update the residual vector
-        for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
-        blas::block::caxpy(alpha, q, r);
+        for (auto i = 0u; i < b.size(); i++) {
+          // update the residual vector
+          for (int j = 0; j < n_krylov; j++) alpha[i][j] = -alpha[i][j];
+          blas::block::caxpy(alpha[i], get_i(q, i), r[i]);
+        }
       }
 
       total_iter += n_krylov;
@@ -302,13 +315,13 @@ namespace quda
 
       // update since n_krylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every n_krylov steps
-      if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2 / r2_old) < param.delta) {
+      if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2[0] / r2_old[0]) < param.delta) {
 
         if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
         mat(r, x);
         r2 = blas::xmyNorm(b, r);
 
-        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+        if (param.deflate && sqrt(r2[0]) < maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
           eig_solve->deflateSVD(x, r, evecs, evals, true);
 
@@ -316,10 +329,13 @@ namespace quda
           mat(r, x);
           r2 = blas::xmyNorm(b, r);
 
-          maxr_deflate = sqrt(r2);
+          maxr_deflate = sqrt(r2[0]);
         }
 
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+        if (use_heavy_quark_res) {
+          auto hq = blas::HeavyQuarkResidualNorm(x, r);
+          for (auto i = 0u; i < b.size(); i++) heavy_quark_res[i] = sqrt(hq[i].z);
+        }
 
         // break-out check if we have reached the limit of the precision
         if (r2 > r2_old) {
@@ -327,7 +343,7 @@ namespace quda
           resIncreaseTotal++;
           warningQuda(
             "CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+            sqrt(r2[0]), sqrt(r2_old[0]), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
             break;
@@ -340,7 +356,7 @@ namespace quda
       }
 
       // No matter what, if we haven't converged, we do a restart.
-      if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+      if (!convergenceL2(r2, stop)) {
         restart++; // restarting if residual is still too great
 
         PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
@@ -361,10 +377,12 @@ namespace quda
     if (param.compute_true_res) {
       // Calculate the true residual
       mat(r, x);
-      double true_res = blas::xmyNorm(b, r);
-      param.true_res = sqrt(true_res / b2);
-      param.true_res_hq
-        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r).z) : 0.0;
+      auto true_r2 = blas::xmyNorm(b, r);
+      auto hq = blas::HeavyQuarkResidualNorm(x, r);
+      for (auto i = 0u; i < b.size(); i++) {
+        param.true_res[i] = sqrt(true_r2[i] / b2[i]);
+        param.true_res_hq[i] = sqrt(hq[i].z);
+      }
     }
 
     if (!param.is_preconditioner) {
@@ -372,7 +390,7 @@ namespace quda
       param.iter += total_iter;
     }
 
-    PrintSummary("CA-GCR", total_iter, r2, b2, stop, param.tol_hq);
+    PrintSummary("CA-GCR", total_iter, r2, b2, stop);
 
     if (param.is_preconditioner) commGlobalReductionPop();
   }

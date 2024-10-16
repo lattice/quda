@@ -43,6 +43,11 @@ namespace quda
       }
     }
 
+    XUpdateBatch(const XUpdateBatch &other) = default;
+    XUpdateBatch(XUpdateBatch &&other) = default;
+    XUpdateBatch &operator=(const XUpdateBatch &other) = default;
+    XUpdateBatch &operator=(XUpdateBatch &&other) = default;
+
     /**
        @brief use the vectors currently stored and add to the given output field
        @param x the output field to add to

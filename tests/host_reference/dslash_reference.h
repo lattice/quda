@@ -87,16 +87,17 @@ static inline void su3Tmul(sFloat *res, const gFloat *mat, const sFloat *vec)
 }
 
 std::array<double, 2> verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
-                                      QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+                                      QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv,
+                                      int src_idx);
 
 std::array<double, 2> verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
                                       QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge,
-                                      void *clover, void *clover_inv);
+                                      void *clover, void *clover_inv, int src_idx = 0);
 
 std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn,
                                                     void *spinorCheck, QudaGaugeParam &gauge_param,
                                                     QudaInvertParam &inv_param, void **gauge, void *clover,
-                                                    void *clover_inv);
+                                                    void *clover_inv, int src_idx);
 
 double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param,
                                    QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv);
@@ -105,9 +106,9 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
                                       QudaGaugeParam &gauge_param, QudaEigParam &eig_param, void **gauge, void *clover,
                                       void *clover_inv);
 
-std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn,
-                                                void *spinorCheck, QudaGaugeParam &gauge_param,
-                                                QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
+                                                QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge,
+                                                void *clover, void *clover_inv, int src_idx);
 
 /**
  * @brief Verify a staggered inversion on the host. This version is a thin wrapper around a version that takes
@@ -122,7 +123,7 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
  */
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param);
+                                               QudaInvertParam &inv_param, int src_idx);
 
 /**
  * @brief Verify a single- or multi-shift staggered inversion on the host
@@ -137,7 +138,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda:
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
                                                std::vector<quda::ColorSpinorField> &out_vector,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param);
+                                               QudaInvertParam &inv_param, int src_idx = 0);
 
 /**
  * @brief Verify a staggered-type eigenvector

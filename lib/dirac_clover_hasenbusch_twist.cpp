@@ -29,14 +29,14 @@ namespace quda
   void DiracCloverHasenbuschTwist::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     if (symmetric) {
-      ApplyWilsonCloverHasenbuschTwist(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity],
+      ApplyWilsonCloverHasenbuschTwist(out(this_parity), in(other_parity), *gauge, *clover, -kappa, mu, in(this_parity),
                                        this_parity, dagger, commDim.data, profile);
-      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity,
+      ApplyWilsonClover(out(other_parity), in(this_parity), *gauge, *clover, -kappa, in(other_parity), other_parity,
                         dagger, commDim.data, profile);
     } else {
-      ApplyWilsonClover(out[other_parity], in[this_parity], *gauge, *clover, -kappa, in[other_parity], other_parity,
+      ApplyWilsonClover(out(other_parity), in(this_parity), *gauge, *clover, -kappa, in(other_parity), other_parity,
                         dagger, commDim.data, profile);
-      ApplyTwistedClover(out[this_parity], in[other_parity], *gauge, *clover, -kappa, mu, in[this_parity], this_parity,
+      ApplyTwistedClover(out(this_parity), in(other_parity), *gauge, *clover, -kappa, mu, in(this_parity), this_parity,
                          dagger, commDim.data, profile);
     }
   }
@@ -115,10 +115,6 @@ namespace quda
     double kappa2 = -kappa * kappa;
     auto tmp = getFieldTmp(out);
 
-    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
     if (!symmetric) {
       // No need to change order of calls for dagger
       // because the asymmetric operator is actually symmetric
@@ -126,27 +122,27 @@ namespace quda
       // the pieces in Dslash and DslashXPay respect the dagger
 
       // DiracCloverHasenbuschTwistPC::Dslash applies A^{-1}Dslash
-      Dslash(tmp, in, parity[0]);
+      Dslash(tmp, in, other_parity);
 
       // applies (A + imu*g5 - kappa^2 D)-
-      ApplyTwistedClover(out, tmp, *gauge, *clover, kappa2, mu, in, parity[1], dagger, commDim.data, profile);
+      ApplyTwistedClover(out, tmp, *gauge, *clover, kappa2, mu, in, this_parity, dagger, commDim.data, profile);
     } else if (!dagger) { // symmetric preconditioning
       // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
       // where A is actually a clover inverse.
 
       // This is the non-dag case: AD
-      Dslash(tmp, in, parity[0]);
+      Dslash(tmp, in, other_parity);
 
       // Then x + AD (AD)
-      DslashXpayTwistClovInv(out, tmp, parity[1], in, kappa2, mu);
+      DslashXpayTwistClovInv(out, tmp, this_parity, in, kappa2, mu);
     } else { // symmetric preconditioning, dagger
       // This is the dagger: 1 - DADA
       //  i) Apply A
-      CloverInv(out, in, parity[1]);
+      CloverInv(out, in, this_parity);
       // ii) Apply A D => ADA
-      Dslash(tmp, out, parity[0]);
+      Dslash(tmp, out, other_parity);
       // iii) Apply  x + D(ADA)
-      DslashXpayTwistNoClovInv(out, tmp, parity[1], in, kappa2, mu);
+      DslashXpayTwistNoClovInv(out, tmp, this_parity, in, kappa2, mu);
     }
   }
 
