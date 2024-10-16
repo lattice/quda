@@ -16,6 +16,21 @@ namespace quda
 
   using namespace colorspinor;
 
+  /** Helper function for parity computation */
+  inline int computeParity(const ColorSpinorField &f)
+  {
+
+    // Account for odd-even vs. even-odd site orders
+    int ret_val = f.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0;
+
+    // Account for potential parity flip to access single parity subset QDP-JIT fields
+    if (f.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER && f.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+      ret_val = 1 - ret_val;
+    }
+
+    return ret_val;
+  }
+
   template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In,
             template <int, int> class Basis_>
   struct CopyColorSpinorArg : kernel_param<> {
@@ -32,8 +47,8 @@ namespace quda
       kernel_param(dim3(in.VolumeCB(), in.SiteSubset(), 1)),
       out(out, 1, Out_),
       in(in, 1, const_cast<FloatIn *>(In_)),
-      outParity(out.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
-      inParity(in.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0)
+      outParity(computeParity(out)),
+      inParity(computeParity(in))
     {
     }
   };
