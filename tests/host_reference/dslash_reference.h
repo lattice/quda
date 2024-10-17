@@ -5,64 +5,147 @@
 #include <comm_quda.h>
 #include <gauge_field.h>
 
-template <typename Float> static inline void sum(Float *dst, Float *a, Float *b, int cnt)
+#include "index_utils.hpp"
+
+/**
+ * @brief Computes the element-wise sum of two arrays, storing it into a third
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[out] dst The output array to store the sum
+ * @param[in] a The first input array
+ * @param[in] b The second input array
+ * @param[in] len The number of elements in the input arrays
+ */
+template <typename Float> static inline void sum(Float *dst, const Float *a, const Float *b, int len)
 {
-  for (int i = 0; i < cnt; i++) dst[i] = a[i] + b[i];
+  for (int i = 0; i < len; i++) dst[i] = a[i] + b[i];
 }
 
-template <typename Float> static inline void sub(Float *dst, Float *a, Float *b, int cnt)
+/**
+ * @brief Computes the element-wise difference of two arrays, storing it into a third
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[out] dst The output array to store the sum
+ * @param[in] a The first input array
+ * @param[in] b The second input array
+ * @param[in] len The number of elements in the input arrays
+ */
+template <typename Float> static inline void sub(Float *dst, const Float *a, const Float *b, int len)
 {
-  for (int i = 0; i < cnt; i++) dst[i] = a[i] - b[i];
+  for (int i = 0; i < len; i++) dst[i] = a[i] - b[i];
 }
 
-template <typename Float> static inline void ax(Float *dst, Float a, Float *x, int cnt)
+/**
+ * @brief Rescale an array by a real scalar, storing it into a separate array
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[out] dst The output array to store the rescaling
+ * @param[in] a The rescaling factor
+ * @param[in] x The input array
+ * @param[in] len The number of elements in the input array
+ */
+template <typename Float> static inline void ax(Float *dst, Float a, const Float *x, int len)
 {
-  for (int i = 0; i < cnt; i++) dst[i] = a * x[i];
+  for (int i = 0; i < len; i++) dst[i] = a * x[i];
 }
 
-// performs the operation y[i] = a*x[i] + y[i]
-template <typename Float> static inline void axpy(Float a, Float *x, Float *y, int len)
+/**
+ * @brief Perform the operation y[i] = a*x[i] + y[i]
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[in] a The rescaling factor
+ * @param[in] x The input array
+ * @param[in,out] y An input and output array that is accumulated into
+ * @param[in] len The number of elements in the input array
+ */
+template <typename Float> static inline void axpy(Float a, const Float *x, Float *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = a * x[i] + y[i];
 }
 
-// performs the operation y[i] = a*x[i] + b*y[i]
-template <typename Float> static inline void axpby(Float a, Float *x, Float b, Float *y, int len)
+/**
+ * @brief Perform the operation y[i] = a*x[i] + b*y[i]
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[in] a One rescaling factor
+ * @param[in] x The input array
+ * @param[in] b The second rescaling factor
+ * @param[in,out] y An input and output array that is accumulated into
+ * @param[in] len The number of elements in the input array
+ */
+template <typename Float> static inline void axpby(Float a, const Float *x, Float b, Float *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = a * x[i] + b * y[i];
 }
 
-// performs the operation y[i] = a*x[i] - y[i]
-template <typename Float> static inline void axmy(Float *x, Float a, Float *y, int len)
+/**
+ * @brief Perform the operation y[i] = a*x[i] - y[i]
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[in] a The rescaling factor
+ * @param[in] x The input array
+ * @param[in,out] y An input and output array that is accumulated into
+ * @param[in] len The number of elements in the input array
+ */
+template <typename Float> static inline void axmy(const Float *x, Float a, Float *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = a * x[i] - y[i];
 }
 
-template <typename Float> static double norm2(Float *v, int len)
+/**
+ * @brief Perform the element-wise norm2 of an array
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[in] x The input array
+ * @param[in] len The number of elements in the input array
+ */
+template <typename Float> static double norm2(const Float *v, int len)
 {
   double sum = 0.0;
   for (int i = 0; i < len; i++) sum += v[i] * v[i];
   return sum;
 }
 
+/**
+ * @brief Perform the element-wise negation of an array
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[in,out] x The input array
+ * @param[in] len The number of elements in the input array
+ */
 template <typename Float> static inline void negx(Float *x, int len)
 {
   for (int i = 0; i < len; i++) x[i] = -x[i];
 }
 
-template <typename sFloat, typename gFloat> static inline void dot(sFloat *res, const gFloat *a, const sFloat *b)
+/**
+ * @brief Perform the element-wise complex dot product of a 3-component complex array
+ *
+ * @tparam Float The floating-point type of the array elements
+ * @param[out] res The output values
+ * @param[in] a The first input array
+ * @param[in] b The first input array
+ */
+template <typename Float> static inline void dot(Float *res, const Float *a, const Float *b)
 {
   res[0] = res[1] = 0;
   for (int m = 0; m < 3; m++) {
-    sFloat a_re = a[2 * m + 0];
-    sFloat a_im = a[2 * m + 1];
-    sFloat b_re = b[2 * m + 0];
-    sFloat b_im = b[2 * m + 1];
+    Float a_re = a[2 * m + 0];
+    Float a_im = a[2 * m + 1];
+    Float b_re = b[2 * m + 0];
+    Float b_im = b[2 * m + 1];
     res[0] += a_re * b_re - a_im * b_im;
     res[1] += a_re * b_im + a_im * b_re;
   }
 }
 
+/**
+ * @brief Perform the Hermitian conjugate of an SU(3) matrix, storing it in a second matrix
+ *
+ * @tparam Float The floating-point type of the matrix elements
+ * @param[out] res The output SU(3) matrix
+ * @param[in] mat The input SU(3) matrix
+ */
 template <typename Float> static inline void su3Transpose(Float *res, const Float *mat)
 {
   for (int m = 0; m < 3; m++) {
@@ -73,15 +156,31 @@ template <typename Float> static inline void su3Transpose(Float *res, const Floa
   }
 }
 
-template <typename sFloat, typename gFloat> static inline void su3Mul(sFloat *res, const gFloat *mat, const sFloat *vec)
+/**
+ * @brief Perform an SU(3) matrix-vector multiplication
+ *
+ * @tparam Float The floating-point type of the matrix and vector elements
+ * @param[out] res The output 3-component vector
+ * @param[in] mat The input SU(3) matrix
+ * @param[in] vec The input 3-component vector
+ */
+template <typename Float> static inline void su3Mul(Float *res, const Float *mat, const Float *vec)
 {
   for (int n = 0; n < 3; n++) dot(&res[n * (2)], &mat[n * (3 * 2)], vec);
 }
 
-template <typename sFloat, typename gFloat>
-static inline void su3Tmul(sFloat *res, const gFloat *mat, const sFloat *vec)
+/**
+ * @brief Perform an SU(3) matrix-vector multiplication, using the Hermitian conjugate of the matrix
+ *
+ * @tparam Float The floating-point type of the matrix and vector elements
+ * @param[out] res The output 3-component vector
+ * @param[in] mat The input SU(3) matrix
+ * @param[in] vec The input 3-component vector
+ */
+template <typename Float>
+static inline void su3Tmul(Float *res, const Float *mat, const Float *vec)
 {
-  gFloat matT[3 * 3 * 2];
+  Float matT[3 * 3 * 2];
   su3Transpose(matT, mat);
   su3Mul(res, matT, vec);
 }
@@ -179,134 +278,35 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
  */
 double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha0, int t0);
 
-// i represents a "half index" into an even or odd "half lattice".
-// when oddBit={0,1} the half lattice is {even,odd}.
-//
-// the displacements, such as dx, refer to the full lattice coordinates.
-//
-// neighborIndex() takes a "half index", displaces it, and returns the
-// new "half index", which can be an index into either the even or odd lattices.
-// displacements of magnitude one always interchange odd and even lattices.
-//
-
+/**
+ * @brief Return the pointer to a gauge link as a function of an origin and an offset
+ *
+ * @param[in] i The checkerboard index of the site
+ * @param[in] dir The displacement direction
+ * @param[in] oddBit The parity of the site
+ * @param[in] gaugeEven The even gauge fields stored in a QDP layout
+ * @param[in] gaugeOdd The odd gauge fields stored in a QDP layout
+ * @param[in] ghostGaugeEven The even-parity gauge ghost fields
+ * @param[in] ghostGaugeOdd The odd-parity gauge ghost fields
+ * @param[in] n_ghost_faces The depth of the ghost fields
+ * @param[in] nbr_distance Displacement distance
+ * @return A pointer to the offset gauge link
+ */
 template <typename Float>
-static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
+const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven, const Float *const *gaugeOdd,
+                               const Float *const *ghostGaugeEven, const Float *const *ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
 {
-  Float **gaugeField;
   int j;
   int d = nbr_distance;
+  const Float* const* gaugeField = [&] () -> const Float* const* {
+    if (dir % 2 == 0)
+      return (oddBit ? gaugeOdd : gaugeEven);
+    else
+      return (oddBit ? gaugeEven : gaugeOdd);
+  }();
+
   if (dir % 2 == 0) {
     j = i;
-    gaugeField = (oddBit ? gaugeOdd : gaugeEven);
-  } else {
-    switch (dir) {
-    case 1: j = neighborIndex(i, oddBit, 0, 0, 0, -d); break;
-    case 3: j = neighborIndex(i, oddBit, 0, 0, -d, 0); break;
-    case 5: j = neighborIndex(i, oddBit, 0, -d, 0, 0); break;
-    case 7: j = neighborIndex(i, oddBit, -d, 0, 0, 0); break;
-    default: j = -1; break;
-    }
-    gaugeField = (oddBit ? gaugeEven : gaugeOdd);
-  }
-
-  return &gaugeField[dir / 2][j * (3 * 3 * 2)];
-}
-
-template <typename Float>
-static inline const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, int neighbor_distance,
-                                          int site_size = 24)
-{
-  int j;
-  int nb = neighbor_distance;
-  switch (dir) {
-  case 0: j = neighborIndex(i, oddBit, 0, 0, 0, +nb); break;
-  case 1: j = neighborIndex(i, oddBit, 0, 0, 0, -nb); break;
-  case 2: j = neighborIndex(i, oddBit, 0, 0, +nb, 0); break;
-  case 3: j = neighborIndex(i, oddBit, 0, 0, -nb, 0); break;
-  case 4: j = neighborIndex(i, oddBit, 0, +nb, 0, 0); break;
-  case 5: j = neighborIndex(i, oddBit, 0, -nb, 0, 0); break;
-  case 6: j = neighborIndex(i, oddBit, +nb, 0, 0, 0); break;
-  case 7: j = neighborIndex(i, oddBit, -nb, 0, 0, 0); break;
-  default: j = -1; break;
-  }
-
-  return &spinorField[j * site_size];
-}
-
-// i represents a "half index" into an even or odd "half lattice".
-// when oddBit={0,1} the half lattice is {even,odd}.
-//
-// the displacements, such as dx, refer to the full lattice coordinates.
-//
-// neighborIndex() takes a "half index", displaces it, and returns the
-// new "half index", which can be an index into either the even or odd lattices.
-// displacements of magnitude one always interchange odd and even lattices.
-//
-//
-template <QudaPCType type> int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
-{
-  // fullLatticeIndex was modified for fullLatticeIndex_4d.  It is in util_quda.cpp.
-  // This code bit may not properly perform 5dPC.
-  int X = type == QUDA_5D_PC ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
-  // Checked that this matches code in dslash_core_ante.h.
-  int xs = X / (Z[3] * Z[2] * Z[1] * Z[0]);
-  int x4 = (X / (Z[2] * Z[1] * Z[0])) % Z[3];
-  int x3 = (X / (Z[1] * Z[0])) % Z[2];
-  int x2 = (X / Z[0]) % Z[1];
-  int x1 = X % Z[0];
-  // Displace and project back into domain 0,...,Ls-1.
-  // Note that we add Ls to avoid the negative problem
-  // of the C % operator.
-  xs = (xs + dxs + Ls) % Ls;
-  // Etc.
-  x4 = (x4 + dx4 + Z[3]) % Z[3];
-  x3 = (x3 + dx3 + Z[2]) % Z[2];
-  x2 = (x2 + dx2 + Z[1]) % Z[1];
-  x1 = (x1 + dx1 + Z[0]) % Z[0];
-  // Return linear half index.  Remember that integer division
-  // rounds down.
-  return (xs * (Z[3] * Z[2] * Z[1] * Z[0]) + x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
-}
-
-template <QudaPCType type, typename Float>
-Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int site_size = 24)
-{
-  int nb = neighbor_distance;
-  int j;
-  switch (dir) {
-  case 0: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, 0, +nb); break;
-  case 1: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, 0, -nb); break;
-  case 2: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, +nb, 0); break;
-  case 3: j = neighborIndex_5d<type>(i, oddBit, 0, 0, 0, -nb, 0); break;
-  case 4: j = neighborIndex_5d<type>(i, oddBit, 0, 0, +nb, 0, 0); break;
-  case 5: j = neighborIndex_5d<type>(i, oddBit, 0, 0, -nb, 0, 0); break;
-  case 6: j = neighborIndex_5d<type>(i, oddBit, 0, +nb, 0, 0, 0); break;
-  case 7: j = neighborIndex_5d<type>(i, oddBit, 0, -nb, 0, 0, 0); break;
-  case 8: j = neighborIndex_5d<type>(i, oddBit, +nb, 0, 0, 0, 0); break;
-  case 9: j = neighborIndex_5d<type>(i, oddBit, -nb, 0, 0, 0, 0); break;
-  default: j = -1; break;
-  }
-  return &spinorField[j * site_size];
-}
-
-#ifdef MULTI_GPU
-inline int x4_mg(int i, int oddBit)
-{
-  int Y = fullLatticeIndex(i, oddBit);
-  int x4 = Y / (Z[2] * Z[1] * Z[0]);
-  return x4;
-}
-
-template <typename Float>
-static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
-                                      Float **ghostGaugeEven, Float **ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
-{
-  Float **gaugeField;
-  int j;
-  int d = nbr_distance;
-  if (dir % 2 == 0) {
-    j = i;
-    gaugeField = (oddBit ? gaugeOdd : gaugeEven);
   } else {
 
     int Y = fullLatticeIndex(i, oddBit);
@@ -318,13 +318,12 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     int X2 = Z[1];
     int X3 = Z[2];
     int X4 = Z[3];
-    Float *ghostGaugeField;
 
     switch (dir) {
     case 1: { //-X direction
       int new_x1 = (x1 - d + X1) % X1;
       if (x1 - d < 0 && quda::comm_dim_partitioned(0)) {
-        ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
+        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
         int offset = (n_ghost_faces + x1 - d) * X4 * X3 * X2 / 2 + (x4 * X3 * X2 + x3 * X2 + x2) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -334,7 +333,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 3: { //-Y direction
       int new_x2 = (x2 - d + X2) % X2;
       if (x2 - d < 0 && quda::comm_dim_partitioned(1)) {
-        ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
+        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
         int offset = (n_ghost_faces + x2 - d) * X4 * X3 * X1 / 2 + (x4 * X3 * X1 + x3 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -344,7 +343,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 5: { //-Z direction
       int new_x3 = (x3 - d + X3) % X3;
       if (x3 - d < 0 && quda::comm_dim_partitioned(2)) {
-        ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
+        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
         int offset = (n_ghost_faces + x3 - d) * X4 * X2 * X1 / 2 + (x4 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -354,7 +353,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 7: { //-T direction
       int new_x4 = (x4 - d + X4) % X4;
       if (x4 - d < 0 && quda::comm_dim_partitioned(3)) {
-        ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
+        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
         int offset = (n_ghost_faces + x4 - d) * X1 * X2 * X3 / 2 + (x3 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -362,21 +361,61 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
       break;
     } // 7
 
-    default:
-      j = -1;
-      printf("ERROR: wrong dir \n");
-      exit(1);
+    default: j = -1; errorQuda("wrong dir");
     }
-    gaugeField = (oddBit ? gaugeEven : gaugeOdd);
   }
 
   return &gaugeField[dir / 2][j * (3 * 3 * 2)];
 }
 
+/**
+ * @brief Return the pointer to a gauge link as a function of an origin and an offset
+ *
+ * @param[in] i The checkerboard index of the site
+ * @param[in] dir The displacement direction
+ * @param[in] oddBit The parity of the site
+ * @param[in] gaugeEven The even gauge fields stored in a QDP layout
+ * @param[in] gaugeOdd The odd gauge fields stored in a QDP layout
+ * @param[in] nbr_distance Displacement distance
+ * @return A pointer to the offset gauge link
+ */
 template <typename Float>
-static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, const Float *spinorField,
-                                                 Float **fwd_nbr_spinor, Float **back_nbr_spinor, int neighbor_distance,
-                                                 int nFace, int site_size = 24)
+const Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
+{
+  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<const Float * const*>(nullptr), static_cast<const Float * const*>(nullptr),
+                   0, nbr_distance);
+}
+
+/**
+ * @brief Compute the 4th dimension index for a given checkerboard index
+ * @param[in] i The checkerboard index
+ * @param[in] oddBit The odd/even bit for the index
+ * @return The 4th dimension index
+ */
+inline int x4_mg(int i, int oddBit)
+{
+  int Y = fullLatticeIndex(i, oddBit);
+  int x4 = Y / (Z[2] * Z[1] * Z[0]);
+  return x4;
+}
+
+/**
+ * @brief Return the pointer to a fermion field as a function of an origin and an offset
+ *
+ * @param[in] i The checkerboard index of the site
+ * @param[in] dir The displacement direction
+ * @param[in] oddBit The parity of the site
+ * @param[in] spinorField The spinor field
+ * @param[in] fwd_nbr_spinor The forward ghost region for the spinor field
+ * @param[in] back_nbr_spinor The backward ghost region for the spinor field
+ * @param[in] neighbor_distance Displacement distance
+ * @param[in] nFace The depth of the ghost fields
+ * @param[in] site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
+template <typename Float>
+const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, const Float *const *fwd_nbr_spinor,
+                            const Float *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -471,52 +510,61 @@ static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, con
     }
     break;
   }
-  default:
-    j = -1;
-    printf("ERROR: wrong dir\n");
-    exit(1);
+  default: j = -1; errorQuda("ERROR: wrong dir");
   }
 
   return &spinorField[j * site_size];
 }
 
-template <QudaPCType type> int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
+/**
+ * @brief Return the pointer to a fermion field as a function of an origin and an offset
+ *
+ * @param[in] i The checkerboard index of the site
+ * @param[in] dir The displacement direction
+ * @param[in] oddBit The parity of the site
+ * @param[in] spinorField The spinor field
+ * @param[in] neighbor_distance Displacement distance
+ * @param[in] site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
+template <typename Float>
+const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, int neighbor_distance,
+                                          int site_size = 24)
 {
-  int ret;
-
-  int Y = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
-
-  int xs = Y / (Z[3] * Z[2] * Z[1] * Z[0]);
-  int x4 = (Y / (Z[2] * Z[1] * Z[0])) % Z[3];
-  int x3 = (Y / (Z[1] * Z[0])) % Z[2];
-  int x2 = (Y / Z[0]) % Z[1];
-  int x1 = Y % Z[0];
-  int ghost_x4 = x4 + dx4;
-
-  xs = (xs + dxs + Ls) % Ls;
-  x4 = (x4 + dx4 + Z[3]) % Z[3];
-  x3 = (x3 + dx3 + Z[2]) % Z[2];
-  x2 = (x2 + dx2 + Z[1]) % Z[1];
-  x1 = (x1 + dx1 + Z[0]) % Z[0];
-
-  if ((ghost_x4 >= 0 && ghost_x4) < Z[3] || !quda::comm_dim_partitioned(3)) {
-    ret = (xs * Z[3] * Z[2] * Z[1] * Z[0] + x4 * Z[2] * Z[1] * Z[0] + x3 * Z[1] * Z[0] + x2 * Z[0] + x1) >> 1;
-  } else {
-    ret = (xs * Z[2] * Z[1] * Z[0] + x3 * Z[1] * Z[0] + x2 * Z[0] + x1) >> 1;
-  }
-
-  return ret;
+  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<const Float *const *>(nullptr), static_cast<const Float *const *>(nullptr),
+                        neighbor_distance, 0, site_size);
 }
 
+/**
+ * @brief Compute the 4th dimension index for a given 5-d index with or without 4D-PC
+ * @tparam type The PCType, either QUDA_5D_PC or QUDA_4D_PC
+ * @param[in] i The 5-d index
+ * @param[in] oddBit The odd/even bit for the index
+ * @return The 4th dimension index
+ */
 template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
 {
   int Y = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
   return (Y / (Z[2] * Z[1] * Z[0])) % Z[3];
 }
 
+/**
+ * @brief Return the pointer to a 5-d fermion field as a function of an origin and an offset
+ *
+ * @param[in] i The checkerboard index of the site
+ * @param[in] dir The displacement direction
+ * @param[in] oddBit The parity of the site
+ * @param[in] spinorField The spinor field
+ * @param[in] fwd_nbr_spinor The forward ghost region for the spinor field
+ * @param[in] back_nbr_spinor The backward ghost region for the spinor field
+ * @param[in] neighbor_distance Displacement distance
+ * @param[in] nFace The depth of the ghost fields
+ * @param[in] site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
 template <QudaPCType type, typename Float>
-Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
-                              Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+const Float *spinorNeighbor_5d(int i, int dir, int oddBit, const Float *spinorField, const Float *const *fwd_nbr_spinor,
+                         const Float *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -600,7 +648,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
       int offset = ((x4 + nb - Z[3]) * Ls * X3 * X2 * X1 + xs * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
       return fwd_nbr_spinor[3] + offset * site_size;
     }
-    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, +nb, 0, 0, 0);
+    j = neighborIndex_5d<type>(i, oddBit, 0, +nb, 0, 0, 0);
     break;
   }
   case 7: //-T
@@ -610,16 +658,31 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
       int offset = ((x4 - nb + nFace) * Ls * X3 * X2 * X1 + xs * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
       return back_nbr_spinor[3] + offset * site_size;
     }
-    j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, -nb, 0, 0, 0);
+    j = neighborIndex_5d<type>(i, oddBit, 0, -nb, 0, 0, 0);
     break;
   }
-  default:
-    j = -1;
-    printf("ERROR: wrong dir\n");
-    exit(1);
+  case 8: j = neighborIndex_5d<type>(i, oddBit, +nb, 0, 0, 0, 0); break;
+  case 9: j = neighborIndex_5d<type>(i, oddBit, -nb, 0, 0, 0, 0); break;
+  default: j = -1; errorQuda("ERROR: wrong dir");
   }
 
   return &spinorField[j * site_size];
 }
 
-#endif // MULTI_GPU
+/**
+ * @brief Return the pointer to a 5-d fermion field as a function of an origin and an offset
+ *
+ * @param i The checkerboard index of the site
+ * @param dir The displacement direction
+ * @param oddBit The parity of the site
+ * @param spinorField The spinor field
+ * @param neighbor_distance Displacement distance
+ * @param site_size The number of values in a single spinor (6 for staggered, 24 for Wilson)
+ * @return A pointer to the offset fermion field
+ */
+template <QudaPCType type, typename Float>
+Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance = 1, int site_size = 24)
+{
+  return spinorNeighbor_5d<type>(i, dir, oddBit, spinorField, static_cast<Float **>(nullptr),
+                                 static_cast<Float **>(nullptr), neighbor_distance, 0, site_size);
+}
