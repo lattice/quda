@@ -66,8 +66,8 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
 
     for (int dir = 0; dir < 8; dir++) {
       const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
-      real_t *fatlnk = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-      real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
+      const real_t *fatlnk = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+      const real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
         gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
         nullptr;
       const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor,

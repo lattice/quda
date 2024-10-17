@@ -62,7 +62,7 @@ void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *s
   for (int i = 0; i < Vh; i++) {
 
     for (int dir = 0; dir < 8; dir++) {
-      Float *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+      const Float *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
       const Float *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
 
       Float projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
