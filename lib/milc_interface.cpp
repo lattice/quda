@@ -2160,6 +2160,7 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_s
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = QUDA_BOOLEAN_TRUE; // mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_dagger = QUDA_BOOLEAN_FALSE; // mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_pc = input_struct.coarse_solve_type[level - 1] == QUDA_DIRECT_PC_SOLVE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.use_poly_acc = input_struct.deflate_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = input_struct.deflate_poly_deg; // mg_eig_poly_deg[level];
