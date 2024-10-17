@@ -18,7 +18,7 @@
 using namespace quda;
 
 /**
- * @brief Apply the 4-d Dslash to all fifth dimensional slices for a 4-d data layout
+ * @brief Apply the 4-d Dslash (Wilson) to all fifth dimensional slices for a 4-d data layout
  *
  * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
  * @tparam Float The floating-point type used for the computation.
@@ -110,7 +110,7 @@ void axpby_ssp_project(Float *z, Float a, Float *x, Float b, Float *y, int idx_c
 }
 
 /**
- * @brief Apply the Ls dimension portion of the eofa Mobius dslash
+ * @brief Apply the Ls dimension portion (m5) of EOFA Mobius dslash
  *
  * @tparam Float The floating-point type used for the vectors
  * @param out Host output rhs
@@ -214,14 +214,14 @@ void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, doub
 }
 
 /**
- * @brief Apply the Ls dimension portion of the domain wall dslash in a 4-d data layout
+ * @brief Apply the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
  * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
  * @tparam zero_initialize Whether or not to zero initialize or accumulate into the output rhs
  * @tparam Float The floating-point type used for the vectors
  * @param out Host output rhs
  * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe
+ * @param parity 0 for D_ee, 1 for D_oo
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param mferm Domain wall fermion mass
  */
@@ -253,7 +253,7 @@ void dslashReference_5th(Float *out, Float *in, int parity, int dagger, Float mf
 }
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the domain wall dslash in a 4-d data layout
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
  * @tparam Float The floating-point type used for the vectors
  * @param out Host output rhs
@@ -362,7 +362,7 @@ template <typename sComplex> sComplex cpow(const sComplex &x, int y)
 }
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the Mobius dslash in a 4-d data layout
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the Mobius dslash in a 4-d data layout
  *
  * @tparam Float The floating-point type used for the vectors
  * @tparam sComplex The C99 complex floating point type used for the vectors
@@ -456,7 +456,7 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
 }
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the eofa Mobius dslash
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the EOFA Mobius dslash
  *
  * @tparam Float The floating-point type used for the vectors
  * @param out Host output rhs
@@ -574,7 +574,7 @@ void mdw_eofa_m5inv(void *out, void *in, int parity, int dagger, double mferm, d
   }
 }
 
-// this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
+// this actually applies the preconditioned dslash, e.g., D_ee * \psi_e + D_eo * \psi_o or D_oo * \psi_o + D_oe * \psi_e
 void dw_dslash(void *out, void *const *gauge, void *in, int parity, int dagger, QudaPrecision precision,
                QudaGaugeParam &gauge_param, double mferm)
 {

@@ -4,12 +4,12 @@
 #include <color_spinor_field.h>
 
 /**
- * @brief Apply the preconditioned 5-d domain wall dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
+ * @brief Apply the preconditioned 5-d domain wall dslash, e.g., D_ee * \psi_e + D_eo * \psi_o or D_oo * \psi_o + D_oe * \psi_e
  *
  * @param out Host output rhs
  * @param gauge Gauge links
  * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe
+ * @param parity 0 for D_ee * \psi_e + D_eo * \psi_o, 1 for D_oo * \psi_o + D_oe * \psi_e
  * @param dagger 0 for the regular operator, 1 for the dagger operator
  * @param precision Single or double precision
  * @param gauge_param Gauge field parameters
@@ -19,7 +19,7 @@ void dw_dslash(void *out, void *const *gauge, void *in, int parity, int dagger, 
                QudaGaugeParam &gauge_param, double mferm);
 
 /**
- * @brief Apply the 4-d Dslash to all fifth dimensional slices for a 4-d data layout
+ * @brief Apply the 4-d Dslash (Wilson) to all fifth dimensional slices for a 4-d data layout
  *
  * @param out Host output rhs
  * @param gauge Gauge links
@@ -34,7 +34,7 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int parity, int dagger
                  QudaGaugeParam &gauge_param, double mferm);
 
 /**
- * @brief Apply the Ls dimension portion of the domain wall dslash in a 4-d data layout
+ * @brief Apply the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
  * @param out Host output rhs
  * @param gauge Gauge links
@@ -50,7 +50,7 @@ void dw_dslash_5_4d(void *out, void *const *gauge, void *in, int parity, int dag
                     QudaGaugeParam &gauge_param, double mferm, bool zero_initialize);
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the domain wall dslash in a 4-d data layout
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
  * @param out Host output rhs
  * @param gauge Gauge links
@@ -66,7 +66,7 @@ void dslash_5_inv(void *out, void *const *gauge, void *in, int parity, int dagge
                   QudaGaugeParam &gauge_param, double mferm, double *kappa);
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the Mobius dslash
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the Mobius dslash
  *
  * @param out Host output rhs
  * @param gauge Gauge links
@@ -82,7 +82,7 @@ void mdw_dslash_5_inv(void *out, void *const *gauge, void *in, int parity, int d
                       QudaGaugeParam &gauge_param, double mferm, double _Complex *kappa);
 
 /**
- * @brief Apply the Ls dimension portion of the Mobius dslash
+ * @brief Apply the Ls dimension portion (m5) of the Mobius dslash
  *
  * @param out Host output rhs
  * @param gauge Gauge links
@@ -99,7 +99,7 @@ void mdw_dslash_5(void *out, void *const *gauge, void *in, int parity, int dagge
                   QudaGaugeParam &gauge_param, double mferm, double _Complex *kappa, bool zero_initialize);
 
 /**
- * @brief Pre-apply b_5 and c_5 parameters for the Mobius dslash
+ * @brief Apply the Ls dimension portion of D_eo/D_oe (i.e., the b + c * D5) for the Mobius dslash
  *
  * @param out Host output rhs
  * @param gauge Gauge links
@@ -254,7 +254,7 @@ void mdw_mdagm_local(void *out, void *const *gauge, void *in, double _Complex *k
                      double _Complex *b5, double _Complex *c5);
 
 /**
- * @brief Apply the Ls dimension portion of the eofa Mobius dslash
+ * @brief Apply the Ls dimension portion (m5) of the eofa Mobius dslash
  *
  * @param out Host output rhs
  * @param in Host input spinor
@@ -275,7 +275,7 @@ void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, doub
                  double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision);
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the eofa Mobius dslash
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the eofa Mobius dslash
  *
  * @param out Host output rhs
  * @param in Host input spinor
