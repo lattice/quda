@@ -39,15 +39,15 @@ using namespace quda;
  * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
 template <typename Float>
-void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *spinorField, Float **fwdSpinor,
-                     Float **backSpinor, int parity, int dagger)
+void dslashReference(Float *res, const Float *const *gaugeFull, const Float *const *ghostGauge, const Float *spinorField,
+                     const Float *const *fwdSpinor, const Float *const *backSpinor, int parity, int dagger)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
-  Float *gaugeEven[4], *gaugeOdd[4];
-  Float *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
-  Float *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  const Float *gaugeEven[4], *gaugeOdd[4];
+  const Float *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const Float *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;

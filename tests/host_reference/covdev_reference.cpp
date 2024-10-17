@@ -26,6 +26,7 @@
 template <typename Float>
 void covdevReference(Float *res, Float **link, const Float *spinorField, int oddBit, int daggerBit, int mu)
 {
+#pragma omp parallel for
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   Float *linkEven[4], *linkOdd[4];
@@ -35,6 +36,7 @@ void covdevReference(Float *res, Float **link, const Float *spinorField, int odd
     linkOdd[dir] = link[dir] + Vh * gauge_site_size;
   }
 
+#pragma omp parallel for
   for (int sid = 0; sid < Vh; sid++) {
     auto offset = spinor_site_size * sid;
 
@@ -131,6 +133,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
 
   const int my_spinor_site_size = in.Nspin() == 1 ? stag_spinor_site_size : spinor_site_size;
 
+#pragma omp parallel for
   for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
@@ -144,6 +147,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
     ghostLinkOdd[dir] = ghostLink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
   }
 
+#pragma omp parallel for
   for (int sid = 0; sid < Vh; sid++) {
     int offset = my_spinor_site_size * sid;
 

@@ -31,20 +31,21 @@
  * @param[in] dslash_type The type of Dslash operation
  */
 template <typename real_t>
-void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **ghostFatlink,
-                              real_t **ghostLonglink, real_t *spinorField, real_t **fwd_nbr_spinor,
-                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
+void staggeredDslashReference(real_t *res, const real_t *const *fatlink, const real_t *const *longlink,
+                              const real_t *const *ghostFatlink, const real_t *const *ghostLonglink,
+                              const real_t *spinorField, const real_t *const *fwd_nbr_spinor,
+                              const real_t *const *back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
-  real_t *fatlinkEven[4], *fatlinkOdd[4];
-  real_t *longlinkEven[4], *longlinkOdd[4];
+  const real_t *fatlinkEven[4], *fatlinkOdd[4];
+  const real_t *longlinkEven[4], *longlinkOdd[4];
 
-  real_t *ghostFatlinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
-  real_t *ghostFatlinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
-  real_t *ghostLonglinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
-  real_t *ghostLonglinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostFatlinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostFatlinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostLonglinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostLonglinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
 
   for (int dir = 0; dir < 4; dir++) {
     fatlinkEven[dir] = fatlink[dir];
