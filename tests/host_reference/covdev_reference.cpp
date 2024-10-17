@@ -56,8 +56,7 @@ void covdevReference(Float *res, Float **link, const Float *spinorField, int odd
 void covdev_dslash(void *res, void **link, void *spinorField, int oddBit, int daggerBit, int mu,
                    QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
-  if (sPrecision != gPrecision)
-    errorQuda("Spinor and gauge field precision do not match");
+  if (sPrecision != gPrecision) errorQuda("Spinor and gauge field precision do not match");
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     covdevReference((double *)res, (double **)link, (double *)spinorField, oddBit, daggerBit, mu);
@@ -112,8 +111,7 @@ void Matdagmat(Float *out, Float **link, Float *in, int daggerBit, int mu, Float
 void matdagmat(void *out, void **link, void *in, int dagger_bit, int mu, QudaPrecision sPrecision,
                QudaPrecision gPrecision, void *tmp, QudaParity parity)
 {
-  if (sPrecision != gPrecision)
-    errorQuda("Spinor and gauge field precision do not match");
+  if (sPrecision != gPrecision) errorQuda("Spinor and gauge field precision do not match");
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     Matdagmat((double *)out, (double **)link, (double *)in, dagger_bit, mu, (double *)tmp, parity);
@@ -167,8 +165,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
 void covdev_dslash_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int oddBit,
                           int daggerBit, int mu, QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
-  if (sPrecision != gPrecision)
-    errorQuda("Spinor and gauge field precision do not match");
+  if (sPrecision != gPrecision) errorQuda("Spinor and gauge field precision do not match");
 
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
@@ -187,10 +184,10 @@ void covdev_dslash_mg4dir(ColorSpinorField &out, const GaugeField &link, const C
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     covdevReference_mg4dir((double *)out.data(), reinterpret_cast<double **>(data), (double **)ghostLink, in, oddBit,
-                            daggerBit, mu);
+                           daggerBit, mu);
   } else {
     covdevReference_mg4dir((float *)out.data(), reinterpret_cast<float **>(data), (float **)ghostLink, in, oddBit,
-                            daggerBit, mu);
+                           daggerBit, mu);
   }
 }
 

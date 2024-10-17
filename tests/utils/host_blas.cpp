@@ -1,14 +1,15 @@
-#include <host_utils.h>
 #include <stdio.h>
 #include <complex.h>
 #include <comm_quda.h>
 
-template <typename Float> inline void aXpY(Float a, Float *x, Float *y, int len)
+#include "host_utils.h"
+
+template <typename Float> inline void aXpY(Float a, const Float *x, Float *y, int len)
 {
   for (int i = 0; i < len; i++) { y[i] += a * x[i]; }
 }
 
-void axpy(double a, void *x, void *y, int len, QudaPrecision precision)
+void axpy(double a, const void *x, void *y, int len, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
     aXpY(a, (double *)x, (double *)y, len);

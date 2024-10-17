@@ -177,8 +177,7 @@ template <typename Float> static inline void su3Mul(Float *res, const Float *mat
  * @param[in] mat The input SU(3) matrix
  * @param[in] vec The input 3-component vector
  */
-template <typename Float>
-static inline void su3Tmul(Float *res, const Float *mat, const Float *vec)
+template <typename Float> static inline void su3Tmul(Float *res, const Float *mat, const Float *vec)
 {
   Float matT[3 * 3 * 2];
   su3Transpose(matT, mat);
@@ -294,11 +293,12 @@ double verifySpinorDistanceReweight(quda::ColorSpinorField &spinor, double alpha
  */
 template <typename Float>
 const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven, const Float *const *gaugeOdd,
-                               const Float *const *ghostGaugeEven, const Float *const *ghostGaugeOdd, int n_ghost_faces, int nbr_distance)
+                       const Float *const *ghostGaugeEven, const Float *const *ghostGaugeOdd, int n_ghost_faces,
+                       int nbr_distance)
 {
   int j;
   int d = nbr_distance;
-  const Float* const* gaugeField = [&] () -> const Float* const* {
+  const Float *const *gaugeField = [&]() -> const Float *const * {
     if (dir % 2 == 0)
       return (oddBit ? gaugeOdd : gaugeEven);
     else
@@ -323,7 +323,7 @@ const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven
     case 1: { //-X direction
       int new_x1 = (x1 - d + X1) % X1;
       if (x1 - d < 0 && quda::comm_dim_partitioned(0)) {
-        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
+        const Float *ghostGaugeField = (oddBit ? ghostGaugeEven[0] : ghostGaugeOdd[0]);
         int offset = (n_ghost_faces + x1 - d) * X4 * X3 * X2 / 2 + (x4 * X3 * X2 + x3 * X2 + x2) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -333,7 +333,7 @@ const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven
     case 3: { //-Y direction
       int new_x2 = (x2 - d + X2) % X2;
       if (x2 - d < 0 && quda::comm_dim_partitioned(1)) {
-        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
+        const Float *ghostGaugeField = (oddBit ? ghostGaugeEven[1] : ghostGaugeOdd[1]);
         int offset = (n_ghost_faces + x2 - d) * X4 * X3 * X1 / 2 + (x4 * X3 * X1 + x3 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -343,7 +343,7 @@ const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven
     case 5: { //-Z direction
       int new_x3 = (x3 - d + X3) % X3;
       if (x3 - d < 0 && quda::comm_dim_partitioned(2)) {
-        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
+        const Float *ghostGaugeField = (oddBit ? ghostGaugeEven[2] : ghostGaugeOdd[2]);
         int offset = (n_ghost_faces + x3 - d) * X4 * X2 * X1 / 2 + (x4 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -353,7 +353,7 @@ const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven
     case 7: { //-T direction
       int new_x4 = (x4 - d + X4) % X4;
       if (x4 - d < 0 && quda::comm_dim_partitioned(3)) {
-        const Float* ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
+        const Float *ghostGaugeField = (oddBit ? ghostGaugeEven[3] : ghostGaugeOdd[3]);
         int offset = (n_ghost_faces + x4 - d) * X1 * X2 * X3 / 2 + (x3 * X2 * X1 + x2 * X1 + x1) / 2;
         return &ghostGaugeField[offset * (3 * 3 * 2)];
       }
@@ -382,8 +382,8 @@ const Float *gaugeLink(int i, int dir, int oddBit, const Float *const *gaugeEven
 template <typename Float>
 const Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance)
 {
-  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<const Float * const*>(nullptr), static_cast<const Float * const*>(nullptr),
-                   0, nbr_distance);
+  return gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, static_cast<const Float *const *>(nullptr),
+                   static_cast<const Float *const *>(nullptr), 0, nbr_distance);
 }
 
 /**
@@ -529,10 +529,10 @@ const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField
  */
 template <typename Float>
 const Float *spinorNeighbor(int i, int dir, int oddBit, const Float *spinorField, int neighbor_distance,
-                                          int site_size = 24)
+                            int site_size = 24)
 {
-  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<const Float *const *>(nullptr), static_cast<const Float *const *>(nullptr),
-                        neighbor_distance, 0, site_size);
+  return spinorNeighbor(i, dir, oddBit, spinorField, static_cast<const Float *const *>(nullptr),
+                        static_cast<const Float *const *>(nullptr), neighbor_distance, 0, site_size);
 }
 
 /**
@@ -564,7 +564,7 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
  */
 template <QudaPCType type, typename Float>
 const Float *spinorNeighbor_5d(int i, int dir, int oddBit, const Float *spinorField, const Float *const *fwd_nbr_spinor,
-                         const Float *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+                               const Float *const *back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;

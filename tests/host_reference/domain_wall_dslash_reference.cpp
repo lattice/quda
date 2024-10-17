@@ -32,8 +32,8 @@ using namespace quda;
  * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
 template <QudaPCType type, typename Float>
-void dslashReference_4d(Float *out, const Float *const *gauge, Float const * const*ghostGauge, const Float *in, const Float *const *fwdSpinor, const Float *const *backSpinor,
-                        int parity, int dagger)
+void dslashReference_4d(Float *out, const Float *const *gauge, Float const *const *ghostGauge, const Float *in,
+                        const Float *const *fwdSpinor, const Float *const *backSpinor, int parity, int dagger)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
@@ -129,8 +129,8 @@ void axpby_ssp_project(Float *z, Float a, const Float *x, Float b, const Float *
  * @param[in] precision Single or double precision
  */
 template <typename Float>
-void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c, Float mq1,
-                     Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c,
+                     Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
 {
   Float alpha = b + c;
   Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
@@ -200,8 +200,8 @@ void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float 
   }
 }
 
-void mdw_eofa_m5(void *out, const void *in, int parity, int dagger, double mferm, double m5, double b, double c, double mq1,
-                 double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
+void mdw_eofa_m5(void *out, const void *in, int parity, int dagger, double mferm, double m5, double b, double c,
+                 double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     mdw_eofa_m5_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
@@ -566,8 +566,8 @@ void mdw_eofa_m5inv(void *out, const void *in, int parity, int dagger, double mf
                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
-    mdw_eofa_m5inv_ref<double>((double *)out, (const double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
-                               eofa_shift);
+    mdw_eofa_m5inv_ref<double>((double *)out, (const double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3,
+                               eofa_pm, eofa_shift);
   } else {
     mdw_eofa_m5inv_ref<float>((float *)out, (const float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
                               eofa_shift);
@@ -586,7 +586,7 @@ void dw_dslash(void *out, const void *const *gauge, const void *in, int parity, 
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
-  csParam.v = (void*)in;
+  csParam.v = (void *)in;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 5; // for DW dslash
@@ -641,7 +641,7 @@ void dslash_4_4d(void *out, const void *const *gauge, const void *in, int parity
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
-  csParam.v = (void*)in;
+  csParam.v = (void *)in;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 5; // for DW dslash
@@ -699,8 +699,8 @@ void dw_dslash_5_4d(void *out, const void *const *, const void *in, int parity, 
   }
 }
 
-void dslash_5_inv(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision, const QudaGaugeParam &,
-                  double mferm, double *kappa)
+void dslash_5_inv(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                  const QudaGaugeParam &, double mferm, double *kappa)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_5th_inv((double *)out, (double *)in, parity, dagger, mferm, kappa);
@@ -719,8 +719,8 @@ void mdw_dslash_5_inv(void *out, const void *const *, const void *in, int parity
   }
 }
 
-void mdw_dslash_5(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision, const QudaGaugeParam &,
-                  double mferm, const double _Complex *kappa, bool zero_initialize)
+void mdw_dslash_5(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                  const QudaGaugeParam &, double mferm, const double _Complex *kappa, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -740,7 +740,8 @@ void mdw_dslash_5(void *out, const void *const *, const void *in, int parity, in
 }
 
 void mdw_dslash_4_pre(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
-                      const QudaGaugeParam &, double mferm, const double _Complex *b5, const double _Complex *c5, bool zero_initialize)
+                      const QudaGaugeParam &, double mferm, const double _Complex *b5, const double _Complex *c5,
+                      bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -780,8 +781,8 @@ void dw_mat(void *out, const void *const *gauge, const void *in, double kappa, i
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
-void dw_4d_mat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit, QudaPrecision precision,
-               const QudaGaugeParam &gauge_param, double mferm)
+void dw_4d_mat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit,
+               QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
 
   const void *inEven = in;
@@ -799,8 +800,9 @@ void dw_4d_mat(void *out, const void *const *gauge, const void *in, double kappa
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
-void mdw_mat(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b, const double _Complex *kappa_c, int dagger,
-             QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5, const double _Complex *c5)
+void mdw_mat(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
+             const double _Complex *kappa_c, int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param,
+             double mferm, const double _Complex *b5, const double _Complex *c5)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
   double _Complex *kappa5 = (double _Complex *)safe_malloc(Ls * sizeof(double _Complex));
@@ -847,8 +849,8 @@ void mdw_mat(void *out, const void *const *gauge, const void *in, const double _
 }
 
 void mdw_eofa_mat(void *out, const void *const *gauge, const void *in, int dagger, QudaPrecision precision,
-                  const QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1, double mq2,
-                  double mq3, int eofa_pm, double eofa_shift)
+                  const QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1,
+                  double mq2, double mq3, int eofa_pm, double eofa_shift)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -898,8 +900,8 @@ void mdw_eofa_mat(void *out, const void *const *gauge, const void *in, int dagge
   host_free(tmp);
 }
 //
-void dw_matdagmat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit, QudaPrecision precision,
-                  const QudaGaugeParam &gauge_param, double mferm)
+void dw_matdagmat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit,
+                  QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5 * spinor_site_size * precision);
 
@@ -910,8 +912,8 @@ void dw_matdagmat(void *out, const void *const *gauge, const void *in, double ka
   host_free(tmp);
 }
 
-void dw_matpc(void *out, const void *const *gauge, const void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
-              QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
+void dw_matpc(void *out, const void *const *gauge, const void *in, double kappa, QudaMatPCType matpc_type,
+              int dagger_bit, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -930,8 +932,8 @@ void dw_matpc(void *out, const void *const *gauge, const void *in, double kappa,
   host_free(tmp);
 }
 
-void dw_4d_matpc(void *out, const void *const *gauge, const void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
-                 QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
+void dw_4d_matpc(void *out, const void *const *gauge, const void *in, double kappa, QudaMatPCType matpc_type,
+                 int dagger_bit, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
   double kappa2 = -kappa * kappa;
   double *kappa5 = (double *)safe_malloc(Ls * sizeof(double));
@@ -970,9 +972,9 @@ void dw_4d_matpc(void *out, const void *const *gauge, const void *in, double kap
   host_free(kappa5);
 }
 
-void mdw_matpc(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b, const double _Complex *kappa_c,
-               QudaMatPCType matpc_type, int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm,
-               const double _Complex *b5, const double _Complex *c5)
+void mdw_matpc(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
+               const double _Complex *kappa_c, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+               const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5, const double _Complex *c5)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
   double _Complex *kappa5 = (double _Complex *)safe_malloc(Ls * sizeof(double _Complex));
@@ -1043,8 +1045,8 @@ void mdw_matpc(void *out, const void *const *gauge, const void *in, const double
 }
 
 void mdw_eofa_matpc(void *out, const void *const *gauge, const void *in, QudaMatPCType matpc_type, int dagger,
-                    QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c,
-                    double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift)
+                    QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm, double m5, double b,
+                    double c, double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -1111,14 +1113,15 @@ void mdw_eofa_matpc(void *out, const void *const *gauge, const void *in, QudaMat
   host_free(tmp);
 }
 
-void mdw_mdagm_local(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b, const double _Complex *kappa_c,
-                     QudaMatPCType matpc_type, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm,
-                     const double _Complex *b5, const double _Complex *c5)
+void mdw_mdagm_local(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
+                     const double _Complex *kappa_c, QudaMatPCType matpc_type, QudaPrecision precision,
+                     const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5,
+                     const double _Complex *c5)
 {
   lat_dim_t R;
   for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
-  GaugeField *padded_gauge = createExtendedGauge((void **)gauge, (QudaGaugeParam&)gauge_param, R);
+  GaugeField *padded_gauge = createExtendedGauge((void **)gauge, (QudaGaugeParam &)gauge_param, R);
 
   int padded_V = 1;
   int W[4];
