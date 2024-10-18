@@ -21,7 +21,7 @@ using namespace quda;
  * @brief Apply the 4-d Dslash (Wilson) to all fifth dimensional slices for a 4-d data layout
  *
  * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
- * @tparam Float The floating-point type used for the computation.
+ * @tparam real_t The floating-point type used for the computation.
  * @param[out] out Host output rhs
  * @param[in] gauge Gauge links
  * @param[in] ghostGauge The ghost gauge field for multi-GPU computations.
@@ -31,15 +31,15 @@ using namespace quda;
  * @param[in] parity The parity of the dslash (0 for even, 1 for odd).
  * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
-template <QudaPCType type, typename Float>
-void dslashReference_4d(Float *out, const Float *const *gauge, Float const *const *ghostGauge, const Float *in,
-                        const Float *const *fwdSpinor, const Float *const *backSpinor, int parity, int dagger)
+template <QudaPCType type, typename real_t>
+void dslashReference_4d(real_t *out, const real_t *const *gauge, real_t const *const *ghostGauge, const real_t *in,
+                        const real_t *const *fwdSpinor, const real_t *const *backSpinor, int parity, int dagger)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
 
-  const Float *gaugeEven[4], *gaugeOdd[4];
-  const Float *ghostGaugeEven[4], *ghostGaugeOdd[4];
+  const real_t *gaugeEven[4], *gaugeOdd[4];
+  const real_t *ghostGaugeEven[4], *ghostGaugeOdd[4];
 
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gauge[dir];
@@ -56,10 +56,10 @@ void dslashReference_4d(Float *out, const Float *const *gauge, Float const *cons
       for (int dir = 0; dir < 8; dir++) {
         int gaugeOddBit = (xs % 2 == 0 || type == QUDA_4D_PC) ? parity : (parity + 1) % 2;
 
-        const Float *gauge = gaugeLink(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-        const Float *spinor = spinorNeighbor_5d<type>(sp_idx, dir, parity, in, fwdSpinor, backSpinor, 1, 1);
+        const real_t *gauge = gaugeLink(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+        const real_t *spinor = spinorNeighbor_5d<type>(sp_idx, dir, parity, in, fwdSpinor, backSpinor, 1, 1);
 
-        Float projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+        real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
         int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
         multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
 
@@ -79,7 +79,7 @@ void dslashReference_4d(Float *out, const Float *const *gauge, Float const *cons
  * @brief Performs a linear combination of vectors with gamma_+ or gamma_- projection
  *
  * @tparam plus If true, use gamma_+; if false, use gamma_-
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[out] z The output vector
  * @param[in] a The scaling factor for vector x
  * @param[in] x The first input vector
@@ -89,8 +89,8 @@ void dslashReference_4d(Float *out, const Float *const *gauge, Float const *cons
  * @param[in] s The fifth dimension index for vector x and z
  * @param[in] sp The fifth dimension index for vector y
  */
-template <bool plus, class Float> // plus = true -> gamma_+; plus = false -> gamma_-
-void axpby_ssp_project(Float *z, Float a, const Float *x, Float b, const Float *y, int idx_cb_4d, int s, int sp)
+template <bool plus, class real_t> // plus = true -> gamma_+; plus = false -> gamma_-
+void axpby_ssp_project(real_t *z, real_t a, const real_t *x, real_t b, const real_t *y, int idx_cb_4d, int s, int sp)
 {
   // z_s = a*x_s + b*\gamma_+/-*y_sp
   // Will use the DeGrand-Rossi/CPS basis, where gamma5 is diagonal:
@@ -112,7 +112,7 @@ void axpby_ssp_project(Float *z, Float a, const Float *x, Float b, const Float *
 /**
  * @brief Apply the Ls dimension portion (m5) of EOFA Mobius dslash
  *
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[out] out Host output rhs
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe
@@ -128,16 +128,16 @@ void axpby_ssp_project(Float *z, Float a, const Float *x, Float b, const Float *
  * @param[in] eofa_shift EOFA parameter eofa_shift
  * @param[in] precision Single or double precision
  */
-template <typename Float>
-void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c,
-                     Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+template <typename real_t>
+void mdw_eofa_m5_ref(real_t *out, const real_t *in, int parity, int dagger, real_t mferm, real_t m5, real_t b, real_t c,
+                     real_t mq1, real_t mq2, real_t mq3, int eofa_pm, real_t eofa_shift)
 {
-  Float alpha = b + c;
-  Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
+  real_t alpha = b + c;
+  real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
     / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
     / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
 
-  Float kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
+  real_t kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
 
   constexpr int spinor_size = 4 * 3 * 2;
 #pragma omp parallel for
@@ -147,8 +147,8 @@ void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float 
       // Calls for an extension of the original function.
       // 8 is forward hop, which wants P_+, 9 is backward hop,
       // which wants P_-.  Dagger reverses these.
-      const Float *spinor = spinorNeighbor_5d<QUDA_4D_PC>(i, dir, parity, in);
-      Float projectedSpinor[spinor_size];
+      const real_t *spinor = spinorNeighbor_5d<QUDA_4D_PC>(i, dir, parity, in);
+      real_t projectedSpinor[spinor_size];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       // J  Need a conditional here for s=0 and s=Ls-1.
@@ -161,14 +161,14 @@ void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float 
       sum(&out[i * spinor_size], &out[i * spinor_size], projectedSpinor, spinor_size);
     }
     // 1 + kappa*D5
-    axpby((Float)1., &in[i * spinor_size], kappa, &out[i * spinor_size], spinor_size);
+    axpby((real_t)1., &in[i * spinor_size], kappa, &out[i * spinor_size], spinor_size);
   }
 
   // Initialize
-  std::vector<Float> shift_coeffs(Ls);
+  std::vector<real_t> shift_coeffs(Ls);
 
   // Construct Mooee_shift
-  Float N = (eofa_pm ? 1.0 : -1.0) * (2.0 * eofa_shift * eofa_norm)
+  real_t N = (eofa_pm ? 1.0 : -1.0) * (2.0 * eofa_shift * eofa_norm)
     * (std::pow(alpha + 1.0, Ls) + mq1 * std::pow(alpha - 1.0, Ls));
 
   // For the kappa preconditioning
@@ -185,15 +185,15 @@ void mdw_eofa_m5_ref(Float *out, const Float *in, int parity, int dagger, Float 
     for (int s = 0; s < Ls; s++) {
       if (dagger == 0) {
         if (eofa_pm) {
-          axpby_ssp_project<true>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, s, Ls - 1);
+          axpby_ssp_project<true>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, s, Ls - 1);
         } else {
-          axpby_ssp_project<false>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, s, 0);
+          axpby_ssp_project<false>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, s, 0);
         }
       } else {
         if (eofa_pm) {
-          axpby_ssp_project<true>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, Ls - 1, s);
+          axpby_ssp_project<true>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, Ls - 1, s);
         } else {
-          axpby_ssp_project<false>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, 0, s);
+          axpby_ssp_project<false>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, 0, s);
         }
       }
     }
@@ -218,15 +218,15 @@ void mdw_eofa_m5(void *out, const void *in, int parity, int dagger, double mferm
  *
  * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
  * @tparam zero_initialize Whether or not to zero initialize or accumulate into the output rhs
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[in,out] out Host output rhs
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_ee, 1 for D_oo
  * @param[in] dagger 0 for the regular operator, 1 for the dagger operator
  * @param[in] mferm Domain wall fermion mass
  */
-template <QudaPCType type, bool zero_initialize = false, typename Float>
-void dslashReference_5th(Float *out, const Float *in, int parity, int dagger, Float mferm)
+template <QudaPCType type, bool zero_initialize = false, typename real_t>
+void dslashReference_5th(real_t *out, const real_t *in, int parity, int dagger, real_t mferm)
 {
 #pragma omp parallel for
   for (int i = 0; i < V5h; i++) {
@@ -236,8 +236,8 @@ void dslashReference_5th(Float *out, const Float *in, int parity, int dagger, Fl
       // Calls for an extension of the original function.
       // 8 is forward hop, which wants P_+, 9 is backward hop,
       // which wants P_-.  Dagger reverses these.
-      const Float *spinor = spinorNeighbor_5d<type>(i, dir, parity, in);
-      Float projectedSpinor[4 * 3 * 2];
+      const real_t *spinor = spinorNeighbor_5d<type>(i, dir, parity, in);
+      real_t projectedSpinor[4 * 3 * 2];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       // J  Need a conditional here for s=0 and s=Ls-1.
@@ -245,7 +245,7 @@ void dslashReference_5th(Float *out, const Float *in, int parity, int dagger, Fl
       int xs = X / (Z[3] * Z[2] * Z[1] * Z[0]);
 
       if ((xs == 0 && dir == 9) || (xs == Ls - 1 && dir == 8)) {
-        ax(projectedSpinor, (Float)(-mferm), projectedSpinor, 4 * 3 * 2);
+        ax(projectedSpinor, (real_t)(-mferm), projectedSpinor, 4 * 3 * 2);
       }
       sum(&out[i * (4 * 3 * 2)], &out[i * (4 * 3 * 2)], projectedSpinor, 4 * 3 * 2);
     }
@@ -255,7 +255,7 @@ void dslashReference_5th(Float *out, const Float *in, int parity, int dagger, Fl
 /**
  * @brief Apply the inverse of the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[out] out Host output rhs
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe (unused)
@@ -263,28 +263,28 @@ void dslashReference_5th(Float *out, const Float *in, int parity, int dagger, Fl
  * @param[in] mferm Domain wall fermion mass
  * @param[in] kappa Kappa values for each 5th dimension slice
  */
-template <typename Float>
-void dslashReference_5th_inv(Float *out, const Float *in, int, int dagger, Float mferm, const double *kappa)
+template <typename real_t>
+void dslashReference_5th_inv(real_t *out, const real_t *in, int, int dagger, real_t mferm, const double *kappa)
 {
-  double *inv_Ftr = (double *)safe_malloc(Ls * sizeof(Float));
-  double *Ftr = (double *)safe_malloc(Ls * sizeof(Float));
+  double *inv_Ftr = (double *)safe_malloc(Ls * sizeof(real_t));
+  double *Ftr = (double *)safe_malloc(Ls * sizeof(real_t));
   for (int xs = 0; xs < Ls; xs++) {
     inv_Ftr[xs] = 1.0 / (1.0 + pow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
-    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float)); }
+    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(real_t)); }
   }
   if (dagger == 0) {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[0]), &in[12 + 24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[0]), &in[12 + 24 * (i + Vh * (Ls - 1))], 12);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)(2.0 * kappa[xs]), &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (xs + 1))], 12);
-        axpy((Float)Ftr[xs], &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (xs + 1))], 12);
+        axpy((real_t)Ftr[xs], &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
     }
@@ -293,29 +293,29 @@ void dslashReference_5th_inv(Float *out, const Float *in, int, int dagger, Float
     for (int xs = Ls - 2; xs >= 0; --xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)Ftr[xs], &out[24 * (i + Vh * (Ls - 1))], &out[24 * (i + Vh * xs)], 12);
-        axpy((Float)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * (xs + 1))], &out[12 + 24 * (i + Vh * xs)], 12);
+        axpy((real_t)Ftr[xs], &out[24 * (i + Vh * (Ls - 1))], &out[24 * (i + Vh * xs)], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * (xs + 1))], &out[12 + 24 * (i + Vh * xs)], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      ax(&out[24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[Ls - 1]), &out[24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[Ls - 1]), &out[24 * (i + Vh * (Ls - 1))], 12);
     }
   } else {
     // s = 0
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      ax(&out[24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[0]), &in[24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[0]), &in[24 * (i + Vh * (Ls - 1))], 12);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)Ftr[xs], &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (Ls - 1))], 12);
-        axpy((Float)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (xs + 1))], 12);
+        axpy((real_t)Ftr[xs], &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (Ls - 1))], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (xs + 1))], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
     }
@@ -324,15 +324,15 @@ void dslashReference_5th_inv(Float *out, const Float *in, int, int dagger, Float
     for (int xs = Ls - 2; xs >= 0; --xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)(2.0 * kappa[xs]), &out[24 * (i + Vh * (xs + 1))], &out[24 * (i + Vh * xs)], 12);
-        axpy((Float)Ftr[xs], &out[12 + 24 * (i + Vh * (Ls - 1))], &out[12 + 24 * (i + Vh * xs)], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[24 * (i + Vh * (xs + 1))], &out[24 * (i + Vh * xs)], 12);
+        axpy((real_t)Ftr[xs], &out[12 + 24 * (i + Vh * (Ls - 1))], &out[12 + 24 * (i + Vh * xs)], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[Ls - 1]), &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[Ls - 1]), &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
     }
   }
   host_free(inv_Ftr);
@@ -364,7 +364,7 @@ template <typename sComplex> sComplex cpow(const sComplex &x, int y)
 /**
  * @brief Apply the inverse of the Ls dimension portion (m5) of the Mobius dslash in a 4-d data layout
  *
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @tparam sComplex The C99 complex floating point type used for the vectors
  * @param[out] out Host output rhs
  * @param[in] in Host input spinor
@@ -373,15 +373,15 @@ template <typename sComplex> sComplex cpow(const sComplex &x, int y)
  * @param[in] mferm Domain wall fermion mass
  * @param[in] kappa Kappa values for each 5th dimension slice
  */
-template <typename Float, typename sComplex>
-void mdslashReference_5th_inv(Float *out, const Float *in, int, int dagger, Float mferm, const sComplex *kappa)
+template <typename real_t, typename sComplex>
+void mdslashReference_5th_inv(real_t *out, const real_t *in, int, int dagger, real_t mferm, const sComplex *kappa)
 {
   sComplex *inv_Ftr = (sComplex *)safe_malloc(Ls * sizeof(sComplex));
   sComplex *Ftr = (sComplex *)safe_malloc(Ls * sizeof(sComplex));
   for (int xs = 0; xs < Ls; xs++) {
     inv_Ftr[xs] = 1.0 / (1.0 + cpow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
-    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float)); }
+    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(real_t)); }
   }
   if (dagger == 0) {
     // s = 0
@@ -458,7 +458,7 @@ void mdslashReference_5th_inv(Float *out, const Float *in, int, int dagger, Floa
 /**
  * @brief Apply the inverse of the Ls dimension portion (m5) of the EOFA Mobius dslash
  *
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[out] out Host output rhs
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe
@@ -473,26 +473,26 @@ void mdslashReference_5th_inv(Float *out, const Float *in, int, int dagger, Floa
  * @param[in] eofa_pm EOFA parameter eofa_pm
  * @param[in] eofa_shift EOFA parameter eofa_shift
  */
-template <typename Float>
-void mdw_eofa_m5inv_ref(Float *out, const Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c,
-                        Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+template <typename real_t>
+void mdw_eofa_m5inv_ref(real_t *out, const real_t *in, int parity, int dagger, real_t mferm, real_t m5, real_t b,
+                        real_t c, real_t mq1, real_t mq2, real_t mq3, int eofa_pm, real_t eofa_shift)
 {
-  Float alpha = b + c;
-  Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
+  real_t alpha = b + c;
+  real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
     / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
     / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
-  Float kappa5 = (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.); // alpha = b+c
+  real_t kappa5 = (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.); // alpha = b+c
 
   using sComplex = double _Complex;
 
   std::vector<sComplex> kappa_array(Ls, -0.5 * kappa5);
-  std::vector<Float> eofa_u(Ls);
-  std::vector<Float> eofa_x(Ls);
-  std::vector<Float> eofa_y(Ls);
+  std::vector<real_t> eofa_u(Ls);
+  std::vector<real_t> eofa_x(Ls);
+  std::vector<real_t> eofa_y(Ls);
 
   mdslashReference_5th_inv(out, in, parity, dagger, mferm, kappa_array.data());
 
-  Float N = (eofa_pm ? +1. : -1.) * (2. * eofa_shift * eofa_norm)
+  real_t N = (eofa_pm ? +1. : -1.) * (2. * eofa_shift * eofa_norm)
     * (std::pow(alpha + 1., Ls) + mq1 * std::pow(alpha - 1., Ls)) / (b * (m5 + 4.) + 1.);
 
   // Here the signs are somewhat mixed:
@@ -502,9 +502,9 @@ void mdw_eofa_m5inv_ref(Float *out, const Float *in, int parity, int dagger, Flo
     eofa_u[eofa_pm ? s : Ls - 1 - s] = N * std::pow(-1., s) * std::pow(alpha - 1., s) / std::pow(alpha + 1., Ls + s + 1);
   }
 
-  Float sherman_morrison_fac;
+  real_t sherman_morrison_fac;
 
-  Float factor = -kappa5 * mferm;
+  real_t factor = -kappa5 * mferm;
   if (eofa_pm) {
     // eofa_pm = plus
     // Computing x
@@ -541,20 +541,20 @@ void mdw_eofa_m5inv_ref(Float *out, const Float *in, int parity, int dagger, Flo
   for (int idx_cb_4d = 0; idx_cb_4d < Vh; idx_cb_4d++) {
     for (int s = 0; s < Ls; s++) {
       for (int sp = 0; sp < Ls; sp++) {
-        Float t = 2.0 * sherman_morrison_fac;
+        real_t t = 2.0 * sherman_morrison_fac;
         if (dagger == 0) {
           t *= eofa_x[s] * eofa_y[sp];
           if (eofa_pm) {
-            axpby_ssp_project<true>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<true>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           } else {
-            axpby_ssp_project<false>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<false>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           }
         } else {
           t *= eofa_y[s] * eofa_x[sp];
           if (eofa_pm) {
-            axpby_ssp_project<true>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<true>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           } else {
-            axpby_ssp_project<false>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<false>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           }
         }
       }

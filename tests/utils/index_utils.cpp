@@ -1,5 +1,5 @@
-#include <host_utils.h>
-#include <index_utils.hpp>
+#include "host_utils.h"
+#include "index_utils.hpp"
 
 int fullLatticeIndex(int i, int oddBit)
 {

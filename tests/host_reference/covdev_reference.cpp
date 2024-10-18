@@ -23,13 +23,13 @@
 // if daggerBit is one:  perform hermitian covariant derivative operator
 //
 
-template <typename Float>
-void covdevReference(Float *res, Float **link, const Float *spinorField, int oddBit, int daggerBit, int mu)
+template <typename real_t>
+void covdevReference(real_t *res, real_t **link, const real_t *spinorField, int oddBit, int daggerBit, int mu)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
-  Float *linkEven[4], *linkOdd[4];
+  real_t *linkEven[4], *linkOdd[4];
 
   for (int dir = 0; dir < 4; dir++) {
     linkEven[dir] = link[dir];
@@ -40,10 +40,10 @@ void covdevReference(Float *res, Float **link, const Float *spinorField, int odd
   for (int sid = 0; sid < Vh; sid++) {
     auto offset = spinor_site_size * sid;
 
-    Float gaugedSpinor[spinor_site_size];
+    real_t gaugedSpinor[spinor_site_size];
 
-    const Float *lnk = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, 1);
-    const Float *spinor = spinorNeighbor(sid, mu, oddBit, spinorField, 1);
+    const real_t *lnk = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, 1);
+    const real_t *spinor = spinorNeighbor(sid, mu, oddBit, spinorField, 1);
 
     if (daggerBit) {
       for (int s = 0; s < 4; s++) su3Tmul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
@@ -67,15 +67,15 @@ void covdev_dslash(void *res, void **link, void *spinorField, int oddBit, int da
   }
 }
 
-template <typename Float>
+template <typename real_t>
 void Mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int daggerBit, int mu)
 {
   // full dslash operator
   void *data[4] = {link.data(0), link.data(1), link.data(2), link.data(3)};
-  covdevReference(reinterpret_cast<Float *>(out.Odd().data()), reinterpret_cast<Float **>(data),
-                  reinterpret_cast<Float *>(in.Even().data()), 1, daggerBit, mu);
-  covdevReference(reinterpret_cast<Float *>(out.Even().data()), reinterpret_cast<Float **>(data),
-                  reinterpret_cast<Float *>(in.Odd().data()), 0, daggerBit, mu);
+  covdevReference(reinterpret_cast<real_t *>(out.Odd().data()), reinterpret_cast<real_t **>(data),
+                  reinterpret_cast<real_t *>(in.Even().data()), 1, daggerBit, mu);
+  covdevReference(reinterpret_cast<real_t *>(out.Even().data()), reinterpret_cast<real_t **>(data),
+                  reinterpret_cast<real_t *>(in.Odd().data()), 0, daggerBit, mu);
 }
 
 void mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit, int mu)
@@ -87,20 +87,20 @@ void mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &
   }
 }
 
-template <typename Float>
-void Matdagmat(Float *out, Float **link, Float *in, int daggerBit, int mu, Float *tmp, QudaParity parity)
+template <typename real_t>
+void Matdagmat(real_t *out, real_t **link, real_t *in, int daggerBit, int mu, real_t *tmp, QudaParity parity)
 {
   switch (parity) {
   case QUDA_EVEN_PARITY: {
-    Float *inEven = in;
-    Float *outEven = out;
+    real_t *inEven = in;
+    real_t *outEven = out;
     covdevReference(tmp, link, inEven, 1, daggerBit, mu);
     covdevReference(outEven, link, tmp, 0, daggerBit, mu);
     break;
   }
   case QUDA_ODD_PARITY: {
-    Float *inOdd = in;
-    Float *outOdd = out;
+    real_t *inOdd = in;
+    real_t *outOdd = out;
     covdevReference(tmp, link, inOdd, 0, daggerBit, mu);
     covdevReference(outOdd, link, tmp, 1, daggerBit, mu);
     break;
@@ -124,20 +124,20 @@ void matdagmat(void *out, void **link, void *in, int dagger_bit, int mu, QudaPre
 
 #ifdef MULTI_GPU
 
-template <typename sFloat, typename gFloat>
-void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, const ColorSpinorField &in, int oddBit,
+template <typename real_t>
+void covdevReference_mg4dir(real_t *res, real_t **link, real_t **ghostLink, const ColorSpinorField &in, int oddBit,
                             int daggerBit, int mu)
 {
-  auto fwd_nbr_spinor = reinterpret_cast<sFloat **>(in.fwdGhostFaceBuffer);
-  auto back_nbr_spinor = reinterpret_cast<sFloat **>(in.backGhostFaceBuffer);
+  auto fwd_nbr_spinor = reinterpret_cast<real_t **>(in.fwdGhostFaceBuffer);
+  auto back_nbr_spinor = reinterpret_cast<real_t **>(in.backGhostFaceBuffer);
 
   const int my_spinor_site_size = in.Nspin() == 1 ? stag_spinor_site_size : spinor_site_size;
 
 #pragma omp parallel for
   for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
 
-  gFloat *linkEven[4], *linkOdd[4];
-  gFloat *ghostLinkEven[4], *ghostLinkOdd[4];
+  real_t *linkEven[4], *linkOdd[4];
+  real_t *ghostLinkEven[4], *ghostLinkOdd[4];
 
   for (int dir = 0; dir < 4; dir++) {
     linkEven[dir] = link[dir];
@@ -151,11 +151,11 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
   for (int sid = 0; sid < Vh; sid++) {
     int offset = my_spinor_site_size * sid;
 
-    const gFloat *lnk = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
-    const sFloat *spinor = spinorNeighbor(sid, mu, oddBit, static_cast<const sFloat *>(in.data()), fwd_nbr_spinor,
+    const real_t *lnk = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
+    const real_t *spinor = spinorNeighbor(sid, mu, oddBit, static_cast<const real_t *>(in.data()), fwd_nbr_spinor,
                                           back_nbr_spinor, 1, 1, my_spinor_site_size);
 
-    std::vector<sFloat> gaugedSpinor(my_spinor_site_size);
+    std::vector<real_t> gaugedSpinor(my_spinor_site_size);
 
     if (daggerBit) {
       for (int s = 0; s < in.Nspin(); s++) su3Tmul(&gaugedSpinor[s * 6], lnk, &spinor[s * 6]);
@@ -195,7 +195,7 @@ void covdev_dslash_mg4dir(ColorSpinorField &out, const GaugeField &link, const C
   }
 }
 
-template <typename Float>
+template <typename real_t>
 void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int daggerBit, int mu)
 {
   void *data[4] = {link.data(0), link.data(1), link.data(2), link.data(3)};
@@ -207,8 +207,8 @@ void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinor
     auto &outOdd = out.Odd();
 
     inEven.exchangeGhost(QUDA_EVEN_PARITY, nFace, daggerBit);
-    covdevReference_mg4dir(reinterpret_cast<Float *>(outOdd.data()), reinterpret_cast<Float **>(data),
-                           reinterpret_cast<Float **>(ghostLink), in.Even(), 1, daggerBit, mu);
+    covdevReference_mg4dir(reinterpret_cast<real_t *>(outOdd.data()), reinterpret_cast<real_t **>(data),
+                           reinterpret_cast<real_t **>(ghostLink), in.Even(), 1, daggerBit, mu);
   }
 
   {
@@ -216,8 +216,8 @@ void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinor
     auto &outEven = out.Even();
 
     inOdd.exchangeGhost(QUDA_ODD_PARITY, nFace, daggerBit);
-    covdevReference_mg4dir(reinterpret_cast<Float *>(outEven.data()), reinterpret_cast<Float **>(data),
-                           reinterpret_cast<Float **>(ghostLink), in.Odd(), 0, daggerBit, mu);
+    covdevReference_mg4dir(reinterpret_cast<real_t *>(outEven.data()), reinterpret_cast<real_t **>(data),
+                           reinterpret_cast<real_t **>(ghostLink), in.Odd(), 0, daggerBit, mu);
   }
 }
 

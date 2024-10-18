@@ -9,14 +9,15 @@
 
 /**
  * @brief Apply the clover matrix field
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[out] out Result field (single parity)
  * @param[in] clover Clover-matrix field (full field)
  * @param[in] in Input field (single parity)
  * @param[in] parity Parity to which we are applying the clover field
  */
-template <typename Float> void cloverReference(Float *out, const Float *clover, const Float *in, int parity)
+template <typename real_t> void cloverReference(real_t *out, const real_t *clover, const real_t *in, int parity)
 {
+  using complex = std::complex<real_t>;
   int nSpin = 4;
   int nColor = 3;
   int N = nColor * nSpin / 2;
@@ -24,12 +25,12 @@ template <typename Float> void cloverReference(Float *out, const Float *clover, 
 
 #pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
-    const std::complex<Float> *In = reinterpret_cast<const std::complex<Float> *>(&in[i * nSpin * nColor * 2]);
-    std::complex<Float> *Out = reinterpret_cast<std::complex<Float> *>(&out[i * nSpin * nColor * 2]);
+    const complex *In = reinterpret_cast<const complex *>(&in[i * nSpin * nColor * 2]);
+    complex *Out = reinterpret_cast<complex *>(&out[i * nSpin * nColor * 2]);
 
     for (int chi = 0; chi < nSpin / 2; chi++) {
-      const Float *D = &clover[((parity * Vh + i) * 2 + chi) * chiralBlock];
-      const std::complex<Float> *L = reinterpret_cast<const std::complex<Float> *>(&D[N]);
+      const real_t *D = &clover[((parity * Vh + i) * 2 + chi) * chiralBlock];
+      const complex *L = reinterpret_cast<const complex *>(&D[N]);
 
       for (int s_col = 0; s_col < nSpin / 2; s_col++) { // 2 spins per chiral block
         for (int c_col = 0; c_col < nColor; c_col++) {

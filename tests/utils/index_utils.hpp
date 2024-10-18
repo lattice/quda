@@ -92,6 +92,7 @@ int neighborIndexFullLattice(int dim[4], int index, int dx[4]);
  * @brief Calculate the checkerboard neighbor index from a checkerboard index and parity
  *        relative to a specified local volume for a 5-d field
  *
+ * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
  * @param i The checkerboard index of the current site
  * @param oddBit The parity of the input index (0 for even, 1 for odd)
  * @param dxs The displacement in the 5th direction

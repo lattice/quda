@@ -28,7 +28,7 @@ using namespace quda;
 /**
  * @brief Perform a Wilson dslash operation on a spinor field
  *
- * @tparam Float The floating-point type used for the computation.
+ * @tparam real_t The floating-point type used for the computation.
  * @param[out] res The result of the Dslash operation.
  * @param[in] gaugeFull The full gauge field.
  * @param[in] ghostGauge The ghost gauge field for multi-GPU computations.
@@ -38,16 +38,17 @@ using namespace quda;
  * @param[in] parity The parity of the dslash (0 for even, 1 for odd).
  * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
-template <typename Float>
-void dslashReference(Float *res, const Float *const *gaugeFull, const Float *const *ghostGauge, const Float *spinorField,
-                     const Float *const *fwdSpinor, const Float *const *backSpinor, int parity, int dagger)
+template <typename real_t>
+void dslashReference(real_t *res, const real_t *const *gaugeFull, const real_t *const *ghostGauge,
+                     const real_t *spinorField, const real_t *const *fwdSpinor, const real_t *const *backSpinor,
+                     int parity, int dagger)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
-  const Float *gaugeEven[4], *gaugeOdd[4];
-  const Float *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
-  const Float *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *gaugeEven[4], *gaugeOdd[4];
+  const real_t *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
@@ -62,10 +63,10 @@ void dslashReference(Float *res, const Float *const *gaugeFull, const Float *con
   for (int i = 0; i < Vh; i++) {
 
     for (int dir = 0; dir < 8; dir++) {
-      const Float *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      const Float *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const real_t *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+      const real_t *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
 
-      Float projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+      real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
 
@@ -136,11 +137,11 @@ void wil_dslash(void *out, const void *const *gauge, const void *in, int parity,
 }
 
 // applies b*(1 + i*a*gamma_5)
-template <typename Float>
-void twistGamma5(Float *out, const Float *in, int dagger, Float kappa, Float mu, QudaTwistFlavorType flavor, int V,
+template <typename real_t>
+void twistGamma5(real_t *out, const real_t *in, int dagger, real_t kappa, real_t mu, QudaTwistFlavorType flavor, int V,
                  QudaTwistGamma5Type twist)
 {
-  Float a = 0.0, b = 0.0;
+  real_t a = 0.0, b = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
     a = 2.0 * kappa * mu * flavor;         // mu already includes the flavor
     b = 1.0;
@@ -155,10 +156,10 @@ void twistGamma5(Float *out, const Float *in, int dagger, Float kappa, Float mu,
 
 #pragma omp parallel for
   for (int i = 0; i < V; i++) {
-    Float tmp[24];
+    real_t tmp[24];
     for (int s = 0; s < 4; s++)
       for (int c = 0; c < 3; c++) {
-        Float a5 = ((s / 2) ? -1.0 : +1.0) * a;
+        real_t a5 = ((s / 2) ? -1.0 : +1.0) * a;
         tmp[s * 6 + c * 2 + 0] = b * (in[i * 24 + s * 6 + c * 2 + 0] - a5 * in[i * 24 + s * 6 + c * 2 + 1]);
         tmp[s * 6 + c * 2 + 1] = b * (in[i * 24 + s * 6 + c * 2 + 1] + a5 * in[i * 24 + s * 6 + c * 2 + 0]);
       }
@@ -316,11 +317,11 @@ void tm_matpc(void *outEven, const void *const *gauge, const void *inEven_, doub
 }
 
 //----- for non-degenerate dslash only----
-template <typename Float>
-void ndegTwistGamma5(Float *out1, Float *out2, const Float *in1, const Float *in2, const int dagger, const Float kappa,
-                     const Float mu, const Float epsilon, const int V, QudaTwistGamma5Type twist)
+template <typename real_t>
+void ndegTwistGamma5(real_t *out1, real_t *out2, const real_t *in1, const real_t *in2, const int dagger,
+                     const real_t kappa, const real_t mu, const real_t epsilon, const int V, QudaTwistGamma5Type twist)
 {
-  Float a = 0.0, b = 0.0, d = 0.0;
+  real_t a = 0.0, b = 0.0, d = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
     a = 2.0 * kappa * mu;
     b = -2.0 * kappa * epsilon;
@@ -337,11 +338,11 @@ void ndegTwistGamma5(Float *out1, Float *out2, const Float *in1, const Float *in
 
 #pragma omp parallel for
   for (int i = 0; i < V; i++) {
-    Float tmp1[24];
-    Float tmp2[24];
+    real_t tmp1[24];
+    real_t tmp2[24];
     for (int s = 0; s < 4; s++)
       for (int c = 0; c < 3; c++) {
-        Float a5 = ((s / 2) ? -1.0 : +1.0) * a;
+        real_t a5 = ((s / 2) ? -1.0 : +1.0) * a;
         tmp1[s * 6 + c * 2 + 0] = d
           * (in1[i * 24 + s * 6 + c * 2 + 0] - a5 * in1[i * 24 + s * 6 + c * 2 + 1] + b * in2[i * 24 + s * 6 + c * 2 + 0]);
         tmp1[s * 6 + c * 2 + 1] = d
