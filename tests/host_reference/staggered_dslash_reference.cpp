@@ -3,56 +3,49 @@
 #include <math.h>
 #include <string.h>
 
-#include <host_utils.h>
-#include <quda_internal.h>
-#include <quda.h>
-#include <util_quda.h>
-#include <staggered_dslash_reference.h>
-#include <command_line_params.h>
-#include "misc.h"
-#include <blas_quda.h>
 #include <gauge_field.h>
+#include <color_spinor_field.h>
+#include <blas_quda.h>
 
-#include <dslash_reference.h>
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "util_quda.h"
+#include "staggered_dslash_reference.h"
+#include "dslash_reference.h"
+#include "command_line_params.h"
+#include "misc.h"
 
-template <typename Float> void display_link_internal(Float *link)
-{
-  int i, j;
-
-  for (i = 0; i < 3; i++) {
-    for (j = 0; j < 3; j++) { printf("(%10f,%10f) \t", link[i * 3 * 2 + j * 2], link[i * 3 * 2 + j * 2 + 1]); }
-    printf("\n");
-  }
-  printf("\n");
-  return;
-}
-
-// staggeredDslashReferenece()
-//
-// if oddBit is zero: calculate even parity spinor elements (using odd parity spinor)
-// if oddBit is one:  calculate odd parity spinor elements
-// if daggerBit is zero: perform ordinary dslash operator
-// if daggerBit is one:  perform hermitian conjugate of dslash
+/**
+ * @brief Perform a staggered Dslash operation on a spinor field
+ * @tparam real_t The data type of the fields (e.g., float or double)
+ * @param[out] res The result spinor field
+ * @param[in] fatlink The fat gauge links
+ * @param[in] longlink The long gauge links (only used for ASQTAD Dslash)
+ * @param[in] ghostFatlink The ghost fat gauge links (only used in multi-GPU mode)
+ * @param[in] ghostLonglink The ghost long gauge links (only used in multi-GPU mode and for ASQTAD Dslash)
+ * @param[in] spinorField The input spinor field
+ * @param[in] fwd_nbr_spinor The forward neighbor spinor fields (only used in multi-GPU mode)
+ * @param[in] back_nbr_spinor The backward neighbor spinor fields (only used in multi-GPU mode)
+ * @param[in] oddBit The odd/even bit for the site index
+ * @param[in] daggerBit Perform the ordinary dslash (0) or Hermitian conjugate (1)
+ * @param[in] dslash_type The type of Dslash operation
+ */
 template <typename real_t>
-#ifdef MULTI_GPU
-void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **ghostFatlink,
-                              real_t **ghostLonglink, real_t *spinorField, real_t **fwd_nbr_spinor,
-                              real_t **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
-#else
-void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **, real_t **, real_t *spinorField,
-                              real_t **, real_t **, int oddBit, int daggerBit, QudaDslashType dslash_type)
-#endif
+void staggeredDslashReference(real_t *res, const real_t *const *fatlink, const real_t *const *longlink,
+                              const real_t *const *ghostFatlink, const real_t *const *ghostLonglink,
+                              const real_t *spinorField, const real_t *const *fwd_nbr_spinor,
+                              const real_t *const *back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
-  real_t *fatlinkEven[4], *fatlinkOdd[4];
-  real_t *longlinkEven[4], *longlinkOdd[4];
+  const real_t *fatlinkEven[4], *fatlinkOdd[4];
+  const real_t *longlinkEven[4], *longlinkOdd[4];
 
-#ifdef MULTI_GPU
-  real_t *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
-  real_t *ghostLonglinkEven[4], *ghostLonglinkOdd[4];
-#endif
+  const real_t *ghostFatlinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostFatlinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostLonglinkEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostLonglinkOdd[4] = {nullptr, nullptr, nullptr, nullptr};
 
   for (int dir = 0; dir < 4; dir++) {
     fatlinkEven[dir] = fatlink[dir];
@@ -60,12 +53,12 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
     longlinkEven[dir] = longlink[dir];
     longlinkOdd[dir] = longlink[dir] + Vh * gauge_site_size;
 
-#ifdef MULTI_GPU
-    ghostFatlinkEven[dir] = ghostFatlink[dir];
-    ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-    ghostLonglinkEven[dir] = ghostLonglink ? ghostLonglink[dir] : nullptr;
-    ghostLonglinkOdd[dir] = ghostLonglink ? ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
-#endif
+    if (is_multi_gpu()) {
+      ghostFatlinkEven[dir] = ghostFatlink[dir];
+      ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
+      ghostLonglinkEven[dir] = ghostLonglink ? ghostLonglink[dir] : nullptr;
+      ghostLonglinkOdd[dir] = ghostLonglink ? ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
+    }
   }
 
 #pragma omp parallel for
@@ -73,29 +66,18 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
     int offset = stag_spinor_site_size * sid;
 
     for (int dir = 0; dir < 8; dir++) {
-#ifdef MULTI_GPU
       const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
-      real_t *fatlnk
-        = gaugeLink_mg4dir(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-      real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
-        gaugeLink_mg4dir(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
+      const real_t *fatlnk
+        = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+      const real_t *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
+        gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
         nullptr;
-      real_t *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(
-        sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, stag_spinor_site_size);
-      real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
-        spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace,
-                                           stag_spinor_site_size) :
+      const real_t *first_neighbor_spinor = spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor,
+                                                           back_nbr_spinor, 1, nFace, stag_spinor_site_size);
+      const real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+        spinorNeighbor(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace, stag_spinor_site_size) :
         nullptr;
-#else
-      real_t *fatlnk = gaugeLink(sid, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
-      real_t *longlnk
-        = dslash_type == QUDA_ASQTAD_DSLASH ? gaugeLink(sid, dir, oddBit, longlinkEven, longlinkOdd, 3) : nullptr;
-      real_t *first_neighbor_spinor
-        = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 1, stag_spinor_site_size);
-      real_t *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
-        spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, stag_spinor_site_size) :
-        nullptr;
-#endif
+
       real_t gaugedSpinor[stag_spinor_site_size];
 
       if (dir % 2 == 0) {

@@ -399,13 +399,12 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
       for (int dir = 0; dir < 8; dir++) {
 
         const int nFace = 3;//3->2??
-        gFloat *twolnk = 
-          gaugeLink_mg4dir(i, dir, oddBit, twolinkEven, twolinkOdd, ghostTwolinkEven, ghostTwolinkOdd, 3, 2);//?
-          
-        sFloat *second_neighbor_spinor = 
-          spinorNeighbor_5d_mgpu<QUDA_4D_PC>(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 2, nFace,
-                                             stag_spinor_site_size);
-       
+        const gFloat *twolnk
+          = gaugeLink(i, dir, oddBit, twolinkEven, twolinkOdd, ghostTwolinkEven, ghostTwolinkOdd, 3, 2); //?
+
+        const sFloat *second_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(
+          i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 2, nFace, stag_spinor_site_size);
+
         sFloat gaugedSpinor[stag_spinor_site_size];
 
         if (dir % 2 == 0) {
