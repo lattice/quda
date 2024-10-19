@@ -280,6 +280,7 @@ namespace quda {
         } else {
           pAp = blas::reDotProduct(p, Ap);
         }
+	logQuda(QUDA_VERBOSE, "  pAp[0]: %g\n", pAp[0]);
 
         for (auto i = 0u; i < b.size(); i++) x_update_batch[i].get_current_alpha() = r2[i] / pAp[i];
 
@@ -289,6 +290,7 @@ namespace quda {
           r2[i] = cg_norm[i].x;                                  // (r_new, r_new)
           sigma[i] = cg_norm[i].y >= 0.0 ? cg_norm[i].y : r2[i]; // use r2 if (r_k+1, r_k+1-r_k) breaks
         }
+	logQuda(QUDA_VERBOSE, "  r2[0]:  %g\n", r2[0]);
       }
 
       // reliable update conditions
@@ -302,6 +304,7 @@ namespace quda {
 
       if (!ru.trigger()) {
         for (auto i = 0u; i < beta.size(); i++) beta[i] = sigma[i] / r2_old[i]; // use the alternative beta computation
+	logQuda(QUDA_VERBOSE, "  beta[0]:  %g\n", beta[0]);
 
         if (advanced_feature && param.pipeline && !breakdown) {
 
