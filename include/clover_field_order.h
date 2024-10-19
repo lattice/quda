@@ -680,7 +680,8 @@ namespace quda {
 
             // second do scalar copy converting into register type
 #pragma unroll
-            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            //for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], elem(vecTmp, j), nrm); }
           }
 
 #pragma unroll
@@ -734,7 +735,8 @@ namespace quda {
             // first do scalar copy converting into storage type
 #pragma unroll
             for (int j = 0; j < N; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
+              //copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
+              copy_scaled(elem(vecTmp, j), tmp[chirality * M_rem + i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
           }
@@ -744,7 +746,8 @@ namespace quda {
             // first do scalar copy converting into storage type
 #pragma unroll
             for (int j = 0; j < M_rem; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
+              //copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
+              copy_scaled(elem(vecTmp, j), tmp[(1 - chirality) * M_offset * N + j]);
 
             char *ptr = reinterpret_cast<char *>(reinterpret_cast<Vector *>(clover) + parity * offset + x);
             ptr += (volumeCB * (M_offset * N) + chirality * M_rem) * sizeof(Float);
@@ -892,8 +895,8 @@ namespace quda {
           if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          offdiag = clover_ ? ((Float **)clover_)[0] : clover.data<Float **>(inverse)[0];
-          diag = clover_ ? ((Float **)clover_)[1] : clover.data<Float **>(inverse)[1];
+          offdiag = clover_ ? reinterpret_cast<Float **>(clover_)[0] : clover.data<Float **>(inverse)[0];
+          diag = clover_ ? reinterpret_cast<Float **>(clover_)[1] : clover.data<Float **>(inverse)[1];
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }

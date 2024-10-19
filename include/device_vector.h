@@ -34,7 +34,7 @@ namespace quda
     {
       size_t bytes = _size * sizeof(real);
       if (bytes > 0) {
-        _device_data = reinterpret_cast<real *>(pool_device_malloc(bytes));
+        _device_data = static_cast<real *>(pool_device_malloc(bytes));
         qudaMemcpy(_device_data, host_vector.data(), bytes, qudaMemcpyHostToDevice);
       }
     }
@@ -62,7 +62,7 @@ namespace quda
       _size = size_;
       size_t bytes = _size * sizeof(real);
       if (bytes > 0) {
-        _device_data = reinterpret_cast<real *>(pool_device_malloc(bytes));
+        _device_data = static_cast<real *>(pool_device_malloc(bytes));
         qudaMemset(_device_data, 0, bytes);
       }
     }

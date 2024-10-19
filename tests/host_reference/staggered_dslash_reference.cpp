@@ -157,7 +157,12 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
                             long_link.Ghost()[3].data()};
 
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    staggeredDslashReference(static_cast<double *>(out.data()), reinterpret_cast<double **>(qdp_fatlink),
+    //staggeredDslashReference(static_cast<double *>(out.data()), reinterpret_cast<double **>(qdp_fatlink),
+    //                        reinterpret_cast<double **>(qdp_longlink), reinterpret_cast<double **>(ghost_fatlink),
+    //                        reinterpret_cast<double **>(ghost_longlink), static_cast<double *>(in.data()),
+    //                       reinterpret_cast<double **>(in.fwdGhostFaceBuffer),
+    //                       reinterpret_cast<double **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type);
+    staggeredDslashReference(out.data<double*>(), reinterpret_cast<double **>(qdp_fatlink),
                              reinterpret_cast<double **>(qdp_longlink), reinterpret_cast<double **>(ghost_fatlink),
                              reinterpret_cast<double **>(ghost_longlink), static_cast<double *>(in.data()),
                              reinterpret_cast<double **>(in.fwdGhostFaceBuffer),

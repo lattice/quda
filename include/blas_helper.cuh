@@ -208,10 +208,10 @@ namespace quda
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-        for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
+        for (int i = 0; i < n; i++) max_[i] = quda::max(quda::abs((norm_t)v[i].real()), quda::abs((norm_t)v[i].imag()));
         norm_t scale = 0.0;
 #pragma unroll
-        for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
+        for (int i = 0; i < n; i++) scale = quda::max(max_[i], scale);
         norm = scale * fixedInvMaxValue<store_t>::value;
         return fdividef(fixedMaxValue<store_t>::value, scale);
       }
@@ -240,7 +240,8 @@ namespace quda
             Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
             // now copy into output and scale
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
+            //for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
+            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], elem(vecTmp, j), nrm);
           }
 
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -256,10 +257,14 @@ namespace quda
 
           // extract norm
           memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
+	  array<short,6> vecTmpShort;
+	  memcpy(&vecTmpShort, &vecTmp, sizeof(vecTmpShort));
 
           // now copy into output and scale
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
+          //for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
+          //for (int i = 0; i < len; i++) copy_and_scale(v_[i], elem(vecTmp, i), nrm);
+          for (int i = 0; i < len; i++) copy_and_scale(v_[i], vecTmpShort[i], nrm);
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -303,7 +308,8 @@ namespace quda
             Vector vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+            //for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(elem(vecTmp, j), v_[i * N + j]);
             // second do vectorized copy into memory
             vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
           }
@@ -322,8 +328,12 @@ namespace quda
 
           Vector vecTmp;
           memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
+	  array<short,6> vecTmpShort;
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
+          //for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
+          //for (int i = 0; i < len; i++) copy_scaled(elem(vecTmp, i), v_[i]);
+          for (int i = 0; i < len; i++) copy_scaled(vecTmpShort[i], v_[i]);
+	  memcpy(&vecTmp, &vecTmpShort, sizeof(vecTmpShort));
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }

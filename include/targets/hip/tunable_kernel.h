@@ -7,6 +7,7 @@
 #include <kernel.h>
 #include <kernel_ops_target.h>
 #include <quda_hip_api.h>
+#include <kernel_ops_target.h>
 
 namespace quda
 {
