@@ -193,6 +193,14 @@ namespace quda {
     vector<double> pAp(b.size());
 
     if (getVerbosity() >= QUDA_VERBOSE) {
+      auto fl2 = mat.Expose()->getStaggeredShortLinkField()->norm2();
+      logQuda(QUDA_VERBOSE, "fl2:   %g\n", fl2);
+      auto flsl2 = matSloppy.Expose()->getStaggeredShortLinkField()->norm2();
+      logQuda(QUDA_VERBOSE, "flsl2: %g\n", flsl2);
+      auto ll2 = mat.Expose()->getStaggeredLongLinkField()->norm2();
+      logQuda(QUDA_VERBOSE, "ll2:   %g\n", ll2);
+      auto llsl2 = matSloppy.Expose()->getStaggeredLongLinkField()->norm2();
+      logQuda(QUDA_VERBOSE, "llsl2: %g\n", llsl2);
       auto fl1 = mat.Expose()->getStaggeredShortLinkField()->norm1();
       logQuda(QUDA_VERBOSE, "fl1:   %g\n", fl1);
       auto flsl1 = matSloppy.Expose()->getStaggeredShortLinkField()->norm1();
