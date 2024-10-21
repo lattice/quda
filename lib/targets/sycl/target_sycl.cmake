@@ -125,6 +125,7 @@ if("x${CMAKE_SYCL_COMPILER_ID}" STREQUAL "xIntelLLVM" OR "x${CMAKE_SYCL_COMPILER
   #target_compile_options(quda PUBLIC -fno-fast-math)
   target_compile_options(quda PRIVATE -Wno-division-by-zero)
   target_compile_options(quda PRIVATE -Wno-pass-failed)
+  target_compile_options(quda PRIVATE -fno-strict-aliasing)
   #target_compile_options(quda PRIVATE -Wno-sign-compare)
   if("x${CMAKE_BUILD_TYPE}" STREQUAL "xDEVEL")
     target_link_options(quda PUBLIC -gline-directives-only)

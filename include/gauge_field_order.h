@@ -376,7 +376,7 @@ namespace quda {
         scale_inv(static_cast<Float>(1.0))
       {
         for (int d = 0; d < U.Geometry(); d++)
-          u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
+	  u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
         resetScale(U.Scale());
       }
 
@@ -1575,7 +1575,8 @@ namespace quda {
           Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
           // second do copy converting into register type
 #pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+          for (int j = 0; j < N; j++) copy(tmp[i * N + j], elem(vecTmp, j));
+          //for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
         constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
@@ -1598,7 +1599,8 @@ namespace quda {
 	  Vector vecTmp;
 	  // first do copy converting into storage type
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	  for (int j=0; j<N; j++) copy(elem(vecTmp, j), tmp[i*N+j]);
+	  //for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
           vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
         }
@@ -1639,7 +1641,8 @@ namespace quda {
                 ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
             // second do copy converting into register type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+            for (int j = 0; j < N; j++) copy(tmp[i * N + j], elem(vecTmp, j));
+            //for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
           }
           real phase = 0.;
 
@@ -1670,7 +1673,8 @@ namespace quda {
 	    Vector vecTmp;
 	    // first do copy converting into storage type
 #pragma unroll
-	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	    for (int j=0; j<N; j++) copy(elem(vecTmp, j), tmp[i*N+j]);
+	    //for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
 	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
           }
@@ -1728,7 +1732,8 @@ namespace quda {
 					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
 	  // second do copy converting into register type
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
+	  for (int j=0; j<N; j++) copy(tmp[i*N+j], elem(vecTmp, j));
+	  //for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	}
         real phase = 0.;
         if constexpr (hasPhase)
@@ -1752,7 +1757,8 @@ namespace quda {
 	    Vector vecTmp;
 	    // first do copy converting into storage type
 #pragma unroll
-	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	    for (int j=0; j<N; j++) copy(elem(vecTmp, j), tmp[i*N+j]);
+	    //for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
 	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
