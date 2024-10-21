@@ -204,14 +204,14 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          tmc_ndeg_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_ndeg_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
-          tmc_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         }
       } else if (dslash_type == QUDA_WILSON_DSLASH) {
@@ -330,10 +330,10 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          tmc_ndeg_matpc(spinorCheck, gauge, spinorOut, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorCheck, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         } else {
-          tmc_matpc(spinorCheck, gauge, spinorOut, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_matpc(spinorCheck, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         }
       } else if (dslash_type == QUDA_WILSON_DSLASH) {
@@ -370,14 +370,14 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          tmc_ndeg_matpc(spinorTmp, gauge, spinorOut, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorTmp, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_ndeg_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
-          tmc_matpc(spinorTmp, gauge, spinorOut, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_matpc(spinorTmp, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         }
       } else if (dslash_type == QUDA_WILSON_DSLASH) {
@@ -542,10 +542,10 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
   case QUDA_TWISTED_CLOVER_DSLASH: {
     if (twist_flavor != QUDA_TWIST_SINGLET) {
       if (use_pc) {
-        tmc_ndeg_matpc(spinorTmp, gauge, spinor, clover, clover_inv, kappa, mu, epsilon, matpc_type, dagger, cpu_prec,
+        tmc_ndeg_matpc(spinorTmp, gauge, clover, clover_inv, spinor, kappa, mu, epsilon, matpc_type, dagger, cpu_prec,
                        gauge_param);
         if (normop)
-          tmc_ndeg_matpc(spinorTmp2, gauge, spinorTmp, clover, clover_inv, kappa, mu, epsilon, matpc_type,
+          tmc_ndeg_matpc(spinorTmp2, gauge, clover, clover_inv, spinorTmp, kappa, mu, epsilon, matpc_type,
                          dagger_opposite, cpu_prec, gauge_param);
       } else {
         tmc_ndeg_mat(spinorTmp, gauge, clover, spinor, kappa, mu, epsilon, dagger, cpu_prec, gauge_param);
@@ -554,10 +554,10 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
       }
     } else {
       if (use_pc) {
-        tmc_matpc(spinorTmp, gauge, spinor, clover, clover_inv, kappa, mu, twist_flavor, matpc_type, dagger, cpu_prec,
+        tmc_matpc(spinorTmp, gauge, clover, clover_inv, spinor, kappa, mu, twist_flavor, matpc_type, dagger, cpu_prec,
                   gauge_param);
         if (normop)
-          tmc_matpc(spinorTmp2, gauge, spinorTmp, clover, clover_inv, kappa, mu, twist_flavor, matpc_type,
+          tmc_matpc(spinorTmp2, gauge, clover, clover_inv, spinorTmp, kappa, mu, twist_flavor, matpc_type,
                     dagger_opposite, cpu_prec, gauge_param);
       } else {
         tmc_mat(spinorTmp, gauge, clover, spinor, kappa, mu, twist_flavor, dagger, cpu_prec, gauge_param);
@@ -700,13 +700,13 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
   case QUDA_TWISTED_CLOVER_DSLASH: {
     if (twist_flavor != QUDA_TWIST_SINGLET) {
       if (use_pc)
-        tmc_ndeg_matpc(spinorTmp, gauge, spinor_left, clover, clover_inv, kappa, mu, epsilon, matpc_type, dagger,
+        tmc_ndeg_matpc(spinorTmp, gauge, clover, clover_inv, spinor_left, kappa, mu, epsilon, matpc_type, dagger,
                        cpu_prec, gauge_param);
       else
         tmc_ndeg_mat(spinorTmp, gauge, spinor_left, clover, kappa, mu, epsilon, dagger, cpu_prec, gauge_param);
     } else {
       if (use_pc)
-        tmc_matpc(spinorTmp, gauge, spinor_left, clover, clover_inv, kappa, mu, twist_flavor, matpc_type, dagger,
+        tmc_matpc(spinorTmp, gauge, clover, clover_inv, spinor_left, kappa, mu, twist_flavor, matpc_type, dagger,
                   cpu_prec, gauge_param);
       else
         tmc_mat(spinorTmp, gauge, spinor_left, clover, kappa, mu, twist_flavor, dagger, cpu_prec, gauge_param);

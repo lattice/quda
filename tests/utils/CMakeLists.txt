@@ -5,6 +5,7 @@ target_sources(
   face_gauge.cpp
   host_blas.cpp
   host_utils.cpp
+  index_utils.cpp
   llfat_utils.cpp
   misc.cpp
   set_params.cpp

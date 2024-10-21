@@ -1,6 +1,6 @@
 #pragma once
 #include <quda_internal.h>
-#include "color_spinor_field.h"
+#include <color_spinor_field.h>
 
 using namespace quda;
 
