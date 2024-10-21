@@ -1799,8 +1799,8 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
-                                    field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x]);
+            v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x],
+                                    field[(((1 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x]);
           }
         }
       }
@@ -1809,8 +1809,8 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].real();
-            field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].imag();
+            field[(((0 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x] = v[s * Nc + c].real();
+            field[(((1 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x] = v[s * Nc + c].imag();
           }
         }
       }
