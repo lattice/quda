@@ -1,17 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
-#include <quda.h>
-#include <gauge_field.h>
-#include <host_utils.h>
-#include <llfat_utils.h>
-#include <unitarization_links.h>
-#include <misc.h>
+#include <complex>
 #include <string.h>
 
+#include <quda.h>
 #include <quda_internal.h>
-#include <complex>
+#include <gauge_field.h>
+#include <unitarization_links.h>
+
+#include "index_utils.hpp"
+#include "host_utils.h"
+#include "llfat_utils.h"
+#include "misc.h"
 
 #define XUP 0
 #define YUP 1

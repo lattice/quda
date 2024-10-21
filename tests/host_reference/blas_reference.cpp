@@ -6,12 +6,12 @@
 #include <complex>
 #include <inttypes.h>
 
-#include <util_quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include "misc.h"
-
 #include <eigen_helper.h>
+
+#include "util_quda.h"
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "misc.h"
 
 template <typename T> using complex = std::complex<T>;
 
