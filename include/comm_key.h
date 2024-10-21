@@ -23,6 +23,15 @@ namespace quda
     {
       return (array[0] > 0) && (array[1] > 0) && (array[2] > 0) && (array[3] > 0);
     }
+
+    bool operator==(const CommKey &other) const
+    {
+      bool is_same = true;
+      if (n_dim != other.n_dim) return false;
+      for (auto i = 0; i < n_dim; i++)
+        if (array[i] != other.array[i]) is_same = false;
+      return is_same;
+    }
   };
 
   constexpr int inline product(const CommKey &input) { return input[0] * input[1] * input[2] * input[3]; }

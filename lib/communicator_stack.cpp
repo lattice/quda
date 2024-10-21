@@ -47,8 +47,8 @@ namespace quda
   void push_communicator(const CommKey &split_key)
   {
     if (comm_nvshmem_enabled())
-      errorQuda(
-        "Split-grid is currently not supported with NVSHMEM. Please set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+      errorQuda("Split-grid is currently not supported with NVSHMEM. Set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
       communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),
@@ -68,7 +68,11 @@ namespace quda
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
+  int comm_dim_global(int dim) { return get_default_communicator().comm_dim(dim); }
+
   int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
+
+  int comm_coord_global(int dim) { return get_default_communicator().comm_coord(dim); }
 
   int comm_rank_from_coords(const int *coords) { return get_current_communicator().comm_rank_from_coords(coords); }
 

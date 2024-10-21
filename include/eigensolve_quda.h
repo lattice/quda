@@ -266,7 +266,7 @@ namespace quda
        @brief Compute eigenvalues and their residiua
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
-       @param[in] evals The eigenvalues
+       @param[in,out] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
     void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals,
@@ -276,7 +276,7 @@ namespace quda
        @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
-       @param[in] evals The eigenvalues
+       @param[in,out] evals The eigenvalues
     */
     void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
     {
@@ -574,7 +574,7 @@ namespace quda
        @brief Compute eigenvalues and their residiua
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
-       @param[in] evals The eigenvalues
+       @param[in,out] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
     void computeEvals3D(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals,
@@ -584,7 +584,7 @@ namespace quda
        @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
-       @param[in] evals The eigenvalues
+       @param[in,out] evals The eigenvalues
     */
     void computeEvals3D(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
     {

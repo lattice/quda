@@ -50,11 +50,25 @@ namespace quda
   int comm_dim(int dim);
 
   /**
-     Return the coording of this process in the dimension dim
+     Return the global number of processes in the dimension dim
+     @param dim Dimension which we are querying
+     @return Length of process dimensions
+  */
+  int comm_dim_global(int dim);
+
+  /**
+     Return the coordinate of this process in the dimension dim
      @param dim Dimension which we are querying
      @return Coordinate of this process
   */
   int comm_coord(int dim);
+
+  /**
+     Return the global coordinates of this process in the dimension dim
+     @param dim Dimension which we are querying
+     @return Coordinate of this process
+  */
+  int comm_coord_global(int dim);
 
   /**
    * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
