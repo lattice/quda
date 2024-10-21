@@ -53,7 +53,7 @@ namespace quda
     // if reverting to global, we will need to join the tunecaches
     bool join_tune_cache = split_key == default_comm_key;
     int local_rank = comm_rank();
-    int local_tune_rank = getTuneRank();
+    int local_tune_rank = 0;
 
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
