@@ -309,7 +309,7 @@ namespace quda
       for (int i = 0; i < 4; i++) Xh[i] = x.SiteSubset() == 2 && i == 0 ? x.X()[i] / 2 : x.X()[i];
     }
 
-    __device__ __host__ auto init() const { return {0.0, 0.0}; }
+    __device__ __host__ reduce_t init() const { return {0.0, 0.0}; }
   };
 
   template <typename Arg> struct cDotProduct3d : plus<array<double, 2>> {
