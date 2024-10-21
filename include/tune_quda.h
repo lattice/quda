@@ -44,6 +44,14 @@ namespace quda {
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
   /**
+     @brief Unify all instances of the tunecache across ranks.  This
+     is called after returning to a global communicator.
+     @param[in] rank_list The list of ranks from whose tunecaches we
+     want to merge to form the global tunecache
+   */
+  void joinTuneCache(const std::vector<int> &rank_list);
+
+  /**
      @brief Return a string encoding the QUDA version
    */
   const std::string get_quda_version();

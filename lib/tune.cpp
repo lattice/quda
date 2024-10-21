@@ -154,9 +154,36 @@ namespace quda
   const map &getTuneCache() { return tunecache; }
 
   /**
-   * Deserialize tunecache from an istream, useful for reading a file or receiving from other nodes.
+   * @brief Distribute the tunecache from a given rank to all other nodes.
+   * @param[in] root_rank From which global rank to do the broadcast
+   * @param[out] tc Where we wish to receive the tunecache.  This
+   * defaults to the local tunecache.
    */
-  static void deserializeTuneCache(std::istream &in)
+  static void broadcastTuneCache(int32_t root_rank = 0, map &tc_recv = tunecache);
+
+  void joinTuneCache(const std::vector<int> &global_tune_rank)
+  {
+    // vector of the split tunecaches
+    std::vector<map> split_tc(global_tune_rank.size());
+    // broadcast each tunecache to every process
+    for (auto i = 0u; i < global_tune_rank.size(); i++) {
+      broadcastTuneCache(global_tune_rank[i], split_tc[i]);
+      if (comm_rank() == global_tune_rank[i]) split_tc[i] = tunecache;
+      printfQuda("i = %d tune_rank = %d tc size = %lu\n", i, global_tune_rank[i], split_tc[i].size());
+    }
+
+    // now merge the maps
+    for (auto i = 0u; i < global_tune_rank.size(); i++) { tunecache.merge(split_tc[i]); }
+  }
+
+  /**
+   * Deserialize tunecache from an istream, useful for reading a file
+   * or receiving from other nodes.
+   * @param[in] in The stream from which we are deserializing
+   * @param[out] tc The tunecache to which we are deserializing.  This
+   * defaults to the local tunecache.
+   */
+  static void deserializeTuneCache(std::istream &in, map &tc = tunecache)
   {
     std::string line;
     std::stringstream ls;
@@ -187,7 +214,7 @@ namespace quda
       ls.ignore(1);               // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
       param.comment += "\n";      // our convention is to include the newline, since ctime() likes to do this
-      tunecache[key] = param;
+      tc[key] = param;
     }
   }
 
@@ -322,30 +349,26 @@ namespace quda
     }
   }
 
-  /**
-   * @brief Distribute the tunecache from a given rank to all other nodes.
-   * @param[in] root_rank From which global rank to do the broadcast
-   */
-  static void broadcastTuneCache(int32_t root_rank = 0)
+  static void broadcastTuneCache(int32_t root_rank, map &tc_recv)
   {
     std::stringstream serialized;
     size_t size;
 
-    if (comm_rank_global() == root_rank) {
+    if (comm_rank() == root_rank) {
       serializeTuneCache(serialized);
       size = serialized.str().length();
     }
-    comm_broadcast_global(&size, sizeof(size_t), root_rank);
+    comm_broadcast(&size, sizeof(size_t), root_rank);
 
     if (size > 0) {
       if (comm_rank_global() == root_rank) {
-        comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size, root_rank);
+        comm_broadcast(const_cast<char *>(serialized.str().c_str()), size, root_rank);
       } else {
         std::vector<char> serstr(size + 1);
-        comm_broadcast_global(serstr.data(), size, root_rank);
+        comm_broadcast(serstr.data(), size, root_rank);
         serstr[size] = '\0'; // null-terminate
         serialized.str(serstr.data());
-        deserializeTuneCache(serialized);
+        deserializeTuneCache(serialized, tc_recv);
       }
     }
   }
@@ -830,14 +853,14 @@ namespace quda
         serialized = serialize();
         size = serialized.length();
       }
-      comm_broadcast_global(&size, sizeof(size_t), root_rank);
+      comm_broadcast(&size, sizeof(size_t), root_rank);
 
       if (size > 0) {
-        if (comm_rank_global() == root_rank) {
-          comm_broadcast_global(const_cast<char *>(serialized.c_str()), size, root_rank);
+        if (comm_rank() == root_rank) {
+          comm_broadcast(const_cast<char *>(serialized.c_str()), size, root_rank);
         } else {
           std::vector<char> serstr(size + 1);
-          comm_broadcast_global(serstr.data(), size, root_rank);
+          comm_broadcast(serstr.data(), size, root_rank);
           serstr[size] = '\0'; // null-terminate
           std::string_view deserialized(serstr.data());
           deserialize(deserialized);
@@ -957,7 +980,7 @@ namespace quda
          - we are tuning an uber kernel
          in which case do the tuning on all ranks since we can't
          guarantee that all nodes are partaking */
-      if (comm_rank_global() == tune_rank || !commGlobalReduction() || policyTuning() || uberTuning()) {
+      if (comm_rank() == tune_rank || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
         TuneCandidates tc(tunable.num_candidates());
         float best_time;
