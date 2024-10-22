@@ -148,6 +148,21 @@ void dw_4d_mat(void *out, void *const *gauge, void *in, double kappa, int dagger
                QudaGaugeParam &param, double mferm);
 
 /**
+ * @brief Apply the full-parity 4-d data layout Pauli-Villars preconditioned domain wall operator
+ *
+ * @param out Host output rhs
+ * @param gauge Gauge links
+ * @param in Host input spinor
+ * @param kappa Kappa value for the domain wall operator
+ * @param dagger 0 for the regular operator, 1 for the dagger operator
+ * @param precision Single or double precision
+ * @param gauge_param Gauge field parameters
+ * @param mferm Domain wall fermion mass
+ */
+void dw_4dpv_mat(void *out, void *const *gauge, void *in, double kappa, int dagger, QudaPrecision precision,
+               QudaGaugeParam &param, double mferm);
+
+/**
  * @brief Apply the full-parity Mobius operator
  *
  * @param out Host output rhs

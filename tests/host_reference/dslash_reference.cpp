@@ -25,8 +25,7 @@ std::array<double, 2> verifyInversion(void *spinorOut, void **spinorOutMulti, vo
                                       void *clover, void *clover_inv, int src_idx)
 {
   std::array<double, 2> res = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  if (is_chiral(dslash_type)) {
     res = verifyDomainWallTypeInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge,
                                         clover, clover_inv, src_idx);
   } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH
@@ -50,6 +49,9 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
       dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+    } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+      ax(0, spinorCheck, V * spinor_site_size * Lsdim, inv_param.cpu_prec);
+      dw_4dpv_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
       double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
@@ -158,6 +160,28 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
   }
 
   int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
+  double checknrm = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  double innrm = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  printfQuda("In Nrm2: %e\nCheck Nrm2: %e\nRatio Sqrt: %e\n0.5 / kappa5: %e\n", innrm, checknrm, sqrt(innrm/checknrm), 0.5 / kappa5);
+
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+    float* in_arr = (float*)spinorIn;
+    float* check_arr = (float*)spinorCheck;
+
+    printf("In: %e %e %e %e\nCheck: %e %e %e %e\nRatio: %e %e\n",
+           in_arr[0], in_arr[1], in_arr[2], in_arr[3], check_arr[0], check_arr[1], check_arr[2], check_arr[3],
+           sqrt((in_arr[0] * in_arr[0] + in_arr[1] * in_arr[1])/(check_arr[0] * check_arr[0] + check_arr[1] * check_arr[1])),
+           sqrt((in_arr[2] * in_arr[2] + in_arr[3] * in_arr[3])/(check_arr[2] * check_arr[2] + check_arr[3] * check_arr[3])));
+  } else if (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+    double* in_arr = (double*)spinorIn;
+    double* check_arr = (double*)spinorCheck;
+
+    printf("In: %e %e %e %e\nCheck: %e %e %e %e\nRatio: %e %e\n",
+           in_arr[0], in_arr[1], in_arr[2], in_arr[3], check_arr[0], check_arr[1], check_arr[2], check_arr[3],
+           sqrt((in_arr[0] * in_arr[0] + in_arr[1] * in_arr[1])/(check_arr[0] * check_arr[0] + check_arr[1] * check_arr[1])),
+           sqrt((in_arr[2] * in_arr[2] + in_arr[3] * in_arr[3])/(check_arr[2] * check_arr[2] + check_arr[3] * check_arr[3])));
+  }
+
   mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);

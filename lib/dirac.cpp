@@ -174,6 +174,9 @@ namespace quda {
     } else if (param.type == QUDA_DOMAIN_WALL_4DPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall4DPC operator\n");
       return new DiracDomainWall4DPC(param);
+    } else if (param.type == QUDA_DOMAIN_WALL_4DPV_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall4DPV operator\n");
+      return new DiracDomainWall4DPV(param);
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobius operator\n");
       return new DiracMobius(param);
@@ -272,6 +275,7 @@ namespace quda {
     case QUDA_DOMAIN_WALLPC_DIRAC:
     case QUDA_DOMAIN_WALL_4D_DIRAC:
     case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPV_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
@@ -302,6 +306,7 @@ namespace quda {
     case QUDA_TWISTED_CLOVER_DSLASH: return true;
     case QUDA_DOMAIN_WALL_DSLASH:
     case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_DOMAIN_WALL_4DPV_DSLASH:
     case QUDA_MOBIUS_DWF_DSLASH:
     case QUDA_MOBIUS_DWF_EOFA_DSLASH:
     case QUDA_STAGGERED_DSLASH:
@@ -336,6 +341,7 @@ namespace quda {
     case QUDA_DOMAIN_WALLPC_DIRAC:
     case QUDA_DOMAIN_WALL_4D_DIRAC:
     case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPV_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
@@ -362,6 +368,7 @@ namespace quda {
     case QUDA_TWISTED_CLOVER_DSLASH:
     case QUDA_DOMAIN_WALL_DSLASH:
     case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_DOMAIN_WALL_4DPV_DSLASH:
     case QUDA_MOBIUS_DWF_DSLASH:
     case QUDA_MOBIUS_DWF_EOFA_DSLASH:
     case QUDA_LAPLACE_DSLASH:
@@ -391,6 +398,7 @@ namespace quda {
     case QUDA_DOMAIN_WALLPC_DIRAC:
     case QUDA_DOMAIN_WALL_4D_DIRAC:
     case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPV_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
@@ -419,6 +427,7 @@ namespace quda {
     case QUDA_TWISTED_CLOVER_DSLASH:
     case QUDA_DOMAIN_WALL_DSLASH:
     case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_DOMAIN_WALL_4DPV_DSLASH:
     case QUDA_MOBIUS_DWF_DSLASH:
     case QUDA_MOBIUS_DWF_EOFA_DSLASH:
     case QUDA_STAGGERED_DSLASH:
@@ -436,6 +445,7 @@ namespace quda {
     case QUDA_DOMAIN_WALLPC_DIRAC:
     case QUDA_DOMAIN_WALL_4D_DIRAC:
     case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+    case QUDA_DOMAIN_WALL_4DPV_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
@@ -471,6 +481,7 @@ namespace quda {
     switch (type) {
     case QUDA_DOMAIN_WALL_DSLASH:
     case QUDA_DOMAIN_WALL_4D_DSLASH:
+    case QUDA_DOMAIN_WALL_4DPV_DSLASH:
     case QUDA_MOBIUS_DWF_DSLASH:
     case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
     case QUDA_WILSON_DSLASH:
@@ -504,6 +515,7 @@ namespace quda {
     case QUDA_DOMAIN_WALLPC_DIRAC: return QUDA_DOMAIN_WALL_DSLASH;
     case QUDA_DOMAIN_WALL_4D_DIRAC:
     case QUDA_DOMAIN_WALL_4DPC_DIRAC: return QUDA_DOMAIN_WALL_4D_DSLASH;
+    case QUDA_DOMAIN_WALL_4DPV_DIRAC: return QUDA_DOMAIN_WALL_4DPV_DSLASH;
     case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
     case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC: return QUDA_MOBIUS_DWF_DSLASH;
     case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:

@@ -155,8 +155,7 @@ void init(int argc, char **argv)
   }
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  if (is_chiral(dslash_type)) {
     dw_setDims(gauge_param.X, inv_param.Ls);
   } else {
     setDims(gauge_param.X);
@@ -439,6 +438,7 @@ int main(int argc, char **argv)
 
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
+      && dslash_type != QUDA_DOMAIN_WALL_4DPV_DSLASH
       && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
       && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     errorQuda("dslash_type %d not supported", dslash_type);

@@ -135,8 +135,7 @@ struct DslashTestWrapper {
   {
     if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
       errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
-    } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-               || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    } else if (is_chiral(dslash_type)) {
       // for these we always use kernel packing
       dw_setDims(gauge_param.X, Lsdim);
     } else {
@@ -166,6 +165,12 @@ struct DslashTestWrapper {
       case dslash_test_type::MatPCDagMatPC: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
       case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
       default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", static_cast<int>(dtest_type));
+      }
+    } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+      switch (dtest_type) {
+      case dslash_test_type::Mat: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
+      case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
+      default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4DPV_DSLASH\n", static_cast<int>(dtest_type));
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       switch (dtest_type) {
@@ -215,8 +220,7 @@ struct DslashTestWrapper {
     csParam.nSpin = 4;
     csParam.nDim = 4;
     for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
-    if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-        || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    if (is_chiral(dslash_type)) {
       csParam.nDim = 5;
       csParam.x[4] = Ls;
     }
@@ -649,6 +653,20 @@ struct DslashTestWrapper {
         default: printf("Test type not supported for domain wall\n"); exit(-1);
         }
         host_free(kappa_5);
+      } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+        switch (dtest_type) {
+        case dslash_test_type::Mat:
+          dw_4dpv_mat(spinorRef[i].data(), hostGauge, spinor[i].data(), kappa5, inv_param.dagger, gauge_param.cpu_prec,
+                    gauge_param, inv_param.mass);
+          break;
+        case dslash_test_type::MatDagMat:
+          dw_4dpv_mat(spinorTmp[i].data(), hostGauge, spinor[i].data(), kappa5, inv_param.dagger, gauge_param.cpu_prec,
+                    gauge_param, inv_param.mass);
+          dw_4dpv_mat(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), kappa5, not_dagger, gauge_param.cpu_prec,
+                    gauge_param, inv_param.mass);
+          break;
+        default: errorQuda("Test type %d supported for domain wall 4d PV", static_cast<int>(dtest_type));
+        }
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
         double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
         double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
@@ -844,6 +862,25 @@ struct DslashTestWrapper {
             }
             break;
           case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat:
+            if (transfer) {
+              MatDagMatQuda(spinorOut.data(), spinor.data(), &inv_param);
+            } else {
+              dirac->MdagM(cudaSpinorOut, cudaSpinor);
+            }
+            break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+        } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+          switch (dtest_type) {
+          case dslash_test_type::Mat:
+            if (transfer) {
+              MatQuda(spinorOut.data(), spinor.data(), &inv_param);
+            } else {
+              dirac->M(cudaSpinorOut, cudaSpinor);
+            }
+            break;
           case dslash_test_type::MatDagMat:
             if (transfer) {
               MatDagMatQuda(spinorOut.data(), spinor.data(), &inv_param);

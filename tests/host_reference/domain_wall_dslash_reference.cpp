@@ -799,6 +799,26 @@ void dw_4d_mat(void *out, void *const *gauge, void *in, double kappa, int dagger
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
+void dw_4dpv_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
+               QudaGaugeParam &gauge_param, double mferm)
+{
+  void *tmp = safe_malloc(V5 * spinor_site_size * precision);
+
+  if (dagger_bit == 0) {
+    // dwf
+    dw_4d_mat(tmp, gauge, in, kappa, 0, precision, gauge_param, mferm);
+    // pv_dag
+    dw_4d_mat(out, gauge, tmp, kappa, 1, precision, gauge_param, 1.);
+  } else {
+    // pv
+    dw_4d_mat(tmp, gauge, in, kappa, 0, precision, gauge_param, 1.);
+    // dwf_dag
+    dw_4d_mat(out, gauge, tmp, kappa, 1, precision, gauge_param, mferm);
+  }
+
+  host_free(tmp);
+}
+
 void mdw_mat(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
              QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5)
 {

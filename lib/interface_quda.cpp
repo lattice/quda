@@ -1459,6 +1459,12 @@ namespace quda {
       diracParam.type = pc ? QUDA_DOMAIN_WALL_4DPC_DIRAC : QUDA_DOMAIN_WALL_4D_DIRAC;
       diracParam.Ls = inv_param->Ls;
       break;
+    case QUDA_DOMAIN_WALL_4DPV_DSLASH:
+      if (pc)
+        errorQuda("The 4-d domain wall PV operator does not support a preconditioned form");
+      diracParam.type = QUDA_DOMAIN_WALL_4DPV_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      break;
     case QUDA_MOBIUS_DWF_EOFA_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS) {
         errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);

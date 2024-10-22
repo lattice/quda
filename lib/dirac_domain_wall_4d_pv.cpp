@@ -1,0 +1,115 @@
+#include <iostream>
+#include <dirac_quda.h>
+#include <dslash_quda.h>
+#include <blas_quda.h>
+
+namespace quda {
+
+  DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracParam &param) : DiracDomainWall4D(param) {}
+
+  DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracDomainWall4DPV &dirac) : DiracDomainWall4D(dirac) {}
+
+  DiracDomainWall4DPV::~DiracDomainWall4DPV() {}
+
+  DiracDomainWall4DPV &DiracDomainWall4DPV::operator=(const DiracDomainWall4DPV &dirac)
+  {
+    if (&dirac != this) { DiracDomainWall4D::operator=(dirac); }
+
+    return *this;
+  }
+
+  void DiracDomainWall4DPV::Dslash4(cvector_ref<ColorSpinorField>&, cvector_ref<const ColorSpinorField>&,
+                                  const QudaParity) const
+  {
+    errorQuda("The domain wall PV operator does not have a single parity form");
+  }
+
+  void DiracDomainWall4DPV::Dslash5(cvector_ref<ColorSpinorField>&, cvector_ref<const ColorSpinorField>&) const
+  {
+    errorQuda("The domain wall PV operator does not have a single parity form");
+  }
+
+  void DiracDomainWall4DPV::Dslash4Xpay(cvector_ref<ColorSpinorField>&, cvector_ref<const ColorSpinorField>&,
+                                      const QudaParity, cvector_ref<const ColorSpinorField>&, double) const
+  {
+    errorQuda("The domain wall PV operator does not have a single parity form");
+  }
+
+  void DiracDomainWall4DPV::Dslash5Xpay(cvector_ref<ColorSpinorField>&, cvector_ref<const ColorSpinorField>&,
+                                      cvector_ref<const ColorSpinorField>&, double) const
+  {
+    errorQuda("The domain wall PV operator does not have a single parity form");
+  }
+
+  void DiracDomainWall4DPV::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  {
+    printfQuda("Applying DiracDomainWall4DPV::M\n");
+
+    checkFullSpinor(out, in);
+    auto tmp = getFieldTmp(out);
+
+    if (dagger == QUDA_DAG_NO) {
+      // Apply D_dwf
+      ApplyDomainWall4D(tmp, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data,
+                        profile);
+      ApplyDslash5(tmp, in, tmp, mass, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_NO, Dslash5Type::DSLASH5_DWF);
+      blas::xpay(in, -kappa5, tmp);
+
+      // Apply D_PV^dagger
+      ApplyDomainWall4D(out, tmp, *gauge, 0.0, 0.0, nullptr, nullptr, tmp, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data,
+                        profile);
+      ApplyDslash5(out, tmp, out, mass_pv, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_DWF);
+      blas::xpay(tmp, -kappa5, out);
+    } else {
+      // Apply D_PV
+      ApplyDomainWall4D(tmp, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data,
+                        profile);
+      ApplyDslash5(tmp, in, tmp, mass_pv, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_NO, Dslash5Type::DSLASH5_DWF);
+      blas::xpay(in, -kappa5, tmp);
+
+      // Apply D_dwf^dagger
+      ApplyDomainWall4D(out, tmp, *gauge, 0.0, 0.0, nullptr, nullptr, tmp, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data,
+                        profile);
+      ApplyDslash5(out, tmp, out, mass, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_DWF);
+      blas::xpay(tmp, -kappa5, out);
+    }
+  }
+
+  void DiracDomainWall4DPV::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  {
+    checkFullSpinor(out, in);
+    auto tmp = getFieldTmp(out);
+
+    M(tmp, in);
+    Mdag(out, tmp);
+  }
+
+  void DiracDomainWall4DPV::ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  {
+    checkFullSpinor(out, in);
+
+    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data,
+                      profile);
+    ApplyDslash5(out, in, out, mass_pv, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_DWF);
+    blas::xpay(in, -kappa5, out);
+  }
+
+  void DiracDomainWall4DPV::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
+                                  cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const
+  {
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      errorQuda("Preconditioned solution requires a preconditioned solve_type");
+    }
+
+    create_alias(src, b);
+    create_alias(sol, x);
+  }
+
+  void DiracDomainWall4DPV::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                                      const QudaSolutionType) const
+  {
+    // do nothing
+  }
+
+} // end namespace quda

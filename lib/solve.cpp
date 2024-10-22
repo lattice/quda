@@ -21,8 +21,7 @@ namespace quda
   void massRescale(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool for_multishift)
   {
     double kappa5 = (0.5 / (5.0 + param.m5));
-    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-                    || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
+    double kappa = (Dirac::is_dwf(param.dslash_type)) ?
       kappa5 :
       param.kappa;
 

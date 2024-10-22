@@ -418,6 +418,16 @@ namespace quda {
     virtual double MuFactor() const { return 0.; }
 
     /**
+       @brief accessor for M5 -- overrride can return better value
+    */
+    virtual double M5() const { return 0.; }
+
+    /**
+       @brief accessor for Ls -- overrride can return better value
+    */
+    virtual int getLs() const { return 1; }
+
+    /**
        @brief accessor for if we let MG coarsening drop we can drop improvements, for ex long links for small aggregation dimensions
     */
     virtual bool AllowTruncation() const { return false; }
@@ -883,6 +893,8 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const override;
 
+    virtual double M5() const override { return m5; }
+    virtual int getLs() const override { return Ls; }
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_DIRAC; }
   };
@@ -968,6 +980,45 @@ namespace quda {
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
   };
+
+  // Pauli-Villars preconditioned dwf with 4-d parity ordered fields
+  class DiracDomainWall4DPV : public DiracDomainWall4D
+  {
+  private:
+
+    static constexpr double mass_pv = 1.;
+
+  public:
+    DiracDomainWall4DPV(const DiracParam &param);
+    DiracDomainWall4DPV(const DiracDomainWall4DPV &dirac);
+    virtual ~DiracDomainWall4DPV();
+    DiracDomainWall4DPV &operator=(const DiracDomainWall4DPV &dirac);
+
+    virtual bool hasDslash() const override { return false; }
+
+    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 QudaParity parity) const override;
+    void Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
+    void Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
+
+    void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+    void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    void ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
+                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                         const QudaSolutionType solType) const override;
+    virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                             const QudaSolutionType solType) const override;
+
+    virtual int getStencilSteps() const override { return 2; }
+    virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_4DPV_DIRAC; }
+  };
+
 
   // Full Mobius
   class DiracMobius : public DiracDomainWall {

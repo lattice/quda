@@ -151,8 +151,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  } else if (is_chiral(dslash_type)) {
     inv_param.m5 = m5;
     kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
