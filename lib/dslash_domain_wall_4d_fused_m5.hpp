@@ -120,7 +120,7 @@ namespace quda
   template <Dslash5Type...> struct Dslash5TypeList {
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
     DomainWall4DApplyFusedM5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -134,7 +134,7 @@ namespace quda
 #else
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
+      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, DDArg, recon, dslash5_type_impl>;
       Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
@@ -143,7 +143,8 @@ namespace quda
   };
 
   // use custom instantiate to deal with field splitting if needed
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
   void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U,
                    Args... args)

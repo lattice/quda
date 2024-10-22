@@ -63,6 +63,7 @@ struct DslashTestWrapper {
   // CUDA color spinor fields
   std::vector<ColorSpinorField> cudaSpinor;
   std::vector<ColorSpinorField> cudaSpinorOut;
+  std::vector<ColorSpinorField> cudaSpinorTmp;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -83,11 +84,14 @@ struct DslashTestWrapper {
   QudaParity parity = QUDA_EVEN_PARITY;
   static inline dslash_test_type dtest_type = dslash_test_type::Dslash;
   static inline bool test_split_grid = false;
+  static inline bool test_domain_decomposition = false;
   int num_src = 1;
+
+  static inline int dd_col = 0;
 
   const bool transfer = false;
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon, int dd_value, int dd_color)
   {
     if (first_time) {
       gauge_param = newQudaGaugeParam();
@@ -114,6 +118,8 @@ struct DslashTestWrapper {
     inv_param.clover_cuda_prec_sloppy = cuda_prec;
     inv_param.clover_cuda_prec_precondition = cuda_prec;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec;
+
+    init_domain_decomposition(dd_value, dd_color);
 
     init();
   }
@@ -145,6 +151,8 @@ struct DslashTestWrapper {
     }
 
     if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
+
+    test_domain_decomposition = dd_red_black;
 
     for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
@@ -275,6 +283,36 @@ struct DslashTestWrapper {
     inv_param.verbosity = verbosity;
   }
 
+  void init_domain_decomposition(int value, int color)
+  {
+    if (value == 0) {
+      test_domain_decomposition = false;
+      return;
+    }
+    test_domain_decomposition = true;
+    dd_col = color;
+
+    if (value < 3) {
+      dd_red_black = true;
+
+      // dd_block_size is half of the local lattice
+      if (value == 1) {
+        for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
+        return;
+      }
+
+      // dd_block_size is half of the global lattice
+      if (value == 2) {
+        for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
+        return;
+      }
+
+    } else {
+      dd_red_black = false;
+    }
+    errorQuda("Unexpected value for domain decomposition (%d)", value);
+  }
+
   void init()
   {
     printfQuda("Sending gauge field to GPU\n");
@@ -297,11 +335,10 @@ struct DslashTestWrapper {
       csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
 
       printfQuda("Creating cudaSpinor with nParity = %d\n", csParam.siteSubset);
-      cudaSpinor.resize(Nsrc);
-      for (int i = 0; i < Nsrc; i++) cudaSpinor[i] = ColorSpinorField(csParam);
+      resize(cudaSpinor, Nsrc, csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
-      cudaSpinorOut.resize(Nsrc);
-      for (int i = 0; i < Nsrc; i++) cudaSpinorOut[i] = ColorSpinorField(csParam);
+      resize(cudaSpinorOut, Nsrc, csParam);
+      if (test_domain_decomposition) { resize(cudaSpinorTmp, Nsrc, csParam); }
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
@@ -340,12 +377,21 @@ struct DslashTestWrapper {
   static void destroy()
   {
     for (int dir = 0; dir < 4; dir++)
-      if (hostGauge[dir]) host_free(hostGauge[dir]);
+      if (hostGauge[dir]) {
+        host_free(hostGauge[dir]);
+        hostGauge[dir] = nullptr;
+      }
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      if (hostClover) host_free(hostClover);
-      if (hostCloverInv) host_free(hostCloverInv);
+      if (hostClover) {
+        host_free(hostClover);
+        hostClover = nullptr;
+      }
+      if (hostCloverInv) {
+        host_free(hostCloverInv);
+        hostCloverInv = nullptr;
+      }
     }
 
     spinor = {};
@@ -358,6 +404,7 @@ struct DslashTestWrapper {
       vp_spinorOut.clear();
       vp_spinorRef.clear();
     }
+    first_time = true;
   }
 
   void dslashRef()
@@ -806,6 +853,80 @@ struct DslashTestWrapper {
 
       dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity);
 
+    } else if (test_domain_decomposition) {
+
+      vector_ref<ColorSpinorField> spinor = cudaSpinor;
+      vector_ref<ColorSpinorField> out = cudaSpinorOut;
+      vector_ref<ColorSpinorField> tmp = cudaSpinorTmp;
+
+      if (dd_red_black) {
+        for (int n = 0; n < Nsrc; n++) {
+          for (auto i = 0u; i < 4; i++) {
+            cudaSpinor[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorOut[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorTmp[n].DD().block_dim[i] = dd_block_size[i];
+          }
+        }
+
+        blas::zero(cudaSpinorOut);
+        blas::zero(cudaSpinorTmp);
+
+        spinor.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
+        out.DD(DD::reset, DD::red_black_type, dd_col / 2 == 1 ? DD::red_active : DD::black_active);
+
+        for (int i = 0; i < niter; i++) {
+          host_timer.start();
+          switch (dtest_type) {
+          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorOut, cudaSpinor, parity); break;
+          case dslash_test_type::MatPC:
+          case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinor); break;
+          case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinor); break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+          host_timer.stop();
+
+          dslash_time.cpu_time += host_timer.last();
+          // skip first and last iterations since they may skew these metrics if comms are not synchronous
+          if (i > 0 && i < niter) {
+            dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+            dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
+          }
+        }
+
+        spinor.DD(DD::reset);
+        out.DD(DD::reset);
+        spinorOut = cudaSpinorOut;
+
+        if (niter > 2) { // HACK: when benchmarking we do not produce reference solution
+          // We also test that Dyx is same as D applied to projected in and out spinors
+          blas::copy(tmp, cudaSpinor);
+          tmp.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
+          tmp.projectDD();
+          tmp.DD(DD::reset);
+
+          blas::zero(cudaSpinorOut);
+          switch (dtest_type) {
+          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorOut, cudaSpinorTmp, parity); break;
+          case dslash_test_type::MatPC:
+          case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinorTmp); break;
+          case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinorTmp); break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+
+          out.DD(DD::reset, DD::red_black_type, dd_col / 2 == 0 ? DD::red_active : DD::black_active);
+          out.projectDD();
+          out.DD(DD::reset);
+
+          spinorRef = cudaSpinorOut;
+        }
+      } else {
+        errorQuda("Test dd type not supported");
+      }
+
     } else {
 
       for (int i = 0; i < niter; i++) {
@@ -1021,7 +1142,7 @@ struct DslashTestWrapper {
 
   void run_test(int niter, bool = false)
   {
-    {
+    if (getTuning()) {
       printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
     }
@@ -1037,7 +1158,7 @@ struct DslashTestWrapper {
     unsigned long long bytes = (quda::Tunable::bytes_global() - bytes0);
 
     if (!test_split_grid) {
-      if (!transfer) spinorOut = cudaSpinorOut;
+      if (!transfer && !test_domain_decomposition) spinorOut = cudaSpinorOut;
 
       // print timing information
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
@@ -1085,6 +1206,11 @@ struct DslashTestWrapper {
                    norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
         deviation
           = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[0], vp_spinorOut[n]))));
+      }
+    } else if (test_domain_decomposition) {
+      for (int n = 0; n < Nsrc; n++) {
+        auto deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[n], spinorOut[n])));
+        printfQuda("Deviation for (D-PDP)_{%d,%d}*spinor is %e\n", dd_col % 2, dd_col / 2, deviation);
       }
     } else {
       for (int n = 0; n < Nsrc; n++) {

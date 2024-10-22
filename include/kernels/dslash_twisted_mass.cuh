@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct TwistedMassArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct TwistedMassArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
     typedef typename mapper<Float>::type real;
     real a; /** xpay scale facotor */
     real b; /** this is the twist factor */
@@ -14,7 +14,7 @@ namespace quda
     TwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    const ColorSpinorField &halo, const GaugeField &U, double a, double b,
                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b) // if dagger flip the twist
     {
@@ -47,10 +47,17 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
+
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (mykernel_type == INTERIOR_KERNEL) {
+      if (mykernel_type == INTERIOR_KERNEL and arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         x += arg.b * x.igamma(4);
         out = x + arg.a * out;

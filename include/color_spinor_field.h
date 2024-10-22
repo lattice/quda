@@ -149,6 +149,7 @@ namespace quda
     int composite_dim = 0; // e.g., number of eigenvectors in the set
     bool is_component = false;
     int component_id = 0; // eigenvector index
+    DDParam dd {};
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -356,6 +357,9 @@ namespace quda
     //
     CompositeColorSpinorField components;
 
+    /** Domain decomposition options */
+    DDParam dd {};
+
     /**
        Compute the required extended ghost zone sizes and offsets
        @param[in] nFace The depth of the halo
@@ -437,6 +441,31 @@ namespace quda
        @param[in] src Source from which we are copying
      */
     void copy(const ColorSpinorField &src);
+
+    /**
+       @brief Project the field to a domain determined by DDParam
+     */
+    void projectDD();
+
+    /**
+       @brief Returns DDParam (const version)
+     */
+    const DDParam& DD() const { return dd; }
+
+    /**
+       @brief Returns DDParam (non const version)
+     */
+    DDParam& DD() { return dd; }
+
+    /**
+       @brief Sets DDParam from a given DDParam
+     */
+    void DD(const DDParam &in) { dd = in; }
+
+    /**
+       @brief Sets DDParam from a given list of options (DD flags)
+     */
+    template <typename... Args> void DD(const quda::DD &flag, const Args &...args) { dd.set(flag, args...); }
 
     /**
        @brief Zero all elements of this field
@@ -977,6 +1006,8 @@ namespace quda
                               void *Dst = nullptr, const void *Src = nullptr);
 
   void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
+
+  void genericProjectDD(ColorSpinorField &a);
   int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol);
 
   /**

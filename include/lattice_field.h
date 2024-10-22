@@ -7,6 +7,7 @@
 #include <object.h>
 #include <quda_api.h>
 #include <reference_wrapper_helper.h>
+#include <domain_decomposition.h>
 
 /**
  * @file lattice_field.h
@@ -927,6 +928,39 @@ namespace quda {
   }
 
 #define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the domain decomposition of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return true if all fields match
+   */
+  template <typename T1, typename T2>
+  inline bool DD_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+    if (!a.DD().check(a, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!b.DD().check(b, true)) errorQuda("DD checks not passed (%s:%d in %s())", file, line, func);
+    if (!a.DD().match(b.DD(), true)) errorQuda("DD not match (%s:%d in %s())", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for determining if the domain decomposition of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check domain decomposition on
+     @return true if all fields match
+   */
+  template <typename T1, typename T2, typename... Args>
+  inline bool DD_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
+  {
+    // checking all possible pairs
+    return (DD_(func, file, line, a, b) && DD_(func, file, line, a, args...) && DD_(func, file, line, b, args...));
+  }
+
+#define checkDD(...) DD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Return whether data is reordered on the CPU or GPU.  This can set

@@ -98,6 +98,7 @@ namespace quda
     nSpin = param.nSpin;
     nVec = param.nVec;
     twistFlavor = param.twistFlavor;
+    dd = param.dd;
 
     if (param.pc_type != QUDA_5D_PC && param.pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", param.pc_type);
     pc_type = param.pc_type;
@@ -531,6 +532,7 @@ namespace quda
     param.pc_type = pc_type;
     param.suggested_parity = suggested_parity;
     param.create = QUDA_NULL_FIELD_CREATE;
+    param.dd = dd;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const
@@ -1543,6 +1545,8 @@ namespace quda
   {
     genericPrintVector(*this, parity, x_cb, rank);
   }
+
+  void ColorSpinorField::projectDD() { genericProjectDD(*this); }
 
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {

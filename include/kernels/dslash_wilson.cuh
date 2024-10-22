@@ -15,8 +15,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the Wilson operator
    */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, bool distance_pc_ = false>
-  struct WilsonArg : DslashArg<Float, nDim> {
+  template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool distance_pc_ = false>
+  struct WilsonArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
@@ -45,22 +45,18 @@ namespace quda
     /** parameters for distance preconditioning */
     const real alpha0;
     const int t0;
-    const int comm_coord_dim_3;
-    const int comm_dim_dim_3;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
               const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
-      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
-                             comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
+                                    comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
       a(a),
       alpha0(alpha0),
-      t0(t0),
-      comm_coord_dim_3(comm_coord(3) * this->dim[3]),
-      comm_dim_dim_3(comm_dim(3) * this->dim[3])
+      t0(t0)
     {
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
@@ -93,8 +89,8 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-    const int t = arg.comm_coord_dim_3 + coord[3];
-    const int nt = arg.comm_dim_dim_3;
+    const int t = coord.gx[3];
+    const int nt = arg.globalDim3;
     real fwd_coeff_3
       = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
     real bwd_coeff_3
@@ -102,7 +98,8 @@ namespace quda
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
-      {                           // Forward gather - compute fwd offset for vector fetch
+      // Forward gather - compute fwd offset for vector fetch
+      if (arg.dd_in.doHopping(coord, d, +1)) {
         const real fwd_coeff = (d < 3) ? 1.0 : fwd_coeff_3;
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
@@ -130,7 +127,8 @@ namespace quda
         }
       }
 
-      { // Backward gather - compute back offset for spinor and gauge fetch
+      // Backward gather - compute back offset for spinor and gauge fetch
+      if (arg.dd_in.doHopping(coord, d, -1)) {
         const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
@@ -180,11 +178,18 @@ namespace quda
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
+      int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](xs, my_spinor_parity) = out;
+        return;
+      }
+
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](xs, my_spinor_parity);
         out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {

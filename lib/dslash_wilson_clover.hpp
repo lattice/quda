@@ -71,22 +71,25 @@ namespace quda
   template <bool distance_pc> struct DistanceType {
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {
-
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverApply {
     template <bool distance_pc>
     WilsonCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
                       double alpha0, int t0, int parity, bool dagger, const int *comm_override,
                       DistanceType<distance_pc>, TimeProfile &profile)
+#ifdef SIGNATURE_ONLY
+    ;
+#else
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      WilsonCloverArg<Float, nColor, nDim, recon, false, distance_pc> arg(out, in, halo, U, A, a, 0.0, x, parity,
-                                                                          dagger, comm_override, alpha0, t0);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, false, distance_pc> arg(out, in, halo, U, A, a, 0.0, x, parity,
+                                                                                 dagger, comm_override, alpha0, t0);
       WilsonClover<decltype(arg)> wilson(arg, out, in, halo, A);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }
+#endif
   };
 
 } // namespace quda

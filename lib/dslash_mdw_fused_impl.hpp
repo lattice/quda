@@ -21,7 +21,7 @@ namespace quda
 
 #ifdef QUDA_MMA_AVAILABLE
 
-    template <class store_t, int nColor, QudaReconstructType recon, int Ls_> class FusedDslash : public TunableGridStrideKernel2D
+    template <class store_t, int nColor, typename DDArg, QudaReconstructType recon, int Ls_> class FusedDslash : public TunableGridStrideKernel2D
     {
       ColorSpinorField &out;
       const ColorSpinorField &in;
@@ -257,8 +257,8 @@ namespace quda
 #if defined(GPU_DOMAIN_WALL_DIRAC) && defined(QUDA_MMA_AVAILABLE)
     template <int Ls>
     struct FusedDslashLs {
-      template <class store_t, int nColor, QudaReconstructType recon>
-      using type = FusedDslash<store_t, nColor, recon, Ls>;
+      template <class store_t, int nColor, typename DDArg, QudaReconstructType recon>
+      using type = FusedDslash<store_t, nColor, DDArg, recon, Ls>;
     };
 #endif
   } // namespace mobius_tensor_core

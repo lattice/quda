@@ -70,7 +70,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct TwistedMassPreconditionedApply {
 
     TwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
@@ -80,14 +81,14 @@ namespace quda
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       if (asymmetric) {
-        TwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
-                                                             comm_override);
+        TwistedMassArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
+                                                                    comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
 
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
       } else {
-        TwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
-                                                              comm_override);
+        TwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
+                                                                     comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
 
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);

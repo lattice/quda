@@ -186,7 +186,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct StaggeredQSmearApply {
     StaggeredQSmearApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                          cvector_ref<const ColorSpinorField> &, const GaugeField &U, int t0, bool is_tslice_kernel,
                          int parity, int dir, bool dagger, const int *comm_override, TimeProfile &profile)
@@ -196,8 +196,8 @@ namespace quda
         constexpr int nSpin = 1;
 
         auto halo = ColorSpinorField::create_comms_batch(in);
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity, dir,
-                                                                  dagger, comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity,
+                                                                         dir, dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, in, halo, profile);
       } else {

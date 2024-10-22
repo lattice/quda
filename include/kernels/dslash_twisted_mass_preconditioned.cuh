@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool asymmetric_>
-  struct TwistedMassArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool asymmetric_>
+  struct TwistedMassArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
     typedef typename mapper<Float>::type real;
     static constexpr bool asymmetric = asymmetric_; /** whether we are applying the asymmetric operator or not */
     real a;          /** this is the scaling factor */
@@ -18,7 +18,8 @@ namespace quda
     TwistedMassArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    const ColorSpinorField &halo, const GaugeField &U, double a, double b, bool xpay,
                    cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
+                                                          comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the twist
       c(0.0),
@@ -27,8 +28,8 @@ namespace quda
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
-        DslashArg<Float, nDim>::twist_a = this->a;
-        DslashArg<Float, nDim>::twist_b = this->b;
+        DslashArg<Float, nDim, DDArg>::twist_a = this->a;
+        DslashArg<Float, nDim, DDArg>::twist_b = this->b;
       }
     }
   };
@@ -58,7 +59,8 @@ namespace quda
 
 #pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
-      {                              // Forward gather - compute fwd offset for vector fetch
+      // Forward gather - compute fwd offset for vector fetch
+      if (arg.dd_in.doHopping(coord, d, +1)) {
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
         const bool ghost
@@ -95,7 +97,8 @@ namespace quda
         }
       }
 
-      { // Backward gather - compute back offset for spinor and gauge fetch
+      // Backward gather - compute back offset for spinor and gauge fetch
+      if (arg.dd_in.doHopping(coord, d, -1)) {
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = back_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -161,13 +164,17 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
 
       if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
         applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       else // special dslash for symmetric dagger
         applyWilsonTM<nParity, dagger, 1, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && not arg.dd_x.isZero(coord)) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         if (!dagger || Arg::asymmetric) {
           out += arg.a_inv * (x + arg.b_inv * x.igamma(4)); // apply inverse twist which is undone below

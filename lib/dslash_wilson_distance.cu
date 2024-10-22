@@ -1,4 +1,6 @@
+#define SIGNATURE_ONLY
 #include <dslash_wilson.hpp>
+#undef SIGNATURE_ONLY
 
 namespace quda
 {

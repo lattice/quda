@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool clov_inv_>
-  struct WilsonCloverHasenbuschTwistPCArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_, bool clov_inv_>
+  struct WilsonCloverHasenbuschTwistPCArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
     static constexpr bool clov_inv = clov_inv_;
@@ -25,7 +25,7 @@ namespace quda
                                      const ColorSpinorField &halo, const GaugeField &U, const CloverField &A_,
                                      double a_, double b_, cvector_ref<const ColorSpinorField> &x, int parity,
                                      bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a_, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a_, x, parity, dagger, comm_override),
       A(A_, false),
       A_inv(A_, dynamic_clover ? false : true),
       b(dagger ? -0.5 * b_ : 0.5 * b_) // if dynamic clover we don't want the inverse field
@@ -64,6 +64,11 @@ namespace quda
 
       Vector out;
 
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
+
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
@@ -75,7 +80,9 @@ namespace quda
 
       if (isComplete<mykernel_type>(arg, coord) && active) {
 
-        if (!Arg::clov_inv) {
+        if (!Arg::clov_inv and arg.dd_x.isZero(coord)) {
+          out = arg.a * out;
+        } else if (!Arg::clov_inv) {
           Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           out = x + arg.a * out;
         } else {
@@ -100,14 +107,18 @@ namespace quda
           }
 
           tmp.toNonRel(); // switch back to non-chiral basis
-          Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
-          out = x + arg.a * tmp;
+          if (arg.dd_x.isZero(coord)) {
+            out = arg.a * tmp;
+          } else {
+            Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
+            out = x + arg.a * tmp;
+          }
         }
 
         // At this point: out = x + k A^{-1} D in or out = x + k D in
         //
         // now we must add on i g_5 b A x
-        {
+        if (not arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           x.toRel();
           Vector tmp;

@@ -423,17 +423,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_splitgrid_policy${pol2}_DD
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
                      --all-partitions 0
+		     --domain-decomposition 1
                      --test Dslash
-                     --dim 2 4 6 8
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_splitgrid_test_pol${pol2}.xml)
+                     --dim 4 2 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_splitgrid_test_pol${pol2}_DD.xml)
     if(polenv)
-      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2}_DD PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
-    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
+    set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2}_DD PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
 
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -447,7 +448,20 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
-endif()
+    
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
 
   if(QUDA_DIRAC_CLOVER)
     set(DIRAC_NAME clover)
@@ -465,7 +479,6 @@ endif()
     endif()
 
     # asymmetric preconditioning
-    set(DIRAC_NAME clover)
     add_test(NAME dslash_${DIRAC_NAME}_asym_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
@@ -489,6 +502,17 @@ endif()
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_CLOVER_HASENBUSCH)
@@ -530,6 +554,17 @@ endif()
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_MASS)
@@ -571,6 +606,17 @@ endif()
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
@@ -617,6 +663,19 @@ endif()
     if(polenv)
       set_tests_properties(benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    set(TEST_NAME dslash_ndeg_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --flavor nondeg-doublet
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_CLOVER)
@@ -660,6 +719,17 @@ endif()
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
@@ -708,6 +778,18 @@ endif()
       set_tests_properties(benchmark_dslash_ndeg_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    set(TEST_NAME dslash_ndeg_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --flavor nondeg-doublet
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_DOMAIN_WALL)
@@ -737,6 +819,19 @@ endif()
     set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    set(TEST_NAME dslash_ndeg_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+		     --domain-decomposition 1
+                     --flavor nondeg-doublet
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # 4-d preconditioned
@@ -779,6 +874,19 @@ endif()
     set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # Mobius fermions
@@ -866,6 +974,19 @@ endif()
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_STAGGERED)
@@ -874,7 +995,7 @@ endif()
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
                      --test MatPC
-                     --dim 2 4 6 8
+                     --dim 4 2 6 8
                      --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_matpc_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
@@ -884,7 +1005,7 @@ endif()
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
                      --test Mat
-                     --dim 2 4 6 8
+                     --dim 4 2 6 8
                      --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
@@ -894,7 +1015,7 @@ endif()
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
                      --test MatPC
-                     --dim 2 4 6 8
+                     --dim 4 2 6 8
                      --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_splitgrid_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
@@ -911,6 +1032,19 @@ endif()
     set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
     if(polenv)
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 4 2 6 8
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     set(DIRAC_NAME asqtad)
@@ -963,13 +1097,26 @@ endif()
       set_tests_properties(dslash_${DIRAC_NAME}_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
+    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
+    add_test(NAME ${TEST_NAME}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 0
+                     --test Mat
+		     --domain-decomposition 1
+                     --dim 8 6 10 12
+                     --gtest_output=xml:${TEST_NAME}.xml)
+    if(polenv)
+      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
     if(QUDA_LAPLACE)
       set(DIRAC_NAME laplace)
       add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
                COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                        --dslash-type ${DIRAC_NAME}
                        --test Mat
-                       --dim 2 4 6 8
+                       --dim 4 2 6 8
                        --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
       if(polenv)
         set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})

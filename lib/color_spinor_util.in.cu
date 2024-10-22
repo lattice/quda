@@ -5,6 +5,7 @@
 #include <index_helper.cuh>
 #include <blas_quda.h>
 #include <instantiate.h>
+#include <domain_decomposition_helper.cuh>
 
 namespace quda {
 
