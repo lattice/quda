@@ -14,6 +14,7 @@
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
 #include <qio_field.h>
+#include "test.h"
 
 QudaGaugeParam gauge_param;
 QudaInvertParam eig_inv_param;

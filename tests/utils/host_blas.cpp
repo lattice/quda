@@ -1,14 +1,15 @@
-#include <host_utils.h>
 #include <stdio.h>
 #include <complex.h>
 #include <comm_quda.h>
 
-template <typename Float> inline void aXpY(Float a, Float *x, Float *y, int len)
+#include "host_utils.h"
+
+template <typename real_t> inline void aXpY(real_t a, const real_t *x, real_t *y, int len)
 {
   for (int i = 0; i < len; i++) { y[i] += a * x[i]; }
 }
 
-void axpy(double a, void *x, void *y, int len, QudaPrecision precision)
+void axpy(double a, const void *x, void *y, int len, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
     aXpY(a, (double *)x, (double *)y, len);
@@ -25,7 +26,7 @@ void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision
 }
 
 // performs the operation x[i] *= a
-template <typename Float> inline void aX(Float a, Float *x, int len)
+template <typename real_t> inline void aX(real_t a, real_t *x, int len)
 {
   for (int i = 0; i < len; i++) x[i] *= a;
 }
@@ -48,7 +49,7 @@ void cax(double _Complex a, void *x, int len, QudaPrecision precision)
 }
 
 // performs the operation y[i] -= x[i] (minus x plus y)
-template <typename Float> inline void mXpY(Float *x, Float *y, int len)
+template <typename real_t> inline void mXpY(real_t *x, real_t *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] -= x[i];
 }
@@ -62,7 +63,7 @@ void mxpy(void *x, void *y, int len, QudaPrecision precision)
 }
 
 // returns the square of the L2 norm of the vector
-template <typename Float> inline double norm2(Float *v, int len, bool global)
+template <typename real_t> inline double norm2(real_t *v, int len, bool global)
 {
   double sum = 0.0;
   for (int i = 0; i < len; i++) sum += v[i] * v[i];
@@ -79,17 +80,17 @@ double norm_2(void *v, int len, QudaPrecision precision, bool global)
 }
 
 // performs the operation y[i] = x[i] + a*y[i]
-template <typename Float> static inline void xpay(Float *x, Float a, Float *y, int len)
+template <typename real_t> static inline void xpay(const real_t *x, real_t a, real_t *y, int len)
 {
   for (int i = 0; i < len; i++) y[i] = x[i] + a * y[i];
 }
 
-void xpay(void *x, double a, void *y, int length, QudaPrecision precision)
+void xpay(const void *x, double a, void *y, int length, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    xpay((double *)x, a, (double *)y, length);
+    xpay((const double *)x, a, (double *)y, length);
   else
-    xpay((float *)x, (float)a, (float *)y, length);
+    xpay((const float *)x, (float)a, (float *)y, length);
 }
 
 void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precision)
@@ -102,28 +103,28 @@ void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precis
 }
 
 // CPU-style BLAS routines for staggered
-void cpu_axy(QudaPrecision prec, double a, void *x, void *y, int size)
+void cpu_axy(QudaPrecision prec, double a, const void *x, void *y, int size)
 {
   if (prec == QUDA_DOUBLE_PRECISION) {
     double *dst = (double *)y;
-    double *src = (double *)x;
+    const double *src = (const double *)x;
     for (int i = 0; i < size; i++) { dst[i] = a * src[i]; }
   } else { // QUDA_SINGLE_PRECISION
     float *dst = (float *)y;
-    float *src = (float *)x;
+    const float *src = (const float *)x;
     for (int i = 0; i < size; i++) { dst[i] = a * src[i]; }
   }
 }
 
-void cpu_xpy(QudaPrecision prec, void *x, void *y, int size)
+void cpu_xpy(QudaPrecision prec, const void *x, void *y, int size)
 {
   if (prec == QUDA_DOUBLE_PRECISION) {
     double *dst = (double *)y;
-    double *src = (double *)x;
+    const double *src = (const double *)x;
     for (int i = 0; i < size; i++) { dst[i] += src[i]; }
   } else { // QUDA_SINGLE_PRECISION
     float *dst = (float *)y;
-    float *src = (float *)x;
+    const float *src = (const float *)x;
     for (int i = 0; i < size; i++) { dst[i] += src[i]; }
   }
 }

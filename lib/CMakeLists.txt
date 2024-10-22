@@ -17,7 +17,7 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
-  monitor.cpp dirac_coarse.cpp dslash_coarse.cpp
+  solve.cpp monitor.cpp dirac_coarse.cpp dslash_coarse.cpp
   coarse_op.cpp coarsecoarse_op.cpp
   coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp
@@ -30,6 +30,7 @@ set (QUDA_OBJS
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu
   gauge_laplace.cpp gauge_observable.cpp
+  inv_cgnr.cpp inv_cgne.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp

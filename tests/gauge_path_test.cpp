@@ -12,6 +12,7 @@
 #include <gauge_path_quda.h>
 #include <timer.h>
 #include <gtest/gtest.h>
+#include "test.h"
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 

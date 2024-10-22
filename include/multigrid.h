@@ -99,6 +99,9 @@ namespace quda {
     /** Number of vectors used to define coarse space */
     int Nvec;
 
+    /** Batch size when computing null space vectors */
+    int n_vec_batch;
+
     /** Number of times to apply Gram-Schmidt within a block */
     int NblockOrtho;
 
@@ -180,6 +183,7 @@ namespace quda {
       Nlevel(param.n_level),
       spinBlockSize(param.spin_block_size[level]),
       Nvec(param.n_vec[level]),
+      n_vec_batch(param.n_vec_batch[level]),
       NblockOrtho(param.n_block_ortho[level]),
       blockOrthoTwoPass(param.block_ortho_two_pass[level]),
       B(B),
@@ -216,6 +220,7 @@ namespace quda {
       Nlevel(param.Nlevel),
       spinBlockSize(param.mg_global.spin_block_size[level]),
       Nvec(param.mg_global.n_vec[level]),
+      n_vec_batch(param.mg_global.n_vec_batch[level]),
       NblockOrtho(param.mg_global.n_block_ortho[level]),
       blockOrthoTwoPass(param.mg_global.block_ortho_two_pass[level]),
       coarse(param.coarse),
@@ -294,14 +299,14 @@ namespace quda {
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField> B_coarse;
 
-    /** Residual vector */
-    ColorSpinorField r;
+    /** Residual vector set */
+    std::vector<ColorSpinorField> r;
 
-    /** Coarse residual vector */
-    ColorSpinorField r_coarse;
+    /** Coarse residual vector set */
+    std::vector<ColorSpinorField> r_coarse;
 
-    /** Coarse solution vector */
-    ColorSpinorField x_coarse;
+    /** Coarse solution vector set */
+    std::vector<ColorSpinorField> x_coarse;
 
     /** Kahler-Dirac Xinv */
     std::shared_ptr<GaugeField> xInvKD;
@@ -440,7 +445,7 @@ namespace quda {
        @param out The solution vector
        @param in The residual vector (or equivalently the right hand side vector)
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
 
     /**
        @brief Load the null space vectors in from file

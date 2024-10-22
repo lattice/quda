@@ -92,9 +92,9 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Generating Null Space Vectors ... \n"); }
     spinorNoise(null_b, rng, QUDA_NOISE_GAUSS);
 
-    std::vector<ColorSpinorField> B(16);
     csParam.setPrecision(prec_precondition);
-    for (auto &pB : B) { pB = ColorSpinorField(csParam); }
+    std::vector<ColorSpinorField> B;
+    resize(B, 16, csParam);
 
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
     null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
