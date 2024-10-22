@@ -264,7 +264,6 @@ namespace quda
     const Arg &arg;
     constexpr reDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
-    template <typename U> static inline void comm_reduce(U &) { }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {
@@ -320,7 +319,6 @@ namespace quda
     const Arg &arg;
     constexpr cDotProduct3d(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
-    template <typename U> static inline void comm_reduce(U &) { }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int parity, int t)
     {

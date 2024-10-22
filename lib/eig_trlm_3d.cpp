@@ -16,6 +16,7 @@
 #include <util_quda.h>
 #include <tune_quda.h>
 #include <eigen_helper.h>
+#include <split_grid.h>
 
 namespace quda
 {
@@ -64,6 +65,16 @@ namespace quda
 
   void TRLM3D::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
   {
+    // Create 3-d split communicators
+    CommKey split_key = {1, 1, 1, comm_dim(3)};
+
+    if (!split_key.is_valid()) {
+      errorQuda("split_key = [%d,%d,%d,%d] is not valid", split_key[0], split_key[1], split_key[2], split_key[3]);
+    }
+    logQuda(QUDA_DEBUG_VERBOSE, "Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d)\n",
+            comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
+    push_communicator(split_key);
+
     // Override any user input for block size.
     block_size = 1;
 
@@ -215,27 +226,12 @@ namespace quda
       }
 
       if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
-        printf("iter = %d rank = %d converged = ", restart_iter + 1, comm_rank());
+        printf("iter = %d rank = %d converged = ", restart_iter + 1, comm_rank_global());
         for (int t = 0; t < ortho_dim_size; t++) printf("%d", (int)converged_3D[t]);
         printf(" min nlock %3d nconv %3d nkeep %3d\n",min_nlock,min_nconv,min_nkeep);
       }
 
-      // ensure that all processes partake even if all eigenvalues in
-      // those processes have converged
-      int all_converged_int = all_converged;
-      comm_allreduce_int(all_converged_int);
-      all_converged = (static_cast<size_t>(all_converged_int) == comm_size());
-
-      // at least one subset has converged but not all
-      // disable autotuning for now
-      static bool tuning_disable = false;
-      if (all_converged_int > 0 && !all_converged) {
-        pushTuning(false);
-        tuning_disable = true;
-      }
-
       if (all_converged) {
-        if (tuning_disable) popTuning(); // renable tuning since processes are now converged
         reorder3D(kSpace);
         converged = true;
       }
@@ -276,6 +272,11 @@ namespace quda
       // Compute eigenvalues
       computeEvals3D(mat, kSpace, evals);
     }
+
+    push_communicator(default_comm_key);
+
+    // ensure all processes have all e-values
+    comm_allreduce_sum(evals);
 
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
@@ -347,9 +348,7 @@ namespace quda
           }
 
           // r[t] = r[t] - beta[t]{j-1} * v[t]{j-1}
-          pushTuning(false);
           blas::block::axpy(beta_t, {vecs_t.begin(), vecs_t.begin() + j - start}, r_t);
-          popTuning();
 
           // Copy residual back to 4D vector
           blas3d::copy(t, blas3d::COPY_FROM_3D, r_t, r[0]);
@@ -520,10 +519,8 @@ namespace quda
         for (int i = 0; i < dim; i++) blas3d::copy(t, blas3d::COPY_TO_3D, vecs_t[i], vecs_locked[i]);
 
         // Compute the axpy
-        pushTuning(false);
         blas::block::axpy(ritz_mat_keep[t], {vecs_t.begin(), vecs_t.begin() + dim},
                           {kSpace_t.begin(), kSpace_t.begin() + keep});
-        popTuning();
 
         // Copy back to the 4D workspace array
 
@@ -649,26 +646,24 @@ namespace quda
 
     // If size = n_conv, this routine is called post sort
     if (size == n_conv) {
-      evals.resize(ortho_dim_size * comm_dim(ortho_dim) * n_conv, 0.0);
+      evals.resize(ortho_dim_size * comm_dim_global(ortho_dim) * n_conv, 0.0);
 
-      int t_offset = ortho_dim_size * comm_coord(3);      
-      for (int t = 0; t < ortho_dim_size; t++) {
-        for (int i = 0; i < size; i++) {
+      if (comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+        int t_offset = ortho_dim_size * comm_coord_global(3);
+        for (int t = 0; t < ortho_dim_size; t++) {
+          for (int i = 0; i < size; i++) {
 
-	  // Use printf to get data from t dim only
-	  if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
-	    printf("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n",t_offset + t, i,
-		   evals_t[i][t].real(), evals_t[i][t].imag(), residua_3D[t][i]);
-	  }
-	  
-          // Transfer evals to eval array
-          evals[(t_offset + t) * size + i] = evals_t[i][t];
+            // Use printf to get data from t dim only
+            if (getVerbosity() >= QUDA_VERBOSE) {
+              printf("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n",t_offset + t, i,
+                     evals_t[i][t].real(), evals_t[i][t].imag(), residua_3D[t][i]);
+            }
+
+            // Transfer evals to eval array
+            evals[(t_offset + t) * size + i] = evals_t[i][t];
+          }
         }
       }
-      comm_allreduce_sum(evals);
-
-      double XYZ_inv = 1.0 / (comm_dim(0) * comm_dim(1) * comm_dim(2));
-      for (auto &e : evals) e *= XYZ_inv;
     }
   }
 
