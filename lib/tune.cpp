@@ -169,7 +169,7 @@ namespace quda
     for (auto i = 0u; i < global_tune_rank.size(); i++) {
       broadcastTuneCache(global_tune_rank[i], split_tc[i]);
       if (comm_rank() == global_tune_rank[i]) split_tc[i] = tunecache;
-      printfQuda("i = %d tune_rank = %d tc size = %lu\n", i, global_tune_rank[i], split_tc[i].size());
+      logQuda(QUDA_DEBUG_VERBOSE, "i = %d tune_rank = %d tc size = %lu\n", i, global_tune_rank[i], split_tc[i].size());
     }
 
     // now merge the maps
@@ -361,7 +361,7 @@ namespace quda
     comm_broadcast(&size, sizeof(size_t), root_rank);
 
     if (size > 0) {
-      if (comm_rank_global() == root_rank) {
+      if (comm_rank() == root_rank) {
         comm_broadcast(const_cast<char *>(serialized.str().c_str()), size, root_rank);
       } else {
         std::vector<char> serstr(size + 1);
@@ -847,9 +847,9 @@ namespace quda
      */
     void broadcast(int32_t root_rank)
     {
-      size_t size;
+      size_t size = 0;
       std::string serialized;
-      if (comm_rank_global() == root_rank) {
+      if (comm_rank() == root_rank) {
         serialized = serialize();
         size = serialized.length();
       }
