@@ -9,6 +9,7 @@ namespace quda
 
   typedef @QUDA_DSLASH_DDARG@ DDArg;
   typedef precision_type_mapper<precision>::type Float;
+  constexpr bool distance_pc = @QUDA_DSLASH_DISTANCE@;
 
 
   template struct StaggeredApply<Float, nColor, DDArg, ReconstructStaggered::recon[reconI]>;
