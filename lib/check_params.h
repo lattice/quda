@@ -196,6 +196,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(compute_evals_batch_size, 4);
   P(ortho_block_size, 0);
   P(partfile, QUDA_BOOLEAN_FALSE);
 #else
@@ -226,6 +227,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(compute_evals_batch_size, INVALID_INT);
   P(ortho_block_size, INVALID_INT);
   P(partfile, QUDA_BOOLEAN_INVALID);
 #endif
@@ -384,6 +386,19 @@ void printQudaInvertParam(QudaInvertParam *param) {
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
+#ifdef PRINT_PARAM
+    // for MDWF, add b5, c5 to param print
+    for (int i = 0; i < param->Ls; i++) {
+      std::complex<double> b5;
+      memcpy(&b5, param->b_5, sizeof(std::complex<double>));
+      printfQuda("s = %2d b5 = (%16.15e %16.15e)\n", i, b5.real(), b5.imag());
+    }
+    for (int i = 0; i < param->Ls; i++) {
+      std::complex<double> c5;
+      memcpy(&c5, param->c_5, sizeof(std::complex<double>));
+      printfQuda("s = %2d c5 = (%16.15e %16.15e)\n", i, c5.real(), c5.imag());
+    }
+#endif
   }
   if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     P(mu, INVALID_DOUBLE);
@@ -437,8 +452,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef CHECK_PARAM
   P(pipeline, 0); /** Whether to use a pipelined solver */
   P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
-  P(num_src, 1); /**< Number of offsets in the multi-shift solver */
+  P(num_src, 1);    /**< Number of sources to solve for simultaneously */
   P(overlap, 0); /**< width of domain overlaps */
+#else
+  if (param->num_src > QUDA_MAX_MULTI_SRC)
+    errorQuda("num_src %d exceeds limit of %d", param->num_src, QUDA_MAX_MULTI_SRC);
 #endif
 
 #ifdef INIT_PARAM
@@ -447,6 +465,17 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
   for (int d = 0; d < 4; d++) { P(split_grid[d], INVALID_INT); } /**< Grid of sub-partitions */
   P(num_src_per_sub_partition, INVALID_INT);                     /**< Number of sources per sub-partitions */
+#ifdef CHECK_PARAM
+  int split_grid_size = 1;
+  for (int d = 0; d < 4; d++) split_grid_size *= param->split_grid[d];
+  if (split_grid_size > 1) {
+    if (param->num_src_per_sub_partition < 1)
+      errorQuda("Invalid num_src_per_subpartition = %d", param->num_src_per_sub_partition);
+    if (param->num_src % param->num_src_per_sub_partition != 0)
+      errorQuda("num_src %d not compatible with num_src_per_sub_partition %d", param->num_src,
+                param->num_src_per_sub_partition);
+  }
+#endif
 #endif
 
 #ifdef INIT_PARAM
@@ -646,10 +675,18 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(iter, 0);
   P(gflops, 0.0);
   P(secs, 0.0);
+  P(energy, 0.0);
+  P(power, 0.0);
+  P(temp, 0.0);
+  P(clock, 0.0);
 #elif defined(PRINT_PARAM)
   P(iter, INVALID_INT);
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
+  P(energy, INVALID_DOUBLE);
+  P(power, INVALID_DOUBLE);
+  P(temp, INVALID_DOUBLE);
+  P(clock, INVALID_DOUBLE);
 #endif
 
 
@@ -939,12 +976,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-    if (i<QUDA_MAX_MG_LEVEL) {
-          P(n_vec[i], INVALID_INT);
+    if (i < QUDA_MAX_MG_LEVEL) {
+      P(n_vec[i], INVALID_INT);
+      P(n_vec_batch[i], INVALID_INT);
     }
 #else
-    if (i<n_level-1) {
+    if (i < n_level-1) {
       P(n_vec[i], INVALID_INT);
+      P(n_vec_batch[i], INVALID_INT);
     }
 #endif
 
@@ -1026,14 +1065,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #endif
   }
-
-#ifdef INIT_PARAM
-  P(gflops, 0.0);
-  P(secs, 0.0);
-#elif defined(PRINT_PARAM)
-  P(gflops, INVALID_DOUBLE);
-  P(secs, INVALID_DOUBLE);
-#endif
 
 #ifdef INIT_PARAM
   P(allow_truncation, QUDA_BOOLEAN_FALSE);

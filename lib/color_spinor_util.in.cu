@@ -424,4 +424,18 @@ namespace quda {
     resize(v, new_size, param);
   }
 
+  void create_alias(cvector_ref<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param)
+  {
+    if (alias.size() != v.size()) errorQuda("sets differ in size (%lu != %lu)", alias.size(), v.size());
+    for (auto i = 0u; i < v.size(); i++) alias[i] = const_cast<ColorSpinorField &>(v[i]).create_alias(param);
+  }
+
+  void create_alias(std::vector<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param)
+  {
+    alias.resize(v.size());
+    create_alias(cvector_ref<ColorSpinorField>(alias), v, param);
+  }
+
 } // namespace quda

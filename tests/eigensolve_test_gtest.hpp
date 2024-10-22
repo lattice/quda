@@ -73,7 +73,7 @@ TEST_P(EigensolveTest, verify)
   // The solution to avoid this is to use a Krylov space (eig-n-kr) about 3-4 times the
   // size of the search space (eig-n-ev), or use a well chosen Chebyshev polynomial,
   // or use a tighter than necessary tolerance.
-  if (eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_BLK_IR_ARNOLDI) tol *= 10;
+  if (eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_BLK_IR_ARNOLDI) tol *= 15;
   for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
 }
 

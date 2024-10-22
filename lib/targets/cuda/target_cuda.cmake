@@ -82,19 +82,6 @@ endif()
 # CUDA specific QUDA options
 include(CMakeDependentOption)
 
-# large arg support requires CUDA 12.1
-cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1" OFF )
-message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
-mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
-
-# Set the maximum multi-RHS per kernel
-if(QUDA_LARGE_KERNEL_ARG)
-  set(QUDA_MAX_MULTI_RHS "64" CACHE STRING "maximum number of simultaneous RHS in a kernel")
-else()
-  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
-endif()
-message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
-
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
@@ -138,6 +125,21 @@ else()
 endif()
 
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
+
+# large arg support requires CUDA 12.1 and Volta+
+cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
+  OFF)
+message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
+mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# Set the maximum multi-RHS per kernel
+if(QUDA_LARGE_KERNEL_ARG)
+  set(QUDA_MAX_MULTI_RHS "64" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+else()
+  set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
+endif()
+message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})

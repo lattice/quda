@@ -3,6 +3,7 @@
 #include <CLI11.hpp>
 #include <array>
 #include <quda.h>
+#include "misc.h"
 
 // for compatibility while porting - remove later
 extern void usage(char **);
@@ -325,6 +326,7 @@ extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
 extern quda::mgarray<int> nvec;
+extern quda::mgarray<int> nvec_batch;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
 extern quda::mgarray<bool> mg_vec_partfile;
@@ -465,6 +467,7 @@ extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
 extern int eig_ortho_block_size;
+extern int eig_evals_batch_size;
 extern int eig_block_size;
 extern int eig_n_ev;
 extern int eig_n_kr;
@@ -502,6 +505,7 @@ extern bool eig_partfile;
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_ortho_block_size;
+extern quda::mgarray<int> mg_eig_evals_batch_size;
 extern quda::mgarray<int> mg_eig_block_size;
 extern quda::mgarray<int> mg_eig_n_ev_deflate;
 extern quda::mgarray<int> mg_eig_n_ev;

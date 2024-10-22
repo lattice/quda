@@ -89,6 +89,8 @@ typedef enum QudaGaugeFixed_s {
 // Types used in QudaInvertParam
 //
 
+// Note: make sure QudaDslashType has corresponding entries in
+// tests/utils/misc.cpp
 typedef enum QudaDslashType_s {
   QUDA_WILSON_DSLASH,
   QUDA_CLOVER_WILSON_DSLASH,
@@ -638,6 +640,12 @@ typedef enum QudaExtLibType_s {
 } QudaExtLibType;
 
 typedef enum QudaDDType_s { QUDA_DD_NO, QUDA_DD_RED_BLACK, QUDA_DD_INVALID = QUDA_INVALID_ENUM } QudaDDType;
+
+typedef enum QudaWFlowStepType_s {
+  WFLOW_STEP_W1,
+  WFLOW_STEP_W2,
+  WFLOW_STEP_VT,
+} QudaWFlowStepType;
 
 #ifdef __cplusplus
 }

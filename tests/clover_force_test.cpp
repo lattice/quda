@@ -4,6 +4,7 @@
 
 #include "clover_force_reference.h"
 #include "misc.h"
+#include "test.h"
 #include <color_spinor_field.h> // convenient quark field container
 #include <clover_field.h>
 #include <command_line_params.h>

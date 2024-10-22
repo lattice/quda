@@ -1083,12 +1083,13 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    # Test setting `--dslash-type hisq`, which implies `--dslash-type asqtad --compute-fat-long true`
+    set(DIRAC_NAME hisq)
     add_test(NAME dslash_${DIRAC_NAME}_build_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type asqtad
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPC
                      --dim 6 8 10 12
-                     --compute-fat-long true
                      --epsilon-naik -0.01
                      --tadpole-coeff 0.9
         --gtest_output=xml:dslash_${DIRAC_NAME}_build_test_pol${pol2}.xml)
@@ -1150,7 +1151,7 @@ endif()
 if(QUDA_DIRAC_WILSON)
   add_test(NAME invert_test_wilson
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-    --dslash-type wilson --ngcrkrylov 8
+    --dslash-type wilson --ngcrkrylov 8 --nsrc 4 --nsrc-tile 4
     --dim 2 4 6 8 --niter 1000
     --enable-testing true
     --gtest_output=xml:invert_test_wilson.xml)
@@ -1178,7 +1179,7 @@ if(QUDA_DIRAC_TWISTED_MASS)
     --matpc even-even --enable-testing true
     --gtest_output=xml:invert_test_twisted_mass_sym.xml)
 
-  add_test(NAME invert_test_twisted_mass_asym}
+  add_test(NAME invert_test_twisted_mass_asym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-mass
     --dim 2 4 6 8 --niter 1000 --ngcrkrylov 8
@@ -1350,7 +1351,7 @@ foreach(prec IN LISTS TEST_PRECS)
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
       --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-      --enable-testing true
+      --enable-testing true --nsrc 4 --nsrc-tile 4
       --gtest_output=xml:invert_test_asqtad_${prec}.xml)
 
     if(DEFINED ENV{QUDA_ENABLE_TUNING})

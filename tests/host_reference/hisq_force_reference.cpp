@@ -4,9 +4,10 @@
 #include <string.h>
 #include <type_traits>
 
-#include <host_utils.h>
-#include <misc.h>
-#include <hisq_force_reference.h>
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "misc.h"
+#include "hisq_force_reference.h"
 
 extern int Z[4];
 extern int V;

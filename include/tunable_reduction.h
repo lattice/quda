@@ -144,7 +144,7 @@ namespace quda
       n_items(field.Volume()),
       block_size_y(block_size_y)
     {
-      if (commAsyncReduction()) strcat(aux, "async,");
+      if (commAsyncReduction()) strcat(aux, ",async");
     }
 
     /**
@@ -155,7 +155,7 @@ namespace quda
     TunableReduction2D(size_t n_items, QudaFieldLocation location) :
       TunableKernel(n_items, location), n_items(n_items), block_size_y(1)
     {
-      if (commAsyncReduction()) strcat(aux, "async,");
+      if (commAsyncReduction()) strcat(aux, ",async");
     }
 
     /**
