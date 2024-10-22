@@ -110,7 +110,7 @@ if(QUDA_DIRAC_WILSON
   install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_DIRAC_STAGGERED)
+if(QUDA_DIRAC_STAGGERED OR QUDA_DIRAC_LAPLACE)
   add_executable(staggered_dslash_test staggered_dslash_test.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
