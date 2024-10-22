@@ -197,18 +197,14 @@ namespace quda {
       auto fls = matSloppy.Expose()->getStaggeredShortLinkField();
       logQuda(QUDA_VERBOSE, "fl2:  %g\n", fl->norm2());
       logQuda(QUDA_VERBOSE, "fls2: %g\n", fls->norm2());
-      auto ll2 = mat.Expose()->getStaggeredLongLinkField()->norm2();
-      logQuda(QUDA_VERBOSE, "ll2:   %g\n", ll2);
-      auto llsl2 = matSloppy.Expose()->getStaggeredLongLinkField()->norm2();
-      logQuda(QUDA_VERBOSE, "llsl2: %g\n", llsl2);
-      auto fl1 = mat.Expose()->getStaggeredShortLinkField()->norm1();
-      logQuda(QUDA_VERBOSE, "fl1:   %g\n", fl1);
-      auto flsl1 = matSloppy.Expose()->getStaggeredShortLinkField()->norm1();
-      logQuda(QUDA_VERBOSE, "flsl1: %g\n", flsl1);
-      auto ll1 = mat.Expose()->getStaggeredLongLinkField()->norm1();
-      logQuda(QUDA_VERBOSE, "ll1:   %g\n", ll1);
-      auto llsl1 = matSloppy.Expose()->getStaggeredLongLinkField()->norm1();
-      logQuda(QUDA_VERBOSE, "llsl1: %g\n", llsl1);
+      logQuda(QUDA_VERBOSE, "fl1:  %g\n", fl->norm1());
+      logQuda(QUDA_VERBOSE, "fls1: %g\n", fls->norm1());
+      auto ll = mat.Expose()->getStaggeredLongLinkField();
+      auto lls = matSloppy.Expose()->getStaggeredLongLinkField();
+      logQuda(QUDA_VERBOSE, "ll2:  %g\n", ll->norm2());
+      logQuda(QUDA_VERBOSE, "lls2: %g\n", lls->norm2());
+      logQuda(QUDA_VERBOSE, "ll1:  %g\n", ll->norm1());
+      logQuda(QUDA_VERBOSE, "lls1: %g\n", lls->norm1());
     }
 
     if (!param.is_preconditioner) {
