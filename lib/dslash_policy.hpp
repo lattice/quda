@@ -71,7 +71,10 @@ namespace quda
               if (commDim[j]) prev = 2 * j;
             previousDir[2 * i + 1] = prev;
             previousDir[2 * i + 0] = 2 * i + 1; // always valid
-          }
+          } else {
+	    commsCompleted[2*i] = -1;  // mark them invalid for convenience
+	    commsCompleted[2*i+1] = -1;
+	  }
         }
 
         // this tells us how many events / comms occurances there are in
@@ -292,6 +295,67 @@ namespace quda
     }
     return comms_test;
   }
+
+#if 0
+  // checks complete on all communications
+  inline void commsComplete(DslashCommsPattern &pattern, const ColorSpinorField &in, bool gdr_send, bool gdr_recv,
+			    bool zero_copy_recv, int scatterIndex = -1)
+  {
+#if 0
+    for (int i = 3; i >= 0; i--) {
+      for (int dir = 1; dir >= 0; dir--) {
+	// Query if comms has finished
+	if (!pattern.commsCompleted[2 * i + dir]) {
+	  if (commsComplete(in, in, i, dir, gdr_send, gdr_recv, zero_copy_recv, scatterIndex)) {
+	    pattern.commsCompleted[2 * i + dir] = 1;
+	    pattern.completeSum++;
+	  }
+	}
+      } // dir=0,1
+    }
+#else
+    int nq = 0;
+    int d[2*4] = {};
+    for (int i = 3; i >= 0; i--) {
+      for (int dir = 1; dir >= 0; dir--) {
+	if (!pattern.commsCompleted[2 * i + dir]) {
+	  d[nq] = 2 * i + dir;
+	  nq++;
+	}
+      }
+    }
+    bool done[2*4] = {};
+    if(dslash_comms) {
+      PROFILE(in.commsQuery(nq, d, done, gdr_send, gdr_recv), profile, QUDA_PROFILE_COMMS_QUERY);
+    }
+    for(int i=0; i<nq; i++) {
+      if (!dslash_comms || done[i]) {
+	int dim = d[i] / 2;
+	int dir = d[i] % 2;
+	pattern.commsCompleted[2 * dim + dir] = 1;
+	pattern.completeSum++;
+	// now we are receive centric
+	int dir2 = 1-dir;
+
+	// if peer-2-peer in a given direction then we need to insert a wait on that copy event
+	if (comm_peer2peer_enabled(dir2,dim)) {
+	  PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	} else {
+
+	  if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
+
+	  if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
+	    // note the ColorSpinorField::scatter transforms from
+	    // scatter centric to gather centric (e.g., flips
+	    // direction) so here just use dir not dir2
+	    PROFILE(if (dslash_copy) in.scatter(2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
+	  }
+	}
+      }
+    }
+#endif
+  }
+#endif
 
   /**
      @brief Ensure that the dslash is complete.  By construction, the
@@ -648,9 +712,10 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
+	//commsComplete(pattern, in, true, true, false);
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
-
+#if 1
           for (int dir = 1; dir >= 0; dir--) {
 
             // Query if comms has finished
@@ -662,7 +727,7 @@ namespace quda
             }
 
           } // dir=0,1
-
+#endif
           if (!pattern.dslashCompleted[2 * i] && pattern.dslashCompleted[pattern.previousDir[2 * i + 1]]
               && pattern.commsCompleted[2 * i] && pattern.commsCompleted[2 * i + 1]) {
             dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -730,6 +795,8 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
+	//commsComplete(pattern, in, true, true, false);
+#if 1
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
 
@@ -744,6 +811,7 @@ namespace quda
             }
           } // dir=0,1
         }   // i
+#endif
       }     // pattern.completeSum < pattern.CommDimTotal
 
       // Launch exterior kernel

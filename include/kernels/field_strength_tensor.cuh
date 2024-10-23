@@ -169,7 +169,7 @@ namespace quda
     // 3*18 + 12*198 =  54 + 2376 = 2430
     {
       F -= conj(F);                   // 18 real subtractions + one matrix conjugation
-      F *= static_cast<typename Arg::Float>(0.125); // 18 real multiplications
+      F *= static_cast<typename Ftor::Arg::Float>(0.125); // 18 real multiplications
       // 36 floating point operations here
     }
 

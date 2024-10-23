@@ -290,16 +290,18 @@ namespace quda {
   }
 
   template <bool is_device> struct dim_collapse {
-    template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
+    //template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
+    template <typename T, typename Ftor> void operator()(T &out, int, int, const Ftor &ftor)
     {
-      out *= -arg.kappa;
+      out *= -ftor.arg.kappa;
     }
   };
 
   template <> struct dim_collapse<true> {
-    template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
+    //template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
+    template <typename T, typename Ftor> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
     {
-      SharedMemoryCache<T> cache;
+      SharedMemoryCache<T> cache{ftor};
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
 
@@ -308,28 +310,38 @@ namespace quda {
       if (dir == 0 && dim == 0) {
         // full split over dimension and direction
 #pragma unroll
-        for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward gathers (if any)
+        for (int d=1; d < Ftor::Arg::dim_stride; d++) { // get remaining forward gathers (if any)
           // 4-way 1,2,3  (stride = 4)
           // 2-way 1      (stride = 2)
           out += cache.load_z(target::thread_idx().z + d * 2 + 0);
         }
 
 #pragma unroll
-        for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
+        for (int d=0; d < Ftor::Arg::dim_stride; d++) { // get all backward gathers
           out += cache.load_z(target::thread_idx().z + d * 2 + 1);
         }
 
-        out *= -arg.kappa;
+        out *= -ftor.arg.kappa;
       }
     }
   };
 
-  template <typename Arg> struct CoarseDslash {
+  template <typename Arg> struct CoarseDslashParams {
+    static constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
+    using array_t = array<complex<typename Arg::real>, Mc>;
+    using Ops = KernelOps<SharedMemoryCache<array_t>, op_warp_combine<array_t>>;
+  };
+
+  template <typename Arg_> struct CoarseDslash : CoarseDslashParams<Arg_>::Ops {
+    using Arg = Arg_;
     const Arg &arg;
-    constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
+    using typename CoarseDslashParams<Arg>::Ops::KernelOpsT;
+    template <typename ...OpsArgs>
+    constexpr CoarseDslash(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd)
+    template <bool allthreads = false>
+    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd, bool active = true)
     {
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
@@ -347,7 +359,7 @@ namespace quda {
       int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;
 
       // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
-      constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
+      constexpr int Mc = CoarseDslashParams<Arg>::Mc;
       int dir = sMd & 1;
       int sMdim = sMd >> 1;
       int dim = sMdim % Arg::dim_stride;
@@ -355,14 +367,18 @@ namespace quda {
       int s = sM / (Arg::nColor/Mc);
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
-      array<complex <typename Arg::real>, Mc> out{ };
+      typename CoarseDslashParams<Arg>::array_t out{ };
 
       if (Arg::dslash) {
-        applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        target::dispatch<dim_collapse>(out, dir, dim, arg);
+ 	if (!allthreads || active) {
+	  applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+	}
+        target::dispatch<dim_collapse>(out, dir, dim, *this);
       }
 
-      if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+      if (!allthreads || active) {
+	if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+      }
 
       if (dir==0 && dim==0) {
         const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -370,15 +386,17 @@ namespace quda {
         // reduce down to the first group of column-split threads
         out = warp_combine<Arg::color_stride>(out);
 
+	if (!allthreads || active) {
 #pragma unroll
-        for (int color_local=0; color_local<Mc; color_local++) {
-          int c = color_block + color_local; // global color index
-          if (color_offset == 0) {
-            // if not halo we just store, else we accumulate
-            if (doBulk<Arg::type>()) arg.out[src_idx](my_spinor_parity, x_cb, s, c) = out[color_local];
-            else arg.out[src_idx](my_spinor_parity, x_cb, s, c) += out[color_local];
-          }
-        }
+	  for (int color_local=0; color_local<Mc; color_local++) {
+	    int c = color_block + color_local; // global color index
+	    if (color_offset == 0) {
+	      // if not halo we just store, else we accumulate
+	      if (doBulk<Arg::type>()) arg.out[src_idx](my_spinor_parity, x_cb, s, c) = out[color_local];
+	      else arg.out[src_idx](my_spinor_parity, x_cb, s, c) += out[color_local];
+	    }
+	  }
+	}
       }
     }
   };

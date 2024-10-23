@@ -192,6 +192,21 @@ namespace quda {
 
     vector<double> pAp(b.size());
 
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      auto fl = mat.Expose()->getStaggeredShortLinkField();
+      auto fls = matSloppy.Expose()->getStaggeredShortLinkField();
+      logQuda(QUDA_VERBOSE, "fl2:  %g\n", fl->norm2());
+      logQuda(QUDA_VERBOSE, "fls2: %g\n", fls->norm2());
+      logQuda(QUDA_VERBOSE, "fl1:  %g\n", fl->norm1());
+      logQuda(QUDA_VERBOSE, "fls1: %g\n", fls->norm1());
+      auto ll = mat.Expose()->getStaggeredLongLinkField();
+      auto lls = matSloppy.Expose()->getStaggeredLongLinkField();
+      logQuda(QUDA_VERBOSE, "ll2:  %g\n", ll->norm2());
+      logQuda(QUDA_VERBOSE, "lls2: %g\n", lls->norm2());
+      logQuda(QUDA_VERBOSE, "ll1:  %g\n", ll->norm1());
+      logQuda(QUDA_VERBOSE, "lls1: %g\n", lls->norm1());
+    }
+
     if (!param.is_preconditioner) {
       getProfile().TPSTOP(QUDA_PROFILE_PREAMBLE);
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
@@ -235,6 +250,8 @@ namespace quda {
       auto p = get_p(x_update_batch);
       auto p_next = get_p(x_update_batch, true);
       matSloppy(Ap, p);
+      logQuda(QUDA_VERBOSE, "  p[0]2: %g\n", blas::norm2(p[0]));
+      logQuda(QUDA_VERBOSE, "  Ap[0]2: %g\n", blas::norm2(Ap[0]));
 
       vector<double> sigma(b.size());
 
@@ -280,6 +297,7 @@ namespace quda {
         } else {
           pAp = blas::reDotProduct(p, Ap);
         }
+	logQuda(QUDA_VERBOSE, "  pAp[0]: %g\n", pAp[0]);
 
         for (auto i = 0u; i < b.size(); i++) x_update_batch[i].get_current_alpha() = r2[i] / pAp[i];
 
@@ -289,6 +307,7 @@ namespace quda {
           r2[i] = cg_norm[i].x;                                  // (r_new, r_new)
           sigma[i] = cg_norm[i].y >= 0.0 ? cg_norm[i].y : r2[i]; // use r2 if (r_k+1, r_k+1-r_k) breaks
         }
+	logQuda(QUDA_VERBOSE, "  r2[0]:  %g\n", r2[0]);
       }
 
       // reliable update conditions
@@ -302,6 +321,7 @@ namespace quda {
 
       if (!ru.trigger()) {
         for (auto i = 0u; i < beta.size(); i++) beta[i] = sigma[i] / r2_old[i]; // use the alternative beta computation
+	logQuda(QUDA_VERBOSE, "  beta[0]:  %g\n", beta[0]);
 
         if (advanced_feature && param.pipeline && !breakdown) {
 
@@ -887,44 +907,7 @@ namespace quda {
 
     b2avg = b2avg / param.num_src;
 
-    ColorSpinorParam csParam(x);
-    if (!init) {
-      csParam.setPrecision(param.precision);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      rp = ColorSpinorField::Create(csParam);
-      yp = ColorSpinorField::Create(csParam);
-
-      // sloppy fields
-      csParam.setPrecision(param.precision_sloppy);
-      pp = ColorSpinorField::Create(csParam);
-      App = ColorSpinorField::Create(csParam);
-      if (param.precision != param.precision_sloppy) {
-        rSloppyp = ColorSpinorField::Create(csParam);
-        xSloppyp = ColorSpinorField::Create(csParam);
-      } else {
-        rSloppyp = rp;
-        param.use_sloppy_partial_accumulator = false;
-      }
-
-      // temporary fields
-      tmpp = ColorSpinorField::Create(csParam);
-
-      init = true;
-    }
-
-    if (!rnewp) {
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-      // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
-    }
-
-    ColorSpinorField &r = *rp;
-    ColorSpinorField &y = *yp;
-    ColorSpinorField &p = *pp;
-    ColorSpinorField &Ap = *App;
-    ColorSpinorField &rnew = *rnewp;
-    ColorSpinorField &rSloppy = *rSloppyp;
-    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+    create(x, b);
 
     // calculate residuals for all vectors
     // and initialize r2 matrix
@@ -1025,7 +1008,7 @@ namespace quda {
       blas::zero(p.Component(i));
       for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = Linv(i, j); }
     }
-    blas::caxpy(AC, r, p);
+    //blas::legacy::caxpy(AC, r, p);
 
     // set rsloppy to to QR decompoistion of r (p)
     for (int i = 0; i < param.num_src; i++) { blas::copy(rSloppy.Component(i), p.Component(i)); }
@@ -1059,7 +1042,7 @@ namespace quda {
       for (int i = 0; i < param.num_src; i++) {
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = alpha(i, j); }
       }
-      blas::caxpy(AC, p, xSloppy);
+      //blas::legacy::caxpy(AC, p, xSloppy);
 
       // update rSloppy
       beta = pAp.inverse();
@@ -1067,7 +1050,7 @@ namespace quda {
       for (int i = 0; i < param.num_src; i++) {
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = -beta(i, j); }
       }
-      blas::caxpy(AC, Ap, rSloppy);
+      //blas::legacy::caxpy(AC, Ap, rSloppy);
 
       // orthorgonalize R
       // copy rSloppy to rnew as temporary
@@ -1087,7 +1070,7 @@ namespace quda {
         blas::zero(rSloppy.Component(i));
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = Linv(i, j); }
       }
-      blas::caxpy(AC, rnew, rSloppy);
+      //blas::legacy::caxpy(AC, rnew, rSloppy);
 
 #ifdef MWVERBOSE
       for (int i = 0; i < param.num_src; i++) {
@@ -1107,7 +1090,7 @@ namespace quda {
       for (int i = 0; i < param.num_src; i++) {
         for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = std::conj(S(j, i)); }
       }
-      blas::caxpy(AC, p, rnew);
+      //blas::legacy::caxpy(AC, p, rnew);
       // set p = rnew
       for (int i = 0; i < param.num_src; i++) { blas::copy(p.Component(i), rnew.Component(i)); }
 
@@ -1223,44 +1206,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   std::cout << "b2m\n" <<  b2m << std::endl;
   #endif
 
-  ColorSpinorParam csParam(x);
-  if (!init) {
-    csParam.setPrecision(param.precision);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    rp = ColorSpinorField::Create(csParam);
-    yp = ColorSpinorField::Create(csParam);
-
-    // sloppy fields
-    csParam.setPrecision(param.precision_sloppy);
-    pp = ColorSpinorField::Create(csParam);
-    App = ColorSpinorField::Create(csParam);
-    if(param.precision != param.precision_sloppy) {
-      rSloppyp = ColorSpinorField::Create(csParam);
-      xSloppyp = ColorSpinorField::Create(csParam);
-    } else {
-      rSloppyp = rp;
-      param.use_sloppy_partial_accumulator = false;
-    }
-
-    // temporary fields
-    tmpp = ColorSpinorField::Create(csParam);
-    init = true;
-  }
-
-  if(!rnewp) {
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
-    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
-  }
-
-  ColorSpinorField &r = *rp;
-  ColorSpinorField &y = *yp;
-  ColorSpinorField &p = *pp;
-  ColorSpinorField &pnew = *rnewp;
-  ColorSpinorField &Ap = *App;
-  ColorSpinorField &tmp = *tmpp;
-  ColorSpinorField &rSloppy = *rSloppyp;
-  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+  create(x, b);
 
   //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 

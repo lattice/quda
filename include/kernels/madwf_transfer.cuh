@@ -90,10 +90,21 @@ namespace quda
       }
     };
 
-    template <class Arg> struct Transfer5D {
+    template <class Arg> struct Transfer5DParams {
+      //static constexpr dim3 dims(dim3 block, const Arg &arg) {
+      //return dim3(arg.Ls_out * arg.Ls_in * sizeof(typename Arg::matrix_t) / sizeof(typename Arg::real), 1, 1);
+      //}
+      //using Cache = SharedMemoryCache<typename Arg::real, Transfer5DParams>;
+      using Cache = SharedMemoryCache<typename Arg::real>;
+      using Ops = KernelOps<Cache>;
+    };
+
+    template <class Arg> struct Transfer5D : Transfer5DParams<Arg>::Ops {
 
       const Arg &arg;
-      constexpr Transfer5D(const Arg &arg) : arg(arg) { }
+      using typename Transfer5DParams<Arg>::Ops::KernelOpsT;
+      template <typename ...OpsArgs>
+      constexpr Transfer5D(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       /**
@@ -102,7 +113,8 @@ namespace quda
         @param[in] x_b Checkerboarded 4-d space-time index
         @param[in] s The output Ls dimension coordinate
        */
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+      template <bool allthreads = false>
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
       {
         constexpr bool dagger = Arg::dagger;
 
@@ -116,21 +128,24 @@ namespace quda
         const matrix_t *wm_p = arg.wm_p;
 
         int thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
-        SharedMemoryCache<real> cache;
+        //typename Transfer5DParams<Arg>::Cache cache(*this, arg);
+        typename Transfer5DParams<Arg>::Cache cache{*this};
         while (thread_idx < static_cast<int>(Ls_out * Ls_in * sizeof(matrix_t) / sizeof(real))) {
           cache.data()[thread_idx] = reinterpret_cast<const real *>(wm_p)[thread_idx];
           thread_idx += target::block_dim().y * target::block_dim().x;
         }
         cache.sync();
 
-        Vector out;
-        // t -> s_in, s-> s_out
-        for (int t = 0; t < Ls_in; t++) {
-          Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
-          int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
-          matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
-        }
-        arg.out(s * volume_4d_cb + x_cb, parity) = out;
+	if (!allthreads || active) {
+	  Vector out;
+	  // t -> s_in, s-> s_out
+	  for (int t = 0; t < Ls_in; t++) {
+	    Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
+	    int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
+	    matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
+	  }
+	  arg.out(s * volume_4d_cb + x_cb, parity) = out;
+	}
       }
     };
   } // namespace madwf_ml

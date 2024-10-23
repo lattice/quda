@@ -124,7 +124,7 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
 
     const Arg &arg;
-    constexpr covDev(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr covDev(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

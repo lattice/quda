@@ -25,7 +25,7 @@ namespace quda
   struct twistedMass : dslash_default {
 
     const Arg &arg;
-    constexpr twistedMass(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr twistedMass(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

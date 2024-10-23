@@ -29,7 +29,7 @@ namespace quda
   struct domainWall4D : dslash_default {
 
     const Arg &arg;
-    constexpr domainWall4D(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr domainWall4D(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

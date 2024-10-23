@@ -72,8 +72,11 @@ namespace quda
     /**
        @brief Constructor for SharedMemory object.
     */
-    constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
+    HostDevice constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
 
+    /**
+       @brief Constructor for SharedMemory object.
+    */
     template <typename... U>
     constexpr SharedMemory(const KernelOps<U...> &) : data(cache(get_offset(target::block_dim())))
     {
@@ -82,7 +85,7 @@ namespace quda
     /**
        @brief Return this SharedMemory object.
     */
-    constexpr auto sharedMem() const { return *this; }
+    HostDevice constexpr auto sharedMem() const { return *this; }
 
     /**
        @brief Subscripting operator returning a reference to element.

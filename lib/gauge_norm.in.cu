@@ -82,6 +82,9 @@ namespace quda {
 
   double GaugeField::norm1(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+    //fixed = (this->precision == QUDA_QUARTER_PRECISION)
+    //  || (this->precision == QUDA_HALF_PRECISION);
+    //logQuda(QUDA_VERBOSE, "GaugeField::norm1: %i\n", fixed);
     double nrm = 0.0;
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM1);
     return nrm;
@@ -89,6 +92,9 @@ namespace quda {
 
   double GaugeField::norm2(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+    //fixed = (this->precision == QUDA_QUARTER_PRECISION)
+    //  || (this->precision == QUDA_HALF_PRECISION);
+    //logQuda(QUDA_VERBOSE, "GaugeField::norm2: %i\n", fixed);
     double nrm = 0.0;
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM2);
     return nrm;

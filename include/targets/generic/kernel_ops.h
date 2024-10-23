@@ -213,4 +213,12 @@ namespace quda
     using type = T;
   };
 
+  // forward declarations of op types to be defined by target
+  struct op_blockSync;
+  template <typename T> struct op_warp_combine;
+
+  // only types for convenience
+  using only_blockSync = KernelOps<op_blockSync>;
+  template <typename T> using only_warp_combine = KernelOps<op_warp_combine<T>>;
+
 } // namespace quda

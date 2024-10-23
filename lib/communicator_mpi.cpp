@@ -1,5 +1,8 @@
 #include <communicator_quda.h>
 
+//#define QUDA_COMM_CHECKHANG
+//#define QUDA_COMM_CHECKSUM
+
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \
     int status = mpi_call;                                                                                             \
@@ -33,7 +36,58 @@ namespace quda
        determine whether we need to free the datatype or not.
      */
     bool custom;
+
+#ifdef QUDA_COMM_CHECKHANG
+    double startTime;
+#endif
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    bool isSend;
+    int otherRank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    void *buffer;
+    size_t nbytes;
+    uint64_t chksum;
+    MPI_Request chkreq;
+#endif
   };
+
+#ifdef QUDA_COMM_CHECKSUM
+  uint64_t chksum_cpu(void *buf, size_t n)
+  {
+    uint64_t sum = 0xf0f0f0f0;
+    // assume buffer is aligned
+    auto bufl = static_cast<uint64_t *>(buf);
+    size_t nl = n/8;
+    for (size_t i=0; i<nl; i++) {
+      sum ^= bufl[i];
+    }
+    size_t nc = 8 * nl;
+    char *bufc = static_cast<char *>(buf) + nc;
+    size_t rem = n - nc;
+    for (size_t i=0; i<rem; i++) {
+      sum ^= ((uint64_t)bufc[i]) << i;
+    }
+    return sum;
+  }
+  uint64_t chksum_gpu(void *buf, size_t n)
+  {
+    void *bufh = safe_malloc(n);
+    qudaMemcpy(bufh, buf, n, qudaMemcpyDeviceToHost);
+    auto chk = chksum_cpu(bufh, n);
+    host_free(bufh);
+    return chk;
+  }
+  uint64_t chksum(void *buf, size_t n)
+  {
+    auto loc = get_pointer_location(buf);
+    if (loc==QUDA_CPU_FIELD_LOCATION) {
+      return chksum_cpu(buf, n);
+    } else {
+      return chksum_gpu(buf, n);
+    }
+  }
+#endif
 
   Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
                              bool user_set_comm_handle_, void *user_comm)
@@ -135,7 +189,15 @@ namespace quda
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    mh->isSend = true;
+    mh->otherRank = rank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    mh->buffer = buffer;
+    mh->nbytes = nbytes;
+    MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+#endif
     return mh;
   }
 
@@ -147,7 +209,15 @@ namespace quda
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
-
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    mh->isSend = false;
+    mh->otherRank = rank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    mh->buffer = buffer;
+    mh->nbytes = nbytes;
+    MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+#endif
     return mh;
   }
 
@@ -164,11 +234,20 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    mh->isSend = true;
+    mh->otherRank = rank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    mh->buffer = buffer;
+    mh->nbytes = nbytes;
+    MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+#endif
 
     return mh;
   }
@@ -186,11 +265,20 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
     MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
     mh->custom = false;
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    mh->isSend = false;
+    mh->otherRank = rank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    mh->buffer = buffer;
+    mh->nbytes = nbytes;
+    MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+#endif
 
     return mh;
   }
@@ -209,7 +297,7 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -219,6 +307,15 @@ namespace quda
     mh->custom = true;
 
     MPI_CHECK(MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    mh->isSend = true;
+    mh->otherRank = rank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    mh->buffer = buffer;
+    mh->nbytes = 0;  // strides not supported yet
+    //MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+#endif
 
     return mh;
   }
@@ -237,7 +334,7 @@ namespace quda
 
     int tag = 0;
     for (int i = ndim - 1; i >= 0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
-    tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
+    tag = tag >= 0 ? tag : 2 * std::pow(4 * max_displacement, ndim) + tag;
 
     MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -247,6 +344,15 @@ namespace quda
     mh->custom = true;
 
     MPI_CHECK(MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
+#if defined(QUDA_COMM_CHECKHANG) || defined(QUDA_COMM_CHECKSUM)
+    mh->isSend = false;
+    mh->otherRank = rank;
+#endif
+#ifdef QUDA_COMM_CHECKSUM
+    mh->buffer = buffer;
+    mh->nbytes = 0;  // strides not supported yet
+    //MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+#endif
 
     return mh;
   }
@@ -255,21 +361,113 @@ namespace quda
   {
     MPI_CHECK(MPI_Request_free(&(mh->request)));
     if (mh->custom) MPI_CHECK(MPI_Type_free(&(mh->datatype)));
+#ifdef QUDA_COMM_CHECKSUM
+    if (mh->nbytes>0) MPI_CHECK(MPI_Request_free(&(mh->chkreq)));
+#endif
     host_free(mh);
     mh = nullptr;
   }
 
-  void Communicator::comm_start(MsgHandle *mh) { MPI_CHECK(MPI_Start(&(mh->request))); }
+  void Communicator::comm_start(MsgHandle *mh)
+  {
+    MPI_CHECK(MPI_Start(&(mh->request)));
+#ifdef QUDA_COMM_CHECKSUM
+    if (mh->nbytes>0) {
+      if (mh->isSend) {
+	mh->chksum = chksum(mh->buffer, mh->nbytes);
+      }
+      MPI_CHECK(MPI_Start(&(mh->chkreq)));
+    }
+#endif
+#ifdef QUDA_COMM_CHECKHANG
+    mh->startTime = MPI_Wtime();
+#endif
+  }
 
-  void Communicator::comm_wait(MsgHandle *mh) { MPI_CHECK(MPI_Wait(&(mh->request), MPI_STATUS_IGNORE)); }
+  void Communicator::comm_wait(MsgHandle *mh) {
+    MPI_CHECK(MPI_Wait(&(mh->request), MPI_STATUS_IGNORE));
+#ifdef QUDA_COMM_CHECKSUM
+    if (mh->nbytes>0) {
+      MPI_CHECK(MPI_Wait(&(mh->chkreq), MPI_STATUS_IGNORE));
+      if (!mh->isSend) {
+	auto cs = chksum(mh->buffer, mh->nbytes);
+	if (cs != mh->chksum) {
+	  errorQuda("comm_wait checksum failure got %lu expeted %lu\n", cs, mh->chksum);
+	}
+      }
+    }
+#endif
+  }
+
+#ifdef QUDA_COMM_CHECKHANG
+  void hangwarn(bool isSend) {
+    char name[MPI_MAX_PROCESSOR_NAME];
+    int resultlen;
+    MPI_Get_processor_name(name, &resultlen);
+    if (isSend) {
+      warningQuda("%s stuck send in MPI_Test\n", name);
+    } else {
+      warningQuda("%s stuck receive in MPI_Test\n", name);
+    }
+  }
+  MPI_Comm MPI_COMM;
+  bool isSend;
+  int otherRank;
+  void hang(int, siginfo_t *, void *) {
+    char name[MPI_MAX_PROCESSOR_NAME];
+    int resultlen;
+    MPI_Get_processor_name(name, &resultlen);
+    int rank;
+    MPI_CHECK(MPI_Comm_rank(MPI_COMM, &rank));
+    if (isSend) {
+      errorQuda("%s rank %i send to %i stuck in MPI_Test for 120 seconds\n", name, rank, otherRank);
+    } else {
+      errorQuda("%s rank %i receive from %i stuck in MPI_Test for 120 seconds\n", name, rank, otherRank);
+    }
+  }
+#endif
 
   int Communicator::comm_query(MsgHandle *mh)
   {
+#ifdef QUDA_COMM_CHECKHANG
+    static bool firstCall = true;
+    if(firstCall) {
+      firstCall = false;
+      struct sigaction sig_action;
+      memset(&sig_action, 0, sizeof(sig_action));
+      sig_action.sa_sigaction = hang;
+      sig_action.sa_flags = 0;
+      sigemptyset(&sig_action.sa_mask);
+      sigaction(SIGALRM, &sig_action, 0);
+    }
+    MPI_COMM = MPI_COMM_HANDLE;
+    isSend = mh->isSend;
+    otherRank = mh->otherRank;
+    alarm(120);  // 120 seconds
+#endif
     int query;
     MPI_CHECK(MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE));
-
+#ifdef QUDA_COMM_CHECKHANG
+    alarm(0);
+    double endTime = MPI_Wtime();
+    if (endTime-mh->startTime>120.0) {
+      hang(0, nullptr, nullptr);
+    }
+    //if (endTime-mh->startTime>60.0) {
+    //  hangwarn(mh->isSend);
+    //}
+#endif
     return query;
   }
+
+#if 0
+  void Communicator::comm_query(int n, MsgHandle *mh[], int *outcount, int array_of_indices[])
+  {
+    MPI_Request req[n];
+    for (int i=0; i<n; i++) req[i] = mh[i]->request;
+    MPI_CHECK(MPI_Testsome(n, req, outcount, array_of_indices, MPI_STATUSES_IGNORE));
+  }
+#endif
 
   void Communicator::comm_allreduce_sum_array(double *data, size_t size)
   {

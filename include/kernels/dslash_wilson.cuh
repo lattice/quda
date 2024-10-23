@@ -160,10 +160,11 @@ namespace quda
     } // nDim
   }
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson :
+    dslash_default {
 
     const Arg &arg;
-    constexpr wilson(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr wilson(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     // out(x) = M*in = (-D + m) * in(x-mu)
@@ -176,7 +177,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      
+
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;

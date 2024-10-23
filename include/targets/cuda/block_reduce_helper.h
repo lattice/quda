@@ -2,6 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
+#include <kernel_ops.h>
 
 /**
    @file block_reduce_helper.h
@@ -195,13 +196,39 @@ namespace quda
 
 #endif
 
+  /**
+     @brief block_reduce_param is used as a container for passing
+     non-type parameters to specialize block_reduce through the
+     target::dispatch
+     @tparam block_dim Block dimension of the reduction (1, 2 or 3)
+     @tparam batch_size Batch size of the reduction.  Threads will be
+     ordered such that batch size is the slowest running index.  Note
+     that batch_size > 1 requires block_dim <= 2.
+   */
+  template <int block_dim_, int batch_size_ = 1> struct block_reduce_param {
+    static constexpr int block_dim = block_dim_;
+    static constexpr int batch_size = batch_size_;
+    static_assert(batch_size == 1 || block_dim <= 2, "Batching not possible with 3-d block reduction");
+  };
+
   // pre-declaration of block_reduce that we wish to specialize
-  template <bool> struct block_reduce;
+  template <bool> struct block_reduce_impl;
+
+  /**
+     @brief Dummy generic implementation of block_reduce
+  */
+  template <bool is_device> struct block_reduce_impl {
+    template <typename T, typename reducer_t, typename param_t>
+    T operator()(const T &value, bool, int, bool, reducer_t, param_t)
+    {
+      return value;
+    }
+  };
 
   /**
      @brief CUDA specialization of block_reduce, building on the warp_reduce
   */
-  template <> struct block_reduce<true> {
+  template <> struct block_reduce_impl<true> {
 
     template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
@@ -270,6 +297,19 @@ namespace quda
       }
 
       return value;
+    }
+  };
+
+  template <typename T, int block_dim, int batch_size>
+  struct block_reduce {
+    template <typename Ops> HostDevice inline block_reduce(const Ops &) {};
+    template <typename ...Arg> static constexpr size_t shared_mem_size(dim3 block) {
+      return SizeBlockDivWarp::size(block) * sizeof(T);
+    }
+    template <typename reducer_t>
+    HostDevice inline T apply(const T &value, bool async, int batch, bool all, const reducer_t &r)
+    {
+      return target::dispatch<block_reduce_impl>(value, async, batch, all, r, block_reduce_param<block_dim, batch_size>());
     }
   };
 

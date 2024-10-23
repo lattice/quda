@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <target_device.h>
 #include <register_traits.h>
+#include <math_helper.cuh>
 
 namespace quda
 {
@@ -95,6 +96,7 @@ namespace quda
     constexpr int operator()(float f) { return static_cast<int>(rintf(f)); }
   };
 
+#if 0
   /**
      @brief Fast float to integer round used on the device
   */
@@ -105,6 +107,7 @@ namespace quda
       return reinterpret_cast<int &>(f);
     }
   };
+#endif
 
   /**
      @brief Regular double to integer round used on the host
@@ -113,6 +116,7 @@ namespace quda
     constexpr int operator()(double d) { return static_cast<int>(rint(d)); }
   };
 
+#if 0
   /**
      @brief Fast double to integer round used on the device
   */
@@ -123,6 +127,7 @@ namespace quda
       return reinterpret_cast<int &>(d);
     }
   };
+#endif
 
   /**
      @brief Copy function which is trival between floating point

@@ -4,6 +4,7 @@
 #include <quda_matrix.h>
 #include <atomic_helper.h>
 #include <shared_memory_cache_helper.h>
+//#include <mdspan.h>
 
 namespace quda {
 
@@ -40,23 +41,35 @@ namespace quda {
     }
   }
 
+  template <int N> struct GaugeFixHitDims {
+    static constexpr dim3 dims(dim3 block) {
+      block.y = N;
+      return block;
+    }
+  };
+
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
-   * This implementation needs 8x more shared memory than the implementation using atomicadd 
+   * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template <typename Float, int gauge_dir, int nColor>
-  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu)
+  template <typename Float> using GaugeFixHit_AtomicAddOps = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float, int gauge_dir, int nColor, typename Ftor>
+  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu, const Ftor &ftor)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache;
-    auto elems = cache.data();
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float,GaugeFixHitDims<4>> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
+    //auto elems = makeMdspan(cache.data(), 4, target::block_dim().x);
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
+    //if (mu < 4) elems(mu,tid) = 0.0;
     cache.sync();
 
     //Loop over all SU(2) subroups of SU(N)
@@ -73,13 +86,17 @@ namespace quda {
       if (mu < gauge_dir || (mu >= 4 && mu < (gauge_dir + 4))) {
         //Retrieve the four SU(2) parameters...
         // a0
-        atomic_fetch_add(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
+        atomic_add_local(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
+        //atomic_add_local(&elems(0,tid), (link(p,p)).x + (link(q,q)).x); //a0
         // a1
-        atomic_fetch_add(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
+        atomic_add_local(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
+        //atomic_add_local(&elems(1,tid), (link(p,q).y + link(q,p).y) * asq); //a1
         // a2
-        atomic_fetch_add(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
+        atomic_add_local(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
+        //atomic_add_local(&elems(2,tid), (link(p,q).x - link(q,p).x) * asq); //a2
         // a3
-        atomic_fetch_add(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
+        atomic_add_local(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
+        //atomic_add_local(&elems(3,tid), (link(p,p).y - link(q,q).y) * asq); //a3
       } //FLOP per lattice site = gauge_dir * 2 * (4 + 7) = gauge_dir * 22
 
       cache.sync();
@@ -87,15 +104,23 @@ namespace quda {
       if (mu==0) {
         //Over-relaxation boost
         asq =  elems[tid + blockSize] * elems[tid + blockSize];
+        //asq =  elems(1,tid) * elems(1,tid);
         asq += elems[tid + blockSize * 2] * elems[tid + blockSize * 2];
+        //asq += elems(2,tid) * elems(2,tid);
         asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
+        //asq += elems(3,tid) * elems(3,tid);
         Float a0sq = elems[tid] * elems[tid];
+        //Float a0sq = elems(0,tid) * elems(0,tid);
         Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
         Float r = quda::rsqrt((a0sq + x * x * asq));
         elems[tid + blockSize * 0] *= r;
+        //elems(0,tid) *= r;
         elems[tid + blockSize * 1] *= x * r;
+        //elems(1,tid) *= x * r;
         elems[tid + blockSize * 2] *= x * r;
+        //elems(2,tid) *= x * r;
         elems[tid + blockSize * 3] *= x * r;
+        //elems(3,tid) *= x * r;
       } //FLOP per lattice site = 22CUB: "Collective" Software Primitives for CUDA Kernel Development
 
       cache.sync();
@@ -110,7 +135,9 @@ namespace quda {
         for ( int j = 0; j < nColor; j++ ) {
           m0 = link(p,j);
           link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+          //link(p,j) = complex<Float>( elems(0,tid), elems(3,tid) ) * m0 + complex<Float>( elems(2,tid), elems(1,tid) ) * link(q,j);
           link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+          //link(q,j) = complex<Float>(-elems(2,tid), elems(1,tid)) * m0 + complex<Float>( elems(0,tid),-elems(3,tid) ) * link(q,j);
         }
       }
       else{
@@ -122,7 +149,9 @@ namespace quda {
         for ( int j = 0; j < nColor; j++ ) {
           m0 = link(j,p);
           link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
+          //link(j,p) = complex<Float>( elems(0,tid), -elems(3,tid) ) * m0 + complex<Float>( elems(2,tid), -elems(1,tid) ) * link(j,q);
           link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
+          //link(j,q) = complex<Float>(-elems(2,tid), -elems(1,tid)) * m0 + complex<Float>( elems(0,tid),elems(3,tid) ) * link(j,q);
         }
       }
       //_____________ //FLOP per lattice site = 8 * Nc * 2 * (2*6+2) = Nc * 224
@@ -130,6 +159,7 @@ namespace quda {
         cache.sync();
         //reset shared memory SU(2) elements
         if (mu < 4) elems[mu * blockSize + tid] = 0.0;
+        //if (mu < 4) elems(mu,tid) = 0.0;
         cache.sync();
       }
     } //FLOP per lattice site = (block < Nc * ( Nc - 1) / 2) * (22 + 28 gauge_dir + 224 Nc)
@@ -138,17 +168,23 @@ namespace quda {
 
   /**
    * Device function to perform gauge fixing with overrelxation.
-   * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
+   * Uses 4*8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * This implementation needs 8x more shared memory than the implementation using atomicadd
    */
-  template <typename Float, int gauge_dir, int nColor>
-  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu)
+  template <typename Float> using GaugeFixHit_NoAtomicAddOps = KernelOps<SharedMemoryCache<array<Float,4>>>;
+  template <typename Float, int gauge_dir, int nColor, typename Ftor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu, const Ftor &ftor)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache;
-    auto elems = cache.data();
+    SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    //Float *elems = cache.data();
+    Float *elems = &(*cache.data())[0];
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -228,15 +264,19 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template <typename Float, int gauge_dir, int nColor>
-  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu)
+  template <typename Float> using GaugeFixHit_NoAtomicAdd_LessSMOps = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float, int gauge_dir, int nColor, typename Ftor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu, const Ftor &ftor)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache;
-    auto elems = cache.data();
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float,GaugeFixHitDims<4>> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -246,10 +286,14 @@ namespace quda {
       IndexBlock<nColor>(block, p, q);
 
       if (mu == 0) {
-        elems[tid] = link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] = -(link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] = -(link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
+        //elems[tid] = link(p,p).x + link(q,q).x;
+        //elems[tid + blockSize] = -(link(p,q).y + link(q,p).y);
+        //elems[tid + blockSize * 2] = -(link(p,q).x - link(q,p).x);
+        //elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
+        cache.save_y(link(p,p).x + link(q,q).x, 0);
+        cache.save_y(-(link(p,q).y + link(q,p).y), 1);
+        cache.save_y(-(link(p,q).x - link(q,p).x), 2);
+        cache.save_y(-(link(p,p).y - link(q,q).y), 3);
       }
 
 #pragma unroll
@@ -325,16 +369,20 @@ namespace quda {
    * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template <typename Float, int gauge_dir, int nColor>
+  template <typename Float> using GaugeFixHit_AtomicAdd2Ops = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
-							const Float relax_boost, int mu)
+					       const Float relax_boost, int mu, const Ftor &ftor)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache;
-    auto elems = cache.data();
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float,GaugeFixHitDims<4>> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -349,13 +397,13 @@ namespace quda {
       if (mu < gauge_dir) {
         //Retrieve the four SU(2) parameters...
         // a0
-        atomic_fetch_add(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
+        atomic_add_local(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
         // a1
-        atomic_fetch_add(elems + tid + blockSize, (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y)); //a1
+        atomic_add_local(elems + tid + blockSize, (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y)); //a1
         // a2
-        atomic_fetch_add(elems + tid + blockSize * 2, (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x)); //a2
+        atomic_add_local(elems + tid + blockSize * 2, (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x)); //a2
         // a3
-        atomic_fetch_add(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
+        atomic_add_local(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
       }
       cache.sync();
       if (mu == 0) {
@@ -408,16 +456,20 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template <typename Float, int gauge_dir, int nColor>
+  template <typename Float> using GaugeFixHit_NoAtomicAdd2Ops = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<16>>>;
+  template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
-                                                 const Float relax_boost, int mu)
+                                                 const Float relax_boost, int mu, const Ftor &ftor)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache;
-    auto elems = cache.data();
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float,GaugeFixHitDims<16>> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -485,15 +537,20 @@ namespace quda {
    * Uses 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template <typename Float, int gauge_dir, int nColor>
-  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1, const Float relax_boost, int mu)
+  template <typename Float> using GaugeFixHit_NoAtomicAdd_LessSM2Ops = KernelOps<SharedMemoryCache<Float,GaugeFixHitDims<4>>>;
+  template <typename Float, int gauge_dir, int nColor, typename Ftor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
+							const Float relax_boost, int mu, const Ftor &ftor)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache;
-    auto elems = cache.data();
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float,GaugeFixHitDims<4>> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll

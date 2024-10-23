@@ -155,6 +155,15 @@ namespace quda {
       }
     }
 
+#if defined(QUDA_TARGET_SYCL)
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const {
+      using sum_t = double;
+      int mVec = quda::tile_size<nColor, nVec>(tp.block.x);
+      int vsize = 2 * sizeof(sum_t) * mVec;
+      return vsize * (tp.block.x * tp.block.y * tp.block.z) / device::warp_size();
+    }
+#endif
+
 #ifdef SWIZZLE
     bool advanceAux(TuneParam &param) const
     {
@@ -187,6 +196,8 @@ namespace quda {
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
       param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, 1, chiral_blocks);
       param.aux.x = 1; // swizzle factor
+      setSharedBytes(param);
+      //printfQuda("tp.shared_bytes: %u\n", param.shared_bytes);
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }

@@ -3,6 +3,9 @@
 #include <quda_api.h>
 #include <algorithm>
 
+#define HOSTDEVICE __host__ __device__
+#define HostDevice __host__ __device__
+
 namespace quda
 {
 
@@ -10,12 +13,20 @@ namespace quda
   {
 
     // hip-clang: compile-time dispatch
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto ...Params, typename ...Args> __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __HIP_DEVICE_COMPILE__
-      return f<true>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+	return f<true>()(args...);
+      } else {
+	return f<true>().template operator()<Params...>(args...);
+      }
 #else
-      return f<false>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+	return f<false>()(args...);
+      } else {
+	return f<false>().template operator()<Params...>(args...);
+      }
 #endif
     }
 

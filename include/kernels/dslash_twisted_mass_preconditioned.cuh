@@ -138,7 +138,7 @@ namespace quda
   struct twistedMassPreconditioned : dslash_default {
 
     const Arg &arg;
-    constexpr twistedMassPreconditioned(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr twistedMassPreconditioned(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 1 : 0; }
 

@@ -38,11 +38,20 @@ namespace quda
     }
   };
 
+  template <bool dagger, typename Arg> struct nDegTwistedMassPreconditionedParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = std::conditional_t<!dagger || Arg::asymmetric, KernelOps<Cache>, NoKernelOps>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedMassPreconditioned : dslash_default {
+  struct nDegTwistedMassPreconditioned : dslash_default, nDegTwistedMassPreconditionedParams<dagger, Arg>::Ops {
 
     const Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedMassPreconditionedParams<dagger,Arg>::Ops::KernelOpsT;
+    //constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr nDegTwistedMassPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
@@ -53,8 +62,8 @@ namespace quda
        - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5 + c*tau_1)D * in
     */
 
-    template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity)
+    template <KernelType mykernel_type = kernel_type, bool allthreads = false>
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity, bool active = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -62,50 +71,53 @@ namespace quda
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
 
-      bool active
-        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-      else // defined in dslash_twisted_mass_preconditioned
-        applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      if (!allthreads || active) {
+	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+	if constexpr (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
+	  applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+	else // defined in dslash_twisted_mass_preconditioned
+	  applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      }
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if constexpr (xpay && mykernel_type == INTERIOR_KERNEL) {
 
-        if (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
-          // use consistent load order across s to ensure better cache locality
-          Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-          Vector x1 = arg.x[src_idx](coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
-          if (flavor == 0)
-            out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
-          else
-            out += arg.a_inv * (x1 - arg.b_inv * x1.igamma(4) + arg.c_inv * x0);
-        } else {
-          Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
-          out += x; // just directly add since twist already applied in the dslash
-        }
+	if (!allthreads || active) {
+	  if constexpr (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
+	    // use consistent load order across s to ensure better cache locality
+	    Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
+	    Vector x1 = arg.x[src_idx](coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+	    if (flavor == 0)
+	      out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
+	    else
+	      out += arg.a_inv * (x1 - arg.b_inv * x1.igamma(4) + arg.c_inv * x0);
+	  } else {
+	    Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
+	    out += x; // just directly add since twist already applied in the dslash
+	  }
+	}
 
       } else if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out += x;
       }
-      
-      if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-        SharedMemoryCache<Vector> cache;
+
+      if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
+        SharedMemoryCache<Vector> cache{*this};
         if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
         }
 
-        cache.sync(); // safe to sync in here since other threads will exit
+        cache.sync(); // safe to sync here since other threads will exit if allowed, or all be here
         if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
             out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y + 1));
@@ -114,9 +126,8 @@ namespace quda
         }
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+      if (active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

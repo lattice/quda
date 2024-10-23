@@ -1,5 +1,6 @@
 #pragma once
 
+#include <load_store.h>  // for atom_t
 #include <kernel_ops.h>
 #include <target_device.h>
 #include <shared_memory_helper.h>
@@ -90,12 +91,17 @@ namespace quda
     /**
        @brief Constructor for SharedMemoryCache.
     */
-    constexpr SharedMemoryCache() : block(D::dims(target::block_dim())), stride(block.x * block.y * block.z)
+    template <typename ...U, typename ...Arg>
+    constexpr SharedMemoryCache(const KernelOps<U...> &ops, Arg ...arg) :
+      Smem(ops), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
     {
-      // sanity check
+      //checkKernelOp<SharedMemoryCache<T,D,O>,U...>();
+      checkKernelOps<SharedMemoryCache<T,D,O>>(ops);
       static_assert(shared_mem_size(dim3 {32, 16, 8})
-                    == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}) * sizeof(T));
+		    == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}) * sizeof(T));
     }
+
+    constexpr SharedMemoryCache(const SharedMemoryCache<T,D,O> &) = delete;
 
     /**
        @brief Grab the raw base address to shared memory.

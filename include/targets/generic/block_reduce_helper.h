@@ -2,6 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
+#include <kernel_ops.h>
 
 /**
    @file block_reduce_helper.h
@@ -26,6 +27,7 @@ namespace quda
     static constexpr int width = width_;
   };
 
+#if 0
   /**
      @brief block_reduce_param is used as a container for passing
      non-type parameters to specialize block_reduce through the
@@ -40,23 +42,13 @@ namespace quda
     static constexpr int batch_size = batch_size_;
     static_assert(batch_size == 1 || block_dim <= 2, "Batching not possible with 3-d block reduction");
   };
+#endif
 
   /**
      @brief Dummy generic implementation of warp_reduce
   */
   template <bool is_device> struct warp_reduce {
     template <typename T, typename reducer_t, typename param_t> T operator()(const T &value, bool, reducer_t, param_t)
-    {
-      return value;
-    }
-  };
-
-  /**
-     @brief Dummy generic implementation of block_reduce
-  */
-  template <bool is_device> struct block_reduce {
-    template <typename T, typename reducer_t, typename param_t>
-    T operator()(const T &value, bool, int, bool, reducer_t, param_t)
     {
       return value;
     }
@@ -137,6 +129,21 @@ namespace quda
   };
 
   /**
+     @brief Dummy generic implementation of block_reduce
+  */
+  //template <bool is_device> struct block_reduce {
+  //template <typename T, typename reducer_t, typename param_t, typename... BR>
+  //T operator()(const T &value, bool, int, bool, reducer_t, param_t, BR&...)
+  //{
+  //return value;
+  //}
+  //};
+  //template <typename T, typename P, typename O>
+  //struct block_reduce {
+  //template <typename T, int block_dim, int batch_size, bool = true>
+  //struct block_reduce {}
+
+  /**
      @brief BlockReduce provides a generic interface for performing
      reductions at the block level
      @tparam T The type of the value that we are reducing
@@ -144,13 +151,22 @@ namespace quda
      @tparam batch_size Batch size of the reduction.  Threads will be
      ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_dim, int batch_size = 1> class BlockReduce
+  template <typename T, int block_dim, int batch_size = 1>
+  class BlockReduce : public block_reduce<T, block_dim, batch_size>
   {
-    using param_t = block_reduce_param<block_dim, batch_size>;
+    static_assert(batch_size == 1 || block_dim <= 2, "Batching not possible with 3-d block reduction");
+    using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
+    using block_reduce_t = block_reduce<T, block_dim, batch_size>;
     const int batch;
 
   public:
-    constexpr BlockReduce(int batch = 0) : batch(batch) { }
+    template <typename ...U>
+    HOSTDEVICE constexpr BlockReduce(KernelOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
+      //checkKernelOp<BlockReduce_t, U...>();
+      checkKernelOps<BlockReduce_t>(ops);
+    }
+
+    constexpr BlockReduce(const BlockReduce<T,block_dim,batch_size> &) = delete;
 
     /**
        @brief Perform a block-wide sum reduction
@@ -159,7 +175,8 @@ namespace quda
      */
     template <bool async = true> __device__ __host__ inline T Sum(const T &value)
     {
-      return target::dispatch<block_reduce>(value, async, batch, false, quda::plus<T>(), param_t());
+      //return target::dispatch<block_reduce>(value, async, batch, false, quda::plus<T>(), param_t(), opBlockReduce);
+      return this->apply(value, async, batch, false, quda::plus<T>());
     }
 
     /**
@@ -169,8 +186,9 @@ namespace quda
      */
     template <bool async = true> __device__ __host__ inline T AllSum(const T &value)
     {
-      static_assert(param_t::batch_size == 1, "Cannot do AllSum with batch_size > 1");
-      return target::dispatch<block_reduce>(value, async, batch, true, quda::plus<T>(), param_t());
+      static_assert(batch_size == 1, "Cannot do AllSum with batch_size > 1");
+      //return target::dispatch<block_reduce>(value, async, batch, true, quda::plus<T>(), param_t(), opBlockReduce);
+      return this->apply(value, async, batch, true, quda::plus<T>());
     }
 
     /**
@@ -180,7 +198,8 @@ namespace quda
      */
     template <bool async = true> __device__ __host__ inline T Max(const T &value)
     {
-      return target::dispatch<block_reduce>(value, async, batch, false, quda::maximum<T>(), param_t());
+      //return target::dispatch<block_reduce>(value, async, batch, false, quda::maximum<T>(), param_t(), opBlockReduce);
+      return this->apply(value, async, batch, false, quda::maximum<T>());
     }
 
     /**
@@ -190,8 +209,9 @@ namespace quda
      */
     template <bool async = true> __device__ __host__ inline T AllMax(const T &value)
     {
-      static_assert(param_t::batch_size == 1, "Cannot do AllMax with batch_size > 1");
-      return target::dispatch<block_reduce>(value, async, batch, true, quda::maximum<T>(), param_t());
+      static_assert(batch_size == 1, "Cannot do AllMax with batch_size > 1");
+      //return target::dispatch<block_reduce>(value, async, batch, true, quda::maximum<T>(), param_t(), opBlockReduce);
+      return this->apply(value, async, batch, true, quda::maximum<T>());
     }
 
     /**
@@ -201,7 +221,8 @@ namespace quda
      */
     template <bool async = true> __device__ __host__ inline T Min(const T &value)
     {
-      return target::dispatch<block_reduce>(value, async, batch, false, quda::minimum<T>(), param_t());
+      //return target::dispatch<block_reduce>(value, async, batch, false, quda::minimum<T>(), param_t(), opBlockReduce);
+      return this->apply(value, async, batch, false, quda::minimum<T>());
     }
 
     /**
@@ -211,8 +232,9 @@ namespace quda
      */
     template <bool async = true> __device__ __host__ inline T AllMin(const T &value)
     {
-      static_assert(param_t::batch_size == 1, "Cannot do AllMin with batch_size > 1");
-      return target::dispatch<block_reduce>(value, async, batch, true, quda::minimum<T>(), param_t());
+      static_assert(batch_size == 1, "Cannot do AllMin with batch_size > 1");
+      //return target::dispatch<block_reduce>(value, async, batch, true, quda::minimum<T>(), param_t(), opBlockReduce);
+      return this->apply(value, async, batch, true, quda::minimum<T>());
     }
 
     /**
@@ -224,7 +246,8 @@ namespace quda
     template <bool async = true, typename reducer_t>
     __device__ __host__ inline T Reduce(const T &value, const reducer_t &r)
     {
-      return target::dispatch<block_reduce>(value, async, batch, false, r, param_t());
+      //return target::dispatch<block_reduce>(value, async, batch, false, r, param_t(), opBlockReduce);
+      return this->apply(value, async, batch, false, r);
     }
 
     /**
@@ -236,8 +259,9 @@ namespace quda
     template <bool async = true, typename reducer_t>
     __device__ __host__ inline T AllReduce(const T &value, const reducer_t &r)
     {
-      static_assert(param_t::batch_size == 1, "Cannot do AllReduce with batch_size > 1");
-      return target::dispatch<block_reduce>(value, async, batch, true, r, param_t());
+      static_assert(batch_size == 1, "Cannot do AllReduce with batch_size > 1");
+      //return target::dispatch<block_reduce>(value, async, batch, true, r, param_t(), opBlockReduce);
+      return this->apply(value, async, batch, true, r);
     }
   };
 

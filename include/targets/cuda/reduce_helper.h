@@ -257,7 +257,9 @@ namespace quda
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    //T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    KernelOps<BlockReduce> ops{};
+    T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::grid_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
       write_result(arg, aggregate, idx);
@@ -300,7 +302,7 @@ namespace quda
           i += target::block_size<2>();
         }
 
-        sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+        sum = BlockReduce(ops, target::thread_idx().z).Reduce(sum, r);
 
         write_result(arg, sum, idx);
       }
