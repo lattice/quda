@@ -76,7 +76,7 @@ namespace quda
       ColorSpinorField &y;
       const std::vector<double> &a;
       const std::vector<double> &b;
-      unsigned int minThreads() const { return x.VolumeCB(); }
+      unsigned int minThreads() const override { return x.VolumeCB(); }
 
     public:
       axpby3D(ColorSpinorField &x, ColorSpinorField &y, const std::vector<double> &a, const std::vector<double> &b) :
@@ -85,7 +85,7 @@ namespace quda
         apply(device::get_default_stream());
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor>(a, x, b, y));
@@ -93,8 +93,8 @@ namespace quda
 
       void preTune() override { y.backup(); }
       void postTune() override { y.restore(); }
-      long long flops() const { return 6 * x.Volume() * x.Nspin() * x.Ncolor(); }
-      long long bytes() const { return x.Bytes() + 2 * y.Bytes(); }
+      long long flops() const override { return 6 * x.Volume() * x.Nspin() * x.Ncolor(); }
+      long long bytes() const override { return x.Bytes() + 2 * y.Bytes(); }
     };
 
     void axpby(std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y)
@@ -127,7 +127,7 @@ namespace quda
       ColorSpinorField &y;
       const std::vector<Complex> &a;
       const std::vector<Complex> &b;
-      unsigned int minThreads() const { return x.VolumeCB(); }
+      unsigned int minThreads() const override { return x.VolumeCB(); }
 
     public:
       caxpby3D(ColorSpinorField &x, ColorSpinorField &y, const std::vector<Complex> &a, const std::vector<Complex> &b) :
@@ -136,16 +136,16 @@ namespace quda
         apply(device::get_default_stream());
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor>(a, x, b, y));
       }
 
-      void preTune() { y.backup(); }
-      void postTune() { y.restore(); }
-      long long flops() const { return 14 * x.Volume() * x.Nspin() * x.Ncolor(); }
-      long long bytes() const { return x.Bytes() + 2 * y.Bytes(); }
+      void preTune() override { y.backup(); }
+      void postTune() override { y.restore(); }
+      long long flops() const override { return 14 * x.Volume() * x.Nspin() * x.Ncolor(); }
+      long long bytes() const override { return x.Bytes() + 2 * y.Bytes(); }
     };
 
     void caxpby(std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y)
