@@ -241,8 +241,9 @@ namespace quda
         constexpr int M = nSpinBlock * nColor * nVec;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t tmp
-            = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
+          //vec_t tmp
+          //  = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
+          vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, x_cb * N + chi * M + i);
           memcpy(&out[i], &tmp, sizeof(vec_t));
         }
       }
@@ -299,8 +300,9 @@ namespace quda
         constexpr int M = nSpinBlock * nColor * nVec;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
-                                         (chi * M + i) * stride + x_cb);
+          //vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
+          //                               (chi * M + i) * stride + x_cb);
+          vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, (chi * M + i) * stride + x_cb);
           memcpy(&out[i], &tmp, sizeof(vec_t));
         }
       }
@@ -323,7 +325,8 @@ namespace quda
       __device__ __host__ inline void load(complex<short> out[3], complex<short> *in, int parity, int x_cb, int, int) const
       {
         using vec_t = typename VectorType<float, 4>::type;
-        vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb);
+        //vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb);
+        vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, x_cb);
         memcpy(out, &tmp, 3 * sizeof(complex<short>));
       }
     };
@@ -370,8 +373,9 @@ namespace quda
         constexpr int M = (nSpinBlock * nColor * nVec * 2) / 4;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
-                                         (chi * M + i) * stride + x_cb);
+          //vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
+	  //                             (chi * M + i) * stride + x_cb);
+          vec_t tmp = vector_load<vec_t>(in + parity * offset_cb, (chi * M + i) * stride + x_cb);
           memcpy(&out[i * 2], &tmp, sizeof(vec_t));
         }
       }
@@ -424,7 +428,8 @@ namespace quda
         Float tmp[N];
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t ld_tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), i * stride + x_cb);
+          //vec_t ld_tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), i * stride + x_cb);
+          vec_t ld_tmp = vector_load<vec_t>(in + parity * offset_cb, i * stride + x_cb);
           memcpy(&tmp[i * 8], &ld_tmp, sizeof(vec_t));
         }
         constexpr int N_chi = N / (nSpin / nSpinBlock);

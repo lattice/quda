@@ -17,8 +17,9 @@ namespace quda {
 
   template <typename T, int n> __host__ __device__ void block_load(T out[n], const T *in)
   {
-#pragma unroll
-    for (int i = 0; i < n; i++) out[i] = in[i];
+    //#pragma unroll
+    //for (int i = 0; i < n; i++) out[i] = in[i];
+    memcpy(out, in, n*sizeof(T));
     //using U = T[n];
     //using LS = subgroup_load_store<U>;
     //using V = typename LS::vec;
@@ -37,20 +38,23 @@ namespace quda {
 
   template <typename T, int n> __host__ __device__ void block_store(T *out, const T in[n])
   {
-#pragma unroll
-    for (int i = 0; i < n; i++) out[i] = in[i];
+    //#pragma unroll
+    //for (int i = 0; i < n; i++) out[i] = in[i];
+    memcpy(out, in, n*sizeof(T));
   }
 
   template <typename T> __host__ __device__ void block_load(T &out, const T *in)
   {
-    out = *in;
+    //out = *in;
+    memcpy(&out, in, sizeof(T));
     //auto sg = sycl::ext::oneapi::experimental::this_sub_group();
     //out = sg.load(in - sg.get_local_id());
   }
 
   template <typename T> __host__ __device__ void block_store(T *out, const T &in)
   {
-    *out = in;
+    //*out = in;
+    memcpy(out, &in, sizeof(T));
   }
 
 }
