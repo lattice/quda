@@ -28,7 +28,6 @@ namespace quda
     bool operator==(const CommKey &other) const
     {
       bool is_same = true;
-      if (n_dim != other.n_dim) return false;
       for (auto i = 0; i < n_dim; i++)
         if (key[i] != other.key[i]) is_same = false;
       return is_same;
