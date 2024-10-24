@@ -23,14 +23,15 @@ namespace quda
     {
 
       using real = typename mapper<vFloat>::type;
-      template <bool is_device, typename vOrder, typename bOrder>
-      using Arg = BlockTransposeArg<v_t, b_t, is_device, vFloat, vOrder, bFloat, bOrder, nSpin, nColor, nVec>;
+      template <bool is_device, typename vOrder, typename bOrder, bool from_to_non_rel>
+      using Arg = BlockTransposeArg<v_t, b_t, is_device, vFloat, vOrder, bFloat, bOrder, nSpin, nColor, nVec, from_to_non_rel>;
 
       v_t &V;
       cvector_ref<b_t> &B;
+      bool from_to_non_rel;
 
     public:
-      BlockTranspose(v_t &V, cvector_ref<b_t> &B) : TunableKernel2D(V, B.size()), V(V), B(B)
+      BlockTranspose(v_t &V, cvector_ref<b_t> &B, bool from_to_non_rel_) : TunableKernel2D(V, B.size()), V(V), B(B), from_to_non_rel(from_to_non_rel_)
       {
         if constexpr (std::is_const_v<v_t>) {
           strcat(aux, ",v2b");
@@ -38,6 +39,7 @@ namespace quda
           strcat(aux, ",b2v");
         }
         setRHSstring(aux, B.size());
+        if (from_to_non_rel) { strcat(aux, ",from_to_non_rel"); }
         resizeStep(1);
         apply(device::get_default_stream());
       }
@@ -57,10 +59,19 @@ namespace quda
 
       template <typename vAccessor, typename bAccessor> void launch_device_(TuneParam &tp, const qudaStream_t &stream)
       {
-        Arg<true, vAccessor, bAccessor> arg(V, B, tp.block.x, tp.block.y);
-        tp.set_max_shared_bytes = true;
-        resizeVector(tp.block.y * tp.grid.y); // We need a full threadblock
-        launch_device<BlockTransposeKernel>(tp, stream, arg);
+        if (from_to_non_rel) {
+          if (nSpin == 4) {
+            Arg<true, vAccessor, bAccessor, true> arg(V, B, tp.block.x, tp.block.y);
+            tp.set_max_shared_bytes = true;
+            launch_device<BlockTransposeKernel>(tp, stream, arg);
+          } else {
+            errorQuda("from_to_non_rel is only defined for nSpin(=%d) == 4.", nSpin);
+          }
+        } else {
+          Arg<true, vAccessor, bAccessor, false> arg(V, B, tp.block.x, tp.block.y);
+          tp.set_max_shared_bytes = true;
+          launch_device<BlockTransposeKernel>(tp, stream, arg);
+        }
       }
 
       void apply(const qudaStream_t &stream)
@@ -104,82 +115,70 @@ namespace quda
   };
 
   template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor, int nVec, int... N>
-  void launch_span_nVec(v_t &V, cvector_ref<b_t> &B, IntList<nVec, N...>)
+  void launch_span_nVec(v_t &V, cvector_ref<b_t> &B, bool from_to_non_rel, IntList<nVec, N...>)
   {
     if (V.Nvec() == nVec) {
-      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, nVec> transpose(V, B);
+      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, nVec> transpose(V, B, from_to_non_rel);
     } else {
-      IntList<N...> nVecs;
+      IntList<N...> nVecs_remaining;
       if constexpr (sizeof...(N) > 0) {
-        launch_span_nVec<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, nVecs);
+        launch_span_nVec<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, from_to_non_rel, nVecs_remaining);
       } else {
         errorQuda("nVec = %d not instantiated", V.Nvec());
       }
     }
   }
 
-  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor>
-  void block_transpose(v_t &V, cvector_ref<b_t> &B)
-  {
-    IntList<@QUDA_MULTIGRID_MRHS_LIST@> nVecs;
-    launch_span_nVec<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, nVecs);
-  }
-
   template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor, int... N>
-  void launch_span_nColor(v_t &V, cvector_ref<b_t> &B, IntList<nColor, N...>)
+  void launch_span_nColor(v_t &V, cvector_ref<b_t> &B, bool from_to_non_rel, IntList<nColor, N...>)
   {
     if (B[0].Ncolor() == nColor) {
-      block_transpose<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B);
+      IntList<@QUDA_MULTIGRID_MRHS_LIST@> nVecs;
+      launch_span_nVec<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, from_to_non_rel, nVecs);
     } else {
-      IntList<N...> nVecs;
+      IntList<N...> nColors_remaining;
       if constexpr (sizeof...(N) > 0) {
-        launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nVecs);
+        launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, from_to_non_rel, nColors_remaining);
       } else {
-        errorQuda("nColor = %d not instantiated", V.Ncolor());
+        errorQuda("nColor = %d not instantiated", B.Ncolor());
       }
     }
   }
 
-  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin>
-  void block_transpose(v_t &V, cvector_ref<b_t> &B)
-  {
-    if (V.Ncolor() / V.Nvec() != B[0].Ncolor()) {
-      errorQuda("V.Ncolor() / V.Nvec() (=%d) != B.Ncolor() (=%d)", V.Ncolor() / V.Nvec(), B[0].Ncolor());
-    }
-
-    IntList<@QUDA_MULTIGRID_NVEC_LIST@> nColors;
-    launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nColors);
-  }
-
-  template <class v_t, class b_t, typename vFloat, typename bFloat> void block_transpose(v_t &V, cvector_ref<b_t> &B)
+  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int... N>
+  void launch_span_nSpin(v_t &V, cvector_ref<b_t> &B, bool from_to_non_rel, IntList<nSpin, N...>)
   {
     if (V.Nspin() != B[0].Nspin()) { errorQuda("V.Nspin() (=%d) != B.Nspin() (=%d)", V.Nspin(), B[0].Nspin()); }
 
-    if (V.Nspin() == 2) {
-      block_transpose<v_t, b_t, vFloat, bFloat, 2>(V, B);
-    } else if (V.Nspin() == 4) {
-      block_transpose<v_t, b_t, vFloat, bFloat, 4>(V, B);
-    } else if (V.Nspin() == 1) {
-      block_transpose<v_t, b_t, vFloat, bFloat, 1>(V, B);
+    if (V.Nspin() == nSpin) {
+      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> nColors;
+      launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, from_to_non_rel, nColors);
     } else {
-      errorQuda("Unexpected nSpin = %d", V.Nspin());
+      if constexpr (sizeof...(N) > 0) {
+        IntList<N...> nSpins_remaining;
+        launch_span_nSpin<v_t, b_t, vFloat, bFloat>(V, B, from_to_non_rel, nSpins_remaining);
+      } else {
+        errorQuda("Unexpected nSpin = %d", V.Nspin());
+      }
     }
   }
 
-  template <class v_t, class b_t> void block_transpose(v_t &V, cvector_ref<b_t> &B)
+  template <class v_t, class b_t> void block_transpose(v_t &V, cvector_ref<b_t> &B, bool from_to_non_rel)
   {
     if (!is_enabled(V.Precision()) || !is_enabled(B[0].Precision()))
       errorQuda("QUDA_PRECISION=%d does not enable required precision combination (V = %d B = %d)", QUDA_PRECISION,
                 V.Precision(), B[0].Precision());
 
+    IntList<1, 2, 4> nSpins;
+
     if constexpr (is_enabled_multigrid()) {
       if (V.Precision() == QUDA_DOUBLE_PRECISION && B[0].Precision() == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())
-          block_transpose<v_t, b_t, double, double>(V, B);
+          launch_span_nSpin<v_t, b_t, double, double>(V, B, from_to_non_rel, nSpins);
         else
           errorQuda("Double precision multigrid has not been enabled");
       } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0].Precision() == QUDA_SINGLE_PRECISION) {
-        if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) block_transpose<v_t, b_t, float, float>(V, B);
+        if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) launch_span_nSpin<v_t, b_t, float, float>(V, B, from_to_non_rel, nSpins);
       } else {
         errorQuda("Unsupported precision combination V=%d B=%d", V.Precision(), B[0].Precision());
       }
@@ -188,8 +187,8 @@ namespace quda
     }
   }
 
-  void BlockTransposeForward(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B) { block_transpose(V, B); }
+  void BlockTransposeForward(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B, bool from_non_rel) { block_transpose(V, B, from_non_rel); }
 
-  void BlockTransposeBackward(const ColorSpinorField &V, cvector_ref<ColorSpinorField> &B) { block_transpose(V, B); }
+  void BlockTransposeBackward(const ColorSpinorField &V, cvector_ref<ColorSpinorField> &B, bool to_non_rel) { block_transpose(V, B, to_non_rel); }
 
 } // namespace quda

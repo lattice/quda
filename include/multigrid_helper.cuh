@@ -11,6 +11,10 @@ namespace quda {
     // fineSpin == 1, coarseSpin == 2 identifies staggered fine -> coarse w/ spin.
     static constexpr int spin_block_size = (fineSpin == 1 && coarseSpin == 2) ? 0 : fineSpin / coarseSpin;
 
+    static constexpr int get_spin_block_factor() {
+      return (spin_block_size == 0) ? 1 : spin_block_size;
+    }
+
     /**
        Return the coarse spin coordinate from the fine spin coordinate
        @param s Fine spin coordinate

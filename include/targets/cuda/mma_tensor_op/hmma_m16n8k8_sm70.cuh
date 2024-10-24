@@ -18,7 +18,10 @@ namespace quda
     using half = mma::half;
     using half2 = mma::half2;
 
-    template <> struct hmma_t<16, 16, 4, half, half2> {
+    template <int m, int n, int k, class compute_t, class load_t> struct hmma_x_t {
+    };
+
+    template <> struct hmma_x_t<16, 8, 8, half, half2> {
 
       static __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 
@@ -28,8 +31,8 @@ namespace quda
       }
 
       static constexpr int MMA_M = 16;
-      static constexpr int MMA_N = 16;
-      static constexpr int MMA_K = 4;
+      static constexpr int MMA_N = 8;
+      static constexpr int MMA_K = 8;
 
       static constexpr int warp_size = 32;
 
@@ -40,7 +43,7 @@ namespace quda
 
         int warp_id;
         int row_offset; // quad_row * 8 + quad_hilo * 4
-        int col_offset; // quad_col * 8 + quad_hilo * 4
+        int quad_hilo;
         int quad_col;
         int quad_thread; // 0,1,2,3
 
@@ -51,11 +54,10 @@ namespace quda
           int octl_id = lane_id >> 2;
           int quad_id = octl_id & 3;
           int quad_row = quad_id & 1;
-          int quad_hilo = (octl_id >> 2) & 1;
+          quad_hilo = (octl_id >> 2) & 1;
           quad_col = quad_id >> 1;
           quad_thread = lane_id & 3;
           row_offset = quad_row * 8 + quad_hilo * 4;
-          col_offset = quad_col * 8 + quad_hilo * 4;
         }
       };
 
@@ -78,7 +80,7 @@ namespace quda
         __device__ inline void load(const void *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
         {
           const unsigned *A = reinterpret_cast<const unsigned *>(smem);
-          int idx_strided = k * MMA_K + wrm.quad_thread;
+          int idx_strided = k * MMA_K + wrm.quad_thread + wrm.quad_col * 4;
           int idx_contiguous = (warp_row * MMA_M + wrm.row_offset) / 2;
           int thread_offset_a = idx_strided * (lda / 2) + idx_contiguous;
           reg[0] = A[thread_offset_a + 0];
@@ -89,7 +91,7 @@ namespace quda
         __device__ inline void load(const SmemObj &smem_obj, int k, int warp_row, const WarpRegisterMapping &wrm)
         {
           const unsigned *A = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-          int idx_strided = k * MMA_K + wrm.quad_thread;
+          int idx_strided = k * MMA_K + wrm.quad_thread + wrm.quad_col * 4;
           int idx_contiguous = (warp_row * MMA_M + wrm.row_offset) / 2;
           const int thread_offset_a = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
           reg[0] = A[thread_offset_a];
@@ -111,8 +113,8 @@ namespace quda
         __device__ inline void load(const void *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
         {
           const unsigned *B = reinterpret_cast<const unsigned *>(smem);
-          int idx_strided = k * MMA_K + wrm.quad_thread;
-          int idx_contiguous = (warp_col * MMA_N + wrm.col_offset) / 2;
+          int idx_strided = k * MMA_K + wrm.quad_thread + wrm.quad_col * 4;
+          int idx_contiguous = (warp_col * MMA_N + wrm.quad_hilo * 4) / 2;
           int thread_offset_b = idx_strided * (ldb / 2) + idx_contiguous;
           reg[0] = B[thread_offset_b + 0];
           reg[1] = B[thread_offset_b + 1];
@@ -122,8 +124,8 @@ namespace quda
         __device__ inline void load(const SmemObj &smem_obj, int k, int warp_col, const WarpRegisterMapping &wrm)
         {
           const unsigned *B = reinterpret_cast<const unsigned *>(smem_obj.ptr);
-          int idx_strided = k * MMA_K + wrm.quad_thread;
-          int idx_contiguous = (warp_col * MMA_N + wrm.col_offset) / 2;
+          int idx_strided = k * MMA_K + wrm.quad_thread + wrm.quad_col * 4;
+          int idx_contiguous = (warp_col * MMA_N + wrm.quad_hilo * 4) / 2;
           const int thread_offset_b = idx_strided * (SmemObj::ldn / 2) + idx_contiguous;
           reg[0] = B[thread_offset_b];
           reg[1] = B[thread_offset_b + 1];
@@ -139,26 +141,26 @@ namespace quda
       struct OperandC {
 
         using reg_type = float;
-        reg_type reg[8];
+        reg_type reg[4];
 
         __device__ inline OperandC() { zero(); }
 
         __device__ inline void zero()
         {
 #pragma unroll
-          for (int i = 0; i < 8; i++) { reg[i] = 0; }
+          for (int i = 0; i < 4; i++) { reg[i] = 0; }
         }
 
         __device__ inline void ax(float alpha)
         {
 #pragma unroll
-          for (int i = 0; i < 8; i++) { reg[i] *= alpha; }
+          for (int i = 0; i < 4; i++) { reg[i] *= alpha; }
         }
 
         __device__ inline void axpy(float alpha, OperandC x)
         {
 #pragma unroll
-          for (int i = 0; i < 8; i++) { reg[i] += alpha * x.reg[i]; }
+          for (int i = 0; i < 4; i++) { reg[i] += alpha * x.reg[i]; }
         }
 
         template <int ldc>
@@ -167,32 +169,46 @@ namespace quda
           half2 *C = reinterpret_cast<half2 *>(smem);
 
           const int idx_strided = warp_row * 16 + wrm.row_offset + (wrm.quad_thread % 2);
-          const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4 + (wrm.quad_thread / 2);
+          const int idx_contiguous = warp_col * 4 + wrm.quad_col * 2 + (wrm.quad_thread / 2);
 
           int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
           C[thread_offset_c] = __floats2half2_rn(reg[0], reg[1]);
 
           thread_offset_c = (idx_strided + 2) * (ldc / 2) + idx_contiguous;
           C[thread_offset_c] = __floats2half2_rn(reg[2], reg[3]);
-
-          thread_offset_c = idx_strided * (ldc / 2) + (idx_contiguous + 2);
-          C[thread_offset_c] = __floats2half2_rn(reg[4], reg[5]);
-
-          thread_offset_c = (idx_strided + 2) * (ldc / 2) + (idx_contiguous + 2);
-          C[thread_offset_c] = __floats2half2_rn(reg[6], reg[7]);
         }
 
         template <class F> __device__ inline void abs_max(F &max)
         {
 #pragma unroll
-          for (int i = 0; i < 8; i++) { max = fmax(max, fabsf(reg[i])); }
+          for (int i = 0; i < 4; i++) { max = fmax(max, fabsf(reg[i])); }
         }
       };
 
       static __device__ inline void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
       {
-        mma::mma_instruction_t<MMA_M, MMA_N, MMA_K, mma::half, float> mma_instruction;
-        mma_instruction(op_c.reg, op_a.reg, op_b.reg);
+        float op_c_tmp[8];
+#pragma unroll
+        for (int i = 0; i < 8; i++) { op_c_tmp[i] = 0; }
+        mma::mma_instruction_t<MMA_M, 16, 4, mma::half, float> mma_instruction;
+        mma_instruction(op_c_tmp, op_a.reg, op_b.reg);
+        float other_op_c_tmp[8];
+#pragma unroll
+        for (int x = 0; x < 8; x++) {
+          other_op_c_tmp[x] = __shfl_xor_sync(0xffffffff, op_c_tmp[x], 0x8);
+        }
+        int lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) % 32;
+        if (lane_id / 8 % 2 == 0) {
+#pragma unroll
+          for (int x = 0; x < 4; x++) {
+            op_c.reg[x] += op_c_tmp[x] + other_op_c_tmp[x];
+          }
+        } else {
+#pragma unroll
+          for (int x = 0; x < 4; x++) {
+            op_c.reg[x] += op_c_tmp[x + 4] + other_op_c_tmp[x + 4];
+          }
+        }
       }
 
       template <int M, int N, int ldc, bool dagger, class GmemOperandC, class op_t>
@@ -203,15 +219,15 @@ namespace quda
         using store_t = typename GmemOperandC::store_type;
 
         const int row = warp_row + wrm.row_offset + (wrm.quad_thread % 2);
-        const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
+        const int col = warp_col + wrm.quad_col * 4 + (wrm.quad_thread / 2) * 2;
 
         constexpr bool fixed = GmemOperandC::fixed;
         constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
 #pragma unroll
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 2; i++) {
           int m_index = row + (i % 2) * 2;
-          int n_index = col + (i / 2) * 4;
+          int n_index = col;
 
           if constexpr (dagger) {
             using complex_t = complex<store_t>;

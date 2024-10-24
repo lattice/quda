@@ -29,7 +29,7 @@ namespace quda
     };
 
     template <typename Arg>
-    inline __device__ auto computeYhatMMA(Arg &arg, int d, int x_cb, int parity, int m, int n)
+    inline __device__ auto computeYhatMMA(const Arg &arg, int d, int x_cb, int parity, int m, int n)
     {
       using real = typename Arg::Float;
       constexpr int nDim = 4;
@@ -84,8 +84,8 @@ namespace quda
     }
 
     template <typename Arg> struct CalculateYhatMMA {
-      Arg &arg;
-      constexpr CalculateYhatMMA(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr CalculateYhatMMA(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __forceinline__ void operator()()

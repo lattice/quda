@@ -413,7 +413,7 @@ namespace quda
                 for (int wm = 0; wm < warp_m; wm++) {
                   int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
                   int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                  if (!check_bounds || (m < N && n < M)) {
+                  if (!check_bounds || (m < M && n < N)) {
                     int reg_index = (wn * warp_m + wm) * thread_count + tm * thread_n + tn;
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();
