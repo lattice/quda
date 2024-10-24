@@ -178,6 +178,32 @@ namespace quda
                       const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
+   * @brief Rotate gauge U_\mu(x) with rotation field g(x).
+   * @param[in,out] out Rotated gauge field U'_\mu(x) = g(x)U_\mu(x)g^\dagger(x+\hat{\mu})
+   * @param[in] in Gauge field U_\mu(x)
+   * @param[in] rot Rotation field g(x)
+   */
+  void gaugeRotation(GaugeField &out, const GaugeField &in, const GaugeField &rot);
+
+  /**
+   * @brief Gauge fixing with over-relaxation.
+   * @param[in,out] rot Rotation field to fix the gauge
+   * @param[in] u Gauge field
+   * @param[in] omega The over-relaxation parameter, most common value is 1.5 or 1.7
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
+   */
+  void gaugeFixingOVR2(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore);
+
+  /**
+   * @brief Compute the gauge fixing quality, functional or theta is considered as the criterion.
+   * @param[in,out] quality The functional and theta value
+   * @param[in] u Fixed gauge field
+   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
+   * @param[in] compute_theta Set to true to compute the theta value as the criterion
+   */
+  void gaugeFixingQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta);
+
+  /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
