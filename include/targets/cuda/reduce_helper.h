@@ -11,7 +11,7 @@
 #include <cuda/std/climits>
 #include <cuda/std/type_traits>
 #include <cuda/std/limits>
-#include <cuda/std/atomic>
+#include <cuda/atomic>
 using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 
 namespace quda
