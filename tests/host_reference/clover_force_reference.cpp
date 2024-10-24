@@ -4,60 +4,21 @@
 #include <cstring>
 #include <type_traits>
 
-#include "gauge_field.h"
-#include "quda.h"
-#include "color_spinor_field.h" // convenient quark field container
+// QUDA headers
+#include <gauge_field.h>
+#include <color_spinor_field.h> // convenient quark field container
 
 #include "clover_force_reference.h"
 #include "host_utils.h"
+#include "index_utils.hpp"
 #include "misc.h"
 #include "dslash_reference.h"
 #include "wilson_dslash_reference.h"
 #include "gauge_force_reference.h"
-#include "host_utils.h"
 #include "gamma_reference.h"
 
 #include <Eigen/Dense>
 
-// todo pass projector
-template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
-{
-  for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
-
-  for (int s = 0; s < 4; s++) {
-    for (int t = 0; t < 4; t++) {
-      Float projRe = projector[projIdx][s][t][0];
-      Float projIm = projector[projIdx][s][t][1];
-
-      for (int m = 0; m < 3; m++) {
-        Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
-        Float spinorIm = spinorIn[t * (3 * 2) + m * (2) + 1];
-        res[s * (3 * 2) + m * (2) + 0] += projRe * spinorRe - projIm * spinorIm;
-        res[s * (3 * 2) + m * (2) + 1] += projRe * spinorIm + projIm * spinorRe;
-      }
-    }
-  }
-}
-
-// todo pass gamma
-template <typename Float> void multiplySpinorByDiracgamma(Float *res, int gammaIdx, const Float *spinorIn)
-{
-  for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
-
-  for (int s = 0; s < 4; s++) {
-    for (int t = 0; t < 4; t++) {
-      Float projRe = local_gamma[gammaIdx][s][t][0];
-      Float projIm = local_gamma[gammaIdx][s][t][1];
-
-      for (int m = 0; m < 3; m++) {
-        Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
-        Float spinorIm = spinorIn[t * (3 * 2) + m * (2) + 1];
-        res[s * (3 * 2) + m * (2) + 0] += projRe * spinorRe - projIm * spinorIm;
-        res[s * (3 * 2) + m * (2) + 1] += projRe * spinorIm + projIm * spinorRe;
-      }
-    }
-  }
-}
 template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gauge, sFloat *x, sFloat *y)
 {
 
@@ -202,7 +163,7 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
 #else
       sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
       sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
-      const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
 #endif
       sFloat projectedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (projSign + 1) / 2; //+ (dir + daggerBit) % 2;
@@ -875,11 +836,11 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
           for (int flavor = 0; flavor < flavors; ++flavor) {
 
             sFloat temp[spinor_site_size], temp_munu[spinor_site_size], temp_numu[spinor_site_size];
-            multiplySpinorByDiracgamma(temp, nu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
-            multiplySpinorByDiracgamma(temp_munu, mu, temp);
+            multiplySpinorByDiracGamma(temp, nu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
+            multiplySpinorByDiracGamma(temp_munu, mu, temp);
 
-            multiplySpinorByDiracgamma(temp, mu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
-            multiplySpinorByDiracgamma(temp_numu, nu, temp);
+            multiplySpinorByDiracGamma(temp, mu, &p[spinor_site_size * (i + Vh * flavor + Vh * flavors * parity)]);
+            multiplySpinorByDiracGamma(temp_numu, nu, temp);
             for (int s = 0; s < 4; s++) {
               for (int t = 0; t < 3; t++) {
                 temp[s * (3 * 2) + t * (2) + 0]
@@ -1036,12 +997,12 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
 
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param->twist_flavor == QUDA_TWIST_SINGLET) {
-          tmc_dslash(x[i].Even().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
-                     inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec,
+          tmc_dslash(x[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa,
+                     inv_param->mu, inv_param->twist_flavor, myMatPCType, parity, QUDA_DAG_YES, inv_param->cpu_prec,
                      *gauge_param);
         } else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-          tmc_ndeg_dslash(x[i].Even().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(),
-                          inv_param->kappa, inv_param->mu, inv_param->epsilon, parity, myMatPCType, QUDA_DAG_YES,
+          tmc_ndeg_dslash(x[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(),
+                          inv_param->kappa, inv_param->mu, inv_param->epsilon, myMatPCType, parity, QUDA_DAG_YES,
                           inv_param->cpu_prec, *gauge_param);
         }
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -1053,10 +1014,10 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
 
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param->twist_flavor == QUDA_TWIST_SINGLET) {
-          tmc_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+          tmc_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa,
                     inv_param->mu, inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
         } else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-          tmc_ndeg_matpc(p[i].Odd().data(), gauge.data(), tmp.data(), clover.data(), clover_inv.data(), inv_param->kappa,
+          tmc_ndeg_matpc(p[i].Odd().data(), gauge.data(), clover.data(), clover_inv.data(), tmp.data(), inv_param->kappa,
                          inv_param->mu, inv_param->epsilon, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
         }
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -1091,12 +1052,12 @@ void TMCloverForce_reference(void *h_mom, void **h_x, void **h_x0, double *coeff
 
       if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param->twist_flavor == QUDA_TWIST_SINGLET)
-          tmc_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(),
-                     inv_param->kappa, inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO,
+          tmc_dslash(p[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), p[i].Odd().data(),
+                     inv_param->kappa, inv_param->mu, inv_param->twist_flavor, myMatPCType, parity, QUDA_DAG_NO,
                      inv_param->cpu_prec, *gauge_param);
         else if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)
-          tmc_ndeg_dslash(p[i].Even().data(), gauge.data(), p[i].Odd().data(), clover.data(), clover_inv.data(),
-                          inv_param->kappa, inv_param->mu, inv_param->epsilon, parity, myMatPCType, QUDA_DAG_YES,
+          tmc_ndeg_dslash(p[i].Even().data(), gauge.data(), clover.data(), clover_inv.data(), p[i].Odd().data(),
+                          inv_param->kappa, inv_param->mu, inv_param->epsilon, myMatPCType, parity, QUDA_DAG_YES,
                           inv_param->cpu_prec, *gauge_param);
       } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_dslash(p[i].Even().data(), gauge.data(), clover_inv.data(), p[i].Odd().data(), parity, QUDA_DAG_NO,
