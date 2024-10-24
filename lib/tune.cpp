@@ -1077,8 +1077,8 @@ namespace quda
             best_param = param;
           }
           if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
-            logQuda(QUDA_DEBUG_VERBOSE, "T   %s gives %s\n", tunable.paramString(param).c_str(),
-                    tunable.perfString(elapsed_time).c_str());
+            logQuda(QUDA_DEBUG_VERBOSE, "T   %s gives %s (time %.3f ms)\n", tunable.paramString(param).c_str(),
+                    tunable.perfString(elapsed_time).c_str(), elapsed_time*1e3);
           } else {
             logQuda(QUDA_DEBUG_VERBOSE, "    %s gives %s\n", tunable.paramString(param).c_str(),
                     qudaGetLastErrorString().c_str());

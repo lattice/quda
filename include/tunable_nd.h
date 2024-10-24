@@ -264,9 +264,9 @@ namespace quda
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
       param.block.y = block.y;
       param.grid.y = grid.y;
+      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
 
       if (ret) {
         return true;
@@ -523,11 +523,11 @@ namespace quda
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
+      param.block.z = block.z;
+      param.grid.z = grid.z;
       bool ret = tune_block_y                           ? TunableKernel2D_base<grid_stride>::advanceBlockDim(param) :
         TunableKernel2D_base<grid_stride>::tune_block_x ? Tunable::advanceBlockDim(param) :
                                                           false;
-      param.block.z = block.z;
-      param.grid.z = grid.z;
 
       if (ret) {
         // we advanced the block.x / block.y so we're done

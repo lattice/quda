@@ -72,11 +72,11 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
-set(VALID_TARGET_TYPES CUDA HIP SYCL)
+set(VALID_TARGET_TYPES CUDA HIP SYCL OMPTARGET)
 set(QUDA_TARGET_TYPE
   "${DEFTARGET}"
   CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
-set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP SYCL)
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP SYCL OMPTARGET)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
@@ -240,10 +240,10 @@ option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conver
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
-    17
-    CACHE STRING "set the CXX Standard (14 or 17)")
+    20
+    CACHE STRING "set the CXX Standard (14, 17, 20)")
 
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
+set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17 20)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 

@@ -6,6 +6,7 @@ namespace quda {
   namespace reducer {
 
     template <typename T_> struct init_arg : kernel_param<> {
+      static constexpr ThreadsSync requires_threads_sync = ThreadsSyncNo;
       using T = T_;
       T *count;
       init_arg(T *count, int n_reduce) :

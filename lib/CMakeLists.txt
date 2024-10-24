@@ -293,6 +293,9 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "OMPTARGET")
+	include(targets/omptarget/target_omptarget.cmake)
+endif()
 
 # Set the maximum multi-RHS per kernel if not already set by the target
 if(NOT DEFINED QUDA_MAX_MULTI_RHS)
