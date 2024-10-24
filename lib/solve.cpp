@@ -318,7 +318,7 @@ namespace quda
   }
 
   void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
-                          const bool pc_solve);
+                          bool pc_solve, bool use_smeared_gauge);
 
   extern std::vector<ColorSpinorField> solutionResident;
 
@@ -349,7 +349,8 @@ namespace quda
 
     // Create the dirac operator and operators for sloppy, precondition,
     // and an eigensolver
-    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, param, pc_solve);
+    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, param, pc_solve,
+                       param.eig_param ? static_cast<QudaEigParam *>(param.eig_param)->use_smeared_gauge : false);
 
     // wrap CPU host side pointers
     ColorSpinorParam cpuParam(hp_b[0], param, u.X(), pc_solution, param.input_location);
@@ -392,18 +393,6 @@ namespace quda
     } else {
       cudaParam.create = QUDA_NULL_FIELD_CREATE;
       x[0] = ColorSpinorField(cudaParam);
-    }
-
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES && !param.chrono_use_resident) { // download initial guess
-      // initial guess only supported for single-pass solvers
-      if ((param.solution_type == QUDA_MATDAG_MAT_SOLUTION || param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION)
-          && (param.solve_type == QUDA_DIRECT_SOLVE || param.solve_type == QUDA_DIRECT_PC_SOLVE)) {
-        errorQuda("Initial guess not supported for two-pass solver");
-      }
-
-      blas::copy(x, h_x); // solution
-    } else {              // zero initial guess
-      blas::zero(x);
     }
 
     solve(x, b, *dirac, *diracSloppy, *diracPre, *diracEig, param);

@@ -44,7 +44,7 @@ namespace quda
       void apply(const qudaStream_t &stream)
       {
         // intentionally do not autotune, since this can be called inside a tuning region
-        auto tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+        auto tp = tuneLaunch(*this, false, getVerbosity());
         launch_device<init_count>(tp, stream, init_arg<T>(reduce_count, n_reduce));
       }
     };

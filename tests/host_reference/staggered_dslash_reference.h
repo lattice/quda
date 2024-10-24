@@ -23,7 +23,7 @@ void setDims(int *);
  * @param[in] dslash_type Dslash type
  */
 void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type);
+                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type, int laplace3D);
 
 /**
  * @brief Apply the full parity staggered-type dslash
@@ -37,7 +37,7 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
  * @param[in] dslash_type Dslash type
  */
 void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type);
+              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type, int laplace3D);
 
 /**
  * @brief Apply the full parity staggered-type matdag_mat
@@ -51,7 +51,7 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
  * @param[in] dslash_type Dslash type
  */
 void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type);
+                     const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type, int laplace3D);
 
 /**
  * @brief Apply the even-even or odd-odd preconditioned staggered dslash
@@ -66,4 +66,5 @@ void stag_matdag_mat(ColorSpinorField &out, const GaugeField &fat_link, const Ga
  * @param[in] dslash_type Dslash type
  */
 void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                const ColorSpinorField &in, double mass, int dagger_bit, QudaParity parity, QudaDslashType dslash_type);
+                const ColorSpinorField &in, double mass, int dagger_bit, QudaParity parity, QudaDslashType dslash_type,
+                int laplace3D);

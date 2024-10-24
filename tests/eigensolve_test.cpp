@@ -191,17 +191,14 @@ std::vector<double> eigensolve(test_t test_param)
   // Host side arrays to store the eigenpairs computed by QUDA
   int n_eig = eig_n_conv;
   if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
-  std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
 
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
-  for (int i = 0; i < n_eig; i++) {
-    evecs[i] = quda::ColorSpinorField(cs_param);
-    host_evecs_ptr[i] = evecs[i].data();
-  }
+  std::vector<quda::ColorSpinorField> evecs(n_eig, cs_param);
+  for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
 
   // Complex eigenvalues
   std::vector<__complex__ double> evals(eig_n_conv);

@@ -73,7 +73,6 @@ quda::mgarray<bool> mg_vec_partfile = {};
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
-bool gauge_smear = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
@@ -302,13 +301,18 @@ double eofa_mq2 = 0.85;
 double eofa_mq3 = 1.0;
 
 // SU(3) smearing options
-double gauge_smear_rho = 0.1;
-double gauge_smear_epsilon = 1.0;
-double gauge_smear_alpha = 0.6;
-int gauge_smear_steps = 5;
-QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
-int measurement_interval = 5;
+bool gauge_smear = false;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
+double gauge_smear_rho = 0.1;
+double gauge_smear_epsilon = 0.1;
+double gauge_smear_alpha = 0.6;
+double gauge_smear_alpha1 = 0.75;
+double gauge_smear_alpha2 = 0.6;
+double gauge_smear_alpha3 = 0.3;
+int gauge_smear_steps = 5;
+int gauge_smear_dir_ignore = -1;
+int measurement_interval = 5;
+bool su_project = true;
 
 // contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
@@ -410,6 +414,7 @@ namespace
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
+                                                 {"trlm-3d", QUDA_EIG_TR_LANCZOS_3D},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
@@ -453,11 +458,12 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
-  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
-                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-
-  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {
-    {"ape", QUDA_GAUGE_SMEAR_APE}, {"stout", QUDA_GAUGE_SMEAR_STOUT}, {"ovr-imp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT}};
+  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
+                                                                {"stout", QUDA_GAUGE_SMEAR_STOUT},
+                                                                {"ovrimp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
+                                                                {"hyp", QUDA_GAUGE_SMEAR_HYP},
+                                                                {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW},
+                                                                {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
 
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
@@ -765,7 +771,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   // Option group for Eigensolver related options
   auto opgroup = quda_app->add_option_group("Eigensolver", "Options controlling eigensolver");
@@ -1118,9 +1123,16 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+
+  opgroup
+    ->add_option(
+      "--su3-smear-type",
+      gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, HYP, Wilson Flow, Symanzik Flow (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
+  ;
+
   opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
 
   opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
@@ -1128,18 +1140,23 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option(
     "--su3-smear-epsilon", gauge_smear_epsilon,
-    "epsilon coefficient for Over-Improved Stout smearing and step size for Wilson flow (default 1.0)");
+    "epsilon coefficient for Over-Improved Stout smearing and step size for Wilson flow (default 0.1)");
+
+  opgroup->add_option("--su3-smear-alpha1", gauge_smear_alpha1, "alpha1 coefficient for HYP smearing (default 0.75)");
+  opgroup->add_option("--su3-smear-alpha2", gauge_smear_alpha2, "alpha2 coefficient for HYP smearing (default 0.6)");
+  opgroup->add_option("--su3-smear-alpha3", gauge_smear_alpha3, "alpha3 coefficient for HYP smearing (default 0.3)");
+
+  opgroup->add_option(
+    "--su3-smear-dir-ignore", gauge_smear_dir_ignore,
+    "Direction to be ignored by the smearing, negative value means decided by --su3-smear-type (default -1)");
 
   opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 10)");
 
-  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-
-  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
-    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and topological charge every Nth step (default 5) ");
+                      "Measure the field energy and/or topological charge every Nth step (default 5) ");
+
+  opgroup->add_option("--su3-project", su_project,
+                      "Project smeared gauge onto su3 manifold at measurement interval (default true)");
 }
 
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)

@@ -179,7 +179,7 @@ void gauge_force_test(force_test_t test_param)
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
 
-  if (getTuning() == QUDA_TUNE_YES) {
+  if (getTuning()) {
     if (compute_force)
       computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
                             &gauge_param);
@@ -324,7 +324,7 @@ void gauge_loop_test(loop_test_t loop_param)
   // compute the plaquette as part of validation
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
 
-  if (getTuning() == QUDA_TUNE_YES) { gaugeObservablesQuda(&obsParam); }
+  if (getTuning()) { gaugeObservablesQuda(&obsParam); }
 
   quda::host_timer_t host_timer;
   // Multiple execution to exclude warmup time in the first run
