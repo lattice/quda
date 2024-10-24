@@ -455,7 +455,7 @@ namespace quda
         int lane_id = thread_id % 32;
         constexpr bool x = transpose == dagger;
         constexpr int tmp_ld = x ? bN + get_tmp_pad() : bM + get_tmp_pad();
-        tmp2s_smem_t<load_t, x, tmp_ld, 1> pattern; // 1 is dummy here
+        tmp2s_smem_t<T, load_t, x, tmp_ld, 1> pattern; // 1 is dummy here
         constexpr int w_m = pattern.get_wm();
         constexpr int w_k = pattern.get_wn();
         static_assert(bM % w_m == 0, "bM %% w_m");

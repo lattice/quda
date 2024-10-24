@@ -108,10 +108,6 @@ namespace quda
       for (int i = 0; i < 4; i++) ghostFaceCB[i] = halo.getDslashConstant().ghostFaceCB[i];
 
 #ifdef USE_TENSOR_MEMORY_ACCELERATOR
-      if (sizeof(yFloat) != 4) {
-        errorQuda("half precision not supported\n");
-      }
-
       tma_descriptor_key_t<5> key_g = {
         std::array<size_t, 5>{nColor * nSpin * 2, nColor * nSpin, 8, Y.VolumeCB(), static_cast<size_t>(Y.SiteSubset())},
         std::array<size_t, 5>{bK * 2, bM, 1, 1, 1},
