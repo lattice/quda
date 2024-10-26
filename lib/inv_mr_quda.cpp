@@ -113,20 +113,24 @@ namespace quda
 
         if (param.do_block_schwarz()) {
           if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+            for (auto i = 0u; i < b.size(); i++) {
             // Red or black active
-            Ar.DD(DD::reset, DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
-            r_sloppy.DD(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+              (Ar[i]).DD(DD::reset, DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+              (r_sloppy[i]).DD(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+	    }
           } else {
             // Both red and black active but no hopping
-            Ar.DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
-            r_sloppy.DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+            for (auto i = 0u; i < b.size(); i++) {
+              (Ar[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+              (r_sloppy[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+	    }
           }
         }
 
         blas::zero(x_sloppy); // can get rid of this for a special first update kernel
-        auto c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
+        auto c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2  
         for (auto i = 0u; i < b.size(); i++) {
-          scale[i] = c2[i] > 0.0 ? sqrt(c2[i]) : 1.0;
+	  scale[i] = c2[i] > 0.0 ? sqrt(c2[i]) : 1.0;
           scale_inv[i] = 1.0 / scale[i];
           // domain-wise normalization of the initial residual to prevent underflow
           if (c2[i] > 0.0) r2[i] = 1.0; // by definition by this is now true
@@ -167,8 +171,10 @@ namespace quda
 
         if (param.do_block_schwarz()) {
           // Disable domain decomposition
-          Ar.DD(DD::reset);
-          r_sloppy.DD(DD::reset);
+          for (auto i = 0u; i < Ar.size(); i++) {
+            (Ar[i]).DD(DD::reset);
+            (r_sloppy[i]).DD(DD::reset);
+	  }
         }
 
         commGlobalReductionPop(); // renable global reductions for outer solver
