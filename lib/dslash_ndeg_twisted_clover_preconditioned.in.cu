@@ -14,7 +14,7 @@ namespace quda
     template struct NdegTwistedCloverPreconditionedApply<Float,nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
 
-    template NdegTwistedCloverPreconditionedApply<Float,nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedCloverPreconditionedApply<distance_pc>(
+    template NdegTwistedCloverPreconditionedApply<Float,nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedCloverPreconditionedApply(
 		    cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
                     const CloverField &A, double a, double b, double c, bool xpay, int parity,

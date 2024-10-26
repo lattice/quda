@@ -13,7 +13,7 @@ namespace quda
 
     template struct NdegTwistedCloverApply<Float,nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
-    template NdegTwistedCloverApply<Float,nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedCloverApply<distance_pc>(
+    template NdegTwistedCloverApply<Float,nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedCloverApply(
 	    cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
             cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
 	    double b, double c, int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);

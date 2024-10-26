@@ -15,7 +15,7 @@ namespace quda
 
     template struct NdegTwistedMassPreconditionedApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
     
-    template NdegTwistedMassPreconditionedApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedMassPreconditionedApply<distance_pc>(
+    template NdegTwistedMassPreconditionedApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedMassPreconditionedApply(
 		    cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                     cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
                     double c, bool xpay, int parity, bool dagger, bool asymmetric,

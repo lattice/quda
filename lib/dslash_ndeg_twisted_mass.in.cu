@@ -13,7 +13,7 @@ namespace quda
 
   template struct NdegTwistedMassApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
-  template NdegTwistedMassApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedMassApply<distance_pc>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+  template NdegTwistedMassApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::NdegTwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, double c,
                          int parity, bool dagger, const int *comm_override,DistanceType<distance_pc>, TimeProfile &profile);
 

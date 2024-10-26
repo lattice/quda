@@ -18,7 +18,7 @@ namespace quda
 
   template struct WilsonCloverApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
-  template WilsonCloverApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::WilsonCloverApply<distance_pc>(
+  template WilsonCloverApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::WilsonCloverApply(
 			  cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
 			  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
 			  double alpha0, int t0, int parity, bool dagger, const int *comm_override,

@@ -13,7 +13,7 @@ namespace quda
 
   template struct WilsonApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
-  template WilsonApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::WilsonApply<distance_pc>(
+  template WilsonApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::WilsonApply(
     cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
     const GaugeField &U, double a, double alpha0, int t0, int parity, bool dagger, const int *comm_override,
     DistanceType<distance_pc>, TimeProfile &profile);

@@ -13,7 +13,7 @@ namespace quda
 
   template struct StaggeredApply<Float, nColor, DDArg, ReconstructStaggered::recon[reconI]>;
     
-  template StaggeredApply<Float, nColor, DDArg, ReconstructStaggered::recon[reconI]>::StaggeredApply<distance_pc>(
+  template StaggeredApply<Float, nColor, DDArg, ReconstructStaggered::recon[reconI]>::StaggeredApply(
 		  cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
 		  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, int parity, bool dagger,
                   const int *comm_override, DistanceType<distance_pc>,TimeProfile &profile);
