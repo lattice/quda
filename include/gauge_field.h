@@ -653,8 +653,27 @@ namespace quda {
       }
     }
 
+    /**
+     * @brief Print the site data
+     * @param[in] parity Parity index
+     * @param[in] dim The dimension in which we are printing
+     * @param[in] x_cb Checkerboard space-time index
+     * @param[in] rank The rank we are requesting from (default is rank = 0)
+     */
+    void PrintMatrix(int dim, int parity, unsigned int x_cb, int rank = 0) const;
+
     friend struct GaugeFieldParam;
   };
+
+  /**
+     @brief Print the value of the field at the requested coordinates
+     @param[in] a The field we are printing from
+     @param[in] dim The dimension in which we are printing
+     @param[in] parity Parity index
+     @param[in] x_cb Checkerboard space-time index
+     @param[in] rank The rank we are requesting from (default is rank = 0)
+  */
+  void genericPrintMatrix(const GaugeField &a, int dim, int parity, unsigned int x_cb, int rank = 0);
 
   /**
      @brief This is a debugging function, where we cast a gauge field

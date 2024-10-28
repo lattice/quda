@@ -35,7 +35,7 @@ namespace quda {
   template <typename... T> static constexpr bool needsSharedMemImpl<KernelOps<T...>> = (needsSharedMemImpl<T> || ...);
   template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getKernelOps<T>>;
   template <typename... T> static constexpr bool needsSharedMem<KernelOps<T...>> = (needsSharedMemImpl<T> || ...);
-  template <> static constexpr bool needsSharedMem<NoKernelOps> = false;
+  //template <> static constexpr bool needsSharedMem<NoKernelOps> = false;
 #endif
 
   // KernelOps
@@ -241,7 +241,7 @@ namespace quda {
 #else
   template <typename T> static constexpr bool needsFullBlockImpl = (T)false;
   template <typename ...T> static constexpr bool needsFullBlockImpl<KernelOps<T...>> = (needsFullBlockImpl<T> || ...);
-  template <> static constexpr bool needsFullBlockImpl<NoKernelOps> = false;
+  //template <> constexpr bool needsFullBlockImpl<NoKernelOps> = false;
   template <typename T> static constexpr bool needsFullBlock = needsFullBlockImpl<getKernelOps<T>>;
 #endif
 

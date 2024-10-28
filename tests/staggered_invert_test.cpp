@@ -194,6 +194,7 @@ void init()
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
   GaugeFieldParam cpuParam(gauge_param);
+  //cpuParam.scale = 1.0;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuParam.create = QUDA_NULL_FIELD_CREATE;

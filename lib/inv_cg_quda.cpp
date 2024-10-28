@@ -195,16 +195,32 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) {
       auto fl = mat.Expose()->getStaggeredShortLinkField();
       auto fls = matSloppy.Expose()->getStaggeredShortLinkField();
-      logQuda(QUDA_VERBOSE, "fl2:  %g\n", fl->norm2());
-      logQuda(QUDA_VERBOSE, "fls2: %g\n", fls->norm2());
-      logQuda(QUDA_VERBOSE, "fl1:  %g\n", fl->norm1());
-      logQuda(QUDA_VERBOSE, "fls1: %g\n", fls->norm1());
+      std::cout << "fl: ----------------------\n" << *fl;
+      std::cout << "fls: ----------------------\n" << *fls;
+      std::cout << "----------------------\n";
+      int x_max = fl->LocalVolumeCB()-1;
+      fl->PrintMatrix(0, 0, 0);
+      fls->PrintMatrix(0, 0, 0);
+      fl->PrintMatrix(0, 0, x_max);
+      fls->PrintMatrix(0, 0, x_max);
+      fl->PrintMatrix(0, 1, 0);
+      fls->PrintMatrix(0, 1, 0);
+      fl->PrintMatrix(0, 1, x_max);
+      fls->PrintMatrix(0, 1, x_max);
+      for(int i=0; i<4; i++) {
+	printfQuda("fl2(%i):  %g\n", i, fl->norm2(i));
+	printfQuda("fls2(%i): %g\n", i, fls->norm2(i));
+	printfQuda("fl1(%i):  %g\n", i, fl->norm1(i));
+	printfQuda("fls1(%i): %g\n", i, fls->norm1(i));
+      }
       auto ll = mat.Expose()->getStaggeredLongLinkField();
       auto lls = matSloppy.Expose()->getStaggeredLongLinkField();
-      logQuda(QUDA_VERBOSE, "ll2:  %g\n", ll->norm2());
-      logQuda(QUDA_VERBOSE, "lls2: %g\n", lls->norm2());
-      logQuda(QUDA_VERBOSE, "ll1:  %g\n", ll->norm1());
-      logQuda(QUDA_VERBOSE, "lls1: %g\n", lls->norm1());
+      for(int i=0; i<4; i++) {
+	printfQuda("ll2(%i):  %g\n", i, ll->norm2(i));
+	printfQuda("lls2(%i): %g\n", i, lls->norm2(i));
+	printfQuda("ll1(%i):  %g\n", i, ll->norm1(i));
+	printfQuda("lls1(%i): %g\n", i, lls->norm1(i));
+      }
     }
 
     if (!param.is_preconditioner) {

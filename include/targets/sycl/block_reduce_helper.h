@@ -70,7 +70,8 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     T inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
-      auto sg = sycl::ext::oneapi::experimental::this_sub_group();
+      //auto sg = sycl::ext::oneapi::experimental::this_sub_group();
+      auto sg = sycl::ext::oneapi::this_work_item::get_sub_group();
       T value = value_;
 #pragma unroll
       for (int offset = param_t::width/2; offset >= 1; offset /= 2) {

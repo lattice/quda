@@ -853,7 +853,6 @@ namespace quda
 
     /**
      * @brief Print the site vector
-     * @param[in] a The field we are printing from
      * @param[in] parity Parity index
      * @param[in] x_cb Checkerboard space-time index
      * @param[in] rank The rank we are requesting from (default is rank = 0)

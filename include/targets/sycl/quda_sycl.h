@@ -66,14 +66,14 @@ inline std::string str(std::vector<T> v)
 static inline auto getGroup()
 {
   //return sycl::this_group<3>();
-  return sycl::ext::oneapi::experimental::this_group<3>();
-  //return sycl::ext::oneapi::this_work_item::get_work_group();
+  //return sycl::ext::oneapi::experimental::this_group<3>();
+  return sycl::ext::oneapi::this_work_item::get_work_group<3>();
 }
 static inline auto getNdItem()
 {
   //return sycl::this_nd_item<3>();
-  return sycl::ext::oneapi::experimental::this_nd_item<3>();
-  //return sycl::ext::oneapi::this_work_item::get_nd_item();
+  //return sycl::ext::oneapi::experimental::this_nd_item<3>();
+  return sycl::ext::oneapi::this_work_item::get_nd_item<3>();
 }
 
 static inline unsigned int globalRange(int d) { return getNdItem().get_global_range(d); }

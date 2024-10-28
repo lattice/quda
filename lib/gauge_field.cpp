@@ -1389,4 +1389,9 @@ namespace quda {
     }
   }
 
+  void GaugeField::PrintMatrix(int dim, int parity, unsigned int x_cb, int rank) const
+  {
+    genericPrintMatrix(*this, dim, parity, x_cb, rank);
+  }
+
 } // namespace quda

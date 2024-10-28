@@ -1362,7 +1362,7 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
-	array<short,6> vecTmpShort;
+	array<Float,6> vecTmpShort;
 	memcpy(&vecTmpShort, &vecTmp, sizeof(vecTmpShort));
 
 #pragma unroll
@@ -1401,7 +1401,7 @@ namespace quda
 
         GhostVector vecTmp;
         memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
-	array<short,6> vecTmpShort;
+	array<Float,6> vecTmpShort;
 
         // pack the spinor elements
 #pragma unroll
@@ -1478,7 +1478,7 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
-	array<short,6> vecTmpShort;
+	array<Float,6> vecTmpShort;
 	memcpy(&vecTmpShort, &vecTmp, sizeof(vecTmpShort));
 
         // now copy into output and scale
@@ -1517,7 +1517,7 @@ namespace quda
 
         Vector vecTmp;
         memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
-	array<short,6> vecTmpShort;
+	array<Float,6> vecTmpShort;
 
         // pack the spinor elements
 #pragma unroll
