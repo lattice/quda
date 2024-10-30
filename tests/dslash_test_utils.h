@@ -13,11 +13,12 @@
 #include <util_quda.h>
 #include <blas_quda.h>
 
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "wilson_dslash_reference.h"
+#include "domain_wall_dslash_reference.h"
 #include "misc.h"
 #include "dslash_test_helpers.h"
 

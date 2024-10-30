@@ -6,16 +6,18 @@
 #include <gauge_field.h>
 
 #include <comm_quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
 #include <gauge_tools.h>
-#include "misc.h"
 
 #include <pgauge_monte.h>
 #include <random_quda.h>
 #include <unitarization_links.h>
 
 #include <qio_field.h>
+
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "misc.h"
+#include "gauge_utils.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define DABS(a) ((a) < (0.) ? (-(a)) : (a))

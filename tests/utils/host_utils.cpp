@@ -18,6 +18,7 @@
 
 // External headers
 #include "llfat_utils.h"
+#include "gauge_utils.h"
 #include "staggered_gauge_utils.h"
 #include "host_utils.h"
 #include "index_utils.hpp"
@@ -149,60 +150,6 @@ void setQudaDefaultMgTestParams()
     smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
     smoother_solver_ca_lambda_min[i] = 0.0;
     smoother_solver_ca_lambda_max[i] = -1.0; // use power iterations
-  }
-}
-
-void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
-{
-  if (type == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION)
-      constructUnitGaugeField((double **)gauge, param);
-    else
-      constructUnitGaugeField((float **)gauge, param);
-  } else if (type == 1) {
-    if (precision == QUDA_DOUBLE_PRECISION)
-      constructRandomGaugeField((double **)gauge, param);
-    else
-      constructRandomGaugeField((float **)gauge, param);
-  } else {
-    if (precision == QUDA_DOUBLE_PRECISION)
-      applyGaugeFieldScaling((double **)gauge, Vh, param);
-    else
-      applyGaugeFieldScaling((float **)gauge, Vh, param);
-  }
-}
-
-void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
-{
-  // 0 = unit gauge
-  // 1 = random SU(3)
-  // 2 = supplied field
-  int construct_type = 0;
-  if (latfile.size() > 0) {
-    // load in the command line supplied gauge field using QIO and LIME
-    logQuda(QUDA_VERBOSE, "Loading the gauge field in %s\n", latfile.c_str());
-    read_gauge_field(latfile.c_str(), gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_type = 2;
-  } else {
-    if (unit_gauge)
-      construct_type = 0;
-    else
-      construct_type = 1;
-  }
-  constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
-}
-
-void constructHostGaugeField(quda::GaugeField &gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
-{
-  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
-    constructHostGaugeField(static_cast<void **>(gauge.raw_pointer()), gauge_param, argc, argv);
-  } else {
-    GaugeFieldParam param(gauge);
-    param.order = QUDA_QDP_GAUGE_ORDER;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    GaugeField u(param);
-    constructHostGaugeField(static_cast<void **>(u.raw_pointer()), gauge_param, argc, argv);
-    gauge = u;
   }
 }
 
@@ -370,9 +317,9 @@ bool is_normal_residual(QudaInverterType type)
   }
 }
 
-bool is_staggered(QudaDslashType type) { return Dirac::is_staggered_type(type); }
+bool is_staggered(QudaDslashType type) { return quda::Dirac::is_staggered_type(type); }
 
-bool is_chiral(QudaDslashType type) { return Dirac::is_dwf(type); }
+bool is_chiral(QudaDslashType type) { return quda::Dirac::is_dwf(type); }
 
 bool is_laplace(QudaDslashType type)
 {
@@ -422,7 +369,7 @@ void initComms(int, char **, int *const commDims)
   initCommsGridQuda(4, commDims, func, NULL);
 
   for (int d = 0; d < 4; d++) {
-    if (dim_partitioned[d]) { commDimPartitionedSet(d); }
+    if (dim_partitioned[d]) { quda::commDimPartitionedSet(d); }
   }
 
   initRand();
@@ -937,228 +884,6 @@ int x4_from_full_index(int i)
   return x4;
 }
 
-template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
-{
-  // Apply spatial scaling factor (u0) to spatial links
-  for (int d = 0; d < 3; d++) {
-    for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param->anisotropy; }
-  }
-
-  // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
-    for (int j = (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1); j < Vh; j++) {
-      for (auto i = 0lu; i < gauge_site_size; i++) {
-        gauge[3][j * gauge_site_size + i] *= -1.0;
-        gauge[3][(Vh + j) * gauge_site_size + i] *= -1.0;
-      }
-    }
-  }
-
-  if (param->gauge_fix) {
-    // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
-    // to simulate fixing to the temporal gauge.
-    int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
-    int dir = 3; // time direction only
-    Float *even = gauge[dir];
-    Float *odd = gauge[dir] + Vh * gauge_site_size;
-    for (int i = 0; i < iMax; i++) {
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          even[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
-          even[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
-          odd[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
-          odd[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
-        }
-      }
-    }
-  }
-}
-
-// static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
-template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
-{
-  Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {
-    resEven[dir] = res[dir];
-    resOdd[dir] = res[dir] + Vh * gauge_site_size;
-  }
-
-  for (int dir = 0; dir < 4; dir++) {
-#pragma omp parallel for
-    for (int i = 0; i < Vh; i++) {
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
-          resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
-        }
-      }
-    }
-  }
-
-  applyGaugeFieldScaling(res, Vh, param);
-}
-
-template void constructUnitGaugeField(float **res, QudaGaugeParam *param);
-template void constructUnitGaugeField(double **res, QudaGaugeParam *param);
-
-// normalize the vector a
-template <typename Float> static void normalize(complex<Float> *a, int len)
-{
-  double sum = 0.0;
-  for (int i = 0; i < len; i++) sum += norm(a[i]);
-  for (int i = 0; i < len; i++) a[i] /= sqrt(sum);
-}
-
-// orthogonalize vector b to vector a
-template <typename Float> static void orthogonalize(complex<Float> *a, complex<Float> *b, int len)
-{
-  complex<double> dot = 0.0;
-  for (int i = 0; i < len; i++) dot += conj(a[i]) * b[i];
-  for (int i = 0; i < len; i++) b[i] -= (complex<Float>)dot * a[i];
-}
-
-template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type)
-{
-  Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {
-    resEven[dir] = res[dir];
-    resOdd[dir] = res[dir] + Vh * gauge_site_size;
-  }
-
-  for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Vh; i++) {
-      for (int m = 1; m < 3; m++) {   // last 2 rows
-        for (int n = 0; n < 3; n++) { // 3 columns
-          resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = rand() / (Float)RAND_MAX;
-          resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
-        }
-      }
-      normalize((complex<Float> *)(resEven[dir] + (i * 3 + 1) * 3 * 2), 3);
-      orthogonalize((complex<Float> *)(resEven[dir] + (i * 3 + 1) * 3 * 2),
-                    (complex<Float> *)(resEven[dir] + (i * 3 + 2) * 3 * 2), 3);
-      normalize((complex<Float> *)(resEven[dir] + (i * 3 + 2) * 3 * 2), 3);
-
-      normalize((complex<Float> *)(resOdd[dir] + (i * 3 + 1) * 3 * 2), 3);
-      orthogonalize((complex<Float> *)(resOdd[dir] + (i * 3 + 1) * 3 * 2),
-                    (complex<Float> *)(resOdd[dir] + (i * 3 + 2) * 3 * 2), 3);
-      normalize((complex<Float> *)(resOdd[dir] + (i * 3 + 2) * 3 * 2), 3);
-
-      {
-        Float *w = resEven[dir] + (i * 3 + 0) * 3 * 2;
-        Float *u = resEven[dir] + (i * 3 + 1) * 3 * 2;
-        Float *v = resEven[dir] + (i * 3 + 2) * 3 * 2;
-
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-        accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
-        accumulateConjugateProduct(w + 0 * (2), u + 2 * (2), v + 1 * (2), -1);
-        accumulateConjugateProduct(w + 1 * (2), u + 2 * (2), v + 0 * (2), +1);
-        accumulateConjugateProduct(w + 1 * (2), u + 0 * (2), v + 2 * (2), -1);
-        accumulateConjugateProduct(w + 2 * (2), u + 0 * (2), v + 1 * (2), +1);
-        accumulateConjugateProduct(w + 2 * (2), u + 1 * (2), v + 0 * (2), -1);
-      }
-
-      {
-        Float *w = resOdd[dir] + (i * 3 + 0) * 3 * 2;
-        Float *u = resOdd[dir] + (i * 3 + 1) * 3 * 2;
-        Float *v = resOdd[dir] + (i * 3 + 2) * 3 * 2;
-
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-        accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
-        accumulateConjugateProduct(w + 0 * (2), u + 2 * (2), v + 1 * (2), -1);
-        accumulateConjugateProduct(w + 1 * (2), u + 2 * (2), v + 0 * (2), +1);
-        accumulateConjugateProduct(w + 1 * (2), u + 0 * (2), v + 2 * (2), -1);
-        accumulateConjugateProduct(w + 2 * (2), u + 0 * (2), v + 1 * (2), +1);
-        accumulateConjugateProduct(w + 2 * (2), u + 1 * (2), v + 0 * (2), -1);
-      }
-    }
-  }
-
-  if (param->type == QUDA_WILSON_LINKS) {
-    applyGaugeFieldScaling(res, Vh, param);
-  } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
-    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
-  } else if (param->type == QUDA_ASQTAD_FAT_LINKS) {
-    for (int dir = 0; dir < 4; dir++) {
-      for (int i = 0; i < Vh; i++) {
-        for (int m = 0; m < 3; m++) {   // last 2 rows
-          for (int n = 0; n < 3; n++) { // 3 columns
-            resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = 1.0 * rand() / (Float)RAND_MAX;
-            resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 2.0 * rand() / (Float)RAND_MAX;
-            resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = 3.0 * rand() / (Float)RAND_MAX;
-            resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 4.0 * rand() / (Float)RAND_MAX;
-          }
-        }
-      }
-    }
-  }
-}
-
-template void constructRandomGaugeField(float **res, QudaGaugeParam *param, QudaDslashType dslash_type);
-template void constructRandomGaugeField(double **res, QudaGaugeParam *param, QudaDslashType dslash_type);
-
-template <typename Float> void constructUnitaryGaugeField(Float **res)
-{
-  Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {
-    resEven[dir] = res[dir];
-    resOdd[dir] = res[dir] + Vh * gauge_site_size;
-  }
-
-  for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Vh; i++) {
-      for (int m = 1; m < 3; m++) {   // last 2 rows
-        for (int n = 0; n < 3; n++) { // 3 columns
-          resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = rand() / (Float)RAND_MAX;
-          resEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
-        }
-      }
-      normalize((complex<Float> *)(resEven[dir] + (i * 3 + 1) * 3 * 2), 3);
-      orthogonalize((complex<Float> *)(resEven[dir] + (i * 3 + 1) * 3 * 2),
-                    (complex<Float> *)(resEven[dir] + (i * 3 + 2) * 3 * 2), 3);
-      normalize((complex<Float> *)(resEven[dir] + (i * 3 + 2) * 3 * 2), 3);
-
-      normalize((complex<Float> *)(resOdd[dir] + (i * 3 + 1) * 3 * 2), 3);
-      orthogonalize((complex<Float> *)(resOdd[dir] + (i * 3 + 1) * 3 * 2),
-                    (complex<Float> *)(resOdd[dir] + (i * 3 + 2) * 3 * 2), 3);
-      normalize((complex<Float> *)(resOdd[dir] + (i * 3 + 2) * 3 * 2), 3);
-
-      {
-        Float *w = resEven[dir] + (i * 3 + 0) * 3 * 2;
-        Float *u = resEven[dir] + (i * 3 + 1) * 3 * 2;
-        Float *v = resEven[dir] + (i * 3 + 2) * 3 * 2;
-
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-        accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
-        accumulateConjugateProduct(w + 0 * (2), u + 2 * (2), v + 1 * (2), -1);
-        accumulateConjugateProduct(w + 1 * (2), u + 2 * (2), v + 0 * (2), +1);
-        accumulateConjugateProduct(w + 1 * (2), u + 0 * (2), v + 2 * (2), -1);
-        accumulateConjugateProduct(w + 2 * (2), u + 0 * (2), v + 1 * (2), +1);
-        accumulateConjugateProduct(w + 2 * (2), u + 1 * (2), v + 0 * (2), -1);
-      }
-
-      {
-        Float *w = resOdd[dir] + (i * 3 + 0) * 3 * 2;
-        Float *u = resOdd[dir] + (i * 3 + 1) * 3 * 2;
-        Float *v = resOdd[dir] + (i * 3 + 2) * 3 * 2;
-
-        for (int n = 0; n < 6; n++) w[n] = 0.0;
-        accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
-        accumulateConjugateProduct(w + 0 * (2), u + 2 * (2), v + 1 * (2), -1);
-        accumulateConjugateProduct(w + 1 * (2), u + 2 * (2), v + 0 * (2), +1);
-        accumulateConjugateProduct(w + 1 * (2), u + 0 * (2), v + 2 * (2), -1);
-        accumulateConjugateProduct(w + 2 * (2), u + 0 * (2), v + 1 * (2), +1);
-        accumulateConjugateProduct(w + 2 * (2), u + 1 * (2), v + 0 * (2), -1);
-      }
-    }
-  }
-}
-
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
 
@@ -1242,11 +967,7 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
 
 void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
 {
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    constructUnitaryGaugeField((double **)link);
-  } else {
-    constructUnitaryGaugeField((float **)link);
-  }
+  constructRandomUnitaryGaugeField(link, precision);
 
   if (phase == SITELINK_PHASE_MILC) {
 #pragma omp parallel for

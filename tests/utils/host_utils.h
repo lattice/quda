@@ -60,6 +60,13 @@ constexpr bool is_enabled_laplace()
 #endif
 }
 
+/**
+ * @brief Specify if this node is one of the last nodes in the T direction
+ *
+ * @return True if this node is one of the last nodes in the T direction, false otherwise
+ */
+bool last_node_in_t();
+
 // Set some basic parameters via command line or use defaults
 // Implemented in set_params.cpp
 void setQudaStaggeredDefaultInvTestParams();
@@ -69,10 +76,6 @@ void setQudaStaggeredDefaultInvTestParams();
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
                                             int argc, char **argv);
-void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu);
-void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaPrecision precision, QudaGaugeParam *,
-                                QudaDslashType dslash_type);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
 void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
@@ -81,11 +84,7 @@ void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_pa
 void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
                                    quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,
                                    const int oddBit, const double width, const int t0, QudaPrecision prec);
-template <typename Float>
-void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type);
-void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type,
-                                 QudaPrecision local_prec);
-template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type);
+
 //------------------------------------------------------
 
 // Spinor utils
@@ -107,18 +106,13 @@ void setQudaPrecisions();
 void setQudaMgSolveTypes();
 void setQudaDefaultMgTestParams();
 
-// Wilson type gauge and clover fields
 //------------------------------------------------------
-void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
-void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
-void constructHostGaugeField(quda::GaugeField &gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
+
+// Clover fields
+//------------------------------------------------------
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);
-template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param);
-template <typename Float>
-void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH);
-template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param);
 //------------------------------------------------------
 
 // Spinor utils

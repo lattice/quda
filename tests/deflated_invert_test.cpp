@@ -5,14 +5,18 @@
 #include <string.h>
 #include <algorithm>
 
-#include <util_quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
+// In a typical application, quda.h is the only QUDA header required.
+#include <quda.h>
+#include <qio_field.h>
 
-#include <dslash_reference.h>
-//#include <blas_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
+#include "util_quda.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+
+#include "dslash_reference.h"
+#include "wilson_dslash_reference.h"
+#include "domain_wall_dslash_reference.h"
 #include "misc.h"
 
 #if defined(QMP_COMMS)
@@ -20,11 +24,6 @@
 #elif defined(MPI_COMMS)
 #include <mpi.h>
 #endif
-
-#include <qio_field.h>
-
-// In a typical application, quda.h is the only QUDA header required.
-#include <quda.h>
 
 void display_test_info()
 {

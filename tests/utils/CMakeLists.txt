@@ -3,6 +3,7 @@ target_sources(
   quda_test PRIVATE
   command_line_params.cpp
   face_gauge.cpp
+  gauge_utils.cpp
   host_blas.cpp
   host_utils.cpp
   index_utils.cpp

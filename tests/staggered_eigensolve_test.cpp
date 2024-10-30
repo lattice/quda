@@ -7,13 +7,12 @@
 #include <quda.h>
 
 // External headers
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
-#include <qio_field.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "staggered_gauge_utils.h"
+#include "llfat_utils.h"
 #include "test.h"
 
 QudaGaugeParam gauge_param;
@@ -22,6 +21,9 @@ QudaEigParam eig_param;
 
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <staggered_eigensolve_test_gtest.hpp>
+
+using quda::GaugeField;
+using quda::GaugeFieldParam;
 
 void display_test_info(QudaEigParam &param)
 {
