@@ -972,7 +972,7 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
   if (phase == SITELINK_PHASE_MILC) {
 #pragma omp parallel for
     for (int i = 0; i < V; i++) {
-      for (int dir = XUP; dir <= TUP; dir++) {
+      for (int dir = 0; dir < 4; dir++) {
         int idx = i;
         int oddBit = 0;
         if (i >= Vh) {
@@ -993,19 +993,19 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
 
         double coeff = 1.0;
         switch (dir) {
-        case XUP:
+        case 0:
           if ((i4 & 1) != 0) { coeff *= -1; }
           break;
 
-        case YUP:
+        case 1:
           if (((i4 + i1) & 1) != 0) { coeff *= -1; }
           break;
 
-        case ZUP:
+        case 2:
           if (((i4 + i1 + i2) & 1) != 0) { coeff *= -1; }
           break;
 
-        case TUP:
+        case 3:
           if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
           break;
 
@@ -1085,16 +1085,10 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
     for (auto i = 0lu; i < V * gauge_site_size; i++) {
       if (precision == QUDA_SINGLE_PRECISION) {
         float *f = (float *)link[dir];
-        if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3)) {
-          fprintf(stderr, "ERROR:  %luth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
-          exit(1);
-        }
+        if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3)) { errorQuda("%luth: bad number(%f)", i, f[i]); }
       } else {
         double *f = (double *)link[dir];
-        if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)) {
-          fprintf(stderr, "ERROR:  %luth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
-          exit(1);
-        }
+        if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)) { errorQuda("%luth: bad number(%f)", i, f[i]); }
       }
     }
   }

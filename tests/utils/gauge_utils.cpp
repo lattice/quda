@@ -8,6 +8,184 @@
 #include "index_utils.hpp"
 
 /**
+ * @brief Apply spatial anisotropic scaling
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] anisotropy Spatial anisotropy factor
+ */
+template <typename real_t> void applyGaugeSpatialAnisotropy(real_t *const *gauge, int Vh, double anisotropy)
+{
+  auto inv_anisotropy = 1.0 / anisotropy;
+  for (int d = 0; d < 3; d++) {
+#pragma omp parallel for
+    for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] *= inv_anisotropy; }
+  }
+}
+
+/**
+ * @brief Apply temporal boundary conditions
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] t_boundary Temporal boundary conditions
+ * @param[in] three_link Whether or not this is for the asqtad long links, default false
+ */
+template <typename real_t>
+void applyGaugeTemporalBCs(real_t *const *gauge, int Vh, QudaTboundary t_boundary, bool three_link = false)
+{
+  if (t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
+    int lower_bound = (Z[0] / 2) * Z[1] * Z[2];
+    lower_bound *= three_link ? (Z[3] - 3) : (Z[3] - 1);
+#pragma omp parallel for
+    for (int j = lower_bound; j < Vh; j++) {
+      for (auto i = 0lu; i < gauge_site_size; i++) {
+        gauge[3][j * gauge_site_size + i] *= -1.0;
+        gauge[3][(Vh + j) * gauge_site_size + i] *= -1.0;
+      }
+    }
+  }
+}
+
+/**
+ * @brief Emulate imposing the temporal gauge.
+ *
+ * Emulate imposing the temporal gauge by setting all gauge links
+ * except for the last Z[0]*Z[1]*Z[2]/2 to the identity.
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ */
+template <typename real_t> void emulateGaugeTemporalGauge(real_t *const *gauge, int Vh)
+{
+  int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
+  int dir = 3; // time direction only
+  real_t *gaugeEven = gauge[dir];
+  real_t *gaugeOdd = gauge[dir] + Vh * gauge_site_size;
+#pragma omp parallel for
+  for (int i = 0; i < iMax; i++) {
+    for (int m = 0; m < 3; m++) {
+      for (int n = 0; n < 3; n++) {
+        gaugeEven[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
+        gaugeEven[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
+        gaugeOdd[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
+        gaugeOdd[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
+      }
+    }
+  }
+}
+
+/**
+ * @brief Rescale long links by the appropriate coefficient, 1/(24 * tadpole^2)
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] tadpole Tadpole coefficient
+ */
+template <typename real_t> void applyGaugeLongLinkScaling(real_t *const *gauge, int Vh, double tadpole_coeff)
+{
+  auto inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
+  for (int d = 0; d < 3; d++) {
+#pragma omp parallel for
+    for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] *= inv_scale; }
+  }
+}
+
+/**
+ * @brief Get the staggered phase (without boundary conditions) for a given coordinate and phase type.
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[in] x Local x coordinate
+ * @param[in] y Local y coordinate
+ * @param[in] z Local z coordinate
+ * @param[in] t Local t coordinate
+ * @param[in] dim Gauge link direction
+ * @param[in] phase_type Staggered phase type
+ * @param
+ */
+template <typename real_t> real_t getStaggeredPhase(int x, int y, int z, int t, int dim, QudaStaggeredPhase phase_type)
+{
+  real_t phase = 1.0;
+  if (phase_type == QUDA_STAGGERED_PHASE_NO) {
+    phase = 1.0;
+  } else if (phase_type == QUDA_STAGGERED_PHASE_MILC) {
+    if (dim == 0) {
+      phase = (1.0 - 2.0 * (t % 2));
+    } else if (dim == 1) {
+      phase = (1.0 - 2.0 * ((t + x) % 2));
+    } else if (dim == 2) {
+      phase = (1.0 - 2.0 * ((t + x + y) % 2));
+    } else if (dim == 3) {
+      phase = 1.0;
+    }
+  } else if (phase_type == QUDA_STAGGERED_PHASE_TIFR) {
+    if (dim == 0) {
+      phase = (1.0 - 2.0 * ((3 + t + z + y) % 2));
+    } else if (dim == 1) {
+      phase = (1.0 - 2.0 * ((2 + t + z) % 2));
+    } else if (dim == 2) {
+      phase = (1.0 - 2.0 * ((1 + t) % 2));
+    } else if (dim == 3) {
+      phase = 1.0;
+    }
+  } else if (phase_type == QUDA_STAGGERED_PHASE_CHROMA) {
+    // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
+    if (dim == 0) {
+      phase = -1.0;
+    } else if (dim == 1) {
+      phase = (1.0 - 2.0 * ((1 + x) % 2));
+    } else if (dim == 2) {
+      phase = (1.0 - 2.0 * ((1 + x + y) % 2));
+    } else if (dim == 3) {
+      phase = (1.0 - 2 * ((1 + x + y + z) % 2));
+    }
+  } else {
+    errorQuda("Invalid phase %d", phase_type);
+  }
+  return phase;
+}
+
+/**
+ * @brief Apply staggered phases to a gauge field
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] param Additional information about the desired gauge field
+ * @param[in] phase_type Staggered phase type
+ */
+template <typename real_t>
+void applyGaugeStaggeredPhase(real_t *const *gauge, int Vh, const QudaGaugeParam &param,
+                              QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
+{
+  int X1 = param.X[0];
+  int X2 = param.X[1];
+  int X3 = param.X[2];
+
+  // apply the staggered phases
+  for (int d = 0; d < 3; d++) {
+#pragma omp parallel for
+    for (int i = 0; i < Vh; i++) {
+      for (int parity = 0; parity < 2; parity++) {
+        int index = fullLatticeIndex(i, parity);
+        int i4 = index / (X3 * X2 * X1);
+        int i3 = (index - i4 * (X3 * X2 * X1)) / (X2 * X1);
+        int i2 = (index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
+        int i1 = index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
+
+        real_t sign = getStaggeredPhase<real_t>(i1, i2, i3, i4, d, phase_type);
+
+        for (int j = 0; j < 18; j++) { gauge[d][(parity * Vh + i) * gauge_site_size + j] *= sign; }
+      }
+    }
+  }
+}
+
+/**
  * @brief Apply spatial scaling, anti-periodic boundary conditions, or temporal gauge fixing as requested
  *
  * @tparam real_t Floating point type of the gauge field
@@ -17,42 +195,11 @@
  */
 template <typename real_t> void applyGaugeFieldScaling(real_t *const *gauge, int Vh, const QudaGaugeParam &param)
 {
-  // Apply spatial scaling factor (u0) to spatial links
-  for (int d = 0; d < 3; d++) {
-#pragma omp parallel for
-    for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param.anisotropy; }
-  }
+  if (param.anisotropy != 1) applyGaugeSpatialAnisotropy(gauge, Vh, param.anisotropy);
 
-  // Apply boundary conditions to temporal links
-  if (param.t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
-#pragma omp parallel for
-    for (int j = (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1); j < Vh; j++) {
-      for (auto i = 0lu; i < gauge_site_size; i++) {
-        gauge[3][j * gauge_site_size + i] *= -1.0;
-        gauge[3][(Vh + j) * gauge_site_size + i] *= -1.0;
-      }
-    }
-  }
+  applyGaugeTemporalBCs(gauge, Vh, param.t_boundary);
 
-  if (param.gauge_fix) {
-    // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
-    // to simulate fixing to the temporal gauge.
-    int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
-    int dir = 3; // time direction only
-    real_t *gaugeEven = gauge[dir];
-    real_t *gaugeOdd = gauge[dir] + Vh * gauge_site_size;
-#pragma omp parallel for
-    for (int i = 0; i < iMax; i++) {
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          gaugeEven[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
-          gaugeEven[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
-          gaugeOdd[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = (m == n) ? 1 : 0;
-          gaugeOdd[i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 0.0;
-        }
-      }
-    }
-  }
+  if (param.gauge_fix) emulateGaugeTemporalGauge(gauge, Vh);
 }
 
 void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &param, QudaPrecision precision)
@@ -284,9 +431,6 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
 
 void constructHostGaugeField(void *const *gauge, const QudaGaugeParam &gauge_param, int argc, char **argv)
 {
-  // 0 = unit gauge
-  // 1 = random SU(3)
-  // 2 = supplied field
   GaugeFieldConstructionType construct_type;
   if (latfile.size() > 0) {
     // load in the command line supplied gauge field using QIO and LIME
@@ -328,89 +472,14 @@ void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gaug
 template <typename real_t>
 void applyGaugeFieldScaling_long(real_t *const *gauge, int Vh, const QudaGaugeParam &param, QudaDslashType dslash_type)
 {
-  int X1h = param.X[0] / 2;
-  int X1 = param.X[0];
-  int X2 = param.X[1];
-  int X3 = param.X[2];
-  int X4 = param.X[3];
-
   // rescale long links by the appropriate coefficient
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    for (int d = 0; d < 4; d++) {
-      for (size_t i = 0; i < V * gauge_site_size; i++) {
-        gauge[d][i] /= (-24 * param.tadpole_coeff * param.tadpole_coeff);
-      }
-    }
-  }
+  if (dslash_type == QUDA_ASQTAD_DSLASH) applyGaugeLongLinkScaling(gauge, Vh, param.tadpole_coeff);
 
-  // apply the staggered phases
-  for (int d = 0; d < 3; d++) {
+  // apply staggered phases WITHOUT the temporal boundary conditions
+  // the existing code baked in MILC phases...
+  applyGaugeStaggeredPhase(gauge, Vh, param, QUDA_STAGGERED_PHASE_MILC);
 
-    // even
-#pragma omp parallel for
-    for (int i = 0; i < Vh; i++) {
-
-      int index = fullLatticeIndex(i, 0);
-      int i4 = index / (X3 * X2 * X1);
-      int i3 = (index - i4 * (X3 * X2 * X1)) / (X2 * X1);
-      int i2 = (index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
-      int i1 = index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
-      int sign = 1;
-
-      if (d == 0) {
-        if (i4 % 2 == 1) { sign = -1; }
-      }
-
-      if (d == 1) {
-        if ((i4 + i1) % 2 == 1) { sign = -1; }
-      }
-      if (d == 2) {
-        if ((i4 + i1 + i2) % 2 == 1) { sign = -1; }
-      }
-
-      for (int j = 0; j < 18; j++) { gauge[d][i * gauge_site_size + j] *= sign; }
-    }
-    // odd
-    for (int i = 0; i < Vh; i++) {
-      int index = fullLatticeIndex(i, 1);
-      int i4 = index / (X3 * X2 * X1);
-      int i3 = (index - i4 * (X3 * X2 * X1)) / (X2 * X1);
-      int i2 = (index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
-      int i1 = index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
-      int sign = 1;
-
-      if (d == 0) {
-        if (i4 % 2 == 1) { sign = -1; }
-      }
-
-      if (d == 1) {
-        if ((i4 + i1) % 2 == 1) { sign = -1; }
-      }
-      if (d == 2) {
-        if ((i4 + i1 + i2) % 2 == 1) { sign = -1; }
-      }
-
-      for (int j = 0; j < 18; j++) { gauge[d][(Vh + i) * gauge_site_size + j] *= sign; }
-    }
-  }
-
-  // Apply boundary conditions to temporal links
-  if (param.t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
-#pragma omp parallel for
-    for (int j = 0; j < Vh; j++) {
-      int sign = 1;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) {
-        if (j >= (X4 - 3) * X1h * X2 * X3) { sign = -1; }
-      } else {
-        if (j >= (X4 - 1) * X1h * X2 * X3) { sign = -1; }
-      }
-
-      for (int i = 0; i < 18; i++) {
-        gauge[3][j * gauge_site_size + i] *= sign;
-        gauge[3][(Vh + j) * gauge_site_size + i] *= sign;
-      }
-    }
-  }
+  applyGaugeTemporalBCs(gauge, Vh, param.t_boundary, dslash_type == QUDA_ASQTAD_DSLASH);
 }
 
 void applyGaugeFieldScaling_long(void *const *gauge, int Vh, const QudaGaugeParam &param, QudaDslashType dslash_type,

@@ -29,7 +29,7 @@ static QudaGaugeParam gaugeParam;
 // Create a field of links that are not su3_matrices
 void createNoisyLinkCPU(quda::GaugeField &field, QudaPrecision prec, int seed)
 {
-  createSiteLinkCPU(field, prec, 0);
+  createSiteLinkCPU(field, prec, SITELINK_PHASE_NO);
 
   srand(seed);
   for (int dir = 0; dir < 4; ++dir) {

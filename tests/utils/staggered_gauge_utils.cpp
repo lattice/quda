@@ -87,20 +87,7 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
   // FIXME: may break host comparison
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    for (int dir = 0; dir < 4; ++dir) {
-#pragma omp parallel for
-      for (int i = 0; i < V; ++i) {
-        for (auto j = 0lu; j < gauge_site_size; j += 2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            ((double *)longlink[dir])[i * gauge_site_size + j] = 0.0;
-            ((double *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
-          } else {
-            ((float *)longlink[dir])[i * gauge_site_size + j] = 0.0;
-            ((float *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
-          }
-        }
-      }
-    }
+    for (int dir = 0; dir < 4; ++dir) { memset(longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size); }
   }
 }
 
