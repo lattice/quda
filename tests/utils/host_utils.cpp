@@ -970,76 +970,7 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
   constructRandomUnitaryGaugeField(link, precision);
 
   if (phase == SITELINK_PHASE_MILC) {
-#pragma omp parallel for
-    for (int i = 0; i < V; i++) {
-      for (int dir = 0; dir < 4; dir++) {
-        int idx = i;
-        int oddBit = 0;
-        if (i >= Vh) {
-          idx = i - Vh;
-          oddBit = 1;
-        }
-
-        int X1 = Z[0];
-        int X2 = Z[1];
-        int X3 = Z[2];
-        int X4 = Z[3];
-
-        int full_idx = fullLatticeIndex(idx, oddBit);
-        int i4 = full_idx / (X3 * X2 * X1);
-        int i3 = (full_idx - i4 * (X3 * X2 * X1)) / (X2 * X1);
-        int i2 = (full_idx - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
-        int i1 = full_idx - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
-
-        double coeff = 1.0;
-        switch (dir) {
-        case 0:
-          if ((i4 & 1) != 0) { coeff *= -1; }
-          break;
-
-        case 1:
-          if (((i4 + i1) & 1) != 0) { coeff *= -1; }
-          break;
-
-        case 2:
-          if (((i4 + i1 + i2) & 1) != 0) { coeff *= -1; }
-          break;
-
-        case 3:
-          if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
-          break;
-
-        default: printf("ERROR: wrong dir(%d)\n", dir); exit(1);
-        }
-
-        if (precision == QUDA_DOUBLE_PRECISION) {
-          // double* mylink = (double*)link;
-          // mylink = mylink + (4*i + dir)*gauge_site_size;
-          double *mylink = (double *)link[dir];
-          mylink = mylink + i * gauge_site_size;
-
-          mylink[12] *= coeff;
-          mylink[13] *= coeff;
-          mylink[14] *= coeff;
-          mylink[15] *= coeff;
-          mylink[16] *= coeff;
-          mylink[17] *= coeff;
-
-        } else {
-          // float* mylink = (float*)link;
-          // mylink = mylink + (4*i + dir)*gauge_site_size;
-          float *mylink = (float *)link[dir];
-          mylink = mylink + i * gauge_site_size;
-
-          mylink[12] *= coeff;
-          mylink[13] *= coeff;
-          mylink[14] *= coeff;
-          mylink[15] *= coeff;
-          mylink[16] *= coeff;
-          mylink[17] *= coeff;
-        }
-      }
-    }
+    applyGaugeStaggeredPhase(link, Vh, Z, precision, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
   } else if (phase == SITELINK_PHASE_U1) {
     for (int i = 0; i < V; i++) {
       for (int dir = 0; dir < 4; dir++) {

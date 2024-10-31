@@ -88,8 +88,8 @@ template <typename real_t> void emulateGaugeTemporalGauge(real_t *const *gauge, 
  */
 template <typename real_t> void applyGaugeLongLinkScaling(real_t *const *gauge, int Vh, double tadpole_coeff)
 {
-  auto inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
-  for (int d = 0; d < 3; d++) {
+  real_t inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
+  for (int d = 0; d < 4; d++) {
 #pragma omp parallel for
     for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] *= inv_scale; }
   }
@@ -103,15 +103,22 @@ template <typename real_t> void applyGaugeLongLinkScaling(real_t *const *gauge, 
  * @param[in] y Local y coordinate
  * @param[in] z Local z coordinate
  * @param[in] t Local t coordinate
+ * @param[in] X Full-parity local dimensions
  * @param[in] dim Gauge link direction
+ * @param[in] t_boundary Temporal boundary conditions
  * @param[in] phase_type Staggered phase type
  * @param
  */
-template <typename real_t> real_t getStaggeredPhase(int x, int y, int z, int t, int dim, QudaStaggeredPhase phase_type)
+template <typename real_t>
+real_t getStaggeredPhase(int x, int y, int z, int t, const int X[], int dim,
+                         QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
+                         QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
 {
+  real_t t_boundary_factor = (last_node_in_t() && t == (X[3] - 1)) ? t_boundary : 1;
+
   real_t phase = 1.0;
   if (phase_type == QUDA_STAGGERED_PHASE_NO) {
-    phase = 1.0;
+    if (dim == 3) phase = t_boundary_factor;
   } else if (phase_type == QUDA_STAGGERED_PHASE_MILC) {
     if (dim == 0) {
       phase = (1.0 - 2.0 * (t % 2));
@@ -120,7 +127,7 @@ template <typename real_t> real_t getStaggeredPhase(int x, int y, int z, int t, 
     } else if (dim == 2) {
       phase = (1.0 - 2.0 * ((t + x + y) % 2));
     } else if (dim == 3) {
-      phase = 1.0;
+      phase = t_boundary_factor;
     }
   } else if (phase_type == QUDA_STAGGERED_PHASE_TIFR) {
     if (dim == 0) {
@@ -130,7 +137,7 @@ template <typename real_t> real_t getStaggeredPhase(int x, int y, int z, int t, 
     } else if (dim == 2) {
       phase = (1.0 - 2.0 * ((1 + t) % 2));
     } else if (dim == 3) {
-      phase = 1.0;
+      phase = t_boundary_factor;
     }
   } else if (phase_type == QUDA_STAGGERED_PHASE_CHROMA) {
     // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
@@ -141,7 +148,7 @@ template <typename real_t> real_t getStaggeredPhase(int x, int y, int z, int t, 
     } else if (dim == 2) {
       phase = (1.0 - 2.0 * ((1 + x + y) % 2));
     } else if (dim == 3) {
-      phase = (1.0 - 2 * ((1 + x + y + z) % 2));
+      phase = t_boundary_factor * (1.0 - 2 * ((1 + x + y + z) % 2));
     }
   } else {
     errorQuda("Invalid phase %d", phase_type);
@@ -155,16 +162,18 @@ template <typename real_t> real_t getStaggeredPhase(int x, int y, int z, int t, 
  * @tparam real_t Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] Vh One-half of the local volume
- * @param[in] param Additional information about the desired gauge field
+ * @param[in] X Full-parity local dimensions
+ * @param[in] t_boundary Temporal boundary conditions
  * @param[in] phase_type Staggered phase type
  */
 template <typename real_t>
-void applyGaugeStaggeredPhase(real_t *const *gauge, int Vh, const QudaGaugeParam &param,
+void applyGaugeStaggeredPhase(real_t *const *gauge, int Vh, const int X[],
+                              QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
                               QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
 {
-  int X1 = param.X[0];
-  int X2 = param.X[1];
-  int X3 = param.X[2];
+  int X1 = X[0];
+  int X2 = X[1];
+  int X3 = X[2];
 
   // apply the staggered phases
   for (int d = 0; d < 3; d++) {
@@ -177,12 +186,21 @@ void applyGaugeStaggeredPhase(real_t *const *gauge, int Vh, const QudaGaugeParam
         int i2 = (index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1)) / X1;
         int i1 = index - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
 
-        real_t sign = getStaggeredPhase<real_t>(i1, i2, i3, i4, d, phase_type);
+        real_t sign = getStaggeredPhase<real_t>(i1, i2, i3, i4, X, d, t_boundary, phase_type);
 
         for (int j = 0; j < 18; j++) { gauge[d][(parity * Vh + i) * gauge_site_size + j] *= sign; }
       }
     }
   }
+}
+
+void applyGaugeStaggeredPhase(void *const *gauge, int Vh, const int X[], QudaPrecision precision,
+                              QudaTboundary t_boundary, QudaStaggeredPhase phase_type)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    applyGaugeStaggeredPhase((double *const *)gauge, Vh, X, t_boundary, phase_type);
+  else
+    applyGaugeStaggeredPhase((float *const *)gauge, Vh, X, t_boundary, phase_type);
 }
 
 /**
@@ -239,27 +257,12 @@ template <typename real_t> void constructIdentityGaugeField(real_t *const *gauge
   }
 }
 
-/**
- * @brief Constructs a 3x3 identity gauge field
- *
- * @param[out] gauge Generated QDP-ordered gauge field
- * @param[in] precision Gauge field floating point precision
- */
 void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
     constructIdentityGaugeField((double *const *)gauge);
   else
     constructIdentityGaugeField((float *const *)gauge);
-}
-
-void constructUnitGaugeField(void *const *gauge, const QudaGaugeParam &param, QudaPrecision precision)
-{
-  // Compute the identity matrix
-  constructIdentityGaugeField(gauge, precision);
-
-  // Apply spatial isotropy, temporal boundary conditions, and temporal gauge fixing
-  applyGaugeFieldScaling(gauge, Vh, param, precision);
 }
 
 /**
@@ -420,11 +423,15 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
                              QudaPrecision precision)
 {
   if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
-    constructUnitGaugeField(gauge, param, precision);
+    // populate an identity gauge field
+    constructIdentityGaugeField(gauge, precision);
+
+    // apply anisotropy, boundary conditions
+    applyGaugeFieldScaling(gauge, Vh, param, precision);
   } else if (type == GaugeFieldConstructionType::RANDOM_GAUGE) {
     constructRandomGaugeField(gauge, param, precision);
   } else {
-    // Loaded a field, applying some type of post-processing
+    // Loaded a field, apply anisotropy, boundary conditions
     applyGaugeFieldScaling(gauge, Vh, param, precision);
   }
 }
@@ -476,8 +483,9 @@ void applyGaugeFieldScaling_long(real_t *const *gauge, int Vh, const QudaGaugePa
   if (dslash_type == QUDA_ASQTAD_DSLASH) applyGaugeLongLinkScaling(gauge, Vh, param.tadpole_coeff);
 
   // apply staggered phases WITHOUT the temporal boundary conditions
-  // the existing code baked in MILC phases...
-  applyGaugeStaggeredPhase(gauge, Vh, param, QUDA_STAGGERED_PHASE_MILC);
+  // The temporal boundary conditions are (carefully) applied in
+  // applyGaugeTemporalBCs
+  applyGaugeStaggeredPhase(gauge, Vh, param.X, QUDA_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
 
   applyGaugeTemporalBCs(gauge, Vh, param.t_boundary, dslash_type == QUDA_ASQTAD_DSLASH);
 }

@@ -10,12 +10,7 @@ using quda::GaugeField;
 using quda::GaugeFieldParam;
 
 // Local enums for gauge field construction types
-enum class GaugeFieldConstructionType {
-  UNIT_GAUGE,
-  RANDOM_GAUGE,
-  LOAD_GAUGE,
-  PHASE_GAUGE // applies phases to existing fields?
-};
+enum class GaugeFieldConstructionType { UNIT_GAUGE, RANDOM_GAUGE, LOAD_GAUGE };
 
 /**
  * @brief Constructs a QDP-ordered gauge field: either unit, random, or based on a file
@@ -49,6 +44,21 @@ void constructQudaGaugeField(void *const *gauge, GaugeFieldConstructionType type
                              QudaPrecision precision);
 
 /**
+ * @brief Apply staggered phases to a QDP-ordered gauge field
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] Vh One-half of the local volume
+ * @param[in] X Full-parity local dimensions
+ * @param[in] precision Gauge field floating point precision
+ * @param[in] t_boundary Temporal boundary conditions
+ * @param[in] phase_type Staggered phase type
+ */
+void applyGaugeStaggeredPhase(void *const *gauge, int Vh, const int X[], QudaPrecision precision,
+                              QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
+                              QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC);
+
+/**
  * @brief Apply spatial scaling, anti-periodic boundary conditions, or temporal gauge fixing as requested
 
  * @param[out] gauge Generated QDP-ordered gauge field
@@ -71,14 +81,12 @@ void applyGaugeFieldScaling_long(void *const *gauge, int Vh, const QudaGaugePara
                                  QudaPrecision precision);
 
 /**
- * @brief Constructs a unit Nc = 3 gauge field
+ * @brief Constructs a 3x3 identity gauge field
  *
- * @tparam real_t Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
- * @param[in] param Additional information about the desired gauge field
  * @param[in] precision Gauge field floating point precision
  */
-void constructUnitGaugeField(void *const *gauge, const QudaGaugeParam &param, QudaPrecision precision);
+void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
  * @brief Constructs a random unitary gauge field

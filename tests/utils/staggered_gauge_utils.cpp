@@ -25,42 +25,80 @@ static double svd_rel_error = 1e-4;
 static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
 
-void applyStaggeredScaling(void *const *gauge, const QudaGaugeParam &param, GaugeFieldConstructionType type,
-                           QudaPrecision precision)
-{
-  if (type == GaugeFieldConstructionType::PHASE_GAUGE)
-    applyGaugeFieldScaling_long(gauge, Vh, param, QUDA_STAGGERED_DSLASH, precision);
-}
-
 void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
                                 QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
 {
   if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
-    constructUnitGaugeField(fatlink, param, precision);
-    constructUnitGaugeField(longlink, param, precision);
+    // Set fatlink to the identity matrix
+    constructIdentityGaugeField(fatlink, precision);
 
+    // Apply anisotropy, temporal boundary conditions, and emulate temporal
+    // gauge fixing as appropriate
+    applyGaugeFieldScaling(fatlink, Vh, param, precision);
+
+    // Repeat for the longlink field
+    constructIdentityGaugeField(longlink, precision);
+    applyGaugeFieldScaling(longlink, Vh, param, precision);
+
+    // apply MILC phases... and temporal boundary conditions? again?
     applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong)
-      applyGaugeFieldScaling_long(longlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
+    // also apply MILC phases and temporal boundary conditions (again?)
+    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
+      applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
+    }
 
-  } else {
+  } else if (type == GaugeFieldConstructionType::RANDOM_GAUGE) {
     // if doing naive staggered then set to long links so that the staggered phase is applied
     param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
 
-    if (type != GaugeFieldConstructionType::PHASE_GAUGE)
-      constructRandomGaugeField(fatlink, param, precision, dslash_type);
-    else
-      applyStaggeredScaling(fatlink, param, type, precision);
+    constructRandomGaugeField(fatlink, param, precision, dslash_type);
 
     param.type = QUDA_ASQTAD_LONG_LINKS;
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      if (type != GaugeFieldConstructionType::PHASE_GAUGE)
-        constructRandomGaugeField(longlink, param, precision, dslash_type);
-      else
-        applyStaggeredScaling(longlink, param, type, precision);
+      /*createSiteLinkCPU(longlink, precision, SITELINK_PHASE_U1);
+
+      for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
+        for (int i = 0; i < V; ++i) {
+          for (auto j = 0lu; j < gauge_site_size; j++) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              ((double*)longlink[dir])[i * gauge_site_size + j] /= (-24);
+            } else {
+              ((float*)longlink[dir])[i * gauge_site_size + j] /= (-24);
+            }
+          }
+        }
+      }*/
+
+      constructRandomGaugeField(longlink, param, precision, dslash_type);
+      // incorporate non-trivial phase into long links
+      const double phase = (M_PI * rand()) / RAND_MAX;
+      const std::complex<double> z = std::polar(1.0, phase);
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (auto j = 0lu; j < gauge_site_size; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              std::complex<double> *l = (std::complex<double> *)(&(((double *)longlink[dir])[i * gauge_site_size + j]));
+              *l *= z;
+            } else {
+              std::complex<float> *l = (std::complex<float> *)(&(((float *)longlink[dir])[i * gauge_site_size + j]));
+              *l *= z;
+            }
+          }
+        }
+      }
     }
+  } else {
+    // if doing naive staggered then set to long links so that the staggered phase is applied
+    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+
+    constructRandomGaugeField(fatlink, param, precision, dslash_type);
+
+    param.type = QUDA_ASQTAD_LONG_LINKS;
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) { constructRandomGaugeField(longlink, param, precision, dslash_type); }
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       // incorporate non-trivial phase into long links
@@ -80,8 +118,6 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
         }
       }
     }
-
-    if (type == GaugeFieldConstructionType::PHASE_GAUGE) return;
   }
 
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
