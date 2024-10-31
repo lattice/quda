@@ -207,6 +207,8 @@ namespace quda {
       fls->PrintMatrix(0, 1, 0);
       fl->PrintMatrix(0, 1, x_max);
       fls->PrintMatrix(0, 1, x_max);
+      printfQuda("fl2:  %g\n", fl->norm2());
+      printfQuda("fls2: %g\n", fls->norm2());
       for(int i=0; i<4; i++) {
 	printfQuda("fl2(%i):  %g\n", i, fl->norm2(i));
 	printfQuda("fls2(%i): %g\n", i, fls->norm2(i));
@@ -215,6 +217,8 @@ namespace quda {
       }
       auto ll = mat.Expose()->getStaggeredLongLinkField();
       auto lls = matSloppy.Expose()->getStaggeredLongLinkField();
+      printfQuda("ll2:  %g\n", ll->norm2());
+      printfQuda("lls2: %g\n", lls->norm2());
       for(int i=0; i<4; i++) {
 	printfQuda("ll2(%i):  %g\n", i, ll->norm2(i));
 	printfQuda("lls2(%i): %g\n", i, lls->norm2(i));

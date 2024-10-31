@@ -46,7 +46,7 @@ namespace quda
                   "gauge fields");
       }
 
-      resizeVector(vector_length_y, (is_ghost ? in.Ndim() : in.Geometry()) * 2); // only resizing z component
+      resizeVector(vector_length_z, (is_ghost ? in.Ndim() : in.Geometry()) * 2); // only resizing z component
     }
 
     void apply(const qudaStream_t &stream) override
