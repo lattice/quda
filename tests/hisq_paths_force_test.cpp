@@ -253,9 +253,10 @@ static void hisq_force_startup()
   } // set halo region for CPU
   cpuGauge_ex = new GaugeField(gParam_ex);
 
-  auto generated_link_type = (link_recon == QUDA_RECONSTRUCT_NO ?
-                                SITELINK_PHASE_NO :
-                                (link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_MILC));
+  auto generated_link_type
+    = (link_recon == QUDA_RECONSTRUCT_NO ?
+         SiteLinkType::SITELINK_PHASE_NO :
+         (link_recon == QUDA_RECONSTRUCT_13 ? SiteLinkType::SITELINK_PHASE_U1 : SiteLinkType::SITELINK_PHASE_MILC));
   createSiteLinkCPU(*cpuGauge, qudaGaugeParam.cpu_prec, generated_link_type);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 

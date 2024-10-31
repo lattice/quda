@@ -138,7 +138,7 @@ void gauge_force_test(force_test_t test_param)
   quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SITELINK_PHASE_NO);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   quda::GaugeField U_milc(param);
@@ -284,7 +284,7 @@ void gauge_loop_test(loop_test_t loop_param)
   quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SITELINK_PHASE_NO);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   quda::GaugeField U_milc(param);

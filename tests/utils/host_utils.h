@@ -176,10 +176,12 @@ template <typename Float> void printVector(Float *v);
 int getOddBit(int X);
 
 // Custom "sitelink" enum used to create unphased, MILC phased, or continuous U(1) phased links
-enum {
-  SITELINK_PHASE_NO = 0,   // no phase, used to create SU(3) links
-  SITELINK_PHASE_MILC = 1, // MILC phase, used to test staggered fermions
-  SITELINK_PHASE_U1 = 2    // continuous phase, used to test reconstruct 13
+enum class SiteLinkType {
+  SITELINK_PHASE_NO,   // no phase, used to create SU(3) links
+  SITELINK_PHASE_MILC, // MILC phase, used to test staggered fermions
+  SITELINK_PHASE_U1,   // continuous phase, used to test reconstruct 13
+  SITELINK_RANDOM,     // random fields, used to "create" asqtad fat links
+  SITELINK_NOISY,      // noisy SU(3) fields, used for unitarization force tests
 };
 
 /**
@@ -188,8 +190,8 @@ enum {
    @param[in] precision Precision of field
    @param[in] phase Type of phase; 0 == no additional phase, 1 == MILC phases, 2 == U(1) phase
  */
-void createSiteLinkCPU(void *const *const link, QudaPrecision precision, int phase);
-void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase);
+void createSiteLinkCPU(void *const *const link, QudaPrecision precision, SiteLinkType phase);
+void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, SiteLinkType phase);
 
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
 void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,

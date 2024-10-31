@@ -35,7 +35,7 @@ void constructHostGaugeField(quda::GaugeField &gauge, const QudaGaugeParam &gaug
 /**
  * @brief Constructs a gauge field based on a construction type
  *
- * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in,out] gauge Generated QDP-ordered gauge field
  * @param[in] type Type of construction gauge field
  * @param[in] param Additional information about the desired gauge field
  * @param[in] precision Gauge field floating point precision
@@ -89,14 +89,30 @@ void applyGaugeFieldScaling_long(void *const *gauge, int Vh, const QudaGaugePara
 void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
- * @brief Constructs a random unitary gauge field
+ * @brief Constructs a random SU(3) gauge field
  *
  * FIXME: use gauge_random.cu routines to create a random field via a hypercubic distribution
  *
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] precision Gauge field floating point precision
  */
-void constructRandomUnitaryGaugeField(void *const *gauge, QudaPrecision precision);
+void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision);
+
+/**
+ * @brief Constructs a random U(3) gauge field
+ *
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] precision Gauge field floating point precision
+ */
+void constructRandomU3GaugeField(void *const *gauge, QudaPrecision precision);
+
+/**
+ * @brief Constructs a "gauge field" of random (sane, invertable) matrices
+ *
+ * @param[out] gauge Generated QDP-ordered gauge field
+ * @param[in] precision Gauge field floating point precision
+ */
+void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
  * @brief Constructs a random gauge field, which may be SU(3), U(3), or arbitrary as requested

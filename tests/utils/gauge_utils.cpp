@@ -273,7 +273,7 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision)
  * @tparam real_t Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  */
-template <typename real_t> void constructRandomUnitaryGaugeField(real_t *const *gauge)
+template <typename real_t> void constructRandomSU3GaugeField(real_t *const *gauge)
 {
   using complex = std::complex<real_t>;
 
@@ -357,63 +357,120 @@ template <typename real_t> void constructRandomUnitaryGaugeField(real_t *const *
   }
 }
 
-void constructRandomUnitaryGaugeField(void *const *gauge, QudaPrecision precision)
+void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    constructRandomUnitaryGaugeField((double *const *)gauge);
+    constructRandomSU3GaugeField((double *const *)gauge);
   else
-    constructRandomUnitaryGaugeField((float *const *)gauge);
+    constructRandomSU3GaugeField((float *const *)gauge);
+}
+
+/**
+ * @brief Rescales a gauge field with a per-site random phase
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[in,out] gauge Generated QDP-ordered gauge field
+ */
+template <typename real_t> void applyRandomU1Phase(real_t *const *gauge)
+{
+  for (int dir = 0; dir < 4; dir++) {
+    for (int i = 0; i < V; i++) {
+      // create a random phase
+      real_t phase = 2 * M_PI * rand() / RAND_MAX;
+      std::complex<real_t> u1 = std::polar(static_cast<real_t>(1), phase);
+
+      // rescale bottom row
+      std::complex<real_t> *link = reinterpret_cast<std::complex<real_t> *>(gauge[dir] + i * gauge_site_size);
+      constexpr int m = 2;          // bottom row
+      for (int n = 0; n < 3; n++) { // 3 columns
+        link[m * 3 + n] *= u1;
+      }
+    }
+  }
+}
+
+void constructRandomU3GaugeField(void *const *gauge, QudaPrecision precision)
+{
+  constructRandomSU3GaugeField(gauge, precision);
+
+  if (precision == QUDA_DOUBLE_PRECISION)
+    applyRandomU1Phase((double *const *)gauge);
+  else
+    applyRandomU1Phase((float *const *)gauge);
+}
+
+/**
+ * @brief Constructs a "gauge field" of random (sane, invertable) matrices
+ *
+ * FIXME: use gauge_random.cu routines to create a random field via a hypercubic distribution
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[out] gauge Generated QDP-ordered gauge field
+ */
+template <typename real_t> void constructRandomMatrixGaugeField(real_t *const *gauge)
+{
+
+  // Encapsulate creating a random matrix in a lambda to simplify making sure
+  // the matrix is invertable
+  auto randomMatrix = [](real_t *link) -> void {
+    for (int m = 0; m < 3; m++) {   // 3 rows
+      for (int n = 0; n < 3; n++) { // 3 columns
+        link[m * (3 * 2) + n * (2) + 0] = 0.8 * (2.0 * rand() / static_cast<double>(RAND_MAX) - 1.0);
+        link[m * (3 * 2) + n * (2) + 1] = 1.3 * (2.0 * rand() / static_cast<double>(RAND_MAX) - 1.0);
+      }
+    }
+  };
+
+  auto isReasonable = [](real_t *link) -> bool {
+    std::complex<real_t> *mat = reinterpret_cast<std::complex<real_t> *>(link);
+
+    auto det = mat[0 * 3 + 0] * (mat[1 * 3 + 1] * mat[2 * 3 + 2] - mat[1 * 3 + 2] * mat[2 * 3 + 1])
+      - mat[0 * 3 + 1] * (mat[1 * 3 + 0] * mat[2 * 3 + 2] - mat[1 * 3 + 2] * mat[2 * 3 + 0])
+      + mat[0 * 3 + 2] * (mat[1 * 3 + 0] * mat[2 * 3 + 1] - mat[1 * 3 + 1] * mat[2 * 3 + 0]);
+
+    // the 1e-3 is arbitrary
+    if (std::abs(det) > 1e-3)
+      return true;
+    else
+      return false;
+  };
+
+  for (int dir = 0; dir < 4; dir++) {
+    for (int i = 0; i < V; i++) {
+      real_t *link = gauge[dir] + i * gauge_site_size;
+      do {
+        randomMatrix(link);
+      } while (!isReasonable(link));
+    }
+  }
+}
+
+void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    constructRandomMatrixGaugeField((double *const *)gauge);
+  else
+    constructRandomMatrixGaugeField((float *const *)gauge);
 }
 
 void constructRandomGaugeField(void *const *gauge, const QudaGaugeParam &param, QudaPrecision precision,
                                QudaDslashType dslash_type)
 {
-  // Start by generating a unitary gauge field gauge field
-  constructRandomUnitaryGaugeField(gauge, precision);
 
   // Next set boundary conditions, phases, scalings, etc based on what the dslash_type may dictate wanting
   if (param.type == QUDA_WILSON_LINKS) {
+    // Generate a random SU3 field, apply boundary conditions, scalings, etc
+    constructRandomSU3GaugeField(gauge, precision);
     applyGaugeFieldScaling(gauge, Vh, param, precision);
   } else if (param.type == QUDA_ASQTAD_LONG_LINKS) {
+    // Generate a random SU3 field, apply staggered phases, boundary conditions,
+    // scalings, etc, depending on if we're actually requesting staggered or
+    // hisq long links
+    constructRandomSU3GaugeField(gauge, precision);
     applyGaugeFieldScaling_long(gauge, Vh, param, dslash_type, precision);
   } else if (param.type == QUDA_ASQTAD_FAT_LINKS) {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      double *gaugeOdd[4], *gaugeEven[4];
-      for (int dir = 0; dir < 4; dir++) {
-        gaugeEven[dir] = (double *)gauge[dir];
-        gaugeOdd[dir] = (double *)gauge[dir] + Vh * gauge_site_size;
-      }
-      for (int dir = 0; dir < 4; dir++) {
-        for (int i = 0; i < Vh; i++) {
-          for (int m = 0; m < 3; m++) {   // last 2 rows
-            for (int n = 0; n < 3; n++) { // 3 columns
-              gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = 1.0 * rand() / static_cast<double>(RAND_MAX);
-              gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 2.0 * rand() / static_cast<double>(RAND_MAX);
-              gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = 3.0 * rand() / static_cast<double>(RAND_MAX);
-              gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 4.0 * rand() / static_cast<double>(RAND_MAX);
-            }
-          }
-        }
-      }
-    } else {
-      float *gaugeOdd[4], *gaugeEven[4];
-      for (int dir = 0; dir < 4; dir++) {
-        gaugeEven[dir] = (float *)gauge[dir];
-        gaugeOdd[dir] = (float *)gauge[dir] + Vh * gauge_site_size;
-      }
-      for (int dir = 0; dir < 4; dir++) {
-        for (int i = 0; i < Vh; i++) {
-          for (int m = 0; m < 3; m++) {   // last 2 rows
-            for (int n = 0; n < 3; n++) { // 3 columns
-              gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = 1.0 * rand() / static_cast<float>(RAND_MAX);
-              gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 2.0 * rand() / static_cast<float>(RAND_MAX);
-              gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = 3.0 * rand() / static_cast<float>(RAND_MAX);
-              gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = 4.0 * rand() / static_cast<float>(RAND_MAX);
-            }
-          }
-        }
-      }
-    }
+    // Generate an invertable and sane but otherwise random 3x3 matrix field
+    constructRandomMatrixGaugeField(gauge, precision);
   } else {
     errorQuda("Invalid dslash_type %d", dslash_type);
   }

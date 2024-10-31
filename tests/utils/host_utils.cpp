@@ -11,6 +11,7 @@
 #include <mpi_comm_handle.h>
 
 // QUDA headers
+#include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
 #include <dirac_quda.h>
@@ -965,47 +966,28 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
     checkGauge((float **)oldG, (float **)newG, epsilon);
 }
 
-void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
+void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType phase)
 {
-  constructRandomUnitaryGaugeField(link, precision);
+  if (phase == SiteLinkType::SITELINK_PHASE_NO) { constructRandomSU3GaugeField(gauge, precision); }
+  if (phase == SiteLinkType::SITELINK_PHASE_MILC) {
+    constructRandomSU3GaugeField(gauge, precision);
+    applyGaugeStaggeredPhase(gauge, Vh, Z, precision, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
+  } else if (phase == SiteLinkType::SITELINK_PHASE_U1) {
+    constructRandomU3GaugeField(gauge, precision);
+  } else if (phase == SiteLinkType::SITELINK_RANDOM) {
+    constructRandomMatrixGaugeField(gauge, precision);
+  } else if (phase == SiteLinkType::SITELINK_NOISY) {
+    constructRandomSU3GaugeField(gauge, precision);
 
-  if (phase == SITELINK_PHASE_MILC) {
-    applyGaugeStaggeredPhase(link, Vh, Z, precision, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
-  } else if (phase == SITELINK_PHASE_U1) {
-    for (int i = 0; i < V; i++) {
-      for (int dir = 0; dir < 4; dir++) {
-        // rescale bottom row by random phase
-        if (precision == QUDA_DOUBLE_PRECISION) {
-          // double* mylink = (double*)link;
-          // mylink = mylink + (4*i + dir)*gauge_site_size;
-          double *mylink = (double *)link[dir];
-          mylink = mylink + i * gauge_site_size;
-
-          // create a random phase
-          double phase = 2 * M_PI * rand() / (double)RAND_MAX;
-          double cos_sin[2];
-          sincos(phase, &cos_sin[0], &cos_sin[1]);
-
-          for (int c = 0; c < 3; c++) {
-            double elem[2] = {mylink[12 + 2 * c], mylink[12 + 2 * c + 1]};
-            mylink[12 + 2 * c] = elem[0] * cos_sin[0] - elem[1] * cos_sin[1];
-            mylink[12 + 2 * c + 1] = elem[0] * cos_sin[1] + elem[1] * cos_sin[0];
-          }
-        } else {
-          // float* mylink = (float*)link;
-          // mylink = mylink + (4*i + dir)*gauge_site_size;
-          float *mylink = (float *)link[dir];
-          mylink = mylink + i * gauge_site_size;
-
-          float phase = 2 * (float)M_PI * rand() / (float)RAND_MAX;
-          float cos_sin[2];
-          sincosf(phase, &cos_sin[0], &cos_sin[1]);
-
-          for (int c = 0; c < 3; c++) {
-            float elem[2] = {mylink[12 + 2 * c], mylink[12 + 2 * c + 1]};
-            mylink[12 + 2 * c] = elem[0] * cos_sin[0] - elem[1] * cos_sin[1];
-            mylink[12 + 2 * c + 1] = elem[0] * cos_sin[1] + elem[1] * cos_sin[0];
-          }
+    // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
+    for (int dir = 0; dir < 4; ++dir) {
+      for (int i = 0; i < V * 18; ++i) {
+        if (prec == QUDA_DOUBLE_PRECISION) {
+          double *link = (double *)gauge[dir] + i;
+          *link += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
+        } else if (prec == QUDA_SINGLE_PRECISION) {
+          float *link = (float *)gauge[dir] + i;
+          *link += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
         }
       }
     }
@@ -1015,10 +997,10 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
   for (int dir = 0; dir < 4; dir++) {
     for (auto i = 0lu; i < V * gauge_site_size; i++) {
       if (precision == QUDA_SINGLE_PRECISION) {
-        float *f = (float *)link[dir];
+        float *f = (float *)gauge[dir];
         if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3)) { errorQuda("%luth: bad number(%f)", i, f[i]); }
       } else {
-        double *f = (double *)link[dir];
+        double *f = (double *)gauge[dir];
         if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)) { errorQuda("%luth: bad number(%f)", i, f[i]); }
       }
     }
@@ -1028,12 +1010,18 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
   return;
 }
 
-void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase)
+void createSiteLinkCPU(quda::GaugeField &gauge, QudaPrecision precision, SiteLinkType phase)
 {
-  if (u.Order() == QUDA_QDP_GAUGE_ORDER)
-    createSiteLinkCPU(static_cast<void **>(u.raw_pointer()), precision, phase);
-  else
-    errorQuda("Unsupported gauge order %d", u.Order());
+  if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+    createSiteLinkCPU(static_cast<void *const *>(gauge.raw_pointer()), precision, phase);
+  } else {
+    quda::GaugeFieldParam param(gauge);
+    param.order = QUDA_QDP_GAUGE_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    quda::GaugeField u(param);
+    createSiteLinkCPU(static_cast<void *const *>(u.raw_pointer()), precision, phase);
+    gauge = u;
+  }
 }
 
 template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
@@ -1168,8 +1156,7 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
 
 void createMomCPU(void *mom, QudaPrecision precision, double max_val)
 {
-  size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *temp = safe_malloc(4 * V * gauge_site_size * gSize);
+  // this doesn't have the right gaussian distribution, but alas
 
   for (int i = 0; i < V; i++) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1191,7 +1178,6 @@ void createMomCPU(void *mom, QudaPrecision precision, double max_val)
     }
   }
 
-  host_free(temp);
   return;
 }
 
