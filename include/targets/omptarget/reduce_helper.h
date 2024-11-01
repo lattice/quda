@@ -5,6 +5,12 @@
 #include <block_reduce_helper.h>
 #include <kernel_helper.h>
 
+#define QUDA_OPENMP_ATOMIC_READ_PARTIAL_REDUCTION
+
+#ifdef QUDA_OPENMP_ATOMIC_READ_PARTIAL_REDUCTION
+#include <atomic_helper.h>
+#endif
+
 using count_t = unsigned int;
 
 namespace quda
@@ -164,7 +170,11 @@ namespace quda
       if (thisSubBlock) {
         auto i = target::thread_idx_linear<2>();
         while (i < target::grid_dim().x) {
-          sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
+#ifdef QUDA_OPENMP_ATOMIC_READ_PARTIAL_REDUCTION
+          sum = r(sum, atomic_read(arg.partial[idx * target::grid_dim().x + i]));
+#else
+          sum = r(sum, arg.partial[idx * target::grid_dim().x + i]);
+#endif
           // printf("team %d thread %d  sum %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&sum));
           i += target::block_size<2>();
         }

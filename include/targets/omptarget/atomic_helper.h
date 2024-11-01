@@ -52,4 +52,28 @@ namespace quda
     if(*addr<val){*addr=val;}
   }
 
+  template <typename T>
+  inline T atomic_read(T &x)
+  {
+    T v;
+    #pragma omp atomic read
+    v = x;
+    return v;
+  }
+  template <typename T, int N>
+  inline array<T,N> atomic_read(array<T,N> &x)
+  {
+    array<T,N> v;
+    for (int i = 0; i < N; ++i)
+      v[i] = atomic_read(x[i]);
+    return v;
+  }
+  template <typename T>
+  inline deviation_t<T> atomic_read(deviation_t<T> &x)
+  {
+    deviation_t<T> v;
+    v.diff = atomic_read(x.diff);
+    v.ref = atomic_read(x.ref);
+    return v;
+  }
 } // namespace quda
