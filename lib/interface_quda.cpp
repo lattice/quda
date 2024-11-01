@@ -582,6 +582,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   GaugeField *in = GaugeField::Create(gauge_param);
   logQuda(QUDA_VERBOSE, "** in2: %g\n", in->norm2());
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) in->PrintMatrix(0, 0, 0);
 
   if (in->Order() == QUDA_BQCD_GAUGE_ORDER) {
     static size_t checksum = SIZE_MAX;
@@ -620,7 +621,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
-  if (getVerbosity() == QUDA_DEBUG_VERBOSE) gauge_param.create = QUDA_ZERO_FIELD_CREATE;
+  if (getVerbosity() >= QUDA_VERBOSE) gauge_param.create = QUDA_ZERO_FIELD_CREATE;
   gauge_param.reconstruct = param->reconstruct;
   gauge_param.setPrecision(param->cuda_prec, true);
   gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -629,6 +630,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   precise = new GaugeField(gauge_param);
 
+  logQuda(QUDA_VERBOSE, "** precise2: %g\n", precise->norm2());
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) precise->PrintMatrix(0, 0, 0);
   if (param->use_resident_gauge) {
     if(gaugePrecise == nullptr) errorQuda("No resident gauge field");
     // copy rather than point at to ensure that the padded region is filled in
@@ -639,6 +642,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     precise->copy(*in);
   }
   logQuda(QUDA_VERBOSE, "** precise2: %g\n", precise->norm2());
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) precise->PrintMatrix(0, 0, 0);
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) precise->zeroPad();
+  logQuda(QUDA_VERBOSE, "** precise2: %g\n", precise->norm2());
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) precise->PrintMatrix(0, 0, 0);
 
   // for gaugeSmeared we are interested only in the precise version
   if (param->type == QUDA_SMEARED_LINKS) {

@@ -250,12 +250,12 @@ namespace quda {
     */
     void setTuningString();
 
+  public:
     /**
        @brief Initialize the padded region to 0
      */
     void zeroPad();
 
-  public:
     /**
        @brief Default constructor
     */

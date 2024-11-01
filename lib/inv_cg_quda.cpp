@@ -272,6 +272,8 @@ namespace quda {
       matSloppy(Ap, p);
       logQuda(QUDA_VERBOSE, "  p[0]2: %g\n", blas::norm2(p[0]));
       logQuda(QUDA_VERBOSE, "  Ap[0]2: %g\n", blas::norm2(Ap[0]));
+      if (getVerbosity() == QUDA_DEBUG_VERBOSE) p[0].PrintVector(0, 0);
+      if (getVerbosity() == QUDA_DEBUG_VERBOSE) Ap[0].PrintVector(0, 0);
 
       vector<double> sigma(b.size());
 

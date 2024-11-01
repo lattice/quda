@@ -329,7 +329,7 @@ namespace quda {
       printf("rank = %d x = %u, s = %d, { ", comm_rank(), x_cb, s);
       for (int c = 0; c < o.Ncolor(); c++) {
         auto value = complex<double>(o(parity, x_cb, s, c));
-        printf("(%f,%f) ", value.real(), value.imag());
+        printf("(%g,%g) ", value.real(), value.imag());
       }
       printf("}\n");
     }
@@ -340,7 +340,7 @@ namespace quda {
   {
     if (a.isNative()) {
       constexpr auto order = colorspinor::getNative<Float>(nSpin);
-      print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
+      print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, false>(a), parity, x_cb);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       constexpr auto order = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
