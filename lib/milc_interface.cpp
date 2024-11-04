@@ -1,3 +1,4 @@
+#define _INTERFACE_
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -742,7 +743,7 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int **input_path_bu
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
-  obsParam.traces = reinterpret_cast<double _Complex *>(traces);
+  obsParam.traces = reinterpret_cast<double_complex *>(traces);
   obsParam.input_path_buff = input_path_buf;
   obsParam.path_length = path_length;
   obsParam.loop_coeff = loop_coeff;
@@ -820,7 +821,7 @@ void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2],
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
   obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
   obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
-  obsParam.traces = reinterpret_cast<double _Complex *>(traces);
+  obsParam.traces = reinterpret_cast<double_complex *>(traces);
   obsParam.input_path_buff = input_path_buf;
   obsParam.path_length = path_length;
   obsParam.loop_coeff = loop_coeff;

@@ -63,7 +63,7 @@ namespace quda {
     mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
   {
 
-    constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+    static constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
 
     auto create_gauge_copy = [](const GaugeField &X) -> auto
     {

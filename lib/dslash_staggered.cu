@@ -59,7 +59,7 @@ namespace quda
 
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC
           || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
-        if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+        if constexpr (is_enabled(QUDA_MILC_GAUGE_ORDER)) {
           StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
@@ -69,7 +69,7 @@ namespace quda
           errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
         }
       } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
-        if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+        if constexpr (is_enabled(QUDA_TIFR_GAUGE_ORDER)) {
           StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
@@ -86,7 +86,7 @@ namespace quda
                       double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                       const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
       instantiate<StaggeredApply, ReconstructStaggered>(out, in, x, U, a, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Staggered operator has not been built");

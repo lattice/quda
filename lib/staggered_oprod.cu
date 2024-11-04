@@ -113,7 +113,7 @@ namespace quda {
 
   void computeStaggeredOprod(GaugeField *out[], ColorSpinorField& in, const double coeff[], int nFace)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       if (nFace == 1) {
         computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 0, coeff, nFace);

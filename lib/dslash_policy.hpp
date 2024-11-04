@@ -1,3 +1,4 @@
+#include <array>
 #include <memory>
 #include <tune_quda.h>
 #include <index_helper.cuh>
@@ -481,11 +482,11 @@ namespace quda
       const int packIndex = device::get_default_stream_idx();
       constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
 
-      if (!((shmem & 2) and (shmem & 1))) {
+      if (!((shmem & 2) && (shmem & 1))) {
         issuePack(halo, in, dslash, 1 - dslashParam.parity, location, packIndex, shmem);
       }
 
-      dslash.setPack(((shmem & 2) or (shmem & 1)), location); // enable fused kernel packing
+      dslash.setPack(((shmem & 2) || (shmem & 1)), location); // enable fused kernel packing
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
 

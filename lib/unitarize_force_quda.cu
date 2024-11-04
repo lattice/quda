@@ -55,7 +55,7 @@ namespace quda {
     void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
 			int* fails)
     {
-      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
         getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
         checkReconstruct(u, oldForce, newForce);
         checkPrecision(u, oldForce, newForce);
@@ -93,7 +93,7 @@ namespace quda {
 
     void unitarizeForceCPU(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u)
     {
-      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
         if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
         int num_failures = 0;
         constexpr int nColor = 3;

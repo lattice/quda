@@ -22,17 +22,17 @@ namespace quda
                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
-      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+      if constexpr (is_enabled(QUDA_RECONSTRUCT_NO))
         Apply<Float, nColor, Recon::recon[0]>(out, in, x, U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
     } else if (U.Reconstruct() == Recon::recon[1]) {
-      if constexpr (is_enabled<QUDA_RECONSTRUCT_12>())
+      if constexpr (is_enabled(QUDA_RECONSTRUCT_12))
         Apply<Float, nColor, Recon::recon[1]>(out, in, x, U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
     } else if (U.Reconstruct() == Recon::recon[2]) {
-      if constexpr (is_enabled<QUDA_RECONSTRUCT_8>())
+      if constexpr (is_enabled(QUDA_RECONSTRUCT_8))
         Apply<Float, nColor, Recon::recon[2]>(out, in, x, U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);

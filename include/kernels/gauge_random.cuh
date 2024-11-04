@@ -52,6 +52,8 @@ namespace quda {
       temp2[i] *= radius[i];
     }
 
+    printf("%f %f\n", phi[0], radius[0]);
+
     // construct Anti-Hermitian matrix
     const real rsqrt_3 = quda::rsqrt(3.0);
     ret(0, 0) = complex<real>(0.0, temp1[2] + rsqrt_3 * temp2[3]);
@@ -82,12 +84,12 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      if (arg.group and arg.sigma == 0.0) {
+      if (arg.group && arg.sigma == 0.0) {
         // if sigma = 0 then we just set the output matrix to the identity and finish
         Link I;
         setIdentity(&I);
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
-      } else if (not arg.group and arg.sigma == 0.0) {
+      } else if (! arg.group && arg.sigma == 0.0) {
         // if sigma = 0 then we just set the output matrix to the zero and finish
         Link O = {};
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = O;

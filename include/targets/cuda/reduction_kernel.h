@@ -73,11 +73,11 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
-  {
-    Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
-  }
+  // template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  // __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
+  // {
+  //   Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  // }
 
   /**
      @brief MultiReduction_impl is the implementation of the generic
@@ -150,10 +150,10 @@ namespace quda
      per thread (in the x dimension)
      @param[in] arg Kernel argument
    */
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
-  {
-    MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
-  }
+  // template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  // __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
+  // {
+  //   MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  // }
 
 } // namespace quda

@@ -11,7 +11,13 @@
 #include <util_quda.h>
 #include <color_spinor_field.h>
 
+#ifdef _MSC_VER
+#define NOMINMAX
+#include <winsock.h>
+#undef NOMINMAX
+#else
 #include <sys/time.h>
+#endif
 
 namespace quda {
 
@@ -378,7 +384,7 @@ namespace quda {
           warningQuda(
             "GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
             sqrt(r2[0]), sqrt(r2_old[0]), resIncreaseTotal);
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+          if (resIncrease > maxResIncrease || resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("GCR: solver exiting due to too many true residual norm increases");
             break;
           }

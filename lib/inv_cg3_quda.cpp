@@ -177,7 +177,7 @@ namespace quda {
         if (convergence(r2, heavy_quark_res, stop, stop_hq) && param.delta >= param.tol) update = true;
 
         // For heavy-quark inversion force a reliable update if we continue after
-        if (use_heavy_quark_res and L2breakdown and convergenceHQ(heavy_quark_res, stop_hq) and param.delta >= param.tol) {
+        if (use_heavy_quark_res && L2breakdown && convergenceHQ(heavy_quark_res, stop_hq) && param.delta >= param.tol) {
           update = true;
         }
 
@@ -216,7 +216,7 @@ namespace quda {
           warningQuda(
             "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
             sqrt(r2[0]), r0Norm, resIncreaseTotal);
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+          if (resIncrease > maxResIncrease || resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
@@ -229,7 +229,7 @@ namespace quda {
         }
 
         // if L2 broke down we turn off reliable updates and restart the CG
-        if (use_heavy_quark_res and L2breakdown) {
+        if (use_heavy_quark_res && L2breakdown) {
           delta = 0;
           heavy_quark_check = 1;
           warningQuda("CG3: Restarting without reliable updates for heavy-quark residual");
@@ -267,7 +267,7 @@ namespace quda {
           warningQuda(
             "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
             sqrt(r2[0]), r0Norm, resIncreaseTotal);
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+          if (resIncrease > maxResIncrease || resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CG3: solver exiting due to too many true residual norm increases");
             break;
           }

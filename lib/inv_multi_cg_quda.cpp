@@ -359,7 +359,7 @@ namespace quda {
           warningQuda("Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)",
                       reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
 
-          if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) {
+          if (resIncrease > maxResIncrease || resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) {
             warningQuda("solver exiting due to too many true residual norm increases");
             break;
           }
@@ -409,7 +409,7 @@ namespace quda {
       num_offset_now -= converged;
 
       // exit early so that we can finish of shift 0 using CG and allowing for mixed precison refinement
-      if ( (mixed || zero_refinement) and param.compute_true_res and num_offset_now==1) {
+      if ( (mixed || zero_refinement) && param.compute_true_res && num_offset_now==1) {
         exit_early=true;
         num_offset_now--;
       }
@@ -449,7 +449,7 @@ namespace quda {
         // only calculate true residual if we need to:
         // 1.) For higher shifts if we did not use mixed precision
         // 2.) For shift 0 if we did not exit early  (we went to the full solution)
-        if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
+        if ( (i > 0 && ! mixed) || (i == 0 && ! exit_early) ) {
           mat(r, x[i]);
           if (r.Nspin() == 4) {
             blas::axpy(offset[i], x[i], r); // Offset it.

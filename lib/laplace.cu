@@ -178,7 +178,7 @@ namespace quda
                     int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                     const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_LAPLACE_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_LAPLACE_DSLASH)) {
       instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Laplace operator has not been enabled");

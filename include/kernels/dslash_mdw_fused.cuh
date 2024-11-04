@@ -165,7 +165,7 @@ namespace quda {
       bool ret = false;
 #pragma unroll
       for (int d = 0; d < 4; d++) {
-        ret = ret or (coordinate[d] >= dim[d] - halo_shift[d] or coordinate[d] < halo_shift[d]);
+        ret = ret || (coordinate[d] >= dim[d] - halo_shift[d] || coordinate[d] < halo_shift[d]);
       }
       return ret;
     }

@@ -1,9 +1,9 @@
+#define _INTERFACE_
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <sys/time.h>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -436,7 +436,7 @@ static void init_default_comms()
 }
 
 
-extern char* gitversion;
+extern const char* gitversion;
 
 /*
  * Set the device that QUDA uses.
@@ -1466,7 +1466,7 @@ namespace quda {
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC;
       diracParam.Ls = inv_param->Ls;
       // check we are safe to cast into a Complex (= std::complex<double>)
-      static_assert(sizeof(Complex) == sizeof(double _Complex),
+      static_assert(sizeof(Complex) == sizeof(double_complex),
                     "Irreconcilable difference between interface and internal complex number conventions");
 
       memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
@@ -1482,7 +1482,7 @@ namespace quda {
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
       diracParam.Ls = inv_param->Ls;
-      if (sizeof(Complex) != sizeof(double _Complex)) {
+      if (sizeof(Complex) != sizeof(double_complex)) {
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
       }
       memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
@@ -2353,9 +2353,9 @@ namespace quda
   bool canReuseResidentGauge(QudaInvertParam *param)
   {
     if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
-      return (gaugePrecise != nullptr) and param->cuda_prec == gaugePrecise->Precision();
+      return (gaugePrecise != nullptr) && param->cuda_prec == gaugePrecise->Precision();
     } else {
-      return (gaugeFatPrecise != nullptr) and param->cuda_prec == gaugeFatPrecise->Precision();
+      return (gaugeFatPrecise != nullptr) && param->cuda_prec == gaugeFatPrecise->Precision();
     }
   }
 
@@ -2521,7 +2521,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
-void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam *eig_param)
+void eigensolveQuda(void **host_evecs, double_complex *host_evals, QudaEigParam *eig_param)
 {
   if (!initialized) errorQuda("QUDA not initialized");
 
@@ -4898,7 +4898,7 @@ void polyakovLoopQuda(double ploop[2], int dir)
   ploop[1] = obsParam.ploop[1];
 }
 
-void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+void computeGaugeLoopTraceQuda(double_complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
                                int num_paths, int max_length, double factor)
 {
   if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
@@ -5611,7 +5611,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   gaugeObservables(*gauge, *param);
 }
 
-static void check_param(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
+static void check_param(double_complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
                         int n_evec, int tile_evec, QudaInvertParam *inv_param, const int X[4])
 {
   if (host_sinks == nullptr) errorQuda("Invalid host_sink ptr");
@@ -5628,7 +5628,7 @@ static void check_param(double _Complex *host_sinks, void **host_quark, int n_qu
     if (X[i] < 1 || X[i] > 512) errorQuda("Invalid lattice dimension %d", i);
 }
 
-void laphSinkProject(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
+void laphSinkProject(double_complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
                      int n_evec, int tile_evec, QudaInvertParam *inv_param, const int X[4])
 {
   auto profile = pushProfile(profileSinkProject, inv_param);

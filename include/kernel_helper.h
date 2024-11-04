@@ -2,6 +2,9 @@
 
 #include "comm_quda.h"
 
+#undef TRUE
+#undef FALSE
+
 namespace quda
 {
 

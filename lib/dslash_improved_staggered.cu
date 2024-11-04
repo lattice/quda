@@ -172,7 +172,7 @@ namespace quda
                               const GaugeField &U, const GaugeField &L, double a, cvector_ref<const ColorSpinorField> &x,
                               int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_ASQTAD_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_ASQTAD_DSLASH)) {
       for (int i = 0; i < 4; i++) {
         if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
           errorQuda("partitioned dimension with local size less than 6 is not supported in improved staggered dslash");

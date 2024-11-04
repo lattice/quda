@@ -1,4 +1,10 @@
+#ifdef _MSC_VER
+#define NOMINMAX
+#include <winsock.h>
+#undef NOMINMAX
+#else
 #include <unistd.h> // for gethostname()
+#endif
 #include <assert.h>
 #include <limits>
 

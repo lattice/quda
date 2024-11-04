@@ -70,6 +70,10 @@ const char *getOmpThreadStr();
 
 void errorQuda_(const char *func, const char *file, int line, ...);
 
+#ifdef _MSC_VER
+#define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
+
 #define errorQuda(...)                                                                                                 \
   do {                                                                                                                 \
     fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                                                          \

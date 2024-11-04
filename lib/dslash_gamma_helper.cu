@@ -98,7 +98,7 @@ namespace quda {
   void ApplyTwistGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d, double kappa,
                        double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
   {
-    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_TWISTED_MASS_DSLASH)) {
       instantiate_recurse2<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else {
       errorQuda("Twisted mass operator has not been built");
@@ -138,7 +138,7 @@ namespace quda {
   // out(x) = tau_1*in
   void ApplyTau(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int d)
   {
-    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_TWISTED_MASS_DSLASH)) {
       instantiate_recurse2<TauApply>(out, in, d);
     } else {
       errorQuda("Twisted mass operator has not been built");

@@ -115,7 +115,7 @@ namespace quda
                                             bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                             const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_TWISTED_CLOVER_DSLASH)) {
       instantiate<NdegTwistedCloverPreconditionedApply>(out, in, x, U, A, a, b, c, xpay, parity, dagger, comm_override,
                                                         profile);
     } else {

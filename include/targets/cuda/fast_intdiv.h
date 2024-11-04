@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __CUDACC_RTC__
+
 // declaration of class we wish to specialize
 template <bool> struct mul_hi;
 
@@ -11,5 +13,7 @@ template <> struct mul_hi<true> {
     return q;
   }
 };
+
+#endif
 
 #include "../generic/fast_intdiv.h"

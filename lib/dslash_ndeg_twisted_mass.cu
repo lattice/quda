@@ -70,7 +70,7 @@ namespace quda
                             const GaugeField &U, double a, double b, double c, cvector_ref<const ColorSpinorField> &x,
                             int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_TWISTED_MASS_DSLASH)) {
       instantiate<NdegTwistedMassApply>(out, in, x, U, a, b, c, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Non-degenerate twisted-mass operator has not been built");

@@ -497,7 +497,7 @@ namespace quda {
 
       PrintStats("eigCG", k, r2, b2, heavy_quark_res);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-      converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(r2, heavy_quark_res, local_stop, param.tol_hq);
+      converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) || convergence(r2, heavy_quark_res, local_stop, param.tol_hq);
     }
 
     args.ResetArgs();//eigCG cycle finished, this cleans V2k as well

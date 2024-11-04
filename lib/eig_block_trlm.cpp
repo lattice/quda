@@ -440,12 +440,12 @@ namespace quda
     // Use Sum of all beta values in the final block for
     // the convergence condition
     double beta_sum = 0;
-    for (int i = 0; i < block_data_length; i++) beta_sum += fabs(block_beta[n_kr * block_size - block_data_length + i]);
+    for (int i = 0; i < block_data_length; i++) beta_sum += abs(block_beta[n_kr * block_size - block_data_length + i]);
 
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = fabs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
+        residua[i * block_size + b + num_locked] = abs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
       }
     }
 

@@ -45,7 +45,7 @@ set(CMAKE_CUDA_FLAGS_STRICT
     "-O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -Xcompiler \"${CXX_OPT}\""
+    "-Zi -O2 -Xcompiler \"${CXX_OPT}\""
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
@@ -265,6 +265,9 @@ target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
           -Wreorder
+          $<$<CXX_COMPILER_ID:MSVC>:
+          -Xcompiler=/Zc:__cplusplus
+          >
           $<$<CXX_COMPILER_ID:Clang>:
           -Xcompiler=-Wno-unused-function
           -Xcompiler=-Wno-unknown-pragmas

@@ -2,7 +2,22 @@
 #include <comm_quda.h>
 #include <quda.h>     // for QUDA_VERSION_STRING
 #include <timer.h>
+#ifdef _MSC_VER
+// Windows does not define the S_ISREG and S_ISDIR macros in stat.h, so we do.
+// We have to define _CRT_INTERNAL_NONSTDC_NAMES 1 before #including sys/stat.h
+// in order for Microsoft's stat.h to define names like S_IFMT, S_IFREG, and S_IFDIR,
+// rather than just defining  _S_IFMT, _S_IFREG, and _S_IFDIR as it normally does.
+#define _CRT_INTERNAL_NONSTDC_NAMES 1
+#include <sys/stat.h>
+#if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
+  #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+  #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#else
 #include <sys/stat.h> // for stat()
+#endif
 #include <fcntl.h>
 #include <cfloat> // for FLT_MAX
 #include <ctime>
@@ -10,7 +25,16 @@
 #include <typeinfo>
 #include <map>
 #include <list>
+#ifdef _MSC_VER
+#include <io.h>
+#include <synchapi.h>
+#define sleep(sec) Sleep(sec * 1000)
+#else
 #include <unistd.h>
+#define _open open
+#define _write write
+#define _close close
+#endif
 #include <uint_to_char.h>
 #include <target_device.h>
 
@@ -23,7 +47,7 @@
 #include <communicator_quda.h>
 
 //#define LAUNCH_TIMER
-extern char *gitversion;
+extern const char *gitversion;
 
 namespace quda
 {
@@ -457,7 +481,7 @@ namespace quda
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
       lock_path = resource_path + (error ? "/tunecache_error.lock" : "/tunecache.lock");
-      lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
+      lock_handle = _open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
       if (lock_handle == -1) {
         warningQuda("Unable to lock cache file.  Tuned launch parameters will not be cached to disk.  "
                     "If you are certain that no other instances of QUDA are accessing this filesystem, "
@@ -467,7 +491,7 @@ namespace quda
       }
       char msg[] = "If no instances of applications using QUDA are running,\n"
                    "this lock file shouldn't be here and is safe to delete.";
-      int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
+      int stat = _write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
       cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
@@ -492,7 +516,7 @@ namespace quda
       cache_file.close();
 
       // Release lock.
-      close(lock_handle);
+      _close(lock_handle);
       remove(lock_path.c_str());
 
       initial_cache_size = tunecache.size();
@@ -543,7 +567,7 @@ namespace quda
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
       lock_path = resource_path + "/profile.lock";
-      lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
+      lock_handle = _open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
       if (lock_handle == -1) {
         warningQuda("Unable to lock profile file.  Profile will not be saved to disk.  "
                     "If you are certain that no other instances of QUDA are accessing this filesystem, "
@@ -553,7 +577,7 @@ namespace quda
       }
       char msg[] = "If no instances of applications using QUDA are running,\n"
                    "this lock file shouldn't be here and is safe to delete.";
-      int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
+      int stat = _write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
       // profile counter for writing out unique profiles
@@ -660,7 +684,7 @@ namespace quda
       }
 
       // Release lock.
-      close(lock_handle);
+      _close(lock_handle);
       remove(lock_path.c_str());
     }
   }

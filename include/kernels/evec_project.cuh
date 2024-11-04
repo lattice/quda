@@ -11,8 +11,8 @@ namespace quda {
   
   using spinor_array = array<double, 8>;
 
-  constexpr unsigned long max_nx = 4;
-  constexpr unsigned long max_ny = 4;
+  constexpr unsigned long long max_nx = 4;
+  constexpr unsigned long long max_ny = 4;
 
   template <typename Float, int nColor_>
   struct EvecProjectionArg : public ReduceArg<spinor_array>

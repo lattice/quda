@@ -211,7 +211,7 @@ namespace quda
                             const GaugeField &U, int t0, bool is_tslice_kernel, int parity, int dir, bool dagger,
                             const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
       // Local lattice size should be bigger than or equal to 6 in every partitioned direction.
       for (int i = 0; i < 4; i++) {
         if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {

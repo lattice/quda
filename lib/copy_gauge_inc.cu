@@ -299,7 +299,7 @@ namespace quda {
         // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    if (in.Reconstruct() == QUDA_RECONSTRUCT_10 and out.Reconstruct() == QUDA_RECONSTRUCT_10) {
+	    if (in.Reconstruct() == QUDA_RECONSTRUCT_10 && out.Reconstruct() == QUDA_RECONSTRUCT_10) {
 	      typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	      typedef FloatNOrder<FloatOut,10,2,10> momOut;
               CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0),

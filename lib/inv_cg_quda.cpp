@@ -173,7 +173,7 @@ namespace quda {
 
     vector<double> r2_old(r2.size(), 0.0);
     for (auto i = 0u; i < b.size(); i++) {
-      if (r2_old_init[i] != 0.0 and !p_init[i].empty()) {
+      if (r2_old_init[i] != 0.0 && !p_init[i].empty()) {
         // FIXME vectorize this
         r2_old[i] = r2_old_init[i];
         Complex rp = blas::cDotProduct(r_sloppy[i], x_update_batch[i].get_current_field()) / (r2[i]);

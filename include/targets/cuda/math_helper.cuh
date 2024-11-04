@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef _MSC_VER
+#define _USE_MATH_DEFINES
+#include <math.h>
+#endif
 #include <cmath>
 #include <target_device.h>
 
@@ -38,7 +42,7 @@ namespace quda {
     template <typename T> __device__ inline void operator()(const T& a, T *s, T *c)
     {
       BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
-      sincos(a, s, c);
+      ::sincos(a, s, c);
     }
   };
 
@@ -76,7 +80,7 @@ namespace quda {
   };
 
   template <> struct sincospi_impl<true> {
-    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c) { sincospi(a, s, c); }
+    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c) { ::sincospi(a, s, c); }
   };
 
 

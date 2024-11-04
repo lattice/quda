@@ -65,7 +65,7 @@ namespace quda {
   void ApplyStaggeredKahlerDiracInverse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                         const GaugeField &Xinv, bool dagger)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>() && is_enabled_multigrid()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH) && is_enabled_multigrid()) {
       // Instantiate based on precision, number of colors
       instantiate_recurse2<StaggeredKDBlock>(out, in, Xinv, dagger);
     } else {

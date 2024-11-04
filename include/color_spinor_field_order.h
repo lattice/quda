@@ -1196,7 +1196,7 @@ namespace quda
       using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc, disable_ghost>;
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       using Vector = typename VectorType<Float, N>::type;
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
@@ -1432,7 +1432,7 @@ namespace quda
       using Accessor = FloatNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       using Vector = int4;      // 128-bit packed type
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;

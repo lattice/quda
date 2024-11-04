@@ -95,7 +95,7 @@ namespace quda
                               cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_TWISTED_CLOVER_DSLASH)) {
       instantiate<NdegTwistedCloverApply>(out, in, x, U, A, a, b, c, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Non-degenerate twisted-clover operator has not been built");

@@ -19,7 +19,7 @@ namespace quda {
       ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
-      if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+      if constexpr (is_enabled(QUDA_QDP_GAUGE_ORDER)) {
         using G = typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER,true,storeFloat>;
         ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
       } else {

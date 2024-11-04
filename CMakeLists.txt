@@ -36,6 +36,10 @@ include(cmake/CPM.cmake)
 
 find_package(Git)
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
 # By default we will build DEVEL. The different build types will pass different
 # flags to the compiler which may be strict or permissive on warnings, or
 # very verbose at run time and/or compile time.
@@ -337,7 +341,7 @@ set(CMAKE_CXX_FLAGS_STRICT
   "-Os"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-  "-O3 ${CXX_OPT}"
+  "-Zi -O2 ${CXX_OPT}"
   CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-g"
@@ -359,7 +363,7 @@ set(CMAKE_C_FLAGS_STRICT
   "-Os"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-  "-O3"
+  "-Zi -O2"
   CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-g"
@@ -709,5 +713,7 @@ include(CTest)
 
 # add tests, utils, reference, and quda library
 add_subdirectory(lib)
-add_subdirectory(tests)
+if (NOT WIN32)
+  add_subdirectory(tests)
+endif()
 add_subdirectory(doc)

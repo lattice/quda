@@ -130,8 +130,8 @@ namespace quda
     {
       if (params.alternative_reliable) {
         // alternative reliable updates
-        updateX = ((d <= deps * sqrt(r2_old)) or (dfac * dinit > deps * r0Norm)) and (d_new > deps * rNorm)
-          and (d_new > dfac * dinit);
+        updateX = ((d <= deps * sqrt(r2_old)) || (dfac * dinit > deps * r0Norm)) && (d_new > deps * rNorm)
+          && (d_new > dfac * dinit);
         updateR = 0;
       } else {
         if (rNorm > maxrx) maxrx = rNorm;
@@ -205,19 +205,19 @@ namespace quda
     bool reliable_break(double r2, double stop, bool &L2breakdown, double L2breakdown_eps)
     {
       // break-out check if we have reached the limit of the precision
-      if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
+      if (sqrt(r2) > r0Norm && updateX && ! L2breakdown) { // reuse r0Norm for this
         resIncrease++;
         resIncreaseTotal++;
         warningQuda("new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
                     sqrt(r2), r0Norm, resIncreaseTotal);
 
-        if ((params.use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > params.maxResIncrease
-            or resIncreaseTotal > params.maxResIncreaseTotal or r2 < stop) {
+        if ((params.use_heavy_quark_res && sqrt(r2) < L2breakdown_eps) || resIncrease > params.maxResIncrease
+            || resIncreaseTotal > params.maxResIncreaseTotal || r2 < stop) {
           if (params.use_heavy_quark_res) {
             L2breakdown = true;
             warningQuda("L2 breakdown %e, %e", sqrt(r2), L2breakdown_eps);
           } else {
-            if (resIncrease > params.maxResIncrease or resIncreaseTotal > params.maxResIncreaseTotal or r2 < stop) {
+            if (resIncrease > params.maxResIncrease || resIncreaseTotal > params.maxResIncreaseTotal || r2 < stop) {
               warningQuda("solver exiting due to too many true residual norm increases");
               return true;
             }
@@ -239,7 +239,7 @@ namespace quda
     bool reliable_heavy_quark_break(bool L2breakdown, double heavy_quark_res, double heavy_quark_res_old,
                                     bool &heavy_quark_restart)
     {
-      if (params.use_heavy_quark_res and L2breakdown) {
+      if (params.use_heavy_quark_res && L2breakdown) {
         hqresRestartTotal++; // count the number of heavy quark restarts we've done
         delta = 0;
         warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)",

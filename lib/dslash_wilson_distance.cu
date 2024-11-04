@@ -13,7 +13,7 @@ namespace quda
                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if (in.Ndim() == 5) errorQuda("Unexpected nDim = 5");
-    if constexpr (is_enabled<QUDA_WILSON_DSLASH>() && is_enabled_distance_precondition()) {
+    if constexpr (is_enabled(QUDA_WILSON_DSLASH) && is_enabled_distance_precondition()) {
       auto dummy = DistanceType<true>();
       instantiate<WilsonApply>(out, in, x, U, a, alpha0, t0, parity, dagger, comm_override, dummy, profile);
     } else {

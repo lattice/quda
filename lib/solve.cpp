@@ -279,7 +279,7 @@ namespace quda
                   basis.size());
       }
 
-      if (not param.chrono_replace_last) {
+      if (!param.chrono_replace_last) {
         // if we have not filled the space yet just augment
         if ((int)basis.size() < param.chrono_max_dim) {
           ColorSpinorParam cs_param(out[0]);

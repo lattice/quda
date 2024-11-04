@@ -14,7 +14,7 @@ namespace quda
                          const GaugeField &U, const CloverField &A, double a, cvector_ref<const ColorSpinorField> &x,
                          int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_CLOVER_WILSON_DSLASH)) {
       auto dummy = DistanceType<false>();
       instantiate<WilsonCloverApply>(out, in, x, U, A, a, 0, -1, parity, dagger, comm_override, dummy, profile);
     } else {

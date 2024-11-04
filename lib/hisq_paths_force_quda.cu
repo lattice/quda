@@ -546,7 +546,7 @@ namespace quda {
 
     void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
-      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
         getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
         checkNative(link, oprod, newOprod);
         checkLocation(newOprod, oprod, link);
@@ -640,7 +640,7 @@ namespace quda {
 
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
-      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
         getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
         checkNative(link, oldOprod, newOprod);
         checkLocation(newOprod, oldOprod, link);
@@ -713,7 +713,7 @@ namespace quda {
 
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
-      if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+      if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
         getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
         checkNative(link, force);
         checkLocation(force, link);

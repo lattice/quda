@@ -123,7 +123,7 @@ namespace quda
                                           cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                                           bool asymmetric, const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_TWISTED_MASS_DSLASH)) {
       instantiate<NdegTwistedMassPreconditionedApply>(out, in, x, U, a, b, c, xpay, parity, dagger, asymmetric,
                                                       comm_override, profile);
     } else {

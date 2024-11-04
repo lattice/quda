@@ -97,7 +97,7 @@ namespace quda
         }
       }
       // d) QUDA built for same major compute capability but lower minor
-      if (deviceProp.major == my_major and deviceProp.minor > my_minor) {
+      if (deviceProp.major == my_major && deviceProp.minor > my_minor) {
         warningQuda(
           "** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might "
           "result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n",

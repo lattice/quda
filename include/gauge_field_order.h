@@ -1852,7 +1852,7 @@ namespace quda {
     template <typename Float, int length> struct QDPOrder : public LegacyOrder<Float,length> {
       using Accessor = QDPOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       Float *gauge[QUDA_MAX_DIM];
       const unsigned int volumeCB;
       QDPOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
@@ -1898,7 +1898,7 @@ namespace quda {
     template <typename Float, int length> struct QDPJITOrder : public LegacyOrder<Float,length> {
       using Accessor = QDPJITOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       Float *gauge[QUDA_MAX_DIM];
       const unsigned int volumeCB;
       QDPJITOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
@@ -1948,7 +1948,7 @@ namespace quda {
   template <typename Float, int length> struct MILCOrder : public LegacyOrder<Float,length> {
     using Accessor = MILCOrder<Float, length>;
     using real = typename mapper<Float>::type;
-    using complex = complex<real>;
+    using complex = quda::complex<real>;
     Float *gauge;
     const unsigned int volumeCB;
     const int geometry;
@@ -2009,7 +2009,7 @@ namespace quda {
   template <typename Float, int length> struct MILCSiteOrder : public LegacyOrder<Float,length> {
     using Accessor = MILCSiteOrder<Float, length>;
     using real = typename mapper<Float>::type;
-    using complex = complex<real>;
+    using complex = quda::complex<real>;
     Float *gauge;
     const unsigned int volumeCB;
     const int geometry;
@@ -2068,7 +2068,7 @@ namespace quda {
   template <typename Float, int length> struct CPSOrder : LegacyOrder<Float,length> {
     using Accessor = CPSOrder<Float, length>;
     using real = typename mapper<Float>::type;
-    using complex = complex<real>;
+    using complex = quda::complex<real>;
     Float *gauge;
     const unsigned int volumeCB;
     const real anisotropy;
@@ -2137,7 +2137,7 @@ namespace quda {
     template <typename Float, int length> struct BQCDOrder : LegacyOrder<Float,length> {
       using Accessor = BQCDOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       Float *gauge;
       const unsigned int volumeCB;
       unsigned int exVolumeCB; // extended checkerboard volume
@@ -2199,7 +2199,7 @@ namespace quda {
     template <typename Float, int length> struct TIFROrder : LegacyOrder<Float,length> {
       using Accessor = TIFROrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       Float *gauge;
       const unsigned int volumeCB;
       static constexpr int Nc = 3;
@@ -2263,7 +2263,7 @@ namespace quda {
     template <typename Float, int length> struct TIFRPaddedOrder : LegacyOrder<Float,length> {
       using Accessor = TIFRPaddedOrder<Float, length>;
       using real = typename mapper<Float>::type;
-      using complex = complex<real>;
+      using complex = quda::complex<real>;
       Float *gauge;
       const unsigned int volumeCB;
       int exVolumeCB;

@@ -33,41 +33,32 @@ namespace quda
      @brief Helper function for returning if a given gauge field order is enabled
      @tparam order The order requested
    */
-  template <QudaGaugeFieldOrder order> constexpr bool is_enabled();
+  constexpr bool is_enabled(QudaGaugeFieldOrder order)
+  {
+    switch (order) {
 #ifdef BUILD_QDP_INTERFACE
-  template <> constexpr bool is_enabled<QUDA_QDP_GAUGE_ORDER>() { return true; }
-#else
-  template <> constexpr bool is_enabled<QUDA_QDP_GAUGE_ORDER>() { return false; }
+  case QUDA_QDP_GAUGE_ORDER: return true;
 #endif
 #ifdef BUILD_QDPJIT_INTERFACE
-  template <> constexpr bool is_enabled<QUDA_QDPJIT_GAUGE_ORDER>() { return true; }
-#else
-  template <> constexpr bool is_enabled<QUDA_QDPJIT_GAUGE_ORDER>() { return false; }
+  case QUDA_QDPJIT_GAUGE_ORDER: return true;
 #endif
 #ifdef BUILD_CPS_INTERFACE
-  template <> constexpr bool is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>() { return true; }
-#else
-  template <> constexpr bool is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>() { return false; }
+  case QUDA_CPS_WILSON_GAUGE_ORDER: return true;
 #endif
 #ifdef BUILD_MILC_INTERFACE
-  template <> constexpr bool is_enabled<QUDA_MILC_GAUGE_ORDER>() { return true; }
-  template <> constexpr bool is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>() { return true; }
-#else
-  template <> constexpr bool is_enabled<QUDA_MILC_GAUGE_ORDER>() { return false; }
-  template <> constexpr bool is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>() { return false; }
+  case QUDA_MILC_GAUGE_ORDER: return true;
+  case QUDA_MILC_SITE_GAUGE_ORDER: return true;
 #endif
 #ifdef BUILD_BQCD_INTERFACE
-  template <> constexpr bool is_enabled<QUDA_BQCD_GAUGE_ORDER>() { return true; }
-#else
-  template <> constexpr bool is_enabled<QUDA_BQCD_GAUGE_ORDER>() { return false; }
+  case QUDA_BQCD_GAUGE_ORDER: return true;
 #endif
 #ifdef BUILD_TIFR_INTERFACE
-  template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return true; }
-  template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return true; }
-#else
-  template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return false; }
-  template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return false; }
+  case QUDA_TIFR_GAUGE_ORDER: return true;
+  case QUDA_TIFR_PADDED_GAUGE_ORDER: return true;
 #endif
+  default: return false;
+    }
+  }
 
   /**
      @brief Helper function for returning if a given precision is enabled
@@ -89,13 +80,18 @@ namespace quda
      @tparam reconstruct The reconstruct requested
      @return True if enabled, false if not
   */
-  template <QudaReconstructType reconstruct> constexpr bool is_enabled();
-  template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_NO>() { return (QUDA_RECONSTRUCT & 4) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_13>() { return (QUDA_RECONSTRUCT & 2) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_12>() { return (QUDA_RECONSTRUCT & 2) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_9>() { return (QUDA_RECONSTRUCT & 1) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_8>() { return (QUDA_RECONSTRUCT & 1) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_10>() { return true; }
+  constexpr bool is_enabled(QudaReconstructType reconstruct)
+  {
+    switch (reconstruct) {
+    case QUDA_RECONSTRUCT_NO: return (QUDA_RECONSTRUCT & 4) ? true : false;
+    case QUDA_RECONSTRUCT_13: return (QUDA_RECONSTRUCT & 2) ? true : false;
+    case QUDA_RECONSTRUCT_12: return (QUDA_RECONSTRUCT & 2) ? true : false;
+    case QUDA_RECONSTRUCT_9: return (QUDA_RECONSTRUCT & 1) ? true : false;
+    case QUDA_RECONSTRUCT_8: return (QUDA_RECONSTRUCT & 1) ? true : false;
+    case QUDA_RECONSTRUCT_10: return true;
+    default: return false;
+    }
+  }
 
   struct ReconstructFull {
     static constexpr std::array<QudaReconstructType, 6> recon
@@ -142,8 +138,8 @@ namespace quda
   void instantiateReconstruct(G &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[i]) {
-      if constexpr (is_enabled<Recon::recon[i]>())
-        Apply<Float, nColor, Recon::recon[i]>(U, args...);
+      if constexpr (is_enabled(Recon::recon[i]))
+        Apply<Float, nColor, Recon::recon[i]> apply(U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[i]);
     } else if constexpr (i > 0) {
@@ -471,13 +467,13 @@ namespace quda
   constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
   {
     if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+      if constexpr (is_enabled(QUDA_RECONSTRUCT_NO))
         // actual phase type doesn't matter because the phase is baked into the links
         Apply<store_t, nColor, QUDA_RECONSTRUCT_NO, QUDA_STAGGERED_PHASE_NO>(U, args...);
       else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_NO);
     } else if (U.Reconstruct() == QUDA_RECONSTRUCT_13) {
-      if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+      if constexpr (is_enabled(QUDA_RECONSTRUCT_13)) {
         if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO)
           Apply<store_t, nColor, QUDA_RECONSTRUCT_13, QUDA_STAGGERED_PHASE_NO>(U, args...);
         else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC)
@@ -488,7 +484,7 @@ namespace quda
         errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_13);
       }
     } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-      if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+      if constexpr (is_enabled(QUDA_RECONSTRUCT_12)) {
         errorQuda("QUDA_RECONSTRUCT=%d has not been implemented for HISQ gauge routines yet.", QUDA_RECONSTRUCT_12);
       } else {
         errorQuda("QUDA_RECONSTRUCT=%d does not enable %d\n", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_12);
@@ -545,38 +541,43 @@ namespace quda
      @tparam dslash_type The dslash_type requested
      @return True if enabled, false if not
   */
-  template <QudaDslashType dslash_type> constexpr bool is_enabled() { return false; }
+  constexpr bool is_enabled(QudaDslashType dslash_type)
+  {
+    switch (dslash_type) {
 #ifdef GPU_WILSON_DIRAC
-  template <> constexpr bool is_enabled<QUDA_WILSON_DSLASH>() { return true; }
+  case QUDA_WILSON_DSLASH: return true;
 #endif
 #ifdef GPU_CLOVER_DIRAC
-  template <> constexpr bool is_enabled<QUDA_CLOVER_WILSON_DSLASH>() { return true; }
+  case QUDA_CLOVER_WILSON_DSLASH: return true;
 #endif
 #ifdef GPU_CLOVER_HASENBUSCH_TWIST
-  template <> constexpr bool is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>() { return true; }
+  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH: return true;
 #endif
 #ifdef GPU_DOMAIN_WALL_DIRAC
-  template <> constexpr bool is_enabled<QUDA_DOMAIN_WALL_DSLASH>() { return true; }
-  template <> constexpr bool is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>() { return true; }
-  template <> constexpr bool is_enabled<QUDA_MOBIUS_DWF_DSLASH>() { return true; }
-  template <> constexpr bool is_enabled<QUDA_MOBIUS_DWF_EOFA_DSLASH>() { return true; }
+  case QUDA_DOMAIN_WALL_DSLASH: return true;
+  case QUDA_DOMAIN_WALL_4D_DSLASH: return true;
+  case QUDA_MOBIUS_DWF_DSLASH: return true;
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: return true;
 #endif
 #ifdef GPU_STAGGERED_DIRAC
-  template <> constexpr bool is_enabled<QUDA_STAGGERED_DSLASH>() { return true; }
-  template <> constexpr bool is_enabled<QUDA_ASQTAD_DSLASH>() { return true; }
+  case QUDA_STAGGERED_DSLASH: return true;
+  case QUDA_ASQTAD_DSLASH: return true;
 #endif
 #ifdef GPU_TWISTED_MASS_DIRAC
-  template <> constexpr bool is_enabled<QUDA_TWISTED_MASS_DSLASH>() { return true; }
+  case QUDA_TWISTED_MASS_DSLASH: return true;
 #endif
 #ifdef GPU_TWISTED_CLOVER_DIRAC
-  template <> constexpr bool is_enabled<QUDA_TWISTED_CLOVER_DSLASH>() { return true; }
+  case QUDA_TWISTED_CLOVER_DSLASH: return true;
 #endif
 #ifdef GPU_LAPLACE
-  template <> constexpr bool is_enabled<QUDA_LAPLACE_DSLASH>() { return true; }
+  case QUDA_LAPLACE_DSLASH: return true;
 #endif
 #ifdef GPU_COVDEV
-  template <> constexpr bool is_enabled<QUDA_COVDEV_DSLASH>() { return true; }
+  case QUDA_COVDEV_DSLASH: return true;
 #endif
+    default: return false;
+    }
+  }
 
 #ifdef GPU_DISTANCE_PRECONDITIONING
   constexpr bool is_enabled_distance_precondition() { return true; }

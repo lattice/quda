@@ -46,7 +46,7 @@ namespace quda {
   void ApplyClover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                    const CloverField &clover, bool inverse, int parity)
   {
-    if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_CLOVER_WILSON_DSLASH)) {
       instantiate_recurse2<Clover>(out, in, clover, inverse, parity);
     } else {
       errorQuda("Clover dslash has not been built");
@@ -135,7 +135,7 @@ namespace quda {
                         const CloverField &clover, double kappa, double mu, double epsilon, int parity, int dagger,
                         QudaTwistGamma5Type twist)
   {
-    if constexpr (is_enabled<QUDA_CLOVER_WILSON_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_CLOVER_WILSON_DSLASH)) {
       instantiate_recurse2<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else {
       errorQuda("Twisted-clover operator has not been built");

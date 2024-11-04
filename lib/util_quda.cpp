@@ -3,7 +3,7 @@
 #include <cstring>
 #include <stack>
 #include <sstream>
-#include <sys/time.h>
+// #include <sys/time.h>
 
 #include <enum_quda.h>
 #include <util_quda.h>

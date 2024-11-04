@@ -112,13 +112,13 @@ namespace quda
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using O = PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc>;
-      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>())
+      if constexpr (is_enabled(QUDA_TIFR_GAUGE_ORDER))
         CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
       else
         errorQuda("TIFR interface has not been built");
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
       using O = QDPJITDiracOrder<FloatOut, Ns, Nc>;
-      if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>())
+      if constexpr (is_enabled(QUDA_QDPJIT_GAUGE_ORDER))
         CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
       else
         errorQuda("QDPJIT interface has not been built");
@@ -143,13 +143,13 @@ namespace quda
       genericCopyColorSpinor<Ns, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using ColorSpinor = PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc>;
-      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>())
+      if constexpr (is_enabled(QUDA_TIFR_GAUGE_ORDER))
         genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
       else
         errorQuda("TIFR interface has not been built");
     } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
       using ColorSpinor = QDPJITDiracOrder<FloatIn, Ns, Nc>;
-      if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>())
+      if constexpr (is_enabled(QUDA_QDPJIT_GAUGE_ORDER))
         genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
       else
         errorQuda("QDPJIT interface has not been built");

@@ -38,7 +38,7 @@ namespace quda
 
   void computeTwoLink(GaugeField &twoLink, const GaugeField &link)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkNative(twoLink, link);
       checkLocation(twoLink, link);

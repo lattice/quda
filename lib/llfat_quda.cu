@@ -169,7 +169,7 @@ namespace quda {
 
   void longKSLink(GaugeField &lng, const GaugeField &u, const double *coeff)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       computeLongLink(lng, u, coeff[1]);
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -180,7 +180,7 @@ namespace quda {
 
   void fatKSLink(GaugeField &fat, const GaugeField &u, const double *coeff)
   {
-    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_STAGGERED_DSLASH)) {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
       GaugeFieldParam gParam(u);

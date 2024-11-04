@@ -2,8 +2,21 @@
 #include <cstdio>
 #include <string>
 #include <map>
+#ifdef _MSC_VER
+#define NOMINMAX
+#include <Windows.h>
+#include <DbgHelp.h>
+#undef NOMINMAX
+int getpagesize(...)
+{
+  SYSTEM_INFO info;
+  GetSystemInfo(&info);
+  return (int)info.dwPageSize;
+}
+#else
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
+#endif
 #include <quda_internal.h>
 #include <device.h>
 #include <shmem_helper.cuh>
@@ -82,12 +95,27 @@ namespace quda
   {
     void *array[10];
     size_t size;
+#ifdef _MSC_VER
+    SYMBOL_INFO *symbol;
+    HANDLE process = GetCurrentProcess();
+    SymInitialize(process, NULL, TRUE);
+    size = CaptureStackBackTrace(0, 10, array, NULL);
+    symbol = (SYMBOL_INFO *)malloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char));
+    symbol->MaxNameLen = 255;
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO) + 256 * sizeof(char);
+    for (int i = 0; i < size; i++) {
+        SymFromAddr(process, (DWORD64)(array[i]), 0, symbol);
+        printfQuda("%s \n", symbol->Name);
+    }
+    free(symbol);
+#else
     char **strings;
     size = backtrace(array, 10);
     strings = backtrace_symbols(array, size);
     printfQuda("Obtained %zd stack frames.\n", size);
     for (size_t i = 0; i < size; i++) printfQuda("%s\n", strings[i]);
     free(strings);
+#endif
   }
 
   static void print_alloc_header()
@@ -158,8 +186,13 @@ namespace quda
     // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
     static int page_size = 2 * getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
+#ifdef _MSC_VER
+    ptr = _aligned_malloc(a.base_size, page_size);
+    if (!ptr) {
+#else
     int align = posix_memalign(&ptr, page_size, a.base_size);
     if (!ptr || align != 0) {
+#endif
 #endif
       errorQuda("Failed to allocate aligned host memory of size %zu (%s:%d in %s())\n", size, a.file.c_str(), a.line,
                 a.func.c_str());
@@ -490,7 +523,11 @@ namespace quda
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
       track_free(PINNED, ptr);
+#ifdef _MSC_VER
+      _aligned_free(ptr);
+#else
       free(ptr);
+#endif
     } else if (alloc[MAPPED].count(ptr)) {
 #ifdef HOST_ALLOC
       cudaError_t err = cudaFreeHost(ptr);
@@ -502,7 +539,11 @@ namespace quda
         errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
       }
       track_free(MAPPED, ptr);
+#ifdef _MSC_VER
+      _aligned_free(ptr);
+#else
       free(ptr);
+#endif
 #endif
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);

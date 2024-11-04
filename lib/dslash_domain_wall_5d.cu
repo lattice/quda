@@ -85,7 +85,7 @@ namespace quda
                          const GaugeField &U, double a, double m_f, cvector_ref<const ColorSpinorField> &x, int parity,
                          bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    if constexpr (is_enabled<QUDA_DOMAIN_WALL_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_DOMAIN_WALL_DSLASH)) {
       instantiate<DomainWall5DApply>(out, in, x, U, a, m_f, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Domain-wall operator has not been built");

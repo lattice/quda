@@ -344,7 +344,7 @@ namespace quda
           warningQuda(
             "CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
             sqrt(r2[0]), sqrt(r2_old[0]), resIncreaseTotal);
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+          if (resIncrease > maxResIncrease || resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
             break;
           }

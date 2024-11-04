@@ -11,7 +11,7 @@ namespace quda
                    TimeProfile &profile)
   {
     if (in.Ndim() == 5) errorQuda("Unexpected nDim = 5");
-    if constexpr (is_enabled<QUDA_WILSON_DSLASH>()) {
+    if constexpr (is_enabled(QUDA_WILSON_DSLASH)) {
       auto dummy = DistanceType<false>();
       instantiate<WilsonApply>(out, in, x, U, a, 0, -1, parity, dagger, comm_override, dummy, profile);
     } else {
