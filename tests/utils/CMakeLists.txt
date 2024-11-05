@@ -9,6 +9,7 @@ target_sources(
   index_utils.cpp
   llfat_utils.cpp
   misc.cpp
+  momentum_utils.cpp
   set_params.cpp
   staggered_gauge_utils.cpp
   staggered_host_utils.cpp)

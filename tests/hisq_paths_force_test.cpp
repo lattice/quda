@@ -3,16 +3,18 @@
 #include <cstring>
 
 #include <quda.h>
+#include <gauge_field.h>
+#include <ks_improved_force.h>
+#include <momentum.h>
+#include <timer.h>
+#include <gtest/gtest.h>
+
 #include "host_utils.h"
-#include <command_line_params.h>
-#include "gauge_field.h"
+#include "momentum_utils.h"
+#include "command_line_params.h"
 #include "misc.h"
 #include "test.h"
 #include "hisq_force_reference.h"
-#include "ks_improved_force.h"
-#include "momentum.h"
-#include <timer.h>
-#include <gtest/gtest.h>
 
 using namespace quda;
 

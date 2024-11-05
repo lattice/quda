@@ -169,9 +169,19 @@ void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const
 int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1);
 
+// Printing utilities
 void printSpinorElement(void *spinor, int X, QudaPrecision precision);
 void printGaugeElement(void *gauge, int X, QudaPrecision precision);
-template <typename Float> void printVector(Float *v);
+
+/**
+ * @brief Print the components of an nColor = 3 vector
+ * @tparam real_t Floating point type of vector
+ * @param[in] v nColor = 3 complex vector
+ */
+template <typename real_t> void printVector(real_t *v)
+{
+  printfQuda("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
+}
 
 int getOddBit(int X);
 
@@ -187,7 +197,7 @@ enum class SiteLinkType {
 /**
    @brief Host implementation of creating a random set of gauge links, with optional phases
    @param[out] link QDP-ordered gauge links
-   @param[in] precision Precision of field
+   @param[in] precision Floating-point precision of field
    @param[in] phase Type of phase; 0 == no additional phase, 1 == MILC phases, 2 == U(1) phase
  */
 void createSiteLinkCPU(void *const *const link, QudaPrecision precision, SiteLinkType phase);
@@ -207,15 +217,6 @@ void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
 int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, const quda::GaugeField &linkB,
                       const std::string &msgB);
-int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
-
-/**
-   @brief Host reference implementation of the momentum action
-   contribution.
- */
-double mom_action(void *mom, QudaPrecision prec, int len);
-
-void createMomCPU(void *mom, QudaPrecision precision, double max_val = 1.0);
 
 /**
    @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations

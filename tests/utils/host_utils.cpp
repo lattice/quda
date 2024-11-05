@@ -626,11 +626,6 @@ int lex_rank_from_coords_x(const int *coords, void *)
   return rank;
 }
 
-template <typename Float> void printVector(Float *v)
-{
-  printfQuda("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
-}
-
 // returns 0 or 1 if the full lattice index X is even or odd
 int getOddBit(int Y)
 {
@@ -968,8 +963,9 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
 
 void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType phase)
 {
-  if (phase == SiteLinkType::SITELINK_PHASE_NO) { constructRandomSU3GaugeField(gauge, precision); }
-  if (phase == SiteLinkType::SITELINK_PHASE_MILC) {
+  if (phase == SiteLinkType::SITELINK_PHASE_NO) {
+    constructRandomSU3GaugeField(gauge, precision);
+  } else if (phase == SiteLinkType::SITELINK_PHASE_MILC) {
     constructRandomSU3GaugeField(gauge, precision);
     applyGaugeStaggeredPhase(gauge, Vh, Z, precision, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
   } else if (phase == SiteLinkType::SITELINK_PHASE_U1) {
@@ -1154,33 +1150,6 @@ int strong_check_link(const GaugeField &linkA, const std::string &msgA, const Ga
   return compare_link(linkA, linkB);
 }
 
-void createMomCPU(void *mom, QudaPrecision precision, double max_val)
-{
-  // this doesn't have the right gaussian distribution, but alas
-
-  for (int i = 0; i < V; i++) {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      for (int dir = 0; dir < 4; dir++) {
-        double *thismom = (double *)mom;
-        for (auto k = 0lu; k < mom_site_size; k++) {
-          thismom[(4 * i + dir) * mom_site_size + k] = max_val * rand() / RAND_MAX;
-          if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
-        }
-      }
-    } else {
-      for (int dir = 0; dir < 4; dir++) {
-        float *thismom = (float *)mom;
-        for (auto k = 0lu; k < mom_site_size; k++) {
-          thismom[(4 * i + dir) * mom_site_size + k] = max_val * rand() / RAND_MAX;
-          if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
-        }
-      }
-    }
-  }
-
-  return;
-}
-
 void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng)
 {
   unsigned long shift = x[0] * x[1] * x[2] * x[3] * stag_spinor_site_size;
@@ -1194,124 +1163,6 @@ void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const 
     for (int d = 0; d < 4; d++)
       constructRandomSpinorSource(fstag + d * shift, 1, 3, QUDA_SINGLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
   }
-}
-
-template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
-{
-  const int fail_check = 16;
-  int fail[fail_check];
-  for (int f = 0; f < fail_check; f++) fail[f] = 0;
-
-  int iter[mom_site_size];
-  for (auto i = 0lu; i < mom_site_size; i++) iter[i] = 0;
-
-#pragma omp parallel for
-  for (int i = 0; i < len; i++) {
-    for (auto j = 0lu; j < mom_site_size - 1; j++) {
-      int is = i * mom_site_size + j;
-      double diff = fabs(momA[is] - momB[is]);
-      for (int f = 0; f < fail_check; f++)
-        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
-#pragma omp atomic
-          fail[f]++;
-        }
-      // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-      if (diff > 1e-3 || std::isnan(diff)) {
-#pragma omp atomic
-        iter[j]++;
-      }
-    }
-  }
-
-  int accuracy_level = 0;
-  for (int f = 0; f < fail_check; f++) {
-    if (fail[f] == 0) { accuracy_level = f + 1; }
-  }
-
-  for (auto i = 0u; i < mom_site_size; i++) printfQuda("%u fails = %d\n", i, iter[i]);
-
-  for (int f = 0; f < fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0, -(f + 1)), fail[f], len * 9, fail[f] / (double)(len * 9));
-  }
-
-  return accuracy_level;
-}
-
-static void printMomElement(void *mom, int X, QudaPrecision precision)
-{
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    double *thismom = ((double *)mom) + X * mom_site_size;
-    printVector(thismom);
-    printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
-  } else {
-    float *thismom = ((float *)mom) + X * mom_site_size;
-    printVector(thismom);
-    printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
-  }
-}
-
-int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
-{
-  if (verbosity >= QUDA_VERBOSE) {
-    printfQuda("mom:\n");
-    printMomElement(momA, 0, prec);
-    printfQuda("\n");
-    printMomElement(momA, 1, prec);
-    printfQuda("\n");
-    printMomElement(momA, 2, prec);
-    printfQuda("\n");
-    printMomElement(momA, 3, prec);
-    printfQuda("...\n");
-
-    printfQuda("\nreference mom:\n");
-    printMomElement(momB, 0, prec);
-    printfQuda("\n");
-    printMomElement(momB, 1, prec);
-    printfQuda("\n");
-    printMomElement(momB, 2, prec);
-    printfQuda("\n");
-    printMomElement(momB, 3, prec);
-    printfQuda("\n");
-  }
-
-  int ret;
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    ret = compare_mom((double *)momA, (double *)momB, len);
-  } else {
-    ret = compare_mom((float *)momA, (float *)momB, len);
-  }
-
-  return ret;
-}
-
-// compute the magnitude squared anti-Hermitian matrix, including the
-// MILC convention of subtracting 4 from each site norm to improve
-// stability
-template <typename real> double mom_action(real *mom_, int len)
-{
-  double action = 0.0;
-  for (int i = 0; i < len; i++) {
-    real *mom = mom_ + i * mom_site_size;
-    double local = 0.0;
-    for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
-    for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];
-    local -= 4.0;
-    action += local;
-  }
-
-  return action;
-}
-
-double mom_action(void *mom, QudaPrecision prec, int len)
-{
-  double action = 0.0;
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    action = mom_action<double>((double *)mom, len);
-  } else if (prec == QUDA_SINGLE_PRECISION) {
-    action = mom_action<float>((float *)mom, len);
-  }
-  quda::comm_allreduce_sum(action);
-  return action;
 }
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)
