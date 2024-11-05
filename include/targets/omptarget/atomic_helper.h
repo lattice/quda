@@ -69,6 +69,12 @@ namespace quda
     return v;
   }
   template <typename T>
+  inline complex<T> atomic_read(complex<T> &x)
+  {
+    complex<T> v (atomic_read(x.x), atomic_read(x.y));
+    return v;
+  }
+  template <typename T>
   inline deviation_t<T> atomic_read(deviation_t<T> &x)
   {
     deviation_t<T> v;
