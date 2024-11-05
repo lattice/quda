@@ -57,21 +57,6 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
     param.type = QUDA_ASQTAD_LONG_LINKS;
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      /*createSiteLinkCPU(longlink, precision, SITELINK_PHASE_U1);
-
-      for (int dir = 0; dir < 4; ++dir) {
-#pragma omp parallel for
-        for (int i = 0; i < V; ++i) {
-          for (auto j = 0lu; j < gauge_site_size; j++) {
-            if (precision == QUDA_DOUBLE_PRECISION) {
-              ((double*)longlink[dir])[i * gauge_site_size + j] /= (-24);
-            } else {
-              ((float*)longlink[dir])[i * gauge_site_size + j] /= (-24);
-            }
-          }
-        }
-      }*/
-
       constructRandomGaugeField(longlink, param, precision, dslash_type);
       // incorporate non-trivial phase into long links
       const double phase = (M_PI * rand()) / RAND_MAX;
