@@ -226,7 +226,7 @@ void gauge_force_test(force_test_t test_param)
   if (compute_force) {
     logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
     auto action_quda = momActionQuda(mom, &gauge_param);
-    auto action_ref = mom_action(refmom, 4 * V, gauge_param.cpu_prec);
+    auto action_ref = momentumActionCPU(refmom, 4 * V, gauge_param.cpu_prec);
     force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
     logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
             force_deviation);

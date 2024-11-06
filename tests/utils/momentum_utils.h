@@ -31,4 +31,4 @@ int strong_check_mom(const void *momA, const void *momB, int len, QudaPrecision 
  * @param[in] len Length of the momentum field
  * @param[in] precision Floating-point precision of field
  */
-double mom_action(const void *mom, int len, QudaPrecision prec);
+double momentumActionCPU(const void *mom, int len, QudaPrecision prec);

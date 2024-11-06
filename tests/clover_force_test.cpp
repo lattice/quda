@@ -158,7 +158,7 @@ std::tuple<int, double> clover_force_test(test_t param)
   logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   auto action_quda = momActionQuda(mom.data(), &gauge_param);
-  auto action_ref = mom_action(mom_ref.data(), 4 * V, gauge_param.cpu_prec);
+  auto action_ref = momentumActionCPU(mom_ref.data(), 4 * V, gauge_param.cpu_prec);
   force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
   logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
           force_deviation);

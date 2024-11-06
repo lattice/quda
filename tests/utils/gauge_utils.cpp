@@ -17,7 +17,7 @@
  * @param[in] anisotropy Spatial anisotropy factor
  */
 template <typename real_t> struct ApplyGaugeSpatialAnisotropy {
-  ApplyGaugeSpatialAnisotropy(void *const *gauge_, int Vh, double anisotropy)
+  void operator()(void *const *gauge_, int Vh, double anisotropy)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
     auto inv_anisotropy = 1.0 / anisotropy;
@@ -52,7 +52,7 @@ void applyGaugeSpatialAnisotropy(real_t *const *gauge, int Vh, double anisotropy
  * @param[in] three_link Whether or not this is for the asqtad long links, default false
  */
 template <typename real_t> struct ApplyGaugeTemporalBCs {
-  ApplyGaugeTemporalBCs(void *const *gauge_, int Vh, QudaTboundary t_boundary, bool three_link = false)
+  void operator()(void *const *gauge_, int Vh, QudaTboundary t_boundary, bool three_link = false)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
     if (t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
@@ -95,7 +95,7 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
  * @param[in] Vh One-half of the local volume
  */
 template <typename real_t> struct EmulateGaugeTemporalGauge {
-  EmulateGaugeTemporalGauge(void *const *gauge_, int Vh)
+  void operator()(void *const *gauge_, int Vh)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
@@ -141,7 +141,7 @@ void emulateGaugeTemporalGauge(void *const *gauge, int Vh, QudaPrecision precisi
  * @param[in] tadpole Tadpole coefficient
  */
 template <typename real_t> struct ApplyGaugeLongLinkScaling {
-  ApplyGaugeLongLinkScaling(void *const *gauge_, int Vh, double tadpole_coeff)
+  void operator()(void *const *gauge_, int Vh, double tadpole_coeff)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
@@ -238,8 +238,8 @@ real_t getStaggeredPhase(int x, int y, int z, int t, const int X[], int dim,
  * @param[in] phase_type Staggered phase type
  */
 template <typename real_t> struct ApplyGaugeStaggeredPhase {
-  ApplyGaugeStaggeredPhase(void *const *gauge_, int Vh, const int X[], QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
-                           QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
+  void operator()(void *const *gauge_, int Vh, const int X[], QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
+                  QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
@@ -289,7 +289,7 @@ void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &pa
  * @param[out] gauge Generated QDP-ordered gauge field
  */
 template <typename real_t> struct ConstructIdentityGaugeField {
-  ConstructIdentityGaugeField(void *const *gauge_)
+  void operator()(void *const *gauge_)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
@@ -329,7 +329,7 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision)
  * @param[out] gauge Generated QDP-ordered gauge field
  */
 template <typename real_t> struct ConstructRandomSU3GaugeField {
-  ConstructRandomSU3GaugeField(void *const *gauge_)
+  void operator()(void *const *gauge_)
   {
     using complex = std::complex<real_t>;
 
@@ -428,7 +428,7 @@ void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
  * @param[in,out] gauge Generated QDP-ordered gauge field
  */
 template <typename real_t> struct ApplyRandomU1Phase {
-  ApplyRandomU1Phase(void *const *gauge_)
+  void operator()(void *const *gauge_)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
@@ -465,7 +465,7 @@ void constructRandomU3GaugeField(void *const *gauge, QudaPrecision precision)
  * @param[out] gauge Generated QDP-ordered gauge field
  */
 template <typename real_t> struct ConstructRandomMatrixGaugeField {
-  ConstructRandomMatrixGaugeField(void *const *gauge_)
+  void operator()(void *const *gauge_)
   {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
