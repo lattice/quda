@@ -203,7 +203,7 @@ void init()
   cpuFatMILC = GaugeField(cpuParam);
 
   cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-  cpuParam.nFace = 3;
+  cpuParam.nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuLongQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
@@ -216,7 +216,7 @@ void init()
 
   // Reorder gauge fields to MILC order
   cpuFatMILC = cpuFatQDP;
-  cpuLongMILC = cpuLongQDP;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) cpuLongMILC = cpuLongQDP;
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
@@ -237,10 +237,11 @@ void init()
 
   // now copy back to QDP aliases, since these are used for the reference dslash
   cpuFatQDP = cpuFatMILC;
-  cpuLongQDP = cpuLongMILC;
-  // ensure QDP alias has exchanged ghosts
   cpuFatQDP.exchangeGhost();
-  cpuLongQDP.exchangeGhost();
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    cpuLongQDP = cpuLongMILC;
+    cpuLongQDP.exchangeGhost();
+  }
 
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
