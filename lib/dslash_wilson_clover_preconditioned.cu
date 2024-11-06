@@ -1,4 +1,6 @@
+#define SIGNATURE_ONLY
 #include <dslash_wilson_clover_preconditioned.hpp>
+#undef SIGNATURE_ONLY
 
 /**
    This is the Wilson-clover preconditioned linear operator
