@@ -81,6 +81,8 @@ namespace quda {
       errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
     if (param.reconstruct == QUDA_RECONSTRUCT_10 && param.link_type != QUDA_ASQTAD_MOM_LINKS)
       errorQuda("10-reconstruction only supported with momentum links");
+    if (param.nFace > x[0] || param.nFace > x[1] || param.nFace > x[2] || param.nFace > x[3])
+      errorQuda("Halo depth %d is greater than local lattice x = {%d %d %d %d}", param.nFace, x[0], x[1], x[2], x[3]);
 
     nColor = param.nColor;
     nFace = param.nFace;

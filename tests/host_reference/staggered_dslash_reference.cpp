@@ -107,7 +107,7 @@ void staggeredDslashReference(real_t *res, const real_t *const *fatlink, const r
   } // 4-d volume
 }
 
-void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link_,
                  const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
@@ -131,6 +131,7 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
+  auto &long_link = dslash_type == QUDA_ASQTAD_DSLASH ? long_link_ : fat_link;
   void *qdp_fatlink[] = {fat_link.data(0), fat_link.data(1), fat_link.data(2), fat_link.data(3)};
   void *qdp_longlink[] = {long_link.data(0), long_link.data(1), long_link.data(2), long_link.data(3)};
   void *ghost_fatlink[]
