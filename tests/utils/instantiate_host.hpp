@@ -26,11 +26,9 @@ constexpr bool is_enabled(QudaPrecision precision)
 template <template <typename> class Apply, typename... Args>
 constexpr void instantiate_host(QudaPrecision precision, Args &&...args)
 {
+  // always instantiate double precision
   if (precision == QUDA_DOUBLE_PRECISION) {
-    if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
-      Apply<double>(args...);
-    else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+    Apply<double>(args...);
   } else if (precision == QUDA_SINGLE_PRECISION) {
     if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
       Apply<float>(args...);
