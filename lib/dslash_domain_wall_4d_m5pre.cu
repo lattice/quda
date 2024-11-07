@@ -1,4 +1,6 @@
+#define SIGNATURE_ONLY
 #include <dslash_domain_wall_4d_fused_m5.hpp>
+#undef SIGNATURE_ONLY
 
 /**
    This is the gauged domain-wall 4-d preconditioned operator, fused with immediately followed fifth dimension operators.
@@ -16,9 +18,10 @@ namespace quda
                               bool dagger, const int *comm_override, double m_f, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_DOMAIN_WALL_4D_DSLASH>()) {
+      auto dummy = DistanceType<false>();
       auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE>();
       instantiate<DomainWall4DApplyFusedM5>(out, in, x, y, U, b_5, c_5, a, m_5, parity, dagger, comm_override, m_f,
-                                            dummy_list, profile);
+                                            dummy, dummy_list, profile);
     } else {
       errorQuda("Domain-wall operator has not been built");
     }
