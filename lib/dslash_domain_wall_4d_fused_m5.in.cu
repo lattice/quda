@@ -15,7 +15,7 @@ namespace quda
 
   template struct DomainWall4DApplyFusedM5<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
-  template DomainWall4DApplyFusedM5<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::DomainWall4DFusedM5Apply(
+  template DomainWall4DApplyFusedM5<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::DomainWall4DApplyFusedM5(
     cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
     const GaugeField &U, cvector_ref<ColorSpinorField> &y, const Complex *b_5, const Complex *c_5, double a, double m_5,
     int parity, bool dagger, const int *comm_override, double m_f, Dslash5TypeList<dslash5_type>,
