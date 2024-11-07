@@ -269,6 +269,7 @@ target_compile_options(
           -Xcompiler=-Wno-unused-function
           -Xcompiler=-Wno-unknown-pragmas
           -Xcompiler=-mllvm\ -unroll-count=4
+          $<$<CONFIG:STRICT>:-Xcompiler=-Wno-pass-failed>
           >
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
