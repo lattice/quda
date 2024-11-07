@@ -366,6 +366,7 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
     };
 
     for (int dir = 0; dir < 4; dir++) {
+#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         for (int m = 1; m < 3; m++) {   // last 2 rows
           for (int n = 0; n < 3; n++) { // 3 columns

@@ -4,7 +4,7 @@
 
 /**
  *  @brief Helper function for returning if a given precision is enabled
- *  @tparam precision The precision requested
+ *  @param[in] precision The precision requested
  *  @return True if enabled, false if not
  */
 constexpr bool is_enabled(QudaPrecision precision)

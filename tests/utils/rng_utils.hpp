@@ -33,7 +33,13 @@ template <typename real_t = double> real_t random_uniform_host(int i, int parity
     std::uniform_real_distribution<real_t> dist {lower, upper};
     return dist(host_rand[parity * Vh + i]);
   } else {
-    return ((upper - lower) * static_cast<real_t>(rand()) / RAND_MAX) + lower;
+    real_t rand_num;
+    // rand() isn't guaranteed threadsafe
+#pragma omp critical
+    {
+      rand_num = ((upper - lower) * static_cast<real_t>(rand()) / RAND_MAX) + lower;
+    }
+    return rand_num;
   }
 }
 
@@ -64,8 +70,13 @@ template <typename real_t = double> real_t random_gaussian_host(int i, int parit
     } else {
       // uniform numbers on (0, 1)
       int u1 = 0, u2 = 0;
-      while (u1 == 0) { u1 = rand(); }
-      while (u2 == 0) { u2 = rand(); }
+
+// rand() isn't guaranteed threadsafe
+#pragma omp critical
+      {
+        while (u1 == 0) { u1 = rand(); }
+        while (u2 == 0) { u2 = rand(); }
+      }
 
       auto lnu1 = stddev * sqrt(-2. * log((double)u1 / RAND_MAX));
       double sn, cs;
