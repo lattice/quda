@@ -5,40 +5,8 @@
 #include "command_line_params.h"
 #include "host_utils.h"
 #include "instantiate_host.hpp"
+#include "rng_utils.hpp"
 #include "momentum_utils.h"
-
-/**
- * @brief Return a random gaussian-distributed number using Box-Muller;
- * this is only temporarily here
- *
- * @return Random gaussian random number
- */
-double random_gaussian()
-{
-  // Box-Muller generates two random numbers at a time, so cache
-  // a previous one if appropriate
-  static bool number_waiting = false;
-  static double backup_number = 0;
-
-  if (number_waiting) {
-    number_waiting = false;
-    return backup_number;
-  } else {
-    // uniform numbers on (0, 1)
-    int u1 = 0, u2 = 0;
-    while (u1 == 0) { u1 = rand(); }
-    while (u2 == 0) { u2 = rand(); }
-
-    auto lnu1 = sqrt(-2. * log((double)u1 / RAND_MAX));
-    double sn, cs;
-    sincos(2. * M_PI * (double)u2 / RAND_MAX, &sn, &cs);
-
-    backup_number = lnu1 * sn;
-    number_waiting = true;
-
-    return lnu1 * cs;
-  }
-}
 
 /**
  * @brief Create a random traceless anti-Hermitian matrix with the correct
@@ -48,7 +16,8 @@ double random_gaussian()
  * @param[out] mat Output random anti-Hermitian matrix
  * @param[in] max_val Optional scaling factor
  */
-template <typename real_t> void create_random_traceless_antiherm(real_t mat[10], real_t max_val = 1.0)
+template <typename real_t>
+void create_random_traceless_antiherm(real_t mat[10], int i, int parity, real_t max_val = 1.0)
 {
   // The ordering of components is given in the RECONSTRUCT_10 unpack routine
   // in include/gauge_field_order.h
@@ -64,20 +33,20 @@ template <typename real_t> void create_random_traceless_antiherm(real_t mat[10],
 
   // Normalization for generators on the diagonal
   real_t inv_sqrt3 = sqrt(1. / 3.);
-  real_t r3 = max_val * random_gaussian();
-  real_t r8 = max_val * random_gaussian();
+  real_t r3 = max_val * random_gaussian_host(i, parity);
+  real_t r8 = max_val * random_gaussian_host(i, parity);
 
   // contributes to the (0, 1), (1, 0) components
-  mat[0] = max_val * random_gaussian();
-  mat[1] = max_val * random_gaussian();
+  mat[0] = max_val * random_gaussian_host(i, parity);
+  mat[1] = max_val * random_gaussian_host(i, parity);
 
   // contributes to the (0, 2), (2, 0) components
-  mat[2] = max_val * random_gaussian();
-  mat[3] = max_val * random_gaussian();
+  mat[2] = max_val * random_gaussian_host(i, parity);
+  mat[3] = max_val * random_gaussian_host(i, parity);
 
   // contributes to the (1, 2), (2, 1) components
-  mat[4] = max_val * random_gaussian();
-  mat[5] = max_val * random_gaussian();
+  mat[4] = max_val * random_gaussian_host(i, parity);
+  mat[5] = max_val * random_gaussian_host(i, parity);
 
   // (0, 0) imaginary bit
   mat[6] = r3 + inv_sqrt3 * r8;
@@ -99,16 +68,20 @@ void createMomCPU(void *mom, QudaPrecision precision, double max_val)
     return;
   }
 
-  for (int i = 0; i < V; i++) {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      for (int dir = 0; dir < 4; dir++) {
-        create_random_traceless_antiherm((double *)mom + (4 * i + dir) * mom_site_size, max_val);
-      }
-    } else {
-      float max_val_f = static_cast<float>(max_val);
-      for (int dir = 0; dir < 4; dir++) {
-        for (auto k = 0lu; k < mom_site_size; k++) {
-          create_random_traceless_antiherm((float *)mom + (4 * i + dir) * mom_site_size, max_val_f);
+  for (int i = 0; i < Vh; i++) {
+    for (int parity = 0; parity < 2; parity++) {
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        for (int dir = 0; dir < 4; dir++) {
+          create_random_traceless_antiherm((double *)mom + (4 * (parity * Vh + i) + dir) * mom_site_size, i, parity,
+                                           max_val);
+        }
+      } else {
+        float max_val_f = static_cast<float>(max_val);
+        for (int dir = 0; dir < 4; dir++) {
+          for (auto k = 0lu; k < mom_site_size; k++) {
+            create_random_traceless_antiherm((float *)mom + (4 * (parity * Vh + i) + dir) * mom_site_size, i, parity,
+                                             max_val_f);
+          }
         }
       }
     }

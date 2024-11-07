@@ -23,6 +23,8 @@
 
 template <typename T> using complex = std::complex<T>;
 
+using quda::lat_dim_t;
+
 // Staggered gauge field utils
 //------------------------------------------------------
 
@@ -209,9 +211,9 @@ void computeTwoLinkCPU(void **twolink, su3_matrix **sitelinkEx)
 
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaugeParam)
 {
-  quda::lat_dim_t R = {2,2,2,2};
+  lat_dim_t R = {2, 2, 2, 2};
 
-  quda::lat_dim_t X={qudaGaugeParam->X[0], qudaGaugeParam->X[1], qudaGaugeParam->X[2], qudaGaugeParam->X[3]}; 
+  lat_dim_t X = {qudaGaugeParam->X[0], qudaGaugeParam->X[1], qudaGaugeParam->X[2], qudaGaugeParam->X[3]};
 
   exchange_cpu_sitelink_ex(X, R, sitelink, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam->cpu_prec, 0, 4);
 

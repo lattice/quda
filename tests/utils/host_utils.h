@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <array>
+#include <random>
+
 #include <quda.h>
 #include <random_quda.h>
 #include <color_spinor_field.h>
@@ -39,6 +41,9 @@ extern QudaPrecision &cuda_prec_precondition;
 extern QudaPrecision &cuda_prec_eigensolver;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
+
+// Host hypercubic RNG
+extern std::vector<std::mt19937_64> host_rand;
 
 // Determine if we're running in multi-GPU mode
 constexpr bool is_multi_gpu()
@@ -111,8 +116,16 @@ void setQudaDefaultMgTestParams();
 // Clover fields
 //------------------------------------------------------
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
+
+/**
+ * @brief Construct a random (but reasonable) clover field
+ *
+ * @param[out] clover The clover field
+ * @param[in] norm Scale factor for clover field elements
+ * @param[in] diag Diagonal addition to the clover field
+ * @param[in] precision Clover field floating point precision
+ */
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
-template <typename Float> void constructCloverField(Float *res, double norm, double diag);
 //------------------------------------------------------
 
 // Spinor utils
@@ -150,7 +163,17 @@ void performanceStats(std::vector<double> &time, std::vector<double> &gflops, st
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
 void initComms(int argc, char **argv, int *const commDims);
 void finalizeComms();
+
+// Routines for random numbers
+//------------------------------------------------------
+
+/**
+ * @brief Initialize the RNG, needs to be called after comms
+ * are initialized
+ */
 void initRand();
+
+//------------------------------------------------------
 
 int lex_rank_from_coords_t(const int *coords, void *fdata);
 int lex_rank_from_coords_x(const int *coords, void *fdata);

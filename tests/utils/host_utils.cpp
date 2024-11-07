@@ -1,5 +1,8 @@
 #include <limits>
 #include <complex>
+#include <vector>
+#include <random>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +25,8 @@
 #include "gauge_utils.h"
 #include "staggered_gauge_utils.h"
 #include "host_utils.h"
+#include "instantiate_host.hpp"
+#include "rng_utils.hpp"
 #include "index_utils.hpp"
 #include "command_line_params.h"
 #include "misc.h"
@@ -61,6 +66,9 @@ QudaPrecision &cuda_prec_refinement_sloppy = prec_refinement_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 QudaPrecision &cuda_prec_eigensolver = prec_eigensolver;
 QudaPrecision &cuda_prec_ritz = prec_ritz;
+
+// Host hypercubic RNG
+std::vector<std::mt19937_64> host_rand;
 
 size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -167,12 +175,12 @@ void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
   inv_param.return_clover_inverse = 1;
 }
 
+// Pre-declare the instantiation struct
+template <typename real_t> struct ConstructCloverField;
+
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision)
 {
-  if (precision == QUDA_DOUBLE_PRECISION)
-    constructCloverField((double *)clover, norm, diag);
-  else
-    constructCloverField((float *)clover, norm, diag);
+  instantiate_host<ConstructCloverField>(precision, clover, norm, diag);
 }
 
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
@@ -391,6 +399,9 @@ void finalizeComms()
 
 void initRand()
 {
+  using quda::comm_coord;
+  using quda::comm_dim;
+
   int rank = 0;
 
 #if defined(QMP_COMMS)
@@ -400,6 +411,27 @@ void initRand()
 #endif
 
   srand(17 * rank + 137);
+
+  if constexpr (use_hypercubic_host_rng()) {
+    // initialize the hypercubic RNG
+    std::array<int, 4> X = {xdim, ydim, zdim, tdim};
+    int volume = X[0] * X[1] * X[2] * X[3];
+    int volume_h = volume / 2;
+
+    host_rand.resize(volume);
+    std::array<uint64_t, 4> X_global;
+    for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
+
+    for (int parity = 0; parity < 2; parity++)
+      for (int i = 0; i < volume_h; i++) {
+        // get the local coordinate
+        std::array<uint64_t, 4> x;
+        getCoords(x, i, X, parity);
+        for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
+        uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
+        host_rand[parity * volume_h + i] = std::mt19937_64(17ul * global_idx + 137);
+      }
+  }
 }
 
 void setDims(int *X)
@@ -469,7 +501,7 @@ bool last_node_in_t()
 {
   // only apply T-boundary at edge nodes
 #ifdef MULTI_GPU
-  return commCoords(3) == commDim(3) - 1;
+  return quda::commCoords(3) == quda::commDim(3) - 1;
 #else
   return true;
 #endif
@@ -880,33 +912,43 @@ int x4_from_full_index(int i)
   return x4;
 }
 
-template <typename Float> void constructCloverField(Float *res, double norm, double diag)
-{
+/**
+ * @brief Construct a random (but reasonable) clover field
+ *
+ * @tparam real_t Floating point type
+ * @param[out] clover The clover field
+ * @param[in] norm Scale factor for clover field elements
+ * @param[in] diag Diagonal addition to the clover field
+ */
+template <typename real_t> struct ConstructCloverField {
+  void operator()(void *res, double norm, double diag)
+  {
+    for (auto i = 0lu; i < static_cast<size_t>(Vh); i++) {
+      for (auto parity = 0lu; parity < 2lu; parity++) {
+        real_t *clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
+        for (int j = 0; j < 72; j++) { clover_matrix[j] = random_uniform_host<real_t>(i, parity, -norm, norm); }
 
-  Float c = 2.0 * norm / RAND_MAX;
+        // impose clover symmetry on each chiral block
+        for (int ch = 0; ch < 2; ch++) {
+          clover_matrix[3 + 36 * ch] = -clover_matrix[0 + 36 * ch];
+          clover_matrix[4 + 36 * ch] = -clover_matrix[1 + 36 * ch];
+          clover_matrix[5 + 36 * ch] = -clover_matrix[2 + 36 * ch];
+          clover_matrix[30 + 36 * ch] = -clover_matrix[6 + 36 * ch];
+          clover_matrix[31 + 36 * ch] = -clover_matrix[7 + 36 * ch];
+          clover_matrix[32 + 36 * ch] = -clover_matrix[8 + 36 * ch];
+          clover_matrix[33 + 36 * ch] = -clover_matrix[9 + 36 * ch];
+          clover_matrix[34 + 36 * ch] = -clover_matrix[16 + 36 * ch];
+          clover_matrix[35 + 36 * ch] = -clover_matrix[17 + 36 * ch];
+        }
 
-  for (auto i = 0lu; i < static_cast<size_t>(V); i++) {
-    for (int j = 0; j < 72; j++) { res[i * 72 + j] = c * rand() - norm; }
-
-    // impose clover symmetry on each chiral block
-    for (int ch = 0; ch < 2; ch++) {
-      res[i * 72 + 3 + 36 * ch] = -res[i * 72 + 0 + 36 * ch];
-      res[i * 72 + 4 + 36 * ch] = -res[i * 72 + 1 + 36 * ch];
-      res[i * 72 + 5 + 36 * ch] = -res[i * 72 + 2 + 36 * ch];
-      res[i * 72 + 30 + 36 * ch] = -res[i * 72 + 6 + 36 * ch];
-      res[i * 72 + 31 + 36 * ch] = -res[i * 72 + 7 + 36 * ch];
-      res[i * 72 + 32 + 36 * ch] = -res[i * 72 + 8 + 36 * ch];
-      res[i * 72 + 33 + 36 * ch] = -res[i * 72 + 9 + 36 * ch];
-      res[i * 72 + 34 + 36 * ch] = -res[i * 72 + 16 + 36 * ch];
-      res[i * 72 + 35 + 36 * ch] = -res[i * 72 + 17 + 36 * ch];
-    }
-
-    for (int j = 0; j < 6; j++) {
-      res[i * 72 + j] += diag;
-      res[i * 72 + j + 36] += diag;
+        for (int j = 0; j < 6; j++) {
+          clover_matrix[j] += diag;
+          clover_matrix[j + 36] += diag;
+        }
+      }
     }
   }
-}
+};
 
 template <typename Float> static void checkGauge(Float **oldG, Float **newG, double epsilon)
 {
@@ -977,13 +1019,17 @@ void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType
 
     // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
     for (int dir = 0; dir < 4; ++dir) {
-      for (int i = 0; i < V * 18; ++i) {
-        if (prec == QUDA_DOUBLE_PRECISION) {
-          double *link = (double *)gauge[dir] + i;
-          *link += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
-        } else if (prec == QUDA_SINGLE_PRECISION) {
-          float *link = (float *)gauge[dir] + i;
-          *link += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
+      for (int i = 0; i < Vh; ++i) {
+        for (int parity = 0; parity < 2; parity++) {
+          for (size_t c = 0lu; c < gauge_site_size; c++) {
+            if (prec == QUDA_DOUBLE_PRECISION) {
+              double *link = (double *)gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
+              *link += random_uniform_host<double>(i >> 1, i & 1, -1.0 / 40.0, 1.0 / 40.0);
+            } else if (prec == QUDA_SINGLE_PRECISION) {
+              float *link = (float *)gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
+              *link += random_uniform_host<float>(i >> 1, i & 1, -1.f / 40.f, 1.f / 40.f);
+            }
+          }
         }
       }
     }

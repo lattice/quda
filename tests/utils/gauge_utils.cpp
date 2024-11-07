@@ -4,6 +4,7 @@
 
 #include "command_line_params.h"
 #include "host_utils.h"
+#include "rng_utils.hpp"
 #include "gauge_utils.h"
 #include "index_utils.hpp"
 #include "instantiate_host.hpp"
@@ -368,10 +369,10 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
       for (int i = 0; i < Vh; i++) {
         for (int m = 1; m < 3; m++) {   // last 2 rows
           for (int n = 0; n < 3; n++) { // 3 columns
-            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = rand() / static_cast<real_t>(RAND_MAX);
-            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / static_cast<real_t>(RAND_MAX);
-            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = rand() / static_cast<real_t>(RAND_MAX);
-            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / static_cast<real_t>(RAND_MAX);
+            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = random_uniform_host<real_t>(i, 0);
+            gaugeEven[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = random_uniform_host<real_t>(i, 0);
+            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 0] = random_uniform_host<real_t>(i, 1);
+            gaugeOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = random_uniform_host<real_t>(i, 1);
           }
         }
         normalize(reinterpret_cast<complex *>(gaugeEven[dir] + (i * 3 + 1) * 3 * 2), 3);
@@ -433,16 +434,19 @@ template <typename real_t> struct ApplyRandomU1Phase {
     real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
-      for (int i = 0; i < V; i++) {
-        // create a random phase
-        real_t phase = 2 * M_PI * rand() / RAND_MAX;
-        std::complex<real_t> u1 = std::polar(static_cast<real_t>(1), phase);
+      for (int i = 0; i < Vh; i++) {
+        for (int parity = 0; parity < 2; parity++) {
+          // create a random phase
+          real_t phase = random_uniform_host<real_t>(i, parity, 0, 2 * M_PI);
+          std::complex<real_t> u1 = std::polar(static_cast<real_t>(1), phase);
 
-        // rescale bottom row
-        std::complex<real_t> *link = reinterpret_cast<std::complex<real_t> *>(gauge[dir] + i * gauge_site_size);
-        constexpr int m = 2;          // bottom row
-        for (int n = 0; n < 3; n++) { // 3 columns
-          link[m * 3 + n] *= u1;
+          // rescale bottom row
+          std::complex<real_t> *link
+            = reinterpret_cast<std::complex<real_t> *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
+          constexpr int m = 2;          // bottom row
+          for (int n = 0; n < 3; n++) { // 3 columns
+            link[m * 3 + n] *= u1;
+          }
         }
       }
     }
@@ -471,11 +475,11 @@ template <typename real_t> struct ConstructRandomMatrixGaugeField {
 
     // Encapsulate creating a random matrix in a lambda to simplify making sure
     // the matrix is invertable
-    auto randomMatrix = [](real_t *link) -> void {
+    auto randomMatrix = [](real_t *link, int i, int parity) -> void {
       for (int m = 0; m < 3; m++) {   // 3 rows
         for (int n = 0; n < 3; n++) { // 3 columns
-          link[m * (3 * 2) + n * (2) + 0] = 0.8 * (2.0 * rand() / static_cast<double>(RAND_MAX) - 1.0);
-          link[m * (3 * 2) + n * (2) + 1] = 1.3 * (2.0 * rand() / static_cast<double>(RAND_MAX) - 1.0);
+          link[m * (3 * 2) + n * (2) + 0] = 0.8 * random_uniform_host<real_t>(i, parity, -1, 1);
+          link[m * (3 * 2) + n * (2) + 1] = 1.3 * random_uniform_host<real_t>(i, parity, -1, 1);
         }
       }
     };
@@ -495,11 +499,13 @@ template <typename real_t> struct ConstructRandomMatrixGaugeField {
     };
 
     for (int dir = 0; dir < 4; dir++) {
-      for (int i = 0; i < V; i++) {
-        real_t *link = gauge[dir] + i * gauge_site_size;
-        do {
-          randomMatrix(link);
-        } while (!isReasonable(link));
+      for (int i = 0; i < Vh; i++) {
+        for (int parity = 0; parity < 2; parity++) {
+          real_t *link = gauge[dir] + (parity * Vh + i) * gauge_site_size;
+          do {
+            randomMatrix(link, i, parity);
+          } while (!isReasonable(link));
+        }
       }
     }
   }

@@ -14,6 +14,7 @@
 #include "command_line_params.h"
 #include "gauge_utils.h"
 #include "staggered_gauge_utils.h"
+#include "rng_utils.hpp"
 #include "llfat_utils.h"
 
 extern double tadpole_factor;
@@ -59,17 +60,21 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       constructRandomGaugeField(longlink, param, precision, dslash_type);
       // incorporate non-trivial phase into long links
-      const double phase = (M_PI * rand()) / RAND_MAX;
-      const std::complex<double> z = std::polar(1.0, phase);
       for (int dir = 0; dir < 4; ++dir) {
-        for (int i = 0; i < V; ++i) {
-          for (auto j = 0lu; j < gauge_site_size; j += 2) {
-            if (precision == QUDA_DOUBLE_PRECISION) {
-              std::complex<double> *l = (std::complex<double> *)(&(((double *)longlink[dir])[i * gauge_site_size + j]));
-              *l *= z;
-            } else {
-              std::complex<float> *l = (std::complex<float> *)(&(((float *)longlink[dir])[i * gauge_site_size + j]));
-              *l *= z;
+        for (int i = 0; i < Vh; ++i) {
+          for (int parity = 0; parity < 2; parity++) {
+            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+            std::complex<double> z = std::polar(1.0, phase);
+            for (auto j = 0lu; j < gauge_site_size; j += 2) {
+              if (precision == QUDA_DOUBLE_PRECISION) {
+                std::complex<double> *l
+                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              } else {
+                std::complex<float> *l
+                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              }
             }
           }
         }
@@ -83,21 +88,25 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
 
     param.type = QUDA_ASQTAD_LONG_LINKS;
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH) { constructRandomGaugeField(longlink, param, precision, dslash_type); }
-
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      constructRandomGaugeField(longlink, param, precision, dslash_type);
+
       // incorporate non-trivial phase into long links
-      const double phase = (M_PI * rand()) / RAND_MAX;
-      const std::complex<double> z = std::polar(1.0, phase);
       for (int dir = 0; dir < 4; ++dir) {
-        for (int i = 0; i < V; ++i) {
-          for (auto j = 0lu; j < gauge_site_size; j += 2) {
-            if (precision == QUDA_DOUBLE_PRECISION) {
-              std::complex<double> *l = (std::complex<double> *)(&(((double *)longlink[dir])[i * gauge_site_size + j]));
-              *l *= z;
-            } else {
-              std::complex<float> *l = (std::complex<float> *)(&(((float *)longlink[dir])[i * gauge_site_size + j]));
-              *l *= z;
+        for (int i = 0; i < Vh; ++i) {
+          for (int parity = 0; parity < 2; parity++) {
+            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+            std::complex<double> z = std::polar(1.0, phase);
+            for (auto j = 0lu; j < gauge_site_size; j += 2) {
+              if (precision == QUDA_DOUBLE_PRECISION) {
+                std::complex<double> *l
+                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              } else {
+                std::complex<float> *l
+                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              }
             }
           }
         }
