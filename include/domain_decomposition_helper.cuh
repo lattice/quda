@@ -73,10 +73,10 @@ namespace quda
       return block_parity % 2 == 1;
     }
 
-    template <typename Coord> constexpr bool on_border(const Coord &x, int mu, int dir) const
+    template <typename Coord> constexpr bool on_border(const Coord &x, int mu, int dist) const
     {
       if (block_dim[mu] == 0) return false;
-      int x_mu = x.gx[mu] + dir;
+      int x_mu = x.gx[mu] + dist;
       if (x_mu < 0) x_mu += x.gDim[mu];
       if (x_mu >= x.gDim[mu]) x_mu -= x.gDim[mu];
       return x.gx[mu] / block_dim[mu] != x_mu / block_dim[mu];
@@ -92,11 +92,11 @@ namespace quda
       return true;
     }
 
-    template <typename Coord> constexpr bool doHopping(const Coord &x, int mu, int dir) const
+    template <typename Coord> constexpr bool doHopping(const Coord &x, int mu, int dist) const
     {
       bool is_black = block_parity(x);
       bool is_red = !is_black;
-      bool is_border = on_border(x, mu, dir);
+      bool is_border = on_border(x, mu, dist);
 
       if (!is_border) { // Within block
         if (is_red and red_active) return true;
