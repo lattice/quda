@@ -1,8 +1,4 @@
-#include <dslash_wilson_clover_preconditioned.hpp>
-
-/**
-   This is the Wilson-clover linear operator
-*/
+#include <dslash_domain_wall_4d_fused_m5.hpp>
 
 namespace quda
 {
