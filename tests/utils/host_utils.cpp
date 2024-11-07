@@ -1024,10 +1024,10 @@ void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType
           for (size_t c = 0lu; c < gauge_site_size; c++) {
             if (prec == QUDA_DOUBLE_PRECISION) {
               double *link = (double *)gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
-              *link += random_uniform_host<double>(i >> 1, i & 1, -1.0 / 40.0, 1.0 / 40.0);
+              *link += random_uniform_host<double>(i, parity, -1.0 / 40.0, 1.0 / 40.0);
             } else if (prec == QUDA_SINGLE_PRECISION) {
               float *link = (float *)gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
-              *link += random_uniform_host<float>(i >> 1, i & 1, -1.f / 40.f, 1.f / 40.f);
+              *link += random_uniform_host<float>(i, parity, -1.f / 40.f, 1.f / 40.f);
             }
           }
         }
