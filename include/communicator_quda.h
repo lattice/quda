@@ -544,7 +544,7 @@ namespace quda
 
     if (gpuid < 0) {
       int device_count = device::get_device_count();
-      if (device_count == 0) { errorQuda("No devices found"); }
+      if (device_count == 0) { warningQuda("No devices found"); }
 
       // We initialize gpuid if it's still negative.
       gpuid = 0;
@@ -558,7 +558,7 @@ namespace quda
           gpuid = gpuid % device_count;
           printf("MPS enabled, rank=%3d -> gpu=%d\n", comm_rank(), gpuid);
         } else {
-          errorQuda("Too few GPUs available on %s", comm_hostname());
+          warningQuda("Too few GPUs available on %s", comm_hostname());
         }
       }
     } // -ve gpuid

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ostream>
+#include <utility>
 #include "malloc_quda.h"
 
 namespace quda

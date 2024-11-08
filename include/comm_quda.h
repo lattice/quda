@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <cstdlib>
 #include <vector>
 #include <quda_constants.h>
 #include <quda_api.h>

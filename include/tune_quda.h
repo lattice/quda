@@ -87,7 +87,27 @@ namespace quda {
       if (tuneGridDim()) {
         const int step = gridStep();
         param.grid.x += step;
+#ifdef QUDA_TARGET_OMPTARGET
+        /* Makes sure the runtime allows us to set the parameters. */
+        bool failed = false;
+        {
+          const int gd = param.grid.x*param.grid.y*param.grid.z;
+          const int ld = param.block.x*param.block.y*param.block.z;
+          int gn = 0, ln = 0;
+          #pragma omp target teams num_teams(gd) thread_limit(ld) map(tofrom:gn,ln)
+          #pragma omp parallel num_threads(ld)
+          {
+            if(omp_get_team_num()==0 && omp_get_thread_num()==0){
+              gn = omp_get_num_teams();
+              ln = omp_get_num_threads();
+            }
+          }
+          failed = gn!=gd||ln!=ld;
+        }
+        if (failed || param.grid.x > maxGridSize()) {
+#else
         if (param.grid.x > maxGridSize()) {
+#endif
           param.grid.x = minGridSize();
           return false;
         } else {

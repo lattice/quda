@@ -14,6 +14,9 @@
 
 #elif defined(QUDA_TARGET_SYCL)
 #include <targets/sycl/quda_sycl.h>
+
+#elif defined(QUDA_TARGET_OMPTARGET)
+#include <omp.h>
 #endif
 
 #ifdef QUDA_OPENMP

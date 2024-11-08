@@ -27,6 +27,8 @@
 #include <type_traits>
 #include <quda_arch.h> // for double2 / float2
 
+#include <quda_api.h>
+
 namespace quda {
   namespace gauge {
     template<typename Float, typename storeFloat> struct fieldorder_wrapper;

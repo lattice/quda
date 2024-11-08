@@ -1029,6 +1029,7 @@ namespace quda {
 
   template <typename Arg>
   __device__ __host__ inline int virtualThreadIdx(const Arg &arg) {
+    QUDA_RT_CONSTS;
     int warp_id = threadIdx.x / device::warp_size();
     int warp_lane = threadIdx.x % device::warp_size();
     int tx = warp_id * (device::warp_size() / arg.aggregates_per_block) + warp_lane / arg.aggregates_per_block;
@@ -1037,12 +1038,14 @@ namespace quda {
 
   template <typename Arg>
   __device__ __host__ inline int virtualBlockDim(const Arg &arg) {
+    QUDA_RT_CONSTS;
     int block_dim_x = blockDim.x / arg.aggregates_per_block;
     return block_dim_x;
   }
 
   template <typename Arg>
   __device__ __host__ inline int coarseIndex(const Arg &arg) {
+    QUDA_RT_CONSTS;
     int warp_lane = threadIdx.x % device::warp_size();
     int x_coarse = (arg.coarse_color_wave ? blockIdx.y : blockIdx.x) * arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
     return x_coarse;
@@ -1396,6 +1399,7 @@ namespace quda {
     template <typename VUV, typename Pack, typename Arg>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg)
     {
+      QUDA_RT_CONSTS;
       using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
@@ -1638,6 +1642,7 @@ namespace quda {
     template <typename Arg> __device__ inline void operator()(int &parity_coarse, int &x_coarse_cb, int &parity, int &x_cb,
                                                               int &parity_c_row, int &c_row, int &c_col, const Arg &arg)
     {
+      QUDA_RT_CONSTS;
       if (arg.coarse_color_wave) {
         int parity_c_row_block_idx_z = blockDim.y*blockIdx.x + threadIdx.y;
         int c_row_block_idx_z = arg.parity_flip ? (parity_c_row_block_idx_z % arg.coarse_color_grid_z ) : (parity_c_row_block_idx_z / 2); // coarse color row index
