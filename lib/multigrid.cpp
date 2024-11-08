@@ -966,7 +966,7 @@ namespace quda
       }
 
       transfer->R(x_coarse[0], tmp2);
-      static_cast<DiracCoarse *>(diracCoarseResidual)->M(r_coarse, tmp_coarse);
+      static_cast<DiracCoarse *>(diracCoarseResidual)->M(r_coarse[0], tmp_coarse);
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
       setOutputPrefix("");
