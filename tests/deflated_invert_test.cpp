@@ -193,16 +193,15 @@ int main(int argc, char **argv)
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = inv_param.b_5[xs];
+        c5[xs] = inv_param.c_5[xs];
       }
       mdw_mat(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.dagger, inv_param.cpu_prec, gauge_param,
-              inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+              inv_param.mass, b5, c5);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
@@ -237,16 +236,15 @@ int main(int argc, char **argv)
       dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = inv_param.b_5[xs];
+        c5[xs] = inv_param.c_5[xs];
       }
       mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec,
-                gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+                gauge_param, inv_param.mass, b5, c5);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {

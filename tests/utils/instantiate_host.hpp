@@ -20,21 +20,48 @@ constexpr bool is_enabled(QudaPrecision precision)
 
 /**
  * @brief This instantiate function helps with casting void* fields to double or float
+ *        with other arbitrary later template types
+ *
+ * @tparam Apply Type of structure with a constructor that is being instantiated
+ * @tparam ApplyTypes Variadic arguments that go to the "Apply" class after the floating point type
+ * @tparam Args Variadic arguments passed along to the instantiation struct constructors
+ * @param[in] precision Floating-point precision for the computation
+ * @param[in,out] args Any additional arguments required for the computation at hand
+ */
+template <template <typename, typename...> class Apply, typename... ApplyTypes, typename... Args>
+constexpr void instantiate_host(QudaPrecision precision, Args &&...args)
+{
+  // always instantiate double precision
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    Apply<double, ApplyTypes...>()(args...);
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+      Apply<float, ApplyTypes...>()(args...);
+    else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+  } else {
+    errorQuda("Unsupported precision %d\n", precision);
+  }
+}
+
+/**
+ * @brief This instantiate function helps with casting void* fields to double or float
+ *        for domain wall operators with 4-d vs 5-d indexing
  *
  * @tparam Apply Type of structure with a constructor that is being instantiated
  * @tparam Args Variadic arguments passed along to the instantiation struct constructors
  * @param[in] precision Floating-point precision for the computation
  * @param[in,out] args Any additional arguments required for the computation at hand
  */
-template <template <typename> class Apply, typename... Args>
+template <template <typename, QudaPCType> class Apply, QudaPCType type, typename... Args>
 constexpr void instantiate_host(QudaPrecision precision, Args &&...args)
 {
   // always instantiate double precision
   if (precision == QUDA_DOUBLE_PRECISION) {
-    Apply<double>()(args...);
+    Apply<double, type>()(args...);
   } else if (precision == QUDA_SINGLE_PRECISION) {
     if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
-      Apply<float>()(args...);
+      Apply<float, type>()(args...);
     else
       errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
   } else {

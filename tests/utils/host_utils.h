@@ -277,9 +277,21 @@ void cax(double _Complex a, void *x, int len, QudaPrecision precision);
 void axpy(double a, const void *x, void *y, int len, QudaPrecision precision);
 void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision);
 void xpay(const void *x, double a, void *y, int len, QudaPrecision precision);
-void cxpay(void *x, double _Complex a, void *y, int len, QudaPrecision precision);
+void cxpay(const void *x, std::complex<double> a, void *y, int len, QudaPrecision precision);
 void cpu_axy(QudaPrecision prec, double a, const void *x, void *y, int size);
 void cpu_xpy(QudaPrecision prec, const void *x, void *y, int size);
+
+// Trait to convert from a type to a QudaPrecision
+template <typename> struct get_quda_precision {
+};
+template <> struct get_quda_precision<double> {
+  static constexpr QudaPrecision value = QUDA_DOUBLE_PRECISION;
+};
+template <> struct get_quda_precision<float> {
+  static constexpr QudaPrecision value = QUDA_SINGLE_PRECISION;
+};
+
+template <typename real_t> constexpr QudaPrecision get_quda_precision_v = get_quda_precision<real_t>::value;
 
 inline QudaPrecision getPrecision(int i)
 {

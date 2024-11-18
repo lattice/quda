@@ -43,6 +43,7 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
                                                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
                                                     void **gauge, void *, void *, int src_idx)
 {
+  using complex = std::complex<double>;
   if (multishift > 1) errorQuda("Multishift not supported");
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
@@ -51,16 +52,15 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = inv_param.b_5[xs];
+        c5[xs] = inv_param.c_5[xs];
       }
       mdw_mat(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.dagger, inv_param.cpu_prec, gauge_param,
-              inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+              inv_param.mass, b5, c5);
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_mat(spinorCheck, gauge, spinorOut, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass,
                    inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
@@ -83,16 +83,15 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
       dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = inv_param.b_5[xs];
+        c5[xs] = inv_param.c_5[xs];
       }
       mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec,
-                gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+                gauge_param, inv_param.mass, b5, c5);
       // DOMAIN_WALL END
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_matpc(spinorCheck, gauge, spinorOut, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
@@ -123,18 +122,17 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
       dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = inv_param.b_5[xs];
+        c5[xs] = inv_param.c_5[xs];
       }
       mdw_matpc(spinorTmp, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
-                inv_param.mass, inv_param.b_5, inv_param.c_5);
+                inv_param.mass, b5, c5);
       mdw_matpc(spinorCheck, gauge, spinorTmp, kappa_b, kappa_c, inv_param.matpc_type, 1, inv_param.cpu_prec,
-                gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      host_free(kappa_b);
-      host_free(kappa_c);
+                gauge_param, inv_param.mass, b5, c5);
       // DOMAIN_WALL END
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_matpc(spinorTmp, gauge, spinorOut, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
@@ -419,6 +417,7 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
 double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param,
                                    QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv)
 {
+  using complex = std::complex<double>;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
   bool normop = (eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? true : false);
   int vol = (use_pc ? Vh : V);
@@ -470,27 +469,23 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
     break;
   }
   case QUDA_MOBIUS_DWF_DSLASH: {
-    double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-    double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+    std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
     for (int xs = 0; xs < Lsdim; xs++) {
       kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
       kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+      b5[xs] = inv_param.b_5[xs];
+      c5[xs] = inv_param.c_5[xs];
     }
     if (use_pc) {
-      mdw_matpc(spinorTmp, gauge, spinor, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass,
-                inv_param.b_5, inv_param.c_5);
+      mdw_matpc(spinorTmp, gauge, spinor, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass, b5, c5);
       if (normop)
         mdw_matpc(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, matpc_type, dagger_opposite, cpu_prec, gauge_param,
-                  mass, inv_param.b_5, inv_param.c_5);
+                  mass, b5, c5);
     } else {
-      mdw_mat(spinorTmp, gauge, spinor, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, inv_param.b_5,
-              inv_param.c_5);
+      mdw_mat(spinorTmp, gauge, spinor, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, b5, c5);
       if (normop)
-        mdw_mat(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, dagger_opposite, cpu_prec, gauge_param, mass,
-                inv_param.b_5, inv_param.c_5);
+        mdw_mat(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, dagger_opposite, cpu_prec, gauge_param, mass, b5, c5);
     }
-    host_free(kappa_b);
-    host_free(kappa_c);
     break;
   }
   case QUDA_MOBIUS_DWF_EOFA_DSLASH: {
@@ -616,6 +611,7 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
                                       QudaGaugeParam &gauge_param, QudaEigParam &eig_param, void **gauge, void *clover,
                                       void *clover_inv)
 {
+  using complex = std::complex<double>;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
   int vol = (use_pc ? Vh : V);
 
@@ -656,20 +652,17 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
     break;
   }
   case QUDA_MOBIUS_DWF_DSLASH: {
-    double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-    double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+    std::vector<complex> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
     for (int xs = 0; xs < Lsdim; xs++) {
       kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
       kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+      b5[xs] = inv_param.b_5[xs];
+      c5[xs] = inv_param.c_5[xs];
     }
     if (use_pc)
-      mdw_matpc(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass,
-                inv_param.b_5, inv_param.c_5);
+      mdw_matpc(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass, b5, c5);
     else
-      mdw_mat(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, inv_param.b_5,
-              inv_param.c_5);
-    host_free(kappa_b);
-    host_free(kappa_c);
+      mdw_mat(spinorTmp, gauge, spinor_left, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, b5, c5);
     break;
   }
   case QUDA_MOBIUS_DWF_EOFA_DSLASH: {
