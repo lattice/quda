@@ -83,9 +83,6 @@ namespace quda {
 
   double GaugeField::norm1(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    //fixed = (this->precision == QUDA_QUARTER_PRECISION)
-    //  || (this->precision == QUDA_HALF_PRECISION);
-    //logQuda(QUDA_VERBOSE, "GaugeField::norm1: %i\n", fixed);
     double nrm = 0.0;
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM1);
     return nrm;
@@ -93,9 +90,6 @@ namespace quda {
 
   double GaugeField::norm2(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    //fixed = (this->precision == QUDA_QUARTER_PRECISION)
-    //  || (this->precision == QUDA_HALF_PRECISION);
-    //logQuda(QUDA_VERBOSE, "GaugeField::norm2: %i\n", fixed);
     double nrm = 0.0;
     instantiatePrecision<Norm>(*this, nrm, d, fixed, NORM2);
     return nrm;
@@ -115,8 +109,7 @@ namespace quda {
     return nrm;
   }
 
-  template <class Order>
-  void print_matrix(const Order &o, int d, int parity, unsigned int x_cb)
+  template <class Order> void print_matrix(const Order &o, int d, int parity, unsigned int x_cb)
   {
     for (int r = 0; r < o.Ncolor(); r++) {
       printf("rank %d parity %d x %u row %d", comm_rank(), parity, x_cb, r);
@@ -133,17 +126,19 @@ namespace quda {
   {
     switch (a.FieldOrder()) {
     case QUDA_FLOAT2_GAUGE_ORDER:
-      print_matrix(FieldOrder<double, nColor, 1, QUDA_FLOAT2_GAUGE_ORDER, true, Float>(a), d, parity, x_cb); break;
+      print_matrix(FieldOrder<double, nColor, 1, QUDA_FLOAT2_GAUGE_ORDER, true, Float>(a), d, parity, x_cb);
+      break;
     case QUDA_QDP_GAUGE_ORDER:
-      print_matrix(FieldOrder<double, nColor, 1, QUDA_QDP_GAUGE_ORDER, true, Float>(a), d, parity, x_cb); break;
+      print_matrix(FieldOrder<double, nColor, 1, QUDA_QDP_GAUGE_ORDER, true, Float>(a), d, parity, x_cb);
+      break;
     case QUDA_MILC_GAUGE_ORDER:
-      print_matrix(FieldOrder<double, nColor, 1, QUDA_MILC_GAUGE_ORDER, true, Float>(a), d, parity, x_cb); break;
-    default:
-      errorQuda("Unsupported field order %d", a.FieldOrder());
+      print_matrix(FieldOrder<double, nColor, 1, QUDA_MILC_GAUGE_ORDER, true, Float>(a), d, parity, x_cb);
+      break;
+    default: errorQuda("Unsupported field order %d", a.FieldOrder());
     }
   }
 
-  template <typename Float, int nColor, int...N>
+  template <typename Float, int nColor, int... N>
   void genericPrintMatrix(const GaugeField &a, int d, int parity, unsigned int x_cb, IntList<nColor, N...>)
   {
     if (a.Ncolor() == nColor) {
@@ -171,14 +166,16 @@ namespace quda {
     param.location = QUDA_CPU_FIELD_LOCATION;
     param.create = QUDA_COPY_FIELD_CREATE;
     // if field is a pinned device field then we need to clone it on the host
-    bool host_clone = (a.Location() == QUDA_CUDA_FIELD_LOCATION && a.MemType() == QUDA_MEMORY_DEVICE && !use_managed_memory()) ? true : false;
+    bool host_clone
+      = (a.Location() == QUDA_CUDA_FIELD_LOCATION && a.MemType() == QUDA_MEMORY_DEVICE && !use_managed_memory()) ? true :
+                                                                                                                   false;
     std::unique_ptr<GaugeField> clone_a = !host_clone ? nullptr : std::make_unique<GaugeField>(param);
     const GaugeField &a_ = !host_clone ? a : *clone_a.get();
 
     switch (a.Precision()) {
-    case QUDA_DOUBLE_PRECISION:  genericPrintMatrix<double>(a_, d, parity, x_cb); break;
-    case QUDA_SINGLE_PRECISION:  genericPrintMatrix<float>(a_, d, parity, x_cb); break;
-    case QUDA_HALF_PRECISION:    genericPrintMatrix<short>(a_, d, parity, x_cb); break;
+    case QUDA_DOUBLE_PRECISION: genericPrintMatrix<double>(a_, d, parity, x_cb); break;
+    case QUDA_SINGLE_PRECISION: genericPrintMatrix<float>(a_, d, parity, x_cb); break;
+    case QUDA_HALF_PRECISION: genericPrintMatrix<short>(a_, d, parity, x_cb); break;
     case QUDA_QUARTER_PRECISION: genericPrintMatrix<int8_t>(a_, d, parity, x_cb); break;
     default: errorQuda("Precision %d not implemented", a.Precision());
     }

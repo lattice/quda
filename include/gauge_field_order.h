@@ -152,12 +152,12 @@ namespace quda {
   namespace gauge {
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,int8_t>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<double,int8_t>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<double,short>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<double,int>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, short>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, int8_t>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, short>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, int>() { return true; }
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
     template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
@@ -379,8 +379,8 @@ namespace quda {
         scale_inv(static_cast<Float>(1.0))
       {
         for (int d = 0; d < U.Geometry(); d++)
-	  u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
-        resetScale(U.Scale()*(U.LinkMax()==0.0?1.0:U.LinkMax()));
+          u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -462,7 +462,7 @@ namespace quda {
           ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
         }
 
-        resetScale(U.Scale()*(U.LinkMax()==0.0?1.0:U.LinkMax()));
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -497,7 +497,7 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-        resetScale(U.Scale()*(U.LinkMax()==0.0?1.0:U.LinkMax()));
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -586,7 +586,7 @@ namespace quda {
           ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
         }
 
-        resetScale(U.Scale()*(U.LinkMax()==0.0?1.0:U.LinkMax()));
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -639,7 +639,7 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-        resetScale(U.Scale()*(U.LinkMax()==0.0?1.0:U.LinkMax()));
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -718,7 +718,7 @@ namespace quda {
             nullptr;
           ghostVolumeCB[d + 4] = U.Nface() * U.SurfaceCB(d);
         }
-        resetScale(U.Scale()*(U.LinkMax()==0.0?1.0:U.LinkMax()));
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
