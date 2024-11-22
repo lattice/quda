@@ -86,8 +86,6 @@ void createMomCPU(void *mom, QudaPrecision precision, double max_val)
       }
     }
   }
-
-  return;
 }
 
 /**

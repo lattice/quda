@@ -33,11 +33,6 @@
 
 template <typename T> using complex = std::complex<T>;
 
-#define XUP 0
-#define YUP 1
-#define ZUP 2
-#define TUP 3
-
 int Z[4];
 int V;
 int Vh;
@@ -668,20 +663,6 @@ int getOddBit(int Y)
   return (x4 + x3 + x2 + x1) % 2;
 }
 
-// a+=b
-template <typename Float> inline void complexAddTo(Float *a, Float *b)
-{
-  a[0] += b[0];
-  a[1] += b[1];
-}
-
-// a = b*c
-template <typename Float> inline void complexProduct(Float *a, Float *b, Float *c)
-{
-  a[0] = b[0] * c[0] - b[1] * c[1];
-  a[1] = b[0] * c[1] + b[1] * c[0];
-}
-
 // a = conj(b)*conj(c)
 template <typename Float> inline void complexConjugateProduct(Float *a, Float *b, Float *c)
 {
@@ -897,21 +878,6 @@ double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecisio
     return compareFloats_v2((float *)a, (float *)b, len, epsilon);
 }
 
-int x4_from_full_index(int i)
-{
-  int oddBit = 0;
-  int half_idx = i;
-  if (i >= Vh) {
-    oddBit = 1;
-    half_idx = i - Vh;
-  }
-
-  int Y = fullLatticeIndex(half_idx, oddBit);
-  int x4 = Y / (Z[2] * Z[1] * Z[0]);
-
-  return x4;
-}
-
 /**
  * @brief Construct a random (but reasonable) clover field
  *
@@ -1011,45 +977,17 @@ void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType
     constructRandomSU3GaugeField(gauge, precision);
     applyGaugeStaggeredPhase(gauge, Vh, Z, precision, QUDA_ANTI_PERIODIC_T, QUDA_STAGGERED_PHASE_MILC);
   } else if (phase == SiteLinkType::SITELINK_PHASE_U1) {
-    constructRandomU3GaugeField(gauge, precision);
+    constructRandomSU3GaugeField(gauge, precision);
+    applyRandomU1Phase(gauge, precision);
   } else if (phase == SiteLinkType::SITELINK_RANDOM) {
     constructRandomMatrixGaugeField(gauge, precision);
   } else if (phase == SiteLinkType::SITELINK_NOISY) {
     constructRandomSU3GaugeField(gauge, precision);
 
-    // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
-    for (int dir = 0; dir < 4; ++dir) {
-      for (int i = 0; i < Vh; ++i) {
-        for (int parity = 0; parity < 2; parity++) {
-          for (size_t c = 0lu; c < gauge_site_size; c++) {
-            if (prec == QUDA_DOUBLE_PRECISION) {
-              double *link = (double *)gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
-              *link += random_uniform_host<double>(i, parity, -1.0 / 40.0, 1.0 / 40.0);
-            } else if (prec == QUDA_SINGLE_PRECISION) {
-              float *link = (float *)gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
-              *link += random_uniform_host<float>(i, parity, -1.f / 40.f, 1.f / 40.f);
-            }
-          }
-        }
-      }
-    }
+    // this 1/40 is relatively arbitrary, but it's made to add a bit of perturbative
+    // noise that can be re-unitarized away
+    addNoiseToGaugeField(gauge, 1.0 / 40.0, precision);
   }
-
-#if 1
-  for (int dir = 0; dir < 4; dir++) {
-    for (auto i = 0lu; i < V * gauge_site_size; i++) {
-      if (precision == QUDA_SINGLE_PRECISION) {
-        float *f = (float *)gauge[dir];
-        if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3)) { errorQuda("%luth: bad number(%f)", i, f[i]); }
-      } else {
-        double *f = (double *)gauge[dir];
-        if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)) { errorQuda("%luth: bad number(%f)", i, f[i]); }
-      }
-    }
-  }
-#endif
-
-  return;
 }
 
 void createSiteLinkCPU(quda::GaugeField &gauge, QudaPrecision precision, SiteLinkType phase)

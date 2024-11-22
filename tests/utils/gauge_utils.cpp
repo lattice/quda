@@ -454,10 +454,8 @@ template <typename real_t> struct ApplyRandomU1Phase {
   }
 };
 
-void constructRandomU3GaugeField(void *const *gauge, QudaPrecision precision)
+void applyRandomU1Phase(void *const *gauge, QudaPrecision precision)
 {
-  constructRandomSU3GaugeField(gauge, precision);
-
   instantiate_host<ApplyRandomU1Phase>(precision, gauge);
 }
 
@@ -515,6 +513,37 @@ template <typename real_t> struct ConstructRandomMatrixGaugeField {
 void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision)
 {
   instantiate_host<ConstructRandomMatrixGaugeField>(precision, gauge);
+}
+
+/**
+ * @brief Adds some non-unitary noise to a gauge field
+ *
+ * @tparam real_t Floating point type of the gauge field
+ * @param[in,out] gauge Generated QDP-ordered gauge field
+ * @param[in] noise_max Scale of noise added to the gauge field
+ */
+template <typename real_t> struct AddNoiseToGaugeField {
+  void operator()(void *const *gauge_, double noise_max)
+  {
+    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
+    for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
+      for (int i = 0; i < Vh; ++i) {
+        for (int parity = 0; parity < 2; parity++) {
+          for (size_t c = 0lu; c < gauge_site_size; c++) {
+            real_t *link = gauge[dir] + (parity * Vh + i) * gauge_site_size + c;
+            *link += random_uniform_host<real_t>(i, parity, -noise_max, noise_max);
+          }
+        }
+      }
+    }
+  }
+};
+
+void addNoiseToGaugeField(void *const *gauge, double noise_max, QudaPrecision precision)
+{
+  instantiate_host<AddNoiseToGaugeField>(precision, gauge, noise_max);
 }
 
 void constructRandomGaugeField(void *const *gauge, const QudaGaugeParam &param, QudaPrecision precision,

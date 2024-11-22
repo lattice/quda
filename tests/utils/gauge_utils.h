@@ -99,12 +99,12 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision);
 void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision);
 
 /**
- * @brief Constructs a random U(3) gauge field
+ * @brief Rescales a gauge field with a per-site random phase
  *
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] precision Gauge field floating point precision
  */
-void constructRandomU3GaugeField(void *const *gauge, QudaPrecision precision);
+void applyRandomU1Phase(void *const *gauge, QudaPrecision precision);
 
 /**
  * @brief Constructs a "gauge field" of random (sane, invertable) matrices
@@ -113,6 +113,15 @@ void constructRandomU3GaugeField(void *const *gauge, QudaPrecision precision);
  * @param[in] precision Gauge field floating point precision
  */
 void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision);
+
+/**
+ * @brief Adds some non-unitary noise to a gauge field
+ *
+ * @param[in,out] gauge Generated QDP-ordered gauge field
+ * @param[in] noise_max Scale of noise added to the gauge field
+ * @param[in] precision Gauge field floating point precision
+ */
+void addNoiseToGaugeField(void *const *gauge, double noise_max, QudaPrecision precision);
 
 /**
  * @brief Constructs a random gauge field, which may be SU(3), U(3), or arbitrary as requested

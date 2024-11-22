@@ -250,9 +250,6 @@ int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, co
 */
 void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
 
-// used by link fattening code
-int x4_from_full_index(int i);
-
 // additions for dw (quickly hacked on)
 int fullLatticeIndex_4d(int i, int oddBit);
 int fullLatticeIndex_5d(int i, int oddBit);
