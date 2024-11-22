@@ -117,9 +117,9 @@ void computeLinkOrderedOuterProduct(su3_vector *src, quda::GaugeField &dest, siz
 void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
 {
   if (precision == QUDA_SINGLE_PRECISION) {
-    computeLinkOrderedOuterProduct<fsu3_matrix>((fsu3_vector *)src, dst, nhops);
+    computeLinkOrderedOuterProduct<fsu3_matrix>(static_cast<fsu3_vector *>(src), dst, nhops);
   } else {
-    computeLinkOrderedOuterProduct<dsu3_matrix>((dsu3_vector *)src, dst, nhops);
+    computeLinkOrderedOuterProduct<dsu3_matrix>(static_cast<dsu3_vector *>(src), dst, nhops);
   }
 }
 
@@ -342,7 +342,7 @@ public:
   void loadMatrixFromField(const Real *const field, int oddBit, int half_lattice_index,
                            Matrix<3, std::complex<Real>> *const mat) const;
 
-  void loadMatrixFromField(const Real *const field, int oddBit, int dir, int half_lattice_index,
+  void loadMatrixFromField(const Real *const *const field, int oddBit, int dir, int half_lattice_index,
                            Matrix<3, std::complex<Real>> *const mat) const;
 
   void storeMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index,
@@ -352,12 +352,12 @@ public:
                         Real *const) const;
 
   void addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir, int half_lattice_index,
-                        Real coeff, Real *const) const;
+                        Real coeff, Real *const *const) const;
 
   void storeMatrixToMomentumField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir, int half_lattice_index,
                                   Real coeff, Real *const) const;
-  Real getData(const Real *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
-  void addData(Real *const field, int idx, int dir, int oddBit, int offset, Real, int hfv) const;
+  Real getData(const Real *const *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
+  void addData(Real *const *const field, int idx, int dir, int oddBit, int offset, Real, int hfv) const;
   int half_idx_conversion_ex2normal(int half_lattice_index, const int *dim, int oddBit) const;
   int half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const;
 };
@@ -423,16 +423,16 @@ int LoadStore<Real>::half_idx_conversion_normal2ex(int half_lattice_index, const
 }
 
 template <class Real>
-Real LoadStore<Real>::getData(const Real *const field, int idx, int dir, int oddBit, int offset, int hfv) const
+Real LoadStore<Real>::getData(const Real *const *const field, int idx, int dir, int oddBit, int offset, int hfv) const
 {
   // QDP format
-  return ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset];
+  return field[dir][(hfv * oddBit + idx) * 18 + offset];
 }
 template <class Real>
-void LoadStore<Real>::addData(Real *const field, int idx, int dir, int oddBit, int offset, Real v, int hfv) const
+void LoadStore<Real>::addData(Real *const *const field, int idx, int dir, int oddBit, int offset, Real v, int hfv) const
 {
   // QDP format
-  ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset] += v;
+  field[dir][(hfv * oddBit + idx) * 18 + offset] += v;
 }
 
 template <class Real>
@@ -455,7 +455,7 @@ void LoadStore<Real>::loadMatrixFromField(const Real *const field, int oddBit, i
 }
 
 template <class Real>
-void LoadStore<Real>::loadMatrixFromField(const Real *const field, int oddBit, int dir, int half_lattice_index,
+void LoadStore<Real>::loadMatrixFromField(const Real *const *const field, int oddBit, int dir, int half_lattice_index,
                                           Matrix<3, std::complex<Real>> *const mat) const
 {
 #ifdef MULTI_GPU
@@ -464,11 +464,10 @@ void LoadStore<Real>::loadMatrixFromField(const Real *const field, int oddBit, i
   int hfv = Vh;
 #endif
 
-  // const Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
   int offset = 0;
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) {
-      (*mat)(i, j) = (getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
+      (*mat)(i, j) = getData(field, half_lattice_index, dir, oddBit, offset++, hfv);
       (*mat)(i, j) += std::complex<Real>(0, getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
     }
   }
@@ -515,23 +514,18 @@ void LoadStore<Real>::addMatrixToField(const Matrix<3, std::complex<Real>> &mat,
 
 template <class Real>
 void LoadStore<Real>::addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir,
-                                       int half_lattice_index, Real coeff, Real *const field) const
+                                       int half_lattice_index, Real coeff, Real *const *const field) const
 {
-
 #ifdef MULTI_GPU
   int hfv = Vh_ex;
 #else
   int hfv = Vh;
 #endif
 
-  // Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
   int offset = 0;
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) {
-      // local_field[offset++] += coeff*mat(i,j).real();
       addData(field, half_lattice_index, dir, oddBit, offset++, coeff * mat(i, j).real(), hfv);
-
-      // local_field[offset++] += coeff*mat(i,j).imag();
       addData(field, half_lattice_index, dir, oddBit, offset++, coeff * mat(i, j).imag(), hfv);
     }
   }
@@ -762,7 +756,8 @@ void computeOneLinkSite(
 #else
   const int[],
 #endif
-  int half_lattice_index, const Real *const oprod, int sig, Real coeff, const LoadStore<Real> &ls, Real *const output)
+  int half_lattice_index, const Real *const *const oprod, int sig, Real coeff, const LoadStore<Real> &ls,
+  Real *const *const output)
 {
   if (GOES_FORWARDS(sig)) {
     typename ColorMatrix<Real>::Type colorMatW;
@@ -777,7 +772,7 @@ void computeOneLinkSite(
 }
 
 template <class Real>
-void computeOneLinkField(const int dim[4], const Real *const oprod, int sig, Real coeff, Real *const output)
+void computeOneLinkField(const int dim[4], const Real *const *const oprod, int sig, Real coeff, Real *const *const output)
 {
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -795,10 +790,10 @@ void computeOneLinkField(const int dim[4], const Real *const oprod, int sig, Rea
 // middleLinkKernel compiles for now, but lots of debugging to be done
 template <class Real, int oddBit>
 void computeMiddleLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
-                           const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
+                           const int dim[4], void *const oprod, const Real *const Qprev, const Real *const *const link,
                            int sig, int mu, Real coeff,
                            const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
-                           Real *const Pmu, Real *const P3, Real *const Qmu, Real *const newOprod)
+                           Real *const Pmu, Real *const P3, Real *const Qmu, Real *const *const newOprod)
 {
   const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
   const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
@@ -842,13 +837,13 @@ void computeMiddleLinkSite(int half_lattice_index, // half_lattice_index to bett
 
   if (Qprev == NULL) {
     if (sig_positive) {
-      ls.loadMatrixFromField(oprod, 1 - oddBit, sig, point_d, &colorMatY);
+      ls.loadMatrixFromField(static_cast<const Real *const *const>(oprod), 1 - oddBit, sig, point_d, &colorMatY);
     } else {
-      ls.loadMatrixFromField(oprod, oddBit, OPP_DIR(sig), point_c, &colorMatY);
+      ls.loadMatrixFromField(static_cast<const Real *const *const>(oprod), oddBit, OPP_DIR(sig), point_c, &colorMatY);
       colorMatY = conj(colorMatY);
     }
   } else { // Qprev != NULL
-    ls.loadMatrixFromField(oprod, oddBit, point_c, &colorMatY);
+    ls.loadMatrixFromField(static_cast<const Real *const>(oprod), oddBit, point_c, &colorMatY);
   }
 
   colorMatW = (!mu_positive) ? bc_link * colorMatY : conj(bc_link) * colorMatY;
@@ -880,9 +875,9 @@ void computeMiddleLinkSite(int half_lattice_index, // half_lattice_index to bett
 } // computeMiddleLinkSite
 
 template <class Real>
-void computeMiddleLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
+void computeMiddleLinkField(const int dim[4], void *const oprod, const Real *const Qprev, const Real *const *const link,
                             int sig, int mu, Real coeff, Real *const Pmu, Real *const P3, Real *const Qmu,
-                            Real *const newOprod)
+                            Real *const *const newOprod)
 {
 
   int volume = 1;
@@ -911,9 +906,9 @@ template <class Real, int oddBit>
 void computeSideLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
                          const int dim[4], const Real *const P3,
                          const Real *const Qprod, // why?
-                         const Real *const link, int sig, int mu, Real coeff, Real accumu_coeff,
+                         const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
                          const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
-                         Real *const shortP, Real *const newOprod)
+                         Real *const shortP, Real *const *const newOprod)
 {
 
   const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
@@ -979,8 +974,8 @@ void computeSideLinkSite(int half_lattice_index, // half_lattice_index to better
 template <class Real>
 void computeSideLinkField(const int dim[4], const Real *const P3,
                           const Real *const Qprod, // why?
-                          const Real *const link, int sig, int mu, Real coeff, Real accumu_coeff, Real *const shortP,
-                          Real *const newOprod)
+                          const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
+                          Real *const shortP, Real *const *const newOprod)
 {
   // Need some way of setting half_volume
   int volume = 1;
@@ -1005,10 +1000,10 @@ void computeSideLinkField(const int dim[4], const Real *const P3,
 
 template <class Real, int oddBit>
 void computeAllLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
-                        const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
-                        int sig, int mu, Real coeff, Real accumu_coeff,
+                        const int dim[4], const Real *const oprod, const Real *const Qprev,
+                        const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
                         const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
-                        Real *const shortP, Real *const newOprod)
+                        Real *const shortP, Real *const *const newOprod)
 {
 
   const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
@@ -1092,8 +1087,9 @@ void computeAllLinkSite(int half_lattice_index, // half_lattice_index to better 
 } // allLinkKernel
 
 template <class Real>
-void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
-                         int sig, int mu, Real coeff, Real accumu_coeff, Real *const shortP, Real *const newOprod)
+void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev,
+                         const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
+                         Real *const shortP, Real *const *const newOprod)
 {
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -1132,8 +1128,8 @@ template <class Real> struct PathCoefficients {
 };
 
 template <class Real>
-void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coeff, Real *oprod, Real *link,
-                           Real **tempmat, Real *newOprod)
+void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coeff, Real **oprod, Real **link,
+                           Real **tempmat, Real **newOprod)
 {
   Real OneLink, ThreeSt, FiveSt, SevenSt, Lepage, coeff;
 
@@ -1217,9 +1213,6 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   uint64_t len = 1;
   for (int dir = 0; dir < 4; ++dir) len *= X_[dir];
 #endif
-  // allocate memory for temporary fields
-  void *tempmat[6];
-  for (int i = 0; i < 6; i++) { tempmat[i] = safe_malloc(len * 18 * precision); }
 
   PathCoefficients<double> act_path_coeff;
   act_path_coeff.one = path_coeff[0];
@@ -1229,27 +1222,29 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   act_path_coeff.seven = path_coeff[4];
   act_path_coeff.lepage = path_coeff[5];
 
-  void *oprod_array[] = {oprod.data(0), oprod.data(1), oprod.data(2), oprod.data(3)};
-  void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
-  void *noprod_array[] = {newOprod->data(0), newOprod->data(1), newOprod->data(2), newOprod->data(3)};
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    doHisqStaplesForceCPU<double>(X_, act_path_coeff, reinterpret_cast<double *>(oprod_array),
-                                  reinterpret_cast<double *>(link_array), (double **)tempmat,
-                                  reinterpret_cast<double *>(noprod_array));
-  } else if (precision == QUDA_SINGLE_PRECISION) {
-    doHisqStaplesForceCPU<float>(X_, act_path_coeff, reinterpret_cast<float *>(oprod_array),
-                                 reinterpret_cast<float *>(link_array), (float **)tempmat,
-                                 reinterpret_cast<float *>(noprod_array));
+  if (precision == QUDA_SINGLE_PRECISION) {
+    // allocate memory for temporary fields
+    float *tempmat[6];
+    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<float *>(safe_malloc(len * 18 * precision)); }
+    doHisqStaplesForceCPU<float>(X_, act_path_coeff, oprod.data_array<float *>().data, link.data_array<float *>().data,
+                                 tempmat, newOprod->data_array<float *>().data);
+    for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
+  } else if (precision == QUDA_DOUBLE_PRECISION) {
+    // allocate memory for temporary fields
+    double *tempmat[6];
+    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<double *>(safe_malloc(len * 18 * precision)); }
+    doHisqStaplesForceCPU<double>(X_, act_path_coeff, oprod.data_array<double *>().data,
+                                  link.data_array<double *>().data, tempmat, newOprod->data_array<double *>().data);
+    for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
   } else {
     errorQuda("Unsupported precision");
   }
-
-  for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
 }
 
 template <class Real, int oddBit>
-void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *const oprod, const Real *const link,
-                         int sig, Real coeff, const LoadStore<Real> &ls, Real *const output)
+void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *const *const oprod,
+                         const Real *const *const link, int sig, Real coeff, const LoadStore<Real> &ls,
+                         Real *const *const output)
 {
   if (GOES_FORWARDS(sig)) {
 
@@ -1296,8 +1291,8 @@ void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *c
 }
 
 template <class Real>
-void computeLongLinkField(const int dim[4], const Real *const oprod, const Real *const link, int sig, Real coeff,
-                          Real *const output)
+void computeLongLinkField(const int dim[4], const Real *const *const oprod, const Real *const *const link, int sig,
+                          Real coeff, Real *const *const output)
 {
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -1321,16 +1316,13 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
-  void *oprod_array[] = {oprod.data(0), oprod.data(1), oprod.data(2), oprod.data(3)};
-  void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
-  void *noprod_array[] = {newOprod->data(0), newOprod->data(1), newOprod->data(2), newOprod->data(3)};
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      computeLongLinkField<float>(X_, reinterpret_cast<float *>(oprod_array), reinterpret_cast<float *>(link_array),
-                                  sig, coeff, reinterpret_cast<float *>(noprod_array));
+      computeLongLinkField<float>(X_, oprod.data_array<float *>().data, link.data_array<float *>().data, sig, coeff,
+                                  newOprod->data_array<float *>().data);
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      computeLongLinkField<double>(X_, reinterpret_cast<double *>(oprod_array), reinterpret_cast<double *>(link_array),
-                                   sig, coeff, reinterpret_cast<double *>(noprod_array));
+      computeLongLinkField<double>(X_, oprod.data_array<double *>().data, link.data_array<double *>().data, sig, coeff,
+                                   newOprod->data_array<double *>().data);
     } else {
       errorQuda("Unrecognised precision");
     }
@@ -1344,8 +1336,8 @@ void completeForceSite(int half_lattice_index,
 #else
                        const int[],
 #endif
-                       const Real *const oprod, const Real *const link, int sig, const LoadStore<Real> &ls,
-                       Real *const mom)
+                       const Real *const *const oprod, const Real *const *const link, int sig,
+                       const LoadStore<Real> &ls, Real *const mom)
 {
 
   typename ColorMatrix<Real>::Type colorMatX, colorMatY, linkW;
@@ -1366,7 +1358,8 @@ void completeForceSite(int half_lattice_index,
 }
 
 template <class Real>
-void completeForceField(const int dim[4], const Real *const oprod, const Real *const link, int sig, Real *const mom)
+void completeForceField(const int dim[4], const Real *const *const oprod, const Real *const *const link, int sig,
+                        Real *const mom)
 {
   int volume = dim[0] * dim[1] * dim[2] * dim[3];
   const int half_volume = volume / 2;
@@ -1384,15 +1377,13 @@ void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda:
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
-  void *oprod_array[] = {oprod.data(0), oprod.data(1), oprod.data(2), oprod.data(3)};
-  void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      completeForceField<float>(X_, reinterpret_cast<float *>(oprod_array), reinterpret_cast<float *>(link_array), sig,
+      completeForceField<float>(X_, oprod.data_array<float *>().data, link.data_array<float *>().data, sig,
                                 mom->data<float *>());
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      completeForceField<double>(X_, reinterpret_cast<double *>(oprod_array), reinterpret_cast<double *>(link_array),
-                                 sig, mom->data<double *>());
+      completeForceField<double>(X_, oprod.data_array<double *>().data, link.data_array<double *>().data, sig,
+                                 mom->data<double *>());
     } else {
       errorQuda("Unrecognised precision");
     }

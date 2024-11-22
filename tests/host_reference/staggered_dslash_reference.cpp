@@ -146,16 +146,16 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
                             long_link.Ghost()[3].data()};
 
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    staggeredDslashReference(static_cast<double *>(out.data()), reinterpret_cast<double **>(qdp_fatlink),
+    staggeredDslashReference(out.data<double *>(), reinterpret_cast<double **>(qdp_fatlink),
                              reinterpret_cast<double **>(qdp_longlink), reinterpret_cast<double **>(ghost_fatlink),
-                             reinterpret_cast<double **>(ghost_longlink), static_cast<double *>(in.data()),
+                             reinterpret_cast<double **>(ghost_longlink), in.data<double *>(),
                              reinterpret_cast<double **>(in.fwdGhostFaceBuffer),
                              reinterpret_cast<double **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type,
                              laplace3D);
   } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-    staggeredDslashReference(static_cast<float *>(out.data()), reinterpret_cast<float **>(qdp_fatlink),
+    staggeredDslashReference(out.data<float *>(), reinterpret_cast<float **>(qdp_fatlink),
                              reinterpret_cast<float **>(qdp_longlink), reinterpret_cast<float **>(ghost_fatlink),
-                             reinterpret_cast<float **>(ghost_longlink), static_cast<float *>(in.data()),
+                             reinterpret_cast<float **>(ghost_longlink), in.data<float *>(),
                              reinterpret_cast<float **>(in.fwdGhostFaceBuffer),
                              reinterpret_cast<float **>(in.backGhostFaceBuffer), oddBit, daggerBit, dslash_type,
                              laplace3D);
