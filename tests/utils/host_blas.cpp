@@ -63,20 +63,20 @@ void mxpy(void *x, void *y, int len, QudaPrecision precision)
 }
 
 // returns the square of the L2 norm of the vector
-template <typename real_t> inline double norm2(real_t *v, int len)
+template <typename real_t> inline double norm2(real_t *v, int len, bool global)
 {
   double sum = 0.0;
   for (int i = 0; i < len; i++) sum += v[i] * v[i];
-  quda::comm_allreduce_sum(sum);
+  if (global) quda::comm_allreduce_sum(sum);
   return sum;
 }
 
-double norm_2(void *v, int len, QudaPrecision precision)
+double norm_2(void *v, int len, QudaPrecision precision, bool global)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    return norm2((double *)v, len);
+    return norm2((double *)v, len, global);
   else
-    return norm2((float *)v, len);
+    return norm2((float *)v, len, global);
 }
 
 // performs the operation y[i] = x[i] + a*y[i]

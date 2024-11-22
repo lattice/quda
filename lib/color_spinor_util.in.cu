@@ -329,7 +329,7 @@ namespace quda {
       printf("rank = %d x = %u, s = %d, { ", comm_rank(), x_cb, s);
       for (int c = 0; c < o.Ncolor(); c++) {
         auto value = complex<double>(o(parity, x_cb, s, c));
-        printf("(%f,%f) ", value.real(), value.imag());
+        printf("(%g,%g) ", value.real(), value.imag());
       }
       printf("}\n");
     }

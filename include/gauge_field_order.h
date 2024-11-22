@@ -153,8 +153,11 @@ namespace quda {
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
     template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, short>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, int8_t>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, short>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, int>() { return true; }
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
     template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
@@ -377,7 +380,7 @@ namespace quda {
       {
         for (int d = 0; d < U.Geometry(); d++)
           u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
-        resetScale(U.Scale());
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -459,7 +462,7 @@ namespace quda {
           ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
         }
 
-        resetScale(U.Scale());
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -494,7 +497,7 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-        resetScale(U.Scale());
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -583,7 +586,7 @@ namespace quda {
           ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
         }
 
-        resetScale(U.Scale());
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -636,7 +639,7 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-	resetScale(U.Scale());
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -715,7 +718,7 @@ namespace quda {
             nullptr;
           ghostVolumeCB[d + 4] = U.Nface() * U.SurfaceCB(d);
         }
-        resetScale(U.Scale());
+        resetScale(U.Scale() * (U.LinkMax() == 0.0 ? 1.0 : U.LinkMax()));
       }
 
       void resetScale(Float max)
@@ -745,8 +748,8 @@ namespace quda {
        @tparam nSpinCoarse Number of "spin degrees of freedom" (for coarse-link fields only)
        @tparam order Storage order of the field
        @tparam native_ghost Whether to use native ghosts (inlined into
+               the padded area for internal-order fields or use a separate array if false)
        @tparam storeFloat_ Underlying storage type for the field
-       the padded area for internal-order fields or use a separate array if false)
      */
     template <typename Float_, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost = true,
               typename storeFloat_ = Float_>
@@ -1478,7 +1481,7 @@ namespace quda {
             z *= scale;
 #pragma unroll
             for (int i = 0; i < 9; i++) out[i] = cmul(z, out[i]);
-          } else { // stagic phase
+          } else { // static phase
 #pragma unroll
             for (int i = 0; i < 9; i++) { out[i] *= phase; }
           }

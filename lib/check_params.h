@@ -175,6 +175,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(preserve_deflation, QUDA_BOOLEAN_FALSE);
   P(preserve_deflation_space, 0);
   P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_smeared_gauge, false);
   P(use_dagger, QUDA_BOOLEAN_FALSE);
   P(use_norm_op, QUDA_BOOLEAN_FALSE);
   P(compute_svd, QUDA_BOOLEAN_FALSE);
@@ -578,6 +579,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   // domain decomposition parameters
   //P(inv_type_sloppy, QUDA_INVALID_INVERTER); // disable since invalid means no preconditioner
 #if defined INIT_PARAM
+  P(dslash_type_precondition, QUDA_INVALID_DSLASH);
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
   P(preconditioner, 0);
   P(tol_precondition, INVALID_DOUBLE);

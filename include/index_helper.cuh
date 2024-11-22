@@ -1106,4 +1106,26 @@ namespace quda {
     return (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
   }
 
+  /**
+     @brief Compute the flattened 4-d index from a separate T and
+     flattened 3-d XYZ index.
+     @param[in] t Temporal index
+     @param[in] xyz Flattened 3-d index
+     @param[in] X Lattice dimensions
+     @return The flattened 4-d index
+   */
+  template <int reduction_dim, class T> __device__ int idx_from_t_xyz(int t, int xyz, T X[4])
+  {
+    int x[4];
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      if (d != reduction_dim) {
+        x[d] = xyz % X[d];
+        xyz = xyz / X[d];
+      }
+    }
+    x[reduction_dim] = t;
+    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
+  }
+
 } // namespace quda

@@ -32,20 +32,6 @@ namespace quda
     return ((sink[3] * X[2] + sink[2]) * X[1] + sink[1]) * X[0] + sink[0];
   }
 
-  template <int reduction_dim, class T> __device__ int idx_from_t_xyz(int t, int xyz, T X[4])
-  {
-    int x[4];
-#pragma unroll
-    for (int d = 0; d < 4; d++) {
-      if (d != reduction_dim) {
-        x[d] = xyz % X[d];
-        xyz /= X[d];
-      }
-    }
-    x[reduction_dim] = t;
-    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
-  }
-
   template <typename Float, int nColor_, int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = spinor_array>
   struct ContractionSummedArg : public ReduceArg<contract_t> {
     using reduce_t = contract_t;
