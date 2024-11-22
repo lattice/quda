@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "host_utils.h"
+#include "force_utils.hpp"
 #include "index_utils.hpp"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -12,90 +13,6 @@
 extern int Z[4];
 extern int V;
 extern int Vh;
-
-#define CADD(a, b, c)                                                                                                  \
-  {                                                                                                                    \
-    (c).real = (a).real + (b).real;                                                                                    \
-    (c).imag = (a).imag + (b).imag;                                                                                    \
-  }
-#define CMUL(a, b, c)                                                                                                  \
-  {                                                                                                                    \
-    (c).real = (a).real * (b).real - (a).imag * (b).imag;                                                              \
-    (c).imag = (a).real * (b).imag + (a).imag * (b).real;                                                              \
-  }
-#define CSUM(a, b)                                                                                                     \
-  {                                                                                                                    \
-    (a).real += (b).real;                                                                                              \
-    (a).imag += (b).imag;                                                                                              \
-  }
-
-/* c = a* * b */
-#define CMULJ_(a, b, c)                                                                                                \
-  {                                                                                                                    \
-    (c).real = (a).real * (b).real + (a).imag * (b).imag;                                                              \
-    (c).imag = (a).real * (b).imag - (a).imag * (b).real;                                                              \
-  }
-
-/* c = a * b* */
-#define CMUL_J(a, b, c)                                                                                                \
-  {                                                                                                                    \
-    (c).real = (a).real * (b).real + (a).imag * (b).imag;                                                              \
-    (c).imag = (a).imag * (b).real - (a).real * (b).imag;                                                              \
-  }
-
-#define CONJG(a, b)                                                                                                    \
-  {                                                                                                                    \
-    (b).real = (a).real;                                                                                               \
-    (b).imag = -(a).imag;                                                                                              \
-  }
-
-typedef struct {
-  float real;
-  float imag;
-} fcomplex;
-
-/* specific for double complex */
-typedef struct {
-  double real;
-  double imag;
-} dcomplex;
-
-typedef struct {
-  fcomplex e[3][3];
-} fsu3_matrix;
-typedef struct {
-  fcomplex c[3];
-} fsu3_vector;
-typedef struct {
-  dcomplex e[3][3];
-} dsu3_matrix;
-typedef struct {
-  dcomplex c[3];
-} dsu3_vector;
-
-typedef struct {
-  fcomplex m01, m02, m12;
-  float m00im, m11im, m22im;
-  float space;
-} fanti_hermitmat;
-
-typedef struct {
-  dcomplex m01, m02, m12;
-  double m00im, m11im, m22im;
-  double space;
-} danti_hermitmat;
-
-template <typename su3_matrix> su3_matrix *get_su3_matrix(quda::GaugeField &p, int idx, int dir)
-{
-  auto data = static_cast<su3_matrix *>(p.data(dir));
-  return data + idx;
-}
-
-template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vector *a, su3_vector *b, su3_matrix *c)
-{
-  for (int i = 0; i < 3; i++)
-    for (int j = 0; j < 3; j++) CMUL_J(a->c[i], b->c[j], c->e[i][j]);
-}
 
 template <typename su3_matrix, typename su3_vector>
 void computeLinkOrderedOuterProduct(su3_vector *src, quda::GaugeField &dest, size_t nhops)

@@ -255,7 +255,7 @@ std::vector<double> eigensolve(test_t test_param)
   for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
 
   // Complex eigenvalues
-  int n_batch = laplace3D == 3 ? eig_param.ortho_dim_size_local * comm_dim(3) : 1;
+  int n_batch = laplace3D == 3 ? eig_param.ortho_dim_size_local * quda::comm_dim(3) : 1;
   std::vector<__complex__ double> evals(eig_n_conv * n_batch);
   // Vector construct END
   //----------------------------------------------------------------------------
