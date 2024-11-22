@@ -54,9 +54,15 @@ set(CMAKE_HIP_FLAGS_RELEASE
 set(CMAKE_HIP_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_HIP_FLAGS_DEBUG
-    "-g -G"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
+    set(CMAKE_HIP_FLAGS_DEBUG
+        "-g -G"
+        CACHE STRING "Flags used by the HIP compiler during debug builds (with device debug support for NVIDIA).")
+else()
+    set(CMAKE_HIP_FLAGS_DEBUG
+        "-g"
+        CACHE STRING "Flags used by the HIP compiler during debug builds (with device debug support for Clang).")
+endif()
 set(CMAKE_HIP_FLAGS_SANITIZE
     "-g "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
