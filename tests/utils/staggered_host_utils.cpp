@@ -204,8 +204,6 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
 
   int fat_pad = pad_size;
   int link_pad = 3 * pad_size;
-  double scale = gauge_param.scale;
-  //gauge_param.scale = 1.0;
 
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
@@ -235,7 +233,6 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
     gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
-  gauge_param.scale = scale;
 }
 
 #ifndef MULTI_GPU

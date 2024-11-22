@@ -1224,26 +1224,17 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
     // allocate memory for temporary fields
     float *tempmat[6];
     for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<float*>(safe_malloc(len * 18 * precision)); }
-    //float *oprod_array[] = {oprod.data<float*>(0), oprod.data<float*>(1), oprod.data<float*>(2), oprod.data<float*>(3)};
-    //float *link_array[] = {link.data<float*>(0), link.data<float*>(1), link.data<float*>(2), link.data<float*>(3)};
-    //float *noprod_array[] = {newOprod->data<float*>(0), newOprod->data<float*>(1), newOprod->data<float*>(2), newOprod->data<float*>(3)};
-    //doHisqStaplesForceCPU<float>(X_, act_path_coeff, oprod_array, link_array, tempmat, noprod_array);
     doHisqStaplesForceCPU<float>(X_, act_path_coeff, oprod.data_array<float*>().data, link.data_array<float*>().data, tempmat, newOprod->data_array<float*>().data);
     for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
   } else if (precision == QUDA_DOUBLE_PRECISION) {
     // allocate memory for temporary fields
     double *tempmat[6];
     for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<double*>(safe_malloc(len * 18 * precision)); }
-    //double *oprod_array[] = {oprod.data<double*>(0), oprod.data<double*>(1), oprod.data<double*>(2), oprod.data<double*>(3)};
-    //double *link_array[] = {link.data<double*>(0), link.data<double*>(1), link.data<double*>(2), link.data<double*>(3)};
-    //double *noprod_array[] = {newOprod->data<double*>(0), newOprod->data<double*>(1), newOprod->data<double*>(2), newOprod->data<double*>(3)};
-    //doHisqStaplesForceCPU<double>(X_, act_path_coeff, oprod_array, link_array, tempmat, noprod_array);
     doHisqStaplesForceCPU<double>(X_, act_path_coeff, oprod.data_array<double*>().data, link.data_array<double*>().data, tempmat, newOprod->data_array<double*>().data);
     for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
   } else {
     errorQuda("Unsupported precision");
   }
-
 }
 
 template <class Real, int oddBit>
@@ -1322,15 +1313,8 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
 
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      //float *oprod_array[] = {oprod.data<float*>(0), oprod.data<float*>(1), oprod.data<float*>(2), oprod.data<float*>(3)};
-      //float *link_array[] = {link.data<float*>(0), link.data<float*>(1), link.data<float*>(2), link.data<float*>(3)};
-      //float *noprod_array[] = {newOprod->data<float*>(0), newOprod->data<float*>(1), newOprod->data<float*>(2), newOprod->data<float*>(3)};
       computeLongLinkField<float>(X_, oprod.data_array<float*>().data, link.data_array<float*>().data, sig, coeff, newOprod->data_array<float*>().data);
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      //double *oprod_array[] = {oprod.data<double*>(0), oprod.data<double*>(1), oprod.data<double*>(2), oprod.data<double*>(3)};
-      //double *link_array[] = {link.data<double*>(0), link.data<double*>(1), link.data<double*>(2), link.data<double*>(3)};
-      //double *noprod_array[] = {newOprod->data<double*>(0), newOprod->data<double*>(1), newOprod->data<double*>(2), newOprod->data<double*>(3)};
-      //computeLongLinkField<double>(X_, oprod_array, link_array, sig, coeff, noprod_array);
       computeLongLinkField<double>(X_, oprod.data_array<double*>().data, link.data_array<double*>().data, sig, coeff, newOprod->data_array<double*>().data);
     } else {
       errorQuda("Unrecognised precision");

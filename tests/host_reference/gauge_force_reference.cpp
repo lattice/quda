@@ -472,7 +472,6 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
-
   auto qdp_ex = quda::createExtendedGauge(u.data_array().data, param, R);
   lattice_t lat(*qdp_ex);
 
@@ -487,8 +486,6 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
 void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
                                 int **input_path, int *length, double *path_coeff, int num_paths)
 {
-  //void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
-
   // create extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -496,22 +493,17 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
-
-  //auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   auto qdp_ex = quda::createExtendedGauge(u.data_array().data, param, R);
   lattice_t lat(*qdp_ex);
-  //void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
 
   std::vector<double> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-      //dcomplex tr = compute_loop_trace((dsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
       dcomplex tr = compute_loop_trace(qdp_ex->data_array<dsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;
     } else {
-      //dcomplex tr = compute_loop_trace((fsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
       dcomplex tr = compute_loop_trace(qdp_ex->data_array<fsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;
