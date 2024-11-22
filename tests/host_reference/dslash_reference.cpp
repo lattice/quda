@@ -746,17 +746,17 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
 
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int src_idx)
+                                               QudaInvertParam &inv_param, int laplace3D, int src_idx)
 {
   std::vector<quda::ColorSpinorField> out_vector(1);
   out_vector[0] = out;
-  return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param, src_idx);
+  return verifyStaggeredInversion(in, out_vector, fat_link, long_link, inv_param, laplace3D, src_idx);
 }
 
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
                                                std::vector<quda::ColorSpinorField> &out_vector,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int src_idx)
+                                               QudaInvertParam &inv_param, int laplace3D, int src_idx)
 {
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   double l2r_max = 0.0;
@@ -783,7 +783,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
     for (int i = 0; i < multishift; i++) {
       auto &out = out_vector[i];
       double mass = 0.5 * sqrt(inv_param.offset[i]);
-      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
+      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type, laplace3D);
 
       mxpy(in.data(), ref.data(), in.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
       double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
@@ -809,10 +809,7 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
     auto &out = out_vector[0];
     double mass = inv_param.mass;
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-      stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
-
-      // correct for the massRescale function inside invertQuda
-      if (is_laplace(dslash_type)) ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
+      stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type, laplace3D);
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
       QudaParity parity = QUDA_INVALID_PARITY;
       switch (inv_param.matpc_type) {
@@ -820,9 +817,9 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
       case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
       default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
       }
-      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type);
+      stag_matpc(ref, fat_link, long_link, out, mass, 0, parity, dslash_type, laplace3D);
     } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-      stag_matdag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
+      stag_matdag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type, laplace3D);
     } else {
       errorQuda("Invalid staggered solution type %d", inv_param.solution_type);
     }
@@ -844,8 +841,9 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
   return {l2r_max, hqr_max};
 }
 
-double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Complex lambda, int i,
-                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link)
+double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, const std::vector<double _Complex> &lambda, int i,
+                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                      int laplace3D)
 {
   QudaInvertParam &inv_param = *(eig_param.invert_param);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
@@ -861,10 +859,7 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
     else
       sol_type = QUDA_MATDAG_MAT_SOLUTION;
   } else {
-    if (use_pc)
-      sol_type = QUDA_MATPC_SOLUTION;
-    else
-      sol_type = QUDA_MAT_SOLUTION;
+    sol_type = use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
   }
 
   // Create temporary spinors
@@ -872,7 +867,7 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
   quda::ColorSpinorField ref(csParam);
 
   if (sol_type == QUDA_MAT_SOLUTION) {
-    stag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
+    stag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type, laplace3D);
   } else if (sol_type == QUDA_MATPC_SOLUTION) {
     QudaParity parity = QUDA_INVALID_PARITY;
     switch (inv_param.matpc_type) {
@@ -880,26 +875,60 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
     case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
     default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
     }
-    stag_matpc(ref, fat_link, long_link, spinor, mass, 0, parity, dslash_type);
+    stag_matpc(ref, fat_link, long_link, spinor, mass, 0, parity, dslash_type, laplace3D);
   } else if (sol_type == QUDA_MATDAG_MAT_SOLUTION) {
-    stag_matdag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type);
+    stag_matdag_mat(ref, fat_link, long_link, spinor, mass, dagger, dslash_type, laplace3D);
   }
 
-  // Compute M * x - \lambda * x
-  caxpy(-lambda, spinor.data(), ref.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
-  double l2r = sqrt(nrm2 / src2);
+  if (laplace3D == 3) {
+    auto batch_size = (spinor.VolumeCB() / spinor.X()[3]) * stag_spinor_site_size;
+    auto t_offset = spinor.X()[3] * comm_coord(3);
+    std::vector<double> nrm2(spinor.X()[3] * comm_dim(3), 0.0);
+    std::vector<double> src2(spinor.X()[3] * comm_dim(3), 0.0);
+    // Compute M * x - \lambda * x on each slice
+    for (auto t = 0; t < spinor.X()[3]; t++) {
+      auto t_global = t_offset + t;
+      auto offset = t * batch_size * inv_param.cpu_prec;
 
-  printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+      for (int parity = 0; parity < spinor.SiteSubset(); parity++) {
+        caxpy(-lambda[t_global], static_cast<char *>(spinor.data()) + offset, static_cast<char *>(ref.data()) + offset,
+              batch_size, inv_param.cpu_prec);
 
-  return l2r;
+        nrm2[t_global] += norm_2(static_cast<char *>(ref.data()) + offset, batch_size, inv_param.cpu_prec, false);
+        src2[t_global] += norm_2(static_cast<char *>(spinor.data()) + offset, batch_size, inv_param.cpu_prec, false);
+
+        offset += spinor.VolumeCB() * stag_spinor_site_size * inv_param.cpu_prec;
+      }
+    }
+
+    comm_allreduce_sum(nrm2);
+    comm_allreduce_sum(src2);
+
+    for (auto t = 0; t < spinor.X()[3] * comm_dim(3); t++) {
+      auto l = ((double *)&(lambda[t]))[0];
+      printfQuda("Eigenvector %4d, t = %d lambda = %15.14e: tol %.2e, host residual = %.15e\n", i, t, l, eig_param.tol,
+                 sqrt(nrm2[t] / src2[t]));
+    }
+    auto total_nrm2 = std::accumulate(nrm2.begin(), nrm2.end(), 0);
+    auto total_src2 = std::accumulate(src2.begin(), src2.end(), 0);
+
+    return sqrt(total_nrm2 / total_src2);
+  } else {
+    // Compute M * x - \lambda * x
+    caxpy(-lambda[0], spinor.data(), ref.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    double src2 = norm_2(spinor.data(), spinor.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+    double l2r = sqrt(nrm2 / src2);
+    printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+    return l2r;
+  }
 }
 
 double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, quda::ColorSpinorField &spinor_right,
-                                         double _Complex sigma, int i, QudaEigParam &eig_param,
-                                         quda::GaugeField &fat_link, quda::GaugeField &long_link)
+                                         const std::vector<double _Complex> &sigma, int i, QudaEigParam &eig_param,
+                                         quda::GaugeField &fat_link, quda::GaugeField &long_link, int laplace3D)
 {
+  if (laplace3D == 3) errorQuda("3-d Laplace operator not supported");
   QudaInvertParam &inv_param = *(eig_param.invert_param);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
@@ -912,10 +941,10 @@ double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, qu
   quda::ColorSpinorField ref(csParam);
 
   // Only `mat` is used here
-  stag_mat(ref, fat_link, long_link, spinor_left, mass, dagger, dslash_type);
+  stag_mat(ref, fat_link, long_link, spinor_left, mass, dagger, dslash_type, laplace3D);
 
   // Compute M * x_left - \sigma * x_right
-  caxpy(-sigma, spinor_right.data(), ref.data(), spinor_right.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
+  caxpy(-sigma[0], spinor_right.data(), ref.data(), spinor_right.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
   double nrm2 = norm_2(ref.data(), ref.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
   double src2 = norm_2(spinor_left.data(), spinor_left.Volume() * stag_spinor_site_size, inv_param.cpu_prec);
   double l2r = sqrt(nrm2 / src2);

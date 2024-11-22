@@ -32,6 +32,9 @@ bool skip_test(test_t test_param)
   auto compute_svd = ::testing::get<3>(test_param);
   auto spectrum = ::testing::get<4>(test_param);
 
+  // 3-d operator only supported for Laplace
+  if (eig_type == QUDA_EIG_TR_LANCZOS_3D && dslash_type != QUDA_LAPLACE_DSLASH) return true;
+
   // Reverse engineer the operator type
   QudaSolveType combo_solve_type = get_solve_type(use_norm_op, use_pc, compute_svd);
   if (combo_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -87,6 +90,7 @@ bool skip_test(test_t test_param)
     case QUDA_LAPLACE_DSLASH:
       switch (eig_type) {
       case QUDA_EIG_TR_LANCZOS:
+      case QUDA_EIG_TR_LANCZOS_3D:
       case QUDA_EIG_BLK_TR_LANCZOS:
         if (spectrum != QUDA_SPECTRUM_LR_EIG && spectrum != QUDA_SPECTRUM_SR_EIG) return true;
         break;
@@ -117,6 +121,8 @@ TEST_P(StaggeredEigensolveTest, verify)
   auto eig_type = ::testing::get<0>(GetParam());
   if (eig_type == QUDA_EIG_IR_ARNOLDI || eig_type == QUDA_EIG_BLK_IR_ARNOLDI) factor *= 10;
   auto tol = factor * eig_param.tol;
+  if (dslash_type == QUDA_LAPLACE_DSLASH) laplace3D = eig_type == QUDA_EIG_TR_LANCZOS_3D ? 3 : 4;
+
   for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
 }
 
@@ -142,6 +148,9 @@ auto hermitian_solvers = Values(QUDA_EIG_TR_LANCZOS, QUDA_EIG_BLK_TR_LANCZOS, QU
 
 // Can solve non-hermitian systems
 auto non_hermitian_solvers = Values(QUDA_EIG_IR_ARNOLDI);
+
+// Batched solvers for 3-d operators
+auto batched_solvers = Values(QUDA_EIG_TR_LANCZOS_3D);
 
 // Eigensolver spectrum types
 auto hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG);
@@ -170,4 +179,10 @@ INSTANTIATE_TEST_SUITE_P(NormalFull, StaggeredEigensolveTest,
 INSTANTIATE_TEST_SUITE_P(DirectFull, StaggeredEigensolveTest,
                          ::testing::Combine(hermitian_solvers, Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_FALSE),
                                             Values(QUDA_BOOLEAN_FALSE), non_hermitian_spectrum),
+                         gettestname);
+
+// 3-d full system direct solve
+INSTANTIATE_TEST_SUITE_P(DirectFull3D, StaggeredEigensolveTest,
+                         ::testing::Combine(batched_solvers, Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_FALSE),
+                                            Values(QUDA_BOOLEAN_FALSE), hermitian_spectrum),
                          gettestname);

@@ -175,6 +175,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(preserve_deflation, QUDA_BOOLEAN_FALSE);
   P(preserve_deflation_space, 0);
   P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_smeared_gauge, false);
   P(use_dagger, QUDA_BOOLEAN_FALSE);
   P(use_norm_op, QUDA_BOOLEAN_FALSE);
   P(compute_svd, QUDA_BOOLEAN_FALSE);

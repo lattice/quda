@@ -1434,7 +1434,7 @@ void endQuda(void)
 
 namespace quda {
 
-  void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     double kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -1549,7 +1549,7 @@ namespace quda {
     diracParam.use_mobius_fused_kernel = inv_param->use_mobius_fused_kernel;
   }
 
-  void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1567,7 +1567,7 @@ namespace quda {
                 inv_param->cuda_prec_sloppy);
   }
 
-  void setDiracRefineParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracRefineParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1586,7 +1586,7 @@ namespace quda {
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
-  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc, bool comms)
+  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc, bool comms)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1617,7 +1617,7 @@ namespace quda {
                 inv_param->cuda_prec_precondition);
   }
 
-  void setDiracEigParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracEigParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc, bool use_smeared_gauge)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1625,6 +1625,20 @@ namespace quda {
       diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatExtended : gaugeExtended;
       diracParam.fatGauge = gaugeFatExtended;
       diracParam.longGauge = gaugeLongExtended;
+    } else if (use_smeared_gauge) {
+      if (!gaugeSmeared) errorQuda("No smeared gauge field present");
+      if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) {
+        if (gaugeSmeared->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {
+          GaugeFieldParam gauge_param(*gaugePrecise);
+          GaugeField gaugeEig(gauge_param);
+          copyExtendedGauge(gaugeEig, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+          gaugeEig.exchangeGhost();
+          std::swap(gaugeEig, *gaugeSmeared);
+        }
+        diracParam.gauge = gaugeSmeared;
+      } else {
+        errorQuda("Smeared gauge field not supported for operator %d", inv_param->dslash_type);
+      }
     } else {
       diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatEigensolver : gaugeEigensolver;
       diracParam.fatGauge = gaugeFatEigensolver;
@@ -1646,7 +1660,7 @@ namespace quda {
                 inv_param->cuda_prec_eigensolver);
   }
 
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, bool pc_solve)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1663,8 +1677,7 @@ namespace quda {
     dPre = Dirac::create(diracPreParam);
   }
 
-  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param,
-                             const bool pc_solve)
+  void createDiracWithRefine(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, bool pc_solve)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1684,8 +1697,8 @@ namespace quda {
     dRef = Dirac::create(diracRefParam);
   }
 
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
-                          const bool pc_solve)
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, bool pc_solve,
+                          bool use_smeared_gauge)
   {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
@@ -1696,7 +1709,7 @@ namespace quda {
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
     setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
-    setDiracEigParam(diracEigParam, &param, pc_solve);
+    setDiracEigParam(diracEigParam, &param, pc_solve, use_smeared_gauge);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -2392,14 +2405,17 @@ void checkClover(QudaInvertParam *param) {
 
 quda::GaugeField *checkGauge(QudaInvertParam *param)
 {
-  quda::GaugeField *cudaGauge = nullptr;
+  quda::GaugeField *U = param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise :
+                                                                   gaugePrecise;
+
+  if (U == nullptr)
+    errorQuda("Precise gauge %sfield doesn't exist", param->dslash_type == QUDA_ASQTAD_DSLASH ? "fat " : "");
+
+  if (param->cuda_prec != U->Precision()) {
+    errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, U->Precision());
+  }
+
   if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
-    if (gaugePrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
-
-    if (param->cuda_prec != gaugePrecise->Precision()) {
-      errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugePrecise->Precision());
-    }
-
     if (param->cuda_prec_sloppy != gaugeSloppy->Precision()
         || param->cuda_prec_precondition != gaugePrecondition->Precision()
         || param->cuda_prec_refinement_sloppy != gaugeRefinement->Precision()
@@ -2416,17 +2432,9 @@ quda::GaugeField *checkGauge(QudaInvertParam *param)
     if (gaugePrecondition == nullptr) errorQuda("Precondition gauge field doesn't exist");
     if (gaugeRefinement == nullptr) errorQuda("Refinement gauge field doesn't exist");
     if (gaugeEigensolver == nullptr) errorQuda("Refinement gauge field doesn't exist");
-    if (param->overlap) {
-      if (gaugeExtended == nullptr) errorQuda("Extended gauge field doesn't exist");
-    }
-    cudaGauge = gaugePrecise;
+    if (param->overlap && gaugeExtended == nullptr) errorQuda("Extended gauge field doesn't exist");
   } else {
-    if (gaugeFatPrecise == nullptr) errorQuda("Precise gauge fat field doesn't exist");
     if (gaugeLongPrecise == nullptr) errorQuda("Precise gauge long field doesn't exist");
-
-    if (param->cuda_prec != gaugeFatPrecise->Precision()) {
-      errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugeFatPrecise->Precision());
-    }
 
     if (param->cuda_prec_sloppy != gaugeFatSloppy->Precision()
         || param->cuda_prec_precondition != gaugeFatPrecondition->Precision()
@@ -2450,23 +2458,18 @@ quda::GaugeField *checkGauge(QudaInvertParam *param)
     if (gaugeFatPrecondition == nullptr) errorQuda("Precondition gauge fat field doesn't exist");
     if (gaugeFatRefinement == nullptr) errorQuda("Refinement gauge fat field doesn't exist");
     if (gaugeFatEigensolver == nullptr) errorQuda("Eigensolver gauge fat field doesn't exist");
-    if (param->overlap) {
-      if (gaugeFatExtended == nullptr) errorQuda("Extended gauge fat field doesn't exist");
-    }
+    if (param->overlap && gaugeFatExtended == nullptr) errorQuda("Extended gauge fat field doesn't exist");
 
     if (gaugeLongSloppy == nullptr) errorQuda("Sloppy gauge long field doesn't exist");
     if (gaugeLongPrecondition == nullptr) errorQuda("Precondition gauge long field doesn't exist");
     if (gaugeLongRefinement == nullptr) errorQuda("Refinement gauge long field doesn't exist");
     if (gaugeLongEigensolver == nullptr) errorQuda("Eigensolver gauge long field doesn't exist");
-    if (param->overlap) {
-      if (gaugeLongExtended == nullptr) errorQuda("Extended gauge long field doesn't exist");
-    }
-    cudaGauge = gaugeFatPrecise;
+    if (param->overlap && gaugeLongExtended == nullptr) errorQuda("Extended gauge long field doesn't exist");
   }
 
   checkClover(param);
 
-  return cudaGauge;
+  return U;
 }
 
 void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
@@ -2582,7 +2585,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // Create the dirac operator with a sloppy and a precon.
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
-  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve);
+  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve, eig_param->use_smeared_gauge);
   Dirac &dirac = *dEig;
   //------------------------------------------------------
 
@@ -2679,7 +2682,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
-  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
+  memcpy(host_evals, evals.data(), sizeof(Complex) * evals.size());
+
   if (!(eig_param->arpack_check)) {
     for (int i = 0; i < n_eig; i++) host_evecs_[i] = kSpace[i];
   }
@@ -4977,7 +4981,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 
   for (unsigned int i = 0; i < n_steps; i++) {
     if (i) in = out;
-    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, comm_dim, profileWuppertal);
+    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, comm_dim, profileWuppertal);
     logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
   }
 
@@ -5123,7 +5127,9 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
 
   int measurement_n = 0; // The nth measurement to take
   gaugeObservablesQuda(&obs_param[measurement_n]);
-  logQuda(QUDA_SUMMARIZE, "Q charge at step %03d = %+.16e\n", 0, obs_param[measurement_n].qcharge);
+  logQuda(QUDA_SUMMARIZE, "step %03d plaquette (mean %.16e, spatial %.16e temporal %.16e) Q charge = %.16e\n", 0,
+          obs_param[measurement_n].plaquette[0], obs_param[measurement_n].plaquette[1],
+          obs_param[measurement_n].plaquette[2], obs_param[measurement_n].qcharge);
 
   // set default dir_ignore = 3 for APE and STOUT for compatibility
   int dir_ignore = smear_param->dir_ignore;
@@ -5142,13 +5148,15 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
     case QUDA_GAUGE_SMEAR_HYP:
       HYPStep(*gaugeSmeared, tmp, smear_param->alpha1, smear_param->alpha2, smear_param->alpha3, dir_ignore);
       break;
-    default: errorQuda("Unkown gauge smear type %d", smear_param->smear_type);
+    default: errorQuda("Unknown gauge smear type %d", smear_param->smear_type);
     }
 
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++;
       gaugeObservablesQuda(&obs_param[measurement_n]);
-      logQuda(QUDA_SUMMARIZE, "Q charge at step %03d = %+.16e\n", i + 1, obs_param[measurement_n].qcharge);
+      logQuda(QUDA_SUMMARIZE, "step %03d plaquette (mean %.16e, spatial %.16e temporal %.16e) Q charge = %.16e\n",
+              i + 1, obs_param[measurement_n].plaquette[0], obs_param[measurement_n].plaquette[1],
+              obs_param[measurement_n].plaquette[2], obs_param[measurement_n].qcharge);
     }
   }
 
@@ -5297,7 +5305,7 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     // [4] = Laplace [0]
     copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow);
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profileGFlow);
 
     // [0] = [4] = Laplace [0] = Laplace [3]
     f_temp0 = f_temp4;
@@ -5315,7 +5323,7 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     // [4] <- Laplace [1]
     copyExtendedGauge(precise, gout, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, false, comm_dim, profileGFlow);
+    ApplyLaplace(f_temp4, f_temp1, precise, 4, a, b, f_temp1, parity, comm_dim, profileGFlow);
 
     // [1] <- [4]
     f_temp1 = f_temp4;
@@ -5333,7 +5341,7 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     // [4] <- Laplace [2]
     copyExtendedGauge(precise, gin, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow);
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profileGFlow);
 
     // [2] <- [4] = Laplace [2]
     f_temp2 = f_temp4;

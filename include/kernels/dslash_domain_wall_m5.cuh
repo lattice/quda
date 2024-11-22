@@ -578,7 +578,8 @@ namespace quda
 	  for (int s_count = 0; s_count < arg.Ls; s_count++) {
 	    auto factorR = (s_ < s ? -arg.m_f * R : R);
 
-	    Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) : arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+	    Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) :
+	      arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
 	    r += factorR * in.project(4, proj_dir);
 
 	    R *= coeff.kappa(s);
@@ -597,7 +598,8 @@ namespace quda
 	  for (int s_count = 0; s_count < arg.Ls; s_count++) {
 	    auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-	    Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) : arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+	    Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) :
+	      arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
 	    l += factorL * in.project(4, proj_dir);
 
 	    L *= coeff.kappa(s);

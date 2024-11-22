@@ -773,9 +773,12 @@ namespace quda
      @param[in] a Scale factor applied to derivative
      @param[in] b Scale factor applied to aux field
      @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyLaplace(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                    int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                    int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
                     const int *comm_override, TimeProfile &profile);
 
   /**

@@ -250,7 +250,7 @@ void exchange_llfat_init(QudaPrecision prec);
 void exchange_llfat_cleanup(void);
 
 // Implemented in host_blas.cpp
-double norm_2(void *vector, int len, QudaPrecision precision);
+double norm_2(void *vector, int len, QudaPrecision precision, bool global = true);
 void mxpy(void *x, void *y, int len, QudaPrecision precision);
 void ax(double a, void *x, int len, QudaPrecision precision);
 void cax(double _Complex a, void *x, int len, QudaPrecision precision);

@@ -554,10 +554,14 @@ extern double eofa_mq3;
 extern double gauge_smear_rho;
 extern double gauge_smear_epsilon;
 extern double gauge_smear_alpha;
+extern double gauge_smear_alpha1;
+extern double gauge_smear_alpha2;
+extern double gauge_smear_alpha3;
 extern int gauge_smear_steps;
-extern QudaWFlowType wflow_type;
+extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;
+extern bool su_project;
 
 extern double smear_coeff;
 extern int    smear_n_steps;
