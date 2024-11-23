@@ -756,7 +756,8 @@ void computeOneLinkSite(
 #else
   const int[],
 #endif
-  int half_lattice_index, const Real *const *const oprod, int sig, Real coeff, const LoadStore<Real> &ls, Real *const *const output)
+  int half_lattice_index, const Real *const *const oprod, int sig, Real coeff, const LoadStore<Real> &ls,
+  Real *const *const output)
 {
   if (GOES_FORWARDS(sig)) {
     typename ColorMatrix<Real>::Type colorMatW;
@@ -836,13 +837,13 @@ void computeMiddleLinkSite(int half_lattice_index, // half_lattice_index to bett
 
   if (Qprev == NULL) {
     if (sig_positive) {
-      ls.loadMatrixFromField(static_cast<const Real*const*const>(oprod), 1 - oddBit, sig, point_d, &colorMatY);
+      ls.loadMatrixFromField(static_cast<const Real *const *const>(oprod), 1 - oddBit, sig, point_d, &colorMatY);
     } else {
-      ls.loadMatrixFromField(static_cast<const Real*const*const>(oprod), oddBit, OPP_DIR(sig), point_c, &colorMatY);
+      ls.loadMatrixFromField(static_cast<const Real *const *const>(oprod), oddBit, OPP_DIR(sig), point_c, &colorMatY);
       colorMatY = conj(colorMatY);
     }
   } else { // Qprev != NULL
-    ls.loadMatrixFromField(static_cast<const Real*const>(oprod), oddBit, point_c, &colorMatY);
+    ls.loadMatrixFromField(static_cast<const Real *const>(oprod), oddBit, point_c, &colorMatY);
   }
 
   colorMatW = (!mu_positive) ? bc_link * colorMatY : conj(bc_link) * colorMatY;
@@ -973,8 +974,8 @@ void computeSideLinkSite(int half_lattice_index, // half_lattice_index to better
 template <class Real>
 void computeSideLinkField(const int dim[4], const Real *const P3,
                           const Real *const Qprod, // why?
-                          const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff, Real *const shortP,
-                          Real *const *const newOprod)
+                          const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
+                          Real *const shortP, Real *const *const newOprod)
 {
   // Need some way of setting half_volume
   int volume = 1;
@@ -999,8 +1000,8 @@ void computeSideLinkField(const int dim[4], const Real *const P3,
 
 template <class Real, int oddBit>
 void computeAllLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
-                        const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const *const link,
-                        int sig, int mu, Real coeff, Real accumu_coeff,
+                        const int dim[4], const Real *const oprod, const Real *const Qprev,
+                        const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
                         const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
                         Real *const shortP, Real *const *const newOprod)
 {
@@ -1086,8 +1087,9 @@ void computeAllLinkSite(int half_lattice_index, // half_lattice_index to better 
 } // allLinkKernel
 
 template <class Real>
-void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const *const link,
-                         int sig, int mu, Real coeff, Real accumu_coeff, Real *const shortP, Real *const *const newOprod)
+void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev,
+                         const Real *const *const link, int sig, int mu, Real coeff, Real accumu_coeff,
+                         Real *const shortP, Real *const *const newOprod)
 {
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -1223,14 +1225,16 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   if (precision == QUDA_SINGLE_PRECISION) {
     // allocate memory for temporary fields
     float *tempmat[6];
-    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<float*>(safe_malloc(len * 18 * precision)); }
-    doHisqStaplesForceCPU<float>(X_, act_path_coeff, oprod.data_array<float*>().data, link.data_array<float*>().data, tempmat, newOprod->data_array<float*>().data);
+    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<float *>(safe_malloc(len * 18 * precision)); }
+    doHisqStaplesForceCPU<float>(X_, act_path_coeff, oprod.data_array<float *>().data, link.data_array<float *>().data,
+                                 tempmat, newOprod->data_array<float *>().data);
     for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
   } else if (precision == QUDA_DOUBLE_PRECISION) {
     // allocate memory for temporary fields
     double *tempmat[6];
-    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<double*>(safe_malloc(len * 18 * precision)); }
-    doHisqStaplesForceCPU<double>(X_, act_path_coeff, oprod.data_array<double*>().data, link.data_array<double*>().data, tempmat, newOprod->data_array<double*>().data);
+    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<double *>(safe_malloc(len * 18 * precision)); }
+    doHisqStaplesForceCPU<double>(X_, act_path_coeff, oprod.data_array<double *>().data,
+                                  link.data_array<double *>().data, tempmat, newOprod->data_array<double *>().data);
     for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
   } else {
     errorQuda("Unsupported precision");
@@ -1238,8 +1242,9 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
 }
 
 template <class Real, int oddBit>
-void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *const *const oprod, const Real *const *const link,
-                         int sig, Real coeff, const LoadStore<Real> &ls, Real *const *const output)
+void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *const *const oprod,
+                         const Real *const *const link, int sig, Real coeff, const LoadStore<Real> &ls,
+                         Real *const *const output)
 {
   if (GOES_FORWARDS(sig)) {
 
@@ -1286,8 +1291,8 @@ void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *c
 }
 
 template <class Real>
-void computeLongLinkField(const int dim[4], const Real *const *const oprod, const Real *const *const link, int sig, Real coeff,
-                          Real *const *const output)
+void computeLongLinkField(const int dim[4], const Real *const *const oprod, const Real *const *const link, int sig,
+                          Real coeff, Real *const *const output)
 {
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -1313,9 +1318,11 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
 
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      computeLongLinkField<float>(X_, oprod.data_array<float*>().data, link.data_array<float*>().data, sig, coeff, newOprod->data_array<float*>().data);
+      computeLongLinkField<float>(X_, oprod.data_array<float *>().data, link.data_array<float *>().data, sig, coeff,
+                                  newOprod->data_array<float *>().data);
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      computeLongLinkField<double>(X_, oprod.data_array<double*>().data, link.data_array<double*>().data, sig, coeff, newOprod->data_array<double*>().data);
+      computeLongLinkField<double>(X_, oprod.data_array<double *>().data, link.data_array<double *>().data, sig, coeff,
+                                   newOprod->data_array<double *>().data);
     } else {
       errorQuda("Unrecognised precision");
     }
@@ -1329,8 +1336,8 @@ void completeForceSite(int half_lattice_index,
 #else
                        const int[],
 #endif
-                       const Real *const *const oprod, const Real *const *const link, int sig, const LoadStore<Real> &ls,
-                       Real *const mom)
+                       const Real *const *const oprod, const Real *const *const link, int sig,
+                       const LoadStore<Real> &ls, Real *const mom)
 {
 
   typename ColorMatrix<Real>::Type colorMatX, colorMatY, linkW;
@@ -1351,7 +1358,8 @@ void completeForceSite(int half_lattice_index,
 }
 
 template <class Real>
-void completeForceField(const int dim[4], const Real *const *const oprod, const Real *const *const link, int sig, Real *const mom)
+void completeForceField(const int dim[4], const Real *const *const oprod, const Real *const *const link, int sig,
+                        Real *const mom)
 {
   int volume = dim[0] * dim[1] * dim[2] * dim[3];
   const int half_volume = volume / 2;
@@ -1371,9 +1379,11 @@ void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda:
 
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      completeForceField<float>(X_, oprod.data_array<float*>().data, link.data_array<float*>().data, sig, mom->data<float *>());
+      completeForceField<float>(X_, oprod.data_array<float *>().data, link.data_array<float *>().data, sig,
+                                mom->data<float *>());
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      completeForceField<double>(X_, oprod.data_array<double*>().data, link.data_array<double*>().data, sig, mom->data<double *>());
+      completeForceField<double>(X_, oprod.data_array<double *>().data, link.data_array<double *>().data, sig,
+                                 mom->data<double *>());
     } else {
       errorQuda("Unrecognised precision");
     }

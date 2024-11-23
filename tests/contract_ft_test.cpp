@@ -181,9 +181,8 @@ inline int launch_contract_test(const QudaContractType cType, const std::array<i
   contractFTQuda(spinorX.data(), spinorY.data(), &d_result_, cType, (void *)(&cs_param), src_colors, X.data(),
                  source_position.data(), n_mom, mom.data(), fft_type.data());
   // Check results:
-  int faults
-    = contractionFT_reference<Float>(spinorX.data(), spinorY.data(), d_result.data(), cType,
-                                     src_colors, X.data(), source_position.data(), n_mom, mom.data(), fft_type.data());
+  int faults = contractionFT_reference<Float>(spinorX.data(), spinorY.data(), d_result.data(), cType, src_colors,
+                                              X.data(), source_position.data(), n_mom, mom.data(), fft_type.data());
 
   return faults;
 }
