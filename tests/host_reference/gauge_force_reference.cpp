@@ -66,9 +66,9 @@ static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, in
 {
   su3_matrix prev_matrix, curr_matrix = {};
 
-  curr_matrix.e[0][0].real = 1;
-  curr_matrix.e[1][1].real = 1;
-  curr_matrix.e[2][2].real = 1;
+  curr_matrix.e[0][0] = 1;
+  curr_matrix.e[1][1] = 1;
+  curr_matrix.e[2][2] = 1;
 
   for (int j = 0; j < len; j++) {
     int lnkdir;
@@ -129,7 +129,7 @@ static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, do
     int dx[4] = {};
     su3_matrix tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
     auto tr = trace_su3(&tmat);
-    accum += dcomplex {tr.real, tr.imag};
+    accum += dcomplex {tr.real(), tr.imag()};
   }
 
   CSCALE(accum, loop_coeff);
