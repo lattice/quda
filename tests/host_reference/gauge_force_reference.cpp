@@ -120,19 +120,20 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int 
 }
 
 template <typename su3_matrix>
-static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, double loop_coeff, const lattice_t &lat)
+static std::complex<double> compute_loop_trace(su3_matrix **sitelink, int *path, int len, double loop_coeff,
+                                               const lattice_t &lat)
 {
-  dcomplex accum = {};
+  std::complex<double> accum = 0;
 
-#pragma omp parallel for reduction(dcomplex_sum : accum)
+#pragma omp parallel for reduction(+ : accum)
   for (size_t i = 0; i < lat.volume; i++) {
     int dx[4] = {};
     su3_matrix tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
     auto tr = trace_su3(&tmat);
-    accum += dcomplex {tr.real(), tr.imag()};
+    accum += tr;
   }
 
-  CSCALE(accum, loop_coeff);
+  accum *= loop_coeff;
 
   return accum;
 };
@@ -259,15 +260,15 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
 
   for (int i = 0; i < num_paths; i++) {
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-      dcomplex tr
+      std::complex<double> tr
         = compute_loop_trace(qdp_ex->data_array<dsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
-      loop_tr_dbl[2 * i] = factor * tr.real;
-      loop_tr_dbl[2 * i + 1] = factor * tr.imag;
+      loop_tr_dbl[2 * i] = factor * tr.real();
+      loop_tr_dbl[2 * i + 1] = factor * tr.imag();
     } else {
-      dcomplex tr
+      std::complex<double> tr
         = compute_loop_trace(qdp_ex->data_array<fsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
-      loop_tr_dbl[2 * i] = factor * tr.real;
-      loop_tr_dbl[2 * i + 1] = factor * tr.imag;
+      loop_tr_dbl[2 * i] = factor * tr.real();
+      loop_tr_dbl[2 * i + 1] = factor * tr.imag();
     }
   }
 
