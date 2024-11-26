@@ -7,6 +7,7 @@
 #include "host_utils.h"
 #include "force_utils.hpp"
 #include "index_utils.hpp"
+#include "instantiate_host.hpp"
 #include "misc.h"
 #include "hisq_force_reference.h"
 
@@ -14,30 +15,29 @@ extern int Z[4];
 extern int V;
 extern int Vh;
 
-template <typename su3_matrix, typename su3_vector>
-void computeLinkOrderedOuterProduct(su3_vector *src, quda::GaugeField &dest, size_t nhops)
-{
+template <typename real_t> struct ComputeLinkOrderedOuterProduct {
+  void operator()(const void *const src_, quda::GaugeField &dest, size_t nhops)
+  {
+    auto src = reinterpret_cast<const su3_vector<real_t> *const>(src_);
+
 #pragma omp parallel for
-  for (int i = 0; i < V; ++i) {
-    int dx[4];
-    for (int dir = 0; dir < 4; ++dir) {
-      dx[3] = dx[2] = dx[1] = dx[0] = 0;
-      dx[dir] = nhops;
-      int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-      su3_vector *hw = src + nbr_idx;
-      su3_matrix *p = get_su3_matrix<su3_matrix>(dest, i, dir);
-      su3_projector(hw, &src[i], p);
-    } // dir
-  }   // i
-}
+    for (int i = 0; i < V; ++i) {
+      int dx[4];
+      for (int dir = 0; dir < 4; ++dir) {
+        dx[3] = dx[2] = dx[1] = dx[0] = 0;
+        dx[dir] = nhops;
+        int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
+        auto hw = src + nbr_idx;
+        auto p = get_su3_matrix<real_t>(dest, i, dir);
+        su3_projector(hw, &src[i], p);
+      } // dir
+    }   // i
+  }
+};
 
 void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
 {
-  if (precision == QUDA_SINGLE_PRECISION) {
-    computeLinkOrderedOuterProduct<fsu3_matrix>(static_cast<fsu3_vector *>(src), dst, nhops);
-  } else {
-    computeLinkOrderedOuterProduct<dsu3_matrix>(static_cast<dsu3_vector *>(src), dst, nhops);
-  }
+  instantiate_host<ComputeLinkOrderedOuterProduct>(precision, src, dst, nhops);
 }
 
 #define RETURN_IF_ERR                                                                                                  \

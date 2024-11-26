@@ -7,6 +7,7 @@
 #include "host_utils.h"
 #include "force_utils.hpp"
 #include "index_utils.hpp"
+#include "instantiate_host.hpp"
 #include "misc.h"
 #include "gauge_force_reference.h"
 #include "timer.h"
@@ -61,10 +62,11 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
    @param[in] dx Memory for a relative coordinate shift; can be non-zero
    @param[in] lat Utility lattice information
 */
-template <typename su3_matrix>
-static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, int len, int dx[4], const lattice_t &lat)
+template <typename real_t>
+su3_matrix<real_t> compute_gauge_path(const su3_matrix<real_t> *const *const sitelink, int i, const int *const path,
+                                      int len, int dx[4], const lattice_t &lat)
 {
-  su3_matrix prev_matrix, curr_matrix = {};
+  su3_matrix<real_t> prev_matrix = {}, curr_matrix = {};
 
   curr_matrix.e[0][0] = 1;
   curr_matrix.e[1][1] = 1;
@@ -83,7 +85,7 @@ static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, in
     }
 
     int nbr_idx = gf_neighborIndexFullLattice(i, dx, lat);
-    su3_matrix *lnk = sitelink[lnkdir] + nbr_idx;
+    auto lnk = sitelink[lnkdir] + nbr_idx;
 
     if (GOES_FORWARDS(path[j])) {
       mult_su3_nn(&prev_matrix, lnk, &curr_matrix);
@@ -101,81 +103,127 @@ static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, in
   return curr_matrix;
 }
 
-// this function compute one path for all lattice sites
-template <typename su3_matrix, typename Float>
-static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff,
-                                 int dir, const lattice_t &lat)
-{
+/**
+ * @brief Compute a path product over all lattice sites
+ */
+template <typename real_t> struct ComputePathProduct {
+  void operator()(void *const staple_, const void *const *const sitelink_, const int *const path, int len,
+                  const void *const loop_coeff_, int coeff_index, int dir, const lattice_t &lat)
+  {
+    auto staple = reinterpret_cast<su3_matrix<real_t> *const>(staple_);
+    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
+    auto loop_coeff = reinterpret_cast<const real_t *const>(loop_coeff_);
+    auto coeff = loop_coeff[coeff_index];
+
 #pragma omp parallel for
-  for (size_t i = 0; i < lat.volume; i++) {
-    int dx[4] = {};
-    dx[dir] = 1;
+    for (size_t i = 0; i < lat.volume; i++) {
+      int dx[4] = {};
+      dx[dir] = 1;
 
-    su3_matrix curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
+      su3_matrix<real_t> curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
 
-    su3_matrix tmat;
-    su3_adjoint(&curr_matrix, &tmat);
-    scalar_mult_add_su3_matrix(staple + i, &tmat, loop_coeff, staple + i);
-  } // i
-}
-
-template <typename su3_matrix>
-static std::complex<double> compute_loop_trace(su3_matrix **sitelink, int *path, int len, double loop_coeff,
-                                               const lattice_t &lat)
-{
-  std::complex<double> accum = 0;
-
-#pragma omp parallel for reduction(+ : accum)
-  for (size_t i = 0; i < lat.volume; i++) {
-    int dx[4] = {};
-    su3_matrix tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
-    auto tr = trace_su3(&tmat);
-    accum += tr;
+      su3_matrix<real_t> tmat;
+      su3_adjoint(&curr_matrix, &tmat);
+      scalar_mult_add_su3_matrix(staple + i, &tmat, coeff, staple + i);
+    } // i
   }
-
-  accum *= loop_coeff;
-
-  return accum;
 };
 
-template <typename su3_matrix, typename anti_hermitmat, typename Float>
-static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
-                       const lattice_t &lat)
+void compute_path_product(void *const staple, const void *const *const sitelink, const int *const path, int len,
+                          const void *const loop_coeff, int coeff_index, int dir, const lattice_t &lat,
+                          QudaPrecision precision)
 {
-#pragma omp parallel for
-  for (size_t i = 0; i < lat.volume; i++) {
-    su3_matrix tmat1;
-    su3_matrix tmat2;
-    su3_matrix tmat3;
-
-    su3_matrix *lnk = sitelink[dir] + i;
-    su3_matrix *stp = staple + i;
-    anti_hermitmat *mom = momentum + 4 * i + dir;
-
-    mult_su3_na(lnk, stp, &tmat1);
-    uncompress_anti_hermitian(mom, &tmat2);
-
-    scalar_mult_sub_su3_matrix(&tmat2, &tmat1, eb3, &tmat3);
-    make_anti_hermitian(&tmat3, mom);
-  }
+  instantiate_host<ComputePathProduct>(precision, staple, sitelink, path, len, loop_coeff, coeff_index, dir, lat);
 }
 
-template <typename su3_matrix, typename Float>
-static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
-                         const lattice_t &lat)
-{
-#pragma omp parallel for
-  for (size_t i = 0; i < lat.volume; i++) {
-    su3_matrix tmat;
+template <typename real_t> struct ComputeLoopTrace {
+  std::complex<double> operator()(const void *const *const sitelink_, int *path, int len, double loop_coeff,
+                                  const lattice_t &lat)
+  {
+    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
 
-    su3_matrix *lnk = sitelink[dir] + i;
-    su3_matrix *stp = staple + i;
-    su3_matrix *out = gauge + 4 * i + dir;
+    std::complex<double> accum = 0;
 
-    mult_su3_na(lnk, stp, &tmat);
+#pragma omp parallel for reduction(+ : accum)
+    for (size_t i = 0; i < lat.volume; i++) {
+      int dx[4] = {};
+      auto tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
+      auto tr = trace_su3(&tmat);
+      accum += tr;
+    }
 
-    add_su3(&tmat, out, eb3);
+    accum *= loop_coeff;
+
+    return accum;
   }
+};
+
+std::complex<double> compute_loop_trace(const void *const *const sitelink, int *path, int len, double loop_coeff,
+                                        const lattice_t &lat, QudaPrecision precision)
+{
+  return instantiate_host_reduce<ComputeLoopTrace, std::complex<double>>(precision, sitelink, path, len, loop_coeff, lat);
+}
+
+template <typename real_t> struct UpdateMomentum {
+  void operator()(void *const momentum_, int dir, const void *const *const sitelink_, const void *const staple_,
+                  real_t eb3, const lattice_t &lat)
+  {
+    auto momentum = reinterpret_cast<anti_hermitmat<real_t> *const>(momentum_);
+    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
+    auto staple = reinterpret_cast<const su3_matrix<real_t> *const>(staple_);
+
+#pragma omp parallel for
+    for (size_t i = 0; i < lat.volume; i++) {
+      su3_matrix<real_t> tmat1;
+      su3_matrix<real_t> tmat2;
+      su3_matrix<real_t> tmat3;
+
+      auto lnk = sitelink[dir] + i;
+      auto stp = staple + i;
+      auto mom = momentum + 4 * i + dir;
+
+      mult_su3_na(lnk, stp, &tmat1);
+      uncompress_anti_hermitian(mom, &tmat2);
+
+      scalar_mult_sub_su3_matrix(&tmat2, &tmat1, eb3, &tmat3);
+      make_anti_hermitian(&tmat3, mom);
+    }
+  }
+};
+
+void update_momentum(void *const momentum, int dir, const void *const *const sitelink, const void *const staple,
+                     double eb3, const lattice_t &lat, QudaPrecision precision)
+{
+  instantiate_host<UpdateMomentum>(precision, momentum, dir, sitelink, staple, eb3, lat);
+}
+
+template <typename real_t> struct UpdateGauge {
+  void operator()(void *const gauge_, int dir, const void *const *const sitelink_, const void *const staple_,
+                  real_t eb3, const lattice_t &lat)
+  {
+    auto gauge = reinterpret_cast<su3_matrix<real_t> *const>(gauge_);
+    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
+    auto staple = reinterpret_cast<const su3_matrix<real_t> *const>(staple_);
+
+#pragma omp parallel for
+    for (size_t i = 0; i < lat.volume; i++) {
+      su3_matrix<real_t> tmat;
+
+      auto lnk = sitelink[dir] + i;
+      auto stp = staple + i;
+      auto out = gauge + 4 * i + dir;
+
+      mult_su3_na(lnk, stp, &tmat);
+
+      add_su3(&tmat, out, eb3);
+    }
+  }
+};
+
+void update_gauge(void *const gauge, int dir, const void *const *const sitelink, const void *const staple, double eb3,
+                  const lattice_t &lat, QudaPrecision precision)
+{
+  instantiate_host<UpdateGauge>(precision, gauge, dir, sitelink, staple, eb3, lat);
 }
 
 /* This function only computes one direction @dir
@@ -190,33 +238,13 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, quda::GaugeFie
   memset(staple, 0, size);
 
   for (int i = 0; i < num_paths; i++) {
-    if (prec == QUDA_DOUBLE_PRECISION) {
-      double *my_loop_coeff = (double *)loop_coeff;
-      compute_path_product((dsu3_matrix *)staple, u_ex.data_array<dsu3_matrix *>().data, path_dir[i], length[i],
-                           my_loop_coeff[i], dir, lat);
-    } else {
-      float *my_loop_coeff = (float *)loop_coeff;
-      compute_path_product((fsu3_matrix *)staple, u_ex.data_array<fsu3_matrix *>().data, path_dir[i], length[i],
-                           my_loop_coeff[i], dir, lat);
-    }
+    compute_path_product(staple, u_ex.data_array<void *>().data, path_dir[i], length[i], loop_coeff, i, dir, lat, prec);
   }
 
   if (compute_force) {
-    if (prec == QUDA_DOUBLE_PRECISION) {
-      update_mom((danti_hermitmat *)refMom, dir, u.data_array<dsu3_matrix *>().data, (dsu3_matrix *)staple, (double)eb3,
-                 lat);
-    } else {
-      update_mom((fanti_hermitmat *)refMom, dir, u.data_array<fsu3_matrix *>().data, (fsu3_matrix *)staple, (float)eb3,
-                 lat);
-    }
+    update_momentum(refMom, dir, u.data_array<void *>().data, staple, (double)eb3, lat, prec);
   } else {
-    if (prec == QUDA_DOUBLE_PRECISION) {
-      update_gauge((dsu3_matrix *)refMom, dir, u.data_array<dsu3_matrix *>().data, (dsu3_matrix *)staple, (double)eb3,
-                   lat);
-    } else {
-      update_gauge((fsu3_matrix *)refMom, dir, u.data_array<fsu3_matrix *>().data, (fsu3_matrix *)staple, (float)eb3,
-                   lat);
-    }
+    update_gauge(refMom, dir, u.data_array<void *>().data, staple, eb3, lat, prec);
   }
   host_free(staple);
 }
@@ -259,17 +287,10 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
   std::vector<double> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
-    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-      std::complex<double> tr
-        = compute_loop_trace(qdp_ex->data_array<dsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
-      loop_tr_dbl[2 * i] = factor * tr.real();
-      loop_tr_dbl[2 * i + 1] = factor * tr.imag();
-    } else {
-      std::complex<double> tr
-        = compute_loop_trace(qdp_ex->data_array<fsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
-      loop_tr_dbl[2 * i] = factor * tr.real();
-      loop_tr_dbl[2 * i + 1] = factor * tr.imag();
-    }
+    auto tr = compute_loop_trace(qdp_ex->data_array<void *>().data, input_path[i], length[i], path_coeff[i], lat,
+                                 u.Precision());
+    loop_tr_dbl[2 * i] = factor * tr.real();
+    loop_tr_dbl[2 * i + 1] = factor * tr.imag();
   }
 
   quda::comm_allreduce_sum(loop_tr_dbl);
