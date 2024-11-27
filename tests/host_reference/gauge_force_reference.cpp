@@ -12,12 +12,6 @@
 #include "gauge_force_reference.h"
 #include "timer.h"
 
-extern int Z[4];
-extern int V;
-extern int Vh;
-extern int Vh_ex;
-extern int E[4];
-
 int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
 {
   int oddBit = 0;
@@ -53,15 +47,16 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
 }
 
 /**
-   @brief Calculates an arbitary gauge path, returning the product matrix
-   @return The product of the gauge path
-   @param[in] sitelink Gauge link structure
-   @param[in] i Full lattice index of origin
-   @param[in] path Gauge link path
-   @param[in] length Length of gauge path
-   @param[in] dx Memory for a relative coordinate shift; can be non-zero
-   @param[in] lat Utility lattice information
-*/
+ * @brief Calculates an arbitary gauge path, returning the product matrix
+ * @return The product of the gauge path
+ * @tparam real_t The precision of the calculation
+ * @param[in] sitelink Gauge link structure
+ * @param[in] i Full lattice index of origin
+ * @param[in] path Gauge link path
+ * @param[in] length Length of gauge path
+ * @param[in] dx Memory for a relative coordinate shift; can be non-zero
+ * @param[in] lat Utility lattice information
+ */
 template <typename real_t>
 su3_matrix<real_t> compute_gauge_path(const su3_matrix<real_t> *const *const sitelink, int i, const int *const path,
                                       int len, int dx[4], const lattice_t &lat)
@@ -103,9 +98,6 @@ su3_matrix<real_t> compute_gauge_path(const su3_matrix<real_t> *const *const sit
   return curr_matrix;
 }
 
-/**
- * @brief Compute a path product over all lattice sites
- */
 template <typename real_t> struct ComputePathProduct {
   void operator()(void *const staple_, const void *const *const sitelink_, const int *const path, int len,
                   const void *const loop_coeff_, int coeff_index, int dir, const lattice_t &lat)
@@ -129,6 +121,19 @@ template <typename real_t> struct ComputePathProduct {
   }
 };
 
+/**
+ * @brief Compute and store the product of a set of links along a path
+ *
+ * @param[in,out] staple The output product of links along a path, assumed to be zero init'd
+ * @param[in] sitelink Gauge link structure
+ * @param[in] path Gauge link path
+ * @param[in] len Length of gauge path
+ * @param[in] loop_coeff An array of loop rescaling coefficients
+ * @param[in] coeff_index An index into the loop_coeff
+ * @param[in] dir The starting displacement direction
+ * @param[in] lat Utility lattice information
+ * @param[in] precision The floating point precision of all of the links
+ */
 void compute_path_product(void *const staple, const void *const *const sitelink, const int *const path, int len,
                           const void *const loop_coeff, int coeff_index, int dir, const lattice_t &lat,
                           QudaPrecision precision)
@@ -158,6 +163,17 @@ template <typename real_t> struct ComputeLoopTrace {
   }
 };
 
+/**
+ * @brief Compute trace of a closed loop of gauge links
+ *
+ * @return Complex-valued trace
+ * @param[in] sitelink Gauge link structure
+ * @param[in] path Gauge link path
+ * @param[in] len Length of gauge path
+ * @param[in] loop_coeff The loop scaling coefficient
+ * @param[in] lat Utility lattice information
+ * @param[in] precision The floating point precision of all of the links
+ */
 std::complex<double> compute_loop_trace(const void *const *const sitelink, int *path, int len, double loop_coeff,
                                         const lattice_t &lat, QudaPrecision precision)
 {
@@ -174,23 +190,34 @@ template <typename real_t> struct UpdateMomentum {
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
-      su3_matrix<real_t> tmat1;
-      su3_matrix<real_t> tmat2;
-      su3_matrix<real_t> tmat3;
+      su3_matrix<real_t> lnk_stp_dagger;
+      su3_matrix<real_t> mom_full;
+      su3_matrix<real_t> updated_mom_full;
 
       auto lnk = sitelink[dir] + i;
       auto stp = staple + i;
       auto mom = momentum + 4 * i + dir;
 
-      mult_su3_na(lnk, stp, &tmat1);
-      uncompress_anti_hermitian(mom, &tmat2);
+      mult_su3_na(lnk, stp, &lnk_stp_dagger);
+      uncompress_anti_hermitian(mom, &mom_full);
 
-      scalar_mult_sub_su3_matrix(&tmat2, &tmat1, eb3, &tmat3);
-      make_anti_hermitian(&tmat3, mom);
+      scalar_mult_sub_su3_matrix(&mom_full, &lnk_stp_dagger, eb3, &updated_mom_full);
+      make_anti_hermitian(&updated_mom_full, mom);
     }
   }
 };
 
+/**
+ * @brief Update the momentum with the gauge force
+ *
+ * @param[in,out] momentum The momentum to be updated
+ * @param[in] dir The direction of the momentum being computed
+ * @param[in] sitelink Gauge link structure
+ * @param[in] staple The product of links along the path beginning and ending at the momentum site
+ * @param[in] eb3 The contribution scaling coefficient
+ * @param[in] lat Utility lattice information
+ * @param[in] precision The floating point precision of all of the links
+ */
 void update_momentum(void *const momentum, int dir, const void *const *const sitelink, const void *const staple,
                      double eb3, const lattice_t &lat, QudaPrecision precision)
 {
@@ -220,14 +247,38 @@ template <typename real_t> struct UpdateGauge {
   }
 };
 
+/**
+ * @brief Compute the product of gauge links along a path in a direction and add to/overwrite the output field
+ *
+ * @param[in,out] out The output field to be updated
+ * @param[in] dir The direction being summed
+ * @param[in] sitelink The gauge field from which we compute the products of gauge links
+ * @param[in] staple The product of links along the path beginning and ending at the starting gauge link
+ * @param[in] eb3 The contribution scaling coefficient
+ * @param[in] lat Utility lattice information
+ * @param[in] precision The floating point precision of all of the links
+ */
 void update_gauge(void *const gauge, int dir, const void *const *const sitelink, const void *const staple, double eb3,
                   const lattice_t &lat, QudaPrecision precision)
 {
   instantiate_host<UpdateGauge>(precision, gauge, dir, sitelink, staple, eb3, lat);
 }
 
-/* This function only computes one direction @dir
+/**
+ * @brief Compute the product of gauge links along a path in a single direction
+ * and contribute to an open gauge loop or momentum field
  *
+ * @param[in,out] refMom The output momentum field or open gauge loop field
+ * @param[in] dir The direction of the path product loop
+ * @param[in] u The gauge field from which we compute the products of gauge links
+ * @param[in] u_ex The corresponding radius-2 extended gauge field
+ * @param[in] prec The floating point precision of all of the links
+ * @param[in] path_dir[num_paths][path_length] The paths for a specific direction
+ * @param[in] length One less than the number of links in a loop (e.g., 3 for a staple)
+ * @param[in] loop_coeff Coefficients for each loop
+ * @param[in] num_paths How many contributions from path_length different "staples"
+ * @param[in] lat Utility lattice information
+ * @param[in] compute_force Whether we're updating the momentum (true) or computing a gauge loop (false)
  */
 void gauge_force_reference_dir(void *refMom, int dir, double eb3, quda::GaugeField &u, quda::GaugeField &u_ex,
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
@@ -242,7 +293,7 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, quda::GaugeFie
   }
 
   if (compute_force) {
-    update_momentum(refMom, dir, u.data_array<void *>().data, staple, (double)eb3, lat, prec);
+    update_momentum(refMom, dir, u.data_array<void *>().data, staple, eb3, lat, prec);
   } else {
     update_gauge(refMom, dir, u.data_array<void *>().data, staple, eb3, lat, prec);
   }
