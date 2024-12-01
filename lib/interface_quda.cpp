@@ -5522,7 +5522,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   popOutputPrefix();  
 }
     
-void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, unsigned int ns_safe, TimeProfile &profile)
+void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
 { 
   const GaugeField gin = gf_list[0].get();
   GaugeField &g_W0 = gf_list[0].get();
@@ -5536,7 +5536,10 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
   ColorSpinorField &f_temp1 = sf_list[1].get();
   ColorSpinorField &f_temp2 = sf_list[2].get();
   ColorSpinorField &f_temp3 = sf_list[3].get();
-  ColorSpinorField &f_temp4 = sf_list[4].get();  
+  ColorSpinorField &f_temp4 = sf_list[4].get();
+    
+  int &meas_i = meas_cinf[0].get();
+  int &measurement_n = meas_cinf[1].get();
     
   int parity = 0;
 
@@ -5606,7 +5609,8 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     // fout = f_temp0;
     //redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
-      
+    
+    meas_i++;
   }
 
 }    
@@ -5769,13 +5773,17 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> gf_list;  
   gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+    
+  //first one is global counter, second is meas counter
+  int i_glob = 0, measurement_n = 0 ;
+  std::vector<std::reference_wrapper<int>> meas_cinf{i_glob, measurement_n};
   
   int hier_loop_counter = 0;
   while (ret_idx != -1){
       logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
       logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
-      adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
+      adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier,meas_cinf);
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
       for (int j = 0; j < hier_list.size(); j++ ){
@@ -5793,7 +5801,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
               
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier);
+             adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier,meas_cinf);
 
              logQuda(QUDA_DEBUG_VERBOSE," block number %d successfully deployed \n",i);
             }
