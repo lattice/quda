@@ -197,6 +197,8 @@ int main(int argc, char **argv)
     obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
+    
+  QudaGaugeObservableParam *obs_adj_safe(obs_param), *obs_adj_hier(obs_param);
 
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
@@ -289,7 +291,7 @@ int main(int argc, char **argv)
      
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param, obs_param);
+    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param, obs_adj_safe);
     // Perform forward flow algorithm
     performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
     break;

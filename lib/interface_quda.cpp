@@ -5447,7 +5447,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   double b = -8.;  
     
   int comm_dim[4] = {};
-    
+  int measurement_n = 0; // The nth measurement to take  
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
@@ -5512,6 +5512,13 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
     fout = f_temp0;
     //redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
+      
+    if ((j + 1) % smear_param->meas_interval == 0) {
+      measurement_n++; // increment measurements.
+      gaugeObservables(g_VT, obs_param[measurement_n]);
+      logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (j + 1)),
+              obs_param[measurement_n].plaquette[0], blas::norm2(fout));
+    }
 
   }
   cpuParam.v = h_out;
@@ -5538,7 +5545,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
   ColorSpinorField &f_temp3 = sf_list[3].get();
   ColorSpinorField &f_temp4 = sf_list[4].get();
     
-  int &meas_i = meas_cinf[0].get();
+  int &i_glob = meas_cinf[0].get();
   int &measurement_n = meas_cinf[1].get();
     
   int parity = 0;
@@ -5610,7 +5617,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     //redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
     
-    meas_i++;
+    i_glob++;
   }
 
 }    
