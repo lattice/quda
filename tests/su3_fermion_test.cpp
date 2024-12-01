@@ -290,8 +290,8 @@ int main(int argc, char **argv)
     }
      
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
-    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param, obs_adj_safe);
+    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param);
+    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
     // Perform forward flow algorithm
     performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
     break;
