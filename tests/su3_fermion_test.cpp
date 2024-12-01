@@ -213,6 +213,7 @@ int main(int argc, char **argv)
   smear_param.alpha3 = gauge_smear_alpha3;
   smear_param.dir_ignore = gauge_smear_dir_ignore;
 
+
   quda::ColorSpinorField check,check_out,check_out1;  
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -242,6 +243,19 @@ int main(int argc, char **argv)
     //Add noise to spinor
   quda::RNG rng(check, 1234);
   spinorNoise(check, rng, QUDA_NOISE_GAUSS);
+    
+  quda::ColorSpinorField check_norm(cs_param);
+  quda::ColorSpinorField check_norm_out(cs_param);
+    
+  #pragma omp parallel for
+  for (int i = 0; i < V * 24; i++) { 
+      
+      if (i % 2 == 0)
+      check_norm.data<double *>()[i] = check.data<double *>()[i];
+      else
+      check_norm.data<double *>()[i] = 1.*check.data<double *>()[i];
+  }
+    
   
   // constructWilsonTestSpinorParam(&cs_param_out, &invParam, &gauge_param);
   check_out = quda::ColorSpinorField(cs_param);
@@ -249,7 +263,8 @@ int main(int argc, char **argv)
     // constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   check.PrintVector(0,0,0);
   check_out.PrintVector(0,0,0);
-    check_out1.PrintVector(0,0,0);
+  check_norm.PrintVector(0,0,0);
+  check_out1.PrintVector(0,0,0);
   // quda::ColorSpinorField rngDummy(cs_param), rngDummy1(cs_param_out);
   printf("Stage -1 passed\n");  
   host_timer.start(); // start the timer
@@ -269,25 +284,42 @@ int main(int argc, char **argv)
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
-    // performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowHier(check_out1.data(),check.data(), &invParam, &smear_param);
-    performAdjGFlowSafe(check_out.data(),check.data(), &invParam, &smear_param);
       
-    
+    // performGFlowQuda(check_norm_out.data(),check_norm.data(), &invParam, &smear_param, obs_param);
+      
+    performAdjGFlowHier(check_out1.data(),check.data(), &invParam, &smear_param, obs_param);
+    performAdjGFlowSafe(check_out.data(),check.data() , &invParam, &smear_param, obs_param);  
+    performGFlowQuda(check_norm_out.data(),check_norm.data(), &invParam, &smear_param, obs_param);
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
 
   host_timer.stop(); // stop the timer
+  //Change this to a tolerance check
+  printf("First, inspecting the very first element of the 3 evolved fermions:\n");
+  printf("Hierarchical method:\n");
+  check_out1.PrintVector(0,0,0);
+  printf("Safe method:\n");
+  check_out.PrintVector(0,0,0);
+  printf("Norm out method:\n");
+  check_norm_out.PrintVector(0,0,0);
+
+  double method_adj_diff = 0., adj_fwd_diff = 0.;
+      
+  for (int i = 0; i < V * 24; i++) { 
+
+      method_adj_diff += pow(check_out.data<double *>()[i] - check_out1.data<double *>()[i], 2);
+      adj_fwd_diff += pow(check_out.data<double *>()[i] - check_norm_out.data<double *>()[i], 2)/(V*V*24.*24.);
+      
+  }
+  
+  double method_adj_check = sqrt(method_adj_diff), adj_fwd_check = sqrt(adj_fwd_diff);
+  double oom_error = pow(smear_param.n_steps,2) * pow(smear_param.epsilon,3);
     
-    printf("Original spinor\n:");
-  check.PrintVector(0,0,0);
-    printf("Hierarchical method\n:");
-  check_out1.PrintVector(0,1,0);
-    
-    printf("Safe method\n:");
-  check_out.PrintVector(0,1,0);
+  printf("sum of mag errors between Safe and Hierarchical Adj methods (should be zero) = %1.5e \n", method_adj_check);
+  
+  printf("mean of mag errors between Adj and Fwd method (should be of *order* %1.5e) = %1.5e \n", oom_error, adj_fwd_check);
     
   printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
 

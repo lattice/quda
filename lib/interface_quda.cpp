@@ -200,8 +200,6 @@ static TimeProfile profileGFlow("gFlowQuda");
 //!< Profiler for gFlowQuda
 static TimeProfile profileAdjGFlowSafe("AdjgFlowSafeQuda");
 
-static TimeProfile profileAdjGFlowNB("AdjgFlowNBQuda");
-
 static TimeProfile profileAdjGFlowHier("AdjgFlowHierQuda");
 
 //!< Profiler for projectSU3Quda
@@ -5379,12 +5377,21 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     
 // perform adjoint (backwards) gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246 (Appendix D)
 // the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)    
-void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param)
+void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                      QudaGaugeObservableParam *obs_param)
 {
     
   auto profile = pushProfile(profileAdjGFlowSafe);
   pushOutputPrefix("performAdjGFlowQudaSafe: ");
   checkGaugeSmearParam(smear_param);
+    
+  if (smear_param->n_steps < smear_param->adj_n_save ) {
+      
+      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered to equal n_steps: \n",smear_param->n_steps,smear_param->adj_n_save);
+      smear_param->adj_n_save = smear_param->n_steps;
+      logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",smear_param->n_steps,smear_param->adj_n_save);
+      
+  }
 
   // pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -5463,7 +5470,6 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
           if (i == 0) g_W0 = gin;
           else std::swap(g_W0,g_VT);
           
-
           GFlowStep(g_W1, gaugeTemp, g_W0, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
           GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
           GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
@@ -5480,9 +5486,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
     ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileAdjGFlowSafe);  
 
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
-      
-      
-      
+    
     
     f_temp2 = f_temp4;
       
@@ -5518,7 +5522,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
 
   popOutputPrefix();  
 }
-
+    
 void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, unsigned int ns_safe, TimeProfile &profile)
 { 
   const GaugeField gin = gf_list[0].get();
@@ -5564,31 +5568,38 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
 
-      
+    // [4] = Lap2 [0]
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
     ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profile);  
 
+    // [4] -> 3/4 eps [4]  
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
     
+    // [2] = [4]
     f_temp2 = f_temp4;
-      
+    
+    // [4] = Lap1 [2]
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
     ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profile); 
     
-      
+    // [3] -> [3] + 8/9 eps [4]  
     blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
     
+    // [1], [4] <- [3]
     f_temp1 = f_temp3;
     f_temp4 = f_temp1;
-      
+    
+    // [4] <- [4] - 8/9 [2]
     blas::axpy(-8. / 9.,f_temp2, f_temp4);
-      
+    
+    // [0] <- Lap0 [4]
     copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
     ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, false, comm_dim, profile); 
     
+    // [0] <- 1/4 eps [0]; [0] <- [2] + [0]; [0] <- [1] + [0]
     blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
     blas::axpy(1.,f_temp2, f_temp0);
     blas::axpy(1.,f_temp1, f_temp0);
@@ -5648,13 +5659,21 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 }
 
-void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param){
+void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                      QudaGaugeObservableParam *obs_param){
 
   auto profile = pushProfile(profileAdjGFlowHier);
   pushOutputPrefix("performAdjGFlowQudaHier: ");
   checkGaugeSmearParam(smear_param);
     
-  
+  if (smear_param->n_steps < smear_param->adj_n_save ) {
+      
+      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered to equal n_steps: \n",smear_param->n_steps,smear_param->adj_n_save);
+      smear_param->adj_n_save = smear_param->n_steps;
+      logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",smear_param->n_steps,smear_param->adj_n_save);
+      
+  }
+    
   // pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
@@ -5724,10 +5743,10 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save);
   logQuda(QUDA_SUMMARIZE,"hier list size (number of gauge fields to save) is %d\n",hier_list.size());
   if (threshold < hier_list.back()) {threshold = hier_list.back(); logQuda(QUDA_SUMMARIZE, "threshold changed to %d",threshold);}
-  else logQuda(QUDA_SUMMARIZE, "threshold is %d",threshold);
+  else logQuda(QUDA_SUMMARIZE, "threshold is %d\n",threshold);
   
   if (hier_list.empty()) errorQuda("hier_list is not populated\n");
-  if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages \n");
+  if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages\n");
     
   for (unsigned int i = 0; i < hier_list.size() - 1; i++) {
       
