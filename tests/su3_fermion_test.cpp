@@ -214,7 +214,7 @@ int main(int argc, char **argv)
   smear_param.dir_ignore = gauge_smear_dir_ignore;
 
 
-  quda::ColorSpinorField check,check_out,check_out1;  
+  quda::ColorSpinorField check,check_safe,check_hier,check_fwd;  
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   invParam.cuda_prec = QUDA_DOUBLE_PRECISION;
@@ -243,30 +243,32 @@ int main(int argc, char **argv)
     //Add noise to spinor
   quda::RNG rng(check, 1234);
   spinorNoise(check, rng, QUDA_NOISE_GAUSS);
-    
-  quda::ColorSpinorField check_norm(cs_param);
-  quda::ColorSpinorField check_norm_out(cs_param);
-    
-  #pragma omp parallel for
-  for (int i = 0; i < V * 24; i++) { 
+
+//  Example of how to construct a spinor that is the complex conjugate of check. 
+//  quda::ColorSpinorField check_norm(cs_param);
+//   #pragma omp parallel for
+//   for (int i = 0; i < V * 24; i++) { 
       
-      if (i % 2 == 0)
-      check_norm.data<double *>()[i] = check.data<double *>()[i];
-      else
-      check_norm.data<double *>()[i] = 1.*check.data<double *>()[i];
-  }
+//       if (i % 2 == 0)
+//       check_norm.data<double *>()[i] = check.data<double *>()[i];
+//       else
+//       check_norm.data<double *>()[i] = -1.*check.data<double *>()[i];
+//   }
     
-  
-  // constructWilsonTestSpinorParam(&cs_param_out, &invParam, &gauge_param);
-  check_out = quda::ColorSpinorField(cs_param);
-  check_out1 = quda::ColorSpinorField(cs_param);
-    // constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  check_safe = quda::ColorSpinorField(cs_param);
+  check_hier = quda::ColorSpinorField(cs_param);
+  check_fwd = quda::ColorSpinorField(cs_param);
+
+  printf("Inspecting the very first element of the random fermion we will use:\n");
   check.PrintVector(0,0,0);
-  check_out.PrintVector(0,0,0);
-  check_norm.PrintVector(0,0,0);
-  check_out1.PrintVector(0,0,0);
-  // quda::ColorSpinorField rngDummy(cs_param), rngDummy1(cs_param_out);
-  printf("Stage -1 passed\n");  
+  printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
+  printf("Hierarchical method:\n");
+  check_hier.PrintVector(0,0,0);
+  printf("Safe method:\n");
+  check_safe.PrintVector(0,0,0);
+  printf("Forward method:\n");
+  check_fwd.PrintVector(0,0,0);
+     
   host_timer.start(); // start the timer
   switch (smear_param.smear_type) {
   case QUDA_GAUGE_SMEAR_APE:
@@ -284,12 +286,12 @@ int main(int argc, char **argv)
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
-      
-    // performGFlowQuda(check_norm_out.data(),check_norm.data(), &invParam, &smear_param, obs_param);
-      
-    performAdjGFlowHier(check_out1.data(),check.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowSafe(check_out.data(),check.data() , &invParam, &smear_param, obs_param);  
-    performGFlowQuda(check_norm_out.data(),check_norm.data(), &invParam, &smear_param, obs_param);
+     
+    // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
+    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, obs_param);
+    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param, obs_param);
+    // Perform forward flow algorithm
+    performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
@@ -299,22 +301,22 @@ int main(int argc, char **argv)
   //Change this to a tolerance check
   printf("First, inspecting the very first element of the 3 evolved fermions:\n");
   printf("Hierarchical method:\n");
-  check_out1.PrintVector(0,0,0);
+  check_hier.PrintVector(0,0,0);
   printf("Safe method:\n");
-  check_out.PrintVector(0,0,0);
-  printf("Norm out method:\n");
-  check_norm_out.PrintVector(0,0,0);
+  check_safe.PrintVector(0,0,0);
+  printf("Forward method:\n");
+  check_fwd.PrintVector(0,0,0);
 
   double method_adj_diff = 0., adj_fwd_diff = 0.;
       
   for (int i = 0; i < V * 24; i++) { 
 
-      method_adj_diff += pow(check_out.data<double *>()[i] - check_out1.data<double *>()[i], 2);
-      adj_fwd_diff += pow(check_out.data<double *>()[i] - check_norm_out.data<double *>()[i], 2)/(V*V*24.*24.);
+      method_adj_diff += pow(check_safe.data<double *>()[i] - check_hier.data<double *>()[i], 2);
+      adj_fwd_diff += pow(check_safe.data<double *>()[i] - check_fwd.data<double *>()[i], 2);
       
   }
   
-  double method_adj_check = sqrt(method_adj_diff), adj_fwd_check = sqrt(adj_fwd_diff);
+  double method_adj_check = sqrt(method_adj_diff), adj_fwd_check = sqrt(adj_fwd_diff)/(V*24.);
   double oom_error = pow(smear_param.n_steps,2) * pow(smear_param.epsilon,3);
     
   printf("sum of mag errors between Safe and Hierarchical Adj methods (should be zero) = %1.5e \n", method_adj_check);

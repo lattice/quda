@@ -5461,8 +5461,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   // set [3] = input spinor
   f_temp3 = fin;
     
-    
-  printf("Stage 1 passed \n");
+
   for (unsigned int j = 0; j < smear_param->n_steps ; j++)
   {
       for (unsigned int i = 0; i < smear_param->n_steps - j; i++) {
@@ -5773,7 +5772,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   
   int hier_loop_counter = 0;
   while (ret_idx != -1){
-      logQuda(QUDA_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
+      logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
       logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
       adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
@@ -5796,9 +5795,9 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
 
              adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier);
 
-             logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
+             logQuda(QUDA_DEBUG_VERBOSE," block number %d successfully deployed \n",i);
             }
-          logQuda(QUDA_DEBUG_VERBOSE," hierarchial evolution completed \n");
+          logQuda(QUDA_DEBUG_VERBOSE,"Hierarchial evolution completed \n");
           break;
       }
       
