@@ -5392,7 +5392,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
   }
 
-  // pushVerbosity(inv_param->verbosity);
+  pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (smear_param->restart) {
@@ -5803,7 +5803,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
 
              logQuda(QUDA_DEBUG_VERBOSE," block number %d successfully deployed \n",i);
             }
-          logQuda(QUDA_DEBUG_VERBOSE,"Hierarchial evolution completed \n");
+          logQuda(QUDA_VERBOSE,"Hierarchial evolution completed \n");
           break;
       }
       
@@ -5832,7 +5832,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   cpuParam.location = inv_param->output_location;
   ColorSpinorField fout_h(cpuParam);
   fout_h = sf_list[0].get();
-    
+  logQuda(QUDA_DEBUG_VERBOSE,"Spinor written to cpu \n");
   popOutputPrefix();
 
 }

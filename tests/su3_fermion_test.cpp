@@ -242,7 +242,7 @@ int main(int argc, char **argv)
       
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   check = quda::ColorSpinorField(cs_param);
-    //Add noise to spinor
+  //Add noise to spinor
   quda::RNG rng(check, 1234);
   spinorNoise(check, rng, QUDA_NOISE_GAUSS);
 
@@ -330,10 +330,10 @@ int main(int argc, char **argv)
       
   }
   
-  double method_adj_check = sqrt(method_adj_diff), adj_fwd_check = sqrt(adj_fwd_diff)/(V*24.);
+  double method_adj_check = sqrt(method_adj_diff)/(V*24.), adj_fwd_check = sqrt(adj_fwd_diff)/(V*24.);
   double oom_error = pow(smear_param.n_steps,2) * pow(smear_param.epsilon,3);
     
-  printf("Sum of mag errors between Safe and Hierarchical Adj methods (should be zero) = %1.5e \n", method_adj_check);
+  printf("Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n", method_adj_check);
   printf("Mean of mag errors between Adj and Fwd method (should be of *order* %1.5e) = %1.5e \n", oom_error, adj_fwd_check);
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
