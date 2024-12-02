@@ -300,14 +300,20 @@ int main(int argc, char **argv)
     host_fwd_timer.start();
     performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
     host_fwd_timer.stop();
+      
+    printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
+    printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
+    printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());   
+      
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
 
   host_timer.stop(); // stop the timer
-  //Change this to a tolerance check
-  printf("First, inspecting the very first element of the 3 evolved fermions:\n");
+   
+  printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
+  printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
   printf("Hierarchical method:\n");
   check_hier.PrintVector(0,0,0);
   printf("Safe method:\n");
@@ -327,14 +333,8 @@ int main(int argc, char **argv)
   double method_adj_check = sqrt(method_adj_diff), adj_fwd_check = sqrt(adj_fwd_diff)/(V*24.);
   double oom_error = pow(smear_param.n_steps,2) * pow(smear_param.epsilon,3);
     
-  printf("sum of mag errors between Safe and Hierarchical Adj methods (should be zero) = %1.5e \n", method_adj_check);
-  
-  printf("mean of mag errors between Adj and Fwd method (should be of *order* %1.5e) = %1.5e \n", oom_error, adj_fwd_check);
-  
-  printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
-  printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
-  printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());  
-  printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
+  printf("Sum of mag errors between Safe and Hierarchical Adj methods (should be zero) = %1.5e \n", method_adj_check);
+  printf("Mean of mag errors between Adj and Fwd method (should be of *order* %1.5e) = %1.5e \n", oom_error, adj_fwd_check);
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
