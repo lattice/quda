@@ -170,7 +170,7 @@ int main(int argc, char **argv)
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
 
   // start the timer
-  quda::host_timer_t host_timer;
+  quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
 
   // The user may specify which measurements they wish to perform/omit
   // using the QudaGaugeObservableParam struct, and whether or not to
@@ -290,10 +290,16 @@ int main(int argc, char **argv)
     }
      
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
+    host_hier_timer.start();
     performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param);
+    host_hier_timer.stop();
+    host_safe_timer.start();
     performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
+    host_safe_timer.stop();
     // Perform forward flow algorithm
+    host_fwd_timer.start();
     performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
+    host_fwd_timer.stop();
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
@@ -324,8 +330,11 @@ int main(int argc, char **argv)
   printf("sum of mag errors between Safe and Hierarchical Adj methods (should be zero) = %1.5e \n", method_adj_check);
   
   printf("mean of mag errors between Adj and Fwd method (should be of *order* %1.5e) = %1.5e \n", oom_error, adj_fwd_check);
-    
-  printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
+  
+  printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
+  printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
+  printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());  
+  printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
