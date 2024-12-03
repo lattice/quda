@@ -31,6 +31,9 @@ TEST_P(GaugeIOTest, verify)
   gauge_param.cpu_prec = ::testing::get<0>(param);
   if (!quda::is_enabled(gauge_param.cpu_prec)) GTEST_SKIP();
   gauge_param.cuda_prec = gauge_param.cpu_prec;
+  gauge_param.cuda_prec_sloppy = gauge_param.cpu_prec;
+  gauge_param.cuda_prec_precondition = gauge_param.cpu_prec;
+  gauge_param.cuda_prec_eigensolver = gauge_param.cpu_prec;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
 
   // Allocate host side memory for the gauge field.

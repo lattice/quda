@@ -79,7 +79,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
 #ifndef QUDA_BUILD_NATIVE_FFT // skip FFT tests if FFT not available
     const ::testing::TestInfo *const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
     const char *name = test_info->name();
-    if (strcmp(name, "Landau_FFT") == 0 || strcmp(name, "Coulomb_FFT") == 0) {
+    if (strncmp(name, "Landau_FFT", 10) == 0 || strncmp(name, "Coulomb_FFT", 11) == 0) {
       execute = false;
       GTEST_SKIP();
     }

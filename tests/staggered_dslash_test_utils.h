@@ -85,14 +85,16 @@ struct StaggeredDslashTestWrapper {
     for (int i = 0; i < Nsrc; i++) {
       switch (dtest_type) {
       case dslash_test_type::Dslash:
-        stag_dslash(spinorRef[i], cpuFat, cpuLong, spinor[i], parity, dagger, dslash_type);
+        stag_dslash(spinorRef[i], cpuFat, cpuLong, spinor[i], parity, dagger, dslash_type, laplace3D);
         break;
       case dslash_test_type::MatPC:
-        stag_matpc(spinorRef[i], cpuFat, cpuLong, spinor[i], mass, 0, parity, dslash_type);
+        stag_matpc(spinorRef[i], cpuFat, cpuLong, spinor[i], mass, 0, parity, dslash_type, laplace3D);
         break;
-      case dslash_test_type::Mat: stag_mat(spinorRef[i], cpuFat, cpuLong, spinor[i], mass, dagger, dslash_type); break;
+      case dslash_test_type::Mat:
+        stag_mat(spinorRef[i], cpuFat, cpuLong, spinor[i], mass, dagger, dslash_type, laplace3D);
+        break;
       case dslash_test_type::MatDagMat:
-        stag_matdag_mat(spinorRef[i], cpuFat, cpuLong, spinor[i], mass, dagger, dslash_type);
+        stag_matdag_mat(spinorRef[i], cpuFat, cpuLong, spinor[i], mass, dagger, dslash_type, laplace3D);
         break;
       default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
       }
@@ -406,12 +408,12 @@ struct StaggeredDslashTestWrapper {
 
       size_t ghost_bytes = cudaSpinor[0].GhostBytes();
 
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU",
+      ::testing::Test::RecordProperty("Halo_bidirectional_BW_GPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU",
+      ::testing::Test::RecordProperty("Halo_bidirectional_BW_CPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / dslash_time.cpu_time);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_max);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_min);
+      ::testing::Test::RecordProperty("Halo_bidirectional_BW_CPU_min", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_max);
+      ::testing::Test::RecordProperty("Halo_bidirectional_BW_CPU_max", 1.0e-9 * 2 * ghost_bytes / dslash_time.cpu_min);
       ::testing::Test::RecordProperty("Halo_message_size_bytes", 2 * ghost_bytes);
 
       printfQuda(

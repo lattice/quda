@@ -47,25 +47,11 @@ namespace quda {
     __device__ __host__ spinor_array init() const { return spinor_array(); }
   };
   
- template <int reduction_dim, class T> __device__ int idx_from_t_xyz(int t, int xyz, T X[4])
-  {
-    int x[4];
-#pragma unroll
-    for (int d = 0; d < 4; d++) {
-      if (d != reduction_dim) {
-	x[d] = xyz % X[d];
-	xyz = xyz / X[d];
-      }
-    }    
-    x[reduction_dim] = t;    
-    return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
-  }
-  
   template <typename Arg> struct EvecProjection : plus<spinor_array> {
     using reduce_t = spinor_array;
-    using plus<reduce_t>::operator();    
-    static constexpr int reduce_block_dim = 1; // only doing a reduct in the x thread dimension
-    
+    using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 1; // only doing a reduce in the x thread dimension
+
     const Arg &arg;
     constexpr EvecProjection(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

@@ -148,13 +148,13 @@ namespace quda
         mat(r, x);
         r2 = blas::xmyNorm(b, r);
         for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
-        converged = (step < param.Nsteps && r2 < stop) ? true : false;
+        converged = (step > param.Nsteps || r2 < stop);
         if (!converged) blas::copy(r_sloppy, r);
         PrintStats("MR (restart)", iter, r2, b2);
       } else {
         blas::ax(scale, r_sloppy);
         r2 = blas::norm2(r_sloppy);
-        converged = (step < param.Nsteps && r2 < stop) ? true : false;
+        converged = (step > param.Nsteps || r2 < stop);
         if (!converged) blas::copy(r, r_sloppy);
       }
       step++;

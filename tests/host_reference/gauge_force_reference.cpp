@@ -426,7 +426,7 @@ static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *sitelink, void *const *sitelink_ex,
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, quda::GaugeField &u, quda::GaugeField &u_ex,
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
                                const lattice_t &lat, bool compute_force)
 {
@@ -437,26 +437,30 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *s
   for (int i = 0; i < num_paths; i++) {
     if (prec == QUDA_DOUBLE_PRECISION) {
       double *my_loop_coeff = (double *)loop_coeff;
-      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i],
-                           dir, lat);
+      compute_path_product((dsu3_matrix *)staple, u_ex.data_array<dsu3_matrix *>().data, path_dir[i], length[i],
+                           my_loop_coeff[i], dir, lat);
     } else {
       float *my_loop_coeff = (float *)loop_coeff;
-      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i],
-                           dir, lat);
+      compute_path_product((fsu3_matrix *)staple, u_ex.data_array<fsu3_matrix *>().data, path_dir[i], length[i],
+                           my_loop_coeff[i], dir, lat);
     }
   }
 
   if (compute_force) {
     if (prec == QUDA_DOUBLE_PRECISION) {
-      update_mom((danti_hermitmat *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
+      update_mom((danti_hermitmat *)refMom, dir, u.data_array<dsu3_matrix *>().data, (dsu3_matrix *)staple, (double)eb3,
+                 lat);
     } else {
-      update_mom((fanti_hermitmat *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
+      update_mom((fanti_hermitmat *)refMom, dir, u.data_array<fsu3_matrix *>().data, (fsu3_matrix *)staple, (float)eb3,
+                 lat);
     }
   } else {
     if (prec == QUDA_DOUBLE_PRECISION) {
-      update_gauge((dsu3_matrix *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
+      update_gauge((dsu3_matrix *)refMom, dir, u.data_array<dsu3_matrix *>().data, (dsu3_matrix *)staple, (double)eb3,
+                   lat);
     } else {
-      update_gauge((fsu3_matrix *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
+      update_gauge((fsu3_matrix *)refMom, dir, u.data_array<fsu3_matrix *>().data, (fsu3_matrix *)staple, (float)eb3,
+                   lat);
     }
   }
   host_free(staple);
@@ -465,8 +469,6 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *s
 void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int ***path_dir, int *length,
                            void *loop_coeff, int num_paths, bool compute_force)
 {
-  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
-
   // created extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -475,13 +477,12 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
 
-  auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
+  auto qdp_ex = quda::createExtendedGauge(u.data_array().data, param, R);
   lattice_t lat(*qdp_ex);
 
-  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex, u.Precision(), path_dir[dir], length, loop_coeff,
-                              num_paths, lat, compute_force);
+    gauge_force_reference_dir(refMom, dir, eb3, u, *qdp_ex, u.Precision(), path_dir[dir], length, loop_coeff, num_paths,
+                              lat, compute_force);
   }
 
   delete qdp_ex;
@@ -490,8 +491,6 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
 void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
                                 int **input_path, int *length, double *path_coeff, int num_paths)
 {
-  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
-
   // create extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -499,20 +498,20 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
-
-  auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
+  auto qdp_ex = quda::createExtendedGauge(u.data_array().data, param, R);
   lattice_t lat(*qdp_ex);
-  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
 
   std::vector<double> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-      dcomplex tr = compute_loop_trace((dsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
+      dcomplex tr
+        = compute_loop_trace(qdp_ex->data_array<dsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;
     } else {
-      dcomplex tr = compute_loop_trace((fsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
+      dcomplex tr
+        = compute_loop_trace(qdp_ex->data_array<fsu3_matrix *>().data, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;
     }

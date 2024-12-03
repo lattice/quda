@@ -151,18 +151,18 @@ namespace quda
 
     LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, int dir, double a, double b, int parity,
-                 bool dagger, const int *comm_override, TimeProfile &profile)
+                 const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       if (in.Nspin() == 1) {
         constexpr int nSpin = 1;
-        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, dagger, comm_override);
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
       } else if (in.Nspin() == 4) {
         constexpr int nSpin = 4;
-        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, dagger, comm_override);
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
       } else {
@@ -175,11 +175,11 @@ namespace quda
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
   void ApplyLaplace(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
-                    int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                    int dir, double a, double b, cvector_ref<const ColorSpinorField> &x, int parity,
                     const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_LAPLACE_DSLASH>()) {
-      instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, dagger, comm_override, profile);
+      instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, comm_override, profile);
     } else {
       errorQuda("Laplace operator has not been enabled");
     }

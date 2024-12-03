@@ -110,7 +110,7 @@ if(QUDA_DIRAC_WILSON
   install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_DIRAC_STAGGERED)
+if(QUDA_DIRAC_STAGGERED OR QUDA_DIRAC_LAPLACE)
   add_executable(staggered_dslash_test staggered_dslash_test.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
@@ -291,6 +291,8 @@ if(QUDA_MPI OR QUDA_QMP)
   message(STATUS "ctest will run on ${QUDA_TEST_NUM_PROCS} processes")
   set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE};${MPIEXEC_NUMPROC_FLAG};${QUDA_TEST_NUM_PROCS};${MPIEXEC_PREFLAGS}
     CACHE STRING "CTest Launcher command for QUDA's tests")
+else()
+  set(QUDA_TEST_NUM_PROCS 1)
 endif()
 
 # BLAS tests
@@ -963,7 +965,7 @@ endif()
       set_tests_properties(dslash_${DIRAC_NAME}_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
-    if(QUDA_LAPLACE)
+    if(QUDA_DIRAC_LAPLACE)
       set(DIRAC_NAME laplace)
       add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
                COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -1009,19 +1011,15 @@ if(QUDA_DIRAC_WILSON)
     --enable-testing true
     --gtest_output=xml:invert_test_wilson.xml)
 
-  if(DEFINED ENV{QUDA_ENABLE_TUNING})
-    if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
-      add_test(NAME invert_test_splitgrid_wilson
-        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-        --dslash-type wilson --ngcrkrylov 8
-        --dim 2 4 6 8 --niter 1000
-        --nsrc ${QUDA_TEST_NUM_PROCS}
-        --enable-testing true
-        --gtest_output=xml:invert_test_splitgrid_wilson.xml)
+  add_test(NAME invert_test_splitgrid_wilson
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type wilson --ngcrkrylov 8
+    --dim 2 4 6 8 --niter 1000
+    --nsrc ${QUDA_TEST_NUM_PROCS} --nsrc-tile ${QUDA_TEST_NUM_PROCS}
+    --enable-testing true
+    --gtest_output=xml:invert_test_splitgrid_wilson.xml)
 
-      set_tests_properties(invert_test_splitgrid_wilson PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
-    endif()
-  endif()
+  set_tests_properties(invert_test_splitgrid_wilson PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
 endif()
   
 if(QUDA_DIRAC_TWISTED_MASS)
@@ -1186,19 +1184,15 @@ foreach(prec IN LISTS TEST_PRECS)
       --enable-testing true
       --gtest_output=xml:invert_test_staggered_${prec}.xml)
 
-    if(DEFINED ENV{QUDA_ENABLE_TUNING})
-      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
-        add_test(NAME invert_test_splitgrid_staggered_${prec}
-          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-          --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
-          --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-          --nsrc ${QUDA_TEST_NUM_PROCS}
-          --enable-testing true
-          --gtest_output=xml:invert_test_splitgrid_staggered_${prec}.xml)
+    add_test(NAME invert_test_splitgrid_staggered_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type staggered --ngcrkrylov 8 --compute-fat-long true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --nsrc ${QUDA_TEST_NUM_PROCS} --nsrc-tile ${QUDA_TEST_NUM_PROCS}
+      --enable-testing true
+      --gtest_output=xml:invert_test_splitgrid_staggered_${prec}.xml)
 
-        set_tests_properties(invert_test_splitgrid_staggered_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
-      endif()
-    endif()
+    set_tests_properties(invert_test_splitgrid_staggered_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
 
     add_test(NAME invert_test_asqtad_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
@@ -1207,21 +1201,15 @@ foreach(prec IN LISTS TEST_PRECS)
       --enable-testing true --nsrc 4 --nsrc-tile 4
       --gtest_output=xml:invert_test_asqtad_${prec}.xml)
 
-    if(DEFINED ENV{QUDA_ENABLE_TUNING})
-      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
-        add_test(NAME invert_test_splitgrid_asqtad_${prec}
-          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
-          --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
-          --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
-          --nsrc ${QUDA_TEST_NUM_PROCS}
-          --enable-testing true
-          --gtest_output=xml:invert_test_splitgrid_asqtad_${prec}.xml)
+    add_test(NAME invert_test_splitgrid_asqtad_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type asqtad --ngcrkrylov 8 --compute-fat-long true
+      --dim 6 6 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
+      --nsrc ${QUDA_TEST_NUM_PROCS}
+      --enable-testing true
+      --gtest_output=xml:invert_test_splitgrid_asqtad_${prec}.xml)
 
-        set_tests_properties(invert_test_splitgrid_asqtad_${prec} PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
-      endif()
-    endif()
-
-    if (QUDA_LAPLACE)
+    if (QUDA_DIRAC_LAPLACE)
       add_test(NAME invert_test_laplace_${prec}
         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_invert_test> ${MPIEXEC_POSTFLAGS}
         --dslash-type laplace --ngcrkrylov 8 --compute-fat-long true
@@ -1243,21 +1231,6 @@ if (QUDA_DIRAC_DISTANCE_PRECONDITIONING)
       --distance-pc-alpha0 0.1 --distance-pc-t0 4
       --enable-testing true
       --gtest_output=xml:invert_test_wilson_distance_pc.xml)
-
-    if(DEFINED ENV{QUDA_ENABLE_TUNING})
-      if($ENV{QUDA_ENABLE_TUNING} EQUAL 0)
-        add_test(NAME invert_test_splitgrid_wilson
-          COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-          --dslash-type wilson --ngcrkrylov 8
-          --dim 2 4 6 8 --niter 1000
-          --distance-pc-alpha0 0.1 --distance-pc-t0 4
-          --nsrc ${QUDA_TEST_NUM_PROCS}
-          --enable-testing true
-          --gtest_output=xml:invert_test_splitgrid_wilson_distance_pc.xml)
-
-        set_tests_properties(invert_test_splitgrid_wilson PROPERTIES ENVIRONMENT QUDA_TEST_GRID_PARTITION=$ENV{QUDA_TEST_GRID_SIZE})
-      endif()
-    endif()
   endif()
 
   if(QUDA_DIRAC_CLOVER)
@@ -1469,7 +1442,7 @@ foreach(prec IN LISTS TEST_PRECS)
         --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
     endif()
 
-    if (QUDA_LAPLACE)
+    if (QUDA_DIRAC_LAPLACE)
       add_test(NAME eigensolve_test_laplace_${prec}
         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
         --dslash-type laplace --compute-fat-long true

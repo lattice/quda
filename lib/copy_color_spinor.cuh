@@ -181,11 +181,6 @@ namespace quda
       errorQuda("Copying to full fields with lexicographical ordering is not currently supported");
     }
 
-    if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET
-        && (src.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER || dst.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER)) {
-      errorQuda("QDPJIT field ordering not supported for full site fields");
-    }
-
     genericCopyColorSpinor<Ns, Nc>(param);
   }
 
