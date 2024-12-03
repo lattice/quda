@@ -50,7 +50,7 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
-      ax(0, spinorCheck, V * spinor_site_size * Lsdim, inv_param.cpu_prec);
+      printfQuda("QUDA_DOMAIN_WALL_4DPV_DSLASH verification\n");
       dw_4dpv_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
       double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
@@ -228,9 +228,9 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          tmc_ndeg_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_ndeg_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+          tmc_ndeg_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.mu,
                          inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
           tmc_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.mu,

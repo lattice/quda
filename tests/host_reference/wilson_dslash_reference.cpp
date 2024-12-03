@@ -28,7 +28,7 @@ using namespace quda;
 /**
  * @brief Perform a Wilson dslash operation on a spinor field
  *
- * @tparam Float The floating-point type used for the computation.
+ * @tparam real_t The floating-point type used for the computation.
  * @param[out] res The result of the Dslash operation.
  * @param[in] gaugeFull The full gauge field.
  * @param[in] ghostGauge The ghost gauge field for multi-GPU computations.
@@ -38,16 +38,17 @@ using namespace quda;
  * @param[in] parity The parity of the dslash (0 for even, 1 for odd).
  * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
-template <typename Float>
-void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *spinorField, Float **fwdSpinor,
-                     Float **backSpinor, int parity, int dagger)
+template <typename real_t>
+void dslashReference(real_t *res, const real_t *const *gaugeFull, const real_t *const *ghostGauge,
+                     const real_t *spinorField, const real_t *const *fwdSpinor, const real_t *const *backSpinor,
+                     int parity, int dagger)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
-  Float *gaugeEven[4], *gaugeOdd[4];
-  Float *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
-  Float *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *gaugeEven[4], *gaugeOdd[4];
+  const real_t *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
+  const real_t *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
@@ -62,10 +63,10 @@ void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *s
   for (int i = 0; i < Vh; i++) {
 
     for (int dir = 0; dir < 8; dir++) {
-      Float *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      const Float *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const real_t *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+      const real_t *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
 
-      Float projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+      real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
 
@@ -81,10 +82,10 @@ void dslashReference(Float *res, Float **gaugeFull, Float **ghostGauge, Float *s
   }
 }
 
-void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaPrecision precision,
-                QudaGaugeParam &gauge_param)
+void wil_dslash(void *out, const void *const *gauge, const void *in, int parity, int dagger, QudaPrecision precision,
+                const QudaGaugeParam &gauge_param)
 {
-  GaugeFieldParam gauge_field_param(gauge_param, gauge);
+  GaugeFieldParam gauge_field_param(gauge_param, (void *)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   gauge_field_param.location = QUDA_CPU_FIELD_LOCATION;
   GaugeField cpu(gauge_field_param);
@@ -94,7 +95,7 @@ void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaP
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
   csParam.location = QUDA_CPU_FIELD_LOCATION;
-  csParam.v = in;
+  csParam.v = (void *)in;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
@@ -136,11 +137,11 @@ void wil_dslash(void *out, void **gauge, void *in, int parity, int dagger, QudaP
 }
 
 // applies b*(1 + i*a*gamma_5)
-template <typename sFloat>
-void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, const sFloat mu,
-                 const QudaTwistFlavorType flavor, const int V, QudaTwistGamma5Type twist)
+template <typename real_t>
+void twistGamma5(real_t *out, const real_t *in, int dagger, real_t kappa, real_t mu, QudaTwistFlavorType flavor, int V,
+                 QudaTwistGamma5Type twist)
 {
-  sFloat a = 0.0, b = 0.0;
+  real_t a = 0.0, b = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
     a = 2.0 * kappa * mu * flavor;         // mu already includes the flavor
     b = 1.0;
@@ -148,18 +149,17 @@ void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, 
     a = -2.0 * kappa * mu * flavor;
     b = 1.0 / (1.0 + a * a);
   } else {
-    printf("Twist type %d not defined\n", twist);
-    exit(0);
+    errorQuda("Twist type %d not defined", twist);
   }
 
   if (dagger) a *= -1.0;
 
 #pragma omp parallel for
   for (int i = 0; i < V; i++) {
-    sFloat tmp[24];
+    real_t tmp[24];
     for (int s = 0; s < 4; s++)
       for (int c = 0; c < 3; c++) {
-        sFloat a5 = ((s / 2) ? -1.0 : +1.0) * a;
+        real_t a5 = ((s / 2) ? -1.0 : +1.0) * a;
         tmp[s * 6 + c * 2 + 0] = b * (in[i * 24 + s * 6 + c * 2 + 0] - a5 * in[i * 24 + s * 6 + c * 2 + 1]);
         tmp[s * 6 + c * 2 + 1] = b * (in[i * 24 + s * 6 + c * 2 + 1] + a5 * in[i * 24 + s * 6 + c * 2 + 0]);
       }
@@ -168,7 +168,7 @@ void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, 
   }
 }
 
-void twist_gamma5(void *out, void *in, int dagger, double kappa, double mu, QudaTwistFlavorType flavor, int V,
+void twist_gamma5(void *out, const void *in, int dagger, double kappa, double mu, QudaTwistFlavorType flavor, int V,
                   QudaTwistGamma5Type twist, QudaPrecision precision)
 {
 
@@ -179,27 +179,31 @@ void twist_gamma5(void *out, void *in, int dagger, double kappa, double mu, Quda
   }
 }
 
-void tm_dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double mu, QudaTwistFlavorType flavor,
-               QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_dslash(void *out, const void *const *gauge, const void *in_, double kappa, double mu,
+               QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision,
+               const QudaGaugeParam &gauge_param)
 {
-  if (dagger && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD))
-    twist_gamma5(spinorField, spinorField, dagger, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+  // in some cases, for simplicity, in is modified in place.
+  void *in = (void *)in_;
 
-  wil_dslash(res, gaugeFull, spinorField, parity, dagger, precision, gauge_param);
+  if (dagger && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD))
+    twist_gamma5(in, in, dagger, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+
+  wil_dslash(out, gauge, in, parity, dagger, precision, gauge_param);
 
   if (!dagger
       || (dagger && (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC))) {
-    twist_gamma5(res, res, dagger, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+    twist_gamma5(out, out, dagger, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
   } else {
-    twist_gamma5(spinorField, spinorField, dagger, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT, precision);
+    twist_gamma5(in, in, dagger, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT, precision);
   }
 }
 
-void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger, QudaPrecision precision,
-             QudaGaugeParam &gauge_param)
+void wil_mat(void *out, const void *const *gauge, const void *in, double kappa, int dagger, QudaPrecision precision,
+             const QudaGaugeParam &gauge_param)
 {
-  void *inEven = in;
-  void *inOdd = (char *)in + Vh * spinor_site_size * precision;
+  const void *inEven = in;
+  const void *inOdd = (char *)in + Vh * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + Vh * spinor_site_size * precision;
 
@@ -210,11 +214,11 @@ void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger, QudaPr
   xpay(in, -kappa, out, V * spinor_site_size, precision);
 }
 
-void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwistFlavorType flavor, int dagger,
-            QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_mat(void *out, const void *const *gauge, const void *in, double kappa, double mu, QudaTwistFlavorType flavor,
+            int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param)
 {
-  void *inEven = in;
-  void *inOdd = (char *)in + Vh * spinor_site_size * precision;
+  const void *inEven = in;
+  const void *inOdd = (char *)in + Vh * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + Vh * spinor_site_size * precision;
   void *tmp = safe_malloc(V * spinor_site_size * precision);
@@ -232,8 +236,8 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu, QudaTwis
 }
 
 // Apply the even-odd preconditioned Dirac operator
-void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa, QudaMatPCType matpc_type, int dagger,
-               QudaPrecision precision, QudaGaugeParam &gauge_param)
+void wil_matpc(void *outEven, const void *const *gauge, const void *inEven, double kappa, QudaMatPCType matpc_type,
+               int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param)
 {
   void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
@@ -255,9 +259,13 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa, QudaMatP
 }
 
 // Apply the even-odd preconditioned Dirac operator
-void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
-              QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_matpc(void *outEven, const void *const *gauge, const void *inEven_, double kappa, double mu,
+              QudaTwistFlavorType flavor, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+              const QudaGaugeParam &gauge_param)
 {
+  // for optimization reasons, inEven gets flipped "in-place" and then it's undone later
+  void *inEven = (void *)inEven_;
+
   void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
@@ -309,11 +317,11 @@ void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu
 }
 
 //----- for non-degenerate dslash only----
-template <typename sFloat>
-void ndegTwistGamma5(sFloat *out1, sFloat *out2, sFloat *in1, sFloat *in2, const int dagger, const sFloat kappa,
-                     const sFloat mu, const sFloat epsilon, const int V, QudaTwistGamma5Type twist)
+template <typename real_t>
+void ndegTwistGamma5(real_t *out1, real_t *out2, const real_t *in1, const real_t *in2, const int dagger,
+                     const real_t kappa, const real_t mu, const real_t epsilon, const int V, QudaTwistGamma5Type twist)
 {
-  sFloat a = 0.0, b = 0.0, d = 0.0;
+  real_t a = 0.0, b = 0.0, d = 0.0;
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
     a = 2.0 * kappa * mu;
     b = -2.0 * kappa * epsilon;
@@ -323,19 +331,18 @@ void ndegTwistGamma5(sFloat *out1, sFloat *out2, sFloat *in1, sFloat *in2, const
     b = 2.0 * kappa * epsilon;
     d = 1.0 / (1.0 + a * a - b * b);
   } else {
-    printf("Twist type %d not defined\n", twist);
-    exit(0);
+    errorQuda("Twist type %d not defined", twist);
   }
 
   if (dagger) a *= -1.0;
 
 #pragma omp parallel for
   for (int i = 0; i < V; i++) {
-    sFloat tmp1[24];
-    sFloat tmp2[24];
+    real_t tmp1[24];
+    real_t tmp2[24];
     for (int s = 0; s < 4; s++)
       for (int c = 0; c < 3; c++) {
-        sFloat a5 = ((s / 2) ? -1.0 : +1.0) * a;
+        real_t a5 = ((s / 2) ? -1.0 : +1.0) * a;
         tmp1[s * 6 + c * 2 + 0] = d
           * (in1[i * 24 + s * 6 + c * 2 + 0] - a5 * in1[i * 24 + s * 6 + c * 2 + 1] + b * in2[i * 24 + s * 6 + c * 2 + 0]);
         tmp1[s * 6 + c * 2 + 1] = d
@@ -349,9 +356,9 @@ void ndegTwistGamma5(sFloat *out1, sFloat *out2, sFloat *in1, sFloat *in2, const
   }
 }
 
-void ndeg_twist_gamma5(void *outf1, void *outf2, void *inf1, void *inf2, const int dagger, const double kappa,
-                       const double mu, const double epsilon, const int Vf, QudaTwistGamma5Type twist,
-                       QudaPrecision precision)
+void ndeg_twist_gamma5(void *outf1, void *outf2, const void *inf1, const void *inf2, const int dagger,
+                       const double kappa, const double mu, const double epsilon, const int Vf,
+                       QudaTwistGamma5Type twist, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     ndegTwistGamma5((double *)outf1, (double *)outf2, (double *)inf1, (double *)inf2, dagger, kappa, mu, epsilon, Vf,
@@ -363,9 +370,13 @@ void ndeg_twist_gamma5(void *outf1, void *outf2, void *inf1, void *inf2, const i
   }
 }
 
-void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, QudaMatPCType matpc_type,
-                    int parity, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_ndeg_dslash(void *out, const void *const *gauge, const void *in_, double kappa, double mu, double epsilon,
+                    QudaMatPCType matpc_type, int parity, int dagger, QudaPrecision precision,
+                    const QudaGaugeParam &gauge_param)
 {
+  // for optimization reasons, in gets flipped "in-place" and then it's undone later
+  void *in = (void *)in_;
+
   void *out1 = out;
   void *out2 = (char *)out1 + Vh * spinor_site_size * precision;
 
@@ -383,14 +394,14 @@ void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, 
   }
 }
 
-void tm_ndeg_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, double epsilon,
-                   QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_ndeg_matpc(void *outEven, const void *const *gauge, const void *inEven, double kappa, double mu, double epsilon,
+                   QudaMatPCType matpc_type, int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param)
 {
   void *outEven1 = outEven;
   void *outEven2 = (char *)outEven1 + Vh * spinor_site_size * precision;
 
-  void *inEven1 = inEven;
-  void *inEven2 = (char *)inEven1 + Vh * spinor_site_size * precision;
+  const void *inEven1 = inEven;
+  const void *inEven2 = (char *)inEven1 + Vh * spinor_site_size * precision;
 
   void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
   void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
@@ -462,15 +473,15 @@ void tm_ndeg_matpc(void *outEven, void **gauge, void *inEven, double kappa, doub
   host_free(tmp2);
 }
 
-void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int dagger,
-                 QudaPrecision precision, QudaGaugeParam &gauge_param)
+void tm_ndeg_mat(void *out, const void *const *gauge, const void *in, double kappa, double mu, double epsilon,
+                 int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param)
 {
   // V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
-  void *inEven1 = in;
-  void *inEven2 = (char *)inEven1 + precision * Vh * spinor_site_size;
+  const void *inEven1 = in;
+  const void *inEven2 = (char *)inEven1 + precision * Vh * spinor_site_size;
 
-  void *inOdd1 = (char *)inEven2 + precision * Vh * spinor_site_size;
-  void *inOdd2 = (char *)inOdd1 + precision * Vh * spinor_site_size;
+  const void *inOdd1 = (char *)inEven2 + precision * Vh * spinor_site_size;
+  const void *inOdd2 = (char *)inOdd1 + precision * Vh * spinor_site_size;
 
   void *outEven1 = out;
   void *outEven2 = (char *)outEven1 + precision * Vh * spinor_site_size;

@@ -14,16 +14,15 @@
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
 #include <dirac_quda.h>
+#include <qio_field.h>
 
 // External headers
-#include <llfat_utils.h>
-#include <staggered_gauge_utils.h>
-#include <host_utils.h>
-#include <index_utils.hpp>
-#include <command_line_params.h>
-
-#include <misc.h>
-#include <qio_field.h>
+#include "llfat_utils.h"
+#include "staggered_gauge_utils.h"
+#include "host_utils.h"
+#include "index_utils.hpp"
+#include "command_line_params.h"
+#include "misc.h"
 
 template <typename T> using complex = std::complex<T>;
 

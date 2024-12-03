@@ -18,28 +18,28 @@
 using namespace quda;
 
 /**
- * @brief Apply the 4-d Dslash to all fifth dimensional slices for a 4-d data layout
+ * @brief Apply the 4-d Dslash (Wilson) to all fifth dimensional slices for a 4-d data layout
  *
  * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
- * @tparam Float The floating-point type used for the computation.
- * @param out Host output rhs
- * @param gauge Gauge links
- * @param ghostGauge The ghost gauge field for multi-GPU computations.
- * @param in Host input spinor
- * @param fwdSpinor The forward ghost region of the spinor field
- * @param backSpinor The backward ghost region of the spinor field
- * @param parity The parity of the dslash (0 for even, 1 for odd).
- * @param dagger Whether to apply the original or the Hermitian conjugate operator
+ * @tparam real_t The floating-point type used for the computation.
+ * @param[out] out Host output rhs
+ * @param[in] gauge Gauge links
+ * @param[in] ghostGauge The ghost gauge field for multi-GPU computations.
+ * @param[in] in Host input spinor
+ * @param[in] fwdSpinor The forward ghost region of the spinor field
+ * @param[in] backSpinor The backward ghost region of the spinor field
+ * @param[in] parity The parity of the dslash (0 for even, 1 for odd).
+ * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
-template <QudaPCType type, typename Float>
-void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in, Float **fwdSpinor, Float **backSpinor,
-                        int parity, int dagger)
+template <QudaPCType type, typename real_t>
+void dslashReference_4d(real_t *out, const real_t *const *gauge, real_t const *const *ghostGauge, const real_t *in,
+                        const real_t *const *fwdSpinor, const real_t *const *backSpinor, int parity, int dagger)
 {
 #pragma omp parallel for
   for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
 
-  Float *gaugeEven[4], *gaugeOdd[4];
-  Float *ghostGaugeEven[4], *ghostGaugeOdd[4];
+  const real_t *gaugeEven[4], *gaugeOdd[4];
+  const real_t *ghostGaugeEven[4], *ghostGaugeOdd[4];
 
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gauge[dir];
@@ -56,10 +56,10 @@ void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in
       for (int dir = 0; dir < 8; dir++) {
         int gaugeOddBit = (xs % 2 == 0 || type == QUDA_4D_PC) ? parity : (parity + 1) % 2;
 
-        Float *gauge = gaugeLink(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-        Float *spinor = spinorNeighbor_5d<type>(sp_idx, dir, parity, in, fwdSpinor, backSpinor, 1, 1);
+        const real_t *gauge = gaugeLink(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+        const real_t *spinor = spinorNeighbor_5d<type>(sp_idx, dir, parity, in, fwdSpinor, backSpinor, 1, 1);
 
-        Float projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+        real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
         int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
         multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
 
@@ -79,7 +79,7 @@ void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in
  * @brief Performs a linear combination of vectors with gamma_+ or gamma_- projection
  *
  * @tparam plus If true, use gamma_+; if false, use gamma_-
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @param[out] z The output vector
  * @param[in] a The scaling factor for vector x
  * @param[in] x The first input vector
@@ -89,8 +89,8 @@ void dslashReference_4d(Float *out, Float **gauge, Float **ghostGauge, Float *in
  * @param[in] s The fifth dimension index for vector x and z
  * @param[in] sp The fifth dimension index for vector y
  */
-template <bool plus, class Float> // plus = true -> gamma_+; plus = false -> gamma_-
-void axpby_ssp_project(Float *z, Float a, Float *x, Float b, Float *y, int idx_cb_4d, int s, int sp)
+template <bool plus, class real_t> // plus = true -> gamma_+; plus = false -> gamma_-
+void axpby_ssp_project(real_t *z, real_t a, const real_t *x, real_t b, const real_t *y, int idx_cb_4d, int s, int sp)
 {
   // z_s = a*x_s + b*\gamma_+/-*y_sp
   // Will use the DeGrand-Rossi/CPS basis, where gamma5 is diagonal:
@@ -110,34 +110,34 @@ void axpby_ssp_project(Float *z, Float a, Float *x, Float b, Float *y, int idx_c
 }
 
 /**
- * @brief Apply the Ls dimension portion of the eofa Mobius dslash
+ * @brief Apply the Ls dimension portion (m5) of EOFA Mobius dslash
  *
- * @tparam Float The floating-point type used for the vectors
- * @param out Host output rhs
- * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe
- * @param dagger 0 for the regular operator, 1 for the dagger operator
- * @param mferm Domain wall fermion mass
- * @param m5 Domain wall bulk fermion mass
- * @param b "b" value for Mobius
- * @param c "c" value for Mobius
- * @param mq1 EOFA parameter mq1
- * @param mq2 EOFA parameter mq2
- * @param mq3 EOFA parameter mq3
- * @param eofa_pm EOFA parameter eofa_pm
- * @param eofa_shift EOFA parameter eofa_shift
- * @param precision Single or double precision
+ * @tparam real_t The floating-point type used for the vectors
+ * @param[out] out Host output rhs
+ * @param[in] in Host input spinor
+ * @param[in] parity 0 for D_eo, 1 for D_oe
+ * @param[in] dagger 0 for the regular operator, 1 for the dagger operator
+ * @param[in] mferm Domain wall fermion mass
+ * @param[in] m5 Domain wall bulk fermion mass
+ * @param[in] b "b" value for Mobius
+ * @param[in] c "c" value for Mobius
+ * @param[in] mq1 EOFA parameter mq1
+ * @param[in] mq2 EOFA parameter mq2
+ * @param[in] mq3 EOFA parameter mq3
+ * @param[in] eofa_pm EOFA parameter eofa_pm
+ * @param[in] eofa_shift EOFA parameter eofa_shift
+ * @param[in] precision Single or double precision
  */
-template <typename Float>
-void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c, Float mq1,
-                     Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+template <typename real_t>
+void mdw_eofa_m5_ref(real_t *out, const real_t *in, int parity, int dagger, real_t mferm, real_t m5, real_t b, real_t c,
+                     real_t mq1, real_t mq2, real_t mq3, int eofa_pm, real_t eofa_shift)
 {
-  Float alpha = b + c;
-  Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
+  real_t alpha = b + c;
+  real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
     / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
     / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
 
-  Float kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
+  real_t kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
 
   constexpr int spinor_size = 4 * 3 * 2;
 #pragma omp parallel for
@@ -147,8 +147,8 @@ void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm,
       // Calls for an extension of the original function.
       // 8 is forward hop, which wants P_+, 9 is backward hop,
       // which wants P_-.  Dagger reverses these.
-      Float *spinor = spinorNeighbor_5d<QUDA_4D_PC>(i, dir, parity, in);
-      Float projectedSpinor[spinor_size];
+      const real_t *spinor = spinorNeighbor_5d<QUDA_4D_PC>(i, dir, parity, in);
+      real_t projectedSpinor[spinor_size];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       // J  Need a conditional here for s=0 and s=Ls-1.
@@ -161,14 +161,14 @@ void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm,
       sum(&out[i * spinor_size], &out[i * spinor_size], projectedSpinor, spinor_size);
     }
     // 1 + kappa*D5
-    axpby((Float)1., &in[i * spinor_size], kappa, &out[i * spinor_size], spinor_size);
+    axpby((real_t)1., &in[i * spinor_size], kappa, &out[i * spinor_size], spinor_size);
   }
 
   // Initialize
-  std::vector<Float> shift_coeffs(Ls);
+  std::vector<real_t> shift_coeffs(Ls);
 
   // Construct Mooee_shift
-  Float N = (eofa_pm ? 1.0 : -1.0) * (2.0 * eofa_shift * eofa_norm)
+  real_t N = (eofa_pm ? 1.0 : -1.0) * (2.0 * eofa_shift * eofa_norm)
     * (std::pow(alpha + 1.0, Ls) + mq1 * std::pow(alpha - 1.0, Ls));
 
   // For the kappa preconditioning
@@ -185,23 +185,23 @@ void mdw_eofa_m5_ref(Float *out, Float *in, int parity, int dagger, Float mferm,
     for (int s = 0; s < Ls; s++) {
       if (dagger == 0) {
         if (eofa_pm) {
-          axpby_ssp_project<true>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, s, Ls - 1);
+          axpby_ssp_project<true>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, s, Ls - 1);
         } else {
-          axpby_ssp_project<false>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, s, 0);
+          axpby_ssp_project<false>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, s, 0);
         }
       } else {
         if (eofa_pm) {
-          axpby_ssp_project<true>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, Ls - 1, s);
+          axpby_ssp_project<true>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, Ls - 1, s);
         } else {
-          axpby_ssp_project<false>(out, (Float)1., out, shift_coeffs[s], in, idx_cb_4d, 0, s);
+          axpby_ssp_project<false>(out, (real_t)1., out, shift_coeffs[s], in, idx_cb_4d, 0, s);
         }
       }
     }
   }
 }
 
-void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, double m5, double b, double c, double mq1,
-                 double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
+void mdw_eofa_m5(void *out, const void *in, int parity, int dagger, double mferm, double m5, double b, double c,
+                 double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     mdw_eofa_m5_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
@@ -214,19 +214,19 @@ void mdw_eofa_m5(void *out, void *in, int parity, int dagger, double mferm, doub
 }
 
 /**
- * @brief Apply the Ls dimension portion of the domain wall dslash in a 4-d data layout
+ * @brief Apply the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
  * @tparam type Domain wall preconditioning type (4 or 5 dimensions)
  * @tparam zero_initialize Whether or not to zero initialize or accumulate into the output rhs
- * @tparam Float The floating-point type used for the vectors
- * @param out Host output rhs
- * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe
- * @param dagger 0 for the regular operator, 1 for the dagger operator
- * @param mferm Domain wall fermion mass
+ * @tparam real_t The floating-point type used for the vectors
+ * @param[in,out] out Host output rhs
+ * @param[in] in Host input spinor
+ * @param[in] parity 0 for D_ee, 1 for D_oo
+ * @param[in] dagger 0 for the regular operator, 1 for the dagger operator
+ * @param[in] mferm Domain wall fermion mass
  */
-template <QudaPCType type, bool zero_initialize = false, typename Float>
-void dslashReference_5th(Float *out, Float *in, int parity, int dagger, Float mferm)
+template <QudaPCType type, bool zero_initialize = false, typename real_t>
+void dslashReference_5th(real_t *out, const real_t *in, int parity, int dagger, real_t mferm)
 {
 #pragma omp parallel for
   for (int i = 0; i < V5h; i++) {
@@ -236,8 +236,8 @@ void dslashReference_5th(Float *out, Float *in, int parity, int dagger, Float mf
       // Calls for an extension of the original function.
       // 8 is forward hop, which wants P_+, 9 is backward hop,
       // which wants P_-.  Dagger reverses these.
-      Float *spinor = spinorNeighbor_5d<type>(i, dir, parity, in);
-      Float projectedSpinor[4 * 3 * 2];
+      const real_t *spinor = spinorNeighbor_5d<type>(i, dir, parity, in);
+      real_t projectedSpinor[4 * 3 * 2];
       int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       // J  Need a conditional here for s=0 and s=Ls-1.
@@ -245,7 +245,7 @@ void dslashReference_5th(Float *out, Float *in, int parity, int dagger, Float mf
       int xs = X / (Z[3] * Z[2] * Z[1] * Z[0]);
 
       if ((xs == 0 && dir == 9) || (xs == Ls - 1 && dir == 8)) {
-        ax(projectedSpinor, (Float)(-mferm), projectedSpinor, 4 * 3 * 2);
+        ax(projectedSpinor, (real_t)(-mferm), projectedSpinor, 4 * 3 * 2);
       }
       sum(&out[i * (4 * 3 * 2)], &out[i * (4 * 3 * 2)], projectedSpinor, 4 * 3 * 2);
     }
@@ -253,38 +253,38 @@ void dslashReference_5th(Float *out, Float *in, int parity, int dagger, Float mf
 }
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the domain wall dslash in a 4-d data layout
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
- * @tparam Float The floating-point type used for the vectors
- * @param out Host output rhs
- * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe (unused)
- * @param dagger 0 for the regular operator, 1 for the dagger operator
- * @param mferm Domain wall fermion mass
- * @param kappa Kappa values for each 5th dimension slice
+ * @tparam real_t The floating-point type used for the vectors
+ * @param[out] out Host output rhs
+ * @param[in] in Host input spinor
+ * @param[in] parity 0 for D_eo, 1 for D_oe (unused)
+ * @param[in] dagger 0 for the regular operator, 1 for the dagger operator
+ * @param[in] mferm Domain wall fermion mass
+ * @param[in] kappa Kappa values for each 5th dimension slice
  */
-template <typename Float>
-void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm, double *kappa)
+template <typename real_t>
+void dslashReference_5th_inv(real_t *out, const real_t *in, int, int dagger, real_t mferm, const double *kappa)
 {
-  double *inv_Ftr = (double *)safe_malloc(Ls * sizeof(Float));
-  double *Ftr = (double *)safe_malloc(Ls * sizeof(Float));
+  double *inv_Ftr = (double *)safe_malloc(Ls * sizeof(real_t));
+  double *Ftr = (double *)safe_malloc(Ls * sizeof(real_t));
   for (int xs = 0; xs < Ls; xs++) {
     inv_Ftr[xs] = 1.0 / (1.0 + pow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
-    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float)); }
+    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(real_t)); }
   }
   if (dagger == 0) {
     // s = 0
     for (int i = 0; i < Vh; i++) {
-      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[0]), &in[12 + 24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[0]), &in[12 + 24 * (i + Vh * (Ls - 1))], 12);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)(2.0 * kappa[xs]), &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (xs + 1))], 12);
-        axpy((Float)Ftr[xs], &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (xs + 1))], 12);
+        axpy((real_t)Ftr[xs], &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
     }
@@ -293,29 +293,29 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
     for (int xs = Ls - 2; xs >= 0; --xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)Ftr[xs], &out[24 * (i + Vh * (Ls - 1))], &out[24 * (i + Vh * xs)], 12);
-        axpy((Float)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * (xs + 1))], &out[12 + 24 * (i + Vh * xs)], 12);
+        axpy((real_t)Ftr[xs], &out[24 * (i + Vh * (Ls - 1))], &out[24 * (i + Vh * xs)], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * (xs + 1))], &out[12 + 24 * (i + Vh * xs)], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      ax(&out[24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[Ls - 1]), &out[24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[Ls - 1]), &out[24 * (i + Vh * (Ls - 1))], 12);
     }
   } else {
     // s = 0
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      ax(&out[24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[0]), &in[24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[0]), &in[24 * (i + Vh * (Ls - 1))], 12);
     }
 
     // s = 1 ... ls-2
     for (int xs = 0; xs <= Ls - 2; ++xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)Ftr[xs], &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (Ls - 1))], 12);
-        axpy((Float)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (xs + 1))], 12);
+        axpy((real_t)Ftr[xs], &out[24 * (i + Vh * xs)], &out[24 * (i + Vh * (Ls - 1))], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[12 + 24 * (i + Vh * xs)], &out[12 + 24 * (i + Vh * (xs + 1))], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
     }
@@ -324,15 +324,15 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
     for (int xs = Ls - 2; xs >= 0; --xs) {
 #pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
-        axpy((Float)(2.0 * kappa[xs]), &out[24 * (i + Vh * (xs + 1))], &out[24 * (i + Vh * xs)], 12);
-        axpy((Float)Ftr[xs], &out[12 + 24 * (i + Vh * (Ls - 1))], &out[12 + 24 * (i + Vh * xs)], 12);
+        axpy((real_t)(2.0 * kappa[xs]), &out[24 * (i + Vh * (xs + 1))], &out[24 * (i + Vh * xs)], 12);
+        axpy((real_t)Ftr[xs], &out[12 + 24 * (i + Vh * (Ls - 1))], &out[12 + 24 * (i + Vh * xs)], 12);
       }
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
     }
     // s = ls -1
 #pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
-      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (Float)(inv_Ftr[Ls - 1]), &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
+      ax(&out[12 + 24 * (i + Vh * (Ls - 1))], (real_t)(inv_Ftr[Ls - 1]), &out[12 + 24 * (i + Vh * (Ls - 1))], 12);
     }
   }
   host_free(inv_Ftr);
@@ -347,8 +347,8 @@ void dslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm
  * but ensures that the input and output types are compatible with the C complex type `sComplex`.
  *
  * @tparam sComplex The type of the C99 complex number.
- * @param x The complex number to raise to a power.
- * @param y The integer exponent to raise `x` to.
+ * @param[in] x The complex number to raise to a power.
+ * @param[in] y The integer exponent to raise `x` to.
  * @return The complex number `x` raised to the power `y`.
  */
 template <typename sComplex> sComplex cpow(const sComplex &x, int y)
@@ -362,26 +362,26 @@ template <typename sComplex> sComplex cpow(const sComplex &x, int y)
 }
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the Mobius dslash in a 4-d data layout
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the Mobius dslash in a 4-d data layout
  *
- * @tparam Float The floating-point type used for the vectors
+ * @tparam real_t The floating-point type used for the vectors
  * @tparam sComplex The C99 complex floating point type used for the vectors
- * @param out Host output rhs
- * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe (unused)
- * @param dagger 0 for the regular operator, 1 for the dagger operator
- * @param mferm Domain wall fermion mass
- * @param kappa Kappa values for each 5th dimension slice
+ * @param[out] out Host output rhs
+ * @param[in] in Host input spinor
+ * @param[in] parity 0 for D_eo, 1 for D_oe (unused)
+ * @param[in] dagger 0 for the regular operator, 1 for the dagger operator
+ * @param[in] mferm Domain wall fermion mass
+ * @param[in] kappa Kappa values for each 5th dimension slice
  */
-template <typename Float, typename sComplex>
-void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mferm, sComplex *kappa)
+template <typename real_t, typename sComplex>
+void mdslashReference_5th_inv(real_t *out, const real_t *in, int, int dagger, real_t mferm, const sComplex *kappa)
 {
   sComplex *inv_Ftr = (sComplex *)safe_malloc(Ls * sizeof(sComplex));
   sComplex *Ftr = (sComplex *)safe_malloc(Ls * sizeof(sComplex));
   for (int xs = 0; xs < Ls; xs++) {
     inv_Ftr[xs] = 1.0 / (1.0 + cpow(2.0 * kappa[xs], Ls) * mferm);
     Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
-    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(Float)); }
+    for (int i = 0; i < Vh; i++) { memcpy(&out[24 * (i + Vh * xs)], &in[24 * (i + Vh * xs)], 24 * sizeof(real_t)); }
   }
   if (dagger == 0) {
     // s = 0
@@ -456,43 +456,43 @@ void mdslashReference_5th_inv(Float *out, Float *in, int, int dagger, Float mfer
 }
 
 /**
- * @brief Apply the inverse of the Ls dimension portion of the eofa Mobius dslash
+ * @brief Apply the inverse of the Ls dimension portion (m5) of the EOFA Mobius dslash
  *
- * @tparam Float The floating-point type used for the vectors
- * @param out Host output rhs
- * @param in Host input spinor
- * @param parity 0 for D_eo, 1 for D_oe
- * @param dagger 0 for the regular operator, 1 for the dagger operator
- * @param mferm Domain wall fermion mass
- * @param m5 Domain wall bulk fermion mass
- * @param b "b" value for Mobius
- * @param c "c" value for Mobius
- * @param mq1 EOFA parameter mq1
- * @param mq2 EOFA parameter mq2
- * @param mq3 EOFA parameter mq3
- * @param eofa_pm EOFA parameter eofa_pm
- * @param eofa_shift EOFA parameter eofa_shift
+ * @tparam real_t The floating-point type used for the vectors
+ * @param[out] out Host output rhs
+ * @param[in] in Host input spinor
+ * @param[in] parity 0 for D_eo, 1 for D_oe
+ * @param[in] dagger 0 for the regular operator, 1 for the dagger operator
+ * @param[in] mferm Domain wall fermion mass
+ * @param[in] m5 Domain wall bulk fermion mass
+ * @param[in] b "b" value for Mobius
+ * @param[in] c "c" value for Mobius
+ * @param[in] mq1 EOFA parameter mq1
+ * @param[in] mq2 EOFA parameter mq2
+ * @param[in] mq3 EOFA parameter mq3
+ * @param[in] eofa_pm EOFA parameter eofa_pm
+ * @param[in] eofa_shift EOFA parameter eofa_shift
  */
-template <typename Float>
-void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mferm, Float m5, Float b, Float c,
-                        Float mq1, Float mq2, Float mq3, int eofa_pm, Float eofa_shift)
+template <typename real_t>
+void mdw_eofa_m5inv_ref(real_t *out, const real_t *in, int parity, int dagger, real_t mferm, real_t m5, real_t b,
+                        real_t c, real_t mq1, real_t mq2, real_t mq3, int eofa_pm, real_t eofa_shift)
 {
-  Float alpha = b + c;
-  Float eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
+  real_t alpha = b + c;
+  real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
     / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
     / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
-  Float kappa5 = (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.); // alpha = b+c
+  real_t kappa5 = (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.); // alpha = b+c
 
   using sComplex = double _Complex;
 
   std::vector<sComplex> kappa_array(Ls, -0.5 * kappa5);
-  std::vector<Float> eofa_u(Ls);
-  std::vector<Float> eofa_x(Ls);
-  std::vector<Float> eofa_y(Ls);
+  std::vector<real_t> eofa_u(Ls);
+  std::vector<real_t> eofa_x(Ls);
+  std::vector<real_t> eofa_y(Ls);
 
   mdslashReference_5th_inv(out, in, parity, dagger, mferm, kappa_array.data());
 
-  Float N = (eofa_pm ? +1. : -1.) * (2. * eofa_shift * eofa_norm)
+  real_t N = (eofa_pm ? +1. : -1.) * (2. * eofa_shift * eofa_norm)
     * (std::pow(alpha + 1., Ls) + mq1 * std::pow(alpha - 1., Ls)) / (b * (m5 + 4.) + 1.);
 
   // Here the signs are somewhat mixed:
@@ -502,9 +502,9 @@ void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mfe
     eofa_u[eofa_pm ? s : Ls - 1 - s] = N * std::pow(-1., s) * std::pow(alpha - 1., s) / std::pow(alpha + 1., Ls + s + 1);
   }
 
-  Float sherman_morrison_fac;
+  real_t sherman_morrison_fac;
 
-  Float factor = -kappa5 * mferm;
+  real_t factor = -kappa5 * mferm;
   if (eofa_pm) {
     // eofa_pm = plus
     // Computing x
@@ -541,20 +541,20 @@ void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mfe
   for (int idx_cb_4d = 0; idx_cb_4d < Vh; idx_cb_4d++) {
     for (int s = 0; s < Ls; s++) {
       for (int sp = 0; sp < Ls; sp++) {
-        Float t = 2.0 * sherman_morrison_fac;
+        real_t t = 2.0 * sherman_morrison_fac;
         if (dagger == 0) {
           t *= eofa_x[s] * eofa_y[sp];
           if (eofa_pm) {
-            axpby_ssp_project<true>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<true>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           } else {
-            axpby_ssp_project<false>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<false>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           }
         } else {
           t *= eofa_y[s] * eofa_x[sp];
           if (eofa_pm) {
-            axpby_ssp_project<true>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<true>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           } else {
-            axpby_ssp_project<false>(out, (Float)1., out, t, in, idx_cb_4d, s, sp);
+            axpby_ssp_project<false>(out, (real_t)1., out, t, in, idx_cb_4d, s, sp);
           }
         }
       }
@@ -562,21 +562,21 @@ void mdw_eofa_m5inv_ref(Float *out, Float *in, int parity, int dagger, Float mfe
   }
 }
 
-void mdw_eofa_m5inv(void *out, void *in, int parity, int dagger, double mferm, double m5, double b, double c,
+void mdw_eofa_m5inv(void *out, const void *in, int parity, int dagger, double mferm, double m5, double b, double c,
                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
-    mdw_eofa_m5inv_ref<double>((double *)out, (double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
-                               eofa_shift);
+    mdw_eofa_m5inv_ref<double>((double *)out, (const double *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3,
+                               eofa_pm, eofa_shift);
   } else {
-    mdw_eofa_m5inv_ref<float>((float *)out, (float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
+    mdw_eofa_m5inv_ref<float>((float *)out, (const float *)in, parity, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm,
                               eofa_shift);
   }
 }
 
-// this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void dw_dslash(void *out, void *const *gauge, void *in, int parity, int dagger, QudaPrecision precision,
-               QudaGaugeParam &gauge_param, double mferm)
+// this actually applies the preconditioned dslash, e.g., D_ee * \psi_e + D_eo * \psi_o or D_oo * \psi_o + D_oe * \psi_e
+void dw_dslash(void *out, const void *const *gauge, const void *in, int parity, int dagger, QudaPrecision precision,
+               const QudaGaugeParam &gauge_param, double mferm)
 {
   GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -586,7 +586,7 @@ void dw_dslash(void *out, void *const *gauge, void *in, int parity, int dagger, 
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
-  csParam.v = in;
+  csParam.v = (void *)in;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 5; // for DW dslash
@@ -630,8 +630,8 @@ void dw_dslash(void *out, void *const *gauge, void *in, int parity, int dagger, 
   }
 }
 
-void dslash_4_4d(void *out, void *const *gauge, void *in, int parity, int dagger, QudaPrecision precision,
-                 QudaGaugeParam &gauge_param, double)
+void dslash_4_4d(void *out, const void *const *gauge, const void *in, int parity, int dagger, QudaPrecision precision,
+                 const QudaGaugeParam &gauge_param, double)
 {
   GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -641,7 +641,7 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int parity, int dagger
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
-  csParam.v = in;
+  csParam.v = (void *)in;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 5; // for DW dslash
@@ -683,8 +683,8 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int parity, int dagger
   }
 }
 
-void dw_dslash_5_4d(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision,
-                    QudaGaugeParam &, double mferm, bool zero_initialize)
+void dw_dslash_5_4d(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                    const QudaGaugeParam &, double mferm, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -699,8 +699,8 @@ void dw_dslash_5_4d(void *out, void *const *, void *in, int parity, int dagger, 
   }
 }
 
-void dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &,
-                  double mferm, double *kappa)
+void dslash_5_inv(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                  const QudaGaugeParam &, double mferm, double *kappa)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_5th_inv((double *)out, (double *)in, parity, dagger, mferm, kappa);
@@ -709,8 +709,8 @@ void dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger, Qu
   }
 }
 
-void mdw_dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision,
-                      QudaGaugeParam &, double mferm, double _Complex *kappa)
+void mdw_dslash_5_inv(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                      const QudaGaugeParam &, double mferm, const double _Complex *kappa)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     mdslashReference_5th_inv((double *)out, (double *)in, parity, dagger, mferm, kappa);
@@ -719,8 +719,8 @@ void mdw_dslash_5_inv(void *out, void *const *, void *in, int parity, int dagger
   }
 }
 
-void mdw_dslash_5(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision, QudaGaugeParam &,
-                  double mferm, double _Complex *kappa, bool zero_initialize)
+void mdw_dslash_5(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                  const QudaGaugeParam &, double mferm, const double _Complex *kappa, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -739,8 +739,9 @@ void mdw_dslash_5(void *out, void *const *, void *in, int parity, int dagger, Qu
   }
 }
 
-void mdw_dslash_4_pre(void *out, void *const *, void *in, int parity, int dagger, QudaPrecision precision,
-                      QudaGaugeParam &, double mferm, double _Complex *b5, double _Complex *c5, bool zero_initialize)
+void mdw_dslash_4_pre(void *out, const void *const *, const void *in, int parity, int dagger, QudaPrecision precision,
+                      const QudaGaugeParam &, double mferm, const double _Complex *b5, const double _Complex *c5,
+                      bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -764,12 +765,12 @@ void mdw_dslash_4_pre(void *out, void *const *, void *in, int parity, int dagger
   }
 }
 
-void dw_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
-            QudaGaugeParam &gauge_param, double mferm)
+void dw_mat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit, QudaPrecision precision,
+            const QudaGaugeParam &gauge_param, double mferm)
 {
 
-  void *inEven = in;
-  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
+  const void *inEven = in;
+  const void *inOdd = (const char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
@@ -780,12 +781,12 @@ void dw_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bi
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
-void dw_4d_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
-               QudaGaugeParam &gauge_param, double mferm)
+void dw_4d_mat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit,
+               QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
 
-  void *inEven = in;
-  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
+  const void *inEven = in;
+  const void *inOdd = (char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
@@ -799,12 +800,12 @@ void dw_4d_mat(void *out, void *const *gauge, void *in, double kappa, int dagger
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
-void dw_4dpv_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
-               QudaGaugeParam &gauge_param, double mferm)
+void dw_4dpv_mat(void *out, const void *const *gauge, const void *in, double kappa, int dagger, QudaPrecision precision,
+                 const QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5 * spinor_site_size * precision);
 
-  if (dagger_bit == 0) {
+  if (dagger == 0) {
     // dwf
     dw_4d_mat(tmp, gauge, in, kappa, 0, precision, gauge_param, mferm);
     // pv_dag
@@ -819,16 +820,17 @@ void dw_4dpv_mat(void *out, void *const *gauge, void *in, double kappa, int dagg
   host_free(tmp);
 }
 
-void mdw_mat(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
-             QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5)
+void mdw_mat(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
+             const double _Complex *kappa_c, int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param,
+             double mferm, const double _Complex *b5, const double _Complex *c5)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
   double _Complex *kappa5 = (double _Complex *)safe_malloc(Ls * sizeof(double _Complex));
 
   for (int xs = 0; xs < Ls; xs++) kappa5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
 
-  void *inEven = in;
-  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
+  const void *inEven = in;
+  const void *inOdd = (const char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
@@ -866,9 +868,9 @@ void mdw_mat(void *out, void *const *gauge, void *in, double _Complex *kappa_b, 
   host_free(tmp);
 }
 
-void mdw_eofa_mat(void *out, void *const *gauge, void *in, int dagger, QudaPrecision precision,
-                  QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1, double mq2,
-                  double mq3, int eofa_pm, double eofa_shift)
+void mdw_eofa_mat(void *out, const void *const *gauge, const void *in, int dagger, QudaPrecision precision,
+                  const QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1,
+                  double mq2, double mq3, int eofa_pm, double eofa_shift)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -880,8 +882,8 @@ void mdw_eofa_mat(void *out, void *const *gauge, void *in, int dagger, QudaPreci
 
   auto kappa_b = 0.5 / (b * (4. + m5) + 1.);
 
-  void *inEven = in;
-  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
+  const void *inEven = in;
+  const void *inOdd = (char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
@@ -918,8 +920,8 @@ void mdw_eofa_mat(void *out, void *const *gauge, void *in, int dagger, QudaPreci
   host_free(tmp);
 }
 //
-void dw_matdagmat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
-                  QudaGaugeParam &gauge_param, double mferm)
+void dw_matdagmat(void *out, const void *const *gauge, const void *in, double kappa, int dagger_bit,
+                  QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5 * spinor_site_size * precision);
 
@@ -930,8 +932,8 @@ void dw_matdagmat(void *out, void *const *gauge, void *in, double kappa, int dag
   host_free(tmp);
 }
 
-void dw_matpc(void *out, void *const *gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
-              QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
+void dw_matpc(void *out, const void *const *gauge, const void *in, double kappa, QudaMatPCType matpc_type,
+              int dagger_bit, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -950,8 +952,8 @@ void dw_matpc(void *out, void *const *gauge, void *in, double kappa, QudaMatPCTy
   host_free(tmp);
 }
 
-void dw_4d_matpc(void *out, void *const *gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
-                 QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
+void dw_4d_matpc(void *out, const void *const *gauge, const void *in, double kappa, QudaMatPCType matpc_type,
+                 int dagger_bit, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm)
 {
   double kappa2 = -kappa * kappa;
   double *kappa5 = (double *)safe_malloc(Ls * sizeof(double));
@@ -990,9 +992,9 @@ void dw_4d_matpc(void *out, void *const *gauge, void *in, double kappa, QudaMatP
   host_free(kappa5);
 }
 
-void mdw_matpc(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
-               QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
-               double _Complex *b5, double _Complex *c5)
+void mdw_matpc(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
+               const double _Complex *kappa_c, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+               const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5, const double _Complex *c5)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
   double _Complex *kappa5 = (double _Complex *)safe_malloc(Ls * sizeof(double _Complex));
@@ -1062,9 +1064,9 @@ void mdw_matpc(void *out, void *const *gauge, void *in, double _Complex *kappa_b
   host_free(kappa_mdwf);
 }
 
-void mdw_eofa_matpc(void *out, void *const *gauge, void *in, QudaMatPCType matpc_type, int dagger,
-                    QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c,
-                    double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift)
+void mdw_eofa_matpc(void *out, const void *const *gauge, const void *in, QudaMatPCType matpc_type, int dagger,
+                    QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm, double m5, double b,
+                    double c, double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -1131,14 +1133,15 @@ void mdw_eofa_matpc(void *out, void *const *gauge, void *in, QudaMatPCType matpc
   host_free(tmp);
 }
 
-void mdw_mdagm_local(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
-                     QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
-                     double _Complex *b5, double _Complex *c5)
+void mdw_mdagm_local(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
+                     const double _Complex *kappa_c, QudaMatPCType matpc_type, QudaPrecision precision,
+                     const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5,
+                     const double _Complex *c5)
 {
   lat_dim_t R;
   for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
-  GaugeField *padded_gauge = createExtendedGauge((void **)gauge, gauge_param, R);
+  GaugeField *padded_gauge = createExtendedGauge((void **)gauge, (QudaGaugeParam &)gauge_param, R);
 
   int padded_V = 1;
   int W[4];
