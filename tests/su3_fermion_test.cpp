@@ -326,22 +326,10 @@ int main(int argc, char **argv)
   for (int i = 0; i < V * 24; i++) { 
 
       method_adj_diff += pow(fabs(check_safe.data<double *>()[i] - check_hier.data<double *>()[i]), 2);
-      // adj_fwd_diff += pow(fabs(check_safe.data<double *>()[i] - check_fwd.data<double *>()[i]), 2);
-  }
-    
-  for (int i = 0; i < V * 12; i++) {
-      
-      int re_idx = 2*i;
-      int im_idx = 2*i + 1;
-      
-      double re_diff2 = pow(check_safe.data<double *>()[re_idx] - check_fwd.data<double *>()[re_idx], 2);
-      double im_diff2 = pow(check_safe.data<double *>()[im_idx] - check_fwd.data<double *>()[im_idx], 2);
-      
-      adj_fwd_diff += sqrt(re_diff2 + im_diff2);
-      
+      adj_fwd_diff += pow((check_safe.data<double *>()[i] - check_fwd.data<double *>()[i]), 2);
   }
   
-  double method_adj_check = sqrt(method_adj_diff)/(V*24.), adj_fwd_check = adj_fwd_diff/(V*12.);
+  double method_adj_check = sqrt(method_adj_diff)/(V*24.), adj_fwd_check = sqrt(adj_fwd_diff)/(V*24.);
   double oom_error = pow(smear_param.n_steps,2) * pow(smear_param.epsilon,3);
     
   printf("Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n", method_adj_check);
