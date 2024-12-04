@@ -158,3 +158,204 @@ template <typename real_t> void print_su3_matrix(const su3_matrix<real_t> *a)
     printf("\n");
   }
 }
+
+template <class T, class U> struct Promote {
+  typedef T Type;
+};
+
+template <> struct Promote<int, float> {
+  typedef float Type;
+};
+
+template <> struct Promote<float, int> {
+  typedef float Type;
+};
+
+template <> struct Promote<int, double> {
+  typedef double Type;
+};
+
+template <> struct Promote<double, int> {
+  typedef double Type;
+};
+
+template <> struct Promote<float, double> {
+  typedef double Type;
+};
+
+template <> struct Promote<double, float> {
+  typedef double Type;
+};
+
+template <> struct Promote<int, std::complex<float>> {
+  typedef std::complex<float> Type;
+};
+
+template <> struct Promote<std::complex<float>, int> {
+  typedef std::complex<float> Type;
+};
+
+template <> struct Promote<float, std::complex<float>> {
+  typedef std::complex<float> Type;
+};
+
+template <> struct Promote<int, std::complex<double>> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<std::complex<double>, int> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<float, std::complex<double>> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<std::complex<double>, float> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<double, std::complex<double>> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<std::complex<double>, double> {
+  typedef std::complex<double> Type;
+};
+
+template <int N, class T> class Matrix
+{
+private:
+  T data[N][N];
+
+public:
+  Matrix(); // default constructor
+  Matrix(const Matrix<N, T> &) = default;
+  Matrix(Matrix<N, T> &&) = default;
+  Matrix &operator=(const Matrix<N, T> &) = default;
+  Matrix &operator=(Matrix<N, T> &&) = default;
+  Matrix &operator+=(const Matrix<N, T> &mat);
+  Matrix &operator-=(const Matrix<N, T> &mat);
+  const T &operator()(int i, int j) const;
+  T &operator()(int i, int j);
+};
+
+template <int N, class T> Matrix<N, T>::Matrix()
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { data[i][j] = static_cast<T>(0); }
+  }
+}
+
+template <int N, class T> T &Matrix<N, T>::operator()(int i, int j) { return data[i][j]; }
+
+template <int N, class T> const T &Matrix<N, T>::operator()(int i, int j) const { return data[i][j]; }
+
+template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator+=(const Matrix<N, T> &mat)
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { data[i][j] += mat.data[i][j]; }
+  }
+  return *this;
+}
+
+template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator-=(const Matrix<N, T> &mat)
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { data[i][j] -= mat.data[i][j]; }
+  }
+  return *this;
+}
+
+template <int N, class T> Matrix<N, T> operator+(const Matrix<N, T> &a, const Matrix<N, T> &b)
+{
+  Matrix<N, T> result(a);
+  result += b;
+  return result;
+}
+
+template <int N, class T> Matrix<N, T> operator-(const Matrix<N, T> &a, const Matrix<N, T> &b)
+{
+  Matrix<N, T> result(a);
+  result -= b;
+  return result;
+}
+
+template <int N, class T> Matrix<N, T> operator*(const Matrix<N, T> &a, const Matrix<N, T> &b)
+{
+  Matrix<N, T> result;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) {
+      result(i, j) = static_cast<T>(0);
+      for (int k = 0; k < N; ++k) { result(i, j) += a(i, k) * b(k, j); }
+    }
+  }
+  return result;
+}
+
+template <int N, class T> Matrix<N, std::complex<T>> conj(const Matrix<N, std::complex<T>> &mat)
+{
+  Matrix<N, std::complex<T>> result;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { result(i, j) = std::conj(mat(j, i)); }
+  }
+  return result;
+}
+
+template <int N, class T> Matrix<N, T> transpose(const Matrix<N, std::complex<T>> &mat)
+{
+  Matrix<N, T> result;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { result(i, j) = mat(j, i); }
+  }
+  return result;
+}
+
+template <int N, class T> T trace(const Matrix<N, T> &mat)
+{
+  T tr;
+  for (int i = 0; i < N; i++) tr += mat(i, i);
+
+  return tr;
+}
+
+template <int N, class T, class U>
+Matrix<N, typename Promote<T, U>::Type> operator*(const Matrix<N, T> &mat, const U &scalar)
+{
+  typedef typename Promote<T, U>::Type return_type;
+  Matrix<N, return_type> result;
+
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { result(i, j) = scalar * mat(i, j); }
+  }
+  return result;
+}
+
+template <int N, class T, class U>
+Matrix<N, typename Promote<T, U>::Type> operator*(const U &scalar, const Matrix<N, T> &mat)
+{
+  return mat * scalar;
+}
+
+template <int N, class T> struct Identity {
+  Matrix<N, T> operator()() const
+  {
+    Matrix<N, T> id;
+    for (int i = 0; i < N; ++i) { id(i, i) = static_cast<T>(1); }
+    return id;
+  } // operator()
+};
+
+template <int N, class T> struct Zero {
+  // the default constructor zeros all matrix elements
+  Matrix<N, T> operator()() const { return Matrix<N, T>(); }
+};
+
+template <int N, class T> std::ostream &operator<<(std::ostream &os, const Matrix<N, T> &m)
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { os << m(i, j) << " "; }
+    if (i < N - 1) os << std::endl;
+  }
+  return os;
+}

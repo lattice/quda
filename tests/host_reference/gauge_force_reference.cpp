@@ -58,14 +58,12 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
  * @param[in] lat Utility lattice information
  */
 template <typename real_t>
-su3_matrix<real_t> compute_gauge_path(const su3_matrix<real_t> *const *const sitelink, int i, const int *const path,
-                                      int len, int dx[4], const lattice_t &lat)
+Matrix<3, std::complex<real_t>> compute_gauge_path(const Matrix<3, std::complex<real_t>> *const *const sitelink, int i,
+                                                   const int *const path, int len, int dx[4], const lattice_t &lat)
 {
-  su3_matrix<real_t> prev_matrix = {}, curr_matrix = {};
+  using matrix = Matrix<3, std::complex<real_t>>;
 
-  curr_matrix.e[0][0] = 1;
-  curr_matrix.e[1][1] = 1;
-  curr_matrix.e[2][2] = 1;
+  matrix prev_matrix, curr_matrix = Identity<3, std::complex<real_t>>()();
 
   for (int j = 0; j < len; j++) {
     int lnkdir;
@@ -80,12 +78,12 @@ su3_matrix<real_t> compute_gauge_path(const su3_matrix<real_t> *const *const sit
     }
 
     int nbr_idx = gf_neighborIndexFullLattice(i, dx, lat);
-    auto lnk = sitelink[lnkdir] + nbr_idx;
+    auto &lnk = sitelink[lnkdir][nbr_idx];
 
     if (GOES_FORWARDS(path[j])) {
-      mult_su3_nn(&prev_matrix, lnk, &curr_matrix);
+      curr_matrix = prev_matrix * lnk;
     } else {
-      mult_su3_na(&prev_matrix, lnk, &curr_matrix);
+      curr_matrix = prev_matrix * conj(lnk);
     }
 
     if (GOES_FORWARDS(path[j])) {
@@ -102,8 +100,10 @@ template <typename real_t> struct ComputePathProduct {
   void operator()(void *const staple_, const void *const *const sitelink_, const int *const path, int len,
                   const void *const loop_coeff_, int coeff_index, int dir, const lattice_t &lat)
   {
-    auto staple = reinterpret_cast<su3_matrix<real_t> *const>(staple_);
-    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
+    using matrix = Matrix<3, std::complex<real_t>>;
+    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
+
+    auto staple = reinterpret_cast<matrix *const>(staple_);
     auto loop_coeff = reinterpret_cast<const real_t *const>(loop_coeff_);
     auto coeff = loop_coeff[coeff_index];
 
@@ -112,11 +112,9 @@ template <typename real_t> struct ComputePathProduct {
       int dx[4] = {};
       dx[dir] = 1;
 
-      su3_matrix<real_t> curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
+      auto curr_matrix = compute_gauge_path(sitelink, i, path, len, dx, lat);
 
-      su3_matrix<real_t> tmat;
-      su3_adjoint(&curr_matrix, &tmat);
-      scalar_mult_add_su3_matrix(staple + i, &tmat, coeff, staple + i);
+      staple[i] = staple[i] + coeff * conj(curr_matrix);
     } // i
   }
 };
@@ -145,7 +143,8 @@ template <typename real_t> struct ComputeLoopTrace {
   std::complex<double> operator()(const void *const *const sitelink_, int *path, int len, double loop_coeff,
                                   const lattice_t &lat)
   {
-    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
+    using matrix = Matrix<3, std::complex<real_t>>;
+    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
 
     std::complex<double> accum = 0;
 
@@ -153,7 +152,7 @@ template <typename real_t> struct ComputeLoopTrace {
     for (size_t i = 0; i < lat.volume; i++) {
       int dx[4] = {};
       auto tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
-      auto tr = trace_su3(&tmat);
+      auto tr = trace(tmat);
       accum += tr;
     }
 
@@ -184,25 +183,24 @@ template <typename real_t> struct UpdateMomentum {
   void operator()(void *const momentum_, int dir, const void *const *const sitelink_, const void *const staple_,
                   real_t eb3, const lattice_t &lat)
   {
+    using matrix = Matrix<3, std::complex<real_t>>;
+
     auto momentum = reinterpret_cast<anti_hermitmat<real_t> *const>(momentum_);
-    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
-    auto staple = reinterpret_cast<const su3_matrix<real_t> *const>(staple_);
+    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
+    auto staple = reinterpret_cast<const matrix *const>(staple_);
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
-      su3_matrix<real_t> lnk_stp_dagger;
-      su3_matrix<real_t> mom_full;
-      su3_matrix<real_t> updated_mom_full;
+      const auto &lnk = sitelink[dir][i];
+      const auto &stp = staple[i];
+      auto &mom = momentum[4 * i + dir];
 
-      auto lnk = sitelink[dir] + i;
-      auto stp = staple + i;
-      auto mom = momentum + 4 * i + dir;
+      matrix mom_full;
+      uncompress_anti_hermitian(&mom, reinterpret_cast<su3_matrix<real_t> *>(&mom_full));
 
-      mult_su3_na(lnk, stp, &lnk_stp_dagger);
-      uncompress_anti_hermitian(mom, &mom_full);
+      mom_full = mom_full - eb3 * lnk * conj(stp);
 
-      scalar_mult_sub_su3_matrix(&mom_full, &lnk_stp_dagger, eb3, &updated_mom_full);
-      make_anti_hermitian(&updated_mom_full, mom);
+      make_anti_hermitian(reinterpret_cast<const su3_matrix<real_t> *>(&mom_full), &mom);
     }
   }
 };
@@ -228,21 +226,19 @@ template <typename real_t> struct UpdateGauge {
   void operator()(void *const gauge_, int dir, const void *const *const sitelink_, const void *const staple_,
                   real_t eb3, const lattice_t &lat)
   {
-    auto gauge = reinterpret_cast<su3_matrix<real_t> *const>(gauge_);
-    auto sitelink = reinterpret_cast<const su3_matrix<real_t> *const *const>(sitelink_);
-    auto staple = reinterpret_cast<const su3_matrix<real_t> *const>(staple_);
+    using matrix = Matrix<3, std::complex<real_t>>;
+
+    auto gauge = reinterpret_cast<matrix *const>(gauge_);
+    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
+    auto staple = reinterpret_cast<const matrix *const>(staple_);
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
-      su3_matrix<real_t> tmat;
+      const auto &lnk = sitelink[dir][i];
+      const auto &stp = staple[i];
+      auto &out = gauge[4 * i + dir];
 
-      auto lnk = sitelink[dir] + i;
-      auto stp = staple + i;
-      auto out = gauge + 4 * i + dir;
-
-      mult_su3_na(lnk, stp, &tmat);
-
-      add_su3(&tmat, out, eb3);
+      out += eb3 * lnk * conj(stp);
     }
   }
 };

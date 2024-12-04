@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "command_line_params.h"
+#include "gauge_utils.h"
 #include "host_utils.h"
 #include "momentum_utils.h"
 #include "clover_force_reference.h"
