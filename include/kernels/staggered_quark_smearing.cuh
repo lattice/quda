@@ -179,9 +179,9 @@ namespace quda
       if (arg.is_t0_kernel) {
         if (arg.t0 < 0) return;
 
-        if (mykernel_type == INTERIOR_KERNEL) {
+        if constexpr (mykernel_type == INTERIOR_KERNEL) {
           idx += arg.t0 * arg.t0_offset;
-        } else if (mykernel_type != EXTERIOR_KERNEL_ALL) {
+        } else if constexpr (mykernel_type != EXTERIOR_KERNEL_ALL) {
           if (idx >= arg.t0_face_size[mykernel_type])
             idx += arg.face_size[mykernel_type] - arg.t0_face_size[mykernel_type];
           idx += arg.t0 * arg.t0_face_offset[mykernel_type];

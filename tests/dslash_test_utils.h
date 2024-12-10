@@ -428,9 +428,8 @@ struct DslashTestWrapper {
         switch (dtest_type) {
         case dslash_test_type::Dslash:
           // My dslash should be the same as the clover dslash
-          for (int i = 0; i < Nsrc; i++)
-            clover_dslash(spinorRef[i].data(), hostGauge, hostCloverInv, spinor[i].data(), parity, inv_param.dagger,
-                          inv_param.cpu_prec, gauge_param);
+          clover_dslash(spinorRef[i].data(), hostGauge, hostCloverInv, spinor[i].data(), parity, inv_param.dagger,
+                        inv_param.cpu_prec, gauge_param);
           break;
         case dslash_test_type::MatPC:
           // my matpc op

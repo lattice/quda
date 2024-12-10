@@ -103,8 +103,11 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NV
 endif()
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT "use infinity as the sentinel for heterogeneous atomic support?" ON
+                       "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT)
 mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)

@@ -159,8 +159,6 @@ namespace quda {
 
   void genericPrintMatrix(const GaugeField &a, int d, int parity, unsigned int x_cb, int rank)
   {
-    if (rank != comm_rank()) return;
-
     GaugeFieldParam param(a);
     param.field = const_cast<GaugeField *>(&a);
     param.location = QUDA_CPU_FIELD_LOCATION;
@@ -171,6 +169,8 @@ namespace quda {
                                                                                                                    false;
     std::unique_ptr<GaugeField> clone_a = !host_clone ? nullptr : std::make_unique<GaugeField>(param);
     const GaugeField &a_ = !host_clone ? a : *clone_a.get();
+
+    if (rank != comm_rank()) return; // rank returns after potential copy to host to prevent tuning hang
 
     switch (a.Precision()) {
     case QUDA_DOUBLE_PRECISION: genericPrintMatrix<double>(a_, d, parity, x_cb); break;

@@ -15,7 +15,7 @@ namespace quda {
    */
   template <typename T>
   struct FieldKey {
-    std::string volume; /** volume kstring */
+    std::string volume; /** volume string */
     std::string aux;    /** auxiliary string */
 
     FieldKey() = default;
@@ -79,6 +79,18 @@ namespace quda {
     FieldTmp(const FieldKey<T> &key, const typename T::param_type &param);
 
     /**
+       @brief Create a field temporary that corresponds to the field
+       constructed from the param struct.  If a matching field is
+       present in the cache, it will be popped from the cache.  If no
+       such temporary exists a temporary will be allocated.
+       @param[in] key Key corresponding to the field instance we
+       require
+       @param[in] param Parameter structure used to allocated
+       the temporary
+     */
+    FieldTmp(typename T::param_type param);
+
+    /**
        @brief Copy constructor is deleted to prevent accidental cache
        bloat
     */
@@ -110,6 +122,18 @@ namespace quda {
      @param[in] a Field we wish to create a matching temporary for
    */
   template <typename T> auto getFieldTmp(const T &a) { return FieldTmp<T>(a); }
+
+  /**
+     @brief Get a field temporary that is identical to the field
+     instance argument.  If a matching field is present in the cache,
+     it will be popped from the cache.  If no such temporary exists, a
+     temporary will be allocated.  When the destructor for the
+     FieldTmp is called, e.g., the returned object goes out of scope,
+     the temporary will be pushed onto the cache.
+
+     @param[in] a Field we wish to create a matching temporary for
+   */
+  template <typename T> auto getFieldTmp(const typename T::param_type &param) { return FieldTmp<T>(param); }
 
   /**
      @brief Get a vector of field temporaries that are identical to

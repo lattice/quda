@@ -25,6 +25,12 @@
  */
 #define MAX_MULTI_RHS @QUDA_MAX_MULTI_RHS@
 
+/**
+ * @def   MAX_MULTI_BLAS_N
+ * @brief This macro sets the register tile size for MRHS kernels
+ */
+#define MAX_MULTI_RHS_TILE @QUDA_MAX_MULTI_RHS_TILE@
+
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**
@@ -34,6 +40,16 @@
  */
 #define HETEROGENEOUS_ATOMIC
 #undef QUDA_HETEROGENEOUS_ATOMIC
+#endif
+
+#cmakedefine QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
+#ifdef QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
+/**
+ * @def   HETEROGENEOUS_ATOMIC_INF_INIT
+ * @brief This macro sets whether we are using infinity for the signaling sentinel
+ */
+#define HETEROGENEOUS_ATOMIC_INF_INIT
+#undef QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
 #endif
 
 #cmakedefine QUDA_LARGE_KERNEL_ARG

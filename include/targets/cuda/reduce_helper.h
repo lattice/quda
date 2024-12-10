@@ -17,6 +17,11 @@ using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 namespace quda
 {
 
+// By default we use negative infinity as the sentinel for testing for
+// reduction completion.  On some compilers we may need to use finite
+// numbers, so the alternative approach uses negative zero (set with CMake
+// option QUDA_HETEROGENEOUS_ATOMIC_INF_INIT).
+#ifdef HETEROGENEOUS_ATOMIC_INF_INIT
   /**
      @brief The initialization value we used to check for completion
    */
@@ -27,6 +32,31 @@ namespace quda
      case the computed reduction is equal to the initialization
   */
   template <typename T> constexpr T terminate_value() { return cuda::std::numeric_limits<T>::infinity(); }
+
+  /**
+     @brief Test if the result is complete (e.g., is not equal to the sentinel)
+   */
+  template <class T> bool is_complete(const T &result) { return result != init_value<T>(); }
+#else
+  /**
+     @brief The initialization value we used to check for completion
+   */
+  template <typename T> constexpr T init_value() { return -static_cast<T>(0.0); }
+
+  /**
+     @brief The termination value we use to prevent a possible hang in
+     case the computed reduction is equal to the initialization
+  */
+  template <typename T> constexpr T terminate_value() { return static_cast<T>(0.0); }
+
+  /**
+     @brief Test if the result is complete (e.g., is not equal to the sentinel)
+   */
+  template <class T> bool is_complete(const T &result)
+  {
+    return !(result == static_cast<T>(0.0) && std::signbit(result));
+  }
+#endif
 
   // declaration of reduce function
   template <typename Reducer, typename Arg, typename T>
@@ -129,7 +159,7 @@ namespace quda
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
+        while (!is_complete(result_h[i].load(cuda::std::memory_order_relaxed))) { }
       }
 
       // copy back result element by element and convert if necessary to host reduce type
@@ -169,11 +199,7 @@ namespace quda
     auto tid = target::thread_idx_linear<2>();
 
     if (arg.result_d) { // write to host mapped memory
-#ifdef _NVHPC_CUDA      // WAR for nvc++
-      constexpr bool coalesced_write = false;
-#else
       constexpr bool coalesced_write = true;
-#endif
       if constexpr (coalesced_write) {
         static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
         auto mask = __ballot_sync(0xffffffff, tid < n);
