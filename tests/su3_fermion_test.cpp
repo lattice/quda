@@ -321,75 +321,24 @@ int main(int argc, char **argv)
   printf("Forward method:\n");
   check_fwd.PrintVector(0,0,0);
 
-  double method_adj_diff = 0., adj_fwd_diff = 0.;
+  double method_adj_diff = 0.;
   /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
   for (int i = 0; i < V * 24; i++) { 
       method_adj_diff += pow(fabs(check_safe.data<double *>()[i] - check_hier.data<double *>()[i]), 2);
-      adj_fwd_diff += pow((check_safe.data<double *>()[i] - check_fwd.data<double *>()[i]), 2);
   }
-
-  int row_inc = 1;
-  int col_inc = 3;
-
-  std::vector<int> col_st{0, 1, 2};
-  std::vector<int> row_st{0, 3, 6};
-    
-  std::complex<double> test_contract[9 * V];
-
-  std::complex<double> trace = {0.,0.};
-  
-  for (int i = 0; i < V; i++) {
-        
-      for (int ii = 0; ii < 9; ii++){
-          int col_start = i * 9 + (ii % 3);
-          int row_start = i * 9 + ii - ((ii % 3));
-          
-          int which_col_idx = (ii % 3), which_row_idx = (ii - (ii % 3))/ 3;
-          
-          std::complex<double> dot = {0.,0.};
-          
-          for(int i_s = 0; i_s < 4; i_s++){
-                     
-                 int s_row_idx = i * 12 + col_st[which_row_idx]+ i_s*col_inc;
-                 int s_col_idx = i * 12 + col_st[which_col_idx]+ i_s*col_inc;
-
-                 auto m1 = std::conj(check.data<std::complex<double>*>()[s_row_idx]);
-                 auto m2 = check_fwd.data<std::complex<double>*>()[s_col_idx];
-
-                 // if (i == 0 && ii == 0){
-                 //    printf("m1 is %1.5e, %1.5e \n",m1.real(), m1.imag());
-                 //    printf("m2 is %1.5e, %1.5e \n",m2.real(), m2.imag()); 
-                 //    printf("dot is %1.5e, %1.5e \n",(m1*m2).real(), (m1*m2).imag()); 
-                 // }
-
-                 
-                 dot += m1*m2;
-
-             }
-          test_contract[i * 9 + ii] = dot;
-          // if (i == 0){
-          //           printf("chcksafe dot is %1.5e, %1.5e \n",test_contract[i * 9 + ii].real(), test_contract[i * 9 + ii].imag());
-          //        }
-          }
-
-      trace += (test_contract[i * 9] + test_contract[i * 9 + 4] + test_contract[i * 9 + 8]);
-      }
-      
-      printf("trace is %1.5e, %1.5e \n",trace.real(), trace.imag());
-
-    std::complex<double>trace_fwd,trace_adj;
-    trace_fwd = twoColorSpinorContract(check.data<std::complex<double>*>(), check_fwd.data<std::complex<double>*>());
-    trace_adj = twoColorSpinorContract(check.data<std::complex<double>*>(), check_safe.data<std::complex<double>*>());
-   // test_contract2.data<double *>()[i] = check.data<double *>()[i];  
-
-    printf("trace adj is %1.5e, %1.5e \n",trace_adj.real(), trace_adj.imag());
-    printf("trace fwd is %1.5e, %1.5e \n",trace_fwd.real(), trace_fwd.imag());
-  
-  double method_adj_check = sqrt(method_adj_diff)/(V*24.), adj_fwd_check = sqrt(adj_fwd_diff)/(V*24.);
-  double oom_error = pow(smear_param.n_steps,2) * pow(smear_param.epsilon,3);
-    
+  double method_adj_check = sqrt(method_adj_diff)/(V*24.);
   printf("Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n", method_adj_check);
-  printf("Mean of mag errors between Adj and Fwd method (should be of *order* %1.5e) = %1.5e \n", oom_error, adj_fwd_check);
+    
+  std::complex<double>trace_fwd,trace_adj;
+  trace_fwd = twoColorSpinorContract(check.data<std::complex<double>*>(), check_fwd.data<std::complex<double>*>());
+  trace_adj = twoColorSpinorContract(check.data<std::complex<double>*>(), check_safe.data<std::complex<double>*>()); 
+
+  auto trace_diff_err = 2.*std::fabs(trace_fwd - std::conj(trace_adj))/std::fabs(trace_fwd + std::conj(trace_adj));
+
+  printf("The two numbers below should be complex conjugates of one another\n");
+  printf("<check,adj_check> is %1.5e, %1.5e \n",trace_adj.real(), trace_adj.imag());
+  printf("<check,fwd_check> is %1.5e, %1.5e \n",trace_fwd.real(), trace_fwd.imag());
+  printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 

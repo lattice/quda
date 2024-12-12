@@ -5384,13 +5384,16 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   pushOutputPrefix("performAdjGFlowQudaSafe: ");
   checkGaugeSmearParam(smear_param);
     
-  if (smear_param->n_steps < smear_param->adj_n_save ) {
+  // if (smear_param->n_steps <= smear_param->adj_n_save ) {
       
-      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered to equal n_steps: \n",smear_param->n_steps,smear_param->adj_n_save);
-      smear_param->adj_n_save = smear_param->n_steps;
-      logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",smear_param->n_steps,smear_param->adj_n_save);
+  //     logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered: \n",smear_param->n_steps,smear_param->adj_n_save);
+  //     if (smear_param->n_steps == 1)
+  //     smear_param->adj_n_save = smear_param->n_steps;
+  //     else
+  //     smear_param->adj_n_save = smear_param->n_steps - 1;
+  //     logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",smear_param->n_steps,smear_param->adj_n_save);
       
-  }
+  // }
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -5667,13 +5670,16 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   pushOutputPrefix("performAdjGFlowQudaHier: ");
   checkGaugeSmearParam(smear_param);
     
-  if (smear_param->n_steps < smear_param->adj_n_save ) {
+  // if (smear_param->n_steps <= smear_param->adj_n_save ) {
       
-      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered to equal n_steps: \n",smear_param->n_steps,smear_param->adj_n_save);
-      smear_param->adj_n_save = smear_param->n_steps;
-      logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",smear_param->n_steps,smear_param->adj_n_save);
+  //     logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered: \n",smear_param->n_steps,smear_param->adj_n_save);
+  //     if (smear_param->n_steps == 1)
+  //     smear_param->adj_n_save = smear_param->n_steps;
+  //     else
+  //     smear_param->adj_n_save = smear_param->n_steps - 1;
+  //     logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",smear_param->n_steps,smear_param->adj_n_save);
       
-  }
+  // }
     
   // pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
