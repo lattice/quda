@@ -128,3 +128,4 @@ void cpu_xpy(QudaPrecision prec, const void *x, void *y, int size)
     for (int i = 0; i < size; i++) { dst[i] += src[i]; }
   }
 }
+

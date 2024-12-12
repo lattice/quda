@@ -5473,7 +5473,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
           GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
 
       }
-  
+
     // init auxilliary fields [0], [1] and [2] as [3]
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
