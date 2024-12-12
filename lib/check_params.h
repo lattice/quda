@@ -1165,7 +1165,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
     
   if (param->n_steps <= param->adj_n_save ) {
       
-      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) > n_steps (%d); adj_n_save manually altered: \n",param->n_steps,param->adj_n_save);
+      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) >= n_steps (%d); adj_n_save manually altered: \n",param->n_steps,param->adj_n_save);
       if (param->n_steps == 1)
       param->adj_n_save = param->n_steps;
       else
