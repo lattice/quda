@@ -5726,7 +5726,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   std::vector<int> hier_list;
   //The first stage is saved at the very beginning, so its presence is implicit
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save);
-  logQuda(QUDA_SUMMARIZE,"hier list size (number of gauge fields to save) is %d\n",hier_list.size());
+  logQuda(QUDA_SUMMARIZE,"hier list size (number of gauge fields to save) is %lu\n",hier_list.size());
   if (threshold < hier_list.back()) {threshold = hier_list.back(); logQuda(QUDA_SUMMARIZE, "threshold changed to %d",threshold);}
   else logQuda(QUDA_SUMMARIZE, "threshold is %d\n",threshold);
   
@@ -5769,7 +5769,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
       for (int j = 0; j < hier_list.size(); j++ ){
-          logQuda(QUDA_DEBUG_VERBOSE,"%d \n",hier_list[j]);
+          logQuda(QUDA_DEBUG_VERBOSE,"%lu \n",hier_list[j]);
       }
       logQuda(QUDA_DEBUG_VERBOSE,"\n");
       
