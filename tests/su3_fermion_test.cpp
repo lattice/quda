@@ -161,16 +161,16 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
-
-  // Prepare various perf info
-  long long flops_plaquette = 6ll * 597 * V;
-  long long flops_ploop = 198ll * V + 6 * V / gauge_param.X[3];
-
-  // Prepare a gauge observable struct
-  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
-
   // start the timer
   quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
+    
+  // The commented out section is all geared towards gauge observables, so unlikely to be needed for now
+  // // Prepare various perf info
+  // long long flops_plaquette = 6ll * 597 * V;
+  // long long flops_ploop = 198ll * V + 6 * V / gauge_param.X[3];
+
+  // // Prepare a gauge observable struct
+  // QudaGaugeObservableParam param = newQudaGaugeObservableParam();
 
   // The user may specify which measurements they wish to perform/omit
   // using the QudaGaugeObservableParam struct, and whether or not to
@@ -197,8 +197,6 @@ int main(int argc, char **argv)
     obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
-    
-  QudaGaugeObservableParam *obs_adj_safe(obs_param), *obs_adj_hier(obs_param);
 
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
@@ -256,7 +254,7 @@ int main(int argc, char **argv)
 //       else
 //       check_norm.data<double *>()[i] = -1.*check.data<double *>()[i];
 //   }
-    
+
   check_safe = quda::ColorSpinorField(cs_param);
   check_hier = quda::ColorSpinorField(cs_param);
   check_fwd = quda::ColorSpinorField(cs_param);

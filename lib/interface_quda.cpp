@@ -5438,7 +5438,8 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   double b = -8.;  
     
   int comm_dim[4] = {};
-  int measurement_n = 0; // The nth measurement to take  
+  // Will add fermion measruement utilities later
+  // int measurement_n = 0; // The nth measurement to take 
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
@@ -5531,6 +5532,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     
   int &i_glob = meas_cinf[0].get();
   int &measurement_n = meas_cinf[1].get();
+  measurement_n = 0;
     
   int parity = 0;
 
@@ -5726,7 +5728,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   std::vector<int> hier_list;
   //The first stage is saved at the very beginning, so its presence is implicit
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save);
-  logQuda(QUDA_SUMMARIZE,"hier list size (number of gauge fields to save) is %lu\n",hier_list.size());
+  logQuda(QUDA_SUMMARIZE,"hier list size (number of gauge fields to save) is %d\n",(int) hier_list.size());
   if (threshold < hier_list.back()) {threshold = hier_list.back(); logQuda(QUDA_SUMMARIZE, "threshold changed to %d",threshold);}
   else logQuda(QUDA_SUMMARIZE, "threshold is %d\n",threshold);
   
@@ -5742,7 +5744,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       }
       if (i > 0) std::swap(gout,gin);
       
-      for (unsigned int j = 0; j < hier_list[i]; j++){
+      for (unsigned int j = 0; j < (unsigned int) hier_list[i]; j++){
           if (j > 0) std::swap(gout,gin);
 
           WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
@@ -5768,8 +5770,8 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier,meas_cinf);
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
-      for (int j = 0; j < hier_list.size(); j++ ){
-          logQuda(QUDA_DEBUG_VERBOSE,"%lu \n",hier_list[j]);
+      for (int j = 0; j < (int) hier_list.size(); j++ ){
+          logQuda(QUDA_DEBUG_VERBOSE,"%d \n", (int) hier_list[j]);
       }
       logQuda(QUDA_DEBUG_VERBOSE,"\n");
       
@@ -5795,12 +5797,12 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       GaugeField g_1 = gauge_stages[ret_idx];
       
       logQuda(QUDA_DEBUG_VERBOSE,"Modified hier list elements: \n");
-      for (int j = 0; j < hier_list.size(); j++ ){
-          logQuda(QUDA_DEBUG_VERBOSE,"%d \n",hier_list[j]);
+      for (int j = 0; j < (int) hier_list.size(); j++ ){
+          logQuda(QUDA_DEBUG_VERBOSE,"%d \n",(int) hier_list[j]);
       }
       logQuda(QUDA_DEBUG_VERBOSE,"\n");
       
-      for (unsigned int j = 0; j < hier_list[ret_idx]; j++){
+      for (unsigned int j = 0; j < (unsigned int) hier_list[ret_idx]; j++){
           if (j > 0) std::swap(g_2,g_1);
           WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type);
       }
