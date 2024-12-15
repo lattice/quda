@@ -5482,7 +5482,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileAdjGFlowSafe);  
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profileAdjGFlowSafe);  
 
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
     
@@ -5491,7 +5491,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileAdjGFlowSafe); 
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profileAdjGFlowSafe); 
     
       
     blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
@@ -5503,7 +5503,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
     copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
-    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, false, comm_dim, profileAdjGFlowSafe); 
+    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, comm_dim, profileAdjGFlowSafe); 
     
     blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
     blas::axpy(1.,f_temp2, f_temp0);
@@ -5574,7 +5574,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     // [4] = Lap2 [0]
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profile);  
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profile);  
 
     // [4] -> 3/4 eps [4]  
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
@@ -5585,7 +5585,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     // [4] = Lap1 [2]
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profile); 
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profile); 
     
     // [3] -> [3] + 8/9 eps [4]  
     blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
@@ -5600,7 +5600,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     // [0] <- Lap0 [4]
     copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
-    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, false, comm_dim, profile); 
+    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, comm_dim, profile); 
     
     // [0] <- 1/4 eps [0]; [0] <- [2] + [0]; [0] <- [1] + [0]
     blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
