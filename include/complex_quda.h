@@ -360,23 +360,19 @@ public:
   typedef ValueType value_type;
 
   // Constructors
-  __host__ __device__ inline complex<ValueType>(const ValueType &re = ValueType(), const ValueType &im = ValueType())
+  __host__ __device__ inline complex(const ValueType &re = ValueType(), const ValueType &im = ValueType())
   {
     real(re);
     imag(im);
     }
 
-  template <class X>
-    __host__ __device__
-    inline complex<ValueType>(const complex<X> & z)
+    template <class X> __host__ __device__ inline complex(const complex<X> &z)
     {
       real(z.real());
       imag(z.imag());
     }
 
-  template <class X>
-    __host__ __device__
-    inline complex<ValueType>(const std::complex<X> & z)
+    template <class X> __host__ __device__ inline complex(const std::complex<X> &z)
     {
       real(z.real());
       imag(z.imag());
@@ -436,12 +432,11 @@ public:
 template <> struct complex<float> : public float2 {
 public:
   typedef float value_type;
-  complex<float>() = default;
-  constexpr complex<float>(const float &re, const float &im = float()) : float2 {re, im} { }
+  complex() = default;
+  constexpr complex(const float &re, const float &im = float()) : float2 {re, im} { }
 
   template <typename X>
-  constexpr complex<float>(const std::complex<X> &z) :
-    float2 {static_cast<float>(z.real()), static_cast<float>(z.imag())}
+  constexpr complex(const std::complex<X> &z) : float2 {static_cast<float>(z.real()), static_cast<float>(z.imag())}
   {
   }
 
@@ -500,16 +495,15 @@ public:
 template <> struct complex<double> : public double2 {
 public:
   typedef double value_type;
-  complex<double>() = default;
-  constexpr complex<double>(const double &re, const double &im = double()) : double2 {re, im} { }
+  complex() = default;
+  constexpr complex(const double &re, const double &im = double()) : double2 {re, im} { }
 
   template <typename X>
-  constexpr complex<double>(const std::complex<X> &z) :
-    double2 {static_cast<double>(z.real()), static_cast<double>(z.imag())}
+  constexpr complex(const std::complex<X> &z) : double2 {static_cast<double>(z.real()), static_cast<double>(z.imag())}
   {
   }
 
-  template <typename T> __host__ __device__ inline complex<double> &operator=(const complex<T> &z)
+  template <typename T> __host__ __device__ inline complex &operator=(const complex<T> &z)
   {
     real(z.real());
     imag(z.imag());
@@ -572,9 +566,9 @@ template <> struct complex<int8_t> : public char2 {
 public:
   typedef int8_t value_type;
 
-  complex<int8_t>() = default;
+  complex() = default;
 
-  constexpr complex<int8_t>(const int8_t &re, const int8_t &im = int8_t()) : char2 {re, im} { }
+  constexpr complex(const int8_t &re, const int8_t &im = int8_t()) : char2 {re, im} { }
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> &z)
   {
@@ -608,9 +602,9 @@ struct complex <short> : public short2
 public:
   typedef short value_type;
 
-  complex<short>() = default;
+  complex() = default;
 
-  constexpr complex<short>(const short &re, const short &im = short()) : short2 {re, im} { }
+  constexpr complex(const short &re, const short &im = short()) : short2 {re, im} { }
 
   __host__ __device__ inline complex<short> &operator+=(const complex<short> &z)
   {
@@ -644,9 +638,9 @@ struct complex <int> : public int2
 public:
   typedef int value_type;
 
-  complex<int>() = default;
+  complex() = default;
 
-  constexpr complex<int>(const int &re, const int &im = int()) : int2 {re, im} { }
+  constexpr complex(const int &re, const int &im = int()) : int2 {re, im} { }
 
   __host__ __device__ inline complex<int> &operator+=(const complex<int> &z)
   {

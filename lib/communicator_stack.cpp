@@ -2,6 +2,7 @@
 #include <map>
 #include <array.h>
 #include <lattice_field.h>
+#include <tune_quda.h>
 
 namespace quda
 {
@@ -49,8 +50,16 @@ namespace quda
   void push_communicator(const CommKey &split_key)
   {
     if (comm_nvshmem_enabled())
-      errorQuda(
-        "Split-grid is currently not supported with NVSHMEM. Please set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+      errorQuda("Split-grid is currently not supported with NVSHMEM. Set QUDA_ENABLE_NVSHMEM=0 to disable NVSHMEM.");
+
+    // if reverting to global, we will need to join the tunecaches
+    bool join_tune_cache = split_key == default_comm_key;
+    int local_rank = comm_rank();
+    int local_tune_rank = 0;
+
+    // used to store the size of the tunecache at the point of splitting
+    static size_t tune_cache_size = 0;
+
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
       communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),
@@ -59,7 +68,38 @@ namespace quda
 
     LatticeField::freeGhostBuffer(); // Destroy the (IPC) Comm buffers with the old communicator.
 
+    auto split_key_old = current_key;
     current_key = split_key;
+
+    // we are returning to global so we need to join any diverged tunecaches
+    if (join_tune_cache) {
+      // has this tunecache been updated?
+      int tune_cache_update = tune_cache_size != getTuneCache().size();
+      // have any of tunecaches across the split grid been updated?
+      comm_allreduce_int(tune_cache_update);
+
+      if (tune_cache_update) {
+        auto num_sub_partition = split_key_old.product(); // the number of caches we need to merge
+        int sub_partition_dims[] = {comm_dim(0) / split_key_old[0], comm_dim(1) / split_key_old[1],
+                                    comm_dim(2) / split_key_old[2], comm_dim(3) / split_key_old[3]};
+        int sub_partition_coords[] = {comm_coord(0) / sub_partition_dims[0], comm_coord(1) / sub_partition_dims[1],
+                                      comm_coord(2) / sub_partition_dims[2], comm_coord(3) / sub_partition_dims[3]};
+        auto sub_partition_idx = sub_partition_coords[split_key_old.n_dim - 1];
+        for (auto d = split_key_old.n_dim - 2; d >= 0; d--)
+          sub_partition_idx = sub_partition_idx * split_key_old[d] + sub_partition_coords[d];
+
+        std::vector<int> global_tune_ranks(num_sub_partition);
+        for (auto i = 0; i < num_sub_partition; i++) {
+          global_tune_ranks[i] = (sub_partition_idx == i && local_tune_rank == local_rank) ? comm_rank() : 0;
+          comm_allreduce_int(global_tune_ranks[i]);
+        }
+        // we now have a list of all the global tune ranks so we can join them
+        joinTuneCache(global_tune_ranks);
+      }
+    } else if (!join_tune_cache) {
+      // record size of tunecache when first splitting the grid
+      tune_cache_size = getTuneCache().size();
+    }
   }
 
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
@@ -70,7 +110,11 @@ namespace quda
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
+  int comm_dim_global(int dim) { return get_default_communicator().comm_dim(dim); }
+
   int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
+
+  int comm_coord_global(int dim) { return get_default_communicator().comm_coord(dim); }
 
   int comm_rank_from_coords(const int *coords) { return get_current_communicator().comm_rank_from_coords(coords); }
 

@@ -52,6 +52,7 @@ namespace quda
     }
 
     comm_init(nDim, commDims, rank_from_coords, map_data);
+
     globalReduce.push(true);
   }
 
@@ -119,6 +120,9 @@ namespace quda
                 " total number of MPI ranks (%d != %d)",
                 grid_size, size);
     }
+
+    // defer handling MPI errors to QUDA
+    MPI_Comm_set_errhandler(MPI_COMM_HANDLE, MPI_ERRORS_RETURN);
 
     comm_init_common(ndim, dims, rank_from_coords, map_data);
   }

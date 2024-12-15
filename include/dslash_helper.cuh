@@ -12,12 +12,7 @@
 #include <kernel_helper.h>
 #include <tune_quda.h>
 
-#if defined(_NVHPC_CUDA)
-#include <constant_kernel_arg.h>
-constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::FALSE;
-#else
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
-#endif
 
 #include <kernel.h>
 
@@ -241,11 +236,12 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_> struct DslashArg {
+  template <typename Float_, int nDim_, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
     static constexpr int nDim = nDim_;
+    static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -269,6 +265,7 @@ namespace quda
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
+    int_fastdiv n_src;
     int_fastdiv Ls;
 
     // these are set with symmetric preconditioned twisted-mass dagger
@@ -327,6 +324,7 @@ namespace quda
       exterior_threads(0),
       threadDimMapLower {},
       threadDimMapUpper {},
+      n_src(in.size()),
       Ls(halo.X(4) / in.size()),
       twist_a(0.0),
       twist_b(0.0),
@@ -650,8 +648,9 @@ namespace quda
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
-      kernel_param(dim3(threads_x, arg.dc.Ls, arg.nParity)),
-      arg(arg) { }
+      kernel_param(dim3(threads_x, (arg.dc.Ls + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity)), arg(arg)
+    {
+    }
   };
 
   /**

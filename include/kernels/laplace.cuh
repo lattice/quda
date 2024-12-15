@@ -44,8 +44,8 @@ namespace quda
 
     LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
-               cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
+               cvector_ref<const ColorSpinorField> &x, int parity, const int *comm_override) :
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, 1, false, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -74,7 +74,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
+  template <int nParity, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity, int, int thread_dim,
                                                bool &active, int src_idx)
   {
@@ -136,15 +136,16 @@ namespace quda
   }
   
   // out(x) = M*in
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
+  template <int nParity, bool, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
     const Arg &arg;
     constexpr laplace(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx_, int parity)
     {
+      int src_idx = MAX_MULTI_RHS == 1 ? 0 : src_idx_;
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
@@ -163,12 +164,10 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3:
-        applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
+      case 3: applyLaplace<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       case 4:
       default:
-        applyLaplace<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        applyLaplace<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
         break;
       }
 

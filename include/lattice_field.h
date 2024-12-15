@@ -903,6 +903,40 @@ namespace quda {
 #define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
+     @brief Helper function for determining if the color of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If color is unique return the number of colors
+   */
+  template <typename T1, typename T2>
+  inline int Color_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+    int nColor = 0;
+    if (a.Ncolor() == b.Ncolor())
+      nColor = a.Ncolor();
+    else
+      errorQuda("Color %d %d do not match (%s:%d in %s())", a.Ncolor(), b.Ncolor(), file, line, func);
+    return nColor;
+  }
+
+  /**
+     @brief Helper function for determining if the color of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check color on
+     @return If colors is unique return the number of colors
+   */
+  template <typename T1, typename T2, typename... Args>
+  inline int Color_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &...args)
+  {
+    return Color_(func, file, line, a, b) & Color_(func, file, line, a, args...);
+  }
+
+#define checkColor(...) Color_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
      @brief Helper function for determining if the field is in native order
      @param[in] a Input field
      @return true if field is in native order

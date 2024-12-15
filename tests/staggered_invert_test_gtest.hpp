@@ -53,6 +53,10 @@ bool skip_test(test_t param)
     // MR struggles with the staggered and asqtad spectrum, it's not MR's fault
     if (solution_type == QUDA_MAT_SOLUTION && solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_MR_INVERTER)
       return true;
+
+    // BiCGStab-L is unstable with staggered operator with low precision
+    // we could likely restore this when 20-bit quark fields are merged in
+    if (inverter_type == QUDA_BICGSTABL_INVERTER && prec_sloppy < QUDA_SINGLE_PRECISION) return true;
   }
 
   // CG3 is rather unstable with low precision

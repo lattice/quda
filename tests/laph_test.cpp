@@ -114,8 +114,8 @@ auto laph_test(test_t param)
   std::vector<Complex> qudaRes(nSink * nEv * Lt * nSpin, 0.);
 
   int X[4] = {xdim, ydim, zdim, tdim};
-  laphSinkProject((__complex__ double *)qudaRes.data(), (void **)snkPtr.data(), nSink, tileSink,
-                  (void **)evPtr.data(), nEv, tileEv, &invParam, X);
+  laphSinkProject((__complex__ double *)qudaRes.data(), snkPtr.data(), nSink, tileSink, evPtr.data(), nEv, tileEv,
+                  &invParam, X);
   printfQuda("laphSinkProject Done: %g secs, %g Gflops\n", invParam.secs, invParam.gflops / invParam.secs);
 
   auto tol = getTolerance(cuda_prec);

@@ -224,9 +224,6 @@ module quda_fortran
      real(8) :: temp
      real(8) :: clock
 
-     ! Enable auto-tuning?
-     QudaTune :: tune
-
      ! Number of steps in s-step algorithms
      integer(4) :: nsteps
 
