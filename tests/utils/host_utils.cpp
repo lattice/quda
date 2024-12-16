@@ -1247,7 +1247,7 @@ std::complex<double> twoColorSpinorContract(std::complex<double> *spinor1, std::
   std::vector<int> col_st{0, 1, 2};
   std::vector<int> row_st{0, 3, 6};
     
-  complex<double> test_contract[9 * V];
+  std::vector<complex<double>> test_contract(9 * V);
   complex<double> trace = {0. , 0.};
   double trace_re,trace_im;
   for (int i = 0; i < V; i++) {
