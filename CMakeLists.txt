@@ -216,6 +216,12 @@ if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
   message(SEND_ERROR "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
 
+# For now only we only support register tiles for the staggered dslash operators
+set(QUDA_MAX_MULTI_RHS_TILE "1" CACHE STRING "maximum tile size for MRHS kernels (staggered only)")
+if(QUDA_MAX_MULTI_RHS_TILE GREATER QUDA_MAX_MULTI_RHS)
+  message(SEND_ERROR "QUDA_MAX_MULTI_RHS_TILE is greater than QUDA_MAX_MULTI_RHS")
+endif()
+
 set(QUDA_PRECISION
   "14"
   CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
@@ -275,6 +281,7 @@ mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_MAX_MULTI_RHS)
+mark_as_advanced(QUDA_MAX_MULTI_RHS_TILE)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
@@ -420,21 +427,12 @@ if(QUDA_DOWNLOAD_EIGEN)
   CPMAddPackage(
     NAME Eigen
     VERSION ${QUDA_EIGEN_VERSION}
-    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
-    URL_HASH SHA256=B4C198460EBA6F28D34894E3A5710998818515104D6E74E5CC331CE31E46E626
+    URL https://gitlab.com/libeigen/eigen/-/archive/e67c494cba7180066e73b9f6234d0b2129f1cdf5.tar.bz2
+    URL_HASH SHA256=98d244932291506b75c4ae7459af29b1112ea3d2f04660686a925d9ef6634583
     DOWNLOAD_ONLY YES
     SYSTEM YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
   install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
-
-  # Eigen 3.4 needs to be patched on Neon with nvc++
-  if (${CMAKE_CXX_COMPILER_ID} MATCHES "NVHPC")
-    set(CMAKE_PATCH_EIGEN OFF CACHE BOOL "Internal use only; do not modify")
-    if (NOT CMAKE_PATCH_EIGEN)
-      execute_process(COMMAND patch -N "${Eigen_SOURCE_DIR}/Eigen/src/Core/arch/NEON/Complex.h" "${CMAKE_SOURCE_DIR}/cmake/eigen34_neon.diff")
-      set(CMAKE_PATCH_EIGEN ON CACHE BOOL "Internal use only; do not modify" FORCE)
-    endif()
-  endif()
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)

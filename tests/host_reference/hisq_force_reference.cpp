@@ -837,13 +837,13 @@ void computeMiddleLinkSite(int half_lattice_index, // half_lattice_index to bett
 
   if (Qprev == NULL) {
     if (sig_positive) {
-      ls.loadMatrixFromField(static_cast<const Real *const *const>(oprod), 1 - oddBit, sig, point_d, &colorMatY);
+      ls.loadMatrixFromField(static_cast<const Real *const *>(oprod), 1 - oddBit, sig, point_d, &colorMatY);
     } else {
-      ls.loadMatrixFromField(static_cast<const Real *const *const>(oprod), oddBit, OPP_DIR(sig), point_c, &colorMatY);
+      ls.loadMatrixFromField(static_cast<const Real *const *>(oprod), oddBit, OPP_DIR(sig), point_c, &colorMatY);
       colorMatY = conj(colorMatY);
     }
   } else { // Qprev != NULL
-    ls.loadMatrixFromField(static_cast<const Real *const>(oprod), oddBit, point_c, &colorMatY);
+    ls.loadMatrixFromField(static_cast<const Real *>(oprod), oddBit, point_c, &colorMatY);
   }
 
   colorMatW = (!mu_positive) ? bc_link * colorMatY : conj(bc_link) * colorMatY;

@@ -82,10 +82,10 @@ namespace quda
 
     int iter = 0;
     int step = 0;
-    bool converged = false;
+    bool is_done = false;
 
     PrintStats("MR", iter, r2, b2);
-    while (!converged) {
+    while (!is_done) {
 
       int k = 0;
       vector<double> scale(b.size(), 1.0);
@@ -142,22 +142,23 @@ namespace quda
         commGlobalReductionPop(); // renable global reductions for outer solver
       }
 
+      step++;
+
       // FIXME - add over/under relaxation in outer loop
       bool compute_true_res = param.compute_true_res || param.Nsteps > 1;
       if (compute_true_res) {
         mat(r, x);
         r2 = blas::xmyNorm(b, r);
         for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
-        converged = (step > param.Nsteps || r2 < stop);
-        if (!converged) blas::copy(r_sloppy, r);
+        is_done = (step >= param.Nsteps || r2 < stop);
+        if (!is_done) blas::copy(r_sloppy, r);
         PrintStats("MR (restart)", iter, r2, b2);
       } else {
         blas::ax(scale, r_sloppy);
         r2 = blas::norm2(r_sloppy);
-        converged = (step > param.Nsteps || r2 < stop);
-        if (!converged) blas::copy(r, r_sloppy);
+        is_done = (step >= param.Nsteps || r2 < stop);
+        if (!is_done) blas::copy(r, r_sloppy);
       }
-      step++;
     }
 
     PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type));

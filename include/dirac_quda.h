@@ -2398,8 +2398,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->M(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override { return dirac->getStencilSteps(); }
@@ -2420,8 +2419,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->MdagM(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override
@@ -2472,8 +2470,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->MMdag(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override
@@ -2499,8 +2496,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->Mdag(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override { return dirac->getStencilSteps(); }
@@ -2547,7 +2543,7 @@ public:
 
       @param vec[in,out] vector to which gamma5 is applied in place
     */
-    void applyGamma5(ColorSpinorField &vec) const
+    void applyGamma5(cvector_ref<ColorSpinorField> &vec) const
     {
       auto dirac_type = dirac->getDiracType();
       auto pc_type = dirac->getMatPCType();
@@ -2624,10 +2620,8 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->M(out, in);
-      for (auto i = 0u; i < in.size(); i++) {
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
-        applyGamma5(out[i]);
-      }
+      if (shift != 0.0) blas::axpy(shift, in, out);
+      applyGamma5(out);
     }
 
     int getStencilSteps() const override { return dirac->getStencilSteps(); }

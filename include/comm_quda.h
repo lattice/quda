@@ -432,7 +432,18 @@ namespace quda
   */
   void comm_broadcast(void *data, size_t nbytes, int root = 0);
 
+  /**
+     @brief Multi-process barrier that applies to the present
+     communicator
+   */
   void comm_barrier(void);
+
+  /**
+     @brief Multi-process barrier that is global regardless of the
+     present communicator
+   */
+  void comm_barrier_global(void);
+
   void comm_abort(int status);
   void comm_abort_(int status);
 

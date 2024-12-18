@@ -885,6 +885,7 @@ namespace quda
    */
   TuneParam tuneLaunch(Tunable &tunable, bool enabled, QudaVerbosity verbosity)
   {
+    pushVerbosity(verbosity);
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
@@ -940,6 +941,7 @@ namespace quda
         Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
         Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       }
+      popVerbosity();
       return param_tuned;
     }
 
@@ -962,6 +964,7 @@ namespace quda
         Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
         Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       }
+      popVerbosity();
       return param_default;
     } else if (!tuning) {
 
@@ -1179,6 +1182,8 @@ namespace quda
       Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
       Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
     }
+
+    popVerbosity();
     return param;
   }
 
