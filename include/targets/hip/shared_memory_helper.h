@@ -57,11 +57,10 @@ namespace quda
     /**
        @brief Byte offset for this shared memory object.
     */
-    template <typename ...Arg>
-    static constexpr unsigned int get_offset(dim3 block, Arg &...arg)
+    static constexpr unsigned int get_offset(dim3 block)
     {
       unsigned int o = 0;
-      if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block, arg...); }
+      if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block); }
       return o;
     }
 
@@ -73,7 +72,7 @@ namespace quda
     /**
        @brief Constructor for SharedMemory object.
     */
-    HostDevice constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
+    __device__ __host__ constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
 
     /**
        @brief Constructor for SharedMemory object.
@@ -86,7 +85,7 @@ namespace quda
     /**
        @brief Return this SharedMemory object.
     */
-    constexpr auto sharedMem() const { return *this; }
+    __device__ __host__ constexpr auto sharedMem() const { return *this; }
 
     /**
        @brief Subscripting operator returning a reference to element.
