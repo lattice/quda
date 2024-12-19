@@ -195,7 +195,7 @@ namespace quda
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
 
-        auto halo = ColorSpinorField::create_comms_batch(in);
+        auto halo = ColorSpinorField::create_comms_batch(in, 3);
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity, dir,
                                                                   dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);

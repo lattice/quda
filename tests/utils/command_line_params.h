@@ -312,6 +312,7 @@ extern int Msrc;
 extern int Nsrc_tile;
 extern int Msrc_tile;
 extern int niter;
+extern int nrepeat;
 extern int maxiter_precondition;
 extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;

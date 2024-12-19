@@ -139,6 +139,10 @@ namespace quda
       strcpy(aux, "policy_kernel,");
       strcat(aux, in.AuxString().c_str());
       setRHSstring(aux, in.size());
+      strcat(aux, ",n_rhs_tile=");
+      char tile_str[16];
+      i32toa(tile_str, pack_tile_size);
+      strcat(aux, tile_str);
       char comm[5];
       for (int i = 0; i < 4; i++) comm[i] = (comm_dim_pack[i] ? '1' : '0');
       comm[4] = '\0';

@@ -646,7 +646,7 @@ namespace quda {
     memcpy(out.true_res, true_res.data(), true_res.size() * sizeof(double));
     memcpy(out.true_res_hq, true_res_hq.data(), true_res_hq.size() * sizeof(double));
 
-    out.iter = in.iter;
+    out.iter = split_rank == 0 ? in.iter : 0;
     comm_allreduce_int(out.iter);
 
     out.ca_lambda_min = in.ca_lambda_min;

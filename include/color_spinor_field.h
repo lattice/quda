@@ -315,6 +315,12 @@ namespace quda
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
 
+    /** Used to keep local track of nFace in createGhostZone */
+    mutable int nFace_allocated = 0;
+
+    /** Used to keep local track of spin_project in createGhostZone */
+    mutable bool spin_project_allocated = false;
+
     int nColor = 0;
     int nSpin = 0;
     int nVec = 0;
@@ -771,9 +777,12 @@ namespace quda
     /**
       @brief Create a dummy field used for batched communication
       @param[in] v Vector of fields we which to batch together
+      @param[in] nFace The depth of the face in each dimension and direction
+      @param[in] nFace The depth of the face in each dimension and direction
+      @param[in] spin_project Whether we are spin projecting
       @return Dummy (nDim+1)-dimensional field
      */
-    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v);
+    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v, int nFace = 1, bool spin_project = true);
 
     /**
        @brief Create a field that aliases this field's storage.  The
