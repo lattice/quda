@@ -163,11 +163,7 @@ template <class Real>
 void LoadStore<Real>::loadMatrixFromField(const Real *const field, int oddBit, int half_lattice_index,
                                           Matrix<3, std::complex<Real>> *const mat) const
 {
-#ifdef MULTI_GPU
-  int hfv = Vh_ex;
-#else
-  int hfv = Vh;
-#endif
+  int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
 
   int offset = 0;
   for (int i = 0; i < 3; ++i) {
@@ -182,11 +178,7 @@ template <class Real>
 void LoadStore<Real>::loadMatrixFromField(const Real *const *const field, int oddBit, int dir, int half_lattice_index,
                                           Matrix<3, std::complex<Real>> *const mat) const
 {
-#ifdef MULTI_GPU
-  int hfv = Vh_ex;
-#else
-  int hfv = Vh;
-#endif
+  int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
 
   int offset = 0;
   for (int i = 0; i < 3; ++i) {
@@ -201,11 +193,7 @@ template <class Real>
 void LoadStore<Real>::storeMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index,
                                          Real *const field) const
 {
-#ifdef MULTI_GPU
-  int hfv = Vh_ex;
-#else
-  int hfv = Vh;
-#endif
+  int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
 
   int offset = 0;
   for (int i = 0; i < 3; ++i) {
@@ -220,11 +208,8 @@ template <class Real>
 void LoadStore<Real>::addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index,
                                        Real coeff, Real *const field) const
 {
-#ifdef MULTI_GPU
-  int hfv = Vh_ex;
-#else
-  int hfv = Vh;
-#endif
+  int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
+
   Real *const local_field = field + (oddBit * hfv + half_lattice_index) * 18;
 
   int offset = 0;
@@ -240,11 +225,7 @@ template <class Real>
 void LoadStore<Real>::addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir,
                                        int half_lattice_index, Real coeff, Real *const *const field) const
 {
-#ifdef MULTI_GPU
-  int hfv = Vh_ex;
-#else
-  int hfv = Vh;
-#endif
+  int hfv = (is_multi_gpu()) ? Vh_ex : Vh;
 
   int offset = 0;
   for (int i = 0; i < 3; ++i) {
@@ -307,11 +288,10 @@ template <int oddBit> Locator<oddBit>::Locator(const int dim[4]) : half_index(-1
 // and the coordinates.
 template <int oddBit> void Locator<oddBit>::getCoordsFromHalfIndex(int half_lattice_index, int coord[4])
 {
-#ifdef MULTI_GPU
-  int E1 = local_dim[0] + 4;
-  int E2 = local_dim[1] + 4;
-  int E3 = local_dim[2] + 4;
-  // int E4 = local_dim[3]+4;
+  int E1 = local_dim[0] + is_multi_gpu() ? 4 : 0;
+  int E2 = local_dim[1] + is_multi_gpu() ? 4 : 0;
+  int E3 = local_dim[2] + is_multi_gpu() ? 4 : 0;
+  // int E4 = local_dim[3] + is_multi_gpu() ? 4 : 0;
   int E1h = E1 / 2;
 
   int z1 = half_lattice_index / E1h;
@@ -322,34 +302,15 @@ template <int oddBit> void Locator<oddBit>::getCoordsFromHalfIndex(int half_latt
   coord[2] = z2 - coord[3] * E3;
   int x1odd = (coord[1] + coord[2] + coord[3] + oddBit) & 1;
   coord[0] = 2 * x1h + x1odd;
-#else
-  int half_dim_0 = local_dim[0] / 2;
-  int z1 = half_lattice_index / half_dim_0;
-  int x1h = half_lattice_index - z1 * half_dim_0;
-  int z2 = z1 / local_dim[1];
-  coord[1] = z1 - z2 * local_dim[1];
-  coord[3] = z2 / local_dim[2];
-  coord[2] = z2 - coord[3] * local_dim[2];
-  int x1odd = (coord[1] + coord[2] + coord[3] + oddBit) & 1;
-  coord[0] = 2 * x1h + x1odd;
-#endif
 }
 
 template <int oddBit> void Locator<oddBit>::getCoordsFromFullIndex(int full_lattice_index, int coord[4])
 {
-#ifdef MULTI_GPU
-  int D1 = local_dim[0] + 4;
-  int D2 = local_dim[1] + 4;
-  int D3 = local_dim[2] + 4;
-  // int D4=local_dim[3]+4;
-  // int D1h=D1/2;
-#else
-  int D1 = local_dim[0];
-  int D2 = local_dim[1];
-  int D3 = local_dim[2];
-  // int D4=local_dim[3];
-  // int D1h=D1/2;
-#endif
+  int D1 = local_dim[0] + is_multi_gpu() ? 4 : 0;
+  int D2 = local_dim[1] + is_multi_gpu() ? 4 : 0;
+  int D3 = local_dim[2] + is_multi_gpu() ? 4 : 0;
+  // int D4 = local_dim[3] + is_multi_gpu() ? 4 : 0;
+  // int D1h = D1 / 2;
 
   int z1 = full_lattice_index / D1;
   coord[0] = full_lattice_index - z1 * D1;
@@ -379,92 +340,86 @@ template <int oddBit> int Locator<oddBit>::getNeighborFromFullIndex(int full_lat
   if (err) *err = 0;
 
   int coord[4];
-  int neighbor_index;
+  int neighbor_index = 0;
   getCoordsFromFullIndex(full_lattice_index, coord);
-#ifdef MULTI_GPU
-  int E1 = local_dim[0] + 4;
-  int E2 = local_dim[1] + 4;
-  int E3 = local_dim[2] + 4;
-  int E4 = local_dim[3] + 4;
-  switch (dir) {
-  case 0: //+X
-    neighbor_index = full_lattice_index + 1;
-    if (err && (coord[0] == E1 - 1)) *err = 1;
-    break;
-  case 1: //+Y
-    neighbor_index = full_lattice_index + E1;
-    if (err && (coord[1] == E2 - 1)) *err = 1;
-    break;
-  case 2: //+Z
-    neighbor_index = full_lattice_index + E2 * E1;
-    if (err && (coord[2] == E3 - 1)) *err = 1;
-    break;
-  case 3: //+T
-    neighbor_index = full_lattice_index + E3 * E2 * E1;
-    if (err && (coord[3] == E4 - 1)) *err = 1;
-    break;
-  case 7: //-X
-    neighbor_index = full_lattice_index - 1;
-    if (err && (coord[0] == 0)) *err = 1;
-    break;
-  case 6: //-Y
-    neighbor_index = full_lattice_index - E1;
-    if (err && (coord[1] == 0)) *err = 1;
-    break;
-  case 5: //-Z
-    neighbor_index = full_lattice_index - E2 * E1;
-    if (err && (coord[2] == 0)) *err = 1;
-    break;
-  case 4: //-T
-    neighbor_index = full_lattice_index - E3 * E2 * E1;
-    if (err && (coord[3] == 0)) *err = 1;
-    break;
-  default:
-    errorQuda("Neighbor index could not be determined\n");
-    exit(1);
-    break;
-  } // switch(dir)
+  if constexpr (is_multi_gpu()) {
+    int E1 = local_dim[0] + 4;
+    int E2 = local_dim[1] + 4;
+    int E3 = local_dim[2] + 4;
+    int E4 = local_dim[3] + 4;
+    switch (dir) {
+    case 0: //+X
+      neighbor_index = full_lattice_index + 1;
+      if (err && (coord[0] == E1 - 1)) *err = 1;
+      break;
+    case 1: //+Y
+      neighbor_index = full_lattice_index + E1;
+      if (err && (coord[1] == E2 - 1)) *err = 1;
+      break;
+    case 2: //+Z
+      neighbor_index = full_lattice_index + E2 * E1;
+      if (err && (coord[2] == E3 - 1)) *err = 1;
+      break;
+    case 3: //+T
+      neighbor_index = full_lattice_index + E3 * E2 * E1;
+      if (err && (coord[3] == E4 - 1)) *err = 1;
+      break;
+    case 7: //-X
+      neighbor_index = full_lattice_index - 1;
+      if (err && (coord[0] == 0)) *err = 1;
+      break;
+    case 6: //-Y
+      neighbor_index = full_lattice_index - E1;
+      if (err && (coord[1] == 0)) *err = 1;
+      break;
+    case 5: //-Z
+      neighbor_index = full_lattice_index - E2 * E1;
+      if (err && (coord[2] == 0)) *err = 1;
+      break;
+    case 4: //-T
+      neighbor_index = full_lattice_index - E3 * E2 * E1;
+      if (err && (coord[3] == 0)) *err = 1;
+      break;
+    default: errorQuda("Neighbor index could not be determined"); break;
+    } // switch(dir)
 
-#else
-  switch (dir) {
-  case 0:
-    neighbor_index = (coord[0] == local_dim[0] - 1) ? full_lattice_index + 1 - local_dim[0] : full_lattice_index + 1;
-    break;
-  case 1:
-    neighbor_index = (coord[1] == local_dim[1] - 1) ? full_lattice_index + local_dim[0] * (1 - local_dim[1]) :
-                                                      full_lattice_index + local_dim[0];
-    break;
-  case 2:
-    neighbor_index = (coord[2] == local_dim[2] - 1) ?
-      full_lattice_index + local_dim[0] * local_dim[1] * (1 - local_dim[2]) :
-      full_lattice_index + local_dim[0] * local_dim[1];
-    break;
-  case 3:
-    neighbor_index = (coord[3] == local_dim[3] - 1) ?
-      full_lattice_index + local_dim[0] * local_dim[1] * local_dim[2] * (1 - local_dim[3]) :
-      full_lattice_index + local_dim[0] * local_dim[1] * local_dim[2];
-    break;
-  case 7: neighbor_index = (coord[0] == 0) ? full_lattice_index - 1 + local_dim[0] : full_lattice_index - 1; break;
-  case 6:
-    neighbor_index
-      = (coord[1] == 0) ? full_lattice_index - local_dim[0] * (1 - local_dim[1]) : full_lattice_index - local_dim[0];
-    break;
-  case 5:
-    neighbor_index = (coord[2] == 0) ? full_lattice_index - local_dim[0] * local_dim[1] * (1 - local_dim[2]) :
-                                       full_lattice_index - local_dim[0] * local_dim[1];
-    break;
-  case 4:
-    neighbor_index = (coord[3] == 0) ?
-      full_lattice_index - local_dim[0] * local_dim[1] * local_dim[2] * (1 - local_dim[3]) :
-      full_lattice_index - local_dim[0] * local_dim[1] * local_dim[2];
-    break;
-  default:
-    errorQuda("Neighbor index could not be determined\n");
-    exit(1);
-    break;
-  } // switch(dir)
-  if (err) *err = 0;
-#endif
+  } else {
+    switch (dir) {
+    case 0:
+      neighbor_index = (coord[0] == local_dim[0] - 1) ? full_lattice_index + 1 - local_dim[0] : full_lattice_index + 1;
+      break;
+    case 1:
+      neighbor_index = (coord[1] == local_dim[1] - 1) ? full_lattice_index + local_dim[0] * (1 - local_dim[1]) :
+                                                        full_lattice_index + local_dim[0];
+      break;
+    case 2:
+      neighbor_index = (coord[2] == local_dim[2] - 1) ?
+        full_lattice_index + local_dim[0] * local_dim[1] * (1 - local_dim[2]) :
+        full_lattice_index + local_dim[0] * local_dim[1];
+      break;
+    case 3:
+      neighbor_index = (coord[3] == local_dim[3] - 1) ?
+        full_lattice_index + local_dim[0] * local_dim[1] * local_dim[2] * (1 - local_dim[3]) :
+        full_lattice_index + local_dim[0] * local_dim[1] * local_dim[2];
+      break;
+    case 7: neighbor_index = (coord[0] == 0) ? full_lattice_index - 1 + local_dim[0] : full_lattice_index - 1; break;
+    case 6:
+      neighbor_index
+        = (coord[1] == 0) ? full_lattice_index - local_dim[0] * (1 - local_dim[1]) : full_lattice_index - local_dim[0];
+      break;
+    case 5:
+      neighbor_index = (coord[2] == 0) ? full_lattice_index - local_dim[0] * local_dim[1] * (1 - local_dim[2]) :
+                                         full_lattice_index - local_dim[0] * local_dim[1];
+      break;
+    case 4:
+      neighbor_index = (coord[3] == 0) ?
+        full_lattice_index - local_dim[0] * local_dim[1] * local_dim[2] * (1 - local_dim[3]) :
+        full_lattice_index - local_dim[0] * local_dim[1] * local_dim[2];
+      break;
+    default: errorQuda("Neighbor index could not be determined"); break;
+    } // switch(dir)
+    if (err) *err = 0;
+  }
   return neighbor_index;
 }
 
@@ -474,22 +429,13 @@ template <class Real> struct ColorMatrix {
 };
 
 template <class Real, int oddBit>
-void computeOneLinkSite(
-#ifdef MULTI_GPU
-  const int dim[4],
-#else
-  const int[],
-#endif
-  int half_lattice_index, const Real *const *const oprod, int sig, Real coeff, const LoadStore<Real> &ls,
-  Real *const *const output)
+void computeOneLinkSite(const int dim[4], int half_lattice_index, const Real *const *const oprod, int sig, Real coeff,
+                        const LoadStore<Real> &ls, Real *const *const output)
 {
   if (GOES_FORWARDS(sig)) {
     typename ColorMatrix<Real>::Type colorMatW;
-#ifdef MULTI_GPU
-    int idx = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
-#else
-    int idx = half_lattice_index;
-#endif
+    int idx = (is_multi_gpu()) ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+
     ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatW);
     ls.addMatrixToField(colorMatW, oddBit, sig, idx, coeff, output);
   }
@@ -606,11 +552,9 @@ void computeMiddleLinkField(const int dim[4], void *const oprod, const Real *con
 
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
-#ifdef MULTI_GPU
-  const int loop_count = Vh_ex;
-#else
-  const int loop_count = volume / 2;
-#endif
+
+  const int loop_count = (is_multi_gpu()) ? Vh_ex : (volume / 2);
+
   // loop over the lattice volume
   // To keep the code as close to the GPU code as possible, we'll
   // loop over the even sites first and then the odd sites
@@ -704,11 +648,8 @@ void computeSideLinkField(const int dim[4], const Real *const P3,
   // Need some way of setting half_volume
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
-#ifdef MULTI_GPU
-  const int loop_count = Vh_ex;
-#else
-  const int loop_count = volume / 2;
-#endif
+
+  const int loop_count = (is_multi_gpu()) ? Vh_ex : (volume / 2);
   LoadStore<Real> ls(volume);
 
 #pragma omp parallel for
@@ -817,11 +758,8 @@ void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *
 {
   int volume = 1;
   for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
-#ifdef MULTI_GPU
-  const int loop_count = Vh_ex;
-#else
-  const int loop_count = volume / 2;
-#endif
+
+  const int loop_count = (is_multi_gpu()) ? Vh_ex : (volume / 2);
 
   LoadStore<Real> ls(volume);
 #pragma omp parallel for
@@ -931,12 +869,15 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
-#ifdef MULTI_GPU
-  uint64_t len = Vh_ex * 2;
-#else
-  uint64_t len = 1;
-  for (int dir = 0; dir < 4; ++dir) len *= X_[dir];
-#endif
+  uint64_t len = [&]() -> uint64_t {
+    if (is_multi_gpu()) {
+      return Vh_ex * 2;
+    } else {
+      uint64_t length = 1;
+      for (int dir = 0; dir < 4; ++dir) length *= X_[dir];
+      return length;
+    }
+  }();
 
   PathCoefficients<double> act_path_coeff;
   act_path_coeff.one = path_coeff[0];
@@ -978,11 +919,7 @@ void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *c
     typename ColorMatrix<Real>::Type colorMatU, colorMatV, colorMatW, colorMatX, colorMatY, colorMatZ;
 
     int point_a, point_b, point_c, point_d, point_e;
-#ifdef MULTI_GPU
-    int idx = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
-#else
-    int idx = half_lattice_index;
-#endif
+    int idx = (is_multi_gpu()) ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
 
     int X = locator.getFullFromHalfIndex(idx);
     point_c = idx;
@@ -1054,24 +991,14 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
 }
 
 template <class Real, int oddBit>
-void completeForceSite(int half_lattice_index,
-#ifdef MULTI_GPU
-                       const int dim[4],
-#else
-                       const int[],
-#endif
-                       const Real *const *const oprod, const Real *const *const link, int sig,
-                       const LoadStore<Real> &ls, Real *const mom)
+void completeForceSite(int half_lattice_index, const int dim[4], const Real *const *const oprod,
+                       const Real *const *const link, int sig, const LoadStore<Real> &ls, Real *const mom)
 {
 
   typename ColorMatrix<Real>::Type colorMatX, colorMatY, linkW;
 
-#ifdef MULTI_GPU
-  int half_lattice_index_ex = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
-  int idx = half_lattice_index_ex;
-#else
-  int idx = half_lattice_index;
-#endif
+  int idx = (is_multi_gpu()) ? ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit) : half_lattice_index;
+
   ls.loadMatrixFromField(link, oddBit, sig, idx, &linkW);
   ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatX);
 
