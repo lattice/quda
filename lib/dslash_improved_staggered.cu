@@ -160,7 +160,7 @@ namespace quda
       constexpr int nDim = 4;
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
-      auto halo = ColorSpinorField::create_comms_batch(in);
+      auto halo = ColorSpinorField::create_comms_batch(in, 3);
       StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity, dagger,
                                                                         comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
