@@ -369,13 +369,39 @@ namespace quda
     if (diracCoarseSmoother) delete diracCoarseSmoother;
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
 
-    // custom setup for the staggered KD ops
-    if (param.level == 0
-        && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
-            || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
+    // check for a pseudo-fine solve
+    bool pseudo_fine = (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
+                        || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+                        || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV);
 
-      createOptimizedKdDirac();
+    // custom setup for pseudo-fine
+    if (param.level == 0 && pseudo_fine) {
+      if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
+          || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+        createOptimizedKdDirac();
+      } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV) {
+        // createDwfPV();
+        auto fine_gauge = diracSmoother->getGaugeField();
 
+        // TODO: create something for Mobius
+        DiracParam diracParamPV;
+        diracParamPV.kappa = diracSmoother->Kappa();
+        diracParamPV.mass = diracSmoother->Mass();
+        diracParamPV.mu = diracSmoother->Mu();              // doesn't matter
+        diracParamPV.mu_factor = diracSmoother->MuFactor(); // doesn't matter
+        diracParamPV.m5 = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->M5();
+        diracParamPV.Ls = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getLs();
+        diracParamPV.dagger = QUDA_DAG_NO;
+        diracParamPV.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+        diracParamPV.gauge = fine_gauge;
+        diracParamPV.type = QUDA_DOMAIN_WALL_4DPV_DIRAC;
+        diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
+        diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
+        diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
+
+      } else {
+        errorQuda("Invalid pseudo-fine type");
+      }
     } else {
 
       // create coarse grid operator
@@ -911,14 +937,23 @@ namespace quda
     // and if the aggregate size is too small in a direction
     bool can_verify = true;
 
-    if ((param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
-        && (diracSmoother->getDiracType() == QUDA_STAGGERED_DIRAC
-            || diracSmoother->getDiracType() == QUDA_STAGGEREDPC_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC
-            || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC)) {
+    bool is_verify_kd = (param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+                         || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
+      && (diracSmoother->getDiracType() == QUDA_STAGGERED_DIRAC || diracSmoother->getDiracType() == QUDA_STAGGEREDPC_DIRAC
+          || diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC);
+
+    bool is_verify_dwf_pv
+      = (param.transfer_type == QUDA_TRANSFER_DWF_PV) && (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC);
+
+    if (is_verify_kd) {
       // If we're doing an optimized build with the staggered operator, we need to skip the verify on level 0
       can_verify = false;
       logQuda(QUDA_VERBOSE,
               "Intentionally skipping staggered -> staggered KD verify because it's not a \"real\" coarsen\n");
+    } else if (is_verify_dwf_pv) {
+      // If we're doing PV-preconditioned domain wall, we need to skip the verify on level 0
+      can_verify = false;
+      logQuda(QUDA_VERBOSE, "Intentionally skipping dwf -> pv^dagger dwf verify because it's not a \"real\" coarsen\n");
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
                || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
       // If we're doing anything with the asqtad operator, the long links can make verification difficult

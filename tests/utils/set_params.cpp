@@ -435,10 +435,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
 
-    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      printfQuda("Twisted-mass doublet non supported (yet)\n");
-      exit(0);
-    }
+    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { errorQuda("Twisted-mass doublet non supported (yet)"); }
+  }
+
+  if (is_chiral(dslash_type)) {
+    inv_param.m5 = m5;
+    inv_param.Ls = Lsdim;
   }
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -492,7 +494,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
     // Is not a staggered solve, always aggregate
-    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+    // mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+    mg_param.transfer_type[i] = (i == 0) ? pseudofine_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
@@ -614,6 +617,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
+  if (pseudofine_transfer_type == QUDA_TRANSFER_DWF_PV) {
+    mg_param.spin_block_size[0] = 1; // we're doing the DWF PV op
+  }
+
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -668,6 +675,11 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   } else {
     inv_param.clover_coeff = clover_coeff;
   }
+
+  if (is_chiral(dslash_type)) {
+    inv_param.m5 = m5;
+    inv_param.Ls = Lsdim;
+  }
 }
 
 void setMultigridInvertParam(QudaInvertParam &inv_param)
@@ -721,10 +733,12 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
 
-    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      printfQuda("Twisted-mass doublet non supported (yet)\n");
-      exit(0);
-    }
+    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { errorQuda("Twisted-mass doublet non supported (yet)"); }
+  }
+
+  if (is_chiral(dslash_type)) {
+    inv_param.m5 = m5;
+    inv_param.Ls = Lsdim;
   }
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -1105,7 +1119,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
 
-    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
+    mg_param.transfer_type[i] = (i == 0) ? pseudofine_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
@@ -1231,8 +1245,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
 
-  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-      || staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+  if (pseudofine_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+      || pseudofine_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
   }
 

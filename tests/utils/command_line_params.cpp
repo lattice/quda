@@ -182,7 +182,7 @@ quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
 
 // Aggregation type for the top level of staggered
-QudaTransferType staggered_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
+QudaTransferType pseudofine_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
@@ -424,7 +424,8 @@ namespace
     {"aggregate", QUDA_TRANSFER_AGGREGATE},
     {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
     {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD},
-    {"kd-optimized-drop-long", QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG}};
+    {"kd-optimized-drop-long", QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG},
+    {"dwf-pv", QUDA_TRANSFER_DWF_PV}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -1072,9 +1073,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
 
   opgroup
-    ->add_option(
-      "--mg-staggered-coarsen-type",
-      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse, kd-optimized (default))")
+    ->add_option("--mg-pseudofine-coarsen-type", pseudofine_transfer_type,
+                 "The type of coarsening to use for a pseudofine operator (aggregate, kd-coarse, kd-optimized "
+                 "(default), kd-optimized-drop-long, dwf-pv)")
     ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
 
   opgroup->add_option("--mg-staggered-kd-dagger-approximation", mg_staggered_kd_dagger_approximation,

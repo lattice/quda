@@ -428,6 +428,11 @@ namespace quda {
     virtual int getLs() const { return 1; }
 
     /**
+       @brief accessor for the gauge field -- overrride can return better value
+    */
+    virtual GaugeField *getGaugeField() const { return gauge; }
+
+    /**
        @brief accessor for if we let MG coarsening drop we can drop improvements, for ex long links for small aggregation dimensions
     */
     virtual bool AllowTruncation() const { return false; }
@@ -895,6 +900,7 @@ namespace quda {
 
     virtual double M5() const override { return m5; }
     virtual int getLs() const override { return Ls; }
+
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_DIRAC; }
   };
@@ -1014,6 +1020,14 @@ namespace quda {
                          const QudaSolutionType solType) const override;
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const override;
+
+    virtual void prepareSpecialMG(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
+                                  cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const override;
+    virtual void reconstructSpecialMG(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                      const QudaSolutionType solType) const override;
+
+    virtual bool hasSpecialMG() const override { return true; }
 
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_4DPV_DIRAC; }

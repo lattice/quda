@@ -875,9 +875,9 @@ namespace quda
     int geoBlockVolume = 1;
     for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
 
-    // Detect if the "coarse" op is the Kahler-Dirac op or something else
-    // that still acts on a fine staggered ColorSpinorField
-    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
+    // Detect if the "coarse" op is actually a "fine" op, aka such as the Kahler-Dirac
+    // preconditioned operator or DWF_PV operator that still acts on a fine ColorSpinorField
+    if (geoBlockVolume == 1 && Nvec == nColor && (nSpin == 1 || x[4] > 1)) {
       coarseParam.nSpin = nSpin;
       coarseParam.nColor = nColor;
     } else {

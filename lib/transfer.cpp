@@ -54,7 +54,9 @@ namespace quda {
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
 
-    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
+    if (transfer_type == QUDA_TRANSFER_DWF_PV) geo_bs[4] = 1;
+
+    if (ndim > 4 && transfer_type != QUDA_TRANSFER_DWF_PV) errorQuda("Number of dimensions %d not supported", ndim);
 
     this->geo_bs = new int[ndim];
     int total_block_size = 1;
@@ -64,7 +66,8 @@ namespace quda {
     }
 
     // Various consistency checks for optimized KD "transfers"
-    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+        || transfer_type == QUDA_TRANSFER_DWF_PV) {
 
       // Aggregation size is "technically" 1 for optimized KD
       if (total_block_size != 1)
@@ -144,7 +147,7 @@ namespace quda {
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG || transfer_type == QUDA_TRANSFER_DWF_PV) {
       // Need to create V_d and V_h as metadata containers, but we don't
       // actually need to allocate the memory.
       param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -163,7 +166,9 @@ namespace quda {
   void Transfer::createTmp() const
   {
     // The CPU temporaries are needed for creating geometry mappings.
-    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) return;
+    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+        || transfer_type == QUDA_TRANSFER_DWF_PV)
+      return;
 
     if (!fine_tmp_h.empty()) return;
 
@@ -211,7 +216,7 @@ namespace quda {
     postTrace();
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG || transfer_type == QUDA_TRANSFER_DWF_PV) {
       return;
     }
     logQuda(QUDA_VERBOSE, "Transfer: block orthogonalizing\n");
@@ -346,7 +351,8 @@ namespace quda {
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(out, in, fine_to_coarse, spin_map, parity);
-    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+               || transfer_type == QUDA_TRANSFER_DWF_PV) {
 
       if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
       if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
@@ -422,7 +428,8 @@ namespace quda {
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(out, in, fine_to_coarse, spin_map, parity);
-    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+               || transfer_type == QUDA_TRANSFER_DWF_PV) {
 
       if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
       if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");

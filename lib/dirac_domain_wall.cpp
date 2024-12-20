@@ -29,6 +29,7 @@ namespace quda {
       DiracWilson::operator=(dirac);
       m5 = dirac.m5;
       kappa5 = dirac.kappa5;
+      Ls = dirac.Ls;
     }
     return *this;
   }

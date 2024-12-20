@@ -442,7 +442,8 @@ int main(int argc, char **argv)
   if (inv_multigrid) {
     // Only these fermions are supported with MG
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-        && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
+        && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
+        && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH) {
       errorQuda("dslash_type %d not supported for MG\n", dslash_type);
     }
 
