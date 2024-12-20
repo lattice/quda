@@ -370,7 +370,7 @@ namespace quda
     template <typename T> inline auto bisect_col(T &x, size_t width, size_t height0, size_t height1)
     {
       using U = typename std::remove_const<T>::type;
-      auto x_ = std::make_pair( U(width * height0), U(width * height1) );
+      auto x_ = std::make_pair(U(width * height0), U(width * height1));
 
       unsigned int count = 0;
       unsigned count0 = 0;

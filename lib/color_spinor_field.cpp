@@ -226,6 +226,7 @@ namespace quda
     alloc = std::exchange(src.alloc, false);
     reference = std::exchange(src.reference, false);
     ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
+    nFace_allocated = std::exchange(src.nFace_allocated, 0);
     nColor = std::exchange(src.nColor, 0);
     nSpin = std::exchange(src.nSpin, 0);
     nVec = std::exchange(src.nVec, 0);
@@ -307,7 +308,8 @@ namespace quda
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
     if (ghost_precision == QUDA_INVALID_PRECISION) errorQuda("Invalid requested ghost precision");
-    if (ghost_precision_allocated == ghost_precision) return;
+    if (ghost_precision_allocated == ghost_precision && nFace_allocated == nFace &&
+        spin_project_allocated == spin_project) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
     int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
@@ -400,7 +402,10 @@ namespace quda
       dc.dims[3][1] = X[1];
       dc.dims[3][2] = X[2];
     }
+
+    spin_project_allocated = spin_project;
     ghost_precision_allocated = ghost_precision;
+    nFace_allocated = nFace;
   } // createGhostZone
 
   void ColorSpinorField::zero() { qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); }
@@ -819,7 +824,8 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
-  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
+  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v, int nFace,
+                                                                  bool spin_project)
   {
     // first create a dummy batched field
     ColorSpinorParam param(v[0]);
@@ -837,9 +843,12 @@ namespace quda
     FieldKey<ColorSpinorField> key;
     key.volume = v.VolString();
     key.aux = v.AuxString();
-    char aux[32];
-    strcpy(aux, ",ghost_batch=");
-    u32toa(aux + 13, v.size());
+    char aux[48];
+    strcpy(aux, ",nFace=");
+    u32toa(aux + 7, nFace);
+    strcpy(aux + 8, ",ghost_batch=");
+    u32toa(aux + 21, v.size());
+    if (spin_project && v.Nspin() > 1) strcat(aux, ",spin_project");
     key.aux += aux;
 
     return FieldTmp<ColorSpinorField>(key, param);

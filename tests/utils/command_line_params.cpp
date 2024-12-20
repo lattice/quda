@@ -53,6 +53,7 @@ int Msrc = 1;
 int Nsrc_tile = 1;
 int Msrc_tile = 1;
 int niter = 100;
+int nrepeat = 1;
 int maxiter_precondition = 10;
 QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
 int gcrNkrylov = 8;
@@ -604,6 +605,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG, CA-GCR (default 8)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--nrepeat", nrepeat, "The number of times to repeat the test (default 1)");
   quda_app->add_option("--max-res-increase", max_res_increase,
                        "The number of consecutive true residual incrases allowed (default 1)");
   quda_app->add_option("--max-res-increase-total", max_res_increase_total,

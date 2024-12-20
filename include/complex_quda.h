@@ -42,95 +42,10 @@ namespace quda {
 // doesn't try to call the complex sqrt, but the standard sqrt
 namespace quda
 {
-#if 0
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType cos(ValueType x){
-    return std::cos(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType sin(ValueType x){
-    return std::sin(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType tan(ValueType x){
-    return std::tan(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType acos(ValueType x){
-    return acos(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType asin(ValueType x){
-    return std::asin(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType atan(ValueType x){
-    return std::atan(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType atan2(ValueType x,ValueType y){
-    return std::atan2(x,y);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType cosh(ValueType x){
-    return std::cosh(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType sinh(ValueType x){
-    return std::sinh(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType tanh(ValueType x){
-    return std::tanh(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType exp(ValueType x){
-    return std::exp(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType log(ValueType x){
-    return std::log(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType log10(ValueType x){
-    return std::log10(x);
-  }
-  template <typename ValueType, typename ExponentType>
-    __host__ __device__
-    inline ValueType pow(ValueType x, ExponentType e){
-    return pow(x,static_cast<ValueType>(e));
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType sqrt(ValueType x){
-    return std::sqrt(x);
-  }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType abs(ValueType x){
-    return abs(x);
-  }
-#endif
-
   __host__ __device__ inline float conj(float x) { return x; }
   __host__ __device__ inline double conj(double x) { return x; }
 
   template <typename ValueType> struct complex;
-  //template <> struct complex<float>;
-  //template <> struct complex<double>;
 
 
   /// Returns the magnitude of z.
@@ -862,29 +777,17 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline ValueType abs(const complex<ValueType>& z){
-    return hypot(z.real(),z.imag());
+    return hypot(z.real(), z.imag());
   }
-  template <>
-    __host__ __device__
-    inline float abs(const complex<float>& z){
-    return hypot(z.real(),z.imag());
-  }
-  template<>
-    __host__ __device__
-    inline double abs(const complex<double>& z){
-    return hypot(z.real(),z.imag());
-  }
+  template <> __host__ __device__ inline float abs(const complex<float> &z) { return hypot(z.real(), z.imag()); }
+  template <> __host__ __device__ inline double abs(const complex<double> &z) { return hypot(z.real(), z.imag()); }
 
   template <typename ValueType>
     __host__ __device__
     inline ValueType arg(const complex<ValueType>& z){
     return atan2(z.imag(),z.real());
   }
-  template<>
-    __host__ __device__
-    inline float arg(const complex<float>& z){
-    return atan2(z.imag(),z.real());
-  }
+  template <> __host__ __device__ inline float arg(const complex<float> &z) { return atan2(z.imag(), z.real()); }
   template<>
     __host__ __device__
     inline double arg(const complex<double>& z){
@@ -900,19 +803,19 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> polar(const ValueType & m, const ValueType & theta){
-    return complex<ValueType>(m * cos(theta),m * sin(theta));
+    return complex<ValueType>(m * cos(theta), m * sin(theta));
   }
 
   template <>
     __host__ __device__
     inline complex<float> polar(const float & magnitude, const float & angle){
-    return complex<float>(magnitude * cos(angle),magnitude * sin(angle));
+    return complex<float>(magnitude * cos(angle), magnitude * sin(angle));
   }
 
   template <>
     __host__ __device__
     inline complex<double> polar(const double & magnitude, const double & angle){
-    return complex<double>(magnitude * cos(angle),magnitude * sin(angle));
+    return complex<double>(magnitude * cos(angle), magnitude * sin(angle));
   }
 
   // Transcendental functions implementation
@@ -952,25 +855,25 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> exp(const complex<ValueType>& z){
-    return polar(exp(z.real()),z.imag());
+    return polar(exp(z.real()), z.imag());
   }
 
   template <>
     __host__ __device__
     inline complex<float> exp(const complex<float>& z){
-    return polar(exp(z.real()),z.imag());
+    return polar(exp(z.real()), z.imag());
   }
 
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> log(const complex<ValueType>& z){
-    return complex<ValueType>(log(abs(z)),arg(z));
+    return complex<ValueType>(log(abs(z)), arg(z));
   }
 
   template <>
     __host__ __device__
     inline complex<float> log(const complex<float>& z){
-    return complex<float>(log(abs(z)),arg(z));
+    return complex<float>(log(abs(z)), arg(z));
   }
 
 
@@ -998,13 +901,13 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> pow(const ValueType & x, const complex<ValueType> & exponent){
-    return exp(log(x)*exponent);
+    return exp(log(x) * exponent);
   }
 
   template <>
     __host__ __device__
     inline complex<float> pow(const float & x, const complex<float> & exponent){
-    return exp(log(x)*exponent);
+    return exp(log(x) * exponent);
   }
 
   template <typename ValueType>
@@ -1048,13 +951,13 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> sqrt(const complex<ValueType>& z){
-    return polar(sqrt(abs(z)),arg(z)/ValueType(2));
+    return polar(sqrt(abs(z)), arg(z) / ValueType(2));
   }
 
   template <>
     __host__ __device__
     inline complex<float> sqrt(const complex<float>& z){
-    return polar(sqrt(abs(z)),arg(z)/float(2));
+    return polar(sqrt(abs(z)), arg(z) / float(2));
   }
 
   template <typename ValueType>
@@ -1134,7 +1037,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
 
     ValueType d = ValueType(1.0) - z.real();
     d = imag2 + d * d;
-    complex<ValueType> ret(ValueType(0.25) * (log(n) - log(d)),0);
+    complex<ValueType> ret(ValueType(0.25) * (log(n) - log(d)), 0);
 
     d = ValueType(1.0) - z.real() * z.real() - imag2;
 
@@ -1152,7 +1055,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
 
     float d = float(1.0) - z.real();
     d = imag2 + d * d;
-    complex<float> ret(float(0.25) * (log(n) - log(d)),0);
+    complex<float> ret(float(0.25) * (log(n) - log(d)), 0);
 
     d = float(1.0) - z.real() * z.real() - imag2;
 

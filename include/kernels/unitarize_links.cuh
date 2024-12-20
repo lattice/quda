@@ -59,9 +59,7 @@ namespace quda {
 
     for (int i=0; i<n; ++i) {
       for (int j=0; j<n; ++j) {
-	if (abs(temporary(i,j).real()) > max_error || abs(temporary(i,j).imag()) > max_error) {
-	  return false;
-	}
+        if (abs(temporary(i, j).real()) > max_error || abs(temporary(i, j).imag()) > max_error) { return false; }
       }
     }
     return true;
@@ -77,9 +75,12 @@ namespace quda {
     return min;
   }
 
-  template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return abs(a-b) < epsilon; }
+  template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return abs(a - b) < epsilon; }
 
-  template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon) { return abs((a-b)/b) < epsilon; }
+  template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon)
+  {
+    return abs((a - b) / b) < epsilon;
+  }
 
   // Compute the reciprocal square root of the matrix q
   // Also modify q if the eigenvalues are dangerously small.
@@ -107,9 +108,9 @@ namespace quda {
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
 
       if (abs(cosTheta) >= static_cast<real>(1.0)) {
-	theta = (r > 0) ? 0.0 : M_PI;
+        theta = (r > 0) ? 0.0 : M_PI;
       } else {
-	theta = acos(cosTheta); // this is the primary performance limiter
+        theta = acos(cosTheta); // this is the primary performance limiter
       }
 
       const real sqrt_s = s*rsqrt_s;

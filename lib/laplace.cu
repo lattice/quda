@@ -154,7 +154,7 @@ namespace quda
                  const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      auto halo = ColorSpinorField::create_comms_batch(in);
+      auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
       if (in.Nspin() == 1) {
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);

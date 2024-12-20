@@ -211,7 +211,7 @@ namespace quda {
       for (int i = 0; i < m; i++) {
 #pragma unroll
         for (int j = 0; j < n; j++) {
-          maxTile[i*n+j] = max(abs(tile[i*n+j].real()), abs(tile[i*n+j].imag()));
+          maxTile[i * n + j] = max(abs(tile[i * n + j].real()), abs(tile[i * n + j].imag()));
         }
       }
 
@@ -219,9 +219,7 @@ namespace quda {
 #pragma unroll
       for (int i = 0; i < m; i++) {
 #pragma unroll
-        for (int j = 0; j < n; j++) {
-          max = quda::max(max, maxTile[i*n+j]);
-        }
+        for (int j = 0; j < n; j++) { max = quda::max(max, maxTile[i * n + j]); }
       }
       return max;
     }

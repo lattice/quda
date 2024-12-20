@@ -2,7 +2,8 @@
 
 #include <cmath>
 
-namespace quda {
+namespace quda
+{
 
   inline float abs(const float a) { return fabs(a); }
   inline double abs(const double a) { return fabs(a); }
@@ -20,10 +21,10 @@ namespace quda {
   template <typename T> inline T sinpi(const T a) { return ::sin(a * static_cast<float>(M_PI)); }
   template <typename T> inline T cospi(const T a) { return ::cos(a * static_cast<float>(M_PI)); }
   template <typename T> inline T rsqrt(const T a) { return static_cast<T>(1.0) / ::sqrt(a); }
-  //template <typename T> inline T rsqrt(T a) { return ::rsqrt(a); }
   template <typename T> inline T pow(const T a, const T b) { return ::pow(a, b); }
   template <typename T> inline T pow(const T a, const int b) { return ::pow(a, b); }
   template <typename T> inline T fpow(const T a, const int b) { return ::pow(a, b); }
+  template <typename T> inline T fmod(const T a, const T b) { return ::fmod(a, b); }
   inline float fdividef(const float a, const float b) { return a / b; }
 
-}
+} // namespace quda
