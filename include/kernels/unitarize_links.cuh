@@ -59,9 +59,7 @@ namespace quda {
 
     for (int i=0; i<n; ++i) {
       for (int j=0; j<n; ++j) {
-	if (fabs(temporary(i,j).real()) > max_error || fabs(temporary(i,j).imag()) > max_error) {
-	  return false;
-	}
+        if (abs(temporary(i, j).real()) > max_error || abs(temporary(i, j).imag()) > max_error) { return false; }
       }
     }
     return true;
@@ -69,17 +67,20 @@ namespace quda {
 
   template <class T> constexpr T getAbsMin(const T* const array, int size)
   {
-    T min = fabs(array[0]);
+    T min = abs(array[0]);
     for(int i=1; i<size; ++i){
-      T abs_val = fabs(array[i]);
+      T abs_val = abs(array[i]);
       if((abs_val) < min){ min = abs_val; }
     }
     return min;
   }
 
-  template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return fabs(a-b) < epsilon; }
+  template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return abs(a - b) < epsilon; }
 
-  template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon) { return fabs((a-b)/b) < epsilon; }
+  template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon)
+  {
+    return abs((a - b) / b) < epsilon;
+  }
 
   // Compute the reciprocal square root of the matrix q
   // Also modify q if the eigenvalues are dangerously small.
@@ -106,10 +107,10 @@ namespace quda {
       r = c[2]*0.5 - (c[0] * static_cast<real>(1.0 / 3.0)) * (c[1] - c[0] * c[0] * static_cast<real>(1.0 / 9.0));
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
 
-      if (fabs(cosTheta) >= static_cast<real>(1.0)) {
-	theta = (r > 0) ? 0.0 : M_PI;
+      if (abs(cosTheta) >= static_cast<real>(1.0)) {
+        theta = (r > 0) ? 0.0 : M_PI;
       } else {
-	theta = acos(cosTheta); // this is the primary performance limiter
+        theta = acos(cosTheta); // this is the primary performance limiter
       }
 
       const real sqrt_s = s*rsqrt_s;
@@ -132,7 +133,7 @@ namespace quda {
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
     real det = getDeterminant(q).real();
-    if (fabs(det) < arg.svd_abs_error) return false;
+    if (abs(det) < arg.svd_abs_error) return false;
     if (!checkRelativeError<double>(g[0]*g[1]*g[2], det, arg.svd_rel_error)) return false;
 
     // At this point we have finished with the c's

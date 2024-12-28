@@ -64,7 +64,7 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 enable_language(CUDA)
-message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+message(STATUS "CUDA Compiler is " ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 # TODO: Do we stil use that?
 if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
@@ -272,6 +272,7 @@ target_compile_options(
           -Xcompiler=-Wno-unused-function
           -Xcompiler=-Wno-unknown-pragmas
           -Xcompiler=-mllvm\ -unroll-count=4
+          $<$<CONFIG:STRICT>:-Xcompiler=-Wno-pass-failed>
           >
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
@@ -445,7 +446,9 @@ if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
 endif()
 
-target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+if(${QUDA_BUILD_NATIVE_FFT} STREQUAL "ON")
+  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+endif()
 
 if(QUDA_JITIFY)
   target_compile_definitions(quda PRIVATE JITIFY)

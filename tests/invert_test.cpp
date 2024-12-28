@@ -367,12 +367,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
         inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
       }
 
-      quda::comm_allreduce_int(inv_param.iter);
-      inv_param.iter /= quda::comm_size() / num_sub_partition;
-      quda::comm_allreduce_sum(inv_param.gflops);
-      inv_param.gflops /= quda::comm_size() / num_sub_partition;
-      quda::comm_allreduce_max(inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+      printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
                  inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
       if (inv_param.energy > 0) {
         printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n",

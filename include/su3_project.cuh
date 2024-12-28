@@ -9,6 +9,7 @@
  */
 
 #include <quda_matrix.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
@@ -28,8 +29,8 @@ namespace quda {
     for (int i = 0; i < in.rows(); i++) {
 #pragma unroll
       for (int j = 0; j < in.rows(); j++) {
-        if (fabs(in(i,j).real() - inv(j,i).real()) > tol ||
-            fabs(in(i,j).imag() + inv(j,i).imag()) > tol) return false;
+        if (abs(in(i, j).real() - inv(j, i).real()) > tol || abs(in(i, j).imag() + inv(j, i).imag()) > tol)
+          return false;
       }
     }
 
@@ -38,15 +39,13 @@ namespace quda {
     const Matrix identity = conj(in)*in;
 #pragma unroll
     for (int i = 0; i < in.rows(); i++) {
-      if (fabs(identity(i,i).real() - static_cast<Float>(1.0)) > tol ||
-          fabs(identity(i,i).imag()) > tol)
-        return false;
+      if (abs(identity(i, i).real() - static_cast<Float>(1.0)) > tol || abs(identity(i, i).imag()) > tol) return false;
 #pragma unroll
       for (int j = 0; j < in.rows(); j++) {
         if (i>j) { // off-diagonal identity check
-        if (fabs(identity(i,j).real()) > tol || fabs(identity(i,j).imag()) > tol ||
-            fabs(identity(j,i).real()) > tol || fabs(identity(j,i).imag()) > tol )
-          return false;
+          if (abs(identity(i, j).real()) > tol || abs(identity(i, j).imag()) > tol || abs(identity(j, i).real()) > tol
+              || abs(identity(j, i).imag()) > tol)
+            return false;
         }
       }
     }
@@ -66,10 +65,10 @@ namespace quda {
   {
     for (int i = 0; i < in.rows(); i++) {
       for (int j = 0; j < in.rows(); j++) {
-        printf("TESTR: %+.13le %+.13le %+.13le\n",
-               in(i,j).real(), inv(j,i).real(), fabs(in(i,j).real() - inv(j,i).real()));
-	printf("TESTI: %+.13le %+.13le %+.13le\n",
-               in(i,j).imag(), inv(j,i).imag(), fabs(in(i,j).imag() + inv(j,i).imag()));
+        printf("TESTR: %+.13le %+.13le %+.13le\n", in(i, j).real(), inv(j, i).real(),
+               abs(in(i, j).real() - inv(j, i).real()));
+        printf("TESTI: %+.13le %+.13le %+.13le\n", in(i, j).imag(), inv(j, i).imag(),
+               abs(in(i, j).imag() + inv(j, i).imag()));
       }
     }
   }

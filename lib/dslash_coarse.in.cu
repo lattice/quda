@@ -26,7 +26,7 @@ namespace quda {
 
     if constexpr (is_enabled_multigrid()) {
       // create a halo ndim+1 field for batched comms
-      auto halo = ColorSpinorField::create_comms_batch(inA);
+      auto halo = ColorSpinorField::create_comms_batch(inA, 1, false);
 
       // Since use_mma = false, put a dummy 1 here for nVec
       DslashCoarseLaunch<D, dagger, coarseColor, use_mma, 1> Dslash(out, inA, inB, halo, Y, X, kappa, parity, dslash,

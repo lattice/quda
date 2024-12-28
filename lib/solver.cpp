@@ -527,8 +527,8 @@ namespace quda {
     switch (prec) {
     case QUDA_DOUBLE_PRECISION: eps = std::numeric_limits<double>::epsilon() / 2.; break;
     case QUDA_SINGLE_PRECISION: eps = std::numeric_limits<float>::epsilon() / 2.; break;
-    case QUDA_HALF_PRECISION: eps = pow(2., -13); break;
-    case QUDA_QUARTER_PRECISION: eps = pow(2., -6); break;
+    case QUDA_HALF_PRECISION: eps = std::pow(2., -13); break;
+    case QUDA_QUARTER_PRECISION: eps = std::pow(2., -6); break;
     default: errorQuda("Invalid precision %d", param.precision); break;
     }
     return eps;
@@ -646,7 +646,7 @@ namespace quda {
     memcpy(out.true_res, true_res.data(), true_res.size() * sizeof(double));
     memcpy(out.true_res_hq, true_res_hq.data(), true_res_hq.size() * sizeof(double));
 
-    out.iter = in.iter;
+    out.iter = split_rank == 0 ? in.iter : 0;
     comm_allreduce_int(out.iter);
 
     out.ca_lambda_min = in.ca_lambda_min;

@@ -60,13 +60,16 @@ namespace quda
     // used to store the size of the tunecache at the point of splitting
     static size_t tune_cache_size = 0;
 
+    // destroy any message handles associate with the prior communicator
+    LatticeField::freeGhostBuffer();
+    ColorSpinorField::freeGhostBuffer();
+    FieldTmp<ColorSpinorField>::destroy();
+
     auto search = communicator_stack.find(split_key);
     if (search == communicator_stack.end()) {
       communicator_stack.emplace(std::piecewise_construct, std::forward_as_tuple(split_key),
                                  std::forward_as_tuple(get_default_communicator(), split_key.data()));
     }
-
-    LatticeField::freeGhostBuffer(); // Destroy the (IPC) Comm buffers with the old communicator.
 
     auto split_key_old = current_key;
     current_key = split_key;
@@ -361,6 +364,8 @@ namespace quda
   }
 
   void comm_barrier(void) { get_current_communicator().comm_barrier(); }
+
+  void comm_barrier_global(void) { get_default_communicator().comm_barrier(); }
 
   void comm_abort_(int status) { Communicator::comm_abort_(status); };
 
