@@ -50,7 +50,6 @@ namespace quda
 
     const Arg &arg;
     using typename nDegTwistedMassPreconditionedParams<dagger,Arg>::Ops::KernelOpsT;
-    //constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
     template <typename Ftor> constexpr nDegTwistedMassPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation

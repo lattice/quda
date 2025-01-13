@@ -108,9 +108,6 @@ namespace quda
      that need tagging.  This can be used as an alternative in cases
      where the operations are only conditionally used.
    */
-  //struct NoKernelOps {
-  //  using KernelOpsT = NoKernelOps;
-  //};
   using NoKernelOps = KernelOps<>;
 
   /**

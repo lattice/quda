@@ -49,7 +49,6 @@ namespace quda
 
     const Arg &arg;
     using typename nDegTwistedCloverParams<kernel_type,Arg>::Ops::KernelOpsT;
-    //constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
     template <typename Ftor> constexpr nDegTwistedClover(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 

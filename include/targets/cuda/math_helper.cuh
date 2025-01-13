@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <target_device.h>
-#include <quda_cuda_api.h>
 
 #if (CUDA_VERSION >= 11070) && !defined(_NVHPC_CUDA)
 #define BUILTIN_ASSUME(x) \

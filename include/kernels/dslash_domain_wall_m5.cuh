@@ -219,7 +219,6 @@ namespace quda
   template <bool allthreads, bool sync, bool dagger, bool shared, class Vector, class Ftor, class Arg = typename Ftor::Arg, Dslash5Type type = Arg::type>
   __device__ __host__ inline Vector d5(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s, int src_idx, bool active)
   {
-    //using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
     int local_src_idx = target::thread_idx().y / arg.Ls;
     using real = typename Arg::real;
@@ -231,7 +230,6 @@ namespace quda
     if constexpr (mobius_m5::use_half_vector()) {
       // if using shared-memory caching then load spinor field for my site into cache
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
-      //SharedMemoryCache<HalfVector> cache{ftor};
       using Cache = std::conditional_t<shared, SharedMemoryCache<HalfVector>, const Ftor &>;
       Cache cache{ftor};
 
@@ -288,7 +286,6 @@ namespace quda
     } else { // use_half_vector
 
       // if using shared-memory caching then load spinor field for my site into cache
-      //SharedMemoryCache<Vector> cache{ftor};
       using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
       Cache cache{ftor};
 
@@ -390,7 +387,6 @@ namespace quda
   template <typename Arg, bool shared = false> struct constantInvParams {
     using Vec = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
-    //using Ops = KernelOps<Cache>;
     using Ops = std::conditional_t<shared, KernelOps<Cache>, NoKernelOps>;
   };
 
@@ -420,7 +416,6 @@ namespace quda
     const auto inv = arg.inv;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    //SharedMemoryCache<Vector> cache{ftor};
     using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
     Cache cache{ftor};
     if constexpr (shared) {
@@ -460,7 +455,6 @@ namespace quda
   template <typename Arg, bool shared = false> struct variableInvParams {
     using Vec = ColorSpinor<typename Arg::real, Arg::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
     using Cache = SharedMemoryCache<Vec>;
-    //using Ops = KernelOps<Cache>;
     using Ops = std::conditional_t<shared, KernelOps<Cache>, NoKernelOps>;
   };
 
@@ -484,7 +478,6 @@ namespace quda
   template <bool allthreads, bool sync, bool dagger, bool shared, typename Vector, typename Ftor, typename Arg = typename Ftor::Arg>
   __device__ __host__ inline Vector variableInv(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s_, int src_idx, bool active)
   {
-    //using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
     int local_src_idx = target::thread_idx().y / arg.Ls;
     constexpr int nSpin = 4;
@@ -494,7 +487,6 @@ namespace quda
     Vector out;
 
     if constexpr (mobius_m5::use_half_vector()) {
-      //SharedMemoryCache<HalfVector> cache{ftor};
       using Cache = std::conditional_t<shared, SharedMemoryCache<HalfVector>, const Ftor &>;
       Cache cache{ftor};
 
@@ -559,7 +551,6 @@ namespace quda
         out += l.reconstruct(4, proj_dir);
       }
     } else { // use_half_vector
-      //SharedMemoryCache<Vector> cache{ftor};
       using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
       Cache cache{ftor};
       if (shared) {
@@ -619,10 +610,6 @@ namespace quda
      @param[in] arg Argument struct containing any meta data and accessors
   */
   template <typename Arg> struct dslash5invParams {
-    //static constexpr int Nc = mobius_m5::var_inverse() && mobius_m5::use_half_vector() ? 4 / 2 : 4;
-    //using Vec = ColorSpinor<typename Arg::real, Arg::nColor, Nc>;
-    //using Cache = SharedMemoryCache<Vec>;
-    //using Ops = KernelOps<Cache>;
     using Ops = std::conditional_t<mobius_m5::var_inverse(),
       typename variableInvParams<Arg,mobius_m5::shared()>::Ops,
       typename constantInvParams<Arg,mobius_m5::shared()>::Ops>;

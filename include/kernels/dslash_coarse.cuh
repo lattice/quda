@@ -290,7 +290,6 @@ namespace quda {
   }
 
   template <bool is_device> struct dim_collapse {
-    //template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
     template <typename T, typename Ftor> void operator()(T &out, int, int, const Ftor &ftor)
     {
       out *= -ftor.arg.kappa;
@@ -298,9 +297,9 @@ namespace quda {
   };
 
   template <> struct dim_collapse<true> {
-    //template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
     template <typename T, typename Ftor> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
     {
+      using Arg = typename Ftor::Arg;
       SharedMemoryCache<T> cache{ftor};
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
@@ -310,14 +309,14 @@ namespace quda {
       if (dir == 0 && dim == 0) {
         // full split over dimension and direction
 #pragma unroll
-        for (int d=1; d < Ftor::Arg::dim_stride; d++) { // get remaining forward gathers (if any)
+        for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward gathers (if any)
           // 4-way 1,2,3  (stride = 4)
           // 2-way 1      (stride = 2)
           out += cache.load_z(target::thread_idx().z + d * 2 + 0);
         }
 
 #pragma unroll
-        for (int d=0; d < Ftor::Arg::dim_stride; d++) { // get all backward gathers
+        for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
           out += cache.load_z(target::thread_idx().z + d * 2 + 1);
         }
 

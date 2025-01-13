@@ -662,8 +662,6 @@ namespace quda
     neighboring processes.
    */
   template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
-    //static_assert(explicitKernelOps<typename Arg::D>);
-    //static_assert(!hasKernelOps<typename Arg::template P<Arg::D::pc_type()>>);
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
@@ -676,10 +674,6 @@ namespace quda
     template <bool allthreads = false>
     __forceinline__ __device__ void operator()(int, int s, int parity, bool active = true)
     {
-      //typename Arg::D dslash(arg);
-      //if constexpr (hasKernelOps<typename Arg::D>) {
-      //dslash.setKernelOps(*this);
-      //}
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
