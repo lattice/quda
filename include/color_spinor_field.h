@@ -1030,6 +1030,8 @@ namespace quda
   */
   class RNG;
 
+  void spinDuplicate(cvector_ref<ColorSpinorField> &v, const ColorSpinorField &src);
+
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
      @param[out] src The colorspinorfield
