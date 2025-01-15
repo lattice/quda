@@ -609,9 +609,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_location[i] = setup_location[i];
   }
 
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
-
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
@@ -1225,9 +1222,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     nu_pre[i] = 2;
     nu_post[i] = 2;
   }
-
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;

@@ -776,11 +776,6 @@ extern "C" {
     /** Whether to use eigenvectors for the nullspace or, if the coarsest instance deflate*/
     QudaBoolean use_eig_solver[QUDA_MAX_MG_LEVEL];
 
-    /** Minimize device memory allocations during the adaptive setup,
-        placing temporary fields in mapped memory instad of device
-        memory */
-    QudaBoolean setup_minimize_memory;
-
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
 
@@ -1813,6 +1808,15 @@ extern "C" {
    * Free resources allocated by the deflated solver
    */
   void destroyDeflationQuda(void *df_instance);
+
+  /**
+   * @brief Flush the memory pools associated with the supplied type.
+   * At present this only supports the options QUDA_MEMORY_DEVICE and
+   * QUDA_MEMORY_HOST_PINNED, and any other type will result in an
+   * error.
+   * @param[in] type The memory type whose pool we wish to flush.
+   */
+  void flushPoolQuda(QudaMemoryType type);
 
   void setMPICommHandleQuda(void *mycomm);
   
