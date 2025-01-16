@@ -62,7 +62,7 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float, GaugeFixHitDims<4>> cache(ftor);
-    Float *elems = cache.data();
+    auto *elems = cache.data();
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -160,7 +160,7 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<array<Float, 4>> cache(ftor);
-    Float *elems = &(*cache.data())[0];
+    auto *elems = &(*cache.data())[0];
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -251,7 +251,7 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float, GaugeFixHitDims<4>> cache(ftor);
-    Float *elems = cache.data();
+    auto *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -351,7 +351,7 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float, GaugeFixHitDims<4>> cache(ftor);
-    Float *elems = cache.data();
+    auto *elems = cache.data();
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -437,7 +437,7 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float, GaugeFixHitDims<16>> cache(ftor);
-    Float *elems = cache.data();
+    auto *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -517,7 +517,7 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float, GaugeFixHitDims<4>> cache(ftor);
-    Float *elems = cache.data();
+    auto *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
