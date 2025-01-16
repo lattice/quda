@@ -32,7 +32,7 @@ jobs:
           packages: cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
           execute_install_scripts: true
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Ccache for gh actions
         uses: hendrikmuhs/ccache-action@v1.2.9
