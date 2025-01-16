@@ -27,15 +27,16 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran
      
-      - uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
-          execute_install_scripts: true
+      # currently deactivated as it cuased build errors - maybe put in again later
+      # - uses: awalsh128/cache-apt-pkgs-action@latest
+      #   with:
+      #     packages: cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
+      #     execute_install_scripts: true
 
       - uses: actions/checkout@v4
 
       - name: Ccache for gh actions
-        uses: hendrikmuhs/ccache-action@v1.2.9
+        uses: hendrikmuhs/ccache-action@v1.2.13
         with:
           key: ${{ github.job }}-${{ matrix.compiler }}
           max-size: 2000M
