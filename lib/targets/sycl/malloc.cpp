@@ -683,6 +683,7 @@ namespace quda
 
     void flush_pinned()
     {
+      logQuda(QUDA_DEBUG_VERBOSE, "Flushing host pinned memory pool\n");
       if (pinned_memory_pool) {
         std::multimap<size_t, void *>::iterator it;
         for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
@@ -695,6 +696,7 @@ namespace quda
 
     void flush_device()
     {
+      logQuda(QUDA_DEBUG_VERBOSE, "Flushing device memory pool\n");
       device::free_arg_buf(); // free kernel arg buffer
       if (device_memory_pool) {
         std::multimap<size_t, void *>::iterator it;
