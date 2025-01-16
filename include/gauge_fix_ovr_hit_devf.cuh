@@ -150,7 +150,7 @@ namespace quda {
    * Uses 4*8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd
    */
-  template <typename Float> using GaugeFixHit_NoAtomicAddOps = KernelOps<SharedMemoryCache<array<Float, 4>>>;
+  template <typename Float> using GaugeFixHit_NoAtomicAddOps = KernelOps<SharedMemoryCache<Float, GaugeFixHitDims<32>>>;
   template <typename Float, int gauge_dir, int nColor, typename Ftor>
   inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>, nColor> &link, const Float relax_boost, int mu,
                                                  const Ftor &ftor)
@@ -159,8 +159,8 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float, 4>> cache(ftor);
-    auto *elems = &(*cache.data())[0];
+    SharedMemoryCache<Float, GaugeFixHitDims<32>> cache(ftor);
+    auto *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
