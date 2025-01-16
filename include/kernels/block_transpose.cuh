@@ -76,7 +76,7 @@ namespace quda
       int parity_color = target::block_idx().z;
       int color = parity_color % Arg::nColor;
       int parity = parity_color / Arg::nColor;
-      using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
+      using color_spinor_t = typename BlockTransposeKernelOps<Arg>::color_spinor_t;
 
       typename BlockTransposeKernelOps<Arg>::CacheT cache {*this};
 
