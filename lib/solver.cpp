@@ -281,10 +281,10 @@ namespace quda {
       if (space && space->evecs.size() != 0) {
         logQuda(QUDA_VERBOSE, "Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if ((!space->svd && param.eig_param.n_conv != (int)space->evecs.size())
-            || (space->svd && 2 * param.eig_param.n_conv != (int)space->evecs.size()))
-          warningQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(),
-                    param.eig_param.n_conv);
+        if ((!space->svd && (int)space->evecs.size() < param.eig_param.n_conv)
+            || (space->svd && (int)space->evecs.size() < (2 * param.eig_param.n_conv)))
+          errorQuda("Preserved deflation space size %lu is smaller than the necessary %d", space->evecs.size(),
+	            param.eig_param.n_conv);	      
 
         // move vectors from preserved space to local space
         evecs = std::move(space->evecs);
