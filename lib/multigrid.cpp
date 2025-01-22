@@ -412,8 +412,7 @@ namespace quda
       diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level + 1];
       diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
 
-      diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
-                                            param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);
+      diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
 
       // create smoothing operators
       diracParam.dirac = const_cast<Dirac *>(param.matSmooth->Expose());
