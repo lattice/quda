@@ -25,9 +25,9 @@ jobs:
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
+          sudo apt-get install -y --no-install-recommends  ninja-build cmake libopenmpi-dev gfortran clang-14 cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
 
-      # currently deactivated as it cuased build errors - maybe put in again later
+      # currently deactivated as it caused build errors - maybe put in again later
       # - uses: awalsh128/cache-apt-pkgs-action@latest
       #   with:
       #     packages: cuda-compiler-12-1 cuda-libraries-dev-12-1 cuda-nvml-dev-12-1
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Ccache for gh actions
-        uses: hendrikmuhs/ccache-action@v1.2.13
+        uses: hendrikmuhs/ccache-action@v1.2.16
         with:
           key: ${{ github.job }}-${{ matrix.compiler }}
           max-size: 2000M
