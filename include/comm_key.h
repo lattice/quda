@@ -1,27 +1,33 @@
 #pragma once
 
+#include <array.h>
+
 namespace quda
 {
 
   struct CommKey {
 
     static constexpr int n_dim = 4;
+    array<int, n_dim> key = {0, 0, 0, 0};
 
-    int array[n_dim] = {0, 0, 0, 0};
+    constexpr int product() { return key[0] * key[1] * key[2] * key[3]; }
 
-    constexpr inline int product() { return array[0] * array[1] * array[2] * array[3]; }
+    constexpr int &operator[](int d) { return key[d]; }
 
-    constexpr inline int &operator[](int d) { return array[d]; }
+    constexpr const int &operator[](int d) const { return key[d]; }
 
-    constexpr inline const int &operator[](int d) const { return array[d]; }
+    constexpr auto data() { return key.data; }
 
-    constexpr inline int *data() { return array; }
+    constexpr auto data() const { return key.data; }
 
-    constexpr inline const int *data() const { return array; }
+    constexpr bool is_valid() const { return (key[0] > 0) && (key[1] > 0) && (key[2] > 0) && (key[3] > 0); }
 
-    constexpr inline bool is_valid() const
+    bool operator==(const CommKey &other) const
     {
-      return (array[0] > 0) && (array[1] > 0) && (array[2] > 0) && (array[3] > 0);
+      bool is_same = true;
+      for (auto i = 0; i < n_dim; i++)
+        if (key[i] != other.key[i]) is_same = false;
+      return is_same;
     }
   };
 

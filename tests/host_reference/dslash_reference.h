@@ -217,11 +217,13 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
  * @param long_link The long links; null for naive staggered and Laplace
  * @param inv_param Invert params, used to query the solve type, etc
+ * @param laplace3D Whether we are working on the 3-d Laplace operator
+ * @param src_idx The source index we working on (when doing mutil-RHS)
  * @return The residual and HQ residual (if requested)
  */
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda::ColorSpinorField &out,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int src_idx);
+                                               QudaInvertParam &inv_param, int laplace3D, int src_idx);
 
 /**
  * @brief Verify a single- or multi-shift staggered inversion on the host
@@ -231,26 +233,30 @@ std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in, quda:
  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
  * @param long_link The long links; null for naive staggered and Laplace
  * @param inv_param Invert params, used to query the solve type, etc, also includes the shifts
+ * @param laplace3D Whether we are working on the 3-d Laplace operator
+ * @param src_idx The source index we working on (when doing mutil-RHS)
  * @return The residual and HQ residual (if requested)
  */
 std::array<double, 2> verifyStaggeredInversion(quda::ColorSpinorField &in,
                                                std::vector<quda::ColorSpinorField> &out_vector,
                                                quda::GaugeField &fat_link, quda::GaugeField &long_link,
-                                               QudaInvertParam &inv_param, int src_idx = 0);
+                                               QudaInvertParam &inv_param, int laplace3D, int src_idx = 0);
 
 /**
  * @brief Verify a staggered-type eigenvector
  *
  * @param spinor The host eigenvector to be verified
- * @param lambda The host eigenvalue to be verified
+ * @param lambda The host eigenvalue(s) to be verified
  * @param i The number of the eigenvalue, only used when printing outputs
  * @param eig_param Eigensolve params, used to query the operator type, etc
  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
  * @param long_link The long links; null for naive staggered and Laplace
+ * @param laplace3D Whether we are working on the 3-d Laplace operator
  * @return The residual norm
  */
-double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Complex lambda, int i,
-                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link);
+double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, const std::vector<double _Complex> &lambda, int i,
+                                      QudaEigParam &eig_param, quda::GaugeField &fat_link, quda::GaugeField &long_link,
+                                      int laplace3D);
 
 /**
  * @brief Verify a staggered-type singular vector
@@ -262,11 +268,12 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, double _Co
  * @param eig_param Eigensolve params, used to query the operator type, etc
  * @param fat_link The fat links in the context of an ASQTAD solve; otherwise the base gauge links with phases applied
  * @param long_link The long links; null for naive staggered and Laplace
+ * @param laplace3D Whether we are working on the 3-d Laplace operator
  * @return The residual norm
  */
 double verifyStaggeredTypeSingularVector(quda::ColorSpinorField &spinor_left, quda::ColorSpinorField &spinor_right,
-                                         double _Complex sigma, int i, QudaEigParam &eig_param,
-                                         quda::GaugeField &fat_link, quda::GaugeField &long_link);
+                                         const std::vector<double _Complex> &sigma, int i, QudaEigParam &eig_param,
+                                         quda::GaugeField &fat_link, quda::GaugeField &long_link, int laplace3D);
 
 /**
  * @brief Verify the spinor distance reweighting

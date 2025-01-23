@@ -422,12 +422,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
         inv_param.true_res_hq[j + i] = inv_param.true_res_hq[i];
       }
 
-      quda::comm_allreduce_int(inv_param.iter);
-      inv_param.iter /= comm_size() / num_sub_partition;
-      quda::comm_allreduce_sum(inv_param.gflops);
-      inv_param.gflops /= comm_size() / num_sub_partition;
-      quda::comm_allreduce_max(inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+      printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
                  inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
       if (inv_param.energy > 0) {
         printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
@@ -451,9 +446,9 @@ std::vector<std::array<double, 2>> solve(test_t param)
         // Create an appropriate subset of the full out_multishift vector
         std::vector<quda::ColorSpinorField> out_subset
           = {out_multishift.begin() + n * multishift, out_multishift.begin() + (n + 1) * multishift};
-        res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param);
+        res[n] = verifyStaggeredInversion(in[n], out_subset, cpuFatQDP, cpuLongQDP, inv_param, laplace3D);
       } else {
-        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param, n);
+        res[n] = verifyStaggeredInversion(in[n], out[n], cpuFatQDP, cpuLongQDP, inv_param, laplace3D, n);
       }
     }
   }
@@ -511,7 +506,8 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (is_laplace(dslash_type))
+      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_DIRAC_LAPLACE=ON");
     if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
@@ -567,9 +563,10 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
-                  inv_param.residual_type});
+    for (int rep = 0; rep < nrepeat; rep++)
+      solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
+                    schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                    inv_param.residual_type});
   }
 
   cleanup();

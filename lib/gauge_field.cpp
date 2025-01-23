@@ -1357,7 +1357,7 @@ namespace quda {
       qudaMemcpy(buffer, data(), Bytes(), qudaMemcpyDeviceToHost);
     } else {
       if (is_pointer_array(order)) {
-        char *dst_buffer = reinterpret_cast<char *>(buffer);
+        char *dst_buffer = static_cast<char *>(buffer);
         for (int d = 0; d < site_dim; d++) {
           std::memcpy(&dst_buffer[d * bytes / site_dim], gauge_array[d].data(), bytes / site_dim);
         }
@@ -1377,7 +1377,7 @@ namespace quda {
       qudaMemcpy(data(), buffer, Bytes(), qudaMemcpyHostToDevice);
     } else {
       if (is_pointer_array(order)) {
-        const char *dst_buffer = reinterpret_cast<const char *>(buffer);
+        const char *dst_buffer = static_cast<const char *>(buffer);
         for (int d = 0; d < site_dim; d++) {
           std::memcpy(gauge_array[d].data(), &dst_buffer[d * bytes / site_dim], bytes / site_dim);
         }
@@ -1389,6 +1389,11 @@ namespace quda {
         errorQuda("Unsupported order = %d", Order());
       }
     }
+  }
+
+  void GaugeField::PrintMatrix(int dim, int parity, unsigned int x_cb, int rank) const
+  {
+    genericPrintMatrix(*this, dim, parity, x_cb, rank);
   }
 
 } // namespace quda

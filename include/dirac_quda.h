@@ -1911,14 +1911,12 @@ public:
     const bool gpu_setup; /** Where to do the coarse-operator construction*/
     mutable bool init_gpu; /** Whether this instance did the GPU allocation or not */
     mutable bool init_cpu; /** Whether this instance did the CPU allocation or not */
-    const bool mapped; /** Whether we allocate Y and X GPU fields in mapped memory or not */
 
     /**
        @brief Allocate the Y and X fields
        @param[in] gpu Whether to allocate on gpu (true) or cpu (false)
-       @param[in] mapped whether to put gpu allocations into mapped memory
      */
-    void createY(bool gpu = true, bool mapped = false) const;
+    void createY(bool gpu = true) const;
 
     /**
        @brief Allocate the Yhat and Xinv fields
@@ -1935,9 +1933,8 @@ public:
     /**
        @param[in] param Parameters defining this operator
        @param[in] gpu_setup Whether to do the setup on GPU or CPU
-       @param[in] mapped Set to true to put Y and X fields in mapped memory
      */
-    DiracCoarse(const DiracParam &param, bool gpu_setup=true, bool mapped=false);
+    DiracCoarse(const DiracParam &param, bool gpu_setup=true);
 
     /**
        @param[in] param Parameters defining this operator
@@ -2347,8 +2344,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->M(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override { return dirac->getStencilSteps(); }
@@ -2369,8 +2365,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->MdagM(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override
@@ -2421,8 +2416,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->MMdag(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override
@@ -2448,8 +2442,7 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->Mdag(out, in);
-      for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     int getStencilSteps() const override { return dirac->getStencilSteps(); }
@@ -2496,7 +2489,7 @@ public:
 
       @param vec[in,out] vector to which gamma5 is applied in place
     */
-    void applyGamma5(ColorSpinorField &vec) const
+    void applyGamma5(cvector_ref<ColorSpinorField> &vec) const
     {
       auto dirac_type = dirac->getDiracType();
       auto pc_type = dirac->getMatPCType();
@@ -2573,10 +2566,8 @@ public:
     void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
     {
       dirac->M(out, in);
-      for (auto i = 0u; i < in.size(); i++) {
-        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
-        applyGamma5(out[i]);
-      }
+      if (shift != 0.0) blas::axpy(shift, in, out);
+      applyGamma5(out);
     }
 
     int getStencilSteps() const override { return dirac->getStencilSteps(); }

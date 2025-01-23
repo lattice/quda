@@ -15,7 +15,7 @@ namespace quda
 
   template LaplaceApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>::LaplaceApply(
     cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
-    const GaugeField &U, int dir, double a, double b, int parity, bool dagger, const int *comm_override,
+    const GaugeField &U, int dir, double a, double b, int parity, const int *comm_override,
     DistanceType<distance_pc>, TimeProfile &profile);
 
 } // namespace quda

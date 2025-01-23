@@ -18,19 +18,6 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-// Smearing variables
-double gauge_smear_rho = 0.1;
-double gauge_smear_epsilon = 0.1;
-double gauge_smear_alpha = 0.6;
-double gauge_smear_alpha1 = 0.75;
-double gauge_smear_alpha2 = 0.6;
-double gauge_smear_alpha3 = 0.3;
-int gauge_smear_steps = 50;
-QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-int gauge_smear_dir_ignore = -1;
-int measurement_interval = 5;
-bool su_project = true;
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -66,49 +53,6 @@ void display_test_info()
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
   return;
-}
-
-void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
-                                                                {"stout", QUDA_GAUGE_SMEAR_STOUT},
-                                                                {"ovrimp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
-                                                                {"hyp", QUDA_GAUGE_SMEAR_HYP},
-                                                                {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW},
-                                                                {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
-
-  // Option group for SU(3) related options
-  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-
-  opgroup
-    ->add_option(
-      "--su3-smear-type",
-      gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, HYP, Wilson Flow, Symanzik Flow (default stout)")
-    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-  ;
-  opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
-
-  opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.1)");
-
-  opgroup->add_option("--su3-smear-epsilon", gauge_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing or Wilson flow (default 0.1)");
-
-  opgroup->add_option("--su3-smear-alpha1", gauge_smear_alpha1, "alpha1 coefficient for HYP smearing (default 0.75)");
-  opgroup->add_option("--su3-smear-alpha2", gauge_smear_alpha2, "alpha2 coefficient for HYP smearing (default 0.6)");
-  opgroup->add_option("--su3-smear-alpha3", gauge_smear_alpha3, "alpha3 coefficient for HYP smearing (default 0.3)");
-
-  opgroup->add_option(
-    "--su3-smear-dir-ignore", gauge_smear_dir_ignore,
-    "Direction to be ignored by the smearing, negative value means decided by --su3-smear-type (default -1)");
-
-  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and/or topological charge every Nth step (default 5) ");
-
-  opgroup->add_option("--su3-project", su_project,
-                      "Project smeared gauge onto su3 manifold at measurement interval (default true)");
 }
 
 int main(int argc, char **argv)
@@ -257,7 +201,7 @@ int main(int argc, char **argv)
   QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[gauge_smear_steps / measurement_interval + 1];
   for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
     obs_param[i] = newQudaGaugeObservableParam();
-    obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+    obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }

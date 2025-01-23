@@ -104,6 +104,10 @@ namespace quda
       logQuda(QUDA_VERBOSE, "Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param);
       break;
+    case QUDA_EIG_TR_LANCZOS_3D:
+      logQuda(QUDA_VERBOSE, "Creating TR Lanczos 3-d eigensolver\n");
+      eig_solver = new TRLM3D(mat, eig_param);
+      break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       logQuda(QUDA_VERBOSE, "Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param);
@@ -236,7 +240,7 @@ namespace quda
     int n_eig = n_conv;
     if (compute_svd) n_eig *= 2;
     kSpace.resize(n_eig);
-    evals.resize(n_conv);
+    if (eig_param->eig_type != QUDA_EIG_TR_LANCZOS_3D) evals.resize(n_conv);
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -580,6 +584,7 @@ namespace quda
   void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
+    if (size == 0) size = n_conv;
     auto batch_size = eig_param->compute_evals_batch_size;
 
     if (size > static_cast<int>(evecs.size()))
@@ -683,7 +688,7 @@ namespace quda
       case QUDA_SPECTRUM_SR_EIG: printfQuda("'SR' -> sort with real(x) in increasing algebraic order, smallest first.\n"); break;
       case QUDA_SPECTRUM_LI_EIG: printfQuda("'LI' -> sort with imag(x) in decreasing algebraic order, largest first.\n"); break;
       case QUDA_SPECTRUM_SI_EIG: printfQuda("'SI' -> sort with imag(x) in increasing algebraic order, smallest first\n"); break;
-      default: errorQuda("Unkown spectrum type requested: %d", spec_type);
+      default: errorQuda("Unknown spectrum type requested: %d", spec_type);
       }
     }
 

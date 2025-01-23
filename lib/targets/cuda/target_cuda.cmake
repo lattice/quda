@@ -64,7 +64,7 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 enable_language(CUDA)
-message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+message(STATUS "CUDA Compiler is " ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 # TODO: Do we stil use that?
 if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
@@ -103,8 +103,11 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NV
 endif()
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT "use infinity as the sentinel for heterogeneous atomic support?" ON
+                       "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC_INF_INIT)
 mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
@@ -195,12 +198,43 @@ set(QUDA_MULTIGRID_MRHS_LIST ${QUDA_MULTIGRID_MRHS_DEFAULT_LIST} CACHE STRING "T
 mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
 message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
 
-if(QUDA_MULTIGRID)
-  option(QUDA_ENABLE_MMA "Enabling using tensor core" ON)
-  mark_as_advanced(QUDA_ENABLE_MMA)
+option(QUDA_ENABLE_MMA "Enabling using tensor core" ON)
+mark_as_advanced(QUDA_ENABLE_MMA)
 
-  option(QUDA_MULTIGRID_SETUP_USE_SMMA "Enabling using SMMA (3xTF32/3xBF16/3xFP16) for multigrid setup" ON)
-  mark_as_advanced(QUDA_MULTIGRID_SETUP_USE_SMMA)
+macro(process_mma_type MMA_TYPE)
+  if("${${MMA_TYPE}}" MATCHES "^[0-9]+$" AND "${${MMA_TYPE}}" GREATER_EQUAL "0" AND "${${MMA_TYPE}}" LESS "8")
+    if("${${MMA_TYPE}}" GREATER_EQUAL "5" AND "${QUDA_COMPUTE_CAPABILITY}" LESS "80")
+      message(FATAL_ERROR "${MMA_TYPE}=${${MMA_TYPE}} not available for SM 70")
+    endif()
+    message(STATUS "${MMA_TYPE}=${${MMA_TYPE}}")
+  else()
+    message(FATAL_ERROR "Invalid ${MMA_TYPE}=${${MMA_TYPE}}")
+  endif()
+endmacro()
+
+if(QUDA_MULTIGRID)
+
+  set(HELP_STRING "1->SIMT; 2->SMMA; 3->1xFP16; 4->3xFP16; 5->1xTF32; 6->3xTF32; 7->3xBF16; 0->DEFAULT")
+
+  set(QUDA_MULTIGRID_MMA_SETUP_TYPE_HALF "0" CACHE STRING "MMA type to be used for setup/half: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_SETUP_TYPE_HALF)
+  set(QUDA_MULTIGRID_MMA_SETUP_TYPE_SINGLE "0" CACHE STRING "MMA type to be used for setup/single: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_SETUP_TYPE_SINGLE)
+
+  set(QUDA_MULTIGRID_MMA_DSLASH_TYPE_HALF "0" CACHE STRING "MMA type to be used for dslash/half: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_DSLASH_TYPE_HALF)
+  set(QUDA_MULTIGRID_MMA_DSLASH_TYPE_SINGLE "0" CACHE STRING "MMA type to be used for dslash/single: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_DSLASH_TYPE_SINGLE)
+
+  set(QUDA_MULTIGRID_MMA_PROLONGATOR_TYPE_HALF "0" CACHE STRING "MMA type to be used for prolongator/half: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_PROLONGATOR_TYPE_HALF)
+  set(QUDA_MULTIGRID_MMA_PROLONGATOR_TYPE_SINGLE "0" CACHE STRING "MMA type to be used for prolongator/single: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_PROLONGATOR_TYPE_SINGLE)
+
+  set(QUDA_MULTIGRID_MMA_RESTRICTOR_TYPE_HALF "0" CACHE STRING "MMA type to be used for restrictor/half: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_RESTRICTOR_TYPE_HALF)
+  set(QUDA_MULTIGRID_MMA_RESTRICTOR_TYPE_SINGLE "0" CACHE STRING "MMA type to be used for restrictor/single: ${HELP_STRING}")
+  process_mma_type(QUDA_MULTIGRID_MMA_RESTRICTOR_TYPE_SINGLE)
 
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
 
@@ -269,6 +303,7 @@ target_compile_options(
           -Xcompiler=-Wno-unused-function
           -Xcompiler=-Wno-unknown-pragmas
           -Xcompiler=-mllvm\ -unroll-count=4
+          $<$<CONFIG:STRICT>:-Xcompiler=-Wno-pass-failed>
           >
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
@@ -442,7 +477,9 @@ if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
 endif()
 
-target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+if(${QUDA_BUILD_NATIVE_FFT} STREQUAL "ON")
+  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+endif()
 
 if(QUDA_JITIFY)
   target_compile_definitions(quda PRIVATE JITIFY)

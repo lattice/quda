@@ -7,7 +7,7 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped) :
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup) :
     Dirac(param),
     mass(param.mass),
     mu(param.mu),
@@ -23,8 +23,7 @@ namespace quda {
     enable_cpu(false),
     gpu_setup(gpu_setup),
     init_gpu(gpu_setup),
-    init_cpu(!gpu_setup),
-    mapped(mapped)
+    init_cpu(!gpu_setup)
   {
     initializeCoarse();
   }
@@ -59,8 +58,7 @@ namespace quda {
     enable_cpu(Y_h ? true : false),
     gpu_setup(true),
     init_gpu(enable_gpu ? false : true),
-    init_cpu(enable_cpu ? false : true),
-    mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
+    init_cpu(enable_cpu ? false : true)
   {
 
     constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
@@ -116,12 +114,11 @@ namespace quda {
     enable_cpu(dirac.enable_cpu),
     gpu_setup(dirac.gpu_setup),
     init_gpu(enable_gpu ? false : true),
-    init_cpu(enable_cpu ? false : true),
-    mapped(dirac.mapped)
+    init_cpu(enable_cpu ? false : true)
   {
   }
 
-  void DiracCoarse::createY(bool gpu, bool mapped) const
+  void DiracCoarse::createY(bool gpu) const
   {
     int ndim = transfer->Vectors().Ndim();
     lat_dim_t x;
@@ -146,7 +143,6 @@ namespace quda {
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
     gParam.geometry = QUDA_COARSE_GEOMETRY;
-    if (mapped) gParam.mem_type = QUDA_MEMORY_MAPPED;
 
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
@@ -228,7 +224,7 @@ namespace quda {
 
   void DiracCoarse::initializeCoarse()
   {
-    createY(gpu_setup, mapped);
+    createY(gpu_setup);
 
     if (!gpu_setup) {
 
@@ -318,7 +314,7 @@ namespace quda {
     switch(location) {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
-      createY(true, mapped);
+      createY(true);
       createYhat(true);
       Y_d->copy(*Y_h);
       if (need_aos_gauge_copy) { Y_aos_d->copy(*Y_d); }

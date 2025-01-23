@@ -212,7 +212,7 @@ namespace quda
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
   __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s, int src_idx)
   {
-
+    int local_src_idx = target::thread_idx().y / arg.Ls;
     using real = typename Arg::real;
     constexpr bool is_variable = true;
     coeff_type<real, is_variable, Arg> coeff(arg);
@@ -235,7 +235,7 @@ namespace quda
         const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
         if (shared) {
-          half_in = cache.load(threadIdx.x, fwd_s, parity);
+          half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + fwd_s, parity);
         } else {
           Vector full_in = arg.in[src_idx](fwd_idx, parity);
           half_in = full_in.project(4, proj_dir);
@@ -258,7 +258,7 @@ namespace quda
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
         if (shared) {
-          half_in = cache.load(threadIdx.x, back_s, parity);
+          half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + back_s, parity);
         } else {
           Vector full_in = arg.in[src_idx](back_idx, parity);
           half_in = full_in.project(4, proj_dir);
@@ -283,7 +283,8 @@ namespace quda
       { // forwards direction
         const int fwd_s = (s + 1) % arg.Ls;
         const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
-        const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in[src_idx](fwd_idx, parity);
+        const Vector in
+          = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + fwd_s, parity) : arg.in[src_idx](fwd_idx, parity);
         constexpr int proj_dir = dagger ? +1 : -1;
         if (s == arg.Ls - 1) {
           out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
@@ -295,7 +296,8 @@ namespace quda
       { // backwards direction
         const int back_s = (s + arg.Ls - 1) % arg.Ls;
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
-        const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in[src_idx](back_idx, parity);
+        const Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + back_s, parity) :
+                                   arg.in[src_idx](back_idx, parity);
         constexpr int proj_dir = dagger ? -1 : +1;
         if (s == 0) {
           out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
@@ -378,6 +380,7 @@ namespace quda
   __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_,
                                                 int src_idx)
   {
+    int local_src_idx = target::thread_idx().y / arg.Ls;
     using real = typename Arg::real;
     const auto k = arg.kappa;
     const auto inv = arg.inv;
@@ -395,7 +398,8 @@ namespace quda
 
     for (int s = 0; s < arg.Ls; s++) {
 
-      Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+      Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) :
+                           arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
 
       {
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
@@ -436,6 +440,7 @@ namespace quda
   __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_,
                                                 int src_idx)
   {
+    int local_src_idx = target::thread_idx().y / arg.Ls;
     constexpr int nSpin = 4;
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;
@@ -461,7 +466,7 @@ namespace quda
           auto factorR = (s_ < s ? -arg.m_f * R : R);
 
           if (shared) {
-            r += factorR * cache.load(threadIdx.x, s, parity);
+            r += factorR * cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity);
           } else {
             Vector in = arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
             r += factorR * in.project(4, proj_dir);
@@ -489,7 +494,7 @@ namespace quda
           auto factorL = (s_ > s ? -arg.m_f * L : L);
 
           if (shared) {
-            l += factorL * cache.load(threadIdx.x, s, parity);
+            l += factorL * cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity);
           } else {
             Vector in = arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
             l += factorL * in.project(4, proj_dir);
@@ -518,7 +523,8 @@ namespace quda
         for (int s_count = 0; s_count < arg.Ls; s_count++) {
           auto factorR = (s_ < s ? -arg.m_f * R : R);
 
-          Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+          Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) :
+                               arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
           r += factorR * in.project(4, proj_dir);
 
           R *= coeff.kappa(s);
@@ -537,7 +543,8 @@ namespace quda
         for (int s_count = 0; s_count < arg.Ls; s_count++) {
           auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-          Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+          Vector in = shared ? cache.load(threadIdx.x, local_src_idx * arg.Ls + s, parity) :
+                               arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity);
           l += factorL * in.project(4, proj_dir);
 
           L *= coeff.kappa(s);

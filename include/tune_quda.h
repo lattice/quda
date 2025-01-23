@@ -44,6 +44,14 @@ namespace quda {
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
   /**
+     @brief Unify all instances of the tunecache across ranks.  This
+     is called after returning to a global communicator.
+     @param[in] rank_list The list of ranks from whose tunecaches we
+     want to merge to form the global tunecache
+   */
+  void joinTuneCache(const std::vector<int> &rank_list);
+
+  /**
      @brief Return a string encoding the QUDA version
    */
   const std::string get_quda_version();
@@ -61,7 +69,7 @@ namespace quda {
 
   class Tunable {
 
-    friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);
+    friend TuneParam tuneLaunch(Tunable &, bool, QudaVerbosity);
     static inline uint64_t _flops_global = 0;
     static inline uint64_t _bytes_global = 0;
 
@@ -417,7 +425,7 @@ namespace quda {
    * @param[in] verbosity What verbosity to use during tuning?
    * @return The tuned launch parameters
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
+  TuneParam tuneLaunch(Tunable &tunable, bool enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
 
   /**
    * @brief Post an event in the trace, recording where it was posted

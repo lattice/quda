@@ -317,8 +317,8 @@ namespace quda
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }
 
-  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param,
-                          const bool pc_solve);
+  void createDiracWithEig(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dEig, QudaInvertParam &param, bool pc_solve,
+                          bool use_smeared_gauge);
 
   extern std::vector<ColorSpinorField> solutionResident;
 
@@ -349,7 +349,8 @@ namespace quda
 
     // Create the dirac operator and operators for sloppy, precondition,
     // and an eigensolver
-    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, param, pc_solve);
+    createDiracWithEig(dirac, diracSloppy, diracPre, diracEig, param, pc_solve,
+                       param.eig_param ? static_cast<QudaEigParam *>(param.eig_param)->use_smeared_gauge : false);
 
     // wrap CPU host side pointers
     ColorSpinorParam cpuParam(hp_b[0], param, u.X(), pc_solution, param.input_location);

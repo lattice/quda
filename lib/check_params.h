@@ -175,6 +175,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(preserve_deflation, QUDA_BOOLEAN_FALSE);
   P(preserve_deflation_space, 0);
   P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_smeared_gauge, false);
   P(use_dagger, QUDA_BOOLEAN_FALSE);
   P(use_norm_op, QUDA_BOOLEAN_FALSE);
   P(compute_svd, QUDA_BOOLEAN_FALSE);
@@ -578,6 +579,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   // domain decomposition parameters
   //P(inv_type_sloppy, QUDA_INVALID_INVERTER); // disable since invalid means no preconditioner
 #if defined INIT_PARAM
+  P(dslash_type_precondition, QUDA_INVALID_DSLASH);
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
   P(preconditioner, 0);
   P(tol_precondition, INVALID_DOUBLE);
@@ -876,9 +878,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_use_mma[i], QUDA_BOOLEAN_FALSE);
 #endif
     P(dslash_use_mma[i], QUDA_BOOLEAN_FALSE);
+    P(transfer_use_mma[i], QUDA_BOOLEAN_FALSE);
 #else
     P(setup_use_mma[i], QUDA_BOOLEAN_INVALID);
     P(dslash_use_mma[i], QUDA_BOOLEAN_INVALID);
+    P(transfer_use_mma[i], QUDA_BOOLEAN_INVALID);
 #endif
 #ifdef INIT_PARAM
     P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
@@ -1021,12 +1025,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(mg_vec_partfile[i], QUDA_BOOLEAN_INVALID);
 #endif
   }
-
-#ifdef INIT_PARAM
-  P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
-#else
-  P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
-#endif
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);
