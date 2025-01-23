@@ -38,7 +38,7 @@ namespace quda {
 
     long long flops() const { return in.size() * in.Volume() * 504ll; }
 
-    long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
+    long long bytes() const { return out.Bytes() + in.Bytes() + in.size() * clover.Bytes() / (3 - in.SiteSubset()); }
   };
 
   //Apply the clover matrix field to a colorspinor field

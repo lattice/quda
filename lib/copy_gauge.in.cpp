@@ -1,5 +1,6 @@
 #include <gauge_field.h>
 #include <multigrid.h>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -18,9 +19,6 @@ namespace quda {
   template <int nColor>
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
                           void **ghostOut, void **ghostIn, int type);
-
-  template <int...> struct IntList {
-  };
 
   template <int Nc, int... N>
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,

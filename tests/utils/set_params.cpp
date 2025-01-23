@@ -462,6 +462,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_use_mma[i] = mg_transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
@@ -1076,6 +1077,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_use_mma[i] = mg_transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];

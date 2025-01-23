@@ -400,7 +400,7 @@ namespace quda {
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      Prolongate(output, input, V, fine_to_coarse, spin_map, parity);
+      Prolongate(output, input, V, fine_to_coarse, spin_map, _use_mma, parity);
 
       for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
     } else {
@@ -475,7 +475,7 @@ namespace quda {
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      Restrict(output, input, V, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      Restrict(output, input, V, fine_to_coarse, coarse_to_fine, spin_map, _use_mma, parity);
 
       for (auto i = 0u; i < out.size(); i++) out[i] = output[i]; // copy result to out field (aliasing handled automatically)
 
