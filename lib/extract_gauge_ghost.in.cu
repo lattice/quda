@@ -1,6 +1,7 @@
 #include <gauge_field_order.h>
 #include <extract_gauge_ghost_helper.cuh>
 #include "multigrid.h"
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -119,8 +120,6 @@ namespace quda {
 
   template <int nColor>
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset);
-
-  template <int...> struct IntList { };
 
   template <int nColor, int...N>
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset, IntList<nColor, N...>)
