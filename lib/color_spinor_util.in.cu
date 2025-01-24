@@ -5,6 +5,7 @@
 #include <index_helper.cuh>
 #include <blas_quda.h>
 #include <instantiate.h>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -126,8 +127,6 @@ namespace quda {
     else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c, a);
     else errorQuda("Unsupported source type %d", sourceType);
   }
-
-  template <int...> struct IntList { };
 
   template <typename Float, int nSpin, QudaFieldOrder order, typename pack_t, int nColor, int...N>
   void genericSource(const pack_t &pack, IntList<nColor, N...>)

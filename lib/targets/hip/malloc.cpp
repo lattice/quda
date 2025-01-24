@@ -713,6 +713,7 @@ namespace quda
     void flush_pinned()
     {
       if (pinned_memory_pool) {
+        logQuda(QUDA_DEBUG_VERBOSE, "Flushing host pinned memory pool\n");
         std::multimap<size_t, void *>::iterator it;
         for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
           void *ptr = it->second;
@@ -725,7 +726,8 @@ namespace quda
     void flush_device()
     {
       if (device_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
+      logQuda(QUDA_DEBUG_VERBOSE, "Flushing device memory pool\n");
+      std::multimap<size_t, void *>::iterator it;
         for (it = deviceCache.begin(); it != deviceCache.end(); it++) {
           void *ptr = it->second;
           device_free(ptr);

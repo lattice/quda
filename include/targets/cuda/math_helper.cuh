@@ -13,6 +13,21 @@
 
 namespace quda {
 
+  inline __host__ __device__ float abs(const float a) { return fabs(a); }
+  inline __host__ __device__ double abs(const double a) { return fabs(a); }
+
+  template <typename T> inline __host__ __device__ T sqrt(const T a) { return ::sqrt(a); }
+  template <typename T> inline __host__ __device__ T exp(const T a) { return ::exp(a); }
+  template <typename T> inline __host__ __device__ T log(const T a) { return ::log(a); }
+  template <typename T> inline __host__ __device__ T sin(const T a) { return ::sin(a); }
+  template <typename T> inline __host__ __device__ T cos(const T a) { return ::cos(a); }
+  template <typename T> inline __host__ __device__ T sinh(const T a) { return ::sinh(a); }
+  template <typename T> inline __host__ __device__ T cosh(const T a) { return ::cosh(a); }
+  template <typename T> inline __host__ __device__ T acos(const T a) { return ::acos(a); }
+  template <typename T> inline __host__ __device__ T pow(const T a, const int b) { return ::pow(a, b); }
+  template <typename T> inline __host__ __device__ T pow(const T a, const T b) { return ::pow(a, b); }
+  template <typename T> inline __host__ __device__ T fmod(const T a, const T b) { return ::fmod(a, b); }
+
   /**
    * @brief Maximum of two numbers
    * @param a first number

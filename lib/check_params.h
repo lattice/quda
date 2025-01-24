@@ -878,9 +878,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_use_mma[i], QUDA_BOOLEAN_FALSE);
 #endif
     P(dslash_use_mma[i], QUDA_BOOLEAN_FALSE);
+    P(transfer_use_mma[i], QUDA_BOOLEAN_FALSE);
 #else
     P(setup_use_mma[i], QUDA_BOOLEAN_INVALID);
     P(dslash_use_mma[i], QUDA_BOOLEAN_INVALID);
+    P(transfer_use_mma[i], QUDA_BOOLEAN_INVALID);
 #endif
 #ifdef INIT_PARAM
     P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
@@ -1023,12 +1025,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(mg_vec_partfile[i], QUDA_BOOLEAN_INVALID);
 #endif
   }
-
-#ifdef INIT_PARAM
-  P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
-#else
-  P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
-#endif
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);

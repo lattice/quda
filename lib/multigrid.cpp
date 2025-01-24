@@ -125,10 +125,11 @@ namespace quda
         }
       } else {
         // create transfer operator
-        logQuda(QUDA_VERBOSE, "Creating transfer operator\n");
+        logQuda(QUDA_VERBOSE, "Creating transfer operator %s\n", param.transfer_use_mma ? "with MMA enabled" : "");
         transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
                                 param.spinBlockSize, param.mg_global.precision_null[param.level],
                                 param.mg_global.transfer_type[param.level]);
+        transfer->set_use_mma(param.transfer_use_mma);
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -441,8 +442,7 @@ namespace quda
       diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level + 1];
       diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
 
-      diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
-                                            param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);
+      diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
 
       // create smoothing operators
       diracParam.dirac = const_cast<Dirac *>(param.matSmooth->Expose());

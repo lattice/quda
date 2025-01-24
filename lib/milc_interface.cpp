@@ -2491,9 +2491,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_location[i] = QUDA_CUDA_FIELD_LOCATION; // setup_location[i];
   }
 
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
-
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
   if (input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD

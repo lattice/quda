@@ -74,6 +74,9 @@ namespace quda
     */
     constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
 
+    /**
+       @brief Constructor for SharedMemory object.
+    */
     template <typename... U>
     constexpr SharedMemory(const KernelOps<U...> &) : data(cache(get_offset(target::block_dim())))
     {
