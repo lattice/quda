@@ -39,8 +39,11 @@ namespace quda
       csParam.location = param.location;
       csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
                            csParam.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-      if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
-        csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
+      if (csParam.location == QUDA_CUDA_FIELD_LOCATION) {
+        if (param.transfer_type == QUDA_TRANSFER_DWF_PV)
+          csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS; // special case for the PV^dag prec op
+        else
+          csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
       }
       if (param.B[0].Nspin() == 1)
         csParam.gammaBasis = param.B[0].GammaBasis(); // hack for staggered to avoid unnecessary basis checks

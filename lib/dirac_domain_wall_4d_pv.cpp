@@ -6,15 +6,19 @@
 namespace quda
 {
 
-  DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracParam &param) : DiracDomainWall4D(param) { }
+  DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracParam &param) : DiracDomainWall4D(param), mass_pv(1.0) { }
 
-  DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracDomainWall4DPV &dirac) : DiracDomainWall4D(dirac) { }
+  DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracDomainWall4DPV &dirac) :
+    DiracDomainWall4D(dirac), mass_pv(1.0) { }
 
   DiracDomainWall4DPV::~DiracDomainWall4DPV() { }
 
   DiracDomainWall4DPV &DiracDomainWall4DPV::operator=(const DiracDomainWall4DPV &dirac)
   {
-    if (&dirac != this) { DiracDomainWall4D::operator=(dirac); }
+    if (&dirac != this) {
+      DiracDomainWall4D::operator=(dirac);
+      mass_pv = 1.0;
+    }
 
     return *this;
   }
@@ -46,6 +50,8 @@ namespace quda
   {
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
+
+    // printfQuda("Calling DiracDomainWall4DPV::M%s with kappa5 = %e , mass = %e\n", dagger == QUDA_DAG_YES ? "Dag" : "", kappa5, mass);
 
     if (dagger == QUDA_DAG_NO) {
       // Apply D_dwf
@@ -87,6 +93,8 @@ namespace quda
   {
     checkFullSpinor(out, in);
 
+    // printfQuda("Calling DiracDomainWall4DPV::ApplyPVDagger with kappa5 = %e , mass = %e\n", kappa5, mass);
+
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data,
                       profile);
     ApplyDslash5(out, in, out, mass_pv, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_DWF);
@@ -104,6 +112,8 @@ namespace quda
     create_alias(src, b);
     create_alias(sol, x);
   }
+
+  bool DiracDomainWall4DPV::hermitian() const { return (mass_pv == mass); }
 
   void DiracDomainWall4DPV::prepareSpecialMG(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
                                              cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,

@@ -354,7 +354,9 @@ namespace quda {
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
                || transfer_type == QUDA_TRANSFER_DWF_PV) {
 
-      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
+      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Pseudofine operators only support full-parity spinors");
+      if (transfer_type == QUDA_TRANSFER_DWF_PV && out.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+        errorQuda("DWF PV MG only supports full-parity spinors for the outer solve");
       if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
@@ -431,7 +433,9 @@ namespace quda {
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
                || transfer_type == QUDA_TRANSFER_DWF_PV) {
 
-      if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
+      if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Pseudofine operators only support full-parity spinors");
+      if (transfer_type == QUDA_TRANSFER_DWF_PV && in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+        errorQuda("DWF PV MG only supports full-parity spinors for the outer solve");
       if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors

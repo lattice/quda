@@ -63,6 +63,8 @@ namespace quda {
   {
     checkFullSpinor(out, in);
 
+    // printfQuda("Calling DiracDomainWall4D::M%s with kappa5 = %e , mass = %e\n", dagger == QUDA_DAG_YES ? "Dag" : "", kappa5, mass);
+
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
                       profile);
     ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
@@ -135,6 +137,8 @@ namespace quda {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     double kappa2 = kappa5*kappa5;
     auto tmp = getFieldTmp(out);
+
+    // printfQuda("Calling DiracDomainWall4DPC::M%s with kappa5 = %e , mass = %e\n", dagger == QUDA_DAG_YES ? "Dag" : "", kappa5, mass);
 
     if (symmetric && !dagger) {
       // 1 - k^2 M5^-1 D4 M5^-1 D4

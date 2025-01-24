@@ -990,9 +990,8 @@ namespace quda {
   // Pauli-Villars preconditioned dwf with 4-d parity ordered fields
   class DiracDomainWall4DPV : public DiracDomainWall4D
   {
-  private:
-
-    static constexpr double mass_pv = 1.;
+  protected:
+    double mass_pv;
 
   public:
     DiracDomainWall4DPV(const DiracParam &param);
@@ -1029,6 +1028,7 @@ namespace quda {
 
     virtual bool hasSpecialMG() const override { return true; }
 
+    virtual bool hermitian() const;
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_4DPV_DIRAC; }
   };
