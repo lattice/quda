@@ -172,6 +172,9 @@ namespace quda {
     /** Whether to use tensor cores (if available) for dslash */
     bool dslash_use_mma;
 
+    /** Whether to use tensor cores (if available) for transfer */
+    bool transfer_use_mma;
+
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
@@ -203,7 +206,8 @@ namespace quda {
       mg_vec_partfile(param.mg_vec_partfile[level]),
       transfer_type(param.transfer_type[level]),
       setup_use_mma(param.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
-      dslash_use_mma(param.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
+      dslash_use_mma(param.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE),
+      transfer_use_mma(param.transfer_use_mma[level] == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -242,7 +246,8 @@ namespace quda {
       mg_vec_partfile(param.mg_global.mg_vec_partfile[level]),
       transfer_type(param.mg_global.transfer_type[level]),
       setup_use_mma(param.mg_global.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
-      dslash_use_mma(param.mg_global.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
+      dslash_use_mma(param.mg_global.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE),
+      transfer_use_mma(param.mg_global.transfer_use_mma[level] == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];

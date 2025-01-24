@@ -238,6 +238,8 @@ namespace quda {
       // Compute r = b - A * x
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
       // x contains the original guess.
     } else {
       blas::copy(r, b);

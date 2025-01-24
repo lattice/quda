@@ -1,10 +1,8 @@
 #include "multigrid.h"
+#include <int_list.hpp>
 
 namespace quda
 {
-
-  template <int...> struct IntList {
-  };
 
   template <int fineColor, int coarseColor, int... N>
   void BlockOrthogonalize2(ColorSpinorField &V, const std::vector<ColorSpinorField> &B, const int *fine_to_coarse,

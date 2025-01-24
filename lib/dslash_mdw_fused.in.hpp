@@ -7,6 +7,7 @@
 #include <worker.h>
 #include <domain_wall_helper.h>
 #include <fast_intdiv.h>
+#include <int_list.hpp>
 
 // Tensor core functions for Mobius DWF
 namespace quda
@@ -20,9 +21,6 @@ namespace quda
                                  ColorSpinorField &y, const ColorSpinorField &x, double m_f, double m_5,
                                  const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
                                  int halo_shift[4], MdwfFusedDslashType type);
-
-    template <int...> struct IntList {
-    };
 
     template <int Ls, int... N>
     void apply_fused_dslash_list(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,

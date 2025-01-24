@@ -27,7 +27,6 @@ namespace quda {
       getProfile().TPSTART(QUDA_PROFILE_INIT);
 
       ColorSpinorParam csParam(x[0]);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
       resize(y, b.size(), csParam);
       resize(r, b.size(), csParam);
       csParam.setPrecision(param.precision_sloppy);
@@ -40,12 +39,9 @@ namespace quda {
         if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
           create_alias(r0, b);
         } else {
-          csParam.create = QUDA_NULL_FIELD_CREATE;
           resize(r0, b.size(), csParam);
-          blas::copy(r0, r);
         }
       } else {
-        csParam.create = QUDA_NULL_FIELD_CREATE;
         resize(r_sloppy, b.size(), csParam);
         resize(r0, b.size(), csParam);
       }
@@ -126,12 +122,15 @@ namespace quda {
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
-      for (auto i = 0u; i < x.size(); i++) std::swap(y[i], x[i]);
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
+      blas::copy(y, x);
     } else {
       blas::copy(r, b);
       r2 = b2;
-      blas::zero(x);
+      blas::zero(y);
     }
+    blas::zero(x);
 
     if (param.deflate && param.maxiter > 1) {
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
@@ -145,6 +144,8 @@ namespace quda {
     if (param.precision != param.precision_sloppy) {
       blas::copy(r_sloppy, r);
       blas::copy(r0, param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO ? b : r);
+    } else {
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) blas::copy(r0, r);
     }
 
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
@@ -272,7 +273,6 @@ namespace quda {
         if (x.Precision() != x_sloppy[0].Precision()) blas::copy(x, x_sloppy);
 
         blas::xpy(x, y);
-
         mat(r, y);
         r2 = blas::xmyNorm(b, r);
 

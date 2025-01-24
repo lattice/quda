@@ -787,7 +787,7 @@ namespace quda {
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+          strcat(Aux, mma::mg_mma_setup_t<Float>::type::get_type_name().c_str());
 #endif
         }
       }
@@ -802,7 +802,7 @@ namespace quda {
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+          strcat(Aux, mma::mg_mma_setup_t<Float>::type::get_type_name().c_str());
 #endif
         }
       }

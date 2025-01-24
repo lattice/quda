@@ -462,6 +462,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_use_mma[i] = mg_transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
@@ -608,9 +609,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.location[i] = solver_location[i];
     mg_param.setup_location[i] = setup_location[i];
   }
-
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
@@ -1079,6 +1077,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_use_mma[i] = mg_transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
@@ -1225,9 +1224,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     nu_pre[i] = 2;
     nu_post[i] = 2;
   }
-
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;

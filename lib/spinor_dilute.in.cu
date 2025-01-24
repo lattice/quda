@@ -2,6 +2,7 @@
 #include <kernels/spinor_dilute.cuh>
 #include <tunable_nd.h>
 #include <instantiate.h>
+#include <int_list.hpp>
 
 namespace quda
 {
@@ -77,9 +78,6 @@ namespace quda
     }
 
     long long bytes() const { return v.size() * v[0].Bytes() + src.Bytes(); }
-  };
-
-  template <int...> struct IntList {
   };
 
   template <typename real, int Ns, int Nc, int... N>

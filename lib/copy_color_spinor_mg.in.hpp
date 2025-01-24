@@ -13,6 +13,7 @@
 #include <tunable_nd.h>
 #include <kernels/copy_color_spinor_mg.cuh>
 #include <multigrid.h>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -163,9 +164,6 @@ namespace quda {
     }
 
   }
-
-  template <int...> struct IntList {
-  };
 
   template <int fineColor, typename dst_t, typename src_t, typename param_t, int coarseColor, int... N>
   bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<coarseColor, N...>)

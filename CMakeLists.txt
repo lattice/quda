@@ -404,6 +404,9 @@ endif()
 
 find_package(Threads REQUIRED)
 if(QUDA_OPENMP)
+  if(${CMAKE_CXX_COMPILER_ID} MATCHES "NVHPC")
+    message(FATAL_ERROR "Host compiler (nvc++) not supported with QUDA_OPENMP=ON")
+  endif()
   find_package(OpenMP REQUIRED)
 endif()
 
