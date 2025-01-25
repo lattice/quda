@@ -1153,13 +1153,71 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   qudamilc_called<false>(__func__, verbosity);
 } // qudaMultiShiftInvert
 
+// Wrapper function for qudaInvertDeflatable to maintain backward compatibility with old(er) MILC
 void qudaInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                double target_residual, double target_fermilab_residual, const void *const fatlink,
+                const void *const longlink, void *source, void *solution, double *const final_residual,
+                double *const final_fermilab_residual, int *num_iters)
+{
+  
+  // If this function is called then QUDA is not doing deflation
+  // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
+  QudaEigensolverArgs_t eig_args;
+  eig_args.n_ev_deflate=0;
+  eig_args.prec_eigensolver = QUDA_DOUBLE_PRECISION; /* Not used in the undeflated case but needs to be initialized */
+
+  qudaInvertDeflatable(external_precision, quda_precision, mass, inv_args, eig_args,
+                target_residual, target_fermilab_residual, fatlink,
+                longlink, source, solution, final_residual,
+                final_fermilab_residual, num_iters);
+
+} // qudaInvert
+
+
+void qudaInvertDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eig_args,
                 double target_residual, double target_fermilab_residual, const void *const fatlink,
                 const void *const longlink, void *source, void *solution, double *const final_residual,
                 double *const final_fermilab_residual, int *num_iters)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
+
+  QudaParity local_parity = inv_args.evenodd;
+  
+  // parameters for the eigensolve/deflation
+  QudaEigParam qep = newQudaEigParam();
+  qep.block_size = eig_args.block_size;
+  qep.n_conv = eig_args.n_conv;
+  qep.n_ev_deflate = eig_args.n_ev_deflate;
+  qep.n_ev = eig_args.n_ev;
+  qep.n_kr = eig_args.n_kr;
+  qep.tol = eig_args.tol;
+  qep.max_restarts = eig_args.max_restarts;
+  qep.poly_deg = eig_args.poly_deg;
+  qep.a_min = eig_args.a_min;
+  qep.a_max = eig_args.a_max;
+  strcpy( qep.vec_infile, eig_args.vec_infile );
+  strcpy( qep.vec_outfile, eig_args.vec_outfile );
+  qep.preserve_evals = eig_args.preserve_evals;
+  qep.batched_rotate = eig_args.batched_rotate;
+  qep.save_prec = eig_args.save_prec;
+  qep.partfile = eig_args.partfile;
+  qep.io_parity_inflate = eig_args.io_parity_inflate;
+  qep.use_norm_op = eig_args.use_norm_op;
+  qep.use_pc = eig_args.use_pc;
+  qep.eig_type = ( qep.block_size > 1 ) ? QUDA_EIG_BLK_TR_LANCZOS : QUDA_EIG_TR_LANCZOS;  /* or QUDA_EIG_IR_ARNOLDI, QUDA_EIG_BLK_IR_ARNOLDI */
+  qep.spectrum = QUDA_SPECTRUM_SR_EIG; /* Smallest Real. Other options: LM, SM, LR, SR, LI, SI */
+  qep.qr_tol = qep.tol;
+  qep.require_convergence = QUDA_BOOLEAN_TRUE;
+  qep.check_interval = 10;
+  qep.use_dagger = QUDA_BOOLEAN_FALSE;
+  qep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
+  qep.compute_svd = QUDA_BOOLEAN_FALSE;
+  qep.use_eigen_qr = QUDA_BOOLEAN_TRUE;
+  qep.use_poly_acc = QUDA_BOOLEAN_TRUE;
+  qep.arpack_check = QUDA_BOOLEAN_FALSE;
+  qep.compute_evals_batch_size = 16;
+  qep.preserve_deflation = QUDA_BOOLEAN_TRUE;
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
 
@@ -1198,7 +1256,6 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 
   QudaInvertParam invertParam = newQudaInvertParam();
 
-  QudaParity local_parity = inv_args.evenodd;
   const double reliable_delta = 1e-1;
 
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
@@ -1206,18 +1263,18 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
                   QUDA_CG_INVERTER, &invertParam);
  
   // Deflation for even parity solves when desired 
-  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(inv_args.eig_param.n_ev_deflate>0) ? &inv_args.eig_param : nullptr;
-  invertParam.tol_restart = inv_args.tol_restart;
+  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_ev_deflate>0) ? &qep : nullptr;
+  invertParam.tol_restart = eig_args.tol_restart;
 
   // Eigensolver precision
-  invertParam.cuda_prec_eigensolver = inv_args.prec_eigensolver;
+  invertParam.cuda_prec_eigensolver = eig_args.prec_eigensolver;
 
   // Preserve deflation space
   static bool deflation_init = false;
-  if (invertParam.eig_param && inv_args.eig_param.preserve_deflation) {
+  if (invertParam.eig_param && qep.preserve_deflation) {
     if (deflation_init) {
       if (!preserved_deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
-      inv_args.eig_param.preserve_deflation_space = preserved_deflation_space;
+      qep.preserve_deflation_space = preserved_deflation_space;
     }
   }
 
@@ -1239,8 +1296,8 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 
   invertQuda(static_cast<char *>(solution) + quark_offset, static_cast<char *>(source) + quark_offset, &invertParam);
 
-  if (invertParam.eig_param && inv_args.eig_param.preserve_deflation) {
-    preserved_deflation_space = inv_args.eig_param.preserve_deflation_space;
+  if (invertParam.eig_param && qep.preserve_deflation) {
+    preserved_deflation_space = qep.preserve_deflation_space;
     deflation_init = true; // signal that we have deflation space preserved
   }
 
@@ -1252,7 +1309,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
-} // qudaInvert
+} // qudaInvertDeflatable
 
 
 void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const fatlink,
@@ -1399,13 +1456,70 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   qudamilc_called<false>(__func__, verbosity);
 } // qudaSpinTaste
 
+// Wrapper function for qudaInvertMsrcDeflatable to maintain backward compatibility with old(er) MILC
 void qudaInvertMsrc(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                    double target_residual, double target_fermilab_residual, const void *const fatlink,
+                    const void *const longlink, void **sourceArray, void **solutionArray, double *const final_residual,
+                    double *const final_fermilab_residual, int *num_iters, int num_src)
+{
+
+  // If this function is called then QUDA is not doing deflation
+  // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
+  QudaEigensolverArgs_t eig_args;
+  eig_args.n_ev_deflate=0;
+  eig_args.prec_eigensolver = QUDA_DOUBLE_PRECISION; /* Not used in the undeflated case but needs to be initialized */
+
+  qudaInvertMsrcDeflatable(external_precision, quda_precision, mass, inv_args, eig_args,
+                    target_residual, target_fermilab_residual, fatlink,
+                    longlink, sourceArray, solutionArray, final_residual,
+                    final_fermilab_residual, num_iters, num_src);
+
+} // qudaInvertMsrc
+
+void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eig_args,
                     double target_residual, double target_fermilab_residual, const void *const fatlink,
                     const void *const longlink, void **sourceArray, void **solutionArray, double *const final_residual,
                     double *const final_fermilab_residual, int *num_iters, int num_src)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
+  
+  QudaParity local_parity = inv_args.evenodd;
+  
+  // parameters for the eigensolve/deflation
+  QudaEigParam qep = newQudaEigParam();
+  qep.block_size = eig_args.block_size;
+  qep.n_conv = eig_args.n_conv;
+  qep.n_ev_deflate = eig_args.n_ev_deflate;
+  qep.n_ev = eig_args.n_ev;
+  qep.n_kr = eig_args.n_kr;
+  qep.tol = eig_args.tol;
+  qep.max_restarts = eig_args.max_restarts;
+  qep.poly_deg = eig_args.poly_deg;
+  qep.a_min = eig_args.a_min;
+  qep.a_max = eig_args.a_max;
+  strcpy( qep.vec_infile, eig_args.vec_infile );
+  strcpy( qep.vec_outfile, eig_args.vec_outfile );
+  qep.preserve_evals = eig_args.preserve_evals;
+  qep.batched_rotate = eig_args.batched_rotate;
+  qep.save_prec = eig_args.save_prec;
+  qep.partfile = eig_args.partfile;
+  qep.io_parity_inflate = eig_args.io_parity_inflate;
+  qep.use_norm_op = eig_args.use_norm_op;
+  qep.use_pc = eig_args.use_pc;
+  qep.eig_type = ( qep.block_size > 1 ) ? QUDA_EIG_BLK_TR_LANCZOS : QUDA_EIG_TR_LANCZOS;  /* or QUDA_EIG_IR_ARNOLDI, QUDA_EIG_BLK_IR_ARNOLDI */
+  qep.spectrum = QUDA_SPECTRUM_SR_EIG; /* Smallest Real. Other options: LM, SM, LR, SR, LI, SI */
+  qep.qr_tol = qep.tol;
+  qep.require_convergence = QUDA_BOOLEAN_TRUE;
+  qep.check_interval = 10;
+  qep.use_dagger = QUDA_BOOLEAN_FALSE;
+  qep.compute_gamma5 = QUDA_BOOLEAN_FALSE;
+  qep.compute_svd = QUDA_BOOLEAN_FALSE;
+  qep.use_eigen_qr = QUDA_BOOLEAN_TRUE;
+  qep.use_poly_acc = QUDA_BOOLEAN_TRUE;
+  qep.arpack_check = QUDA_BOOLEAN_FALSE;
+  qep.compute_evals_batch_size = 16;
+  qep.preserve_deflation = QUDA_BOOLEAN_TRUE;
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
 
@@ -1427,7 +1541,6 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
 
   QudaInvertParam invertParam = newQudaInvertParam();
 
-  QudaParity local_parity = inv_args.evenodd;
   const double reliable_delta = 1e-1;
 
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
@@ -1436,18 +1549,18 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   invertParam.num_src = num_src;
 
   // Deflation for even parity solves when desired
-  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(inv_args.eig_param.n_ev_deflate>0) ? &inv_args.eig_param : nullptr;
-  invertParam.tol_restart = inv_args.tol_restart;
+  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_ev_deflate>0) ? &qep : nullptr;
+  invertParam.tol_restart = eig_args.tol_restart;
 
   // Eigensolver precision
-  invertParam.cuda_prec_eigensolver = inv_args.prec_eigensolver;
+  invertParam.cuda_prec_eigensolver = eig_args.prec_eigensolver;
 
   // Preserve deflation space
   static bool deflation_init = false;
-  if (invertParam.eig_param && inv_args.eig_param.preserve_deflation) {
+  if (invertParam.eig_param && qep.preserve_deflation) {
     if (deflation_init) {
       if (!preserved_deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
-      inv_args.eig_param.preserve_deflation_space = preserved_deflation_space;
+      qep.preserve_deflation_space = preserved_deflation_space;
     }
   }
 
@@ -1477,8 +1590,8 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   host_free(sln_pointer);
   host_free(src_pointer);
 
-  if (invertParam.eig_param && inv_args.eig_param.preserve_deflation) {
-    preserved_deflation_space = inv_args.eig_param.preserve_deflation_space;
+  if (invertParam.eig_param && qep.preserve_deflation) {
+    preserved_deflation_space = qep.preserve_deflation_space;
     deflation_init = true; // signal that we have deflation space preserved
   }
 
@@ -1499,7 +1612,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
-} // qudaInvert
+} // qudaInvertMsrcDeflatable
 
 void qudaEigCGInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                      double target_residual, double target_fermilab_residual, const void *const fatlink,

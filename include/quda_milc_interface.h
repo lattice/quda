@@ -49,14 +49,40 @@ extern "C" {
                         HISQ fermions since the tadpole factor is
                         baked into the links during their construction */
     double naik_epsilon; /** Naik epsilon parameter (HISQ fermions only).*/
-
-    QudaEigParam eig_param; /** To pass deflation-related stuff like eigenvector filename **/
-    double tol_restart;
-    QudaPrecision prec_eigensolver;
   } QudaInvertArgs_t;
 
   /**
-   * Parameters related to deflated solvers.
+   * Parameters related to deflated linear solvers.
+   */
+  typedef struct {
+    double tol_restart;
+    QudaPrecision prec_eigensolver;
+    
+    int poly_deg; /** Degree of the Chebyshev polynomial **/
+    double a_min; /** Range used in polynomial acceleration **/
+    double a_max;
+    QudaBoolean preserve_evals; /** Whether to preserve the evals or recompute them **/
+    int n_ev; /** Size of the eigenvector search space **/
+    int n_kr; /** Total size of Krylov space **/
+    int n_conv; /** Number of requested converged eigenvectors **/
+    int n_ev_deflate; /** Number of requested converged eigenvectors to use in deflation **/
+    double tol; /** Tolerance on the least well known eigenvalue's residual **/
+    int max_restarts; /** For IRLM/IRAM, quit after n restarts **/
+    int batched_rotate; /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
+    int block_size; /** For block method solvers, the block size **/
+    char vec_infile[256];  /** Filename prefix where to load the null-space vectors */
+    char vec_outfile[256]; /** Filename prefix for where to save the null-space vectors */
+    QudaPrecision save_prec; /** The precision with which to save the vectors */
+    QudaBoolean partfile; /** Whether to save eigenvectors in QIO singlefile or partfile format */
+    QudaBoolean io_parity_inflate; /** Whether to inflate single-parity eigen-vector I/O **/
+    QudaBoolean use_norm_op;
+    QudaBoolean use_pc;
+    
+  } QudaEigensolverArgs_t;
+
+
+  /**
+   * Parameters related to EigCG deflated solvers.
    */
 
   typedef struct {
@@ -373,6 +399,42 @@ extern "C" {
 		  int* num_iters);
 
   /**
+   * Solve Ax=b with deflation for an improved staggered operator. All fields are fields
+   * passed and returned are host (CPU) field in MILC order.  This
+   * function requires that persistent gauge and clover fields have
+   * been created prior.  This interface is experimental.  
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] mass Fermion mass parameter
+   * @param[in] inv_args Struct setting some solver metadata
+   * @param[in] eig_args Struct setting some eigensolver metadata
+   * @param[in] target_residual Target residual
+   * @param[in] target_relative_residual Target Fermilab residual
+   * @param[in] milc_fatlink Fat-link field on the host
+   * @param[in] milc_longlink Long-link field on the host
+   * @param[in] source Right-hand side source field
+   * @param[out] solution Solution spinor field
+   * @param[in] final_residual True residual
+   * @param[in] final_relative_residual True Fermilab residual
+   * @param[in] num_iters Number of iterations taken
+   */
+  void qudaInvertDeflatable(int external_precision,
+		  int quda_precision,
+		  double mass,
+		  QudaInvertArgs_t inv_args,
+		  QudaEigensolverArgs_t eig_args,
+		  double target_residual,
+		  double target_fermilab_residual,
+		  const void* const milc_fatlink,
+		  const void* const milc_longlink,
+		  void* source,
+		  void* solution,
+		  double* const final_resid,
+		  double* const final_rel_resid,
+		  int* num_iters);
+		  
+  /**
    * Prepare a staggered/HISQ multigrid solve with given fat and
    * long links. All fields passed are host (CPU) fields
    * in MILC order. This function requires persistent gauge fields.
@@ -464,6 +526,44 @@ extern "C" {
                       int* num_iters,
                       int num_src);
 
+  /**
+   * Solve Ax=b with deflation for an improved staggered operator with many right hand sides.
+   * All fields are fields passed and returned are host (CPU) field in MILC order.
+   * This function requires that persistent gauge and clover fields have
+   * been created prior.  This interface is experimental.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] mass Fermion mass parameter
+   * @param[in] inv_args Struct setting some solver metadata
+   * @param[in] eig_args Struct setting some eigensolver metadata
+   * @param[in] target_residual Target residual
+   * @param[in] target_relative_residual Target Fermilab residual
+   * @param[in] milc_fatlink Fat-link field on the host
+   * @param[in] milc_longlink Long-link field on the host
+   * @param[in] source array of right-hand side source fields
+   * @param[out] solution array of solution spinor fields
+   * @param[in] final_residual True residual
+   * @param[in] final_relative_residual True Fermilab residual
+   * @param[in] num_iters Number of iterations taken
+   * @param[in] num_src Number of source fields
+   */
+  void qudaInvertMsrcDeflatable(int external_precision,
+                      int quda_precision,
+                      double mass,
+                      QudaInvertArgs_t inv_args,
+                      QudaEigensolverArgs_t eig_args,
+                      double target_residual,
+                      double target_fermilab_residual,
+                      const void* const fatlink,
+                      const void* const longlink,
+                      void** sourceArray,
+                      void** solutionArray,
+                      double* const final_residual,
+                      double* const final_fermilab_residual,
+                      int* num_iters,
+                      int num_src);
+                      
   /**
    * Solve for multiple shifts (e.g., masses) using an improved
    * staggered operator.  All fields are fields passed and returned
