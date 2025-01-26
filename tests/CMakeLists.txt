@@ -209,6 +209,11 @@ target_link_libraries(su3_fermion_test ${TEST_LIBS})
 quda_checkbuildtest(su3_fermion_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS su3_fermion_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(staggered_flow_test staggered_flow_test.cpp)
+target_link_libraries(staggered_flow_test ${TEST_LIBS})
+quda_checkbuildtest(staggered_flow_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS staggered_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(pack_test pack_test.cpp)
 target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
