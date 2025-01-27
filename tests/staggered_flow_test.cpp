@@ -351,6 +351,7 @@ printfQuda("HIIII\n");
     //SET UP INV PARAM END
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
+  std::vector<quda::ColorSpinorField> in_raw(Nsrc);
   std::vector<quda::ColorSpinorField> in(Nsrc);
   std::vector<quda::ColorSpinorField> out(Nsrc);
   std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
@@ -409,8 +410,10 @@ printfQuda("HIIII\n");
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
+    in_raw[n] = quda::ColorSpinorField(cs_param);
     in[n] = quda::ColorSpinorField(cs_param);
-    quda::spinorNoise(in[n], rng, QUDA_NOISE_UNIFORM);
+    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_GAUSS);
+    performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param);
     out[n] = quda::ColorSpinorField(cs_param);
   }
 
