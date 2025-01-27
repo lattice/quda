@@ -1,11 +1,9 @@
 #include "multigrid.h"
+#include <multigrid.hpp>
 #include <dirac_quda.h>
 
 namespace quda
 {
-
-  template <int...> struct IntList {
-  };
 
 #if defined(QUDA_MMA_AVAILABLE)
   template <bool dagger, int Nc, int nVec, int... N>
@@ -80,17 +78,6 @@ namespace quda
     return output;
   }
 
-  template <class F> auto create_color_spinor_copy(cvector_ref<F> &fs, QudaFieldOrder order)
-  {
-    ColorSpinorParam param(fs[0]);
-    int nVec = (fs.size() + 7) / 8 * 8; // Make a multiple of 8
-    param.nColor = fs[0].Ncolor() * nVec;
-    param.nVec = nVec;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    param.fieldOrder = order;
-    return getFieldTmp<ColorSpinorField>(param);
-  }
-
   // Apply the coarse Dirac matrix to a coarse grid vector
   // out(x) = M*in = X*in - kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   //   or
@@ -106,13 +93,6 @@ namespace quda
         ApplyCoarse<false>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision,
                            IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
       } else {
-        constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-        auto v_inA = create_color_spinor_copy(inA, csOrder);
-        auto v_inB = create_color_spinor_copy(inB, csOrder);
-        auto v_out = create_color_spinor_copy(out, csOrder);
-
-        if (dslash) { BlockTransposeForward(v_inA, inA); }
-        if (clover) { BlockTransposeForward(v_inB, inB); }
 
         constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
         auto X_ = create_gauge_copy(X, gOrder, clover);
@@ -120,13 +100,39 @@ namespace quda
 
         if (Y_ != &Y) { Y_->exchangeGhost(QUDA_LINK_BIDIRECTIONAL); }
 
-        ApplyCoarse<true>(v_out, v_inA, v_inB, *Y_, *X_, kappa, parity, dslash, clover, dagger, commDim, halo_precision,
-                          IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+        if (out.size() != inA.size() || out.size() != inB.size()) {
+          errorQuda("out.size(), inA.size(), inB.size(): %lu, %lu, %lu", out.size(), inA.size(), inB.size());
+        }
+        int instantiated_nVec = instantiated_nVec_to_use(out.size());
+        size_t size = out.size();
+        logQuda(QUDA_DEBUG_VERBOSE, "Dslash coarse nVec/out.size() = %d/%lu\n", instantiated_nVec, size);
+        for (size_t offset = 0; offset < size; offset += instantiated_nVec) {
+          cvector_ref<ColorSpinorField> out_offseted {out.begin() + offset,
+                                                      out.begin() + std::min(offset + instantiated_nVec, size)};
+          cvector_ref<const ColorSpinorField> inA_offseted {inA.begin() + offset,
+                                                            inA.begin() + std::min(offset + instantiated_nVec, size)};
+          cvector_ref<const ColorSpinorField> inB_offseted {inB.begin() + offset,
+                                                            inB.begin() + std::min(offset + instantiated_nVec, size)};
+
+          constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+          auto v_inA = create_color_spinor_copy(inA_offseted, instantiated_nVec, csOrder);
+          auto v_inB = create_color_spinor_copy(inB_offseted, instantiated_nVec, csOrder);
+          auto v_out = create_color_spinor_copy(out_offseted, instantiated_nVec, csOrder);
+
+          if (dslash) { BlockTransposeForward(v_inA, inA_offseted); }
+          if (clover) { BlockTransposeForward(v_inB, inB_offseted); }
+
+          // clang-format off
+          IntList<@QUDA_MULTIGRID_NVEC_LIST@> nColors;
+          // clang-format on
+          ApplyCoarse<true>(v_out, v_inA, v_inB, *Y_, *X_, kappa, parity, dslash, clover, dagger, commDim,
+                            halo_precision, nColors);
+
+          BlockTransposeBackward(v_out, out_offseted);
+        }
 
         if (X_ != &X) { delete X_; }
         if (Y_ != &Y) { delete Y_; }
-
-        BlockTransposeBackward(v_out, out);
       }
     } else {
       errorQuda("Multigrid has not been built");

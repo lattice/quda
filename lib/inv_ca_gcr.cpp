@@ -34,7 +34,6 @@ namespace quda
       bool mixed = param.precision != param.precision_sloppy;
 
       ColorSpinorParam csParam(b[0]);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
 
       if (basis == QUDA_POWER_BASIS) {
@@ -185,6 +184,8 @@ namespace quda
       // r = b - Ax0
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
+        for (auto i = 0u; i < b.size(); i++)
+          if (b2[i] == 0) b2[i] = r2[i];
       } else {
         blas::xpay(b, -1.0, r);
         r2 = b2; // dummy setting

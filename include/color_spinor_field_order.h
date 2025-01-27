@@ -472,7 +472,7 @@ namespace quda
     */
     template <typename Float, typename storeFloat, bool block_float_, typename norm_t> struct fieldorder_wrapper {
       using value_type = Float;      /**< Compute type */
-      using store_type = storeFloat; /**< Storage type */
+      using store_t = storeFloat;    /**< Storage type */
       complex<storeFloat> *v;        /**< Field memory address this wrapper encompasses */
       const int idx;                 /**< Index into field */
     private:
@@ -581,7 +581,6 @@ namespace quda
        */
       __device__ __host__ inline auto get_scale() const
       {
-        static_assert(block_float == false, "Orders with block_float == true should not call the get_scale method.");
         return block_float ? static_cast<Float>(1) / norm[norm_idx] : scale;
       }
 
@@ -857,6 +856,8 @@ namespace quda
       static constexpr bool fixed = fixed_point<Float, storeFloat>();
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
+
+      using store_t = storeFloat;
 
       field<Float, storeFloat, fixed, block_float> v;
       unsigned int volumeCB = 0;
