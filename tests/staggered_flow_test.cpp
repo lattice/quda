@@ -394,10 +394,102 @@ printfQuda("HIIII\n");
       logQuda(QUDA_VERBOSE, "Multishift mass %d = %e ; tolerance %e ; hq tolerance %e\n", i, masses[i], invParam.tol_offset[i], invParam.tol_hq_offset[i]);
     }
   }
+
+// Prepare rng, fill host spinors with random numbers
+  //-----------------------------------------------------------------------------------
+
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
+
+  // Create a temporary spinor just to seed the rng
+  quda::ColorSpinorField tmp(cs_param);
+  quda::RNG rng(tmp, 1234);
+  tmp = quda::ColorSpinorField();
+
+  for (int n = 0; n < Nsrc; n++) {
+    // Populate the host spinor with random numbers.
+    in[n] = quda::ColorSpinorField(cs_param);
+    quda::spinorNoise(in[n], rng, QUDA_NOISE_UNIFORM);
+    out[n] = quda::ColorSpinorField(cs_param);
+  }
+
+  // Prepare rng, fill host spinors with random numbers END
+  //-----------------------------------------------------------------------------------
+
+  // QUDA invert test
+  //----------------------------------------------------------------------------
+
+  if (!use_multi_src || multishift > 1) {
+
+    for (int n = 0; n < Nsrc; n++) {
+      // If deflating, preserve the deflation space between solves
+      if (inv_deflate) eig_param.preserve_deflation = n < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      // Perform QUDA inversions
+      if (multishift > 1) {
+        invertMultiShiftQuda(_hp_multi_x[n].data(), in[n].data(), &invParam);
+      } else {
+        invertQuda(out[n].data(), in[n].data(), &invParam);
+      }
+
+      // move residuals to n^th location for verification after solves have finished
+      invParam.true_res[n] = invParam.true_res[0];
+      invParam.true_res_hq[n] = invParam.true_res_hq[0];
+
+      time[n] = invParam.secs;
+      gflops[n] = invParam.gflops / invParam.secs;
+      iter[n] = invParam.iter;
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n", invParam.iter, invParam.secs,
+                 invParam.gflops / invParam.secs);
+      if (invParam.energy > 0) {
+        printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n\n", invParam.energy,
+                   invParam.power, invParam.temp, invParam.clock);
+      }
+    }
+  } else {
+
+    invParam.num_src = Nsrc_tile;
+    invParam.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
+    // Host arrays for solutions, sources, and check
+    std::vector<void *> _hp_x(Nsrc_tile);
+    std::vector<void *> _hp_b(Nsrc_tile);
+
+    for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+      for (int i = 0; i < Nsrc_tile; i++) {
+        _hp_x[i] = out[j + i].data();
+        _hp_b[i] = in[j + i].data();
+      }
+
+      if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &invParam);
+
+      // move residuals to (i+j)^th location for verification after solves have finished
+      for (int i = 0; i < Nsrc_tile; i++) {
+        invParam.true_res[j + i] = invParam.true_res[i];
+        invParam.true_res_hq[j + i] = invParam.true_res_hq[i];
+      }
+
+      printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+                 invParam.iter, invParam.secs, invParam.gflops / invParam.secs, invParam.secs / Nsrc_tile);
+      if (invParam.energy > 0) {
+        printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                   invParam.energy, invParam.energy / Nsrc_tile, invParam.power, invParam.temp, invParam.clock);
+      }
+    }
+  }
+
+  // Free the multigrid solver
+  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
+
+  // Compute timings
+  if (!use_multi_src) performanceStats(time, gflops, iter);
+
+
+    
     
   check = quda::ColorSpinorField(cs_param);
   //Add noise to spinor
-  quda::RNG rng(check, 1234);
+
   spinorNoise(check, rng, QUDA_NOISE_GAUSS);
 
 
