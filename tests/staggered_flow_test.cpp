@@ -419,7 +419,7 @@ printfQuda("HIIII\n");
     // Populate the host spinor with random numbers.
     in_raw[n] = quda::ColorSpinorField(cs_param);
     in[n] = quda::ColorSpinorField(cs_param);
-    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_GAUSS);
+    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_UNIFORM);
     performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param);
     out[n] = quda::ColorSpinorField(cs_param);
     out_flowed[n] = quda::ColorSpinorField(cs_param);
@@ -439,6 +439,8 @@ printfQuda("HIIII\n");
       // Perform QUDA inversions
       if (multishift > 1) {
         invertMultiShiftQuda(_hp_multi_x[n].data(), in[n].data(), &invParam);
+        //QUESTION: is there _hp_multi_x_flowed[n] or or things to be indexed?
+        performGFlowQuda(_hp_multi_x_flowed[n].data(),_hp_multi_x[n].data(), &invParam, &smear_param, obs_param);
       } else {
         invertQuda(out[n].data(), in[n].data(), &invParam);
         performGFlowQuda(out_flowed[n].data(),out[n].data(), &invParam, &smear_param, obs_param);
@@ -475,6 +477,7 @@ printfQuda("HIIII\n");
 
       if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &invParam);
+      performGFlowQuda(_hp_x_flowed.data(),_hp_x.data(),&invParam, &smear_param, obs_param);
 
       // move residuals to (i+j)^th location for verification after solves have finished
       for (int i = 0; i < Nsrc_tile; i++) {
@@ -552,27 +555,6 @@ printfQuda("HIIII\n");
   check_safe.PrintVector(0,0,0);
   printf("Forward method:\n");
   check_fwd.PrintVector(0,0,0);
-
-  // double method_adj_diff = 0.;
-  // /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
-  // for (int i = 0; i < V * 24; i++) { 
-  //     method_adj_diff += pow(fabs(check_safe.data<double *>()[i] - check_hier.data<double *>()[i]), 2);
-  // }
-  // double method_adj_check = sqrt(method_adj_diff)/(V*24.);
-  // printf("Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n", method_adj_check);
-    
-  // std::complex<double>trace_fwd,trace_adj;
-  // trace_fwd = twoColorSpinorContract(check.data<std::complex<double>*>(), check_fwd.data<std::complex<double>*>());
-  // trace_adj = twoColorSpinorContract(check.data<std::complex<double>*>(), check_safe.data<std::complex<double>*>()); 
-
-  // auto trace_diff_err = 2.*std::fabs(trace_fwd - std::conj(trace_adj))/std::fabs(trace_fwd + std::conj(trace_adj));
-
-  // printf("The two numbers below should be complex conjugates of one another\n");
-  // printf("<check,adj_check> is %1.5e, %1.5e \n",trace_adj.real(), trace_adj.imag());
-  // printf("<check,fwd_check> is %1.5e, %1.5e \n",trace_fwd.real(), trace_fwd.imag());
-  // printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
-
-  // if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
   for (int dir = 0; dir < 4; dir++) {
     host_free(qdp_inlink[dir]);
