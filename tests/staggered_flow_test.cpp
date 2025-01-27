@@ -354,11 +354,18 @@ printfQuda("HIIII\n");
   std::vector<quda::ColorSpinorField> in_raw(Nsrc);
   std::vector<quda::ColorSpinorField> in(Nsrc);
   std::vector<quda::ColorSpinorField> out(Nsrc);
+  std::vector<quda::ColorSpinorField> out_flowed(Nsrc);
   std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
+  std::vector<quda::ColorSpinorField> out_multishift_flowed(Nsrc * multishift);
+
+    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+    }
     
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
+  std::vector<std::vector<void *>> _hp_multi_x_flowed(Nsrc, std::vector<void *>(multishift));
     
   // Set up Masses
   std::vector<double> masses(multishift);
@@ -415,6 +422,7 @@ printfQuda("HIIII\n");
     quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_GAUSS);
     performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param);
     out[n] = quda::ColorSpinorField(cs_param);
+    out_flowed[n] = quda::ColorSpinorField(cs_param);
   }
 
   // Prepare rng, fill host spinors with random numbers END
@@ -433,6 +441,7 @@ printfQuda("HIIII\n");
         invertMultiShiftQuda(_hp_multi_x[n].data(), in[n].data(), &invParam);
       } else {
         invertQuda(out[n].data(), in[n].data(), &invParam);
+        performGFlowQuda(out_flowed[n].data(),out[n].data(), &invParam, &smear_param, obs_param);
       }
 
       // move residuals to n^th location for verification after solves have finished
@@ -456,6 +465,7 @@ printfQuda("HIIII\n");
     // Host arrays for solutions, sources, and check
     std::vector<void *> _hp_x(Nsrc_tile);
     std::vector<void *> _hp_b(Nsrc_tile);
+    std::vector<void *> _hp_x_flowed(Nsrc_tile);
 
     for (int j = 0; j < Nsrc; j += Nsrc_tile) {
       for (int i = 0; i < Nsrc_tile; i++) {
@@ -512,9 +522,7 @@ printfQuda("HIIII\n");
      
   host_timer.start(); // start the timer
 
-    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
-      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
-    }
+
      
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
