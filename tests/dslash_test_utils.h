@@ -898,7 +898,7 @@ struct DslashTestWrapper {
         out.DD(DD::reset);
         spinorOut = cudaSpinorOut;
 
-        if (niter > 2) { // HACK: when benchmarking we do not produce reference solution
+        if (niter < 2) { // HACK: when benchmarking we do not produce reference solution
           // We also test that Dyx is same as D applied to projected in and out spinors
           blas::copy(tmp, cudaSpinor);
           tmp.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
@@ -916,7 +916,7 @@ struct DslashTestWrapper {
             errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
           }
 
-          out.DD(DD::reset, DD::red_black_type, dd_col / 2 == 0 ? DD::red_active : DD::black_active);
+          out.DD(DD::reset, DD::red_black_type, dd_col / 2 == 1 ? DD::red_active : DD::black_active);
           out.projectDD();
           out.DD(DD::reset);
 
@@ -1208,8 +1208,14 @@ struct DslashTestWrapper {
       }
     } else if (test_domain_decomposition) {
       for (int n = 0; n < Nsrc; n++) {
-        auto deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[n], spinorOut[n])));
-        printfQuda("Deviation for (D-PDP)_{%d,%d}*spinor is %e\n", dd_col % 2, dd_col / 2, deviation);
+        auto norm_cpu = blas::norm2(spinorRef[n]);
+        auto norm_cpu_quda = blas::norm2(spinorOut[n]);
+        auto max_deviation = blas::max_deviation(spinorRef[n], spinorOut[n]);
+        printfQuda("Results for (D-PDP)_{%d,%d}*spinor: reference = %f, QUDA = %f, L2 relative deviation = %e, max "
+                   "deviation = %e\n",
+                   dd_col % 2, dd_col / 2, norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu),
+                   max_deviation[0]);
+        deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[n], spinorOut[n]))));
       }
     } else {
       for (int n = 0; n < Nsrc; n++) {

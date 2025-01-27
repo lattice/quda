@@ -135,6 +135,8 @@ namespace quda
     switch (a.Precision()) {
     case QUDA_DOUBLE_PRECISION: genericProjectDD<double>(a); break;
     case QUDA_SINGLE_PRECISION: genericProjectDD<float>(a); break;
+    case QUDA_HALF_PRECISION: genericProjectDD<short>(a); break;
+    case QUDA_QUARTER_PRECISION: genericProjectDD<int8_t>(a); break;
     default: errorQuda("Precision %d not implemented", a.Precision());
     }
   }
