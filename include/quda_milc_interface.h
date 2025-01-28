@@ -77,6 +77,20 @@ extern "C" {
     QudaBoolean io_parity_inflate; /** Whether to inflate single-parity eigen-vector I/O **/
     QudaBoolean use_norm_op;
     QudaBoolean use_pc;
+    QudaEigType eig_type; /** Type of eigensolver algorithm to employ **/
+    QudaEigSpectrumType spectrum; /** Which part of the spectrum to solve **/
+    double qr_tol; /** Tolerance on the QR iteration **/
+    QudaBoolean require_convergence; /** If true, the solver will error out if the convergence criteria are not met **/
+    int check_interval; /** For IRLM/IRAM, check every nth restart **/
+    QudaBoolean use_dagger; /** If use_dagger, use Mdag **/
+    QudaBoolean compute_gamma5; /** Performs the \gamma_5 OP solve by post multiplying the eignvectors with \gamma_5 before computing the eigenvalues */
+    QudaBoolean compute_svd; /** Performs an MdagM solve, then constructs the left and right SVD. **/
+    QudaBoolean use_eigen_qr; /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
+    QudaBoolean use_poly_acc; /** Use Polynomial Acceleration **/
+    QudaBoolean arpack_check; /** In the test function, cross check the device result against ARPACK **/
+    char arpack_logfile[512]; /** For Arpack cross check, name of the Arpack logfile **/
+    int compute_evals_batch_size; /** The batch size used when computing eigenvalues **/
+    QudaBoolean preserve_deflation; /** Whether to preserve the deflation space between solves **/
     
   } QudaEigensolverArgs_t;
 
