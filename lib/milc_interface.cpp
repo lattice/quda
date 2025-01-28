@@ -1217,8 +1217,6 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
-
-  QudaParity local_parity = inv_args.evenodd;
   
   // parameters for the eigensolve/deflation
   QudaEigParam qep = newQudaEigParam();
@@ -1259,13 +1257,16 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
   setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                  inv_args.tadpole, inv_args.naik_epsilon);
 
-  QudaInvertParam invertParam = newQudaInvertParam();
-
+  QudaParity local_parity = inv_args.evenodd;
   const double reliable_delta = 1e-1;
-
+  
+  QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
+  
+  if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
+    errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
  
   // Deflation for even parity solves when desired 
   invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_ev_deflate>0) ? &qep : nullptr;
@@ -1489,8 +1490,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
   
-  QudaParity local_parity = inv_args.evenodd;
-  
   // parameters for the eigensolve/deflation
   QudaEigParam qep = newQudaEigParam();
   setEigensolverParams(eig_args, &qep);
@@ -1513,14 +1512,18 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                  inv_args.tadpole, inv_args.naik_epsilon);
 
-  QudaInvertParam invertParam = newQudaInvertParam();
-
+  
   const double reliable_delta = 1e-1;
-
+  QudaParity local_parity = inv_args.evenodd;
+  
+  QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
   invertParam.num_src = num_src;
+  
+  if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
+    errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
 
   // Deflation for even parity solves when desired
   invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_ev_deflate>0) ? &qep : nullptr;

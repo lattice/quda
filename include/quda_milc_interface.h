@@ -72,6 +72,7 @@ extern "C" {
     int block_size; /** For block method solvers, the block size **/
     char vec_infile[256];  /** Filename prefix where to load the null-space vectors */
     char vec_outfile[256]; /** Filename prefix for where to save the null-space vectors */
+    QudaParity vec_in_parity; /** Parity of the incoming eigenvectors **/
     QudaPrecision save_prec; /** The precision with which to save the vectors */
     QudaBoolean partfile; /** Whether to save eigenvectors in QIO singlefile or partfile format */
     QudaBoolean io_parity_inflate; /** Whether to inflate single-parity eigen-vector I/O **/
