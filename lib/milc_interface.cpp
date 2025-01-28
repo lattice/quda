@@ -1200,7 +1200,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
   QudaEigensolverArgs_t eig_args;
   eig_args.n_ev_deflate=0;
-  eig_args.prec_eigensolver = QUDA_DOUBLE_PRECISION; /* Not used in the undeflated case but needs to be initialized */
+  eig_args.prec_eigensolver = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
   qudaInvertDeflatable(external_precision, quda_precision, mass, inv_args, eig_args,
                 target_residual, target_fermilab_residual, fatlink,
@@ -1476,7 +1476,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
   QudaEigensolverArgs_t eig_args;
   eig_args.n_ev_deflate=0;
-  eig_args.prec_eigensolver = QUDA_DOUBLE_PRECISION; /* Not used in the undeflated case but needs to be initialized */
+  eig_args.prec_eigensolver = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
   qudaInvertMsrcDeflatable(external_precision, quda_precision, mass, inv_args, eig_args,
                     target_residual, target_fermilab_residual, fatlink,
