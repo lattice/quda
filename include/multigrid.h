@@ -413,6 +413,11 @@ namespace quda {
     void destroySmoother();
 
     /**
+       @brief Create null vectors by whichever hook or crook
+    */
+    void createNullVectors();
+
+    /**
        @brief Create the coarse dirac operator
     */
     void createCoarseDirac();
@@ -421,6 +426,11 @@ namespace quda {
        @brief Create the optimized KD operator
     */
     void createOptimizedKdDirac();
+
+    /**
+       @brief Create the Pauli-Villars dwf operator
+    */
+    void createDwfPvDirac();
 
     /**
        @brief Create the solver wrapper
@@ -473,8 +483,9 @@ namespace quda {
 
     /**
        @brief Generate lowest eigenvectors
+       @param B Free-field null-space vectors
     */
-    void generateEigenVectors();
+    void generateEigenVectors(std::vector<ColorSpinorField> &B);
 
     /**
        @brief Build free-field null-space vectors
@@ -488,12 +499,13 @@ namespace quda {
     bool is_fine_grid() const
     {
 
-      // Check if we're on a KD fine grid
-      bool kd_nearnull_gen = ((param.level == 1)
-                              && (param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
-                                  || param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG));
+      // Check if we're on a fine grid
+      bool nearnull_gen = ((param.level == 1)
+                           && (param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+                               || param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+                               || param.mg_global.transfer_type[0] == QUDA_TRANSFER_DWF_PV));
 
-      return (param.level == 0 || kd_nearnull_gen);
+      return (param.level == 0 || nearnull_gen);
     }
   };
 

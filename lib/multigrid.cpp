@@ -53,36 +53,9 @@ namespace quda
     rng = new RNG(param.B[0], 1234);
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
-      if (param.level < param.Nlevel - 1) {
-        if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-          if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
-
-            // Initializing to random vectors
-            for (int i = 0; i < (int)param.B.size(); i++) {
-              spinorNoise(r[0], *rng, QUDA_NOISE_UNIFORM);
-              param.B[i] = r[0];
-            }
-          }
-          if (param.mg_global.num_setup_iter[param.level] > 0) {
-            if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE
-                && strcmp(param.mg_global.vec_infile[param.level], "")
-                  != 0) { // only load if infile is defined and not computing
-              loadVectors(param.B);
-            } else if (param.mg_global.use_eig_solver[param.level]) {
-              generateEigenVectors(); // Run the eigensolver
-            } else {
-              generateNullVectors(param.B);
-            }
-          }
-        } else if (strcmp(param.mg_global.vec_infile[param.level], "")
-                   != 0) { // only load if infile is defined and not computing
-          if (param.mg_global.num_setup_iter[param.level] > 0) generateNullVectors(param.B);
-        } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE) { // only conditional load of null vectors
-          loadVectors(param.B);
-        } else { // generate free field vectors
-          buildFreeVectors(param.B);
-        }
-      }
+      if (param.level < param.Nlevel - 1) { createNullVectors(); }
+    } else {
+      errorQuda("Unexpected transfer type %d", param.transfer_type);
     }
 
     // in case of iterative setup with MG the coarse level may be already built
@@ -359,6 +332,38 @@ namespace quda
     popLevel();
   }
 
+  void MG::createNullVectors()
+  {
+    if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+      if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
+
+        // Initializing to random vectors
+        for (int i = 0; i < (int)param.B.size(); i++) {
+          spinorNoise(r[0], *rng, QUDA_NOISE_UNIFORM);
+          param.B[i] = r[0];
+        }
+      }
+      if (param.mg_global.num_setup_iter[param.level] > 0) {
+        if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE
+            && strcmp(param.mg_global.vec_infile[param.level], "")
+              != 0) { // only load if infile is defined and not computing
+          loadVectors(param.B);
+        } else if (param.mg_global.use_eig_solver[param.level]) {
+          generateEigenVectors(param.B); // Run the eigensolver
+        } else {
+          generateNullVectors(param.B);
+        }
+      }
+    } else if (strcmp(param.mg_global.vec_infile[param.level], "")
+               != 0) { // only load if infile is defined and not computing
+      if (param.mg_global.num_setup_iter[param.level] > 0) generateNullVectors(param.B);
+    } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE) { // only conditional load of null vectors
+      loadVectors(param.B);
+    } else { // generate free field vectors
+      buildFreeVectors(param.B);
+    }
+  }
+
   void MG::createCoarseDirac() {
     pushLevel(param.level);
 
@@ -378,52 +383,15 @@ namespace quda
                         || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
                         || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV);
 
+    if (pseudo_fine && param.level != 0) errorQuda("Unexpected pseudo-fine build from level %d", param.level);
+
     // custom setup for pseudo-fine
-    if (param.level == 0 && pseudo_fine) {
-      if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
-          || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
-        createOptimizedKdDirac();
-      } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV) {
-        // createDwfPV();
-        auto fine_gauge = diracSmoother->getGaugeField();
-        auto dirac_type = diracSmoother->getDiracType();
-
-        // TODO: create something for Mobius
-        DiracParam diracParamPV;
-        diracParamPV.kappa = diracSmoother->Kappa();
-        diracParamPV.mass = diracSmoother->Mass();
-        diracParamPV.mu = diracSmoother->Mu();              // doesn't matter
-        diracParamPV.mu_factor = diracSmoother->MuFactor(); // doesn't matter
-        diracParamPV.m5 = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->M5();
-        diracParamPV.Ls = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getLs();
-        diracParamPV.dagger = QUDA_DAG_NO;
-        diracParamPV.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
-        diracParamPV.gauge = fine_gauge;
-
-        if (dirac_type == QUDA_DOMAIN_WALL_4D_DIRAC) {
-          diracParamPV.type = QUDA_DOMAIN_WALL_4DPV_DIRAC;
-          diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
-          diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
-          diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
-        } else if (dirac_type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
-          auto b5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
-          auto c5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
-          for (int i = 0; i < diracParamPV.Ls; i++) {
-            diracParamPV.b_5[i] = b5[i];
-            diracParamPV.c_5[i] = c5[i];
-          }
-          diracParamPV.type = QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC;
-          diracCoarseResidual = new DiracMobiusPV(diracParamPV);
-          diracCoarseSmoother = new DiracMobiusPV(diracParamPV);
-          diracCoarseSmootherSloppy = new DiracMobiusPV(diracParamPV);
-        } else {
-          errorQuda("Invalid fine domain wall operator type %d", dirac_type);
-        }
-
-      } else {
-        errorQuda("Invalid pseudo-fine type");
-      }
-    } else {
+    if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
+        || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      createOptimizedKdDirac();
+    } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV) {
+      createDwfPvDirac();
+    } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_AGGREGATE) {
 
       // create coarse grid operator
       DiracParam diracParam;
@@ -482,7 +450,8 @@ namespace quda
         }
         diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
       }
-    }
+    } else
+      errorQuda("Unexpected coarse build type %d", param.mg_global.transfer_type[param.level]);
 
     if (matCoarseResidual) delete matCoarseResidual;
     if (matCoarseSmoother) delete matCoarseSmoother;
@@ -498,9 +467,6 @@ namespace quda
 
   void MG::createOptimizedKdDirac()
   {
-
-    pushLevel(param.level);
-
     auto dirac_type = diracSmoother->getDiracType();
 
     auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
@@ -512,11 +478,6 @@ namespace quda
     bool mixed_precision_setup
       = (param.mg_global.invert_param->cuda_prec_precondition != param.mg_global.invert_param->cuda_prec_sloppy);
 
-    // Allocate and build the KD inverse block (inverse coarse clover)
-    auto fine_dirac_type = diracSmoother->getDiracType();
-    if (fine_dirac_type != dirac_type)
-      errorQuda("Input dirac type %d does not match smoother type %d\n", dirac_type, fine_dirac_type);
-
     // Determine if the dirac_type is naive staggered
     bool is_naive_staggered = (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC);
     bool is_improved_staggered = (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC);
@@ -527,6 +488,7 @@ namespace quda
     auto fine_gauge = diracSmoother->getStaggeredShortLinkField();
     auto sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getStaggeredShortLinkField() : fine_gauge;
 
+    // Allocate and build the KD inverse block (inverse coarse clover)
     xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(
       *fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
 
@@ -591,8 +553,68 @@ namespace quda
     } else {
       errorQuda("Invalid dirac_type %d", dirac_type);
     }
+  }
 
-    popLevel();
+  void MG::createDwfPvDirac()
+  {
+    auto dirac_type = diracSmoother->getDiracType();
+
+    // Determine if we're doing a mixed precision solve for setup or not
+    bool mixed_precision_setup
+      = (param.mg_global.invert_param->cuda_prec_precondition != param.mg_global.invert_param->cuda_prec_sloppy);
+
+    // Check to make sure the smoother is for the full operator
+    auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
+    if (smoother_solve_type != QUDA_DIRECT_SOLVE) {
+      errorQuda("Invalid solve type %d for optimized KD operator", smoother_solve_type);
+    }
+
+    // Get the fine and sloppy gauge fields
+    auto fine_gauge = diracSmoother->getGaugeField();
+    auto sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getGaugeField() : fine_gauge;
+
+    // Create the Dirac operators, first common parameters
+    DiracParam diracParamPV;
+    diracParamPV.kappa = diracSmoother->Kappa();
+    diracParamPV.mass = diracSmoother->Mass();
+    diracParamPV.mu = diracSmoother->Mu();              // doesn't matter
+    diracParamPV.mu_factor = diracSmoother->MuFactor(); // doesn't matter
+    diracParamPV.m5 = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->M5();
+    diracParamPV.Ls = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getLs();
+    diracParamPV.dagger = QUDA_DAG_NO;
+    diracParamPV.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+    diracParamPV.gauge = fine_gauge;
+
+    // then DWF-4D vs Mobius-specific
+    if (dirac_type == QUDA_DOMAIN_WALL_4D_DIRAC) {
+      diracParamPV.type = QUDA_DOMAIN_WALL_4DPV_DIRAC;
+
+      diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
+      diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
+      if (mixed_precision_setup) {
+        diracParamPV.gauge = sloppy_gauge;
+        diracParamPV.dirac = nullptr;
+      }
+      diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
+    } else if (dirac_type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+      auto b5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
+      auto c5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
+      for (int i = 0; i < diracParamPV.Ls; i++) {
+        diracParamPV.b_5[i] = b5[i];
+        diracParamPV.c_5[i] = c5[i];
+      }
+      diracParamPV.type = QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC;
+
+      diracCoarseResidual = new DiracMobiusPV(diracParamPV);
+      diracCoarseSmoother = new DiracMobiusPV(diracParamPV);
+      if (mixed_precision_setup) {
+        diracParamPV.gauge = sloppy_gauge;
+        diracParamPV.dirac = nullptr;
+      }
+      diracCoarseSmootherSloppy = new DiracMobiusPV(diracParamPV);
+    } else {
+      errorQuda("Invalid fine domain wall operator type %d", dirac_type);
+    }
   }
 
   void MG::destroyCoarseSolver() {
@@ -1148,7 +1170,7 @@ namespace quda
 
         // Reuse the space for the Null vectors. By this point,
         // the coarse grid has already been constructed.
-        generateEigenVectors();
+        generateEigenVectors(param.B);
 
         for (int i = 0; i < param.Nvec; i++) {
 
@@ -1723,7 +1745,7 @@ namespace quda
     popLevel();
   }
 
-  void MG::generateEigenVectors()
+  void MG::generateEigenVectors(std::vector<ColorSpinorField> &B)
   {
     pushLevel(param.level);
 
@@ -1744,8 +1766,8 @@ namespace quda
     for (auto &b : B_evecs) b = ColorSpinorField(csParam);
 
     // before entering the eigen solver, let's free the B vectors to save some memory
-    ColorSpinorParam bParam(param.B[0]);
-    for (auto &b : param.B) b = ColorSpinorField();
+    ColorSpinorParam bParam(B[0]);
+    for (auto &b : B) b = ColorSpinorField();
 
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
@@ -1777,12 +1799,12 @@ namespace quda
     // now reallocate the B vectors copy in e-vectors
     bParam.create = QUDA_NULL_FIELD_CREATE;
     for (auto i = 0u; i < param.B.size(); i++) {
-      param.B[i] = ColorSpinorField(bParam);
-      param.B[i] = B_evecs[i];
+      B[i] = ColorSpinorField(bParam);
+      B[i] = B_evecs[i];
     }
 
     // only save if outfile is defined
-    if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }
+    if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(B); }
 
     popLevel();
   }
