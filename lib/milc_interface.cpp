@@ -1265,11 +1265,14 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
   
+  // Deflation for even parity solves
+  invertParam.eig_param =(qep.n_ev_deflate>0) ? &qep : nullptr;
+  if (qep.n_ev_deflate > 0 && local_parity != QUDA_EVEN_PARITY)
+    errorQuda("MILC interface deflation currently only supports even parity solves.");
+    
   if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
     errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
- 
-  // Deflation for even parity solves when desired 
-  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_ev_deflate>0) ? &qep : nullptr;
+    
   invertParam.tol_restart = eig_args.tol_restart;
 
   // Eigensolver precision
@@ -1521,12 +1524,15 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
   invertParam.num_src = num_src;
-  
+
+  // Deflation for even parity solves
+  invertParam.eig_param =(qep.n_ev_deflate>0) ? &qep : nullptr;
+  if (qep.n_ev_deflate > 0 && local_parity != QUDA_EVEN_PARITY)
+    errorQuda("MILC interface deflation currently only supports even parity solves.");
+    
   if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
     errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
-
-  // Deflation for even parity solves when desired
-  invertParam.eig_param = (local_parity == QUDA_EVEN_PARITY)&&(qep.n_ev_deflate>0) ? &qep : nullptr;
+    
   invertParam.tol_restart = eig_args.tol_restart;
 
   // Eigensolver precision
