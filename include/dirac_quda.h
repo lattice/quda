@@ -428,6 +428,16 @@ namespace quda {
     virtual int getLs() const { return 1; }
 
     /**
+       @brief accessor for b_5 -- overrride can return better value
+    */
+    virtual std::array<Complex, QUDA_MAX_DWF_LS> getB5() const { return std::array<Complex, QUDA_MAX_DWF_LS> {}; }
+
+    /**
+       @brief accessor for c_5 -- overrride can return better value
+    */
+    virtual std::array<Complex, QUDA_MAX_DWF_LS> getC5() const { return std::array<Complex, QUDA_MAX_DWF_LS> {}; }
+
+    /**
        @brief accessor for the gauge field -- overrride can return better value
     */
     virtual GaugeField *getGaugeField() const { return gauge; }
@@ -1080,6 +1090,20 @@ namespace quda {
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const override;
 
+    virtual std::array<Complex, QUDA_MAX_DWF_LS> getB5() const override
+    {
+      std::array<Complex, QUDA_MAX_DWF_LS> b5 {};
+      for (int i = 0; i < Ls; i++) b5[i] = b_5[i];
+      return b5;
+    }
+
+    virtual std::array<Complex, QUDA_MAX_DWF_LS> getC5() const override
+    {
+      std::array<Complex, QUDA_MAX_DWF_LS> c5 {};
+      for (int i = 0; i < Ls; i++) c5[i] = c_5[i];
+      return c5;
+    }
+
     virtual int getStencilSteps() const override { return 1; }
     virtual QudaDiracType getDiracType() const override { return QUDA_MOBIUS_DOMAIN_WALL_DIRAC; }
   };
@@ -1132,6 +1156,56 @@ namespace quda {
 
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC; }
+  };
+
+  // Pauli-Villars preconditioned Mobius domain wall
+  class DiracMobiusPV : public DiracMobius
+  {
+  protected:
+    double mass_pv;
+
+  public:
+    DiracMobiusPV(const DiracParam &param);
+    DiracMobiusPV(const DiracMobiusPV &dirac);
+    virtual ~DiracMobiusPV();
+    DiracMobiusPV &operator=(const DiracMobiusPV &dirac);
+
+    virtual bool hasDslash() const override { return false; }
+
+    void Dslash4(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 QudaParity parity) const override;
+    void Dslash4pre(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    void Dslash5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    void Dslash4Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
+    void Dslash4preXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        cvector_ref<const ColorSpinorField> &x, double k) const;
+    void Dslash5Xpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                     cvector_ref<const ColorSpinorField> &x, double k) const;
+
+    void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+    void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    void ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
+                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                         const QudaSolutionType solType) const override;
+    virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                             const QudaSolutionType solType) const override;
+
+    virtual void prepareSpecialMG(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
+                                  cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                  const QudaSolutionType solType) const override;
+    virtual void reconstructSpecialMG(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                                      const QudaSolutionType solType) const override;
+
+    virtual bool hasSpecialMG() const override { return true; }
+
+    virtual bool hermitian() const;
+    virtual int getStencilSteps() const override { return 2; }
+    virtual QudaDiracType getDiracType() const override { return QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC; }
   };
 
   // Full Mobius EOFA

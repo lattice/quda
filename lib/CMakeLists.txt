@@ -45,7 +45,7 @@ set (QUDA_OBJS
   dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_domain_wall_4d_pv.cpp
-  dirac_mobius.cpp dirac_twisted_clover.cpp dirac_twisted_mass.cpp 
+  dirac_mobius.cpp dirac_mobius_pv.cpp dirac_twisted_clover.cpp dirac_twisted_mass.cpp 
   llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 

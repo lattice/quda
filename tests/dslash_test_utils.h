@@ -166,11 +166,11 @@ struct DslashTestWrapper {
       case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
       default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", static_cast<int>(dtest_type));
       }
-    } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+    } else if (dslash_type == QUDA_DOMAIN_WALL_4D_PV_DSLASH) {
       switch (dtest_type) {
       case dslash_test_type::Mat: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
       case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
-      default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4DPV_DSLASH\n", static_cast<int>(dtest_type));
+      default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_PV_DSLASH\n", static_cast<int>(dtest_type));
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       switch (dtest_type) {
@@ -652,7 +652,7 @@ struct DslashTestWrapper {
         default: printf("Test type not supported for domain wall\n"); exit(-1);
         }
         host_free(kappa_5);
-      } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+      } else if (dslash_type == QUDA_DOMAIN_WALL_4D_PV_DSLASH) {
         switch (dtest_type) {
         case dslash_test_type::Mat:
           dw_4dpv_mat(spinorRef[i].data(), hostGauge, spinor[i].data(), kappa5, inv_param.dagger, gauge_param.cpu_prec,
@@ -871,7 +871,7 @@ struct DslashTestWrapper {
           default:
             errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
           }
-        } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+        } else if (dslash_type == QUDA_DOMAIN_WALL_4D_PV_DSLASH) {
           switch (dtest_type) {
           case dslash_test_type::Mat:
             if (transfer) {

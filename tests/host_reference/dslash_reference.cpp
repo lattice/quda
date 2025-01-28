@@ -49,7 +49,7 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
       dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
-    } else if (dslash_type == QUDA_DOMAIN_WALL_4DPV_DSLASH) {
+    } else if (dslash_type == QUDA_DOMAIN_WALL_4D_PV_DSLASH) {
       printfQuda("QUDA_DOMAIN_WALL_4DPV_DSLASH verification\n");
       dw_4dpv_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {

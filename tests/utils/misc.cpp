@@ -110,8 +110,9 @@ const char *get_dslash_str(QudaDslashType type)
   case QUDA_ASQTAD_DSLASH: ret = "asqtad"; break;
   case QUDA_DOMAIN_WALL_DSLASH: ret = "domain_wall"; break;
   case QUDA_DOMAIN_WALL_4D_DSLASH: ret = "domain_wall_4d"; break;
-  case QUDA_DOMAIN_WALL_4DPV_DSLASH: ret = "domain_wall_4d_pv"; break;
+  case QUDA_DOMAIN_WALL_4D_PV_DSLASH: ret = "domain_wall_4d_pv"; break;
   case QUDA_MOBIUS_DWF_DSLASH: ret = "mobius"; break;
+  case QUDA_MOBIUS_DWF_PV_DSLASH: ret = "mobius_pv"; break;
   case QUDA_MOBIUS_DWF_EOFA_DSLASH: ret = "mobius_eofa"; break;
   case QUDA_LAPLACE_DSLASH: ret = "laplace"; break;
   default: ret = "unknown"; break;
@@ -159,8 +160,10 @@ QudaDslashType get_dslash_from_str(const char *str)
   if (!d_type.compare("hisq")) return QUDA_ASQTAD_DSLASH;
   if (!d_type.compare("domain_wall") || !d_type.compare("domain-wall")) return QUDA_DOMAIN_WALL_DSLASH;
   if (!d_type.compare("domain_wall_4d") || !d_type.compare("domain-wall-4d")) return QUDA_DOMAIN_WALL_4D_DSLASH;
-  if (!d_type.compare("domain_wall_4d_pv") || !d_type.compare("domain-wall-4d-pv")) return QUDA_DOMAIN_WALL_4DPV_DSLASH;
+  if (!d_type.compare("domain_wall_4d_pv") || !d_type.compare("domain-wall-4d-pv"))
+    return QUDA_DOMAIN_WALL_4D_PV_DSLASH;
   if (!d_type.compare("mobius")) return QUDA_MOBIUS_DWF_DSLASH;
+  if (!d_type.compare("mobius_pv") || !d_type.compare("mobius-pv")) return QUDA_MOBIUS_DWF_PV_DSLASH;
   if (!d_type.compare("mobius_eofa") || !d_type.compare("mobius-eofa")) return QUDA_MOBIUS_DWF_EOFA_DSLASH;
   if (!d_type.compare("laplace")) return QUDA_LAPLACE_DSLASH;
   return QUDA_INVALID_DSLASH;

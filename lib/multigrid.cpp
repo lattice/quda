@@ -386,6 +386,7 @@ namespace quda
       } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV) {
         // createDwfPV();
         auto fine_gauge = diracSmoother->getGaugeField();
+        auto dirac_type = diracSmoother->getDiracType();
 
         // TODO: create something for Mobius
         DiracParam diracParamPV;
@@ -398,10 +399,26 @@ namespace quda
         diracParamPV.dagger = QUDA_DAG_NO;
         diracParamPV.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
         diracParamPV.gauge = fine_gauge;
-        diracParamPV.type = QUDA_DOMAIN_WALL_4DPV_DIRAC;
-        diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
-        diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
-        diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
+
+        if (dirac_type == QUDA_DOMAIN_WALL_4D_DIRAC) {
+          diracParamPV.type = QUDA_DOMAIN_WALL_4DPV_DIRAC;
+          diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
+          diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
+          diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
+        } else if (dirac_type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+          auto b5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
+          auto c5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
+          for (int i = 0; i < diracParamPV.Ls; i++) {
+            diracParamPV.b_5[i] = b5[i];
+            diracParamPV.c_5[i] = c5[i];
+          }
+          diracParamPV.type = QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC;
+          diracCoarseResidual = new DiracMobiusPV(diracParamPV);
+          diracCoarseSmoother = new DiracMobiusPV(diracParamPV);
+          diracCoarseSmootherSloppy = new DiracMobiusPV(diracParamPV);
+        } else {
+          errorQuda("Invalid fine domain wall operator type %d", dirac_type);
+        }
 
       } else {
         errorQuda("Invalid pseudo-fine type");
@@ -945,8 +962,9 @@ namespace quda
       && (diracSmoother->getDiracType() == QUDA_STAGGERED_DIRAC || diracSmoother->getDiracType() == QUDA_STAGGEREDPC_DIRAC
           || diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC);
 
-    bool is_verify_dwf_pv
-      = (param.transfer_type == QUDA_TRANSFER_DWF_PV) && (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC);
+    bool is_verify_dwf_pv = (param.transfer_type == QUDA_TRANSFER_DWF_PV)
+      && (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC
+          || diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC);
 
     if (is_verify_kd) {
       // If we're doing an optimized build with the staggered operator, we need to skip the verify on level 0

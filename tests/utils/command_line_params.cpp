@@ -364,7 +364,7 @@ namespace
                                                        {"asqtad", QUDA_ASQTAD_DSLASH},
                                                        {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
                                                        {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
-                                                       {"domain-wall-4d-pv", QUDA_DOMAIN_WALL_4DPV_DSLASH},
+                                                       {"domain-wall-4d-pv", QUDA_DOMAIN_WALL_4D_PV_DSLASH},
                                                        {"mobius", QUDA_MOBIUS_DWF_DSLASH},
                                                        {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};

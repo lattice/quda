@@ -9,7 +9,9 @@ namespace quda
   DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracParam &param) : DiracDomainWall4D(param), mass_pv(1.0) { }
 
   DiracDomainWall4DPV::DiracDomainWall4DPV(const DiracDomainWall4DPV &dirac) :
-    DiracDomainWall4D(dirac), mass_pv(1.0) { }
+    DiracDomainWall4D(dirac), mass_pv(dirac.mass_pv)
+  {
+  }
 
   DiracDomainWall4DPV::~DiracDomainWall4DPV() { }
 
@@ -17,7 +19,7 @@ namespace quda
   {
     if (&dirac != this) {
       DiracDomainWall4D::operator=(dirac);
-      mass_pv = 1.0;
+      mass_pv = dirac.mass_pv;
     }
 
     return *this;
