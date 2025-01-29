@@ -55,9 +55,9 @@ extern "C" {
    * Parameters related to deflated linear solvers.
    */
   typedef struct {
+    size_t struct_size; /** Size of this struct in bytes. Used to check that host application and QUDA see the same struct size **/
     double tol_restart;
     QudaPrecision prec_eigensolver;
-    
     int poly_deg; /** Degree of the Chebyshev polynomial **/
     double a_min; /** Range used in polynomial acceleration **/
     double a_max;

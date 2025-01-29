@@ -1222,6 +1222,9 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
   // parameters for the eigensolve/deflation
   QudaEigParam qep = newQudaEigParam();
   setEigensolverParams(eig_args, &qep);
+  
+  if(eig_args.struct_size != sizeof(eig_args))
+    errorQuda("Unexpected QudaEigensolverArgs_t struct size %lu, expected %lu", eig_args.struct_size, sizeof(eig_args));
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
 
@@ -1498,6 +1501,9 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   // parameters for the eigensolve/deflation
   QudaEigParam qep = newQudaEigParam();
   setEigensolverParams(eig_args, &qep);
+  
+  if(eig_args.struct_size != sizeof(eig_args))
+    errorQuda("Unexpected QudaEigensolverArgs_t struct size %lu, expected %lu", eig_args.struct_size, sizeof(eig_args));
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
 
