@@ -63,6 +63,8 @@ static void *df_preconditioner = nullptr;
 
 static void *preserved_deflation_space = nullptr;
 
+static bool deflation_init = false;
+
 using namespace quda;
 using namespace quda::fermion_force;
 
@@ -1283,7 +1285,6 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
   invertParam.cuda_prec_eigensolver = eig_args.prec_eigensolver;
 
   // Preserve deflation space
-  static bool deflation_init = false;
   if (invertParam.eig_param && qep.preserve_deflation) {
     if (deflation_init) {
       if (!preserved_deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
@@ -1547,7 +1548,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   invertParam.cuda_prec_eigensolver = eig_args.prec_eigensolver;
 
   // Preserve deflation space
-  static bool deflation_init = false;
   if (invertParam.eig_param && qep.preserve_deflation) {
     if (deflation_init) {
       if (!preserved_deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
