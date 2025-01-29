@@ -1201,6 +1201,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   // If this function is called then QUDA is not doing deflation
   // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
   QudaEigensolverArgs_t eig_args;
+  eig_args.struct_size = sizeof(eig_args);
   eig_args.n_ev_deflate=0;
   eig_args.vec_in_parity = QUDA_EVEN_PARITY;
   eig_args.prec_eigensolver = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1480,6 +1481,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   // If this function is called then QUDA is not doing deflation
   // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
   QudaEigensolverArgs_t eig_args;
+  eig_args.struct_size = sizeof(eig_args);
   eig_args.n_ev_deflate=0;
   eig_args.vec_in_parity = QUDA_EVEN_PARITY;
   eig_args.prec_eigensolver = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
