@@ -141,6 +141,12 @@ namespace quda {
     /** The sloppy Dirac operator to use for smoothing */
     DiracMatrix *matSmoothSloppy;
 
+    /** The Dirac operator to use for null vectors */
+    DiracMatrix *matNull;
+
+    /** The sloppy Dirac operator to use for null vectors */
+    DiracMatrix *matNullSloppy;
+
     /** What type of smoother to use */
     QudaInverterType smoother;
 
@@ -178,8 +184,8 @@ namespace quda {
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
-    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField> &B, DiracMatrix *matResidual,
-            DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
+            DiracMatrix *matSmoothSloppy, DiracMatrix *matNull, DiracMatrix *matNullSloppy, int level = 0) :
       SolverParam(*(param.invert_param)),
       mg_global(param),
       level(level),
@@ -198,6 +204,8 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       matSmoothSloppy(matSmoothSloppy),
+      matNull(matNull),
+      matNullSloppy(matNullSloppy),
       smoother(param.smoother[level]),
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
@@ -217,7 +225,7 @@ namespace quda {
     }
 
     MGParam(const MGParam &param, std::vector<ColorSpinorField> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
-            DiracMatrix *matSmoothSloppy, int level = 0) :
+            DiracMatrix *matSmoothSloppy, DiracMatrix *matNull, DiracMatrix *matNullSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
       level(level),
@@ -238,6 +246,8 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       matSmoothSloppy(matSmoothSloppy),
+      matNull(matNull),
+      matNullSloppy(matNullSloppy),
       smoother(param.mg_global.smoother[level]),
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
@@ -328,6 +338,12 @@ namespace quda {
     /** The fine operator used for doing sloppy smoothing */
     const Dirac *diracSmootherSloppy = nullptr;
 
+    /** The fine operator used for null vector generation */
+    const Dirac *diracNull = nullptr;
+
+    /** The fine operator used for doing sloppy null vector generation */
+    const Dirac *diracNullSloppy = nullptr;
+
     /** The coarse operator used for computing inter-grid residuals */
     Dirac *diracCoarseResidual = nullptr;
 
@@ -337,6 +353,12 @@ namespace quda {
     /** The coarse operator used for doing sloppy smoothing */
     Dirac *diracCoarseSmootherSloppy = nullptr;
 
+    /** The coarse operator used for null vector generation */
+    Dirac *diracCoarseNull = nullptr;
+
+    /** The coarse operator used for doing sloppy null vector generation */
+    Dirac *diracCoarseNullSloppy = nullptr;
+
     /** Wrapper for the residual coarse grid operator */
     DiracMatrix *matCoarseResidual = nullptr;
 
@@ -345,6 +367,12 @@ namespace quda {
 
     /** Wrapper for the sloppy smoothing coarse grid operator */
     DiracMatrix *matCoarseSmootherSloppy = nullptr;
+
+    /** Wrapper for the null vector coarse grid operator */
+    DiracMatrix *matCoarseNull = nullptr;
+
+    /** Wrapper for the sloppy null vector coarse grid operator */
+    DiracMatrix *matCoarseNullSloppy = nullptr;
 
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
     RNG *rng = nullptr;
@@ -507,6 +535,11 @@ namespace quda {
 
       return (param.level == 0 || nearnull_gen);
     }
+
+    /**
+      @brief Return if we're a PV operator right now
+    */
+    bool is_pv() const { return param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV; }
   };
 
   /**
@@ -734,10 +767,14 @@ namespace quda {
     Dirac *d;
     Dirac *dSmooth;
     Dirac *dSmoothSloppy;
+    Dirac *dNull;
+    Dirac *dNullSloppy;
 
     DiracM *m;
     DiracM *mSmooth;
     DiracM *mSmoothSloppy;
+    DiracM *mNull;
+    DiracM *mNullSloppy;
 
     std::vector<ColorSpinorField> B;
 
@@ -757,10 +794,14 @@ namespace quda {
       if (m) delete m;
       if (mSmooth) delete mSmooth;
       if (mSmoothSloppy) delete mSmoothSloppy;
+      if (mNull) delete mNull;
+      if (mNullSloppy) delete mNullSloppy;
 
       if (d) delete d;
       if (dSmooth) delete dSmooth;
       if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
+      if (dNull) delete dNull;
+      if (dNullSloppy && dNullSloppy != dNull) delete dNullSloppy;
       getProfile().TPSTOP(QUDA_PROFILE_FREE);
     }
   };

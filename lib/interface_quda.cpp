@@ -2772,6 +2772,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
   dSmooth = Dirac::create(diracSmoothParam);
   mSmooth = new DiracM(*dSmooth);
 
+  // somewhat meaningless, we don't use the solver for 4-d coarsening
+  // of 5-d fields
+  dNull = Dirac::create(diracSmoothParam);
+  mNull = new DiracM(*dSmooth);
+
   // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
   DiracParam diracSmoothSloppyParam;
   setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve,
@@ -2780,6 +2785,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
 
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
   mSmoothSloppy = new DiracM(*dSmoothSloppy);
+
+  // somewhat meaningless, we don't use the solver for 4-d coarsening
+  // of 5-d fields
+  dNullSloppy = Dirac::create(diracSmoothSloppyParam);
+  mNullSloppy = new DiracM(*dSmooth);
 
   ColorSpinorParam csParam(nullptr, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
   csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -2799,7 +2809,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
   for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField(csParam); }
 
   // fill out the MG parameters for the fine level
-  mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
+  mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy, mNull, mNullSloppy);
 
   mg = new MG(*mgParam);
   mgParam->updateInvertParam(*param);
@@ -2863,6 +2873,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
       }
       mg->dSmoothSloppy->setMass(param->mass);
     }
+
     // The above changes are propagated internally by use of references, pointers, etc, so
     // no further updates are needed.
 
@@ -2884,10 +2895,14 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     if (mg->m) delete mg->m;
     if (mg->mSmooth) delete mg->mSmooth;
     if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
+    if (mg->mNull) delete mg->mSmooth;
+    if (mg->mNullSloppy) delete mg->mNullSloppy;
 
     if (mg->d) delete mg->d;
     if (mg->dSmooth) delete mg->dSmooth;
     if (mg->dSmoothSloppy && mg->dSmoothSloppy != mg->dSmooth) delete mg->dSmoothSloppy;
+    if (mg->dNull) delete mg->dNull;
+    if (mg->dNullSloppy && mg->dNullSloppy != mg->dNull) delete mg->dNullSloppy;
 
     // create new fine dirac operators
 
@@ -2904,6 +2919,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
     mg->dSmooth = Dirac::create(diracSmoothParam);
     mg->mSmooth = new DiracM(*(mg->dSmooth));
+    mg->dNull = Dirac::create(diracSmoothParam);
+    mg->mNull = new DiracM(*(mg->dSmooth));
 
     // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
     DiracParam diracSmoothSloppyParam;
@@ -2915,6 +2932,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     mg->mgParam->matResidual = mg->m;
     mg->mgParam->matSmooth = mg->mSmooth;
     mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
+    mg->mgParam->matNull = mg->mNull;
+    mg->mgParam->matNullSloppy = mg->mNullSloppy;
 
     mg->mgParam->updateInvertParam(*param);
     if (mg->mgParam->mg_global.invert_param != param) mg->mgParam->mg_global.invert_param = param;

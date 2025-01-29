@@ -183,7 +183,7 @@ quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
 
 // Aggregation type for the top level of staggered
-QudaTransferType pseudofine_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
+QudaTransferType pseudofine_transfer_type = QUDA_TRANSFER_AGGREGATE;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};

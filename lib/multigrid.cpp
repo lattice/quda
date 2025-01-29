@@ -20,7 +20,9 @@ namespace quda
     xInvKD_sloppy(nullptr),
     diracResidual(param.matResidual->Expose()),
     diracSmoother(param.matSmooth->Expose()),
-    diracSmootherSloppy(param.matSmoothSloppy->Expose())
+    diracSmootherSloppy(param.matSmoothSloppy->Expose()),
+    diracNull(param.matNull->Expose()),
+    diracNullSloppy(param.matNullSloppy->Expose())
   {
     sprintf(prefix, "MG level %d (%s): ", param.level, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
     pushLevel(param.level);
@@ -53,9 +55,12 @@ namespace quda
     rng = new RNG(param.B[0], 1234);
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
-      if (param.level < param.Nlevel - 1) { createNullVectors(); }
-    } else {
-      errorQuda("Unexpected transfer type %d", param.transfer_type);
+      if (param.level < param.Nlevel - 1) {
+        if (param.B[0].Ndim() == 5)
+          errorQuda("Generating null vectors for DWF aggregation is a WIP");
+        else
+          createNullVectors();
+      }
     }
 
     // in case of iterative setup with MG the coarse level may be already built
@@ -76,6 +81,8 @@ namespace quda
     diracResidual = param.matResidual->Expose();
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
+    diracNull = param.matNull->Expose();
+    diracNullSloppy = param.matNullSloppy->Expose();
 
     // Only refresh if we needed to generate near-nulls, that is,
     // if we aren't doing a staggered KD solve
@@ -159,11 +166,13 @@ namespace quda
         coarse->param.matResidual = matCoarseResidual;
         coarse->param.matSmooth = matCoarseSmoother;
         coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
+        coarse->param.matSmooth = matCoarseNull;
+        coarse->param.matSmoothSloppy = matCoarseNullSloppy;
         coarse->reset(refresh);
       } else {
         // create the next multigrid level
-        param_coarse
-          = new MGParam(param, B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level + 1);
+        param_coarse = new MGParam(param, B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy,
+                                   matCoarseNull, matCoarseNullSloppy, param.level + 1);
         param_coarse->fine = this;
         param_coarse->delta = 1e-20;
         param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
@@ -183,6 +192,8 @@ namespace quda
     diracResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
     diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
     diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracNull->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracNullSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
 
     logQuda(QUDA_VERBOSE, "Setup of level %d done\n", param.level);
 
@@ -208,16 +219,22 @@ namespace quda
       diracCoarseResidual->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmootherSloppy->updateFields(fat_gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
+      diracCoarseNull->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseNullSloppy->updateFields(fat_gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
     } else {
       // last nullptr is for the clover field
       diracCoarseResidual->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmootherSloppy->updateFields(gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
+      diracCoarseNull->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseNullSloppy->updateFields(gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
     }
 
     diracCoarseResidual->setMass(mass);
     diracCoarseSmoother->setMass(mass);
     diracCoarseSmootherSloppy->setMass(mass);
+    diracCoarseNull->setMass(mass);
+    diracCoarseNullSloppy->setMass(mass);
 
     // to-do: think about updating Xinv
   }
@@ -377,21 +394,24 @@ namespace quda
     if (diracCoarseResidual) delete diracCoarseResidual;
     if (diracCoarseSmoother) delete diracCoarseSmoother;
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
+    if (diracCoarseNull) delete diracCoarseNull;
+    if (diracCoarseNullSloppy) delete diracCoarseNullSloppy;
+    // otherwise these aliased diracCoarseSmoother[Sloppy]
 
     // check for a pseudo-fine solve
-    bool pseudo_fine = (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
-                        || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
-                        || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV);
+    bool is_pseudo_fine_kd = (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
+                              || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG);
 
-    if (pseudo_fine && param.level != 0) errorQuda("Unexpected pseudo-fine build from level %d", param.level);
+    if (is_pseudo_fine_kd && param.level != 0) errorQuda("Unexpected KD pseudo-fine build from level %d", param.level);
+
+    bool is_pseudo_fine_pv = param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV && param.level == 0;
 
     // custom setup for pseudo-fine
-    if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
-        || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+    if (is_pseudo_fine_kd) {
       createOptimizedKdDirac();
-    } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV) {
+    } else if (is_pseudo_fine_pv) {
       createDwfPvDirac();
-    } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_AGGREGATE) {
+    } else {
 
       // create coarse grid operator
       DiracParam diracParam;
@@ -436,29 +456,37 @@ namespace quda
       if (param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE) {
         diracParam.type = QUDA_COARSEPC_DIRAC;
         diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+        diracCoarseNull = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
         {
           bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
           for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
         }
         diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
+        diracCoarseNullSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
       } else {
         diracParam.type = QUDA_COARSE_DIRAC;
         diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+        diracCoarseNull = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
         {
           bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
           for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
         }
         diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
+        diracCoarseNullSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
       }
-    } else
-      errorQuda("Unexpected coarse build type %d", param.mg_global.transfer_type[param.level]);
+    }
 
     if (matCoarseResidual) delete matCoarseResidual;
     if (matCoarseSmoother) delete matCoarseSmoother;
     if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
+    if (matCoarseNull) delete matCoarseNull;
+    if (matCoarseNullSloppy) delete matCoarseNullSloppy;
+
     matCoarseResidual = new DiracM(*diracCoarseResidual);
     matCoarseSmoother = new DiracM(*diracCoarseSmoother);
     matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
+    matCoarseNull = new DiracM(*diracCoarseNull);
+    matCoarseNullSloppy = new DiracM(*diracCoarseNullSloppy);
 
     logQuda(QUDA_VERBOSE, "Coarse Dirac operator done\n");
 
@@ -526,13 +554,14 @@ namespace quda
 
       diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
       diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
+      diracCoarseNull = new DiracStaggeredKD(diracParamKD);
       if (mixed_precision_setup) {
         diracParamKD.gauge = sloppy_gauge;
         diracParamKD.xInvKD = xInvKD_sloppy.get();
         diracParamKD.dirac = nullptr;
       }
       diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
-
+      diracCoarseNullSloppy = new DiracStaggeredKD(diracParamKD);
     } else if (is_improved_staggered) {
       diracParamKD.type = QUDA_ASQTADKD_DIRAC;
 
@@ -541,15 +570,15 @@ namespace quda
 
       diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
       diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
-
+      diracCoarseNull = new DiracStaggeredKD(diracParamKD);
       if (mixed_precision_setup) {
         diracParamKD.fatGauge = sloppy_gauge;
         diracParamKD.longGauge = diracSmootherSloppy->getStaggeredLongLinkField();
         diracParamKD.xInvKD = xInvKD_sloppy.get();
         diracParamKD.dirac = nullptr;
       }
-
       diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
+      diracCoarseNullSloppy = new DiracStaggeredKD(diracParamKD);
     } else {
       errorQuda("Invalid dirac_type %d", dirac_type);
     }
@@ -591,11 +620,13 @@ namespace quda
 
       diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
       diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
+      diracCoarseNull = new DiracDomainWall4DPV(diracParamPV);
       if (mixed_precision_setup) {
         diracParamPV.gauge = sloppy_gauge;
         diracParamPV.dirac = nullptr;
       }
       diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
+      diracCoarseNullSloppy = new DiracDomainWall4DPV(diracParamPV);
     } else if (dirac_type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
       auto b5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
       auto c5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
@@ -607,11 +638,13 @@ namespace quda
 
       diracCoarseResidual = new DiracMobiusPV(diracParamPV);
       diracCoarseSmoother = new DiracMobiusPV(diracParamPV);
+      diracCoarseNull = new DiracMobiusPV(diracParamPV);
       if (mixed_precision_setup) {
         diracParamPV.gauge = sloppy_gauge;
         diracParamPV.dirac = nullptr;
       }
       diracCoarseSmootherSloppy = new DiracMobiusPV(diracParamPV);
+      diracCoarseNullSloppy = new DiracMobiusPV(diracParamPV);
     } else {
       errorQuda("Invalid fine domain wall operator type %d", dirac_type);
     }
@@ -804,6 +837,10 @@ namespace quda
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       if (matCoarseResidual) delete matCoarseResidual;
       if (diracCoarseResidual) delete diracCoarseResidual;
+      if (matCoarseNullSloppy) delete matCoarseNullSloppy;
+      if (diracCoarseNullSloppy) delete diracCoarseNullSloppy;
+      if (matCoarseNull) delete matCoarseNull;
+      if (diracCoarseNull) delete diracCoarseNull;
       if (postsmoother) delete postsmoother;
       if (param_postsmooth) delete param_postsmooth;
     }
@@ -1427,7 +1464,7 @@ namespace quda
       logQuda(QUDA_VERBOSE, "Disabling Schwarz for null-space finding");
       int commDim[QUDA_MAX_DIM];
       for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
-      diracSmootherSloppy->setCommDim(commDim);
+      diracNullSloppy->setCommDim(commDim);
     }
 
     // if quarter precision halo, promote for null-space finding to half precision
@@ -1435,8 +1472,12 @@ namespace quda
     if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
 
     Solver *solve;
-    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
-    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
+    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ?
+      new DiracMdagM(*diracNull) :
+      nullptr;
+    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ?
+      new DiracMdagM(*diracNullSloppy) :
+      nullptr;
     if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy);
     } else if (solverParam.inv_type == QUDA_MG_INVERTER) {
@@ -1456,12 +1497,11 @@ namespace quda
       solverParam.preconditioner = this;
 
       solverParam.inv_type = QUDA_GCR_INVERTER;
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy,
-                             *param.matSmoothSloppy);
+      solve = Solver::create(solverParam, *param.matNull, *param.matNull, *param.matNullSloppy, *param.matNullSloppy);
       solverParam.inv_type = QUDA_MG_INVERTER;
     } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                             *param.matSmoothSloppy);
+      solve
+        = Solver::create(solverParam, *param.matNull, *param.matNullSloppy, *param.matNullSloppy, *param.matNullSloppy);
     }
 
     for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
@@ -1502,9 +1542,9 @@ namespace quda
         }
 
         std::vector<ColorSpinorField> out(param.n_vec_batch), in(param.n_vec_batch);
-        diracSmoother->prepare(out, in, x, b, QUDA_MAT_SOLUTION);
+        diracNull->prepare(out, in, x, b, QUDA_MAT_SOLUTION);
         (*solve)(out, in);
-        diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
+        diracNull->reconstruct(x, b, QUDA_MAT_SOLUTION);
 
         if (getVerbosity() >= QUDA_VERBOSE) {
           auto nrm2 = norm2(x);
@@ -1557,7 +1597,7 @@ namespace quda
     if (mdagm) delete mdagm;
     if (mdagmSloppy) delete mdagmSloppy;
 
-    diracSmootherSloppy->setHaloPrecision(halo_precision); // restore halo precision
+    diracNullSloppy->setHaloPrecision(halo_precision); // restore halo precision
 
     // reenable Schwarz
     if (schwarz_reset) {
@@ -1771,25 +1811,25 @@ namespace quda
 
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
-      DiracM *mat = new DiracM(*diracResidual);
+      DiracM *mat = new DiracM(*diracNull);
       eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (!normop && dagger) {
-      DiracMdag *mat = new DiracMdag(*diracResidual);
+      DiracMdag *mat = new DiracMdag(*diracNull);
       eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && !dagger) {
-      DiracMdagM *mat = new DiracMdagM(*diracResidual);
+      DiracMdagM *mat = new DiracMdagM(*diracNull);
       eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && dagger) {
-      DiracMMdag *mat = new DiracMMdag(*diracResidual);
+      DiracMMdag *mat = new DiracMMdag(*diracNull);
       eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
