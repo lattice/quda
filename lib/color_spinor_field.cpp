@@ -243,6 +243,7 @@ namespace quda
     ghostFace = std::exchange(src.ghostFace, {});
     ghostFaceCB = std::exchange(src.ghostFaceCB, {});
     ghost_buf = std::exchange(src.ghost_buf, {});
+    dd = std::exchange(src.dd, {});
     dslash_constant = std::exchange(src.dslash_constant, nullptr);
     bytes = std::exchange(src.bytes, 0);
     bytes_raw = std::exchange(src.bytes_raw, 0);
@@ -719,6 +720,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    even->dd=dd;
     return *even;
   }
 
@@ -726,6 +728,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    odd->dd=dd;
     return *odd;
   }
 
@@ -733,6 +736,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    even->dd=dd;
     return *even;
   }
 
@@ -740,6 +744,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    odd->dd=dd;
     return *odd;
   }
 
