@@ -29,7 +29,15 @@ namespace quda
 
     // Whether do hopping with field at neighboring coord
     template <typename Coord> constexpr bool doHopping(const Coord &, int, int) const { return true; }
+    
   };
+
+  inline std::ostream &operator<<(std::ostream &out, const DDNo &)
+  {
+    out << "Domain decomposition not in use " << std::endl;
+
+    return out;
+  }
 
   // Red-black Block DD
   struct DDRedBlack {
@@ -108,5 +116,15 @@ namespace quda
       return false;
     }
   };
+
+
+  inline std::ostream &operator<<(std::ostream &out, const DDRedBlack &arg)
+  {
+    out << "Domain decomposition is set: red active: "<<arg.red_active<<" black active: "<<arg.black_active ;
+    out << " Domain[0] " << arg.block_dim[0] << " Domain[1] " << arg.block_dim[1]; 
+    out << " Domain[2] " << arg.block_dim[2] << " Domain[3] " << arg.block_dim[3]<<std::endl;
+
+    return out;
+  }
 
 } // namespace quda

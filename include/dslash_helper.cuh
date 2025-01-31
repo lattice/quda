@@ -469,6 +469,10 @@ namespace quda
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
     out << "exterior_threads = " << arg.exterior_threads << std::endl;
     out << "exterior_blocks = " << arg.exterior_blocks << std::endl;
+    out << "dd_out: " << arg.dd_out <<std::endl;
+    out << "dd_in: "  << arg.dd_in <<std::endl;
+    out << "dd_x: " << arg.dd_x <<std::endl;
+
     return out;
   }
 
