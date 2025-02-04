@@ -222,9 +222,13 @@ namespace quda
 
       array<Vector, n_src_tile> out;
       if (arg.dd_out.isZero(coord)) {
-	if (mykernel_type != EXTERIOR_KERNEL_ALL || active) applyStaggered<nParity, mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+	if (mykernel_type != EXTERIOR_KERNEL_ALL || active) 
+#pragma unroll
+           for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity) = out[s]; }
 	return; 
       }
+
+      applyStaggered<nParity, mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
 #pragma unroll
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;
