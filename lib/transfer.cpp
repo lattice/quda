@@ -37,6 +37,9 @@ namespace quda {
     postTrace();
     int ndim = B[0].Ndim();
 
+    // find out if this is the pseudo-fine DWF PV
+    bool is_pseudofine_pv = (ndim > 4 && B[0].Nspin() == 4 && transfer_type == QUDA_TRANSFER_DWF_PV);
+
     // Only loop over four dimensions for now, we don't have
     // to worry about the fifth dimension until we hit chiral fermions.
     for (int d = 0; d < 4; d++) {
@@ -56,7 +59,7 @@ namespace quda {
 
     if (transfer_type == QUDA_TRANSFER_DWF_PV) geo_bs[4] = 1;
 
-    if (ndim > 4 && transfer_type != QUDA_TRANSFER_DWF_PV) errorQuda("Number of dimensions %d not supported", ndim);
+    if (ndim > 4 && !is_pseudofine_pv) errorQuda("Number of dimensions %d not supported", ndim);
 
     this->geo_bs = new int[ndim];
     int total_block_size = 1;
@@ -67,15 +70,16 @@ namespace quda {
 
     // Various consistency checks for optimized KD "transfers"
     if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
-        || transfer_type == QUDA_TRANSFER_DWF_PV) {
+        || is_pseudofine_pv) {
 
       // Aggregation size is "technically" 1 for optimized KD
       if (total_block_size != 1)
-        errorQuda("Invalid total geometric block size %d for transfer type optimized-kd, must be 1", total_block_size);
+        errorQuda("Invalid total geometric block size %d for transfer type %d, must be 1", total_block_size,
+                  transfer_type);
 
       // The number of coarse dof is technically fineColor for optimized KD
       if (Nvec != B[0].Ncolor())
-        errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0].Ncolor());
+        errorQuda("Invalid Nvec %d for pseudo-fine aggregation, must be fine color %d", Nvec, B[0].Ncolor());
 
     } else {
       int aggregate_size = total_block_size * B[0].Ncolor();

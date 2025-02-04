@@ -202,7 +202,9 @@ namespace quda
       suggested_parity = impliedParityFromMatPC(inv_param.matpc_type);
 
       if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH
+          || inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_PV_DSLASH
+          || inv_param.dslash_type == QUDA_MOBIUS_DWF_PV_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
       } else if ((inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
@@ -804,11 +806,12 @@ namespace quda
        @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
        @param[in] spinlockSize Geometric block size that defines the coarse spin dimension
        @param[in] Nvec Number of coarse color degrees of freedom per grid point
+       @param[in] customLs Optionally override the Ls value, which is useful for 4-d aggregation DWF MG
        @param[in] precision Optionally set the precision of the fine field
        @param[in] location Optionally set the location of the coarse field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
-    ColorSpinorField create_coarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+    ColorSpinorField create_coarse(const int *geoBlockSize, int spinBlockSize, int Nvec, int customLs = -1,
                                    QudaPrecision precision = QUDA_INVALID_PRECISION,
                                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION,
                                    QudaMemoryType mem_Type = QUDA_MEMORY_INVALID);

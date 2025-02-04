@@ -1041,6 +1041,26 @@ namespace quda {
     virtual bool hermitian() const;
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_DOMAIN_WALL_4DPV_DIRAC; }
+
+    /**
+     * @brief Create the coarse domain wall PV operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
+     *
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
+     * @param kappa Kappa parameter for the coarse operator
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for Wilson operator
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0.,
+                                double mu = 0., double mu_factor = 0., bool allow_truncation = false) const override;
   };
 
 
@@ -1206,6 +1226,26 @@ namespace quda {
     virtual bool hermitian() const;
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC; }
+
+    /**
+     * @brief Create the coarse mobius domain wall PV operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
+     *
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
+     * @param kappa Kappa parameter for the coarse operator
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for Wilson operator
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0.,
+                                double mu = 0., double mu_factor = 0., bool allow_truncation = false) const override;
   };
 
   // Full Mobius EOFA
@@ -2305,6 +2345,108 @@ public:
     /**
       @brief If managed memory and prefetch is enabled, prefetch
       all relevant memory fields (Xhat, Y)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const override;
+  };
+
+  // Pauli-Villars preconditioned coarse dwf operator with 4-d parity ordered fields
+  class DiracCoarsePV : public DiracCoarse
+  {
+  protected:
+    double mass_pv;
+    bool mobius_parent;
+    // kappas?
+
+  public:
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] gpu_setup Whether to do the setup on GPU or CPU
+     */
+    DiracCoarsePV(const DiracParam &param, bool gpu_setup = true);
+
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] Y_h CPU coarse link field
+       @param[in] X_h CPU coarse clover field
+       @param[in] Xinv_h CPU coarse inverse clover field
+       @param[in] Yhat_h CPU coarse preconditioned link field
+       @param[in] Y_d GPU coarse link field
+       @param[in] X_d GPU coarse clover field
+       @param[in] Xinv_d GPU coarse inverse clover field
+       @param[in] Yhat_d GPU coarse preconditioned link field
+     */
+    DiracCoarsePV(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                  std::shared_ptr<GaugeField> Xinv_h, std::shared_ptr<GaugeField> Yhat_h,
+                  std::shared_ptr<GaugeField> Y_d = nullptr, std::shared_ptr<GaugeField> X_d = nullptr,
+                  std::shared_ptr<GaugeField> Xinv_d = nullptr, std::shared_ptr<GaugeField> Yhat_d = nullptr);
+
+    /**
+       @param[in] dirac Another operator instance to clone from (shallow copy)
+       @param[in] param Parameters defining this operator
+     */
+    DiracCoarsePV(const DiracCoarse &dirac, const DiracParam &param);
+
+    virtual bool hasDslash() const override { return false; }
+
+    /**
+       @brief Apply preconditioned Dslash out = (D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[parity] parity Parity which we are applying the operator to
+     */
+    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                QudaParity parity) const override;
+
+    /**
+       @brief Apply preconditioned DslashXpay out = (x + k * D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[parity] parity Parity which we are applying the operator to
+       @param[in] x Auxiliary field
+       @param[in] k scalar multiplier
+     */
+    void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                    cvector_ref<const ColorSpinorField> &x, double k) const override;
+
+    void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+    void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    void ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
+                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                         const QudaSolutionType solType) const override;
+    virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                             const QudaSolutionType solType) const override;
+
+    virtual bool hermitian() const;
+    virtual int getStencilSteps() const override { return 2; }
+    virtual QudaDiracType getDiracType() const override { return QUDA_COARSEPV_DIRAC; }
+
+    /**
+     * @brief Create the 4-d coarsened  even-odd preconditioned coarse
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned coarse operator differs from that of the
+     * unpreconditioned coarse operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator, assumed to be zero
+     * @param mu TM mu parameter for the coarse operator
+     * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const override;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (X, Y)
       to the CPU or GPU as requested
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)

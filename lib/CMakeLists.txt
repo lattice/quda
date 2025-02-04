@@ -17,8 +17,8 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
-  solve.cpp monitor.cpp dirac_coarse.cpp dslash_coarse.cpp
-  coarse_op.cpp coarsecoarse_op.cpp
+  solve.cpp monitor.cpp dirac_coarse.cpp dirac_coarse_pv.cpp
+  dslash_coarse.cpp coarse_op.cpp coarsecoarse_op.cpp
   coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp
   eig_trlm_3d.cpp blas_3d.cu

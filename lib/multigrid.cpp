@@ -54,13 +54,11 @@ namespace quda
 
     rng = new RNG(param.B[0], 1234);
 
-    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
-      if (param.level < param.Nlevel - 1) {
-        if (param.B[0].Ndim() == 5)
-          errorQuda("Generating null vectors for DWF aggregation is a WIP");
-        else
-          createNullVectors();
-      }
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE && param.level < param.Nlevel - 1) {
+      if (param.B[0].Ndim() == 5 && param.level == 0)
+        errorQuda("DWF does not support traditional aggregation, use 4-d aggregation");
+      else
+        createNullVectors();
     }
 
     // in case of iterative setup with MG the coarse level may be already built
@@ -113,18 +111,20 @@ namespace quda
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
+        auto customLs = is_pv() ? reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getLs() : -1;
+
         // create coarse residual vector if not already created in verify()
         if (r_coarse.empty()) {
           r_coarse.resize(1);
-          r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                                 param.mg_global.location[param.level + 1]);
+          r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
+                                                 r[0].Precision(), param.mg_global.location[param.level + 1]);
         }
 
         // create coarse solution vector if not already created in verify()
         if (x_coarse.empty()) {
           x_coarse.resize(1);
-          x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                                 param.mg_global.location[param.level + 1]);
+          x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
+                                                 r[0].Precision(), param.mg_global.location[param.level + 1]);
         }
 
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
@@ -132,8 +132,10 @@ namespace quda
 
         // only have single precision B vectors on the coarse grid
         QudaPrecision B_coarse_precision = std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
-        for (int i=0; i<nVec_coarse; i++)
-          B_coarse[i] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
+
+        // the -1 is to preserve the dimensionality of the near-null vectors
+        for (int i = 0; i < nVec_coarse; i++)
+          B_coarse[i] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, is_pv() ? 1 : -1,
                                                  B_coarse_precision, param.mg_global.setup_location[param.level + 1]);
 
         // if we're not generating on all levels then we need to propagate the vectors down
@@ -151,7 +153,7 @@ namespace quda
       // (only if using managed memory and prefetching is enabled, otherwise no-op)
       for (int i = 0; i < param.Nvec; i++) { param.B[i].prefetch(QUDA_CPU_FIELD_LOCATION); }
 
-      createCoarseDirac();
+      buildNextDirac();
     }
 
     // delay allocating smoother until after coarse-links have been created
@@ -353,7 +355,6 @@ namespace quda
   {
     if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
       if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
-
         // Initializing to random vectors
         for (int i = 0; i < (int)param.B.size(); i++) {
           spinorNoise(r[0], *rng, QUDA_NOISE_UNIFORM);
@@ -381,14 +382,11 @@ namespace quda
     }
   }
 
-  void MG::createCoarseDirac() {
+  void MG::buildNextDirac()
+  {
     pushLevel(param.level);
 
     logQuda(QUDA_VERBOSE, "Creating coarse Dirac operator\n");
-
-    // check if we are coarsening the preconditioned system then
-    bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
-    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
 
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
@@ -396,7 +394,6 @@ namespace quda
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
     if (diracCoarseNull) delete diracCoarseNull;
     if (diracCoarseNullSloppy) delete diracCoarseNullSloppy;
-    // otherwise these aliased diracCoarseSmoother[Sloppy]
 
     // check for a pseudo-fine solve
     bool is_pseudo_fine_kd = (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
@@ -404,76 +401,19 @@ namespace quda
 
     if (is_pseudo_fine_kd && param.level != 0) errorQuda("Unexpected KD pseudo-fine build from level %d", param.level);
 
-    bool is_pseudo_fine_pv = param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV && param.level == 0;
+    bool is_pseudo_fine_pv = is_pv() && param.level == 0;
+
+    bool is_coarse_pv = is_pv() && param.level != 0;
 
     // custom setup for pseudo-fine
     if (is_pseudo_fine_kd) {
       createOptimizedKdDirac();
     } else if (is_pseudo_fine_pv) {
       createDwfPvDirac();
+    } else if (is_coarse_pv) {
+      createCoarsePvDirac();
     } else {
-
-      // create coarse grid operator
-      DiracParam diracParam;
-      diracParam.transfer = transfer;
-
-      // Parameters that matter for coarse construction and application
-      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac *>(diracSmoother) : const_cast<Dirac *>(diracResidual);
-      diracParam.kappa = (param.B[0].Nspin() == 1) ?
-        -1.0 :
-        diracParam.dirac->Kappa(); // -1 cancels automatic kappa in application of Y fields
-      diracParam.mass = diracParam.dirac->Mass();
-      diracParam.mu = diracParam.dirac->Mu();
-      diracParam.mu_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
-
-      // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
-      // preconditioned, or a KD op, we have to force bi-directional builds.
-      diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
-      for (int i = 0; i <= param.level; i++) {
-        if ((param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
-             && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE)
-            || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD
-                || param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
-          diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
-        }
-      }
-
-      diracParam.dagger = QUDA_DAG_NO;
-      diracParam.matpcType = matpc_type;
-      diracParam.type = QUDA_COARSE_DIRAC;
-      diracParam.halo_precision = param.mg_global.precision_null[param.level];
-      diracParam.setup_use_mma = param.mg_global.setup_use_mma[param.level];
-      // level + 1 since this is for the coarse grid
-      diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level + 1];
-      diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
-
-      diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-
-      // create smoothing operators
-      diracParam.dirac = const_cast<Dirac *>(param.matSmooth->Expose());
-      diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level + 1];
-
-      if (param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE) {
-        diracParam.type = QUDA_COARSEPC_DIRAC;
-        diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
-        diracCoarseNull = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
-        {
-          bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
-          for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
-        }
-        diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
-        diracCoarseNullSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
-      } else {
-        diracParam.type = QUDA_COARSE_DIRAC;
-        diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
-        diracCoarseNull = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
-        {
-          bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
-          for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
-        }
-        diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
-        diracCoarseNullSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
-      }
+      createCoarseDirac();
     }
 
     if (matCoarseResidual) delete matCoarseResidual;
@@ -491,6 +431,76 @@ namespace quda
     logQuda(QUDA_VERBOSE, "Coarse Dirac operator done\n");
 
     popLevel();
+  }
+
+  void MG::createCoarseDirac()
+  {
+    // check if we are coarsening the preconditioned system then
+    bool preconditioned_coarsen
+      = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
+    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+
+    // create coarse grid operator
+    DiracParam diracParam;
+    diracParam.transfer = transfer;
+
+    // Parameters that matter for coarse construction and application
+    diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac *>(diracSmoother) : const_cast<Dirac *>(diracResidual);
+    diracParam.kappa = (param.B[0].Nspin() == 1) ?
+      -1.0 :
+      diracParam.dirac->Kappa(); // -1 cancels automatic kappa in application of Y fields
+    diracParam.mass = diracParam.dirac->Mass();
+    diracParam.mu = diracParam.dirac->Mu();
+    diracParam.mu_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
+
+    // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
+    // preconditioned, or a KD op, we have to force bi-directional builds.
+    diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
+    for (int i = 0; i <= param.level; i++) {
+      if ((param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
+           && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE)
+          || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD
+              || param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
+        diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
+      }
+    }
+
+    diracParam.dagger = QUDA_DAG_NO;
+    diracParam.matpcType = matpc_type;
+    diracParam.type = QUDA_COARSE_DIRAC;
+    diracParam.halo_precision = param.mg_global.precision_null[param.level];
+    diracParam.setup_use_mma = param.mg_global.setup_use_mma[param.level];
+    // level + 1 since this is for the coarse grid
+    diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level + 1];
+    diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
+
+    diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+
+    // create smoothing operators
+    diracParam.dirac = const_cast<Dirac *>(param.matSmooth->Expose());
+    diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level + 1];
+
+    if (param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE) {
+      diracParam.type = QUDA_COARSEPC_DIRAC;
+      diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+      diracCoarseNull = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+      {
+        bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
+        for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+      }
+      diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
+      diracCoarseNullSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
+    } else {
+      diracParam.type = QUDA_COARSE_DIRAC;
+      diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+      diracCoarseNull = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+      {
+        bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
+        for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+      }
+      diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
+      diracCoarseNullSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
+    }
   }
 
   void MG::createOptimizedKdDirac()
@@ -620,13 +630,11 @@ namespace quda
 
       diracCoarseResidual = new DiracDomainWall4DPV(diracParamPV);
       diracCoarseSmoother = new DiracDomainWall4DPV(diracParamPV);
-      diracCoarseNull = new DiracDomainWall4DPV(diracParamPV);
       if (mixed_precision_setup) {
         diracParamPV.gauge = sloppy_gauge;
         diracParamPV.dirac = nullptr;
       }
       diracCoarseSmootherSloppy = new DiracDomainWall4DPV(diracParamPV);
-      diracCoarseNullSloppy = new DiracDomainWall4DPV(diracParamPV);
     } else if (dirac_type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
       auto b5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
       auto c5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
@@ -638,17 +646,25 @@ namespace quda
 
       diracCoarseResidual = new DiracMobiusPV(diracParamPV);
       diracCoarseSmoother = new DiracMobiusPV(diracParamPV);
-      diracCoarseNull = new DiracMobiusPV(diracParamPV);
       if (mixed_precision_setup) {
         diracParamPV.gauge = sloppy_gauge;
         diracParamPV.dirac = nullptr;
       }
       diracCoarseSmootherSloppy = new DiracMobiusPV(diracParamPV);
-      diracCoarseNullSloppy = new DiracMobiusPV(diracParamPV);
     } else {
       errorQuda("Invalid fine domain wall operator type %d", dirac_type);
     }
+
+    // near-null vectors are generated with the Wilson operator
+    diracParamPV.type = QUDA_WILSON_DIRAC;
+    warningQuda("The Wilson mass/kappa hasn't been properly set");
+    diracParamPV.gauge = fine_gauge;
+    diracCoarseNull = new DiracWilson(diracParamPV);
+    diracParamPV.gauge = sloppy_gauge;
+    diracCoarseNullSloppy = new DiracWilson(diracParamPV);
   }
+
+  void MG::createCoarsePvDirac() { errorQuda("MG::createCoarsePvDirac has not been implemented yet"); }
 
   void MG::destroyCoarseSolver() {
     pushLevel(param.level);
@@ -826,8 +842,8 @@ namespace quda
     if (param.level < param.Nlevel - 1) {
       if (coarse) delete coarse;
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
-	if (coarse_solver) delete coarse_solver;
-	if (param_coarse_solver) delete param_coarse_solver;
+        if (coarse_solver) delete coarse_solver;
+        if (param_coarse_solver) delete param_coarse_solver;
       }
 
       if (transfer) delete transfer;
@@ -970,16 +986,20 @@ namespace quda
 
     // create coarse residual vector if not already created in verify()
     if (r_coarse.empty()) {
+      auto customLs = is_pv() ? reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getLs() : -1;
+
       r_coarse.resize(1);
-      r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                             param.mg_global.location[param.level + 1]);
+      r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
+                                             r[0].Precision(), param.mg_global.location[param.level + 1]);
     }
 
     // create coarse solution vector if not already created in verify()
     if (x_coarse.empty()) {
+      auto customLs = is_pv() ? reinterpret_cast<const DiracDomainWall *>(diracSmoother)->getLs() : -1;
+
       x_coarse.resize(1);
-      x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r[0].Precision(),
-                                             param.mg_global.location[param.level + 1]);
+      x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
+                                             r[0].Precision(), param.mg_global.location[param.level + 1]);
     }
 
     {

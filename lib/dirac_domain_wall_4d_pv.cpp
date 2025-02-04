@@ -150,4 +150,17 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
+  void DiracDomainWall4DPV::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                           double mu, double mu_factor, bool) const
+  {
+    errorQuda("DiracDomainWall4DPV::createCoarseOp has not been implemented yet");
+
+    /*if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Wilson-type operators only support aggregation coarsening");
+
+    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    CloverField *c = nullptr;
+    CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);*/
+  }
+
 } // end namespace quda

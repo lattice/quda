@@ -495,7 +495,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    // Is not a staggered solve, always aggregate
+    // This signals if we're doing a dwf PV solver or a regular aggregation-based solve
     // mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
     mg_param.transfer_type[i] = (i == 0) ? pseudofine_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
@@ -618,6 +618,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   if (pseudofine_transfer_type == QUDA_TRANSFER_DWF_PV) {
     mg_param.spin_block_size[0] = 1; // we're doing the DWF PV op
+    mg_param.spin_block_size[1] = 2; // we actually coarsen spin 4 -> spin 2 here
   }
 
   mg_param.setup_type = setup_type;

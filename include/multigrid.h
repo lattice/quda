@@ -446,9 +446,19 @@ namespace quda {
     void createNullVectors();
 
     /**
-       @brief Create the coarse dirac operator
+       @brief Build the Dirac operator for the next level down
+    */
+    void buildNextDirac();
+
+    /**
+       @brief Create a traditional aggregated coarse operator
     */
     void createCoarseDirac();
+
+    /**
+       @brief Create the 4-d coarsened Pauli-Villars operator
+    */
+    void createCoarsePvDirac();
 
     /**
        @brief Create the optimized KD operator
@@ -537,9 +547,9 @@ namespace quda {
     }
 
     /**
-      @brief Return if we're a PV operator right now
+      @brief Return if this full MG solver is a PV solve
     */
-    bool is_pv() const { return param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_DWF_PV; }
+    bool is_pv() const { return param.mg_global.transfer_type[0] == QUDA_TRANSFER_DWF_PV; }
   };
 
   /**

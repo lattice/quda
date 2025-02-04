@@ -263,6 +263,9 @@ namespace quda {
     } else if (param.type == QUDA_COARSEPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
       return new DiracCoarsePC(param);
+    } else if (param.type == QUDA_COARSEPV_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePV operator\n");
+      return new DiracCoarsePV(param);
     } else if (param.type == QUDA_GAUGE_COVDEV_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeCovDev operator\n");
       return new GaugeCovDev(param);
@@ -310,6 +313,7 @@ namespace quda {
     case QUDA_ASQTADKD_DIRAC:
     case QUDA_COARSE_DIRAC:
     case QUDA_COARSEPC_DIRAC:
+    case QUDA_COARSEPV_DIRAC:
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC: return false;
@@ -372,6 +376,7 @@ namespace quda {
     case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
     case QUDA_COARSE_DIRAC:
     case QUDA_COARSEPC_DIRAC:
+    case QUDA_COARSEPV_DIRAC:
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC: return false;
@@ -434,6 +439,7 @@ namespace quda {
     case QUDA_STAGGEREDKD_DIRAC:
     case QUDA_COARSE_DIRAC:
     case QUDA_COARSEPC_DIRAC:
+    case QUDA_COARSEPV_DIRAC:
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC: return false;
@@ -496,6 +502,7 @@ namespace quda {
     case QUDA_ASQTADKD_DIRAC:
     case QUDA_COARSE_DIRAC:
     case QUDA_COARSEPC_DIRAC:
+    case QUDA_COARSEPV_DIRAC:
     case QUDA_GAUGE_COVDEV_DIRAC:
     case QUDA_GAUGE_LAPLACE_DIRAC:
     case QUDA_GAUGE_LAPLACEPC_DIRAC: return false;

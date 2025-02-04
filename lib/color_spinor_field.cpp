@@ -869,7 +869,7 @@ namespace quda
     return ColorSpinorField(param);
   }
 
-  ColorSpinorField ColorSpinorField::create_coarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+  ColorSpinorField ColorSpinorField::create_coarse(const int *geoBlockSize, int spinBlockSize, int Nvec, int customLs,
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
                                                    QudaMemoryType new_mem_type)
   {
@@ -881,12 +881,31 @@ namespace quda
 
     // Detect if the "coarse" op is actually a "fine" op, aka such as the Kahler-Dirac
     // preconditioned operator or DWF_PV operator that still acts on a fine ColorSpinorField
-    if (geoBlockVolume == 1 && Nvec == nColor && (nSpin == 1 || x[4] > 1)) {
-      coarseParam.nSpin = nSpin;
-      coarseParam.nColor = nColor;
+    if (geoBlockVolume == 1 && Nvec == nColor) {
+      if (nSpin == 1) {
+        // creating pseudo-fine near-nulls
+        coarseParam.nSpin = nSpin;
+        coarseParam.nColor = nColor;
+      }
+      // no need to do anything for dwf, it's covered below
     } else {
       coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
       coarseParam.nColor = Nvec;
+    }
+
+    if (customLs != -1) {
+      if (customLs == 1 && X(4) != 1) {
+        logQuda(QUDA_VERBOSE, "Eliminating the 5th dimension while creating a coarse spinor\n");
+        coarseParam.nDim = 4;
+        coarseParam.x[4] = 1;
+      } else if (customLs > 1 && X(4) != customLs) {
+        logQuda(QUDA_VERBOSE, "Resizing the 5th dimension while creating a coarse spinor\n");
+        coarseParam.nDim = 5;
+        coarseParam.x[4] = customLs;
+      } else {
+        logQuda(QUDA_VERBOSE, "Custom Ls %d requested while creating a coarse spinor but no change was necessary\n",
+                customLs);
+      }
     }
 
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
