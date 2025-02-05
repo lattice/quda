@@ -994,7 +994,36 @@ namespace quda {
     return (DD_(func, file, line, a, b) && DD_(func, file, line, a, args...) && DD_(func, file, line, b, args...));
   }
 
-#define checkDD(...) DD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+  #define checkDD(...) DD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+    /**
+     @brief Helper function for signalling that DD is not supported
+     @param[in] a Input field
+     @return true if all fields are supported
+   */
+  template <typename T1>
+  inline bool NoDD_(const char *func, const char *file, int line, const T1 &a_)
+  {
+    const unwrap_t<T1> &a(a_);
+    if (!a.DD() == false) errorQuda("DD not supported (%s:%d in %s())", file, line, func);
+    return true;
+  }
+
+  /**
+     @brief Helper function for signalling that DD is not supported
+     @param[in] a Input field
+     @param[in] args List of additional fields to check domain decomposition on
+     @return true if all fields match
+   */
+  template <typename T1, typename... Args>
+  inline bool NoDD_(const char *func, const char *file, int line, const T1 &a, const Args &...args)
+  {
+    // checking all possible pairs
+    return (NoDD_(func, file, line, a) && NoDD_(func, file, line, args...));
+  }
+
+  #define assertNoDD(...) NoDD_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
 
   /**
      @brief Return whether data is reordered on the CPU or GPU.  This can set
