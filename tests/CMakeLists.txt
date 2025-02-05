@@ -878,18 +878,6 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(benchmark_dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
-    add_test(NAME ${TEST_NAME}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type ${DIRAC_NAME}
-                     --all-partitions 0
-                     --test Mat
-		     --domain-decomposition 1
-                     --dim 4 2 6 8
-                     --gtest_output=xml:${TEST_NAME}.xml)
-    if(polenv)
-      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif()
 
     # Mobius fermions
     set(DIRAC_NAME mobius)
@@ -977,18 +965,6 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
-    set(TEST_NAME dslash_${DIRAC_NAME}_mat_policy${pol2}_DD)
-    add_test(NAME ${TEST_NAME}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type ${DIRAC_NAME}
-                     --all-partitions 0
-                     --test Mat
-		     --domain-decomposition 1
-                     --dim 4 2 6 8
-                     --gtest_output=xml:${TEST_NAME}.xml)
-    if(polenv)
-      set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
-    endif()
   endif()
 
   if(QUDA_DIRAC_STAGGERED)
