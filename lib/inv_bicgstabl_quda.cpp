@@ -521,6 +521,8 @@ namespace quda {
         blas::xpay(b, -1.0, r_full);
         r2 = b2; // dummy setting
       }
+      for (auto i = 0u; i < b.size(); i++)
+        if (b2[i] == 0) b2[i] = r2[i];
       blas::copy(y, x); // we accumulate into y
     } else {
       blas::copy(r_full, b); // r[0] = b

@@ -275,7 +275,7 @@ namespace quda {
     inline static array<void *, 2> ghost_pinned_recv_buffer_hd = {};
 
     /**
-       Remove ghost pointer for sending to
+       Remote ghost pointer for sending to
     */
     inline static array_3d<void *, 2, QUDA_MAX_DIM, 2> ghost_remote_send_buffer_d;
 

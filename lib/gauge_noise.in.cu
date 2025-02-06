@@ -4,6 +4,7 @@
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/gauge_noise.cuh>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -45,8 +46,6 @@ namespace quda {
     void preTune() { rng.backup(); }
     void postTune() { rng.restore(); }
   };
-
-  template <int...> struct IntList { };
 
   template <typename real, int nColor, int...N>
   void gaugeNoise(GaugeField &U, RNG &rng, QudaNoiseType type, IntList<nColor, N...>)
