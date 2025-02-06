@@ -266,7 +266,7 @@ namespace quda {
     }
 
     /**
-       @brief Project four-component spinor to either chirality
+       @brief Project four-component spinor to either chirality IN THE CHIRAL BASIS
        @param[in] chirality Which chirality
     */
     __device__ __host__ inline ColorSpinor<Float,Nc,2> chiral_project(int chirality) const {
@@ -274,9 +274,7 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<Ns/2; s++) {
 #pragma unroll
-	for (int c=0; c<Nc; c++) {
-	  proj(s,c) = (*this)(chirality*Ns/2+s,c);
-	}
+        for (int c = 0; c < Nc; c++) { proj(s, c) = (*this)(chirality * Ns / 2 + s, c); }
       }
       return proj;
     }
@@ -669,7 +667,7 @@ namespace quda {
     }
 
     /**
-       @brief Reconstruct two-component spinor to a four-component spinor
+       @brief Reconstruct two-component spinor to a four-component spinor IN THE CHIRAL BASIS
        @param[in] chirality Which chirality we assigning to
     */
     __device__ __host__ inline ColorSpinor<Float,Nc,4> chiral_reconstruct(int chirality) const {
@@ -677,9 +675,7 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<Ns; s++) {
 #pragma unroll
-	for (int c=0; c<Nc; c++) {
-	  recon(chirality*Ns+s,c) = (*this)(s,c);
-	}
+        for (int c = 0; c < Nc; c++) { recon(chirality * Ns + s, c) = (*this)(s, c); }
       }
       return recon;
     }

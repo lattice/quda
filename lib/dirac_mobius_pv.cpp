@@ -107,6 +107,13 @@ namespace quda
     Mdag(out, tmp);
   }
 
+  void DiracMobiusPV::ApplyMDwf(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  {
+    checkFullSpinor(out, in);
+
+    DiracMobius::M(out, in);
+  }
+
   void DiracMobiusPV::ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);

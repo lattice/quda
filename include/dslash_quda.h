@@ -936,7 +936,7 @@ namespace quda
      @param[in] in Input field
      @param[in] proj Sign of \pm projection
   */
-  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj);
+  void ApplyChiralProj(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int proj);
 
   /**
      @brief Constructs the mid-point 4D propagator from a 5D domain wall propagator
@@ -951,5 +951,19 @@ namespace quda
      @param[in] in Input field
   */
   void make4DChiralProp(ColorSpinorField &out, ColorSpinorField &in);
+
+  /**
+     @brief Splits a 5-d ColorSpinorField into Ls 4-d ColorSpinorFields
+     @param[out] out Output 4-d fields
+     @param[in] in Input 5-d field
+  */
+  void Split5DTo4DFields(cvector_ref<ColorSpinorField> &out, const ColorSpinorField &in);
+
+  /**
+   @brief Joins Ls 4-d ColorSpinorFields into one 5-d ColorSpinorField
+   @param[out] out Output 5-d field
+   @param[in] in Input 4-d fields
+*/
+  void Join4DTo5DField(ColorSpinorField &out, cvector_ref<const ColorSpinorField> &in);
 
 } // namespace quda

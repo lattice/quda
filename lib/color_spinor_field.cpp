@@ -895,16 +895,16 @@ namespace quda
 
     if (customLs != -1) {
       if (customLs == 1 && X(4) != 1) {
-        logQuda(QUDA_VERBOSE, "Eliminating the 5th dimension while creating a coarse spinor\n");
+        logQuda(QUDA_DEBUG_VERBOSE, "Eliminating the 5th dimension while creating a coarse spinor\n");
         coarseParam.nDim = 4;
         coarseParam.x[4] = 1;
       } else if (customLs > 1 && X(4) != customLs) {
-        logQuda(QUDA_VERBOSE, "Resizing the 5th dimension while creating a coarse spinor\n");
+        logQuda(QUDA_DEBUG_VERBOSE, "Resizing the 5th dimension while creating a coarse spinor\n");
         coarseParam.nDim = 5;
         coarseParam.x[4] = customLs;
       } else {
-        logQuda(QUDA_VERBOSE, "Custom Ls %d requested while creating a coarse spinor but no change was necessary\n",
-                customLs);
+        logQuda(QUDA_DEBUG_VERBOSE,
+                "Custom Ls %d requested while creating a coarse spinor but no change was necessary\n", customLs);
       }
     }
 

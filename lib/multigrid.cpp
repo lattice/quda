@@ -1,12 +1,15 @@
 #include <cstring>
 
-#include <multigrid.h>
-#include <tune_quda.h>
-#include <random_quda.h>
-#include <vector_io.h>
+#include "multigrid.h"
+#include "tune_quda.h"
+#include "random_quda.h"
+#include "vector_io.h"
+
+// for dwf verify
+#include "dslash_quda.h"
 
 // for building the KD inverse op
-#include <staggered_kd_build_xinv.h>
+#include "staggered_kd_build_xinv.h"
 
 namespace quda
 {
@@ -1053,7 +1056,122 @@ namespace quda
     } else if (is_verify_dwf_pv) {
       // If we're doing PV-preconditioned domain wall, we need to skip the verify on level 0
       can_verify = false;
-      logQuda(QUDA_VERBOSE, "Intentionally skipping dwf -> pv^dagger dwf verify because it's not a \"real\" coarsen\n");
+      logQuda(
+        QUDA_VERBOSE, "Performing a custom verify for dwf -> pv^dagger dwf verify: reconstructing dwf from the multi-rhs Wilson + chiral projectors\n");
+
+      // make sure diracNull is the Wilson operator
+      if (diracCoarseNull->getDiracType() != QUDA_WILSON_DIRAC)
+        errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
+
+      const DiracWilson *d_wilson = reinterpret_cast<const DiracWilson *>(diracCoarseNull);
+
+      // get Ls
+      auto Ls = coarse_tmp[0].X(4);
+
+      // create a random rhs
+      auto &rhs = coarse_tmp[0];
+      spinorNoise(rhs, *rng, QUDA_NOISE_UNIFORM);
+
+      // place to store underlying "M" times rhs
+      auto &dwf_lhs = coarse_tmp[1];
+      zero(dwf_lhs);
+
+      // place to store applying the dwf operator built from Wilson bits
+      auto &emul_lhs = coarse_tmp[2];
+      zero(emul_lhs);
+
+      // create a set of 4-d vectors
+      ColorSpinorParam csParam(coarse_tmp[0]);
+      csParam.nDim = 4;
+      csParam.x[4] = 1;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+
+      std::vector<ColorSpinorField> rhs_4(Ls), emul_lhs_4(Ls);
+      for (auto &f : rhs_4) f = ColorSpinorField(csParam);
+      for (auto &f : emul_lhs_4) f = ColorSpinorField(csParam);
+      auto rhs_4d = vector_ref<ColorSpinorField>(rhs_4);
+      auto emul_lhs_4d = vector_ref<ColorSpinorField>(emul_lhs_4);
+
+      if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
+        auto mass = reinterpret_cast<const DiracDomainWall4DPV *>(diracSmoother)->Mass();
+        auto m5 = reinterpret_cast<const DiracDomainWall4DPV *>(diracSmoother)->M5();
+        auto kappa5 = 0.5 / (5.0 + m5);
+
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        std::vector<ColorSpinorField> chiral_plus_4(Ls), chiral_minus_4(Ls);
+        for (auto &f : chiral_plus_4) f = ColorSpinorField(csParam);
+        for (auto &f : chiral_minus_4) f = ColorSpinorField(csParam);
+
+        auto chiral_plus = vector_ref<ColorSpinorField>(chiral_plus_4);
+        auto chiral_minus = vector_ref<ColorSpinorField>(chiral_minus_4);
+
+        // apply the underlying "M"
+        reinterpret_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
+
+        // split rhs
+        Split5DTo4DFields(rhs_4d, rhs);
+
+        // This bit is equivalent to the DWF call:
+        // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
+        //                   profile);
+
+        d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
+        d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
+
+        // This next block is equivalent to the DWF call:
+        // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
+
+        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axpy((s == Ls - 1) ? -mass : 1, chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+          // backwards direction
+          blas::axpy((s == 0) ? -mass : 1, chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+        }
+
+        // This last bit is equivalent to the call:
+        // blas::xpay(in, -kappa5, out);
+
+        blas::xpay(rhs_4d, -kappa5, emul_lhs_4d);
+
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          // for debugging purposes
+          std::vector<ColorSpinorField> dwf_lhs_4(Ls);
+          for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
+          auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
+
+          Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
+
+          // in theory emul_lhs contains the same thing as dwf_lhs on a per-component basis
+          for (int s = 0; s < Ls; s++)
+            printfQuda("s %d norm2 source %e norm2 chiral+ %e norm2 chiral- %e norm2 dwf %e norm2 emul %e\n", s,
+                       blas::norm2(rhs_4d[s]), blas::norm2(chiral_plus[s]), blas::norm2(chiral_minus[s]),
+                       blas::norm2(dwf_lhs_4d[s]), blas::norm2(emul_lhs_4d[s]));
+        }
+
+        // re-join
+        Join4DTo5DField(emul_lhs, emul_lhs_4d);
+
+        // verify
+        double emul_nrm2 = blas::norm2(emul_lhs);
+        double native_nrm2 = blas::norm2(dwf_lhs);
+        auto max_deviation = blas::max_deviation(dwf_lhs, emul_lhs);
+        auto l2_deviation = sqrt(xmyNorm(dwf_lhs, emul_lhs) / native_nrm2);
+
+        logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+                emul_nrm2, native_nrm2, l2_deviation, max_deviation[0]);
+
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+
+      } else if (diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+        // apply the underlying "M"
+        reinterpret_cast<const DiracMobiusPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
+      }
+
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
                || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
       // If we're doing anything with the asqtad operator, the long links can make verification difficult

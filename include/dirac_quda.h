@@ -1022,6 +1022,7 @@ namespace quda {
     void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
     void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
 
+    void ApplyMDwf(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
     void ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
@@ -1207,6 +1208,7 @@ namespace quda {
     void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
     void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
 
+    void ApplyMDwf(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
     void ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,

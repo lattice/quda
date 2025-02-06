@@ -91,6 +91,13 @@ namespace quda
     Mdag(out, tmp);
   }
 
+  void DiracDomainWall4DPV::ApplyMDwf(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  {
+    checkFullSpinor(out, in);
+
+    DiracDomainWall4D::M(out, in);
+  }
+
   void DiracDomainWall4DPV::ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     checkFullSpinor(out, in);
