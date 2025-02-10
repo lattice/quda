@@ -18,8 +18,10 @@ namespace quda {
       tmp = T(param);
     }
 
+    // ensure meta data matches on the produced temporary
     if constexpr (std::is_same_v<T, ColorSpinorField>) {
-      tmp.GammaBasis(a.GammaBasis()); // ensure gamma basis matches
+      tmp.GammaBasis(a.GammaBasis());
+      tmp.Nvec_actual(a.Nvec_actual());
     }
   }
 
@@ -47,6 +49,12 @@ namespace quda {
     } else {            // no entry found, we must allocate a new field
       param.create = QUDA_ZERO_FIELD_CREATE;
       tmp = T(param);
+    }
+
+    // ensure meta data matches on the produced temporary
+    if constexpr (std::is_same_v<T, ColorSpinorField>) {
+      tmp.GammaBasis(param.gammaBasis);
+      tmp.Nvec_actual(param.nVec_actual);
     }
   }
 

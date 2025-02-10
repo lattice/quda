@@ -661,6 +661,9 @@ extern "C" {
     /** Dslash MMA usage on each level of the multigrid */
     QudaBoolean dslash_use_mma[QUDA_MAX_MG_LEVEL];
 
+    /** Transfer MMA usage on each level of the multigrid */
+    QudaBoolean transfer_use_mma[QUDA_MAX_MG_LEVEL];
+
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 

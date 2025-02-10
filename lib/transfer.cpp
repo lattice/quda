@@ -280,7 +280,7 @@ namespace quda {
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      Prolongate(out, in, V, fine_to_coarse_d, spin_map, parity);
+      Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
     } else {
       errorQuda("Invalid transfer type in prolongate");
     }
@@ -314,7 +314,7 @@ namespace quda {
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, parity);
+      Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
 
     } else {
       errorQuda("Invalid transfer type in restrict");

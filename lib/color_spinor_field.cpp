@@ -97,6 +97,7 @@ namespace quda
     nColor = param.nColor;
     nSpin = param.nSpin;
     nVec = param.nVec;
+    nVec_actual = param.nVec_actual;
     twistFlavor = param.twistFlavor;
 
     if (param.pc_type != QUDA_5D_PC && param.pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", param.pc_type);
@@ -230,6 +231,7 @@ namespace quda
     nColor = std::exchange(src.nColor, 0);
     nSpin = std::exchange(src.nSpin, 0);
     nVec = std::exchange(src.nVec, 0);
+    nVec_actual = std::exchange(src.nVec_actual, 0);
     twistFlavor = std::exchange(src.twistFlavor, QUDA_TWIST_INVALID);
     pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
     suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
@@ -293,6 +295,7 @@ namespace quda
       std::stringstream aux_ss;
       aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",order=" << fieldOrder
              << ",Ns=" << nSpin << ",Nc=" << nColor;
+      if (nVec > 1) aux_ss << ",nVec=" << nVec;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
       if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
@@ -524,6 +527,7 @@ namespace quda
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.nVec = nVec;
+    param.nVec_actual = nVec_actual;
     param.twistFlavor = twistFlavor;
     param.fieldOrder = fieldOrder;
     param.setPrecision(precision, ghost_precision); // intentionally called here and not in LatticeField
@@ -1569,6 +1573,8 @@ namespace quda
     out << "init = " << a.init << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
+    out << "nVec = " << a.nVec << std::endl;
+    out << "nVec_actual = " << a.nVec_actual << std::endl;
     out << "twistFlavor = " << a.twistFlavor << std::endl;
     out << "nDim = " << a.nDim << std::endl;
     for (int d = 0; d < a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;

@@ -95,6 +95,9 @@ namespace quda {
     /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
     QudaParity parity;
 
+    /** Whether to apply the transfer operation with MMA */
+    mutable bool _use_mma;
+
     /** Implies whether or not the fine level is a staggered operator, in which
     case we don't actually need to allocate any memory. */
     mutable QudaTransferType transfer_type;
@@ -140,6 +143,8 @@ namespace quda {
      @brief for resetting the Transfer when the null vectors have changed
      */
     void reset();
+
+    void set_use_mma(bool b) const { _use_mma = b; }
 
     /**
      * Apply the prolongator
@@ -244,8 +249,10 @@ namespace quda {
        - V: spatial -> spin/color -> nVec
      @param[out] The output V Matrix field
      @param[in] B input vectors
+     @param[in] from_non_rel whether or not transform B from non-relativistic basis
    */
-  void BlockTransposeForward(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B);
+  void BlockTransposeForward(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B,
+                             bool from_non_rel = false);
 
   /**
      @brief Transpose the a composite V field into B vectors:
@@ -253,8 +260,9 @@ namespace quda {
        - V: spatial -> spin/color -> nVec
      @param[in] The output V Matrix field
      @param[out] B input vectors
+     @param[in] from_non_rel whether or not transform B to non-reletivistic basis
    */
-  void BlockTransposeBackward(const ColorSpinorField &V, const cvector_ref<ColorSpinorField> &B);
+  void BlockTransposeBackward(const ColorSpinorField &V, const cvector_ref<ColorSpinorField> &B, bool to_non_rel = false);
 
   /**
      @brief Apply the prolongation operator
@@ -266,11 +274,15 @@ namespace quda {
      @param[in] parity of the output fine field (if single parity output field)
    */
   void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
-                  const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+                  const int *fine_to_coarse, const int *const *spin_map, bool use_mma, int parity = QUDA_INVALID_PARITY);
 
   template <int coarseColor, int fineColor>
   void Prolongate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                   const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+
+  template <int fineColor, int coarseColor, int nVec>
+  void ProlongateMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                     const int *fine_to_coarse, const int *const *spin_map, int parity);
 
   /**
      @brief Apply the restriction operator
@@ -283,11 +295,17 @@ namespace quda {
      @param[in] parity of the input fine field (if single parity input field)
    */
   void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
-                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, bool use_mma,
+                int parity = QUDA_INVALID_PARITY);
 
   template <int coarseColor, int fineColor>
   void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                 const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+
+  template <int coarseColor, int fineColor, int nVec>
+  void RestrictMma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                   const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map,
+                   int parity = QUDA_INVALID_PARITY);
 
   /**
      @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning
