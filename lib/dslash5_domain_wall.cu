@@ -48,6 +48,10 @@ namespace quda
       return in.size() * flops_;
     }
 
+    // for if out and x alias
+    void preTune() { out.backup(); }
+    void postTune() { out.restore(); }
+
     long long bytes() const
     {
       long long Ls = in.X(4);

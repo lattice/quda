@@ -61,6 +61,10 @@ namespace quda
         return bytes;
       }
 
+      // for if out and x alias
+      void preTune() { out.backup(); }
+      void postTune() { out.restore(); }
+
       unsigned int minThreads() const { return in.VolumeCB() / in.X(4); }
       int blockStep() const { return 4; }
       int blockMin() const { return 4; }
