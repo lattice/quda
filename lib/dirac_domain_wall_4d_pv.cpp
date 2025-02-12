@@ -131,15 +131,14 @@ namespace quda
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
+    checkFullSpinor(x, b);
 
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
+    create_alias(src, b);
+    create_alias(sol, x);
+    auto tmp = getFieldTmp(x);
 
-      src[i] = getFieldTmp(x[i]);
-      ApplyPVDagger(src[i], b[i]);
-
-      sol[i] = x[i].create_alias();
-    }
+    ApplyPVDagger(tmp, b);
+    blas::copy(src, tmp);
   }
 
   void DiracDomainWall4DPV::reconstruct(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,

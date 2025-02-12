@@ -111,24 +111,22 @@ namespace quda
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
+    checkFullSpinor(x, b);
 
-    for (auto i = 0u; i < b.size(); i++) {
-      checkFullSpinor(x[i], b[i]);
+    create_alias(src, b);
+    create_alias(sol, x);
+    auto tmp = getFieldTmp(x);
 
-      src[i] = getFieldTmp(b[i]);
-      KahlerDiracInv(src[i], b[i]);
+    KahlerDiracInv(tmp, b);
 
-      // if we're preconditioning the Schur op, we need to rescale by the mass
-      // parent could be an ASQTAD operator if we've enabled dropping the long links
-      if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
-        // do nothing
-      } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
-        blas::ax(0.5 / mass, src[i]);
-      } else {
-        errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
-      }
-
-      sol[i] = x[i].create_alias();
+    // if we're preconditioning the Schur op, we need to rescale by the mass
+    // parent could be an ASQTAD operator if we've enabled dropping the long links
+    if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
+      blas::copy(src, tmp);
+    } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
+      blas::axy(0.5 / mass, tmp, src);
+    } else {
+      errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
     }
   }
 

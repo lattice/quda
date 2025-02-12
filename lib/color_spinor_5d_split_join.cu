@@ -25,8 +25,6 @@ namespace quda {
       launch<Split5DTo4D>(tp, stream, Split5DTo4DArgs<Float, nColor>(out, in));
     }
 
-    void preTune() { out.backup(); }
-    void postTune() { out.restore(); }
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 
