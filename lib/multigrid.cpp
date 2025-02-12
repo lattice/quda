@@ -1150,29 +1150,35 @@ namespace quda
 
     pushOutputPrefix(prefix);
 
+    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+    QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ?
+      QUDA_EVEN_PARITY :
+      QUDA_ODD_PARITY;
+
     if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
         = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-      QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
-      QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ?
-        QUDA_EVEN_PARITY :
-        QUDA_ODD_PARITY;
       transfer->setSiteSubset(site_subset, parity); // use this to force location of transfer
     }
 
-    // if input vector is single parity then we must be solving the
-    // preconditioned system in general this can only happen on the
-    // top level
     QudaSolutionType outer_solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
     QudaSolutionType inner_solution_type = param.coarse_grid_solution_type;
+    // is the smoother consistent with the coarse grid correction
+    bool smoother_solver_uniform
+      = (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION)
+      || (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION);
 
-    if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
+    // if using preconditioned smoother then need to reconstruct full residual
+    // FIXME extend this check for precision, Schwarz, etc.
+    bool use_solver_residual = presmoother && smoother_solver_uniform;
+
+    if (outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
 
-    if ( inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
+    if (inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
-    if (param.level < param.Nlevel-1) {
+    if (param.level < param.Nlevel - 1) {
       // do the pre smoothing
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
@@ -1182,27 +1188,17 @@ namespace quda
       else
         zero(out);
 
-      auto &solution = inner_solution_type == outer_solution_type ? x : x.Even();
-      diracSmoother->reconstruct(solution, b, inner_solution_type);
-
-      // if using preconditioned smoother then need to reconstruct full residual
-      // FIXME extend this check for precision, Schwarz, etc.
-      bool use_solver_residual
-        = (presmoother
-           && ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION)
-               || (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION))) ?
-        true :
-        false;
+      if (!smoother_solver_uniform) diracSmoother->reconstruct(x, b, inner_solution_type);
 
       // FIXME this is currently borked if inner solver is preconditioned
       const auto &residual = !presmoother       ? b :
         use_solver_residual                     ? presmoother->get_residual() :
         b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<const ColorSpinorField>(r) :
-                                                  cvector_ref<const ColorSpinorField>(r).Even();
+                                                  cvector_ref<const ColorSpinorField>(r)(parity);
 
       if (!use_solver_residual && presmoother) {
         auto &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<ColorSpinorField>(r) :
-                                                                   cvector_ref<ColorSpinorField>(r).Even();
+                                                                   cvector_ref<ColorSpinorField>(r)(parity);
         (*param.matResidual)(residual, x);
         axpby(1.0, b, -1.0, residual);
       }
@@ -1220,13 +1216,13 @@ namespace quda
         // prolongate back to this grid
         auto &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ?
           cvector_ref<ColorSpinorField>(r) :
-          cvector_ref<ColorSpinorField>(r).Even();                   // define according to inner solution type
-        transfer->P(x_coarse_2_fine, x_coarse);                      // repurpose residual storage
-        xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
+          cvector_ref<ColorSpinorField>(r)(parity); // define according to inner solution type
+        transfer->P(x_coarse_2_fine, x_coarse);     // repurpose residual storage
+        xpy(x_coarse_2_fine,
+            inner_solution_type == outer_solution_type ? x : x(parity)); // sum to solution FIXME - do inside the transfer
       }
 
-      // we should keep a copy of the prepared right hand side as we've already destroyed it
-      //dirac.prepare(in, out, solution, residual, inner_solution_type);
+      if (!smoother_solver_uniform) diracSmoother->prepare(out, in, x, b, inner_solution_type);
 
       if (postsmoother)
         (*postsmoother)(out, in); // for inner solve preconditioned, in the should be the original prepared rhs
@@ -1239,7 +1235,6 @@ namespace quda
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
       if (presmoother) (*presmoother)(out, in);
       diracSmoother->reconstruct(x, b, outer_solution_type);
-
     }
 
     popOutputPrefix();
