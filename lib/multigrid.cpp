@@ -1183,18 +1183,15 @@ namespace quda
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
 
-      if (presmoother)
-        (*presmoother)(out, in);
-      else
-        zero(out);
+      if (presmoother) (*presmoother)(out, in);
 
       if (!smoother_solver_uniform) diracSmoother->reconstruct(x, b, inner_solution_type);
 
-      // FIXME this is currently borked if inner solver is preconditioned
-      const auto &residual = !presmoother       ? b :
-        use_solver_residual                     ? presmoother->get_residual() :
-        b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<const ColorSpinorField>(r) :
-                                                  cvector_ref<const ColorSpinorField>(r)(parity);
+      const auto &residual = use_solver_residual ? presmoother->get_residual() :
+        !presmoother && smoother_solver_uniform  ? in :
+        !presmoother                             ? b :
+        b.SiteSubset() == QUDA_FULL_SITE_SUBSET  ? cvector_ref<const ColorSpinorField>(r) :
+                                                   cvector_ref<const ColorSpinorField>(r)(parity);
 
       if (!use_solver_residual && presmoother) {
         auto &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<ColorSpinorField>(r) :
@@ -1206,7 +1203,6 @@ namespace quda
       // We need this to ensure that the coarse level has been created.
       // e.g. in case of iterative setup with MG we use just pre- and post-smoothing at the first iteration.
       if (transfer) {
-
         // restrict to the coarse grid
         transfer->R(r_coarse, residual);
 
@@ -1214,18 +1210,19 @@ namespace quda
         (*coarse_solver)(x_coarse, r_coarse);
 
         // prolongate back to this grid
-        auto &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ?
-          cvector_ref<ColorSpinorField>(r) :
-          cvector_ref<ColorSpinorField>(r)(parity); // define according to inner solution type
-        transfer->P(x_coarse_2_fine, x_coarse);     // repurpose residual storage
-        xpy(x_coarse_2_fine,
-            inner_solution_type == outer_solution_type ? x : x(parity)); // sum to solution FIXME - do inside the transfer
+        if (!presmoother) {
+          transfer->P(inner_solution_type == outer_solution_type ? x : x(parity), x_coarse);
+        } else { // we must sum to the presmoother solution
+          auto &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? cvector_ref<ColorSpinorField>(r) :
+                                                                             cvector_ref<ColorSpinorField>(r)(parity);
+          transfer->P(x_coarse_2_fine, x_coarse); // repurpose residual storage
+          xpy(x_coarse_2_fine, inner_solution_type == outer_solution_type ? x : x(parity));
+        }
       }
 
       if (!smoother_solver_uniform) diracSmoother->prepare(out, in, x, b, inner_solution_type);
 
-      if (postsmoother)
-        (*postsmoother)(out, in); // for inner solve preconditioned, in the should be the original prepared rhs
+      if (postsmoother) (*postsmoother)(out, in);
 
       diracSmoother->reconstruct(x, b, outer_solution_type);
 
