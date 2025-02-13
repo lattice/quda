@@ -219,8 +219,8 @@ namespace quda
     MemAlloc a(func, file, line);
     a.size = a.base_size = size;
     auto q = device::defaultQueue();
-#ifndef USE_QDPJIT
     void *ptr = sycl::malloc_device(size, q);
+#ifndef USE_QDPJIT
     if (!ptr) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
