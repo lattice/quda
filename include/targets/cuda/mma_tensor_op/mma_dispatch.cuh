@@ -9,6 +9,7 @@ namespace quda
   } // namespace hmma
 } // namespace quda
 
+#include <mma_tensor_op/hmma_m16n8k8_sm70.cuh>
 #include <mma_tensor_op/hmma_m16n16k4_sm70.cuh>
 #include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
 
