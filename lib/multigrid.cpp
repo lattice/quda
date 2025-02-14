@@ -764,7 +764,8 @@ namespace quda
     ColorSpinorParam fine_param(param.B[0]);
     fine_param.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
                             fine_param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-    fine_param.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
+    fine_param.gammaBasis
+      = (param.level > 0 || param.B[0].Nspin() == 1) ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
     for (auto &f : fine_tmp) f = ColorSpinorField(fine_param);
 
     std::vector<ColorSpinorField> coarse_tmp(param.Nvec);
