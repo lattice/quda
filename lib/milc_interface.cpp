@@ -110,16 +110,16 @@ void qudaInit(QudaInitArgs_t input)
 
 void qudaCleanUpDeflationSpace()
 {
-    qudamilc_called<true>(__func__);
-    if (preserved_deflation_space) {
+  qudamilc_called<true>(__func__);
+  if (preserved_deflation_space) {
 
-	deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
-        logQuda(QUDA_VERBOSE, "Cleaning up deflation space of size %lu\n", space->evecs.size());
-	space->evecs.clear();
-        space->evals.clear();
-	delete space;
-    }
-    qudamilc_called<false>(__func__);
+    deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+    logQuda(QUDA_VERBOSE, "Cleaning up deflation space of size %lu\n", space->evecs.size());
+    space->evecs.clear();
+    space->evals.clear();
+    delete space;
+  }
+  qudamilc_called<false>(__func__);
 }
 
 void qudaFinalize()
@@ -1013,8 +1013,8 @@ static void setEigensolverParams(QudaEigensolverArgs_t eig_args, QudaEigParam *q
   qep->poly_deg = eig_args.poly_deg;
   qep->a_min = eig_args.a_min;
   qep->a_max = eig_args.a_max;
-  strcpy( qep->vec_infile, eig_args.vec_infile );
-  strcpy( qep->vec_outfile, eig_args.vec_outfile );
+  strcpy(qep->vec_infile, eig_args.vec_infile);
+  strcpy(qep->vec_outfile, eig_args.vec_outfile);
   qep->preserve_evals = eig_args.preserve_evals;
   qep->batched_rotate = eig_args.batched_rotate;
   qep->save_prec = eig_args.save_prec;
@@ -1197,36 +1197,34 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
                 const void *const longlink, void *source, void *solution, double *const final_residual,
                 double *const final_fermilab_residual, int *num_iters)
 {
-  
+
   // If this function is called then QUDA is not doing deflation
   // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
   QudaEigensolverArgs_t eig_args;
   eig_args.struct_size = sizeof(eig_args);
-  eig_args.n_ev_deflate=0;
+  eig_args.n_ev_deflate = 0;
   eig_args.vec_in_parity = QUDA_EVEN_PARITY;
   eig_args.prec_eigensolver = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  qudaInvertDeflatable(external_precision, quda_precision, mass, inv_args, eig_args,
-                target_residual, target_fermilab_residual, fatlink,
-                longlink, source, solution, final_residual,
-                final_fermilab_residual, num_iters);
+  qudaInvertDeflatable(external_precision, quda_precision, mass, inv_args, eig_args, target_residual,
+                       target_fermilab_residual, fatlink, longlink, source, solution, final_residual,
+                       final_fermilab_residual, num_iters);
 
 } // qudaInvert
 
-
-void qudaInvertDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eig_args,
-                double target_residual, double target_fermilab_residual, const void *const fatlink,
-                const void *const longlink, void *source, void *solution, double *const final_residual,
-                double *const final_fermilab_residual, int *num_iters)
+void qudaInvertDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                          QudaEigensolverArgs_t eig_args, double target_residual, double target_fermilab_residual,
+                          const void *const fatlink, const void *const longlink, void *source, void *solution,
+                          double *const final_residual, double *const final_fermilab_residual, int *num_iters)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
-  
+
   // parameters for the eigensolve/deflation
   QudaEigParam qep = newQudaEigParam();
   setEigensolverParams(eig_args, &qep);
-  
-  if(eig_args.struct_size != sizeof(eig_args))
+
+  if (eig_args.struct_size != sizeof(eig_args))
     errorQuda("Unexpected QudaEigensolverArgs_t struct size %lu, expected %lu", eig_args.struct_size, sizeof(eig_args));
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
@@ -1266,20 +1264,20 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
 
   QudaParity local_parity = inv_args.evenodd;
   const double reliable_delta = 1e-1;
-  
+
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
-  
+
   // Deflation for even parity solves
-  invertParam.eig_param =(qep.n_ev_deflate>0) ? &qep : nullptr;
+  invertParam.eig_param = (qep.n_ev_deflate > 0) ? &qep : nullptr;
   if (qep.n_ev_deflate > 0 && local_parity != QUDA_EVEN_PARITY)
     errorQuda("MILC interface deflation currently only supports even parity solves.");
-    
+
   if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
     errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
-    
+
   invertParam.tol_restart = eig_args.tol_restart;
 
   // Eigensolver precision
@@ -1325,7 +1323,6 @@ void qudaInvertDeflatable(int external_precision, int quda_precision, double mas
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaInvertDeflatable
-
 
 void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const fatlink,
                 const void *const longlink, void* src, void* dst, int* num_iters)
@@ -1482,30 +1479,30 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   // Create dummy QudaEigensolverArgs_t that requests 0 eigenvalues
   QudaEigensolverArgs_t eig_args;
   eig_args.struct_size = sizeof(eig_args);
-  eig_args.n_ev_deflate=0;
+  eig_args.n_ev_deflate = 0;
   eig_args.vec_in_parity = QUDA_EVEN_PARITY;
   eig_args.prec_eigensolver = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  qudaInvertMsrcDeflatable(external_precision, quda_precision, mass, inv_args, eig_args,
-                    target_residual, target_fermilab_residual, fatlink,
-                    longlink, sourceArray, solutionArray, final_residual,
-                    final_fermilab_residual, num_iters, num_src);
+  qudaInvertMsrcDeflatable(external_precision, quda_precision, mass, inv_args, eig_args, target_residual,
+                           target_fermilab_residual, fatlink, longlink, sourceArray, solutionArray, final_residual,
+                           final_fermilab_residual, num_iters, num_src);
 
 } // qudaInvertMsrc
 
-void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eig_args,
-                    double target_residual, double target_fermilab_residual, const void *const fatlink,
-                    const void *const longlink, void **sourceArray, void **solutionArray, double *const final_residual,
-                    double *const final_fermilab_residual, int *num_iters, int num_src)
+void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                              QudaEigensolverArgs_t eig_args, double target_residual, double target_fermilab_residual,
+                              const void *const fatlink, const void *const longlink, void **sourceArray,
+                              void **solutionArray, double *const final_residual, double *const final_fermilab_residual,
+                              int *num_iters, int num_src)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
-  
+
   // parameters for the eigensolve/deflation
   QudaEigParam qep = newQudaEigParam();
   setEigensolverParams(eig_args, &qep);
-  
-  if(eig_args.struct_size != sizeof(eig_args))
+
+  if (eig_args.struct_size != sizeof(eig_args))
     errorQuda("Unexpected QudaEigensolverArgs_t struct size %lu, expected %lu", eig_args.struct_size, sizeof(eig_args));
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
@@ -1526,10 +1523,9 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                  inv_args.tadpole, inv_args.naik_epsilon);
 
-  
   const double reliable_delta = 1e-1;
   QudaParity local_parity = inv_args.evenodd;
-  
+
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
@@ -1537,13 +1533,13 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   invertParam.num_src = num_src;
 
   // Deflation for even parity solves
-  invertParam.eig_param =(qep.n_ev_deflate>0) ? &qep : nullptr;
+  invertParam.eig_param = (qep.n_ev_deflate > 0) ? &qep : nullptr;
   if (qep.n_ev_deflate > 0 && local_parity != QUDA_EVEN_PARITY)
     errorQuda("MILC interface deflation currently only supports even parity solves.");
-    
+
   if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
     errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
-    
+
   invertParam.tol_restart = eig_args.tol_restart;
 
   // Eigensolver precision
