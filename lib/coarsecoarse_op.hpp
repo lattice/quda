@@ -58,7 +58,7 @@ namespace quda
       gCoarseAtomic yAccessorAtomic(const_cast<GaugeField &>(Yatomic));
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
 
-      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, true, Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
         gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa,
         mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
@@ -93,7 +93,7 @@ namespace quda
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
-      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
         gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa,
         mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
@@ -153,7 +153,7 @@ namespace quda
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
-      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
         gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v_), v_, kappa,
         mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
