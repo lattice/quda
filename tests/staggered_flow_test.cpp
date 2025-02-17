@@ -556,11 +556,11 @@ printfQuda("HIIII\n");
   printf("Forward method:\n");
   check_fwd.PrintVector(0,0,0);
 
-  for (int dir = 0; dir < 4; dir++) {
-    host_free(qdp_inlink[dir]);
-    host_free(qdp_fatlink[dir]);
-    host_free(qdp_longlink[dir]);
-  }
+  // for (int dir = 0; dir < 4; dir++) {
+  //   host_free(qdp_inlink[dir]);
+  //   host_free(qdp_fatlink[dir]);
+  //   host_free(qdp_longlink[dir]);
+  // }
 
   freeGaugeQuda();
   endQuda();
