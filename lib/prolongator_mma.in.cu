@@ -25,7 +25,7 @@ namespace quda
     int parity;
     QudaFieldLocation location;
 
-    using mma_t = typename mma::mg_mma_prolongator_t<Float>::type;
+    using mma_t = typename mma::mg_mma_prolongator_t<vFloat>::type;
 
     static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
 

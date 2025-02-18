@@ -188,7 +188,8 @@ namespace quda
     static_assert(N % Arg::bN == 0, "N %% Arg::bN != 0.\n");
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
-    __align__(128) extern __shared__ typename mma_t::compute_t smem_ptr[];
+    __align__(128) extern __shared__ int smem[];
+    auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
     typename Config::SmemObjA smem_obj_a_real(smem_ptr);
     typename Config::SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + Config::smem_lda * Arg::bK);
     typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * Arg::bK);

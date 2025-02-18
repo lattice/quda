@@ -58,6 +58,7 @@ set (QUDA_OBJS
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
+  spin_duplicate.cu
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
@@ -182,6 +183,7 @@ configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
 configure_file(spinor_dilute.in.cu spinor_dilute.cu @ONLY)
+configure_file(spin_duplicate.in.cu spin_duplicate.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
 configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)

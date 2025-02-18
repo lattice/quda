@@ -304,9 +304,6 @@ namespace quda {
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField> B_coarse;
 
-    /** Residual vector set */
-    std::vector<ColorSpinorField> r;
-
     /** Coarse residual vector set */
     std::vector<ColorSpinorField> r_coarse;
 
