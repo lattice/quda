@@ -119,7 +119,7 @@ namespace quda {
     }
 
     // Compute initial residual depending on whether we have an initial guess or not.
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
       for (auto i = 0u; i < b.size(); i++)

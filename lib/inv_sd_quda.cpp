@@ -40,7 +40,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     if (is_zero_src(x, b, b2)) return;
 
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       // Compute the true residual
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -83,7 +83,7 @@ namespace quda {
     }
 
     param.iter += k;
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       // Compute the true residual
       mat(r, x);
       auto true_r2 = blas::xmyNorm(b, r);

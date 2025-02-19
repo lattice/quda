@@ -35,29 +35,29 @@ namespace quda
   cvector_ref<const ColorSpinorField> CGNE::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    if (!return_residual) errorQuda("return_residual not enabled");
     // CG residual will match the CGNE residual (FIXME: but only with zero initial guess?)
-    return param.use_init_guess ? xe : cg->get_residual();
+    return use_init_guess ? xe : cg->get_residual();
   }
 
   // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
   void CGNE::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      if (!use_init_guess) blas::zero(x);
       return;
     }
 
     create(x, b);
 
     const int iter0 = param.iter;
-    auto b2 = param.compute_true_res ? blas::norm2(b) : vector<double>(b.size(), 0.0);
+    auto b2 = compute_true_res ? blas::norm2(b) : vector<double>(b.size(), 0.0);
 
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       // compute initial residual
       mmdag.Expose()->M(xe, x);
 
-      if (param.compute_true_res) {
+      if (compute_true_res) {
         bool is_zero = true;
         for (auto i = 0u; i < b2.size(); i++) {
           is_zero = is_zero || b2[i] == 0.0;
@@ -80,7 +80,7 @@ namespace quda
       mmdag.Expose()->Mdag(x, ye);
     }
 
-    if (param.compute_true_res || (param.use_init_guess && param.return_residual)) {
+    if (compute_true_res || (use_init_guess && return_residual)) {
       // compute the true residual
       mmdag.Expose()->M(xe, x);
       blas::xpay(b, -1.0, xe); // xe now holds the residual

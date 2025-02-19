@@ -18,6 +18,9 @@ namespace quda {
     matPrecon(matPrecon),
     matEig(matEig),
     param(param),
+    use_init_guess(param.use_init_guess),
+    compute_true_res(param.compute_true_res),
+    return_residual(param.return_residual),
     deflate_compute(true),
     recompute_evals(!param.eig_param.preserve_evals)
   {
@@ -490,7 +493,7 @@ namespace quda {
 
     for (auto i = 0u; i < r2.size(); i++) {
       auto rhs_str = set_rhs_str(i, r2.size());
-      if (param.compute_true_res) {
+      if (compute_true_res) {
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           logQuda(QUDA_SUMMARIZE,
                   "%s: Convergence at %d iterations, %sL2 relative residual: iterated = %9.6e, true = %9.6e "

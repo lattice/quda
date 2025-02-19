@@ -33,7 +33,7 @@ namespace quda
   cvector_ref<const ColorSpinorField> CGNR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    if (!return_residual) errorQuda("return_residual not enabled");
     return br;
   }
 
@@ -41,7 +41,7 @@ namespace quda
   void CGNR::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      if (!use_init_guess) blas::zero(x);
       return;
     }
 
@@ -49,7 +49,7 @@ namespace quda
 
     const int iter0 = param.iter;
     vector<double> b2(b.size(), 0.0);
-    if (param.compute_true_res) {
+    if (compute_true_res) {
       b2 = blas::norm2(b);
       bool is_zero = true;
       for (auto i = 0u; i < b2.size(); i++) {
@@ -65,12 +65,12 @@ namespace quda
     mdagm.Expose()->Mdag(br, b);
     cg->operator()(x, br);
 
-    if (param.compute_true_res || param.return_residual) {
+    if (compute_true_res || return_residual) {
       // compute the true residual
       mdagm.Expose()->M(br, x);
       blas::xpay(b, -1.0, br); // br now holds the residual
 
-      if (param.compute_true_res) {
+      if (compute_true_res) {
         vector<double> r2(b.size());
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           auto hq = blas::HeavyQuarkResidualNorm(x, br);

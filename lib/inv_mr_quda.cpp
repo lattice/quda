@@ -47,15 +47,15 @@ namespace quda
   cvector_ref<const ColorSpinorField> MR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
-    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
-    if (param.precision != param.precision_sloppy && !param.compute_true_res) blas::copy(r, r_sloppy);
+    if (!return_residual) errorQuda("return_residual not enabled");
+    if (param.precision != param.precision_sloppy && !compute_true_res) blas::copy(r, r_sloppy);
     return r;
   }
 
   void MR::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
     if (param.maxiter == 0 || param.Nsteps == 0) {
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      if (!use_init_guess) blas::zero(x);
       return;
     }
 
@@ -66,7 +66,7 @@ namespace quda
     vector<double> b2 = blas::norm2(b); // Save norm of b
     vector<double> r2;
 
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    if (use_init_guess) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r); // r = b - Ax0
       for (auto i = 0u; i < b.size(); i++)
@@ -145,8 +145,7 @@ namespace quda
       step++;
 
       // FIXME - add over/under relaxation in outer loop
-      bool compute_true_res = param.compute_true_res || param.Nsteps > 1;
-      if (compute_true_res) {
+      if (compute_true_res || param.Nsteps > 1) {
         mat(r, x);
         r2 = blas::xmyNorm(b, r);
         for (auto i = 0u; i < b2.size(); i++) param.true_res[i] = sqrt(r2[i] / b2[i]);
