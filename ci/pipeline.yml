@@ -10,13 +10,13 @@ variables:
 
 build_job:
   stage: build
-  extends: .container-builder
+  extends: .container-builder-cscs-gh200
   variables:
     DOCKERFILE: ci/docker/Dockerfile.build
 
 test_job:
   stage: test
-  extends: .container-runner-daint-gpu
+  extends: .container-runner-daint-gh200
   image: $PERSIST_IMAGE_NAME
   script:
     - ctest --test-dir /quda/build/ --output-on-failure
