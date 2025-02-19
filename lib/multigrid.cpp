@@ -249,25 +249,17 @@ namespace quda
   {
     pushLevel(param.level);
 
-    if (presmoother) {
-      delete presmoother;
-      presmoother = nullptr;
-    }
+    if (postsmoother && postsmoother != presmoother) delete postsmoother;
+    postsmoother = nullptr;
 
-    if (param_presmooth) {
-      delete param_presmooth;
-      param_presmooth = nullptr;
-    }
+    if (presmoother) delete presmoother;
+    presmoother = nullptr;
 
-    if (postsmoother) {
-      delete postsmoother;
-      postsmoother = nullptr;
-    }
+    if (param_postsmooth) delete param_postsmooth;
+    param_postsmooth = nullptr;
 
-    if (param_postsmooth) {
-      delete param_postsmooth;
-      param_postsmooth = nullptr;
-    }
+    if (param_presmooth) delete param_presmooth;
+    param_presmooth = nullptr;
 
     popLevel();
   }
@@ -331,10 +323,14 @@ namespace quda
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
 
-      postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
-        Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                       *param.matSmoothSloppy) :
-        nullptr;
+      if (presmoother && param_postsmooth->inv_type == param_presmooth->inv_type && param.nu_post == param.nu_pre) {
+        postsmoother = presmoother;
+      } else {
+        postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
+          Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                         *param.matSmoothSloppy) :
+          nullptr;
+      }
     }
     logQuda(QUDA_VERBOSE, "Smoother done\n");
 
@@ -721,16 +717,11 @@ namespace quda
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       if (matCoarseResidual) delete matCoarseResidual;
       if (diracCoarseResidual) delete diracCoarseResidual;
-      if (postsmoother) delete postsmoother;
-      if (param_postsmooth) delete param_postsmooth;
     }
 
-    if (rng) {
-      delete rng;
-    }
+    if (rng) delete rng;
 
-    if (presmoother) delete presmoother;
-    if (param_presmooth) delete param_presmooth;
+    destroySmoother();
     if (param_coarse) delete param_coarse;
 
     popLevel();
@@ -1174,7 +1165,10 @@ namespace quda
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
 
-      if (presmoother) (*presmoother)(out, in);
+      if (presmoother) {
+        presmoother->update_param(*param_presmooth);
+        (*presmoother)(out, in);
+      }
 
       if (!smoother_solver_uniform) diracSmoother->reconstruct(x, b, inner_solution_type);
 
@@ -1210,7 +1204,10 @@ namespace quda
 
       if (!smoother_solver_uniform) diracSmoother->prepare(out, in, x, b, inner_solution_type);
 
-      if (postsmoother) (*postsmoother)(out, in);
+      if (postsmoother) {
+        postsmoother->update_param(*param_postsmooth);
+        (*postsmoother)(out, in);
+      }
 
       diracSmoother->reconstruct(x, b, outer_solution_type);
 
