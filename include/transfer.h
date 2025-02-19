@@ -49,6 +49,9 @@ namespace quda {
     /** Block-normalized null-space components that define the prolongator */
     mutable ColorSpinorField V;
 
+    /** Copy of the null-space components reordered to be mma compatible */
+    mutable ColorSpinorField V_mma;
+
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
     mutable ColorSpinorField fine_tmp_h;
 
@@ -84,19 +87,19 @@ namespace quda {
     int spin_bs;
 
     /** The mapping onto coarse spin from fine spin (inner) and fine parity (outer), for staggered */
-    int **spin_map;
+    int **spin_map = nullptr;
 
     /** Nspin for the fine level. Required for deallocating spin_map. */
     const int nspin_fine;
 
     /** Whether the transfer operator is to be applied to full fields or single parity fields */
-    QudaSiteSubset site_subset;
+    QudaSiteSubset site_subset = QUDA_FULL_SITE_SUBSET;
 
     /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
-    QudaParity parity;
+    QudaParity parity = QUDA_INVALID_PARITY;
 
     /** Whether to apply the transfer operation with MMA */
-    mutable bool _use_mma;
+    mutable bool _use_mma = false;
 
     /** Implies whether or not the fine level is a staggered operator, in which
     case we don't actually need to allocate any memory. */
@@ -144,7 +147,7 @@ namespace quda {
      */
     void reset();
 
-    void set_use_mma(bool b) const { _use_mma = b; }
+    void set_use_mma(bool b) const;
 
     /**
      * Apply the prolongator
@@ -170,7 +173,7 @@ namespace quda {
      * @param location Which memory space are we requesting
      * @return The V field const reference
      */
-    const ColorSpinorField &Vectors() const { return V; }
+    const ColorSpinorField &Vectors() const { return _use_mma ? V_mma : V; }
 
     /**
      * Returns the number of near nullvectors

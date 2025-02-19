@@ -107,7 +107,6 @@ namespace quda
         transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
                                 param.spinBlockSize, param.mg_global.precision_null[param.level],
                                 param.mg_global.transfer_type[param.level]);
-        transfer->set_use_mma(param.transfer_use_mma);
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -152,6 +151,9 @@ namespace quda
       for (int i = 0; i < param.Nvec; i++) { param.B[i].prefetch(QUDA_CPU_FIELD_LOCATION); }
 
       createCoarseDirac();
+
+      // once coarse operators has been constructed, enable MMA for the transfer operators
+      transfer->set_use_mma(param.transfer_use_mma);
     }
 
     // delay allocating smoother until after coarse-links have been created
