@@ -20,7 +20,7 @@ test_job:
   image: $PERSIST_IMAGE_NAME
   script:
     - export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
-    - export LD_PRELOAD="/usr/lib64/libmpi_gtl_cuda.so
+    - export LD_PRELOAD=/usr/lib64/libmpi_gtl_cuda.so
     - ctest --test-dir /quda/build/ --output-on-failure
   variables:
     CRAY_CUDA_MPS: 0
