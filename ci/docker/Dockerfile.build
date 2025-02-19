@@ -26,9 +26,9 @@ RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
 
 COPY . /quda/src
 
-ENV QUDA_TEST_GRID_SIZE="1 1 1 2"
+ENV QUDA_TEST_GRID_SIZE="1 1 2 2"
 
-RUN  QUDA_TEST_GRID_SIZE="1 1 1 2" cmake -S /quda/src \
+RUN  QUDA_TEST_GRID_SIZE=$QUDA_TEST_GRID_SIZE cmake -S /quda/src \
     -DCMAKE_CUDA_COMPILER=nvcc \
     -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
     -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
