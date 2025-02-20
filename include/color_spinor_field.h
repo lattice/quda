@@ -690,6 +690,8 @@ namespace quda
       */
     bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
 
+    bool is_reference() const { return reference; }
+
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
 
