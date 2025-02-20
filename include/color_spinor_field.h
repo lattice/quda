@@ -478,6 +478,8 @@ namespace quda
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
+    void set_data(void *v, QudaMemoryType type) { this->v = {v, type}; }
+
     /**
        @brief Return pointer to the field allocation
     */

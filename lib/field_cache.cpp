@@ -39,15 +39,17 @@ namespace quda {
 
   template <typename T> FieldTmp<T>::FieldTmp(typename T::param_type param)
   {
+    auto create = param.create;
     param.create = QUDA_REFERENCE_FIELD_CREATE;
-    key = FieldKey(T(param));
+    key = FieldKey(T(param), create == QUDA_REFERENCE_FIELD_CREATE);
 
     auto it = cache.find(key);
     if (it != cache.end() && it->second.size()) { // found an entry
       tmp = std::move(it->second.top());
       it->second.pop(); // pop the defunct object
+      if (create == QUDA_REFERENCE_FIELD_CREATE) tmp.set_data(param.v, param.mem_type);
     } else {            // no entry found, we must allocate a new field
-      param.create = QUDA_ZERO_FIELD_CREATE;
+      param.create = create;
       tmp = T(param);
     }
 

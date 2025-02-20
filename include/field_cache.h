@@ -24,7 +24,10 @@ namespace quda {
        @brief Constructor for FieldKey
        @param[in] a Field whose key we wish to generate
     */
-    FieldKey(const T &a) : volume(a.VolString()), aux(a.AuxString()) { }
+    FieldKey(const T &a, bool is_ref = false) : volume(a.VolString()), aux(a.AuxString())
+    {
+      if (is_ref) aux.append(",ref");
+    }
 
     /**
        @brief Less than operator used for ordering in the container
