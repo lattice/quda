@@ -1678,10 +1678,7 @@ namespace quda
           !presmoother && smoother_solver_uniform  ? in :
           !presmoother                             ? b :
                                                      r;
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/develop
         // restrict to the coarse grid
         transfer->R(r_coarse, residual);
 
