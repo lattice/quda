@@ -67,7 +67,7 @@ namespace quda
                 const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity,
                 IntList<fineColor, N...>)
   {
-    if (in[0].Ncolor() == fineColor) {
+    if (in[0].Ncolor() / in[0].Nvec() == fineColor) {
       // clang-format off
       IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
       // clang-format on
@@ -76,7 +76,7 @@ namespace quda
       if constexpr (sizeof...(N) > 0) {
         Restrict<use_mma>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity, IntList<N...>());
       } else {
-        errorQuda("Fine Nc = %d has not been instantiated", in[0].Ncolor());
+        errorQuda("Fine Nc = %d has not been instantiated", in[0].Ncolor() / in[0].Nvec());
       }
     }
   }

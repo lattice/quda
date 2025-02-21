@@ -1152,8 +1152,8 @@ namespace quda
 
     ColorSpinorParam csParam(b[0]);
     auto r = getFieldTmp<ColorSpinorField>(presmoother ? b.size() : 0, csParam);
-    resize(r_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
-    resize(x_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
+    resize(r_coarse, b.size_actual(), QUDA_NULL_FIELD_CREATE);
+    resize(x_coarse, b.size_actual(), QUDA_NULL_FIELD_CREATE);
 
     if (outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");

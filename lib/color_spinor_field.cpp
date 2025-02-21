@@ -686,7 +686,8 @@ namespace quda
   bool ColorSpinorField::are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     return (a.SiteSubset() == b.SiteSubset() && a.VolumeCB() == b.VolumeCB() && a.Ncolor() == b.Ncolor()
-            && a.Nspin() == b.Nspin() && a.Nvec() == b.Nvec() && a.TwistFlavor() == b.TwistFlavor());
+            && a.Nspin() == b.Nspin() && a.Nvec() == b.Nvec() && a.TwistFlavor() == b.TwistFlavor() &&
+            a.Location() == b.Location() && a.MemType() == b.MemType());
   }
 
   bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorField &b)

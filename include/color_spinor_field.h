@@ -925,6 +925,11 @@ namespace quda
      */
     static void test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
 
+    static bool are_aliases(const ColorSpinorField &a, const ColorSpinorField &b)
+    {
+      return are_compatible(a, b) && a.data() == b.data();
+    }
+
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
     friend struct ColorSpinorParam;
   };

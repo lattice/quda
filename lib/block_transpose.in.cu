@@ -198,11 +198,13 @@ namespace quda
 
   void BlockTransposeForward(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B, bool from_non_rel)
   {
+    if (ColorSpinorField::are_aliases(V, B[0])) return;
     block_transpose(V, B, from_non_rel);
   }
 
   void BlockTransposeBackward(const ColorSpinorField &V, cvector_ref<ColorSpinorField> &B, bool to_non_rel)
   {
+    if (ColorSpinorField::are_aliases(V, B[0])) return;
     block_transpose(V, B, to_non_rel);
   }
 
