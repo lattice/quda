@@ -21,11 +21,12 @@ namespace quda {
   /** This is the arg struct used for all multigrid coarse-grid
       construction.  The same instance is reused for different
       kernels */
-  template <bool from_coarse_, typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
+  template <bool from_coarse_, typename Float_, typename store_t_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
             typename coarseGaugeAtomic, typename fineGauge, typename fineSpinorAV_, typename fineSpinorUV_,
             typename fineSpinorV_, typename fineClover>
   struct CalculateYArg : kernel_param<> {
     using Float = Float_; /** Float Precision of the computation */
+    using store_t = store_t_; /** Stoarge type */
 
     using fineSpinorV = fineSpinorV_; /** Type of the fine grid spinor field */
     using fineSpinorUV = fineSpinorUV_; /** Type of the temporary that stores the fine-link * spinor field product */

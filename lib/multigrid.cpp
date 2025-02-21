@@ -961,8 +961,6 @@ namespace quda
   {
     pushLevel(param.level);
 
-    saveTuneCache();
-
     QudaPrecision prec
       = std::min(param.mg_global.precision_null[param.level], param.mg_global.invert_param->cuda_prec_sloppy);
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
@@ -1661,7 +1659,6 @@ namespace quda
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
     if (param.level < param.Nlevel - 1) {
-      // do the pre smoothing
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
 
@@ -1681,6 +1678,10 @@ namespace quda
           !presmoother && smoother_solver_uniform  ? in :
           !presmoother                             ? b :
                                                      r;
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/develop
         // restrict to the coarse grid
         transfer->R(r_coarse, residual);
 

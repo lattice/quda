@@ -124,14 +124,14 @@ namespace quda {
   template <typename T> auto getFieldTmp(const T &a) { return FieldTmp<T>(a); }
 
   /**
-     @brief Get a field temporary that is identical to the field
-     instance argument.  If a matching field is present in the cache,
+     @brief Get a field temporary that correspond to the field
+     parameter argument.  If a matching field is present in the cache,
      it will be popped from the cache.  If no such temporary exists, a
      temporary will be allocated.  When the destructor for the
      FieldTmp is called, e.g., the returned object goes out of scope,
      the temporary will be pushed onto the cache.
 
-     @param[in] a Field we wish to create a matching temporary for
+     @param[in] a Field paramer we wish to create a matching temporary for
    */
   template <typename T> auto getFieldTmp(const typename T::param_type &param) { return FieldTmp<T>(param); }
 
@@ -163,6 +163,7 @@ namespace quda {
      allocated.  When the destructor is called, e.g.,
      the returned object goes out of scope, the temporaries will be
      pushed onto the cache.
+
      @param[in] a Field param we wish to create a matching vector of temporaries for
    */
   template <typename T> auto getFieldTmp(size_t size, const typename T::param_type &param)
