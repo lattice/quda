@@ -314,9 +314,6 @@ namespace quda {
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField> B_coarse;
 
-    /** Residual vector set */
-    std::vector<ColorSpinorField> r;
-
     /** Coarse residual vector set */
     std::vector<ColorSpinorField> r_coarse;
 
@@ -494,6 +491,11 @@ namespace quda {
     void verify(bool recursively = false);
 
     /**
+       @brief Special verification for the domain wall PV operator
+     */
+    void verifyDwfPV();
+
+    /**
        This applies the V-cycle to the residual vector returning the residual vector
        @param out The solution vector
        @param in The residual vector (or equivalently the right hand side vector)
@@ -550,6 +552,18 @@ namespace quda {
       @brief Return if this full MG solver is a PV solve
     */
     bool is_pv() const { return param.mg_global.transfer_type[0] == QUDA_TRANSFER_DWF_PV; }
+
+    /**
+      @brief Get the outermost Dirac type
+      @return Outermost Dirac type
+     */
+    QudaDiracType get_outermost_dirac_type() const
+    {
+      MGParam *local_param = &param;
+      while (local_param->fine != nullptr) local_param = &local_param->fine->param;
+
+      return local_param->matSmooth->Expose()->getDiracType();
+    }
   };
 
   /**

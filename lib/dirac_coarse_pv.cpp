@@ -8,25 +8,40 @@
 namespace quda
 {
 
-  DiracCoarsePV::DiracCoarsePV(const DiracParam &param, bool gpu_setup) : DiracCoarse(param, gpu_setup)
+  DiracCoarsePV::DiracCoarsePV(const DiracParam &param, bool gpu_setup) :
+    DiracCoarse(param, gpu_setup),
+    m5(param.m5),
+    kappa5(0.5 / (5.0 + m5)),
+    Ls(param.Ls),
+    parent_dwf(param.parent_dwf),
+    mass_pv(1.0)
   {
-    /* do nothing */
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    prepareMobiusCoefficients(param);
   }
 
   DiracCoarsePV::DiracCoarsePV(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
                                std::shared_ptr<GaugeField> Xinv_h, std::shared_ptr<GaugeField> Yhat_h,
                                std::shared_ptr<GaugeField> Y_d, std::shared_ptr<GaugeField> X_d,
                                std::shared_ptr<GaugeField> Xinv_d, std::shared_ptr<GaugeField> Yhat_d) :
-    DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
+    DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d),
+    m5(param.m5),
+    kappa5(0.5 / (5.0 + m5)),
+    Ls(param.Ls),
+    parent_dwf(param.parent_dwf),
+    mass_pv(1.0)
   {
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    prepareMobiusCoefficients(param);
   }
 
-  DiracCoarsePV::DiracCoarsePV(const DiracCoarse &dirac, const DiracParam &param) : DiracCoarse(dirac, param)
+  DiracCoarsePV::DiracCoarsePV(const DiracCoarse &dirac, const DiracParam &param) :
+    DiracCoarse(dirac, param),
+    m5(param.m5),
+    kappa5(0.5 / (5.0 + m5)),
+    Ls(param.Ls),
+    parent_dwf(param.parent_dwf),
+    mass_pv(1.0)
   {
-    /* do nothing */
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    prepareMobiusCoefficients(param);
   }
 
   void DiracCoarsePV::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -107,30 +122,42 @@ namespace quda
   void DiracCoarsePV::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
                                      double mu_factor, bool) const
   {
-    errorQuda("DiracCoarsePV::createCoarseOp has not been implemented yet");
-
-    /*if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
-      errorQuda("Coarse operators only support aggregation coarsening");
-
-    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
-      initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
-                     QUDA_MATPC_INVALID, need_bidirectional);
-    } else {
-      initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      if (Y.Order() != X.Order()) { errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order()); }
-      bool use_mma = Y.Order() == QUDA_MILC_GAUGE_ORDER;
-      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
-                     QUDA_MATPC_INVALID, need_bidirectional, use_mma);
-    }*/
+    errorQuda("DiracCoarsePV does not define createCoarseOp, construct a DiracCoarse first instead");
   }
 
   void DiracCoarsePV::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
-    errorQuda("DiracCoarsePV has not been implemented yet");
-    Dirac::prefetch(mem_space, stream);
-    if (Y_d) Y_d->prefetch(mem_space, stream);
-    if (X_d) X_d->prefetch(mem_space, stream);
+    DiracCoarse::prefetch(mem_space, stream);
+  }
+
+  void DiracCoarsePV::prepareMobiusCoefficients(const DiracParam &param)
+  {
+    if (parent_dwf == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+      memcpy(b_5, param.b_5, sizeof(Complex) * param.Ls);
+      memcpy(c_5, param.c_5, sizeof(Complex) * param.Ls);
+
+      double b = b_5[0].real();
+      double c = c_5[0].real();
+      mobius_kappa_b = 0.5 / (b * (m5 + 4.) + 1.);
+      mobius_kappa_c = 0.5 / (c * (m5 + 4.) - 1.);
+
+      mobius_kappa = mobius_kappa_b / mobius_kappa_c;
+
+      // check if doing zMobius
+      for (int i = 0; i < Ls; i++) {
+        if (b_5[i].imag() != 0.0 || c_5[i].imag() != 0.0
+            || (i < Ls - 1 && (b_5[i] != b_5[i + 1] || c_5[i] != c_5[i + 1]))) {
+          zMobius = true;
+        }
+      }
+
+      if (zMobius) {
+        logQuda(QUDA_VERBOSE, "%s: Detected variable or complex cofficients: using zMobius\n", __func__);
+      } else {
+        logQuda(QUDA_VERBOSE, "%s: Detected fixed real cofficients: using regular Mobius\n", __func__);
+      }
+
+      if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA"); }
+    }
   }
 } // namespace quda

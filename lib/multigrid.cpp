@@ -36,25 +36,6 @@ namespace quda
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
 
-    // allocating vectors
-    {
-      // create residual vectors
-      ColorSpinorParam csParam(param.B[0]);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      csParam.location = param.location;
-      csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
-                           csParam.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-      if (csParam.location == QUDA_CUDA_FIELD_LOCATION) {
-        if (param.transfer_type == QUDA_TRANSFER_DWF_PV)
-          csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS; // special case for the PV^dag prec op
-        else
-          csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
-      }
-      if (param.B[0].Nspin() == 1)
-        csParam.gammaBasis = param.B[0].GammaBasis(); // hack for staggered to avoid unnecessary basis checks
-      resize(r, 1, csParam);
-    }
-
     rng = new RNG(param.B[0], 1234);
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE && param.level < param.Nlevel - 1) {
@@ -120,14 +101,18 @@ namespace quda
         if (r_coarse.empty()) {
           r_coarse.resize(1);
           r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
-                                                 r[0].Precision(), param.mg_global.location[param.level + 1]);
+                                                 param.mg_global.invert_param->cuda_prec_sloppy,
+                                                 param.mg_global.location[param.level + 1]);
+          if (is_pv() && param.level == 0) r_coarse[0].GammaBasis(QUDA_UKQCD_GAMMA_BASIS);
         }
 
         // create coarse solution vector if not already created in verify()
         if (x_coarse.empty()) {
           x_coarse.resize(1);
           x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
-                                                 r[0].Precision(), param.mg_global.location[param.level + 1]);
+                                                 param.mg_global.invert_param->cuda_prec_sloppy,
+                                                 param.mg_global.location[param.level + 1]);
+          if (is_pv() && param.level == 0) x_coarse[0].GammaBasis(QUDA_UKQCD_GAMMA_BASIS);
         }
 
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
@@ -359,10 +344,7 @@ namespace quda
     if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
       if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
         // Initializing to random vectors
-        for (int i = 0; i < (int)param.B.size(); i++) {
-          spinorNoise(r[0], *rng, QUDA_NOISE_UNIFORM);
-          param.B[i] = r[0];
-        }
+        for (int i = 0; i < (int)param.B.size(); i++) { spinorNoise(param.B[i], *rng, QUDA_NOISE_UNIFORM); }
       }
       if (param.mg_global.num_setup_iter[param.level] > 0) {
         if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE
@@ -608,7 +590,7 @@ namespace quda
     // Check to make sure the smoother is for the full operator
     auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
     if (smoother_solve_type != QUDA_DIRECT_SOLVE) {
-      errorQuda("Invalid solve type %d for optimized KD operator", smoother_solve_type);
+      errorQuda("Invalid solve type %d for optimized PV operator", smoother_solve_type);
     }
 
     // Get the fine and sloppy gauge fields
@@ -661,13 +643,105 @@ namespace quda
     // near-null vectors are generated with the Wilson operator
     diracParamPV.type = QUDA_WILSON_DIRAC;
     warningQuda("The Wilson mass/kappa hasn't been properly set");
+    // diracParamPV.kappa = param.mg_global.kappa_dwf_null;
     diracParamPV.gauge = fine_gauge;
     diracCoarseNull = new DiracWilson(diracParamPV);
     diracParamPV.gauge = sloppy_gauge;
     diracCoarseNullSloppy = new DiracWilson(diracParamPV);
   }
 
-  void MG::createCoarsePvDirac() { errorQuda("MG::createCoarsePvDirac has not been implemented yet"); }
+  void MG::createCoarsePvDirac()
+  {
+    auto dirac_type = diracSmoother->getDiracType();
+
+    if (dirac_type != QUDA_DOMAIN_WALL_4DPV_DIRAC && dirac_type != QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC)
+      errorQuda("Unexpected Dirac type %d for CoarsePv build", dirac_type);
+
+    // lots of checks to make sure the coarse system is also a full system
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION)
+      errorQuda("Unexpected coarse grid solution type %d, expecting %d", param.coarse_grid_solution_type,
+                QUDA_MAT_SOLUTION);
+
+    // Check to make sure the smoother is for the full operator
+    auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
+    if (smoother_solve_type != QUDA_DIRECT_SOLVE) {
+      errorQuda("Invalid solve type %d for coarse PV operator", smoother_solve_type);
+    }
+
+    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+
+    // create coarse grid operator
+    DiracParam diracParam;
+    diracParam.transfer = transfer;
+
+    // Here's a sneaky one: we build the null operator *first*, since it's just a vanilla
+    // DiracCoarse and it'll get us the coarse X and Y fields we need.
+    // Note that this bakes a "kappa" into the operator, which we'll have to undo later.
+
+    // Parameters that matter for coarse construction and application
+    diracParam.dirac = const_cast<Dirac *>(diracNull);
+    diracParam.kappa = diracParam.dirac->Kappa();
+    warningQuda("diracParam.kappa needs to be set properly for null space generation");
+    diracParam.mass = diracParam.dirac->Mass();
+    diracParam.mu = diracParam.dirac->Mu(); // ignored
+    diracParam.mu_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level]; // ignored
+
+    // We're always coarsening the simple Wilson operator so we don't need a bidirectional build
+    diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
+
+    diracParam.dagger = QUDA_DAG_NO;
+    diracParam.matpcType = matpc_type; // ignored
+    diracParam.type = QUDA_COARSE_DIRAC;
+    diracParam.halo_precision = param.mg_global.precision_null[param.level];
+    diracParam.setup_use_mma = param.mg_global.setup_use_mma[param.level];
+    // level + 1 since this is for the coarse grid
+    diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level + 1];
+    diracParam.allow_truncation = false;
+
+    diracParam.type = QUDA_COARSE_DIRAC;
+    diracCoarseNull = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+
+    // create the sloppy null
+    diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level + 1];
+    {
+      bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
+      for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+    }
+    diracCoarseNullSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
+
+    // Now we build the CoarsePV operator
+    diracParam.dirac = const_cast<Dirac *>(param.matSmooth->Expose());
+    diracParam.Ls = diracParam.dirac->getLs(); // param.mg_global.custom_ls[param.level + 1]
+    diracParam.m5 = diracParam.dirac->M5();
+    diracParam.parent_dwf = get_outermost_dirac_type();
+
+    if (diracParam.parent_dwf == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+      auto b5 = diracSmoother->getB5();
+      auto c5 = diracSmoother->getC5();
+      for (int i = 0; i < diracParam.Ls; i++) {
+        diracParam.b_5[i] = b5[i];
+        diracParam.c_5[i] = c5[i];
+      }
+    }
+
+    diracParam.type = QUDA_COARSEPV_DIRAC;
+
+    // temporarily restore values
+    diracParam.halo_precision = param.mg_global.precision_null[param.level];
+    for (int i = 0; i < 4; i++) diracParam.commDim[i] = 1;
+
+    // build the residual operator
+    diracCoarseResidual = new DiracCoarsePV(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
+
+    // create smoothing operators
+    diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level + 1];
+    diracCoarseSmoother = new DiracCoarsePV(static_cast<DiracCoarse &>(*diracCoarseNull), diracParam);
+    {
+      bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
+      for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+    }
+    diracCoarseSmootherSloppy = new DiracCoarsePV(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
+  }
 
   void MG::destroyCoarseSolver() {
     pushLevel(param.level);
@@ -887,10 +961,10 @@ namespace quda
   {
     pushLevel(param.level);
 
-    QudaPrecision prec = (param.mg_global.precision_null[param.level] < r[0].Precision()) ?
-      param.mg_global.precision_null[param.level] :
-      r[0].Precision();
+    saveTuneCache();
 
+    QudaPrecision prec
+      = std::min(param.mg_global.precision_null[param.level], param.mg_global.invert_param->cuda_prec_sloppy);
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
     // moreover, we can improve the precision of block ortho with a tighter max than 1.0
@@ -904,13 +978,23 @@ namespace quda
 
     // temporary fields used for verification
     std::vector<ColorSpinorField> fine_tmp(param.Nvec);
-    ColorSpinorParam fine_param(r[0]);
-    fine_param.create = QUDA_NULL_FIELD_CREATE;
+    ColorSpinorParam fine_param(param.B[0]);
+    fine_param.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
+                            fine_param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+    if (param.transfer_type == QUDA_TRANSFER_DWF_PV && param.level == 1)
+      fine_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    else
+      fine_param.gammaBasis
+        = (param.level > 0 || param.B[0].Nspin() == 1) ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
     for (auto &f : fine_tmp) f = ColorSpinorField(fine_param);
 
     std::vector<ColorSpinorField> coarse_tmp(param.Nvec);
     ColorSpinorParam coarse_param(r_coarse[0]);
     coarse_param.create = QUDA_NULL_FIELD_CREATE;
+    if (is_pv() && param.level != 0) {
+      coarse_param.nDim = 4;
+      coarse_param.x[4] = 1;
+    }
     for (auto &c : coarse_tmp) c = ColorSpinorField(coarse_param);
 
     auto &tmp1 = fine_tmp[0];
@@ -926,6 +1010,7 @@ namespace quda
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
       // change fine_tmp to match B basis to allow comparison
+      auto basis = fine_tmp[0].GammaBasis();
       for (auto &f : fine_tmp) f.GammaBasis(param.B[0].GammaBasis());
       transfer->R(coarse_tmp, param.B);
       transfer->P(fine_tmp, coarse_tmp);
@@ -944,10 +1029,12 @@ namespace quda
         if (check_deviation(max_deviation[i][0], tol))
           errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[i][0], tol);
       }
-      for (auto &f : fine_tmp) f.GammaBasis(r[0].GammaBasis()); // restore basis
+      for (auto &f : fine_tmp) f.GammaBasis(basis); // restore basis
 
       // the oblique check
       if (param.mg_global.run_oblique_proj_check) {
+        if (is_pv()) errorQuda("The oblique projector check does not currently work with DWF");
+
         sprintf(prefix, "MG level %d (%s): Null vector Oblique Projections : ", param.level + 1,
                 param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         setOutputPrefix(prefix);
@@ -993,7 +1080,9 @@ namespace quda
 
       r_coarse.resize(1);
       r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
-                                             r[0].Precision(), param.mg_global.location[param.level + 1]);
+                                             param.mg_global.invert_param->cuda_prec_sloppy,
+                                             param.mg_global.location[param.level + 1]);
+      if (is_pv() && param.level == 0) r_coarse[0].GammaBasis(QUDA_UKQCD_GAMMA_BASIS);
     }
 
     // create coarse solution vector if not already created in verify()
@@ -1002,11 +1091,20 @@ namespace quda
 
       x_coarse.resize(1);
       x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, customLs,
-                                             r[0].Precision(), param.mg_global.location[param.level + 1]);
+                                             param.mg_global.invert_param->cuda_prec_sloppy,
+                                             param.mg_global.location[param.level + 1]);
+      if (is_pv() && param.level == 0) x_coarse[0].GammaBasis(QUDA_UKQCD_GAMMA_BASIS);
     }
 
     {
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P^\\dagger P) eta_c\n");
+
+      if (is_pv() && param.level != 0) {
+        printfQuda("x_coarse[0] nColor %d Ls %d nDim %d\n", x_coarse[0].Ncolor(), x_coarse[0].X(4), x_coarse[0].Ndim());
+        printfQuda("r_coarse[0] nColor %d Ls %d nDim %d\n", r_coarse[0].Ncolor(), r_coarse[0].X(4), r_coarse[0].Ndim());
+        printfQuda("       tmp2 nColor %d Ls %d nDim %d\n", tmp2.Ncolor(), tmp2.X(4), tmp2.Ndim());
+        errorQuda("Coarse level PV DWF verify starts failing here");
+      }
 
       spinorNoise(x_coarse[0], *rng, QUDA_NOISE_UNIFORM);
       transfer->P(tmp2, x_coarse[0]);
@@ -1048,6 +1146,11 @@ namespace quda
       && (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC
           || diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC);
 
+    bool is_verify_coarse_pv = (param.transfer_type == QUDA_TRANSFER_AGGREGATE)
+      && (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4DPV_DIRAC
+          || diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALLPV_DIRAC
+          || diracSmoother->getDiracType() == QUDA_COARSEPV_DIRAC);
+
     if (is_verify_kd) {
       // If we're doing an optimized build with the staggered operator, we need to skip the verify on level 0
       can_verify = false;
@@ -1059,180 +1162,32 @@ namespace quda
       logQuda(
         QUDA_VERBOSE, "Performing a custom verify for dwf -> pv^dagger dwf verify: reconstructing dwf from the multi-rhs Wilson + chiral projectors\n");
 
-      // make sure diracNull is the Wilson operator
-      if (diracCoarseNull->getDiracType() != QUDA_WILSON_DIRAC)
+      verifyDwfPV();
+    } else if (is_verify_coarse_pv) {
+
+      logQuda(QUDA_VERBOSE,
+              "Performing a custom verify for coarse pv^dagger dwf verify: reconstructing coarse dwf from the "
+              "multi-rhs coarse + chiral projectors\n");
+
+      // make sure diracNull is the coarse operator
+      if (diracCoarseNull->getDiracType() != QUDA_COARSE_DIRAC)
         errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
 
-      const DiracWilson *d_wilson = reinterpret_cast<const DiracWilson *>(diracCoarseNull);
+      const DiracCoarse *d_coarse = reinterpret_cast<const DiracCoarse *>(diracCoarseNull);
 
-      // get Ls
-      auto Ls = coarse_tmp[0].X(4);
+      // First verify that the Wilson operator is good
 
-      // we've verified that this is a DWF operator; grab the mass and m5
-      auto mass = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->Mass();
-      auto m5 = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->M5();
+      (*param.matNull)(tmp2, tmp1);
 
-      logQuda(QUDA_VERBOSE, "Ls %d mass %f m5 %f\n", Ls, mass, m5);
+      transfer->R(x_coarse[0], tmp2);
+      static_cast<DiracCoarse *>(diracCoarseNull)->M(r_coarse[0], tmp_coarse);
 
-      // create a random rhs
-      auto &rhs = coarse_tmp[0];
-      spinorNoise(rhs, *rng, QUDA_NOISE_UNIFORM);
+      double r_nrm = norm2(r_coarse[0]);
+      auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
+      auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
 
-      // place to store underlying "M" times rhs
-      auto &dwf_lhs = coarse_tmp[1];
-      zero(dwf_lhs);
-
-      // place to store applying the dwf operator built from Wilson bits
-      auto &emul_lhs = coarse_tmp[2];
-      zero(emul_lhs);
-
-      // create a set of 4-d vectors
-      ColorSpinorParam csParam(coarse_tmp[0]);
-      csParam.nDim = 4;
-      csParam.x[4] = 1;
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-
-      // prepare vectors of 4-d fields for the rhs and emulated lhs
-      std::vector<ColorSpinorField> rhs_4(Ls), emul_lhs_4(Ls);
-      for (auto &f : rhs_4) f = ColorSpinorField(csParam);
-      for (auto &f : emul_lhs_4) f = ColorSpinorField(csParam);
-      auto rhs_4d = vector_ref<ColorSpinorField>(rhs_4);
-      auto emul_lhs_4d = vector_ref<ColorSpinorField>(emul_lhs_4);
-
-      // split rhs
-      Split5DTo4DFields(rhs_4d, rhs);
-
-      // prepare vectors to hold intermediate chiral projections
-      std::vector<ColorSpinorField> chiral_plus_4(Ls), chiral_minus_4(Ls);
-      for (auto &f : chiral_plus_4) f = ColorSpinorField(csParam);
-      for (auto &f : chiral_minus_4) f = ColorSpinorField(csParam);
-      auto chiral_plus = vector_ref<ColorSpinorField>(chiral_plus_4);
-      auto chiral_minus = vector_ref<ColorSpinorField>(chiral_minus_4);
-
-      if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
-        auto kappa5 = 0.5 / (5.0 + m5);
-
-        // apply the exact DiracDomainWall4D::M
-        reinterpret_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
-
-        // This bit is equivalent to the DWF call:
-        // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
-        //                   profile);
-
-        d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
-        d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
-
-        // This next block is equivalent to the DWF call:
-        // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
-
-        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
-        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
-        for (int s = 0; s < Ls; s++) {
-          // forwards direction
-          blas::axpy((s == Ls - 1) ? -mass : 1, chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
-          // backwards direction
-          blas::axpy((s == 0) ? -mass : 1, chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
-        }
-
-        // This last bit is equivalent to the call:
-        // blas::xpay(in, -kappa5, out);
-
-        blas::xpay(rhs_4d, -kappa5, emul_lhs_4d);
-
-      } else if (diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
-        auto b_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
-        auto c_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
-        double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
-
-        // from compute_coeff_mobius_pre and compute_coeff_mobius
-        std::array<double, QUDA_MAX_DWF_LS> kappa, alpha, beta;
-
-        // apply the exact DiracMobius::M
-        reinterpret_cast<const DiracMobiusPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
-
-        // create a temporary
-        std::vector<ColorSpinorField> tmp_4(Ls);
-        for (auto &f : tmp_4) f = ColorSpinorField(csParam);
-        auto tmp_4d = vector_ref<ColorSpinorField>(tmp_4);
-
-        // This bit is equivalent to the following Mobius call:
-        // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
-
-        // from compute_coeff_mobius_pre
-        for (int s = 0; s < Ls; s++) {
-          beta[s] = b_5[s].real();
-          alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
-        }
-
-        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
-        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
-        for (int s = 0; s < Ls; s++) {
-          // forwards direction
-          blas::axy(alpha[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
-          // backwards direction
-          blas::axpy(alpha[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
-          // diagonal contribution
-          blas::axpy(beta[s], rhs_4d[s], emul_lhs_4d[s]);
-        }
-
-        // This bit is equivalent to the next Mobius call:
-        // ApplyDomainWall4D(tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
-
-        // a = 0; xpay false; much simpler than it looks
-        d_wilson->Dslash(tmp_4d.Even(), emul_lhs_4d.Odd(), QUDA_EVEN_PARITY);
-        d_wilson->Dslash(tmp_4d.Odd(), emul_lhs_4d.Even(), QUDA_ODD_PARITY);
-
-        // This bit is equivalent to the last Mobius call:
-        // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
-
-        // from compute_coeff_mobius
-        for (int s = 0; s < Ls; s++) {
-          kappa[s]
-            = 0.5 * (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0); // 0.5 from gamma matrices
-        }
-
-        // seems to be the same chiral projectors?
-        for (int s = 0; s < Ls; s++) {
-          // forwards direction
-          blas::axy(kappa[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
-          // backwards direction
-          blas::axpy(kappa[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
-          // diagonal contribution
-          blas::axpy(1.0, rhs_4d[s], emul_lhs_4d[s]);
-        }
-
-        // last, but not least, this call
-        // blas::axpy(-mobius_kappa_b, tmp, out);
-
-        blas::axpy(-mobius_kappa_b, tmp_4d, emul_lhs_4d);
-      }
-
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        // for debugging purposes
-        std::vector<ColorSpinorField> dwf_lhs_4(Ls);
-        for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
-        auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
-
-        Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
-
-        // in theory emul_lhs contains the same thing as dwf_lhs on a per-component basis
-        for (int s = 0; s < Ls; s++)
-          printfQuda("s %d norm2 source %e norm2 chiral+ %e norm2 chiral- %e norm2 dwf %e norm2 emul %e\n", s,
-                     blas::norm2(rhs_4d[s]), blas::norm2(chiral_plus[s]), blas::norm2(chiral_minus[s]),
-                     blas::norm2(dwf_lhs_4d[s]), blas::norm2(emul_lhs_4d[s]));
-      }
-
-      // re-join
-      Join4DTo5DField(emul_lhs, emul_lhs_4d);
-
-      // verify
-      double emul_nrm2 = blas::norm2(emul_lhs);
-      double native_nrm2 = blas::norm2(dwf_lhs);
-      auto max_deviation = blas::max_deviation(dwf_lhs, emul_lhs);
-      auto l2_deviation = sqrt(xmyNorm(dwf_lhs, emul_lhs) / native_nrm2);
-
-      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n", emul_nrm2,
-              native_nrm2, l2_deviation, max_deviation[0]);
+      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+              norm2(x_coarse[0]), r_nrm, l2_deviation, max_deviation[0]);
 
       if (check_deviation(l2_deviation, tol))
         errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
@@ -1462,12 +1417,211 @@ namespace quda
     popLevel();
   }
 
+  void MG::verifyDwfPV()
+  {
+    // quickly make sure diracCoarseNull is the Wilson operator
+    if (diracCoarseNull->getDiracType() != QUDA_WILSON_DIRAC)
+      errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
+
+    const DiracWilson *d_wilson = reinterpret_cast<const DiracWilson *>(diracCoarseNull);
+
+    // get Ls
+    auto Ls = r_coarse[0].X(4);
+
+    // we've verified that this is a DWF operator; grab the mass and m5
+    auto mass = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->Mass();
+    auto m5 = reinterpret_cast<const DiracDomainWall *>(diracSmoother)->M5();
+
+    logQuda(QUDA_VERBOSE, "Ls %d mass %f m5 %f\n", Ls, mass, m5);
+
+    // prepare extra coarse vectors
+    ColorSpinorParam coarse_param(r_coarse[0]);
+
+    // change the basis for verification
+    coarse_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+    // create a random rhs
+    coarse_param.create = QUDA_NULL_FIELD_CREATE;
+    ColorSpinorField rhs(coarse_param);
+    spinorNoise(rhs, *rng, QUDA_NOISE_UNIFORM);
+
+    // place to store underlying "M" times rhs
+    coarse_param.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField dwf_lhs(coarse_param);
+
+    // place to store applying the dwf operator built from Wilson bits
+    ColorSpinorField emul_lhs(coarse_param);
+
+    // create a set of 4-d vectors
+    ColorSpinorParam csParam(rhs);
+    csParam.nDim = 4;
+    csParam.x[4] = 1;
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+
+    // prepare vectors of 4-d fields for the rhs and emulated lhs
+    std::vector<ColorSpinorField> rhs_4(Ls), emul_lhs_4(Ls);
+    for (auto &f : rhs_4) f = ColorSpinorField(csParam);
+    for (auto &f : emul_lhs_4) f = ColorSpinorField(csParam);
+    auto rhs_4d = vector_ref<ColorSpinorField>(rhs_4);
+    auto emul_lhs_4d = vector_ref<ColorSpinorField>(emul_lhs_4);
+
+    // split rhs
+    Split5DTo4DFields(rhs_4d, rhs);
+
+    // prepare vectors to hold intermediate chiral projections
+    std::vector<ColorSpinorField> chiral_plus_4(Ls), chiral_minus_4(Ls);
+    for (auto &f : chiral_plus_4) f = ColorSpinorField(csParam);
+    for (auto &f : chiral_minus_4) f = ColorSpinorField(csParam);
+    auto chiral_plus = vector_ref<ColorSpinorField>(chiral_plus_4);
+    auto chiral_minus = vector_ref<ColorSpinorField>(chiral_minus_4);
+
+    if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
+      auto kappa5 = 0.5 / (5.0 + m5);
+
+      // apply the exact DiracDomainWall4D::M
+      reinterpret_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
+
+      // This bit is equivalent to the DWF call:
+      // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
+      //                   profile);
+
+      d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
+      d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
+
+      // This next block is equivalent to the DWF call:
+      // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
+
+      ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+      ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+      for (int s = 0; s < Ls; s++) {
+        // forwards direction
+        blas::axpy((s == Ls - 1) ? -mass : 1, chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+        // backwards direction
+        blas::axpy((s == 0) ? -mass : 1, chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+      }
+
+      // This last bit is equivalent to the call:
+      // blas::xpay(in, -kappa5, out);
+
+      blas::xpay(rhs_4d, -kappa5, emul_lhs_4d);
+
+    } else if (diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+      auto b_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
+      auto c_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
+      double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
+
+      // from compute_coeff_mobius_pre and compute_coeff_mobius
+      std::array<double, QUDA_MAX_DWF_LS> kappa, alpha, beta;
+
+      // apply the exact DiracMobius::M
+      reinterpret_cast<const DiracMobiusPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
+
+      // create a temporary
+      std::vector<ColorSpinorField> tmp_4(Ls);
+      for (auto &f : tmp_4) f = ColorSpinorField(csParam);
+      auto tmp_4d = vector_ref<ColorSpinorField>(tmp_4);
+
+      // This bit is equivalent to the following Mobius call:
+      // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
+
+      // from compute_coeff_mobius_pre
+      for (int s = 0; s < Ls; s++) {
+        beta[s] = b_5[s].real();
+        alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
+      }
+
+      ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+      ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+      for (int s = 0; s < Ls; s++) {
+        // forwards direction
+        blas::axy(alpha[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+        // backwards direction
+        blas::axpy(alpha[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+        // diagonal contribution
+        blas::axpy(beta[s], rhs_4d[s], emul_lhs_4d[s]);
+      }
+
+      // This bit is equivalent to the next Mobius call:
+      // ApplyDomainWall4D(tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+
+      // a = 0; xpay false; much simpler than it looks
+      d_wilson->Dslash(tmp_4d.Even(), emul_lhs_4d.Odd(), QUDA_EVEN_PARITY);
+      d_wilson->Dslash(tmp_4d.Odd(), emul_lhs_4d.Even(), QUDA_ODD_PARITY);
+
+      // This bit is equivalent to the last Mobius call:
+      // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
+
+      // from compute_coeff_mobius
+      for (int s = 0; s < Ls; s++) {
+        kappa[s]
+          = 0.5 * (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0); // 0.5 from gamma matrices
+      }
+
+      // seems to be the same chiral projectors?
+      for (int s = 0; s < Ls; s++) {
+        // forwards direction
+        blas::axy(kappa[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+        // backwards direction
+        blas::axpy(kappa[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+        // diagonal contribution
+        blas::axpy(1.0, rhs_4d[s], emul_lhs_4d[s]);
+      }
+
+      // last, but not least, this call
+      // blas::axpy(-mobius_kappa_b, tmp, out);
+
+      blas::axpy(-mobius_kappa_b, tmp_4d, emul_lhs_4d);
+    }
+
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      // for debugging purposes
+      std::vector<ColorSpinorField> dwf_lhs_4(Ls);
+      for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
+      auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
+
+      Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
+
+      // in theory emul_lhs contains the same thing as dwf_lhs on a per-component basis
+      for (int s = 0; s < Ls; s++)
+        printfQuda("s %d norm2 source %e norm2 chiral+ %e norm2 chiral- %e norm2 dwf %e norm2 emul %e\n", s,
+                   blas::norm2(rhs_4d[s]), blas::norm2(chiral_plus[s]), blas::norm2(chiral_minus[s]),
+                   blas::norm2(dwf_lhs_4d[s]), blas::norm2(emul_lhs_4d[s]));
+    }
+
+    // re-join
+    Join4DTo5DField(emul_lhs, emul_lhs_4d);
+
+    // verify
+    double emul_nrm2 = blas::norm2(emul_lhs);
+    double native_nrm2 = blas::norm2(dwf_lhs);
+    auto max_deviation = blas::max_deviation(dwf_lhs, emul_lhs);
+    auto l2_deviation = sqrt(xmyNorm(dwf_lhs, emul_lhs) / native_nrm2);
+
+    logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n", emul_nrm2,
+            native_nrm2, l2_deviation, max_deviation[0]);
+
+    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+    // these were set while hacking in tests of quarter precision ghosts
+    // moreover, we can improve the precision of block ortho with a tighter max than 1.0
+    QudaPrecision prec
+      = std::min(param.mg_global.precision_null[param.level], param.mg_global.invert_param->cuda_prec_sloppy);
+
+    double tol;
+    switch (prec) {
+    case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+    case QUDA_HALF_PRECISION: tol = 5e-2; break;
+    case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
+    default: tol = 1e-8;
+    }
+
+    if (check_deviation(l2_deviation, tol))
+      errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+    if (check_deviation(max_deviation[0], tol))
+      warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+  }
+
   void MG::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)
   {
-    resize(r, b.size(), QUDA_NULL_FIELD_CREATE);
-    resize(r_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
-    resize(x_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
-
     pushOutputPrefix(prefix);
 
     QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
@@ -1492,6 +1646,14 @@ namespace quda
     // FIXME extend this check for precision, Schwarz, etc.
     bool use_solver_residual = presmoother && smoother_solver_uniform;
 
+    // need to compute residual vector if presmoothing and smoother not consistent with coarse grid correction
+    bool compute_residual = presmoother && !smoother_solver_uniform;
+
+    ColorSpinorParam csParam(b[0]);
+    auto r = getFieldTmp<ColorSpinorField>(presmoother ? b.size() : 0, csParam);
+    resize(r_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
+    resize(x_coarse, b.size(), QUDA_NULL_FIELD_CREATE);
+
     if (outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
 
@@ -1507,22 +1669,18 @@ namespace quda
 
       if (!smoother_solver_uniform) diracSmoother->reconstruct(x, b, inner_solution_type);
 
-      const auto &residual = use_solver_residual ? presmoother->get_residual() :
-        !presmoother && smoother_solver_uniform  ? in :
-        !presmoother                             ? b :
-        b.SiteSubset() == QUDA_FULL_SITE_SUBSET  ? cvector_ref<const ColorSpinorField>(r) :
-                                                   cvector_ref<const ColorSpinorField>(r)(parity);
-
-      if (!use_solver_residual && presmoother) {
-        auto &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? cvector_ref<ColorSpinorField>(r) :
-                                                                   cvector_ref<ColorSpinorField>(r)(parity);
-        (*param.matResidual)(residual, x);
-        axpby(1.0, b, -1.0, residual);
+      if (compute_residual) {
+        (*param.matResidual)(r, x);
+        axpby(1.0, b, -1.0, r);
       }
 
       // We need this to ensure that the coarse level has been created.
       // e.g. in case of iterative setup with MG we use just pre- and post-smoothing at the first iteration.
       if (transfer) {
+        const auto &residual = use_solver_residual ? presmoother->get_residual() :
+          !presmoother && smoother_solver_uniform  ? in :
+          !presmoother                             ? b :
+                                                     r;
         // restrict to the coarse grid
         transfer->R(r_coarse, residual);
 
@@ -1533,10 +1691,10 @@ namespace quda
         if (!presmoother) {
           transfer->P(inner_solution_type == outer_solution_type ? x : x(parity), x_coarse);
         } else { // we must sum to the presmoother solution
-          auto &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? cvector_ref<ColorSpinorField>(r) :
-                                                                             cvector_ref<ColorSpinorField>(r)(parity);
-          transfer->P(x_coarse_2_fine, x_coarse); // repurpose residual storage
-          xpy(x_coarse_2_fine, inner_solution_type == outer_solution_type ? x : x(parity));
+          auto res = inner_solution_type == outer_solution_type ? cvector_ref<ColorSpinorField>(r) :
+                                                                  cvector_ref<ColorSpinorField>(r)(parity);
+          transfer->P(res, x_coarse);
+          xpy(res, inner_solution_type == outer_solution_type ? x : x(parity));
         }
       }
 
@@ -1631,7 +1789,7 @@ namespace quda
     }
     solverParam.pipeline
       = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
-    solverParam.precision = r[0].Precision();
+    solverParam.precision = param.mg_global.invert_param->cuda_prec_sloppy;
 
     if (is_fine_grid()) {
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
@@ -1642,8 +1800,8 @@ namespace quda
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-    ColorSpinorParam csParam(B[0]);                             // Create spinor field parameters:
-    csParam.setPrecision(r[0].Precision(), r[0].Precision(), true); // ensure native ordering
+    ColorSpinorParam csParam(B[0]);                                           // Create spinor field parameters:
+    csParam.setPrecision(solverParam.precision, solverParam.precision, true); // ensure native ordering
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
     csParam.gammaBasis = B[0].Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
                                              QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
@@ -1652,9 +1810,7 @@ namespace quda
     resize(b, param.n_vec_batch, csParam);
     resize(x, param.n_vec_batch, csParam);
 
-    csParam.create = QUDA_NULL_FIELD_CREATE;
-
-    // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
+    // if we're not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
     bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
       && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
     if (schwarz_reset) {
@@ -1800,8 +1956,8 @@ namespace quda
     if (schwarz_reset) {
       logQuda(QUDA_VERBOSE, "Reenabling Schwarz for null-space finding\n");
       int commDim[QUDA_MAX_DIM];
-      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
-      diracSmootherSloppy->setCommDim(commDim);
+      for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 0;
+      diracNullSloppy->setCommDim(commDim);
     }
 
     if (param.mg_global.vec_store[param.level] == QUDA_BOOLEAN_TRUE) { // conditional store of null vectors

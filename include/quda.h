@@ -818,6 +818,12 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
+    /** Custom Ls factors for each coarse level for DWF MG */
+    int coarse_ls[QUDA_MAX_MG_LEVEL];
+
+    /** Kappa value to use in the Wilson operator for DWF null vector generation */
+    double kappa_dwf_null;
+
     /** Boolean for aggregation type, implies staggered or not */
     QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 

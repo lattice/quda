@@ -394,8 +394,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.gamma_basis
-    = (pseudofine_transfer_type == QUDA_TRANSFER_DWF_PV) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (kappa == -1.0) {
@@ -441,6 +440,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   if (is_chiral(dslash_type)) {
     inv_param.m5 = m5;
+    kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
   }
 
@@ -678,6 +678,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   if (is_chiral(dslash_type)) {
     inv_param.m5 = m5;
+    kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
   }
 }
@@ -692,8 +693,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.gamma_basis
-    = (pseudofine_transfer_type == QUDA_TRANSFER_DWF_PV) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (kappa == -1.0) {
@@ -739,6 +739,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   if (is_chiral(dslash_type)) {
     inv_param.m5 = m5;
+    kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
   }
 

@@ -63,7 +63,8 @@ namespace quda {
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool setup_use_mma;      // whether to use tensor cores where applicable for setup
     bool dslash_use_mma;     // whether to use tensor cores where applicable for dslash
-    bool allow_truncation; /** whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions */
+    bool allow_truncation; // whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions
+    QudaDiracType parent_dwf; // outer-most Dirac type for DWF MG
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
 
@@ -2358,9 +2359,34 @@ public:
   class DiracCoarsePV : public DiracCoarse
   {
   protected:
+    double m5;
+    double kappa5;
+    int Ls; // length of the fifth dimension
+
+    QudaDiracType parent_dwf;
+
+    // Mobius coefficients
+    Complex b_5[QUDA_MAX_DWF_LS];
+    Complex c_5[QUDA_MAX_DWF_LS];
+
+    /**
+       Whether we are using classical Mobius with constant real-valued
+        b and c coefficients, or zMobius with complex-valued variable
+        coefficients
+    */
+    bool zMobius;
+
+    double mobius_kappa_b;
+    double mobius_kappa_c;
+    double mobius_kappa;
+
     double mass_pv;
-    bool mobius_parent;
-    // kappas?
+
+    /**
+       @brief Based on the input values of DiracParam, prepare the various Mobius coefficients
+       @param[in] param Parameters defining this operator
+     */
+    void prepareMobiusCoefficients(const DiracParam &param);
 
   public:
     /**
@@ -2424,9 +2450,24 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const override;
 
+    virtual std::array<Complex, QUDA_MAX_DWF_LS> getB5() const override
+    {
+      std::array<Complex, QUDA_MAX_DWF_LS> b5 {};
+      for (int i = 0; i < Ls; i++) b5[i] = b_5[i];
+      return b5;
+    }
+
+    virtual std::array<Complex, QUDA_MAX_DWF_LS> getC5() const override
+    {
+      std::array<Complex, QUDA_MAX_DWF_LS> c5 {};
+      for (int i = 0; i < Ls; i++) c5[i] = c_5[i];
+      return c5;
+    }
+
     virtual bool hermitian() const;
     virtual int getStencilSteps() const override { return 2; }
     virtual QudaDiracType getDiracType() const override { return QUDA_COARSEPV_DIRAC; }
+    QudaDiracType getParentDwfType() const { return parent_dwf; }
 
     /**
      * @brief Create the 4-d coarsened  even-odd preconditioned coarse
