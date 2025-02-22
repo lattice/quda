@@ -149,12 +149,24 @@ namespace quda {
 
      @param[in] a Vector of fields we wish to create a matching
      temporary for
+     @param[in] reference If true, then the temporary we create is a
+     just a vector of references to "a"
    */
-  template <typename T> auto getFieldTmp(cvector_ref<T> &a)
+  template <typename U> auto getFieldTmp(cvector_ref<U> &a, bool reference = false)
   {
+    using T = std::remove_const_t<U>;
     std::vector<FieldTmp<T>> tmp;
     tmp.reserve(a.size());
-    for (auto i = 0u; i < a.size(); i++) tmp.push_back(std::move(getFieldTmp(a[i])));
+    if (reference) {
+      auto param = typename T::param_type(a[0]);
+      param.create = QUDA_REFERENCE_FIELD_CREATE;
+      for (auto i = 0u; i < a.size(); i++) {
+        param.v = a[i].data();
+        tmp.push_back(std::move(getFieldTmp<T>(param)));
+      }
+    } else {
+      for (auto i = 0u; i < a.size(); i++) tmp.push_back(std::move(getFieldTmp<T>(a[i])));
+    }
     return tmp;
   }
 
