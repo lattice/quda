@@ -1375,30 +1375,7 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b) override
-    {
-      if (x.size() != b.size()) errorQuda("Mismatched set sizes %lu != %lu", x.size(), b.size());
-      pushOutputPrefix(prefix);
-
-      QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
-
-      std::vector<ColorSpinorField> out(b.size());
-      std::vector<ColorSpinorField> in(b.size());
-
-      if (dirac.hasSpecialMG()) {
-        dirac.prepareSpecialMG(out, in, x, b, solution_type);
-      } else {
-        dirac.prepare(out, in, x, b, solution_type);
-      }
-      (*solver)(out, in);
-      if (dirac.hasSpecialMG()) {
-        dirac.reconstructSpecialMG(x, b, solution_type);
-      } else {
-        dirac.reconstruct(x, b, solution_type);
-      }
-
-      popOutputPrefix();
-    }
+    void operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b) override;
 
     /**
      * @brief Return reference to the solver. Used when mass/mu
