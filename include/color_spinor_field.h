@@ -893,6 +893,15 @@ namespace quda
     static int Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int resolution = 1);
 
     /**
+       @brief Check if two instances are weakly compatible (precision
+       and order can differ)
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
        @brief Check if two instances are compatible
        @param[in] a Input field
        @param[in] b Input field
@@ -901,13 +910,21 @@ namespace quda
     static bool are_compatible(const ColorSpinorField &a, const ColorSpinorField &b);
 
     /**
-       @brief Check if two instances are weakly compatible (precision
+       @brief Check if a field and a param are weakly compatible (precision
        and order can differ)
        @param[in] a Input field
-       @param[in] b Input field
-       @return Return true if two fields are compatible
+       @param[in] b Input param
+       @return Return true if the two are compatible
      */
-    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorParam &b);
+
+    /**
+       @brief Check if a field and a param are compatible
+       @param[in] a Input field
+       @param[in] b Input param
+       @return Return true if the two are compatible
+     */
+    static bool are_compatible(const ColorSpinorField &a, const ColorSpinorParam &b);
 
     /**
        @brief Test if two instances are compatible.  Throws an error
