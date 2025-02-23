@@ -444,6 +444,12 @@ namespace quda
     bool empty() const { return !init; }
 
     /**
+       @brief Returns if the object is only a ghost
+       @return true if the object is only a ghost
+    */
+    bool is_ghost() const { return ghost_only; }
+
+    /**
        @brief Copy the source field contents into this
        @param[in] src Source from which we are copying
      */

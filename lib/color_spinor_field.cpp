@@ -226,6 +226,7 @@ namespace quda
     init = std::exchange(src.init, false);
     alloc = std::exchange(src.alloc, false);
     reference = std::exchange(src.reference, false);
+    ghost_only = std::exchange(src.ghost_only, false);
     ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
     nFace_allocated = std::exchange(src.nFace_allocated, 0);
     nColor = std::exchange(src.nColor, 0);
