@@ -24,7 +24,7 @@ namespace quda
   void Prolongate2(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *const *spin_map, int parity, IntList<coarseColor, N...>)
   {
-    if (in[0].Ncolor() == coarseColor) {
+    if (in[0].Ncolor() / in[0].Nvec() == coarseColor) {
       if constexpr (coarseColor >= fineColor) {
         if constexpr (use_mma) {
           constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -54,7 +54,7 @@ namespace quda
       if constexpr (sizeof...(N) > 0) {
         Prolongate2<use_mma, fineColor>(out, in, v, fine_to_coarse, spin_map, parity, IntList<N...>());
       } else {
-        errorQuda("Coarse Nc = %d has not been instantiated", in[0].Ncolor());
+        errorQuda("Coarse Nc = %d has not been instantiated", in[0].Ncolor() / in[0].Nvec());
       }
     }
   }

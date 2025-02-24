@@ -26,7 +26,7 @@ namespace quda
                  const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity,
                  IntList<coarseColor, N...>)
   {
-    if (out[0].Ncolor() == coarseColor) {
+    if (out[0].Ncolor() / out[0].Nvec() == coarseColor) {
       if constexpr (coarseColor >= fineColor) {
         if constexpr (use_mma) {
           constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -57,7 +57,7 @@ namespace quda
       if constexpr (sizeof...(N) > 0) {
         Restrict2<use_mma, fineColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity, IntList<N...>());
       } else {
-        errorQuda("Coarse Nc = %d has not been instantiated", out[0].Ncolor());
+        errorQuda("Coarse Nc = %d has not been instantiated", out[0].Ncolor() / out[0].Nvec());
       }
     }
   }
