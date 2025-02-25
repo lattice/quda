@@ -19,7 +19,7 @@ namespace quda {
   {
     Solver::create(x, b);
 
-    if (!init || r.size() != b.size()) {
+    if (!init || r.size() != b.size() || !ColorSpinorField::are_compatible(r[0], b[0])) {
       ColorSpinorParam csParam(b[0]);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       resize(r, b.size(), csParam);

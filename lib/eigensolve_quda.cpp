@@ -16,6 +16,8 @@
 #include <tune_quda.h>
 #include <vector_io.h>
 #include <eigen_helper.h>
+#include <transfer.h>
+#include <multigrid.hpp>
 
 namespace quda
 {
@@ -545,10 +547,15 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflateSVD(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
+  void EigenSolver::deflateSVD(cvector_ref<ColorSpinorField> &sol_, cvector_ref<const ColorSpinorField> &src_,
                                cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                                bool accumulate) const
   {
+    auto src = expand_color_spinor(src_, evecs.Ncolor());
+    auto sol = expand_color_spinor(sol_, evecs.Ncolor());
+    BlockTransposeBackward(src_[0], src);
+    if (accumulate) BlockTransposeBackward(sol_[0], sol);
+
     // number of evecs
     if (n_ev_deflate == 0) {
       warningQuda("deflateSVD called with n_ev_deflate = 0");
@@ -579,6 +586,8 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate) blas::zero(sol);
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
+
+    BlockTransposeForward(sol_[0], sol);
   }
 
   void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
@@ -628,10 +637,15 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
+  void EigenSolver::deflate(cvector_ref<ColorSpinorField> &sol_, cvector_ref<const ColorSpinorField> &src_,
                             cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                             bool accumulate) const
   {
+    auto src = expand_color_spinor(src_, evecs.Ncolor());
+    auto sol = expand_color_spinor(sol_, evecs.Ncolor());
+    BlockTransposeBackward(src_[0], src);
+    if (accumulate) BlockTransposeBackward(sol_[0], sol);
+
     // number of evecs
     if (n_ev_deflate == 0) {
       warningQuda("deflate called with n_ev_deflate = 0");
@@ -655,6 +669,8 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate) blas::zero(sol);
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
+
+    BlockTransposeForward(sol_[0], sol);
   }
 
   void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace,

@@ -32,7 +32,7 @@ namespace quda
   template <class F> auto create_color_spinor_copy(cvector_ref<F> &fs, int nVec, QudaFieldOrder order)
   {
     ColorSpinorParam param(fs[0]);
-    if (fs.size() == 1 && fs.FieldOrder() == order) {
+    if (fs.size() == 1 && fs.FieldOrder() == order && fs[0].Nvec() == nVec) {
       // if already in the right order, then we can just wrap it
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = fs[0].data();
@@ -44,6 +44,21 @@ namespace quda
       param.fieldOrder = order;
     }
     return getFieldTmp<ColorSpinorField>(param);
+  }
+
+  template <class F> auto expand_color_spinor(cvector_ref<F> &fs, int nColor)
+  {
+    if (fs.size() == 1 && fs.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
+        && fs[0].Ncolor() / fs[0].Nvec() == nColor) {
+      ColorSpinorParam param(fs[0]);
+      param.nColor = nColor;
+      param.nVec = 1;
+      param.setPrecision(param.Precision(), param.Precision(), true);
+      return getFieldTmp<ColorSpinorField>(fs[0].Nvec_actual(), param);
+    } else {
+      // if already in the right order, then we can just wrap it
+      return getFieldTmp(fs, true);
+    }
   }
 
   template <class Op>

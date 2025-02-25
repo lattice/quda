@@ -276,7 +276,8 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (out.size_actual() != in.size_actual()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+    if (out.size_actual() != in.size_actual())
+      errorQuda("Mismatched set sizes %lu != %lu", out.size_actual(), in.size_actual());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(out, in, fine_to_coarse_d, spin_map, parity);
@@ -310,7 +311,8 @@ namespace quda {
   void Transfer::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (out.size_actual() != in.size_actual()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+    if (out.size_actual() != in.size_actual())
+      errorQuda("Mismatched set sizes %lu != %lu", out.size_actual(), in.size_actual());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(out, in, fine_to_coarse_d, spin_map, parity);
