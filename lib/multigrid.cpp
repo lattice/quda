@@ -1098,24 +1098,103 @@ namespace quda
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P^\\dagger P) eta_c\n");
 
       if (is_pv() && param.level != 0) {
-        printfQuda("x_coarse[0] nColor %d Ls %d nDim %d\n", x_coarse[0].Ncolor(), x_coarse[0].X(4), x_coarse[0].Ndim());
-        printfQuda("r_coarse[0] nColor %d Ls %d nDim %d\n", r_coarse[0].Ncolor(), r_coarse[0].X(4), r_coarse[0].Ndim());
-        printfQuda("       tmp2 nColor %d Ls %d nDim %d\n", tmp2.Ncolor(), tmp2.X(4), tmp2.Ndim());
-        errorQuda("Coarse level PV DWF verify starts failing here");
-      }
+        // printfQuda("x_coarse[0] nColor %d Ls %d nDim %d\n", x_coarse[0].Ncolor(), x_coarse[0].X(4), x_coarse[0].Ndim());
+        // printfQuda("r_coarse[0] nColor %d Ls %d nDim %d\n", r_coarse[0].Ncolor(), r_coarse[0].X(4), r_coarse[0].Ndim());
+        // printfQuda("       tmp2 nColor %d Ls %d nDim %d\n", tmp2.Ncolor(), tmp2.X(4), tmp2.Ndim());
 
-      spinorNoise(x_coarse[0], *rng, QUDA_NOISE_UNIFORM);
-      transfer->P(tmp2, x_coarse[0]);
-      transfer->R(r_coarse[0], tmp2);
-      auto r2 = norm2(r_coarse[0]);
-      auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
-      auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
-      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
-              norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
-      if (check_deviation(l2_deviation, tol))
-        errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol))
-        errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
+        // right now, x_coarse[0] and r_coarse[0] are nColor == 24 (or whatever), Ls == 8 (or whatever) 5-d fields
+        // we need to split them into a vector of 8 4-d fields
+
+        // get Ls
+        auto Ls = x_coarse[0].X(4);
+
+        // populate x_coarse[0] with random values
+        spinorNoise(x_coarse[0], *rng, QUDA_NOISE_UNIFORM);
+
+        // create the set of 4-d coarse vectors
+        ColorSpinorParam csParam(x_coarse[0]);
+        csParam.nDim = 4;
+        csParam.x[4] = 1;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+
+        // prepare vectors of coarse 4-d fields for x_coarse and r_coarse
+        std::vector<ColorSpinorField> x_coarse_4(Ls), r_coarse_4(Ls);
+        for (auto &f : x_coarse_4) f = ColorSpinorField(csParam);
+        for (auto &f : r_coarse_4) f = ColorSpinorField(csParam);
+        auto x_coarse_4d = vector_ref<ColorSpinorField>(x_coarse_4);
+        auto r_coarse_4d = vector_ref<ColorSpinorField>(r_coarse_4);
+
+        // create the set of 4-d fine vectors
+        ColorSpinorParam csParamFine(tmp2);
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+
+        // prepare vectors of fine 4-d fields for tmp2
+        std::vector<ColorSpinorField> tmp2_4(Ls);
+        for (auto &f : tmp2_4) f = ColorSpinorField(csParamFine);
+        auto tmp2_4d = vector_ref<ColorSpinorField>(tmp2_4);
+
+        // split x_coarse[0]
+        Split5DTo4DFields(x_coarse_4d, x_coarse[0]);
+
+        // Check split 5d to 4d: norm2 of the 5-d field should equal the sum of the norms of the 4-d fields
+        auto x_coarse_5d_r2 = norm2(x_coarse[0]);
+        {
+          auto x_coarse_4d_r2 = norm2(x_coarse_4d);
+          double accum_4d = 0.;
+          for (int i = 0; i < Ls; i++) {
+            // printfQuda("x_coarse_4d constituent %d has norm %e\n", i, x_coarse_4d_r2[i]);
+            accum_4d += x_coarse_4d_r2[i];
+          }
+          auto l2_deviation = sqrt(abs(x_coarse_5d_r2 - accum_4d) / x_coarse_5d_r2);
+          logQuda(QUDA_VERBOSE, "Split5DTo4D: 5-d norm2 %e , summed 4-d norm2 %e; Deviations: L2 relative = %e\n",
+                  x_coarse_5d_r2, accum_4d, l2_deviation);
+          if (check_deviation(l2_deviation, tol))
+            errorQuda("Split5DTo4D failed, L2 relative deviation = %e > %e", l2_deviation, tol);
+        }
+
+        transfer->P(tmp2_4d, x_coarse_4d);
+        transfer->R(r_coarse_4d, tmp2_4d);
+
+        // join r_coarse_4d
+        Join4DTo5DField(r_coarse[0], r_coarse_4d);
+
+        // check norms, etc
+        auto r2 = norm2(r_coarse[0]);
+
+        // Check join 4d to 5d: norm2 of the 5-d field should equal the sum of the norms of the 4-d fields
+        {
+          auto r_coarse_4d_r2 = norm2(r_coarse_4d);
+          double accum_4d = 0.;
+          for (int i = 0; i < Ls; i++) { accum_4d += r_coarse_4d_r2[i]; }
+          auto l2_deviation = sqrt(abs(r2 - accum_4d) / r2);
+          logQuda(QUDA_VERBOSE, "Join4DTo5D: 5-d norm2 %e , summed 4-d norm2 %e; Deviations: L2 relative = %e\n", r2,
+                  accum_4d, l2_deviation);
+          if (check_deviation(l2_deviation, tol))
+            errorQuda("Join4DTo5D failed, L2 relative deviation = %e > %e", l2_deviation, tol);
+        }
+
+        auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
+        auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
+        logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
+                norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
+      } else {
+        spinorNoise(x_coarse[0], *rng, QUDA_NOISE_UNIFORM);
+        transfer->P(tmp2, x_coarse[0]);
+        transfer->R(r_coarse[0], tmp2);
+        auto r2 = norm2(r_coarse[0]);
+        auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
+        auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
+        logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
+                norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
+      }
     }
 
     logQuda(QUDA_SUMMARIZE, "Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
@@ -1172,6 +1251,8 @@ namespace quda
         errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
 
       const DiracCoarse *d_coarse = reinterpret_cast<const DiracCoarse *>(diracCoarseNull);
+
+      errorQuda("Coarse PV verify starts failing here");
 
       // First verify that the Wilson operator is good
 
