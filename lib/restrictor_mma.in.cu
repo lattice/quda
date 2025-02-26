@@ -26,7 +26,7 @@ namespace quda
     const int parity;
     int aggregate_size;
 
-    using mma_t = typename mma::mg_mma_restrictor_t<out_t>::type;
+    using mma_t = typename mma::mg_mma_restrictor_t<v_t>::type;
 
     static constexpr int spin_block_factor = spin_mapper<fineSpin, coarseSpin>::get_spin_block_factor();
     // The number of fine grid aggregate to be inlucded in an thread block per iteration: this number
