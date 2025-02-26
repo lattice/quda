@@ -103,7 +103,7 @@ namespace quda
         if (out.size() != inA.size() || out.size() != inB.size()) {
           errorQuda("out.size(), inA.size(), inB.size(): %lu, %lu, %lu", out.size(), inA.size(), inB.size());
         }
-        int instantiated_nVec = instantiated_nVec_to_use(out.size());
+        int instantiated_nVec = instantiated_nVec_to_use(out.size_actual());
         size_t size = out.size();
         logQuda(QUDA_DEBUG_VERBOSE, "Dslash coarse nVec/out.size() = %d/%lu\n", instantiated_nVec, size);
         for (size_t offset = 0; offset < size; offset += instantiated_nVec) {

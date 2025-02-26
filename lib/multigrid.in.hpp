@@ -67,7 +67,7 @@ namespace quda
     if (out.size_actual() != in.size_actual()) {
       errorQuda("divide_and_conquer out.size() != in.size(): %lu != %lu", out.size(), in.size());
     }
-    size_t instantiated_nVec = instantiated_nVec_to_use(out.size());
+    size_t instantiated_nVec = instantiated_nVec_to_use(out.size_actual());
     size_t size = out.size_actual();
     logQuda(QUDA_DEBUG_VERBOSE, "MG divide_and_conquer nVec/out.size() = %lu/%lu\n", instantiated_nVec, size);
     if (size <= instantiated_nVec) {
