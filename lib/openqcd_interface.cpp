@@ -8,6 +8,8 @@
 #include <sstream>
 #include <regex>
 #include <type_traits>
+#include <unistd.h>
+#include <pthread.h>
 
 #include <quda_openqcd_interface.h>
 #include <quda.h>
@@ -21,7 +23,7 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, nullptr, {}, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
@@ -435,6 +437,8 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
     }
   }
 
+  setMPICommHandleQuda(&layout.comm);
+
 #ifdef MULTI_GPU
 /* TODO: would we ever want to run with QMP COMMS? */
 #ifdef QMP_COMMS
@@ -448,7 +452,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
 #endif
 
   /* must happen *after* communication initialization */
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_rank(layout.comm, &my_rank);
   sprintf(prefix, "QUDA (rank=%d): ", my_rank);
 
   strcpy(qudaState.infile, infile);
@@ -459,7 +463,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
     qudaState.init.verbosity = kv.get<QudaVerbosity>("QUDA", "verbosity", qudaState.init.verbosity);
   }
 
-  MPI_Bcast((void *)&qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)&qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, layout.comm);
   setVerbosityQuda(qudaState.init.verbosity, prefix, qudaState.init.logfile);
   initQuda(device);
 }
@@ -545,6 +549,8 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
   if (qudaState.initialized) return;
   qudaState.init = init;
   qudaState.layout = layout;
+
+  if (layout.comm == MPI_COMM_NULL) return;
 
   qudaopenqcd_called<true>(__func__);
   openQCD_qudaSetLayout(qudaState.layout, infile);
@@ -703,6 +709,23 @@ void openQCD_back_and_forth(void *h_in, void *h_out)
   out_h = out;
 }
 
+
+int openQCD_qudaIndexIptLexi(const int iy)
+{
+  int x[4];
+  int L_openqcd[4];
+  openqcd::rotate_coords(qudaState.layout.L, L_openqcd);
+
+  x[3] = iy % L_openqcd[3];
+  int c = (iy - x[3])/L_openqcd[3];
+  x[2] = c % L_openqcd[2];
+  c = (c - x[2])/L_openqcd[2];
+  x[1] = c % L_openqcd[1];
+  x[0] = (c - x[1])/L_openqcd[1];
+
+  return openqcd::ipt(x, L_openqcd);
+}
+
 int openQCD_qudaIndexIpt(const int *x)
 {
   int L_openqcd[4];
@@ -811,9 +834,6 @@ void openQCD_qudaSpinorFree(void **quda_field)
 
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 {
-  int my_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-
   /* sets up the necessary parameters */
   QudaInvertParam param = newOpenQCDParam();
 
@@ -1157,7 +1177,7 @@ void *openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
 
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_rank(qudaState.layout.comm, &my_rank);
 
   /* Allocate on the heap */
   QudaInvertParam *param = new QudaInvertParam(newQudaInvertParam());
@@ -1491,9 +1511,9 @@ void *openQCD_qudaSolverReadIn(int id)
   }
 
   /* transfer of the struct to all processes */
-  MPI_Bcast((void *)param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
-  MPI_Bcast((void *)invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, MPI_COMM_WORLD);
-  MPI_Bcast((void *)multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)param, sizeof(*param), MPI_BYTE, 0, qudaState.layout.comm);
+  MPI_Bcast((void *)invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, qudaState.layout.comm);
+  MPI_Bcast((void *)multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, qudaState.layout.comm);
   multigrid_param->invert_param = invert_param_mg;
 
   /**
@@ -1729,6 +1749,52 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
   return param->true_res[0];
 }
 
+void *openQCD_qudaInvertWrapper(void* arg)
+{
+  /* enable the thread to use QUDA */
+  device::init_thread();
+
+  openQCD_qudaInvert_args_t *args = (openQCD_qudaInvert_args_t*) arg;
+  args->retval = openQCD_qudaInvert(args->id, args->mu, args->source, args->solution, args->status);
+  return &args->retval;
+}
+
+void openQCD_qudaInvertFire(int id, double mu, void *source, void *solution, int *status)
+{
+  /* pack all arguments into a struct */
+  qudaState.inv_args.id = id;
+  qudaState.inv_args.mu = mu;
+  qudaState.inv_args.source = source;
+  qudaState.inv_args.solution = solution;
+  qudaState.inv_args.status = status;
+
+  if (qudaState.thread.created == true) {
+    errorQuda("Thread already created");
+  }
+  int rc = pthread_create(&qudaState.thread.thread, NULL, openQCD_qudaInvertWrapper, (void*) &qudaState.inv_args);
+  qudaState.thread.created = true;
+  if (rc != 0) {
+    perror("Error in openQCD_qudaInvertFire");
+    errorQuda("pthread_create failed");
+  }
+}
+
+double openQCD_qudaInvertWait(void)
+{
+  if (!qudaState.thread.created) {
+    errorQuda("openQCD_qudaInvertFire not called");
+  }
+  int rc = pthread_join(qudaState.thread.thread, nullptr);
+  qudaState.thread.created = false;
+  if (rc != 0) {
+    perror("Error in openQCD_qudaInvertWait");
+    errorQuda("pthread_join failed");
+  }
+
+  return qudaState.inv_args.retval;
+}
+
+
 void openQCD_qudaSolverDestroy(int id)
 {
   check_solver_id(id);
@@ -1749,7 +1815,7 @@ void *openQCD_qudaEigensolverReadIn(int id, int solver_id)
   int my_rank;
   QudaEigParam *param;
 
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_rank(qudaState.layout.comm, &my_rank);
   QudaVerbosity verbosity = QUDA_SUMMARIZE;
 
   /* Allocate on the heap */
@@ -1823,7 +1889,7 @@ void *openQCD_qudaEigensolverReadIn(int id, int solver_id)
   }
 
   /* transfer of the struct to all the processes */
-  MPI_Bcast((void *)param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast((void *)param, sizeof(*param), MPI_BYTE, 0, qudaState.layout.comm);
 
   void *inv_param = openQCD_qudaSolverGetHandle(solver_id);
   param->invert_param = static_cast<QudaInvertParam *>(inv_param);

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "mpi.h"
+#include "pthread.h"
+
 #define OPENQCD_MAX_INVERTERS 32
 #define OPENQCD_MAX_EIGENSOLVERS 32
 
@@ -95,6 +98,7 @@ typedef enum OpenQCDGaugeGroup_s {
  * L2, ...
  */
 typedef struct {
+  MPI_Comm comm;                            /** MPI communicator */
   int L[4];                                 /** Local lattice dimensions L1, L2, L3, L0 */
   int nproc[4];                             /** Machine grid size NPROC1, NPROC2, NPROC3, NPROC0*/
   int nproc_blk[4];                         /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK,
@@ -129,6 +133,20 @@ typedef struct {
 } openQCD_QudaInitArgs_t;
 
 typedef struct {
+  bool created;
+  pthread_t thread;
+} openQCD_QudaThread_t;
+
+typedef struct {
+  int id;
+  double mu;
+  void *source;
+  void *solution;
+  int *status;
+  double retval;
+} openQCD_qudaInvert_args_t;
+
+typedef struct {
   int initialized;   /** Whether openQCD_qudaInit() was called or not */
   int ud_rev;        /** Revision of ud field from openqxd */
   int ad_rev;        /** Revision of ad field from openqxd */
@@ -140,6 +158,8 @@ typedef struct {
   int swd_qhat;      /** qhat coefficient corresponding to the current SW field in QUDA */
   openQCD_QudaInitArgs_t init;
   openQCD_QudaLayout_t layout;
+  openQCD_QudaThread_t thread;
+  openQCD_qudaInvert_args_t inv_args;
   void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
                                              * Notice that this void pointer HAS to be directly before
                                              * handles[32], because it's possible to call
@@ -203,6 +223,7 @@ void openQCD_back_and_forth(void *h_in, void *h_out);
  * @see        openqcd::ipt()
  */
 int openQCD_qudaIndexIpt(const int *x);
+int openQCD_qudaIndexIptLexi(const int iy);
 
 /**
  * @brief      Wrapper around openqcd::iup
@@ -368,6 +389,8 @@ void openQCD_qudaSolverPrintSetup(int id);
  * @return     Residual
  */
 double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status);
+void openQCD_qudaInvertFire(int id, double mu, void *source, void *solution, int *status);
+double openQCD_qudaInvertWait(void);
 
 /**
  * @brief      Destroys an existing solver context and frees all involed
