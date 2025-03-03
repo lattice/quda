@@ -76,7 +76,7 @@ typedef struct openQCD_QudaSolver_s {
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, nullptr, {}, nullptr, {}, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, MPI_COMM_NULL, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
