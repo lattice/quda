@@ -568,6 +568,19 @@ void freeUniqueSloppyGaugeUtility(GaugeField *&precise, GaugeField *&sloppy, Gau
 void freeUniqueGaugeUtility(GaugeField *&precise, GaugeField *&sloppy, GaugeField *&precondition, GaugeField *&refinement,
                             GaugeField *&eigensolver, GaugeField *&extended, bool preserve_precise);
 
+/**
+ * Make extendedGaugeResident up to date with gaugePrecise. If new_gauge is true, a new extended gauge will
+ * be created from gaugePrecise and then assigned to extendedGaugeResident. If new_gauge is false, parameters
+ * of extendedGaugeResident will be checked against input ones. If they are different, a new extended gauge
+ * with these parameters will be created and assigned to extendedGaugeResident. If extendedGaugeResident has
+ * not been allocated, a new extended gauge will be created only if new_gauge is false (for those who do not
+ * want to allocate the extra field).
+ * @param new_gauge[in] Flag to indicate if a new gauge field has being loaded as gaugePrecise
+ * @param R[in] R parameter for createExtendedGauge()
+ * @param profile[in] profile parameter for createExtendedGauge()
+ * @param redundant_comms[in] redundant_comms parameter for createExtendedGauge()
+ * @param recon[in] recon parameter for createExtendedGauge()
+ */
 void updateExtendedGaugeResident(bool new_gauge, const lat_dim_t &R, TimeProfile &profile, bool redundant_comms = false,
                                  QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID)
 {
@@ -587,6 +600,11 @@ void updateExtendedGaugeResident(bool new_gauge, const lat_dim_t &R, TimeProfile
   }
 }
 
+/**
+ * Make extendedGaugeResident up to date with gaugePrecise. If the extended gauge field has already been
+ * allocated, it could be assigned to extendedGaugeResident directly.
+ * @param extendedGauge[in] Already created extended gauge field
+ */
 void updateExtendedGaugeResident(GaugeField *extendedGauge)
 {
   if (extendedGaugeResident) delete extendedGaugeResident;
