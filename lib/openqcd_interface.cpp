@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <unistd.h>
 #include <pthread.h>
+#include <list>
 
 #include <quda_openqcd_interface.h>
 #include <quda.h>
@@ -22,6 +23,57 @@
 #include <mpi.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+typedef struct {
+  bool created;
+  pthread_t thread;
+} openQCD_QudaThread_t;
+
+typedef struct {
+  int id;
+  double mu;
+  void *source;
+  void *solution;
+  int *status;
+  double retval;
+} openQCD_qudaInvert_args_t;
+
+typedef struct {
+  int initialized;   /** Whether openQCD_qudaInit() was called or not */
+  int ud_rev;        /** Revision of ud field from openqxd */
+  int ad_rev;        /** Revision of ad field from openqxd */
+  int swd_ud_rev;    /** Revision of ud field used to calc/transfer the SW field from openqxd */
+  int swd_ad_rev;    /** Revision of ad field used to calc/transfer the SW field from openqxd */
+  double swd_kappa;  /** kappa corresponding to the current SW field in QUDA */
+  double swd_su3csw; /** SU(3) csw coefficient corresponding to the current SW field in QUDA */
+  double swd_u1csw;  /** U(1) csw coefficient corresponding to the current SW field in QUDA */
+  int swd_qhat;      /** qhat coefficient corresponding to the current SW field in QUDA */
+  openQCD_QudaInitArgs_t init;
+  openQCD_QudaLayout_t layout;
+  openQCD_QudaThread_t thread;
+  std::list<openQCD_qudaInvert_args_t> inv_args;
+  void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
+                                             * Notice that this void pointer HAS to be directly before
+                                             * handles[32], because it's possible to call
+                                             * openQCD_qudaSolverGetHandle with -1. */
+  void *inv_handles[OPENQCD_MAX_INVERTERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  void *eig_handles[OPENQCD_MAX_EIGENSOLVERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
+  char infile[1024];                           /** Path to the input file (if given to quda_init()) */
+} openQCD_QudaState_t;
+
+typedef struct openQCD_QudaSolver_s {
+  char infile[1024];            /** Path to the input file (if given to quda_init()) */
+  int id;                       /** Solver section identifier in the input file */
+  QudaMultigridParam *mg_param; /** Pointer to the multigrid param struct */
+  double u1csw;                 /** u1csw property */
+  int qhat;                     /** qhat property */
+  int mg_ud_rev;                /** Revision of ud field from openqxd */
+  int mg_ad_rev;                /** Revision of ad field from openqxd */
+  double mg_kappa;              /** kappa corresponding to the current mg-instance in QUDA */
+  double mg_su3csw;             /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
+  double mg_u1csw;              /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
+  int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
+} openQCD_QudaSolver;
 
 static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, {}, nullptr, {}, {}, ""};
 
@@ -1749,49 +1801,79 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
   return param->true_res[0];
 }
 
-void *openQCD_qudaInvertWrapper(void* arg)
+void *openQCD_qudaInvertWrapper(void*)
 {
   /* enable the thread to use QUDA */
   device::init_thread();
 
-  openQCD_qudaInvert_args_t *args = (openQCD_qudaInvert_args_t*) arg;
-  args->retval = openQCD_qudaInvert(args->id, args->mu, args->source, args->solution, args->status);
-  return &args->retval;
+  for (openQCD_qudaInvert_args_t& args : qudaState.inv_args) {
+    args.retval = openQCD_qudaInvert(args.id, args.mu, args.source, args.solution, args.status);
+  }
+
+  return nullptr;
 }
 
-void openQCD_qudaInvertFire(int id, double mu, void *source, void *solution, int *status)
+void check_mpi_init(void)
 {
-  /* pack all arguments into a struct */
-  qudaState.inv_args.id = id;
-  qudaState.inv_args.mu = mu;
-  qudaState.inv_args.source = source;
-  qudaState.inv_args.solution = solution;
-  qudaState.inv_args.status = status;
+  int flag;
+  MPI_Query_thread(&flag);
+  if (flag < MPI_THREAD_MULTIPLE)
+    errorQuda("MPI was not initialized with thread support. "
+      "Initialize MPI with quda_mpi_init instead of MPI_Init.");
+}
+
+void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution, int *status)
+{
+  check_mpi_init();
+
+  openQCD_qudaInvert_args_t args;
+  args.id = id;
+  args.mu = mu;
+  args.source = source;
+  args.solution = solution;
+  args.status = status;
+
+  qudaState.inv_args.push_back(args);
+}
+
+void openQCD_qudaInvertStart(void)
+{
+  check_mpi_init();
 
   if (qudaState.thread.created == true) {
     errorQuda("Thread already created");
   }
-  int rc = pthread_create(&qudaState.thread.thread, NULL, openQCD_qudaInvertWrapper, (void*) &qudaState.inv_args);
-  qudaState.thread.created = true;
+  int rc = pthread_create(&qudaState.thread.thread, nullptr, openQCD_qudaInvertWrapper, nullptr);
   if (rc != 0) {
-    perror("Error in openQCD_qudaInvertFire");
+    perror("Error in openQCD_qudaInvertStart");
     errorQuda("pthread_create failed");
   }
+  qudaState.thread.created = true;
 }
 
-double openQCD_qudaInvertWait(void)
+void openQCD_qudaInvertWait(double *residual)
 {
+  check_mpi_init();
+
   if (!qudaState.thread.created) {
-    errorQuda("openQCD_qudaInvertFire not called");
+    errorQuda("openQCD_qudaInvertStart not called");
   }
   int rc = pthread_join(qudaState.thread.thread, nullptr);
-  qudaState.thread.created = false;
   if (rc != 0) {
     perror("Error in openQCD_qudaInvertWait");
     errorQuda("pthread_join failed");
   }
+  qudaState.thread.created = false;
 
-  return qudaState.inv_args.retval;
+  if (residual != nullptr) {
+    int i = 0;
+    for (openQCD_qudaInvert_args_t args : qudaState.inv_args) {
+      residual[i] = args.retval;
+      i++;
+    }
+  }
+
+  qudaState.inv_args.clear();
 }
 
 

@@ -132,56 +132,6 @@ typedef struct {
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
 } openQCD_QudaInitArgs_t;
 
-typedef struct {
-  bool created;
-  pthread_t thread;
-} openQCD_QudaThread_t;
-
-typedef struct {
-  int id;
-  double mu;
-  void *source;
-  void *solution;
-  int *status;
-  double retval;
-} openQCD_qudaInvert_args_t;
-
-typedef struct {
-  int initialized;   /** Whether openQCD_qudaInit() was called or not */
-  int ud_rev;        /** Revision of ud field from openqxd */
-  int ad_rev;        /** Revision of ad field from openqxd */
-  int swd_ud_rev;    /** Revision of ud field used to calc/transfer the SW field from openqxd */
-  int swd_ad_rev;    /** Revision of ad field used to calc/transfer the SW field from openqxd */
-  double swd_kappa;  /** kappa corresponding to the current SW field in QUDA */
-  double swd_su3csw; /** SU(3) csw coefficient corresponding to the current SW field in QUDA */
-  double swd_u1csw;  /** U(1) csw coefficient corresponding to the current SW field in QUDA */
-  int swd_qhat;      /** qhat coefficient corresponding to the current SW field in QUDA */
-  openQCD_QudaInitArgs_t init;
-  openQCD_QudaLayout_t layout;
-  openQCD_QudaThread_t thread;
-  openQCD_qudaInvert_args_t inv_args;
-  void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
-                                             * Notice that this void pointer HAS to be directly before
-                                             * handles[32], because it's possible to call
-                                             * openQCD_qudaSolverGetHandle with -1. */
-  void *inv_handles[OPENQCD_MAX_INVERTERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
-  void *eig_handles[OPENQCD_MAX_EIGENSOLVERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
-  char infile[1024];                           /** Path to the input file (if given to quda_init()) */
-} openQCD_QudaState_t;
-
-typedef struct openQCD_QudaSolver_s {
-  char infile[1024];            /** Path to the input file (if given to quda_init()) */
-  int id;                       /** Solver section identifier in the input file */
-  QudaMultigridParam *mg_param; /** Pointer to the multigrid param struct */
-  double u1csw;                 /** u1csw property */
-  int qhat;                     /** qhat property */
-  int mg_ud_rev;                /** Revision of ud field from openqxd */
-  int mg_ad_rev;                /** Revision of ad field from openqxd */
-  double mg_kappa;              /** kappa corresponding to the current mg-instance in QUDA */
-  double mg_su3csw;             /** SU(3) csw coefficient corresponding to the current mg-instance in QUDA */
-  double mg_u1csw;              /** U(1) csw coefficient corresponding to the current mg-instance in QUDA */
-  int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
-} openQCD_QudaSolver;
 
 typedef struct {
   double kappa;  /* kappa: hopping parameter */
@@ -389,8 +339,29 @@ void openQCD_qudaSolverPrintSetup(int id);
  * @return     Residual
  */
 double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status);
-void openQCD_qudaInvertFire(int id, double mu, void *source, void *solution, int *status);
-double openQCD_qudaInvertWait(void);
+
+
+/**
+ * @brief      Register a solve to be started with [[openQCD_qudaInvertStart]].
+ *             The parameters of this function are exactly the same as for
+ *             [[openQCD_qudaInvert]].
+ */
+void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution, int *status);
+
+/**
+ * @brief      Fire up the solves registered with [[openQCD_qudaInvertDispatch]]
+ *             in order of their registration asynchronously. This spawns a
+ *             thread with pthread_create that calls [[openQCD_qudaInvert]].
+ */
+void openQCD_qudaInvertStart(void);
+
+/**
+ * @brief      Wait for the thread started with [[openQCD_qudaInvertStart]]
+ *             using pthread_join to finish and collect its results.
+ *
+ * @param      residual  The residuals of the dispatched solves.
+ */
+void openQCD_qudaInvertWait(double *residual);
 
 /**
  * @brief      Destroys an existing solver context and frees all involed
