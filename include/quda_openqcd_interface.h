@@ -353,7 +353,7 @@ void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution,
  *             in order of their registration asynchronously. This spawns a
  *             thread with pthread_create that calls [[openQCD_qudaInvert]].
  */
-void openQCD_qudaInvertStart(void);
+MPI_Comm openQCD_qudaInvertStart(void);
 
 /**
  * @brief      Wait for the thread started with [[openQCD_qudaInvertStart]]

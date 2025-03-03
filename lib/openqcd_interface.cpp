@@ -51,6 +51,7 @@ typedef struct {
   openQCD_QudaInitArgs_t init;
   openQCD_QudaLayout_t layout;
   openQCD_QudaThread_t thread;
+  MPI_Comm comm;
   std::list<openQCD_qudaInvert_args_t> inv_args;
   void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
                                              * Notice that this void pointer HAS to be directly before
@@ -75,7 +76,7 @@ typedef struct openQCD_QudaSolver_s {
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, {}, nullptr, {}, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, nullptr, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
@@ -1836,7 +1837,7 @@ void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution,
   qudaState.inv_args.push_back(args);
 }
 
-void openQCD_qudaInvertStart(void)
+MPI_Comm openQCD_qudaInvertStart(void)
 {
   check_mpi_init();
 
@@ -1848,7 +1849,10 @@ void openQCD_qudaInvertStart(void)
     perror("Error in openQCD_qudaInvertStart");
     errorQuda("pthread_create failed");
   }
+
   qudaState.thread.created = true;
+  MPI_Comm_dup(MPI_COMM_WORLD, &qudaState.comm);
+  return qudaState.comm;
 }
 
 void openQCD_qudaInvertWait(double *residual)
@@ -1873,6 +1877,7 @@ void openQCD_qudaInvertWait(double *residual)
     }
   }
 
+  MPI_Comm_free(&qudaState.comm);
   qudaState.inv_args.clear();
 }
 
