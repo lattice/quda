@@ -41,6 +41,7 @@ namespace quda
       param.nVec = nVec;
       param.nVec_actual = fs.size();
       param.create = QUDA_NULL_FIELD_CREATE;
+      if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
       param.fieldOrder = order;
     }
     return getFieldTmp<ColorSpinorField>(param);
