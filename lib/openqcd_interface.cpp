@@ -30,8 +30,6 @@ typedef struct {
 } openQCD_QudaThread_t;
 
 typedef struct {
-  int id;
-  double mu;
   void *source;
   void *solution;
   int *status;
@@ -53,9 +51,10 @@ typedef struct {
   openQCD_QudaThread_t thread;
   MPI_Comm comm;
   std::list<openQCD_qudaInvert_args_t> inv_args;
+  QudaInvertParam async_params;
   void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
                                              * Notice that this void pointer HAS to be directly before
-                                             * handles[32], because it's possible to call
+                                             * inv_handles[32], because it's possible to call
                                              * openQCD_qudaSolverGetHandle with -1. */
   void *inv_handles[OPENQCD_MAX_INVERTERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
   void *eig_handles[OPENQCD_MAX_EIGENSOLVERS]; /** Array of void-pointers to QudaInvertParam structs for the solver(s) */
@@ -76,7 +75,7 @@ typedef struct openQCD_QudaSolver_s {
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, MPI_COMM_NULL, {}, nullptr, {}, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1 }, MPI_COMM_NULL, {}, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
@@ -1808,7 +1807,21 @@ void *openQCD_qudaInvertWrapper(void*)
   device::init_thread();
 
   for (openQCD_qudaInvert_args_t& args : qudaState.inv_args) {
-    args.retval = openQCD_qudaInvert(args.id, args.mu, args.source, args.solution, args.status);
+    logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n");
+    PUSH_RANGE("invertQuda", 5);
+    invertQuda(static_cast<char *>(args.solution), static_cast<char *>(args.source), &qudaState.async_params);
+    POP_RANGE;
+
+    *(args.status) = qudaState.async_params.true_res[0] <= qudaState.async_params.tol ? qudaState.async_params.iter : -1;
+    args.retval = qudaState.async_params.true_res[0];
+
+    logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
+    logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", qudaState.async_params.true_res[0]);
+    logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", qudaState.async_params.true_res_hq[0]);
+    logQuda(QUDA_VERBOSE, "  iter        = %d\n",   qudaState.async_params.iter);
+    logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", qudaState.async_params.gflops);
+    logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", qudaState.async_params.secs);
+    logQuda(QUDA_VERBOSE, "  status      = %d\n",   *(args.status));
   }
 
   return nullptr;
@@ -1823,13 +1836,30 @@ void check_mpi_init(void)
       "Initialize MPI with quda_mpi_init instead of MPI_Init.");
 }
 
-void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution, int *status)
+void openQCD_qudaInvertAsyncSetup(int id, double mu)
+{
+  check_mpi_init();
+  if (gauge_field_get_unset()) { errorQuda("Gauge field not populated in openQxD."); }
+
+  if (qudaState.layout.h_sw != nullptr) {
+    qudaState.layout.h_sw();
+  } else {
+    errorQuda("qudaState.layout.h_sw is not set.");
+  }
+
+  qudaState.async_params = *static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+  qudaState.async_params.mu = mu;
+
+  if (!openQCD_qudaInvertParamCheck(&qudaState.async_params)) {
+    errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync.");
+  }
+}
+
+void openQCD_qudaInvertAsyncDispatch(void *source, void *solution, int *status)
 {
   check_mpi_init();
 
   openQCD_qudaInvert_args_t args;
-  args.id = id;
-  args.mu = mu;
   args.source = source;
   args.solution = solution;
   args.status = status;
@@ -1837,13 +1867,16 @@ void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution,
   qudaState.inv_args.push_back(args);
 }
 
-MPI_Comm openQCD_qudaInvertStart(void)
+MPI_Comm openQCD_qudaInvertAsyncStart(OpenQCDSolveType type)
 {
   check_mpi_init();
 
-  if (qudaState.thread.created == true) {
+  if (type != OPENQCD_SOLVE_SERIAL)
+    errorQuda("Currently only serial solves are allowed");
+
+  if (qudaState.thread.created == true)
     errorQuda("Thread already created");
-  }
+
   int rc = pthread_create(&qudaState.thread.thread, nullptr, openQCD_qudaInvertWrapper, nullptr);
   if (rc != 0) {
     perror("Error in openQCD_qudaInvertStart");
@@ -1855,13 +1888,13 @@ MPI_Comm openQCD_qudaInvertStart(void)
   return qudaState.comm;
 }
 
-void openQCD_qudaInvertWait(double *residual)
+void openQCD_qudaInvertAsyncWait(double *residual)
 {
   check_mpi_init();
 
-  if (!qudaState.thread.created) {
+  if (!qudaState.thread.created)
     errorQuda("openQCD_qudaInvertStart not called");
-  }
+
   int rc = pthread_join(qudaState.thread.thread, nullptr);
   if (rc != 0) {
     perror("Error in openQCD_qudaInvertWait");

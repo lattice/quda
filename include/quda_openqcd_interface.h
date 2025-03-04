@@ -92,6 +92,12 @@ typedef enum OpenQCDGaugeGroup_s {
   OPENQCD_GAUGE_INVALID = QUDA_INVALID_ENUM
 } OpenQCDGaugeGroup;
 
+typedef enum OpenQCDSolveType_s {
+  OPENQCD_SOLVE_SERIAL = 1,
+  OPENQCD_SOLVE_MRHS = 2,
+  OPENQCD_SOLVE_INVALID = QUDA_INVALID_ENUM
+} OpenQCDSolveType;
+
 /**
  * Parameters related to problem size and machine topology. They should hold the
  * numbers in quda format, i.e. xyzt convention. For example L[0] = L1, L[1] =
@@ -342,26 +348,38 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
 
 
 /**
- * @brief      Register a solve to be started with [[openQCD_qudaInvertStart]].
+ * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
+ *             about the parameters.
+ */
+void openQCD_qudaInvertAsyncSetup(int id, double mu);
+
+/**
+ * @brief      Register a solve to be started with [[openQCD_qudaInvertAsyncStart]].
  *             The parameters of this function are exactly the same as for
  *             [[openQCD_qudaInvert]].
  */
-void openQCD_qudaInvertDispatch(int id, double mu, void *source, void *solution, int *status);
+void openQCD_qudaInvertAsyncDispatch(void *source, void *solution, int *status);
 
 /**
  * @brief      Fire up the solves registered with [[openQCD_qudaInvertDispatch]]
  *             in order of their registration asynchronously. This spawns a
  *             thread with pthread_create that calls [[openQCD_qudaInvert]].
+ *
+ * @param[in]  type  Can only be OPENQCD_SOLVE_SERIAL at the moment.
+ *
+ * @return     The MPI communicator with which the main threads should
+ *             communicate among ewach other until
+ *             [[openQCD_qudaInvertAsyncWait]] has returned.
  */
-MPI_Comm openQCD_qudaInvertStart(void);
+MPI_Comm openQCD_qudaInvertAsyncStart(OpenQCDSolveType type);
 
 /**
- * @brief      Wait for the thread started with [[openQCD_qudaInvertStart]]
+ * @brief      Wait for the thread started with [[openQCD_qudaInvertAsyncStart]]
  *             using pthread_join to finish and collect its results.
  *
  * @param      residual  The residuals of the dispatched solves.
  */
-void openQCD_qudaInvertWait(double *residual);
+void openQCD_qudaInvertAsyncWait(double *residual);
 
 /**
  * @brief      Destroys an existing solver context and frees all involed
