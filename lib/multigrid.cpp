@@ -1098,10 +1098,6 @@ namespace quda
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P^\\dagger P) eta_c\n");
 
       if (is_pv() && param.level != 0) {
-        // printfQuda("x_coarse[0] nColor %d Ls %d nDim %d\n", x_coarse[0].Ncolor(), x_coarse[0].X(4), x_coarse[0].Ndim());
-        // printfQuda("r_coarse[0] nColor %d Ls %d nDim %d\n", r_coarse[0].Ncolor(), r_coarse[0].X(4), r_coarse[0].Ndim());
-        // printfQuda("       tmp2 nColor %d Ls %d nDim %d\n", tmp2.Ncolor(), tmp2.X(4), tmp2.Ndim());
-
         // right now, x_coarse[0] and r_coarse[0] are nColor == 24 (or whatever), Ls == 8 (or whatever) 5-d fields
         // we need to split them into a vector of 8 4-d fields
 
@@ -1118,20 +1114,15 @@ namespace quda
         csParam.create = QUDA_NULL_FIELD_CREATE;
 
         // prepare vectors of coarse 4-d fields for x_coarse and r_coarse
-        std::vector<ColorSpinorField> x_coarse_4(Ls), r_coarse_4(Ls);
-        for (auto &f : x_coarse_4) f = ColorSpinorField(csParam);
-        for (auto &f : r_coarse_4) f = ColorSpinorField(csParam);
-        auto x_coarse_4d = vector_ref<ColorSpinorField>(x_coarse_4);
-        auto r_coarse_4d = vector_ref<ColorSpinorField>(r_coarse_4);
+        auto x_coarse_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
+        auto r_coarse_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
 
         // create the set of 4-d fine vectors
         ColorSpinorParam csParamFine(tmp2);
         csParamFine.create = QUDA_NULL_FIELD_CREATE;
 
         // prepare vectors of fine 4-d fields for tmp2
-        std::vector<ColorSpinorField> tmp2_4(Ls);
-        for (auto &f : tmp2_4) f = ColorSpinorField(csParamFine);
-        auto tmp2_4d = vector_ref<ColorSpinorField>(tmp2_4);
+        auto tmp2_4d = getFieldTmp<ColorSpinorField>(Ls, csParamFine);
 
         // split x_coarse[0]
         Split5DTo4DFields(x_coarse_4d, x_coarse[0]);
@@ -1246,14 +1237,12 @@ namespace quda
               "Performing a custom verify for coarse pv^dagger dwf verify: reconstructing coarse dwf from the "
               "multi-rhs coarse + chiral projectors\n");
 
-      // make sure diracNull is the coarse operator
-      if (diracCoarseNull->getDiracType() != QUDA_COARSE_DIRAC)
-        errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
-
-      const DiracCoarse *d_coarse = reinterpret_cast<const DiracCoarse *>(diracCoarseNull);
-
       // check 4-d dslash
       {
+        // make sure diracCoarseNull is the coarse operator
+        if (diracCoarseNull->getDiracType() != QUDA_COARSE_DIRAC)
+          errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
+
         // create 4-d coarse vectors
         ColorSpinorParam csParam(x_coarse[0]);
         csParam.nDim = 4;
@@ -1283,7 +1272,7 @@ namespace quda
         transfer->R(coarse_4_lhs[0], fine_4_lhs);
 
         // coarse operator
-        d_coarse->M(coarse_4_lhs[1], coarse_4_rhs);
+        diracCoarseNull->M(coarse_4_lhs[1], coarse_4_rhs);
 
         // check
         double r_nrm = norm2(coarse_4_lhs[1]);
@@ -1297,6 +1286,18 @@ namespace quda
           errorQuda("4-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
         if (check_deviation(max_deviation[0], tol))
           warningQuda("4-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+      }
+
+      // check 5-d dslash
+      {
+        // tmp1 and tmp2 are fine 4-d vectors
+        // x_coarse[0] and r_coarse[0] are coarse 5-d vectors
+
+        // make sure diracCoarseResidual is the coarse pv operator
+        if (diracCoarseResidual->getDiracType() != QUDA_COARSEPV_DIRAC)
+          errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
+
+        static_cast<DiracCoarsePV *>(diracCoarseResidual)->ApplyMDwf(r_coarse[0], x_coarse[0]);
       }
 
       errorQuda("Coarse PV verify starts failing here");
@@ -1566,21 +1567,17 @@ namespace quda
     csParam.create = QUDA_NULL_FIELD_CREATE;
 
     // prepare vectors of 4-d fields for the rhs and emulated lhs
-    std::vector<ColorSpinorField> rhs_4(Ls), emul_lhs_4(Ls);
-    for (auto &f : rhs_4) f = ColorSpinorField(csParam);
-    for (auto &f : emul_lhs_4) f = ColorSpinorField(csParam);
-    auto rhs_4d = vector_ref<ColorSpinorField>(rhs_4);
-    auto emul_lhs_4d = vector_ref<ColorSpinorField>(emul_lhs_4);
+    auto rhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    auto emul_lhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    vector_ref<ColorSpinorField> rhs_4d(rhs_4d_), emul_lhs_4d(emul_lhs_4d_);
 
     // split rhs
     Split5DTo4DFields(rhs_4d, rhs);
 
     // prepare vectors to hold intermediate chiral projections
-    std::vector<ColorSpinorField> chiral_plus_4(Ls), chiral_minus_4(Ls);
-    for (auto &f : chiral_plus_4) f = ColorSpinorField(csParam);
-    for (auto &f : chiral_minus_4) f = ColorSpinorField(csParam);
-    auto chiral_plus = vector_ref<ColorSpinorField>(chiral_plus_4);
-    auto chiral_minus = vector_ref<ColorSpinorField>(chiral_minus_4);
+    auto chiral_plus_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    auto chiral_minus_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    vector_ref<ColorSpinorField> chiral_plus(chiral_plus_4d_), chiral_minus(chiral_minus_4d_);
 
     if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
       auto kappa5 = 0.5 / (5.0 + m5);
@@ -1624,9 +1621,8 @@ namespace quda
       reinterpret_cast<const DiracMobiusPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
 
       // create a temporary
-      std::vector<ColorSpinorField> tmp_4(Ls);
-      for (auto &f : tmp_4) f = ColorSpinorField(csParam);
-      auto tmp_4d = vector_ref<ColorSpinorField>(tmp_4);
+      auto tmp_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+      vector_ref<ColorSpinorField> tmp_4d(tmp_4d_);
 
       // This bit is equivalent to the following Mobius call:
       // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
@@ -1682,9 +1678,11 @@ namespace quda
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       // for debugging purposes
-      std::vector<ColorSpinorField> dwf_lhs_4(Ls);
-      for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
-      auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
+      // std::vector<ColorSpinorField> dwf_lhs_4(Ls);
+      // for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
+      // auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
+      auto dwf_lhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+      vector_ref<ColorSpinorField> dwf_lhs_4d(dwf_lhs_4d_);
 
       Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
 

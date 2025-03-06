@@ -1,9 +1,11 @@
 #include <string.h>
-#include <multigrid.h>
-#include <tune_quda.h>
 #include <algorithm>
-#include <transfer.h>
-#include <blas_quda.h>
+
+#include "multigrid.h"
+#include "tune_quda.h"
+#include "transfer.h"
+#include "blas_quda.h"
+#include "dslash_quda.h"
 
 namespace quda
 {
@@ -44,37 +46,44 @@ namespace quda
     prepareMobiusCoefficients(param);
   }
 
-  void DiracCoarsePV::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                             QudaParity parity) const
+  void DiracCoarsePV::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity) const
   {
     errorQuda("The coarse PV operator does not have a single parity form");
   }
 
-  void DiracCoarsePV::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+  void DiracCoarsePV::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
+                                 cvector_ref<const ColorSpinorField> &, double) const
   {
     errorQuda("The coarse PV operator does not have a single parity form");
   }
 
   void DiracCoarsePV::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    errorQuda("DiracCoarsePV has not been implemented yet");
-    QudaFieldLocation location = checkLocation(out[0], in[0]);
-    initializeLazy(location);
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
-      auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim.data, halo_precision,
-                  dslash_use_mma);
-    } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim.data, halo_precision,
-                  dslash_use_mma);
-    }
+    errorQuda("DiracCoarsePV::M has not been completely implemented yet");
+
+    if (out.size() != 1 || in.size() != 1)
+      errorQuda("DiracCoarsePV does not support multi-rhs yet; out.size == %lu , in.size == %lu", out.size(), in.size());
+
+    if (out.X(4) != Ls) errorQuda("Unexpected fourth dimension for out = %d, expected %d", out.X(4), Ls);
+    if (in.X(4) != Ls) errorQuda("Unexpected fourth dimension for in = %d, expected %d", in.X(4), Ls);
+
+    ColorSpinorParam csParam(out[0]);
+    csParam.nDim = 4;
+    csParam.x[4] = 1;
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+
+    auto in_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    auto out_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
+
+    // split rhs
+    Split5DTo4DFields(in_4d, in[0]);
+    DiracCoarse::M(out_4d, in_4d);
+    Join4DTo5DField(out[0], out_4d);
   }
 
   void DiracCoarsePV::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    errorQuda("DiracCoarsePV::MdagM has not been implemented yet");
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
@@ -82,7 +91,7 @@ namespace quda
 
   void DiracCoarsePV::ApplyPVDagger(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    errorQuda("DiracCoarsePV::ApplyPVDagger has not been implemented yet");
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -96,11 +105,36 @@ namespace quda
     }
   }
 
+  void DiracCoarsePV::ApplyMDwf(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  {
+    if (out.size() != 1 || in.size() != 1)
+      errorQuda("DiracCoarsePV does not support multi-rhs yet; out.size == %lu , in.size == %lu", out.size(), in.size());
+
+    if (out.X(4) != Ls) errorQuda("Unexpected fourth dimension for out = %d, expected %d", out.X(4), Ls);
+    if (in.X(4) != Ls) errorQuda("Unexpected fourth dimension for in = %d, expected %d", in.X(4), Ls);
+
+    ColorSpinorParam csParam(out[0]);
+    csParam.nDim = 4;
+    csParam.x[4] = 1;
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+
+    auto in_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    auto out_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
+
+    printfQuda("DiracCoarse kappa = %e\n", kappa);
+
+    // split rhs
+    Split5DTo4DFields(in_4d, in[0]);
+    DiracCoarse::M(out_4d, in_4d);
+    blas::ax(kappa, out_4d); // undo the kappa baked into DiracCoarse
+    Join4DTo5DField(out[0], out_4d);
+  }
+
   void DiracCoarsePV::prepare(cvector_ref<ColorSpinorField> &sol, cvector_ref<ColorSpinorField> &src,
                               cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                               const QudaSolutionType solType) const
   {
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    errorQuda("DiracCoarsePV::prepare has not been implemented yet");
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
@@ -113,14 +147,14 @@ namespace quda
                                   const QudaSolutionType) const
   {
     /* do nothing */
-    errorQuda("DiracCoarsePV has not been implemented yet");
+    errorQuda("DiracCoarsePV::reconstruct has not been implemented yet");
   }
 
   bool DiracCoarsePV::hermitian() const { return (mass_pv == mass); }
 
   // Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarsePV::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                     double mu_factor, bool) const
+  void DiracCoarsePV::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double,
+                                     bool) const
   {
     errorQuda("DiracCoarsePV does not define createCoarseOp, construct a DiracCoarse first instead");
   }
