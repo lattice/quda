@@ -182,11 +182,6 @@ if(QUDA_QIO)
   target_link_libraries(io_test ${TEST_LIBS})
   quda_checkbuildtest(io_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  
-  add_executable(vanilla_io vanilla_io.cpp)
-  target_link_libraries(vanilla_io ${TEST_LIBS})
-  quda_checkbuildtest(vanilla_io QUDA_BUILD_ALL_TESTS)
-  install(TARGETS vanilla_io ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 add_executable(tune_test tune_test.cpp)
