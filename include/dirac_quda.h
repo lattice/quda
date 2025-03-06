@@ -2451,6 +2451,9 @@ public:
     virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
                              const QudaSolutionType solType) const override;
 
+    virtual double M5() const override { return m5; }
+    virtual int getLs() const override { return Ls; }
+
     virtual std::array<Complex, QUDA_MAX_DWF_LS> getB5() const override
     {
       std::array<Complex, QUDA_MAX_DWF_LS> b5 {};

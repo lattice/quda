@@ -113,6 +113,9 @@ namespace quda
     if (out.X(4) != Ls) errorQuda("Unexpected fourth dimension for out = %d, expected %d", out.X(4), Ls);
     if (in.X(4) != Ls) errorQuda("Unexpected fourth dimension for in = %d, expected %d", in.X(4), Ls);
 
+    if (parent_dwf != QUDA_DOMAIN_WALL_4D_DIRAC)
+      errorQuda("Only the coarse DomainWall4DPV operator is supported for now");
+
     ColorSpinorParam csParam(out[0]);
     csParam.nDim = 4;
     csParam.x[4] = 1;
@@ -120,13 +123,37 @@ namespace quda
 
     auto in_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
     auto out_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
-
-    printfQuda("DiracCoarse kappa = %e\n", kappa);
+    auto chiral_plus = getFieldTmp<ColorSpinorField>(Ls, csParam);
+    auto chiral_minus = getFieldTmp<ColorSpinorField>(Ls, csParam);
 
     // split rhs
     Split5DTo4DFields(in_4d, in[0]);
+
+    // This bit is spiritually equivalent to the DWF call:
+    // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
+    //                   profile);
+
     DiracCoarse::M(out_4d, in_4d);
-    blas::ax(kappa, out_4d); // undo the kappa baked into DiracCoarse
+    blas::axpy(-1.0, in_4d, out_4d);
+    blas::ax(-0.5 / kappa, out_4d); // undo the kappa baked into DiracCoarse
+
+    // This next block is spiritually equivalent to the DWF call:
+    // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
+
+    ApplyCoarseChiralProj(chiral_plus, in_4d, +1);  // for the backwards direction
+    ApplyCoarseChiralProj(chiral_minus, in_4d, -1); // for the forwards direction
+    for (int s = 0; s < Ls; s++) {
+      // forwards direction
+      blas::axpy((s == Ls - 1) ? -mass : 1, chiral_minus[(s + 1) % Ls], out_4d[s]);
+      // backwards direction
+      blas::axpy((s == 0) ? -mass : 1, chiral_plus[(s + Ls - 1) % Ls], out_4d[s]);
+    }
+
+    // This last bit is spiritually equivalent to the call:
+    // blas::xpay(in, -kappa5, out);
+
+    blas::xpay(in_4d, -2.0 * kappa5, out_4d);
+
     Join4DTo5DField(out[0], out_4d);
   }
 

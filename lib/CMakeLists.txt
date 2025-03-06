@@ -49,7 +49,7 @@ set (QUDA_OBJS
   llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
-  dslash_gamma_helper.cu dslash_clover_helper.cu
+  dslash_gamma_helper.cu dslash_clover_helper.cu dslash_gamma_helper_mg.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
@@ -191,6 +191,7 @@ configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
 configure_file(dslash_coarse_mma.in.hpp dslash_coarse_mma.hpp @ONLY)
 configure_file(block_transpose.in.cu block_transpose.cu @ONLY)
 configure_file(multigrid.in.hpp multigrid.hpp @ONLY)
+configure_file(dslash_gamma_helper_mg.in.cu dslash_gamma_helper_mg.cu @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")

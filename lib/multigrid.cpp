@@ -1124,6 +1124,8 @@ namespace quda
         // prepare vectors of fine 4-d fields for tmp2
         auto tmp2_4d = getFieldTmp<ColorSpinorField>(Ls, csParamFine);
 
+        printfQuda("Testing Split/Join Workflow\n");
+
         // split x_coarse[0]
         Split5DTo4DFields(x_coarse_4d, x_coarse[0]);
 
@@ -1137,7 +1139,7 @@ namespace quda
             accum_4d += x_coarse_4d_r2[i];
           }
           auto l2_deviation = sqrt(abs(x_coarse_5d_r2 - accum_4d) / x_coarse_5d_r2);
-          logQuda(QUDA_VERBOSE, "Split5DTo4D: 5-d norm2 %e , summed 4-d norm2 %e; Deviations: L2 relative = %e\n",
+          logQuda(QUDA_VERBOSE, "  Split5DTo4D: 5-d norm2 %e , summed 4-d norm2 %e; Deviations: L2 relative = %e\n",
                   x_coarse_5d_r2, accum_4d, l2_deviation);
           if (check_deviation(l2_deviation, tol))
             errorQuda("Split5DTo4D failed, L2 relative deviation = %e > %e", l2_deviation, tol);
@@ -1158,7 +1160,7 @@ namespace quda
           double accum_4d = 0.;
           for (int i = 0; i < Ls; i++) { accum_4d += r_coarse_4d_r2[i]; }
           auto l2_deviation = sqrt(abs(r2 - accum_4d) / r2);
-          logQuda(QUDA_VERBOSE, "Join4DTo5D: 5-d norm2 %e , summed 4-d norm2 %e; Deviations: L2 relative = %e\n", r2,
+          logQuda(QUDA_VERBOSE, "  Join4DTo5D: 5-d norm2 %e , summed 4-d norm2 %e; Deviations: L2 relative = %e\n", r2,
                   accum_4d, l2_deviation);
           if (check_deviation(l2_deviation, tol))
             errorQuda("Join4DTo5D failed, L2 relative deviation = %e > %e", l2_deviation, tol);
@@ -1166,7 +1168,35 @@ namespace quda
 
         auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
         auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
-        logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
+        logQuda(QUDA_VERBOSE, "  Split/Join L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
+                norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
+
+        // now test the fused prolongate/restrict
+        printfQuda("Testing 5-d field Workflow\n");
+
+        // populate x_coarse[0] with random values
+        spinorNoise(x_coarse[0], *rng, QUDA_NOISE_UNIFORM);
+
+        // create a temporary 5-d fine vectors
+        csParamFine = ColorSpinorParam(tmp2);
+        csParamFine.nDim = 5;
+        csParamFine.x[4] = Ls;
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+
+        // prepare vectors of fine 4-d fields for tmp2
+        auto tmp2_5d = getFieldTmp<ColorSpinorField>(csParamFine);
+
+        transfer->P(tmp2_5d, x_coarse[0]);
+        transfer->R(r_coarse[0], tmp2_5d);
+
+        r2 = norm2(r_coarse[0]);
+        max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
+        l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
+        logQuda(QUDA_VERBOSE, "  5-d field L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
                 norm2(x_coarse[0]), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
         if (check_deviation(l2_deviation, tol))
           errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
@@ -1232,7 +1262,7 @@ namespace quda
 
       verifyDwfPV();
     } else if (is_verify_coarse_pv) {
-
+      can_verify = false;
       logQuda(QUDA_VERBOSE,
               "Performing a custom verify for coarse pv^dagger dwf verify: reconstructing coarse dwf from the "
               "multi-rhs coarse + chiral projectors\n");
@@ -1290,17 +1320,76 @@ namespace quda
 
       // check 5-d dslash
       {
-        // tmp1 and tmp2 are fine 4-d vectors
-        // x_coarse[0] and r_coarse[0] are coarse 5-d vectors
-
         // make sure diracCoarseResidual is the coarse pv operator
         if (diracCoarseResidual->getDiracType() != QUDA_COARSEPV_DIRAC)
-          errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
+          errorQuda("Unexpected Dirac type %d", diracCoarseResidual->getDiracType());
 
-        static_cast<DiracCoarsePV *>(diracCoarseResidual)->ApplyMDwf(r_coarse[0], x_coarse[0]);
+        // create 5-d coarse vectors
+        ColorSpinorParam csParam(x_coarse[0]);
+        csParam.nDim = 5;
+        csParam.x[4] = diracResidual->getLs();
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+        auto coarse_5d_rhs = ColorSpinorField(csParam);
+        std::vector<ColorSpinorField> coarse_5d_lhs(2); // create two fields
+        for (auto &f : coarse_5d_lhs) f = ColorSpinorField(csParam);
+
+        // populate the coarse rhs with random noise
+        spinorNoise(coarse_5d_rhs, *rng, QUDA_NOISE_UNIFORM);
+
+        // create 5-d fine vectors
+        ColorSpinorParam csParamFine(tmp2);
+        csParamFine.nDim = 5;
+        csParamFine.x[4] = diracCoarseResidual->getLs();
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+        csParamFine.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+        auto fine_5d_rhs = ColorSpinorField(csParamFine);
+        auto fine_5d_lhs = ColorSpinorField(csParamFine);
+
+        // emulated
+
+        transfer->P(fine_5d_rhs, coarse_5d_rhs);
+
+        // fine operator, which has different paths depending on if it's fine or coarse
+        if (diracSmoother->getDiracType() == QUDA_COARSE_DIRAC) {
+          errorQuda("\"Fine\" PV level being coarse isn't supported yet");
+        } else {
+          // we need an extra basis change...
+          csParamFine.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+          auto fine_5d_rhs_inter = ColorSpinorField(csParamFine);
+          auto fine_5d_lhs_inter = ColorSpinorField(csParamFine);
+
+          blas::copy(fine_5d_rhs_inter, fine_5d_rhs);
+          if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4DPV_DIRAC) {
+            static_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
+          } else {
+            errorQuda("The coarse MobiusPV op has not been implemented yet");
+            // static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
+          }
+
+          blas::copy(fine_5d_lhs, fine_5d_lhs_inter);
+        }
+
+        transfer->R(coarse_5d_lhs[0], fine_5d_lhs);
+
+        // non-emulated
+        static_cast<DiracCoarsePV *>(diracCoarseResidual)->ApplyMDwf(coarse_5d_lhs[1], coarse_5d_rhs);
+
+        // check
+        double r_nrm = norm2(coarse_5d_lhs[1]);
+        auto max_deviation = blas::max_deviation(coarse_5d_lhs[1], coarse_5d_lhs[0]);
+        auto l2_deviation = sqrt(xmyNorm(coarse_5d_lhs[0], coarse_5d_lhs[1]) / norm2(coarse_5d_lhs[0]));
+
+        logQuda(QUDA_VERBOSE, "5-d L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+                norm2(coarse_5d_lhs[0]), r_nrm, l2_deviation, max_deviation[0]);
+
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("5-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          warningQuda("5-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
       }
-
-      errorQuda("Coarse PV verify starts failing here");
 
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
                || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
@@ -1429,6 +1518,8 @@ namespace quda
       if (check_deviation(max_deviation[0], tol))
         errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
     }
+
+    if (is_verify_coarse_pv) errorQuda("Coarse PV verify starts breaking here");
 
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators

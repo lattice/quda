@@ -702,6 +702,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
+
+    if (is_chiral(dslash_type)) mass *= 0.5; // some convention
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH

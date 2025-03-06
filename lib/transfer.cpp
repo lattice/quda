@@ -7,6 +7,7 @@
 #include <multigrid.h>
 #include <tune_quda.h>
 #include <malloc_quda.h>
+#include "dslash_quda.h"
 
 #include <iostream>
 #include <algorithm>
@@ -290,7 +291,32 @@ namespace quda {
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
+      if (out.Ndim() == 5 && in.Ndim() == 5) {
+        if (_use_mma) errorQuda("DWF MG doesn't support MMA yet");
+        if (out.X(4) != in.X(4)) errorQuda("5th dimension sizes in=%d out=%d do not agree", in.X(4), out.X(4));
+        // create the set of 4-d coarse vectors
+        ColorSpinorParam csParam(in[0]);
+        csParam.nDim = 4;
+        csParam.x[4] = 1;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        auto in_4d = getFieldTmp<ColorSpinorField>(in[0].X(4), csParam);
+
+        // create the set of 4-d fine vectors
+        ColorSpinorParam csParamFine(out[0]);
+        csParamFine.nDim = 4;
+        csParamFine.x[4] = 1;
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+        auto out_4d = getFieldTmp<ColorSpinorField>(out[0].X(4), csParamFine);
+
+        // split, prolongate, join
+        Split5DTo4DFields(in_4d, in[0]);
+        Prolongate(out_4d, in_4d, V, fine_to_coarse_d, spin_map, _use_mma, parity);
+        Join4DTo5DField(out[0], out_4d);
+      } else if (out.Ndim() == 4 && in.Ndim() == 4) {
+        Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
+      } else {
+        errorQuda("Invalid combination of dimensions out=%d in=%d", out.Ndim(), in.Ndim());
+      }
     } else {
       errorQuda("Invalid transfer type in prolongate");
     }
@@ -327,7 +353,32 @@ namespace quda {
       if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
+      if (out.Ndim() == 5 && in.Ndim() == 5) {
+        if (_use_mma) errorQuda("DWF MG doesn't support MMA yet");
+        if (out.X(4) != in.X(4)) errorQuda("5th dimension sizes in=%d out=%d do not agree", in.X(4), out.X(4));
+        // create the set of 4-d coarse vectors
+        ColorSpinorParam csParam(out[0]);
+        csParam.nDim = 4;
+        csParam.x[4] = 1;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        auto out_4d = getFieldTmp<ColorSpinorField>(out[0].X(4), csParam);
+
+        // create the set of 4-d fine vectors
+        ColorSpinorParam csParamFine(in[0]);
+        csParamFine.nDim = 4;
+        csParamFine.x[4] = 1;
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+        auto in_4d = getFieldTmp<ColorSpinorField>(in[0].X(4), csParamFine);
+
+        // split, prolongate, join
+        Split5DTo4DFields(in_4d, in[0]);
+        Restrict(out_4d, in_4d, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
+        Join4DTo5DField(out[0], out_4d);
+      } else if (out.Ndim() == 4 && in.Ndim() == 4) {
+        Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
+      } else {
+        errorQuda("Invalid combination of dimensions out=%d in=%d", out.Ndim(), in.Ndim());
+      }
 
     } else {
       errorQuda("Invalid transfer type in restrict");

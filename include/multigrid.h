@@ -782,6 +782,14 @@ namespace quda {
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma = false);
 
   /**
+     @brief Apply the coarse chiral projector to a coarse spinor.
+     @param[out] out The result vector
+     @param[in] in The input vector
+     @param[in] proj +/-1 for the positive/negative projector
+   */
+  void ApplyCoarseChiralProj(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int proj);
+
+  /**
      This is an object that captures an entire MG preconditioner
      state.  A bit of a hack at the moment, this is used to allow us
      to store and reuse the mg solver between solves.  This is use by
