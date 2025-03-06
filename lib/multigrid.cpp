@@ -1252,26 +1252,54 @@ namespace quda
 
       const DiracCoarse *d_coarse = reinterpret_cast<const DiracCoarse *>(diracCoarseNull);
 
+      // check 4-d dslash
+      {
+        // create 4-d coarse vectors
+        ColorSpinorParam csParam(x_coarse[0]);
+        csParam.nDim = 4;
+        csParam.x[4] = 1;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+
+        auto coarse_4_rhs = ColorSpinorField(csParam);
+        std::vector<ColorSpinorField> coarse_4_lhs(2); // create two fields
+        for (auto &f : coarse_4_lhs) f = ColorSpinorField(csParam);
+
+        // populate the coarse rhs with random noise
+        spinorNoise(coarse_4_rhs, *rng, QUDA_NOISE_UNIFORM);
+
+        // create the set of 4-d fine vectors
+        ColorSpinorParam csParamFine(tmp2);
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+        if (param.level == 1)
+          csParamFine.gammaBasis = (param.level == 1) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+        auto fine_4_rhs = ColorSpinorField(csParamFine);
+        auto fine_4_lhs = ColorSpinorField(csParamFine);
+
+        // First verify that the coarse operator is good
+
+        // emulated R D P
+        transfer->P(fine_4_rhs, coarse_4_rhs);
+        (*param.matNull)(fine_4_lhs, fine_4_rhs);
+        transfer->R(coarse_4_lhs[0], fine_4_lhs);
+
+        // coarse operator
+        d_coarse->M(coarse_4_lhs[1], coarse_4_rhs);
+
+        // check
+        double r_nrm = norm2(coarse_4_lhs[1]);
+        auto max_deviation = blas::max_deviation(coarse_4_lhs[1], coarse_4_lhs[0]);
+        auto l2_deviation = sqrt(xmyNorm(coarse_4_lhs[0], coarse_4_lhs[1]) / norm2(coarse_4_lhs[0]));
+
+        logQuda(QUDA_VERBOSE, "4-d L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+                norm2(x_coarse[0]), r_nrm, l2_deviation, max_deviation[0]);
+
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("4-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          warningQuda("4-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+      }
+
       errorQuda("Coarse PV verify starts failing here");
-
-      // First verify that the Wilson operator is good
-
-      (*param.matNull)(tmp2, tmp1);
-
-      transfer->R(x_coarse[0], tmp2);
-      static_cast<DiracCoarse *>(diracCoarseNull)->M(r_coarse[0], tmp_coarse);
-
-      double r_nrm = norm2(r_coarse[0]);
-      auto max_deviation = blas::max_deviation(r_coarse[0], x_coarse[0]);
-      auto l2_deviation = sqrt(xmyNorm(x_coarse[0], r_coarse[0]) / norm2(x_coarse[0]));
-
-      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              norm2(x_coarse[0]), r_nrm, l2_deviation, max_deviation[0]);
-
-      if (check_deviation(l2_deviation, tol))
-        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol))
-        warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
 
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
                || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {

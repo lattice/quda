@@ -18,7 +18,7 @@ namespace quda {
     // for nSpin != 2
     using F_coarse_grained = typename colorspinor_mapper<Float, nSpin, nColor>::type;
     // else
-    using F_fine_grained = typename colorspinor::FieldOrderCB<Float, nSpin, nColor, 1, colorspinor::getNative<Float>(nSpin), Float, Float, true, isFixed<Float>::value>;
+    using F_fine_grained = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, colorspinor::getNative<real>(nSpin)>;
 
     using F = std::conditional_t<nSpin == 2, F_fine_grained, F_coarse_grained>;
 
