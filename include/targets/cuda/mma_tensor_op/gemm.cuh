@@ -245,7 +245,8 @@ namespace quda
       {
         float max = 0;
 
-        extern __shared__ typename mma_t::compute_t smem_ptr[];
+        extern __shared__ int smem[];
+        auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
 
         SmemObjA smem_obj_a_real(smem_ptr);
         SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
@@ -305,7 +306,8 @@ namespace quda
       {
         float max = 0;
 
-        extern __shared__ typename mma_t::compute_t smem_ptr[];
+        extern __shared__ int smem[];
+        auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
 
         SmemObjA smem_obj_a_real(smem_ptr);
         SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
@@ -373,7 +375,8 @@ namespace quda
       {
         float max = 0;
 
-        extern __shared__ typename mma_t::compute_t smem_ptr[];
+        extern __shared__ int smem[];
+        auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
 
         SmemObjA smem_obj_a_real(smem_ptr);
         SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
