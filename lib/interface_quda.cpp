@@ -5204,9 +5204,25 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   gaugeObservables(in, obs_param[measurement_n]);
 
-  logQuda(QUDA_SUMMARIZE, "flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
-  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->t0, obs_param[0].plaquette[0],
-          obs_param[0].energy[0], obs_param[0].energy[1], obs_param[0].energy[2], obs_param[0].qcharge);
+  // Assume first six rectangles are spatial and last six are temporal
+  double rect_s = 0.0;
+  double rect_t = 0.0;
+  for (int i = 0; i < 6; i++) {
+    double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+    std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+    rect_s += traces_.real();
+  }
+  for (int i = 6; i < 12; i++) {
+    double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+    std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+    rect_t += traces_.real();
+  }
+  rect_s /= 6.0;
+  rect_t /= 6.0;
+
+  logQuda(QUDA_SUMMARIZE, "flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge, Rect_s, Rect_t\n");
+  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->t0, obs_param[0].plaquette[0],
+          obs_param[0].energy[0], obs_param[0].energy[1], obs_param[0].energy[2], obs_param[0].qcharge, rect_s, rect_t);
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     // Perform W1, W2, and Vt Wilson Flow steps as defined in
@@ -5217,9 +5233,26 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.
       gaugeObservables(out, obs_param[measurement_n]);
-      logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
+
+      // Assume first six rectangles are spatial and last six are temporal
+      double rect_s = 0.0;
+      double rect_t = 0.0;
+      for (int i = 0; i < 6; i++) {
+        double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+        std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+        rect_s += traces_.real();
+      }
+      for (int i = 6; i < 12; i++) {
+        double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+        std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+        rect_t += traces_.real();
+      }
+      rect_s /= 6.0;
+      rect_t /= 6.0;
+
+      logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
               obs_param[measurement_n].plaquette[0], obs_param[measurement_n].energy[0],
-              obs_param[measurement_n].energy[1], obs_param[measurement_n].energy[2], obs_param[measurement_n].qcharge);
+              obs_param[measurement_n].energy[1], obs_param[measurement_n].energy[2], obs_param[measurement_n].qcharge, rect_s, rect_t);
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
