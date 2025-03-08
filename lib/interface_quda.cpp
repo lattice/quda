@@ -5220,9 +5220,11 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   rect_s /= 6.0;
   rect_t /= 6.0;
 
-  logQuda(QUDA_SUMMARIZE, "flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge, Rect_s, Rect_t\n");
-  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->t0, obs_param[0].plaquette[0],
-          obs_param[0].energy[0], obs_param[0].energy[1], obs_param[0].energy[2], obs_param[0].qcharge, rect_s, rect_t);
+  logQuda(QUDA_SUMMARIZE, "flow t, Clover_t, Clover_s, Plaq_t, Plaq_s, Rect_t, Rect_s, charge\n");
+  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->t0,
+		  obs_param[0].energy[2], obs_param[0].energy[1],
+		  obs_param[0].plaquette[2]*3.0,obs_param[0].plaquette[1]*3.0,
+	  	  rect_t, rect_s, obs_param[0].qcharge);
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     // Perform W1, W2, and Vt Wilson Flow steps as defined in
@@ -5251,8 +5253,9 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
       rect_t /= 6.0;
 
       logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-              obs_param[measurement_n].plaquette[0], obs_param[measurement_n].energy[0],
-              obs_param[measurement_n].energy[1], obs_param[measurement_n].energy[2], obs_param[measurement_n].qcharge, rect_s, rect_t);
+                  obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1],
+                  obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0,
+                  rect_t, rect_s, obs_param[measurement_n].qcharge);
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
