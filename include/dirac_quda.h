@@ -1968,7 +1968,7 @@ public:
     /**
        @brief Whether the Dirac operator is mma enabled
     */
-    virtual bool is_mma_enabled() const { return dslash_use_mma; }
+    virtual bool is_mma_enabled() const override { return dslash_use_mma; }
 
     /**
        @brief Apply the coarse clover operator
