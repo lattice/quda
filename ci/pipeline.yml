@@ -21,6 +21,8 @@ test_job:
   script:
     - export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
     - export LD_PRELOAD=/usr/lib64/libmpi_gtl_cuda.so
+    - if [[ $SLURM_LOCALID == "0" ]]; then rm -rf /quda/build/Testing && ln -s /dev/shm /quda/build/Testing; fi
+    - sleep 1
     - ctest --test-dir /quda/build/ --output-on-failure
   variables:
     CRAY_CUDA_MPS: 0
