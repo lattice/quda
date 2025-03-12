@@ -83,6 +83,16 @@ namespace quda
       strcpy(aux[kernel_type], kernel_str);
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
+      // if QUDA_ENABLE_CARVEOUT_MAX_SHARED is set to 0, don't set the carveout hint
+      static bool set_max_carveout = [&] () {
+        char *enable_trace_env = getenv("QUDA_ENABLE_CARVEOUT_MAX_SHARED");
+        if (enable_trace_env != nullptr && strcmp(enable_trace_env, "0") == 0)
+          return false;
+        else
+          return true;
+      }();
+      if (!set_max_carveout)
+        strcat(aux[kernel_type], ",no-max-carveout");
     }
 
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
@@ -244,7 +254,7 @@ namespace quda
        compilation time.
     */
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
-    inline void launch(TuneParam &tp, const qudaStream_t &stream)
+    void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
       launch_device<dslash_functor>(

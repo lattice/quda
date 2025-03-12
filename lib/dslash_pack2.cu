@@ -173,6 +173,16 @@ namespace quda
 #ifdef STRIPED
       strcat(aux, ",striped");
 #endif
+      // if QUDA_ENABLE_CARVEOUT_MAX_SHARED is set to 0, don't set the carveout hint
+      static bool set_max_carveout = [&] () {
+        char *enable_trace_env = getenv("QUDA_ENABLE_CARVEOUT_MAX_SHARED");
+        if (enable_trace_env != nullptr && strcmp(enable_trace_env, "0") == 0)
+          return false;
+        else
+          return true;
+      }();
+      if (!set_max_carveout)
+        strcat(aux, ",no-max-carveout");
     }
 
 public:
