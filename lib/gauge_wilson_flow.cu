@@ -53,6 +53,12 @@ namespace quda {
       case WFLOW_STEP_W1: strcat(aux, "_W1"); break;
       case WFLOW_STEP_W2: strcat(aux, "_W2"); break;
       case WFLOW_STEP_VT: strcat(aux, "_VT"); break;
+      case WFLOW_4THORDER_STEP_1: strcat(aux, "_F1"); break;
+      case WFLOW_4THORDER_STEP_2: strcat(aux, "_F2"); break;
+      case WFLOW_4THORDER_STEP_3: strcat(aux, "_F3"); break;
+      case WFLOW_4THORDER_STEP_4: strcat(aux, "_F4"); break;
+      case WFLOW_4THORDER_STEP_5: strcat(aux, "_F5"); break;
+      case WFLOW_4THORDER_STEP_6: strcat(aux, "_F6"); break;
       default : errorQuda("Unknown Wilson Flow step type %d", step_type);
       }
 
@@ -79,6 +85,24 @@ namespace quda {
         case WFLOW_STEP_VT:
           launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_STEP_VT>(out, temp, in, epsilon));
           break;
+	case WFLOW_4THORDER_STEP_1:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_4THORDER_STEP_1>(out, temp, in, epsilon));
+          break;
+	case WFLOW_4THORDER_STEP_2:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_4THORDER_STEP_2>(out, temp, in, epsilon));
+          break;
+	case WFLOW_4THORDER_STEP_3:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_4THORDER_STEP_3>(out, temp, in, epsilon));
+          break;
+	case WFLOW_4THORDER_STEP_4:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_4THORDER_STEP_4>(out, temp, in, epsilon));
+          break;
+	case WFLOW_4THORDER_STEP_5:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_4THORDER_STEP_5>(out, temp, in, epsilon));
+          break;
+	case WFLOW_4THORDER_STEP_6:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_4THORDER_STEP_6>(out, temp, in, epsilon));
+          break;
         }
         break;
       case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
@@ -92,6 +116,24 @@ namespace quda {
           break;
         case WFLOW_STEP_VT:
           launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_VT>(out, temp, in, epsilon));
+          break;
+	case WFLOW_4THORDER_STEP_1:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_4THORDER_STEP_1>(out, temp, in, epsilon));
+          break;
+        case WFLOW_4THORDER_STEP_2:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_4THORDER_STEP_2>(out, temp, in, epsilon));
+          break;
+        case WFLOW_4THORDER_STEP_3:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_4THORDER_STEP_3>(out, temp, in, epsilon));
+          break;
+        case WFLOW_4THORDER_STEP_4:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_4THORDER_STEP_4>(out, temp, in, epsilon));
+          break;
+        case WFLOW_4THORDER_STEP_5:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_4THORDER_STEP_5>(out, temp, in, epsilon));
+          break;
+        case WFLOW_4THORDER_STEP_6:
+          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_4THORDER_STEP_6>(out, temp, in, epsilon));
           break;
         }
         break;
@@ -150,6 +192,38 @@ namespace quda {
     // Step Vt
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_VT);
     out.exchangeExtendedGhost(out.R(), false);
+  
+  }
+
+  void WFlowStepFourthOrder(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type)
+  {
+    checkPrecision(out, temp, in);
+    checkReconstruct(out, in);
+    checkNative(out, in);
+    if (temp.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Temporary vector must not use reconstruct");
+    if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
+      errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
+
+    // Fourth order steps:
+    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_4THORDER_STEP_1);
+    out.exchangeExtendedGhost(out.R(), false);
+    
+    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_type, WFLOW_4THORDER_STEP_2);
+    in.exchangeExtendedGhost(in.R(), false);
+    
+    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_4THORDER_STEP_3);
+    out.exchangeExtendedGhost(out.R(), false);
+    
+    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_type, WFLOW_4THORDER_STEP_4);
+    in.exchangeExtendedGhost(in.R(), false);
+    
+    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_4THORDER_STEP_5);
+    out.exchangeExtendedGhost(out.R(), false);
+    
+    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_type, WFLOW_4THORDER_STEP_6);
+    in.exchangeExtendedGhost(in.R(), false);
+
+    out = in;    
   }
 
   void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon,

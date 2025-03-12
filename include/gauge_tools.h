@@ -146,6 +146,20 @@ namespace quda
   void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
 
   /**
+     @brief Apply Wilson Flow fourth-order steps to the gauge field.
+     This routine assumes that the input and output fields are
+     extended, with the input field being exchanged prior to calling
+     this function.  On exit from this routine, the output field will
+     have been exchanged.
+     @param[out] out Output smeared field
+     @param[in] temp Temp space
+     @param[in] in Input gauge field
+     @param[in] epsilon Step size
+     @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
+  */
+  void WFlowStepFourthOrder(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
+  
+  /**
      @brief Apply intermediary Wilson Flow steps W1, W2 or Vt to the gauge field.
      This routine assumes that the input and output fields are
      extended, with the input field being exchanged prior to calling

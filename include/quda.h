@@ -1692,6 +1692,14 @@ extern "C" {
   void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
   /**
+   * Performs Wilson Flow (fourth order algorithm) on gaugePrecise and stores it in gaugeSmeared
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */
+  void performWFlowFourthOrderQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
+  
+  /**
    * Performs Gradient Flow (gauge + fermion) on gaugePrecise and stores it in gaugeSmeared
    * @param[out] h_out Output fermion field
    * @param[in] h_in Input fermion field
