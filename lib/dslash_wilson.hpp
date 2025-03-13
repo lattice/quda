@@ -22,7 +22,7 @@ namespace quda
   public:
     Wilson(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
            const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo, wilson_use_async ? ",async" : "")
+      Dslash(arg, out, in, halo, wilson_use_async ? ",async-p" + std::to_string(pipeline_depth) : "")
     {
     }
 
@@ -33,7 +33,7 @@ namespace quda
         int bulk = Arg::F::length * sizeof(Float);
         int norm = isFixed<Float>::value ? sizeof(float) : 0;
         int gauge = Arg::G::reconLen * sizeof(Float);
-        return (bulk + norm + gauge) * 2;
+        return (bulk + norm + gauge) * pipeline_depth;
       } else {
         return 0;
       }

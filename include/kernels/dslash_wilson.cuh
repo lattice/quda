@@ -70,6 +70,21 @@ namespace quda
     }
   };
 
+  constexpr int pipeline_depth = 4;
+
+  constexpr int get_pipeline_index(int d, int dir)
+  { // 0 for forward, 1 for backward
+    if (pipeline_depth == 8) {
+      return d * 2 + dir;
+    } else if (pipeline_depth == 2) {
+      return dir;
+    } else if (pipeline_depth == 4) {
+      return (d % 2) * 2 + dir;
+    } else {
+      return 0; // should never go here
+    }
+  }
+
   /**
        @brief Applies the off-diagonal part of the Wilson operator
        @param[out] out The out result field
@@ -94,7 +109,7 @@ namespace quda
 
     cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
 
-    using Cache = StencilCache<typename Arg::F, typename Arg::G, 2>;
+    using Cache = StencilCache<typename Arg::F, typename Arg::G, pipeline_depth>;
     Cache cache(arg.in[src_idx], arg.U);
 
     auto load_forward = [&](int d) {
@@ -104,7 +119,7 @@ namespace quda
 
       const bool ghost = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-      pipe.producer_acquire();
+      // pipe.producer_acquire();
       if (false && doHalo<kernel_type>(d) && ghost) {
 #if 0
           // we need to compute the face index if we are updating a face that isn't ours
@@ -118,12 +133,13 @@ namespace quda
 #endif
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        arg.U.cache(cache, 0, pipe, d, gauge_idx, gauge_parity);
+        arg.U.cache(cache, get_pipeline_index(d, 0), pipe, d, gauge_idx, gauge_parity);
         if (d < 3) {
-          arg.in[src_idx].cache(cache, 0, pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          arg.in[src_idx].cache(cache, get_pipeline_index(d, 0), pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb,
+                                their_spinor_parity);
         } else {
-          arg.in[src_idx].cache_half<(1 - proj_dir) / 2>(cache, 0, pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb,
-                                                         their_spinor_parity);
+          arg.in[src_idx].cache_half<(1 - proj_dir) / 2>(cache, get_pipeline_index(d, 0), pipe,
+                                                         fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
         }
       }
       pipe.producer_commit();
@@ -136,7 +152,7 @@ namespace quda
 
       const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-      pipe.producer_acquire();
+      // pipe.producer_acquire();
       if (false && doHalo<kernel_type>(d) && ghost) {
 #if 0
           // we need to compute the face index if we are updating a face that isn't ours
@@ -151,12 +167,13 @@ namespace quda
 #endif
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        arg.U.cache(cache, 1, pipe, d, gauge_idx, 1 - gauge_parity);
+        arg.U.cache(cache, get_pipeline_index(d, 1), pipe, d, gauge_idx, 1 - gauge_parity);
         if (d < 3) {
-          arg.in[src_idx].cache(cache, 1, pipe, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          arg.in[src_idx].cache(cache, get_pipeline_index(d, 1), pipe, back_idx + coord.s * arg.dc.volume_4d_cb,
+                                their_spinor_parity);
         } else {
-          arg.in[src_idx].cache_half<(1 - proj_dir) / 2>(cache, 1, pipe, back_idx + coord.s * arg.dc.volume_4d_cb,
-                                                         their_spinor_parity);
+          arg.in[src_idx].cache_half<(1 - proj_dir) / 2>(cache, get_pipeline_index(d, 1), pipe,
+                                                         back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
         }
       }
       pipe.producer_commit();
@@ -182,13 +199,13 @@ namespace quda
 #endif
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        Link U = cache.load_gauge(0, d, gauge_idx, gauge_parity);
+        Link U = cache.load_gauge(get_pipeline_index(d, 0), d, gauge_idx, gauge_parity);
         if (d < 3) {
-          Vector in = cache.load_color_spinor(0);
-          load_forward(d + 1);
+          Vector in = cache.load_color_spinor(get_pipeline_index(d, 0));
+          // load_forward(d + 1);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         } else {
-          HalfVector in = cache.load_color_spinor_half(0);
+          HalfVector in = cache.load_color_spinor_half(get_pipeline_index(d, 0));
           out += (U * (static_cast<real>(2.0) * in)).reconstruct(d, proj_dir);
         }
       }
@@ -215,33 +232,115 @@ namespace quda
 #endif
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        Link U = cache.load_gauge(1, d, gauge_idx, 1 - gauge_parity);
+        Link U = cache.load_gauge(get_pipeline_index(d, 1), d, gauge_idx, 1 - gauge_parity);
         if (d < 3) {
-          Vector in = cache.load_color_spinor(1);
-          load_backward(d + 1);
+          Vector in = cache.load_color_spinor(get_pipeline_index(d, 1));
+          // load_backward(d + 1);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         } else {
-          HalfVector in = cache.load_color_spinor_half(1);
+          HalfVector in = cache.load_color_spinor_half(get_pipeline_index(d, 1));
           out += (conj(U) * (static_cast<real>(2.0) * in)).reconstruct(d, proj_dir);
         }
       }
     };
 
-    load_forward(0);
-    load_backward(0);
+    if constexpr (pipeline_depth == 2) {
 
-#pragma unroll
-    for (int d = 0; d < 4; d++) {
+      load_forward(0);
+      load_backward(0);
+
       cuda::pipeline_consumer_wait_prior<1>(pipe);
-      compute_forward(d);
+      compute_forward(0);
+      load_forward(1);
 
-      if (d < 3) {
-        cuda::pipeline_consumer_wait_prior<1>(pipe);
-      } else {
-        cuda::pipeline_consumer_wait_prior<0>(pipe);
-      }
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_backward(0);
+      load_backward(1);
 
-      compute_backward(d);
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_forward(1);
+      load_forward(2);
+
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_backward(1);
+      load_backward(2);
+
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_forward(2);
+      load_forward(3);
+
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_backward(2);
+      load_backward(3);
+
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_forward(3);
+
+      cuda::pipeline_consumer_wait_prior<0>(pipe);
+      compute_backward(3);
+
+    } else if constexpr (pipeline_depth == 4) {
+
+      load_forward(0);
+      load_backward(0);
+      load_forward(1);
+      load_backward(1);
+
+      cuda::pipeline_consumer_wait_prior<3>(pipe);
+      compute_forward(0);
+      load_forward(2);
+
+      cuda::pipeline_consumer_wait_prior<3>(pipe);
+      compute_backward(0);
+      load_backward(2);
+
+      cuda::pipeline_consumer_wait_prior<3>(pipe);
+      compute_forward(1);
+      load_forward(3);
+
+      cuda::pipeline_consumer_wait_prior<3>(pipe);
+      compute_backward(1);
+      load_backward(3);
+
+      cuda::pipeline_consumer_wait_prior<3>(pipe);
+      compute_forward(2);
+
+      cuda::pipeline_consumer_wait_prior<2>(pipe);
+      compute_backward(2);
+
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_forward(3);
+
+      cuda::pipeline_consumer_wait_prior<0>(pipe);
+      compute_backward(3);
+
+    } else if constexpr (pipeline_depth == 8) {
+
+      load_forward(0);
+      load_backward(0);
+      load_forward(1);
+      load_backward(1);
+      load_forward(2);
+      load_backward(2);
+      load_forward(3);
+      load_backward(3);
+
+      cuda::pipeline_consumer_wait_prior<7>(pipe);
+      compute_forward(0);
+      cuda::pipeline_consumer_wait_prior<6>(pipe);
+      compute_backward(0);
+      cuda::pipeline_consumer_wait_prior<5>(pipe);
+      compute_forward(1);
+      cuda::pipeline_consumer_wait_prior<4>(pipe);
+      compute_backward(1);
+      cuda::pipeline_consumer_wait_prior<3>(pipe);
+      compute_forward(2);
+      cuda::pipeline_consumer_wait_prior<2>(pipe);
+      compute_backward(2);
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
+      compute_forward(3);
+      cuda::pipeline_consumer_wait_prior<0>(pipe);
+      compute_backward(3);
     }
   }
 
