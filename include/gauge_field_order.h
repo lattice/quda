@@ -1524,11 +1524,14 @@ namespace quda {
         static constexpr int length = length_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        typedef typename VectorType<Float, N>::type Vector;
+        using Vector = typename VectorType<Float, N>::type;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
         static constexpr int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
+        static constexpr int M = reconLen / N;
+        static constexpr int Nrem = reconLen - M * N - hasPhase;
+        static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");
         Float *gauge;
         const AllocInt offset;
         Float *ghost[4];
@@ -1546,7 +1549,7 @@ namespace quda {
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
           gauge(gauge_ ? gauge_ : u.data<Float *>()),
-          offset(u.Bytes() / (2 * sizeof(Float) * N)),
+          offset(u.Bytes() / (2 * sizeof(Float))),
           ghostExchange(u.GhostExchange()),
           volumeCB(u.VolumeCB()),
           stride(u.Stride()),
@@ -1569,21 +1572,28 @@ namespace quda {
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
       {
-        const int M = reconLen / N;
         real tmp[reconLen];
 
 #pragma unroll
-        for (int i=0; i<M; i++){
+        for (int i = 0; i < M; i++) {
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
+          auto vecTmp = vector_load<Vector>(gauge + parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
           // second do copy converting into register type
 #pragma unroll
           for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
+        // now load any remainder
+        if constexpr (Nrem > 0) {
+          using VectorR = typename VectorType<Float, Nrem>::type;
+          auto vecTmp = vector_load<VectorR>(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+#pragma unroll
+          for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+        }
+
         constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
         if constexpr (load_phase) {
-          copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
+          copy(phase, gauge[parity * offset + phaseOffset + stride * dir + x]);
           phase *= static_cast<real>(2.0);
         }
 
@@ -1592,22 +1602,32 @@ namespace quda {
 
       __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
       {
-        const int M = reconLen / N;
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
 #pragma unroll
-        for (int i=0; i<M; i++){
-	  Vector vecTmp;
+        for (int i = 0; i < M; i++) {
+          Vector vecTmp;
 	  // first do copy converting into storage type
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-	  // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
+          for (int j = 0; j < N; j++) copy(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
+          // second do vectorized copy into memory
+          vector_store(gauge + parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
         }
+
+        // now save any remainder
+        if constexpr (Nrem > 0) {
+          using VectorR = typename VectorType<Float, Nrem>::type;
+          VectorR vecTmp;
+#pragma unroll
+          for (int j = 0; j < Nrem; j++) copy(reinterpret_cast<Float *>(&vecTmp)[j], tmp[M * N + j]);
+          // second do vectorized copy into memory
+          vector_store(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
+        }
+
         if constexpr (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
+          copy(gauge[parity * offset + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
         }
       }
 
@@ -1632,26 +1652,33 @@ namespace quda {
           load(v, volumeCB + x, dir, parity, inphase); // an offset of size volumeCB puts us at the padded region
           // This also works perfectly when phases are stored. No need to change this.
         } else {
-          const int M = reconLen / N;
           real tmp[reconLen];
 
 #pragma unroll
-          for (int i=0; i<M; i++) {
-	    // first do vectorized copy from memory into registers
-            Vector vecTmp = vector_load<Vector>(
-                ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
+          for (int i = 0; i < M; i++) {
+            // first do vectorized copy from memory into registers
+            auto vecTmp
+              = vector_load<Vector>(ghost[dir] + parity * faceVolumeCB[dir] * reconLen, i * faceVolumeCB[dir] + x);
             // second do copy converting into register type
 #pragma unroll
             for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
           }
+
+          // now load any remainder
+          if constexpr (Nrem > 0) {
+            using VectorR = typename VectorType<Float, Nrem>::type;
+            auto vecTmp = vector_load<VectorR>(ghost[dir] + parity * faceVolumeCB[dir] * (reconLen + M * N), x);
+#pragma unroll
+            for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+          }
+
           real phase = 0.;
 
           if constexpr (hasPhase) {
-
             // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
             //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
             // } else {
-            copy(phase, ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x]);
+            copy(phase, ghost[dir][parity * faceVolumeCB[dir] * reconLen + faceVolumeCB[dir] * (reconLen - 1) + x]);
             phase *= static_cast<real>(2.0);
             // }
           }
@@ -1664,23 +1691,32 @@ namespace quda {
         if (!ghost[dir]) { // store in main field not separate array
           save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
         } else {
-          const int M = reconLen / N;
           real tmp[reconLen];
           reconstruct.Pack(tmp, v);
 
 #pragma unroll
-          for (int i=0; i<M; i++) {
-	    Vector vecTmp;
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp;
 	    // first do copy converting into storage type
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
-	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
+            vector_store(ghost[dir] + parity * faceVolumeCB[dir] * reconLen, i * faceVolumeCB[dir] + x, vecTmp);
+          }
+
+          // now save any remainder
+          if constexpr (Nrem > 0) {
+            using VectorR = typename VectorType<Float, Nrem>::type;
+            VectorR vecTmp;
+#pragma unroll
+            for (int j = 0; j < Nrem; j++) copy(reinterpret_cast<Float *>(&vecTmp)[j], tmp[M * N + j]);
+            // second do vectorized copy into memory
+            vector_store(ghost[dir] + parity * faceVolumeCB[dir] * (reconLen + M * N), x, vecTmp);
           }
 
           if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
-            copy(ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x],
+            copy(ghost[dir][parity * faceVolumeCB[dir] * reconLen + faceVolumeCB[dir] * (reconLen - 1) + x],
                  static_cast<real>(0.5) * phase);
           }
         }
@@ -1721,18 +1757,31 @@ namespace quda {
       __device__ __host__ inline void loadGhostEx(complex v[length / 2], int buff_idx, int extended_idx, int dir,
                                                   int dim, int g, int parity, const int R[]) const
       {
-        const int M = reconLen / N;
         real tmp[reconLen];
 
 #pragma unroll
-	for (int i=0; i<M; i++) {
-	  // first do vectorized copy from memory
-	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
-					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
-	  // second do copy converting into register type
+        for (int i = 0; i < M; i++) {
+          // first do vectorized copy from memory
+          auto vecTmp = vector_load<Vector>(
+            ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen,
+            +i * R[dim] * faceVolumeCB[dim] + buff_idx);
+
+          // second do copy converting into register type
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
-	}
+          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+        }
+
+        // now load any remainder
+        if constexpr (Nrem > 0) {
+          using VectorR = typename VectorType<Float, Nrem>::type;
+          auto vecTmp
+            = vector_load<VectorR>(ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen
+                                     + (M * N) * R[dim] * faceVolumeCB[dim],
+                                   buff_idx);
+#pragma unroll
+          for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+        }
+
         real phase = 0.;
         if constexpr (hasPhase)
           copy(phase,
@@ -1746,26 +1795,38 @@ namespace quda {
       __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int, int dir, int dim,
                                                   int g, int parity, const int R[]) const
       {
-        const int M = reconLen / N;
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
 #pragma unroll
-	  for (int i=0; i<M; i++) {
-	    Vector vecTmp;
-	    // first do copy converting into storage type
+        for (int i = 0; i < M; i++) {
+          Vector vecTmp;
+          // first do copy converting into storage type
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
 	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
-	  }
-          if constexpr (hasPhase) {
-            real phase = reconstruct.getPhase(v);
-            copy(ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
-                            + R[dim] * faceVolumeCB[dim] * M * N + buff_idx],
-                 static_cast<real>(0.5) * phase);
-          }
+        }
+
+        // now save any remainder
+        if constexpr (Nrem > 0) {
+          using VectorR = typename VectorType<Float, Nrem>::type;
+          VectorR vecTmp;
+#pragma unroll
+          for (int j = 0; j < Nrem; j++) copy(reinterpret_cast<Float *>(&vecTmp)[j], tmp[M * N + j]);
+          // second do vectorized copy into memory
+          vector_store(ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen
+                         + (M * N) * R[dim] * faceVolumeCB[dim],
+                       buff_idx, vecTmp);
+        }
+
+        if constexpr (hasPhase) {
+          real phase = reconstruct.getPhase(v);
+          copy(ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
+                          + R[dim] * faceVolumeCB[dim] * M * N + buff_idx],
+               static_cast<real>(0.5) * phase);
+        }
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }
@@ -2392,6 +2453,10 @@ namespace quda {
   struct gauge_mapper<double, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<double, N, 2, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+  template <QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_10, 10, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
+    typedef gauge::FloatNOrder<double, 10, 2, 10, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
 
   // single precision
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
@@ -2417,6 +2482,10 @@ namespace quda {
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<float, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_10, 10, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
+    typedef gauge::FloatNOrder<float, 10, 4, 10, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // half precision
@@ -2444,6 +2513,10 @@ namespace quda {
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<short, N, QUDA_ORDER_FP, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+  template <QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_10, 10, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
+    typedef gauge::FloatNOrder<short, 10, QUDA_ORDER_FP, 10, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
 
   // quarter precision
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
@@ -2469,6 +2542,10 @@ namespace quda {
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
     typedef gauge::FloatNOrder<int8_t, N, QUDA_ORDER_FP, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_10, 10, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
+    typedef gauge::FloatNOrder<int8_t, 10, QUDA_ORDER_FP, 10, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,

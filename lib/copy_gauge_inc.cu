@@ -300,27 +300,27 @@ namespace quda {
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    if (in.Reconstruct() == QUDA_RECONSTRUCT_10 and out.Reconstruct() == QUDA_RECONSTRUCT_10) {
-	      typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	      typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	      using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
+	      using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
               CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0),
                                                                                    momIn(in, In, 0), in);
               copyMom<decltype(arg)>(arg,out,in,location);
 	    } else if (in.Reconstruct() == QUDA_RECONSTRUCT_10) {
-	      typedef FloatNOrder<FloatIn,18,2,11> momIn;
-	      typedef FloatNOrder<FloatOut,18,2,18> momOut;
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type;
               CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0),
                                                                                    momIn(in, In, 0), in);
               copyMom<decltype(arg)>(arg,out,in,location);
 	    } else {
-	      typedef FloatNOrder<FloatIn,18,2,18> momIn;
-	      typedef FloatNOrder<FloatOut,18,2,11> momOut;
+              using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO>::type;
+              using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
               CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0),
                                                                                    momIn(in, In, 0), in);
               copyMom<decltype(arg)>(arg,out,in,location);
 	    }
 	  } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 #ifdef BUILD_QDP_INTERFACE
-	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	    using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
 	    typedef QDPOrder<FloatIn,10> momIn;
             CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
             copyMom<decltype(arg)>(arg,out,in,location);
@@ -329,7 +329,7 @@ namespace quda {
 #endif
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
-	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	    using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
 	    typedef MILCOrder<FloatIn,10> momIn;
             CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
             copyMom<decltype(arg)>(arg,out,in,location);
@@ -338,7 +338,7 @@ namespace quda {
 #endif
 	  } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
-	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	    using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10, 10>::type;
 	    typedef MILCSiteOrder<FloatIn,10> momIn;
             CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
             copyMom<decltype(arg)>(arg,out,in,location);
@@ -347,7 +347,7 @@ namespace quda {
 #endif
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
-	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
+	    using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
 	    typedef TIFROrder<FloatIn,18> momIn;
             CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
             copyMom<decltype(arg)>(arg,out,in,location);
@@ -356,7 +356,7 @@ namespace quda {
 #endif
 	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
-	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
+	    using momOut = typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_10>::type;
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
             CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In), in);
             copyMom<decltype(arg)>(arg,out,in,location);
@@ -370,7 +370,7 @@ namespace quda {
 #ifdef BUILD_QDP_INTERFACE
 	  typedef QDPOrder<FloatOut,10> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
+            using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
             CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
             copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
@@ -387,7 +387,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	  typedef MILCOrder<FloatOut,10> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
+	    using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
             CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
             copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
@@ -408,7 +408,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	  typedef MILCSiteOrder<FloatOut,10> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
+	    using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10, 10>::type;
             CopyGaugeArg<FloatOut, FloatIn, 10, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
             copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
@@ -425,8 +425,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
 	  typedef TIFROrder<FloatOut,18> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
-	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
+	    using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
             CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
             copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
@@ -443,8 +442,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
 	  typedef TIFRPaddedOrder<FloatOut,18> momOut;
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
-	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
+	    using momIn = typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_10>::type;
             CopyGaugeArg<FloatOut, FloatIn, 18, fine_grain(), momOut, momIn> arg(momOut(out, Out), momIn(in, In, 0), in);
             copyMom<decltype(arg)>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
