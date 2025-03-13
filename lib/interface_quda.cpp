@@ -5569,7 +5569,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   popOutputPrefix();  
 }
 
-void gfEvolve(ColorSpinorField &f_temp4,std::vector<std::reference_wrapper<GaugeField>> tgl, QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
+void gfEvolve(ColorSpinorField &f_temp3,std::vector<std::reference_wrapper<GaugeField>> tgl, QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
 {
   // const GaugeField gin = gf_list[0].get();
   // GaugeField &g_W0 = gf_list[0].get();
@@ -5587,12 +5587,11 @@ void gfEvolve(ColorSpinorField &f_temp4,std::vector<std::reference_wrapper<Gauge
   GaugeField gaugeTemp = tgl[0].get();
   GaugeField precise = tgl[1].get();
 
-  ColorSpinorField f_temp0 = f_temp4;  
-  ColorSpinorField f_temp1 = f_temp4;
-  ColorSpinorField f_temp2 = f_temp4;
-  ColorSpinorField f_temp3 = f_temp4;
-  
-    
+  ColorSpinorField f_temp0 = f_temp3;  
+  ColorSpinorField f_temp1 = f_temp3;
+  ColorSpinorField f_temp2 = f_temp3;
+  ColorSpinorField f_temp4 = f_temp3;
+
   int &i_glob = meas_cinf[0].get();
   int &measurement_n = meas_cinf[1].get();
   measurement_n = 0;
@@ -5658,10 +5657,10 @@ void gfEvolve(ColorSpinorField &f_temp4,std::vector<std::reference_wrapper<Gauge
       
     // fout = f_temp0;
     //redefining f_temp0 to restart loop
-    f_temp3 = f_temp0;
-
+    // f_temp3 = f_temp0;
+    printfQuda("f_temp3 loop\n");
+    f_temp3.PrintVector(0,300,0);
   }
-  f_temp4 = f_temp3;  
     
 }
     
@@ -5758,12 +5757,18 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
 
     if (i_glob == 30) {
         ColorSpinorField out;
+        printfQuda("below vv is flowed adjoint\n");
+        f_temp3.PrintVector(0,300,0);
         invertQuda(f_temp4.data(),f_temp3.data(),inv_param);
+        printfQuda("below vv is solved spinor\n");
+        f_temp4.PrintVector(0,300,0);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, i_glob, profile, meas_cinf);
-        cvector<Complex> PsiPsibar = quda::blas::cDotProduct(f_temp4,f_temp3);
-        printfQuda("well soemthing happened\n");
+        printfQuda("below vv is flowed spinor\n");
+        f_temp4.PrintVector(0,300,0);
+        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(f_temp4,f_temp3);
+        printfQuda("well soemthing happened %1.5e \n",PsiPsibarR[0]);
     } 
 
   }
