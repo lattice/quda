@@ -2485,7 +2485,7 @@ namespace quda {
   };
   template <QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_10, 10, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<float, 10, 4, 10, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<float, 10, 2, 10, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // half precision
