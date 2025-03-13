@@ -5653,13 +5653,6 @@ void gfEvolve(ColorSpinorField &f_temp3,std::vector<std::reference_wrapper<Gauge
     blas::axpy(smear_param->epsilon * 3. / 4., f_temp2, f_temp3);
     // apply step W3 (Vt) of gauge field flow part
     GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
-    
-      
-    // fout = f_temp0;
-    //redefining f_temp0 to restart loop
-    // f_temp3 = f_temp0;
-    printfQuda("f_temp3 loop\n");
-    f_temp3.PrintVector(0,300,0);
   }
     
 }
