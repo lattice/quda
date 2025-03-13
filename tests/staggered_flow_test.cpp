@@ -347,7 +347,7 @@ printfQuda("HIIII\n");
                  mg_param.invert_param->power, mg_param.invert_param->temp, mg_param.invert_param->clock);
     }
   }
-
+    //multishift: same linear system, different masses (charm + strange ie)
     //SET UP INV PARAM END
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
@@ -364,6 +364,7 @@ printfQuda("HIIII\n");
     
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
+    //simulates what user might do from external library
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
   std::vector<std::vector<void *>> _hp_multi_x_flowed(Nsrc, std::vector<void *>(multishift));
     
