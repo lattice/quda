@@ -22,9 +22,26 @@ namespace quda
   public:
     Wilson(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
            const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+      Dslash(arg, out, in, halo, wilson_use_async ? ",async" : "")
     {
     }
+
+    unsigned int sharedBytesPerThread() const override
+    {
+      if constexpr (wilson_use_async) {
+        using Float = typename Arg::Float;
+        int bulk = Arg::F::length * sizeof(Float);
+        int norm = isFixed<Float>::value ? sizeof(float) : 0;
+        int gauge = Arg::G::reconLen * sizeof(Float);
+        return (bulk + norm + gauge) * 2;
+      } else {
+        return 0;
+      }
+    }
+
+    int blockStep() const override { return device::warp_size(); }
+
+    int blockMin() const override { return device::warp_size(); }
 
     void apply(const qudaStream_t &stream)
     {
