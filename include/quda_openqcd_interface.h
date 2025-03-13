@@ -98,13 +98,21 @@ typedef enum OpenQCDSolveType_s {
   OPENQCD_SOLVE_INVALID = QUDA_INVALID_ENUM
 } OpenQCDSolveType;
 
+typedef enum OpenQCDFieldType_s {
+  OPENQCD_FIELD_SPINOR = 1,
+  OPENQCD_FIELD_GAUGE = 2,
+  OPENQCD_FIELD_CLOVER = 3,
+  OPENQCD_FIELD_INVALID = QUDA_INVALID_ENUM
+} OpenQCDFieldType;
+
 /**
  * Parameters related to problem size and machine topology. They should hold the
  * numbers in quda format, i.e. xyzt convention. For example L[0] = L1, L[1] =
  * L2, ...
  */
 typedef struct {
-  MPI_Comm comm;                            /** MPI communicator */
+  MPI_Comm quda_comm;                       /** QUDA MPI communicator */
+  MPI_Comm world_comm;                      /** World MPI communicator */
   int L[4];                                 /** Local lattice dimensions L1, L2, L3, L0 */
   int nproc[4];                             /** Machine grid size NPROC1, NPROC2, NPROC3, NPROC0*/
   int nproc_blk[4];                         /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK,
@@ -123,6 +131,8 @@ typedef struct {
   dirac_parms_t (*dirac_parms)(void);       /** @see dirac_parms() */
   void *(*h_gauge)(void);                   /** function to return a pointer to the gauge field */
   void *(*h_sw)(void);                      /** function to return a pointer to the updated Clover field */
+  int (*openqcd2quda)(OpenQCDFieldType type, void *in, void *out);        /** spinor gather function */
+  void (*quda2openqcd)(OpenQCDFieldType type, void *in, void *out);       /** spinor scatter function */
   void (*get_gfld_flags)(int *ud, int *ad); /** function pointer to gauge field revision query function */
 } openQCD_QudaLayout_t;
 
@@ -135,6 +145,8 @@ typedef struct {
   void *gauge;             /** base pointer to the gauge fields */
   int volume;              /** VOLUME */
   int bndry;               /** BNDRY */
+  int two_grids_equal;     /** Whether the QUDA and the openqxd process grids are equal or not */
+  void *(*buffer_field)(int idx, void *field);        /** obtain buffer field */
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
 } openQCD_QudaInitArgs_t;
 
