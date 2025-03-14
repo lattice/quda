@@ -1876,6 +1876,9 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
   IF_IN_COMM(logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", param->secs));
   IF_IN_COMM(logQuda(QUDA_VERBOSE, "  status      = %d\n", *status));
 
+  MPI_Bcast(status, 1, MPI_INT, 0, qudaState.layout.world_comm);
+  MPI_Bcast(param->true_res, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+
   return param->true_res[0];
 }
 
