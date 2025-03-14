@@ -71,7 +71,7 @@ namespace quda
   };
 
   constexpr bool wilson_use_async = true;
-  constexpr int pipeline_depth = 8;
+  constexpr int pipeline_depth = 4;
 
   constexpr int get_pipeline_index(int d, int dir)
   { // 0 for forward, 1 for backward
@@ -343,9 +343,10 @@ namespace quda
     }
   }
 
-  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Cache>
+  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Cache, typename Pipe>
   __device__ __host__ __forceinline__ void applyWilsonData(const Arg &arg, Coord &coord, int parity, int idx,
-                                                           int thread_dim, bool &active, int src_idx, Cache &cache)
+                                                           int thread_dim, bool &active, int src_idx, Cache &cache,
+                                                           Pipe &pipe)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -355,9 +356,9 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-    cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
-
     auto load_forward = [&](int d) {
+      if (idx >= arg.dc.volume_4d_cb) { return; }
+
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
       constexpr int proj_dir = dagger ? +1 : -1;
@@ -387,10 +388,11 @@ namespace quda
                                                          fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
         }
       }
-      pipe.producer_commit();
     };
 
     auto load_backward = [&](int d) {
+      if (idx >= arg.dc.volume_4d_cb) { return; }
+
       const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
       const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
       constexpr int proj_dir = dagger ? -1 : +1;
@@ -421,26 +423,24 @@ namespace quda
                                                          back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
         }
       }
-      pipe.producer_commit();
     };
 
-    if constexpr (pipeline_depth == 8) {
 #pragma unroll
-      for (int d = 0; d < 4; d++) {
-        load_forward(d);
-        cuda::pipeline_consumer_wait_prior<0>(pipe);
-        cache.sync();
-        load_backward(d);
-        cuda::pipeline_consumer_wait_prior<0>(pipe);
-        cache.sync();
-      }
+    for (int d = 0; d < 4; d++) {
+      pipe.producer_acquire();
+      load_forward(d);
+      pipe.producer_commit();
+      pipe.producer_acquire();
+      load_backward(d);
+      pipe.producer_commit();
     }
   }
 
-  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector, typename Cache>
+  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector,
+            typename Cache, typename Pipe>
   __device__ __host__ __forceinline__ void applyWilsonCompute(Vector &out, const Arg &arg, Coord &coord, int parity,
                                                               int idx, int thread_dim, bool &active, int src_idx,
-                                                              Cache &cache)
+                                                              Cache &cache, Pipe &pipe)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -515,14 +515,14 @@ namespace quda
       }
     };
 
-    if constexpr (pipeline_depth == 8) {
 #pragma unroll
-      for (int d = 0; d < 4; d++) {
-        cache.sync();
-        compute_forward(d);
-        cache.sync();
-        compute_backward(d);
-      }
+    for (int d = 0; d < 4; d++) {
+      pipe.consumer_wait();
+      compute_forward(d);
+      pipe.consumer_release();
+      pipe.consumer_wait();
+      compute_backward(d);
+      pipe.consumer_release();
     }
   }
 
@@ -637,6 +637,18 @@ namespace quda
       using Cache = StencilCache<typename Arg::F, typename Arg::G, pipeline_depth>;
       Cache cache(arg.in[src_idx], arg.U, half_thread_idx, half_block_dim);
 
+      bool is_producer = target::thread_idx().x < half_block_dim;
+
+      const cuda::pipeline_role thread_role = is_producer ? cuda::pipeline_role::producer : cuda::pipeline_role::consumer;
+
+#ifdef __CUDA_ARCH__
+      __shared__ cuda::pipeline_shared_state<cuda::thread_scope::thread_scope_block, pipeline_depth> shared_state;
+      auto block = cooperative_groups::this_thread_block();
+      cuda::pipeline pipeline = cuda::make_pipeline(block, &shared_state, thread_role);
+#else
+      cuda::pipeline pipeline = cuda::make_pipeline();
+#endif
+
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim; // which dimension is thread working on (fused kernel only)
@@ -645,14 +657,17 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
-      if (target::thread_idx().x / half_block_dim == 0) {
+      if (is_producer) {
         // producer
-        applyWilsonData<nParity, dagger, mykernel_type>(arg, coord, parity, idx, thread_dim, active, src_idx, cache);
+        applyWilsonData<nParity, dagger, mykernel_type>(arg, coord, parity, idx, thread_dim, active, src_idx, cache,
+                                                        pipeline);
       } else {
         // consumer
         Vector out;
         applyWilsonCompute<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx,
-                                                           cache);
+                                                           cache, pipeline);
+
+        if (idx >= arg.dc.volume_4d_cb) { return; }
 
         int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
         if (xpay && mykernel_type == INTERIOR_KERNEL) {

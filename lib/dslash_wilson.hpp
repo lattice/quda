@@ -45,7 +45,7 @@ namespace quda
 
     int blockMin() const override { return 2 * device::warp_size(); }
 
-    unsigned int maxBlockSize(const TuneParam &) const { return 2 * device::warp_size(); }
+    unsigned int maxBlockSize(const TuneParam &) const { return 512; }
 
     void apply(const qudaStream_t &stream)
     {

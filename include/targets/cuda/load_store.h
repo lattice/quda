@@ -2,6 +2,7 @@
 
 #include <register_traits.h>
 #include <inline_ptx.h>
+#include <cooperative_groups/memcpy_async.h>
 #include <cuda/pipeline>
 
 namespace quda
