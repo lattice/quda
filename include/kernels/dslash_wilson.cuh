@@ -70,7 +70,8 @@ namespace quda
     }
   };
 
-  constexpr int pipeline_depth = 4;
+  constexpr bool wilson_use_async = false;
+  constexpr int pipeline_depth = 8;
 
   constexpr int get_pipeline_index(int d, int dir)
   { // 0 for forward, 1 for backward
@@ -96,8 +97,8 @@ namespace quda
        @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
     */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilsonAsync(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
-                                                   int thread_dim, bool &active, int src_idx)
+  __device__ __host__ __forceinline__ void applyWilsonAsync(Vector &out, const Arg &arg, Coord &coord, int parity,
+                                                            int idx, int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -433,8 +434,6 @@ namespace quda
       }
     } // nDim
   }
-
-  constexpr bool wilson_use_async = true;
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
 

@@ -121,4 +121,16 @@ namespace quda {
     asm("st.cs.global.v2.s16 [%0+0], {%1, %2};" :: __PTR(addr), "h"(x), "h"(y));
   }
 
+  template <size_t _Copy_size> __device__ inline void cp_async_cached_shared_global(char *__dest, const char *__src)
+  {
+    static_assert(_Copy_size == 4 || _Copy_size == 8 || _Copy_size == 16,
+                  "cp.async.shared.global requires a copy size of 4, 8, or 16.");
+
+    asm volatile("cp.async.ca.shared.global [%0], [%1], %2, %2;"
+                 :
+                 : "r"(static_cast<uint32_t>(__cvta_generic_to_shared(__dest))),
+                   "l"(static_cast<uint64_t>(__cvta_generic_to_global(__src))), "n"(_Copy_size)
+                 : "memory");
+  }
+
 } // namespace quda

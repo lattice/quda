@@ -60,7 +60,11 @@ namespace quda
   template <> struct vector_load_async_impl<true> {
     template <typename T, class Pipe> __device__ inline void operator()(T *out, const T *ptr, int idx, Pipe &pipe)
     {
+#if 0
       cuda::memcpy_async(out, &ptr[idx], sizeof(T), pipe);
+#else
+      cp_async_cached_shared_global<sizeof(T)>(reinterpret_cast<char *>(out), reinterpret_cast<const char *>(&ptr[idx]));
+#endif
     }
   };
 
