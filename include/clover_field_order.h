@@ -588,7 +588,6 @@ namespace quda {
         static constexpr bool enable_reconstruct = enable_reconstruct_;
         using Accessor = FloatNOrder<Float, length, N, add_rho, enable_reconstruct, huge_alloc>;
         using real = typename mapper<Float>::type;
-        typedef typename VectorType<Float, N>::type Vector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         typedef float norm_type;
         static constexpr int Ns = 4;
@@ -676,11 +675,11 @@ namespace quda {
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
-            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
+            auto vecTmp = vector_load<Float, N>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
 
             // second do scalar copy converting into register type
 #pragma unroll
-            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], vecTmp[j], nrm); }
           }
 
 #pragma unroll
@@ -730,24 +729,21 @@ namespace quda {
 
 #pragma unroll
           for (int i = 0; i < M_offset; i++) {
-            Vector vecTmp;
+            array<Float, N> vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], tmp[chirality * M_rem + i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
           }
 
-          if (M_rem) {
-            typename VectorType<Float, std::max(M_rem, 1)>::type vecTmp;
+          if constexpr (M_rem) {
+            array<Float, M_rem> vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < M_rem; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
+            for (int j = 0; j < M_rem; j++) copy_scaled(vecTmp[j], tmp[(1 - chirality) * M_offset * N + j]);
 
-            char *ptr = reinterpret_cast<char *>(reinterpret_cast<Vector *>(clover) + parity * offset + x);
-            ptr += (volumeCB * (M_offset * N) + chirality * M_rem) * sizeof(Float);
+            auto *ptr = clover + (parity * offset + x) * N + volumeCB * (M_offset * N) + chirality * M_rem;
             vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory
           }
         }
