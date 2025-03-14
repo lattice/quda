@@ -27,7 +27,7 @@ namespace quda
      kernel.  For the wilson class example above, the WilsonArg class
      defined in the same file is the corresponding argument class.
   */
-  template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
+  template <template <int, bool, bool, KernelType, typename> class D, typename Arg, bool check_bounds = true>
   class Dslash : public TunableKernel3D
   {
 
@@ -248,7 +248,8 @@ namespace quda
     {
       tp.set_max_shared_bytes = true;
       launch_device<dslash_functor>(
-        tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
+        tp, stream,
+        dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg, check_bounds>(arg, tp.block.x * tp.grid.x));
     }
 
   public:

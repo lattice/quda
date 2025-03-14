@@ -25,8 +25,6 @@ namespace quda
     void *_norm_ptr[stages];
     void *_gauge_ptr[stages];
 
-    dim3 block;
-    dim3 thread;
     const int stride;
     int j;
     int warp_id;
@@ -124,13 +122,28 @@ namespace quda
         return matrix;
     }
 
-    __device__ __host__ StencilCache(const color_spinor_order_t &color_spinor_order, const gauge_order_t &gauge_order):
+    /**
+       @brief Dummy instantiation for the host compiler
+    */
+    template <bool is_device, typename dummy = void> struct sync_impl {
+      void operator()() { }
+    };
+
+    /**
+       @brief Synchronize the cache when on the device
+    */
+    template <typename dummy> struct sync_impl<true, dummy> {
+      __device__ inline void operator()() { __syncthreads(); }
+    };
+
+    __device__ __host__ void sync() const { target::dispatch<sync_impl>(); }
+
+    __device__ __host__ StencilCache(const color_spinor_order_t &color_spinor_order, const gauge_order_t &gauge_order,
+                                     int thread, int stride_) :
       color_spinor_order(color_spinor_order),
       gauge_order(gauge_order),
-      block(target::block_dim()),
-      thread(target::thread_idx()),
-      stride(block.x * block.y * block.z),
-      j((thread.z * block.y + thread.y) * block.x + thread.x),
+      stride(stride_),
+      j(thread),
       warp_id(j / 32),
       lane_id(j % 32)
     {

@@ -636,8 +636,8 @@ namespace quda
    */
   template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
             template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
-            KernelType kernel_type_, typename Arg_>
-  struct dslash_functor_arg : kernel_param<use_kernel_arg> {
+            KernelType kernel_type_, typename Arg_, bool check_bounds = true>
+  struct dslash_functor_arg : kernel_param<use_kernel_arg, check_bounds> {
     using Arg = Arg_;
     using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
@@ -648,7 +648,9 @@ namespace quda
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
-      kernel_param(dim3(threads_x, (arg.dc.Ls + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity)), arg(arg)
+      kernel_param<use_kernel_arg, check_bounds>(
+        dim3(threads_x, (arg.dc.Ls + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity)),
+      arg(arg)
     {
     }
   };
@@ -694,7 +696,9 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
+        if constexpr (Arg::check_bounds) {
+          if (x_cb >= arg.threads) return;
+        }
 
 #ifdef QUDA_FAST_COMPILE_DSLASH
         dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
