@@ -238,6 +238,26 @@
 #endif
 
 /**
+ * @def QUDA_ORDER_SINGLE
+ * @brief This macro sets the data ordering for single precision fields
+ */
+#define QUDA_ORDER_DOUBLE @QUDA_ORDER_DOUBLE@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_DOUBLE == 2 || QUDA_ORDER_DOUBLE == 4, "invalid QUDA_ORDER_DOUBLE");
+#endif
+
+/**
+ * @def QUDA_ORDER_SINGLE
+ * @brief This macro sets the data ordering for single precision fields
+ */
+#define QUDA_ORDER_SINGLE @QUDA_ORDER_SINGLE@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_SINGLE == 2 || QUDA_ORDER_SINGLE == 4 || QUDA_ORDER_SINGLE == 8, "invalid QUDA_ORDER_SINGLE");
+#endif
+
+/**
  * @def QUDA_ORDER_FP
  * @brief This macro sets the data ordering for Wilson, gauge
  * (recon-8/9) and clover fixed-point fields
