@@ -5231,8 +5231,8 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
 // perform forward gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246 (Appendix D)
 // the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)
-void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                      QudaGaugeObservableParam *obs_param)
+void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                      QudaGaugeObservableParam *obs_param, const size_t nSpinors)
 {
 
   auto profile = pushProfile(profileGFlow);
@@ -5267,15 +5267,25 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   precise = GaugeField(gParam_helper);
 
   // spinor fields
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-  ColorSpinorField fin_h(cpuParam);
-
-  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField fin(deviceParam);
-  fin = fin_h;
-
-  deviceParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField fout(deviceParam);
+  std::vector<ColorSpinorField> fin_h, fin, fout;
+  // auxilliary fermion fields [0], [1], [2] and [3]
+  std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+    fin_h.push_back(ColorSpinorField(cpuParam));
+    ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+    fin.push_back(ColorSpinorField(deviceParam));
+    fin[i] = fin_h[i];
+    deviceParam.create = QUDA_NULL_FIELD_CREATE;
+    fout.push_back(ColorSpinorField(deviceParam));
+    f_temp0.push_back(ColorSpinorField(deviceParam));
+    f_temp1.push_back(ColorSpinorField(deviceParam));
+    f_temp2.push_back(ColorSpinorField(deviceParam));
+    f_temp3.push_back(ColorSpinorField(deviceParam));
+    f_temp4.push_back(ColorSpinorField(deviceParam));
+    // set [3] = input spinor
+    f_temp3[i] = fin[i];
+  }
 
   int parity = 0;
 
@@ -5287,29 +5297,21 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
-  // auxilliary fermion fields [0], [1], [2] and [3]
-  ColorSpinorField f_temp0(deviceParam);
-  ColorSpinorField f_temp1(deviceParam);
-  ColorSpinorField f_temp2(deviceParam);
-  ColorSpinorField f_temp3(deviceParam);
-  ColorSpinorField f_temp4(deviceParam);
-
-  // set [3] = input spinor
-  f_temp3 = fin;
-
   int measurement_n = 0; // The nth measurement to take
 
   gaugeObservables(gin, obs_param[measurement_n]);
 
-  logQuda(QUDA_SUMMARIZE, "flow t, plaquette, norm(f_spinor)\n");
-  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e\n", smear_param->t0, obs_param[0].plaquette[0], blas::norm2(fin));
+  logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0);
+  logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[0].plaquette[0]);
+  for (size_t i = 0; i < nSpinors; i++) {
+    logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", i, blas::norm2(fin[i]));
+  }
 
   // loop, iterations of gf
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
 
     if (i > 0) std::swap(gin, gout); // output from prior step becomes input for next step
 
-    // init auxilliary fields [0], [1] and [2] as [3]
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
@@ -5329,7 +5331,6 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     // apply step W1 of gauge field flow part
     GFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
 
-    // STEP 2
     // [3] <- [1]
     f_temp3 = f_temp1;
 
@@ -5371,8 +5372,11 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.
       gaugeObservables(gout, obs_param[measurement_n]);
-      logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-              obs_param[measurement_n].plaquette[0], blas::norm2(fout));
+      logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0 + smear_param->epsilon * (i + 1));
+      logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[measurement_n].plaquette[0]);
+      for (size_t j = 0; j < nSpinors; j++) {
+        logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", j, blas::norm2(fout[j]));
+      }
     }
   } /* end of one iteration of GF application */
 
@@ -5380,10 +5384,12 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   copyExtendedGauge(*gaugeSmeared, gout, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(gaugeSmeared->R());
 
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField fout_h(cpuParam);
-  fout_h = fout;
+  // copy fout to h_out
+  for(size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+    ColorSpinorField fout_h(cpuParam);
+    fout_h = fout[i];
+  }
 
   popOutputPrefix();
 
