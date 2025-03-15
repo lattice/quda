@@ -67,7 +67,7 @@ namespace quda {
         launch_host<ComputeStaggeredGeometryReorder>(tp, stream, arg);
 
       } else if (fineXinv.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        constexpr QudaGaugeFieldOrder fineOrder = QUDA_FLOAT2_GAUGE_ORDER;
+        constexpr QudaGaugeFieldOrder fineOrder = QUDA_NATIVE_GAUGE_ORDER;
         constexpr QudaGaugeFieldOrder coarseOrder = QUDA_MILC_GAUGE_ORDER;
         CalculateStaggeredGeometryReorderArg<Float,fineColor,fineOrder,coarseOrder,dagger_approximation> arg(fineXinv, coarseXinv, scale);
         launch_device<ComputeStaggeredGeometryReorder>(tp, stream, arg);

@@ -15,7 +15,7 @@ namespace quda {
     typedef typename mapper<storeFloat>::type Float;
 
     if (u.isNative()) {
-      using G = typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,storeFloat>;
+      using G = typename gauge::FieldOrder<Float, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, false, storeFloat>;
       ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       

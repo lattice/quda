@@ -67,7 +67,7 @@ namespace quda
     } else {
 
       constexpr QudaFieldOrder csOrder = colorspinor::getNative<vFloat>(fineSpin);
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_NATIVE_GAUGE_ORDER;
 
       if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());

@@ -197,7 +197,10 @@ option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
 set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields")
 set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields")
-set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
+set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields")
+set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields")
+
+set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson and clover fixed-point fields (4, 8)")
 set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
 set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
 

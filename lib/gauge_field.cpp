@@ -66,7 +66,6 @@ namespace quda {
   void GaugeField::create(const GaugeFieldParam &param)
   {
     if (param.siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", param.siteSubset);
-    if (param.order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", param.order);
     if (param.GhostPrecision() != param.Precision())
       errorQuda("Ghost precision %d doesn't match field precision %d", param.GhostPrecision(), param.Precision());
     if (param.link_type != QUDA_COARSE_LINKS && param.nColor != 3)

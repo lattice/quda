@@ -33,20 +33,15 @@
 #define QUDA_INVALID_LINKS        QUDA_INVALID_ENUM
 
 #define QudaGaugeFieldOrder integer(4)
-#define QUDA_FLOAT_GAUGE_ORDER 1
-#define QUDA_FLOAT2_GAUGE_ORDER 2 //no reconstruct and double precision
-#define QUDA_FLOAT4_GAUGE_ORDER 4 // 8 reconstruct single, and 12 reconstruct single, half, quarter
-#define QUDA_FLOAT8_GAUGE_ORDER 8 // 8 reconstruct half and quarter
-#define QUDA_NATIVE_GAUGE_ORDER 9 // used to denote one of the above types in a trait, not used directly
-#define QUDA_QDP_GAUGE_ORDER 10   // expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_QDPJIT_GAUGE_ORDER 11     // expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_CPS_WILSON_GAUGE_ORDER 12 // expect *gauge even-odd spacetime column-row color
-#define QUDA_MILC_GAUGE_ORDER 13       // expect *gauge even-odd mu spacetime row-column order
-#define QUDA_MILC_SITE_GAUGE_ORDER                                                                                     \
-  14                             // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-#define QUDA_BQCD_GAUGE_ORDER 15 // expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 16
-#define QUDA_TIFR_PADDED_GAUGE_ORDER 17
+#define QUDA_NATIVE_GAUGE_ORDER 0     // used to denote the internal QUDA ordering
+#define QUDA_QDP_GAUGE_ORDER 1        // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_QDPJIT_GAUGE_ORDER 2     // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_CPS_WILSON_GAUGE_ORDER 3 // expect *gauge even-odd spacetime column-row color
+#define QUDA_MILC_GAUGE_ORDER 4       // expect *gauge even-odd mu spacetime row-column order
+#define QUDA_MILC_SITE_GAUGE_ORDER 5  // MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+#define QUDA_BQCD_GAUGE_ORDER 6       // expect *gauge mu even-odd spacetime+halos row-column order
+#define QUDA_TIFR_GAUGE_ORDER 7
+#define QUDA_TIFR_PADDED_GAUGE_ORDER 8
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)

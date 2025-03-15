@@ -76,7 +76,7 @@ namespace quda {
         CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(X, X, g, mass);
         launch_host<ComputeStaggeredVUV>(tp, stream, arg);
       } else if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        constexpr QudaGaugeFieldOrder order = QUDA_FLOAT2_GAUGE_ORDER;
+        constexpr QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER;
         CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(X, X, g, mass);
         launch_device<ComputeStaggeredVUV>(tp, stream, arg);
       }
@@ -195,8 +195,7 @@ namespace quda {
         // We can assume: gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != QUDA_SINGLE_PRECISION)
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-        gf_param.order = QUDA_FLOAT2_GAUGE_ORDER; // guaranteed for no recon
-        gf_param.setPrecision( QUDA_SINGLE_PRECISION );
+        gf_param.setPrecision(QUDA_SINGLE_PRECISION, true);
         tmp_U = std::make_unique<GaugeField>(gf_param);
 
         tmp_U->copy(gauge);
@@ -208,10 +207,7 @@ namespace quda {
     // Step 3: Create the X field based on Xinv, but switch to a native ordering for a GPU setup.
     std::unique_ptr<GaugeField> tmp_X(nullptr);
     GaugeFieldParam x_param(*xInvMilcOrder);
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-      x_param.setPrecision(x_param.Precision());
-    }
+    if (location == QUDA_CUDA_FIELD_LOCATION) x_param.setPrecision(x_param.Precision(), true);
     tmp_X = std::make_unique<GaugeField>(x_param);
     GaugeField& X = *tmp_X;
 

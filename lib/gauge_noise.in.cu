@@ -72,7 +72,7 @@ namespace quda {
         U_.Reconstruct() != QUDA_RECONSTRUCT_NO || !U_.isNative()) {
       QudaPrecision prec = std::max(U_.Precision(), QUDA_SINGLE_PRECISION);
       param.setPrecision(prec, true);
-      if (param.order != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Unexpected order %d", param.order);
+      if (param.order != QUDA_NATIVE_GAUGE_ORDER) errorQuda("Unexpected order %d", param.order);
       param.create = QUDA_NULL_FIELD_CREATE;
       param.location = QUDA_CUDA_FIELD_LOCATION;
       U = GaugeField::Create(param);

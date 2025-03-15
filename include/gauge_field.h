@@ -11,28 +11,12 @@ namespace quda {
   namespace gauge
   {
 
-    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct)
-    {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
-          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13
-                   || reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-        }
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
-          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-          if (order == static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP)) return true;
-        }
-      }
-      return false;
-    }
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<int>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
 
   } // namespace gauge
 
@@ -126,22 +110,9 @@ namespace quda {
     */
     void setPrecision(QudaPrecision precision, bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
       this->precision = precision;
       this->ghost_precision = precision;
-
-      if (native) {
-        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
-            || reconstruct == QUDA_RECONSTRUCT_10) {
-          order = QUDA_FLOAT2_GAUGE_ORDER;
-        } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-                   && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
-          order = static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP);
-        } else {
-          order = QUDA_FLOAT4_GAUGE_ORDER;
-        }
-      }
+      if (force_native) order = QUDA_NATIVE_GAUGE_ORDER;
     }
   };
 
@@ -424,7 +395,7 @@ namespace quda {
        This function returns true if the field is stored in an
        internal field order for the given precision.
     */
-    bool isNative() const { return gauge::isNative(order, precision, reconstruct); }
+    bool isNative() const { return order == QUDA_NATIVE_GAUGE_ORDER ? true : false; }
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
