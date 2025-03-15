@@ -5749,8 +5749,30 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     i_glob++;
 
     if (i_glob == 30) {
-        ColorSpinorField out;
+        // ColorSpinorField out;
         printfQuda("below vv is flowed adjoint\n");
+        //create hisq
+// // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
+//       computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &gauge_param);
+
+//       if (n_naiks > 1) {
+//         // Create Naiks, 3rd path table set
+//         computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[2].data(), &gauge_param);
+
+//         // Rescale+copy Naiks into Naik field
+//         cpu_axy(gauge_param.cuda_prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
+//         cpu_axy(gauge_param.cuda_prec, eps_naik, longlink, longlink_eps, V * 4 * gauge_site_size);
+//       } else {
+//         memset(fatlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
+//         memset(longlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
+//       }
+
+      // // Create X and long links, 2nd path table set
+      // computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[1].data(), &gauge_param);
+
+      // loadfatlongGaugeQuda
+
+        
         f_temp3.PrintVector(0,300,0);
         invertQuda(f_temp4.data(),f_temp3.data(),inv_param);
         printfQuda("below vv is solved spinor\n");
