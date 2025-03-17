@@ -15,14 +15,18 @@
 namespace quda
 {
 
-  template <typename Arg> class Wilson : public Dslash<wilson, Arg, /* check_bounds */ false>
+  template <typename Arg>
+  class Wilson : public Dslash<wilson, Arg, /* check_bounds */ false, /* launch_bounds */ wilson_use_reg_realloc>
   {
-    using Dslash = Dslash<wilson, Arg, /* check_bounds */ false>;
+    using Dslash = Dslash<wilson, Arg, /* check_bounds */ false, /* launch_bounds */ wilson_use_reg_realloc>;
 
   public:
     Wilson(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
            const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo, wilson_use_async ? ",async-p" + std::to_string(pipeline_depth) + "-specialized" : "")
+      Dslash(arg, out, in, halo,
+             wilson_use_async ? ",async-p" + std::to_string(pipeline_depth) + "-specialized-reg-realloc"
+                 + std::to_string(wilson_use_reg_realloc) :
+                                "")
     {
     }
 
@@ -41,16 +45,20 @@ namespace quda
 
     unsigned int minThreads() const override { return Dslash::minThreads() * 2; }
 
-    int blockStep() const override { return 2 * device::warp_size(); }
+    int blockStep() const override { return (wilson_use_reg_realloc ? 8 : 2) * device::warp_size(); }
 
-    int blockMin() const override { return 2 * device::warp_size(); }
+    int blockMin() const override { return (wilson_use_reg_realloc ? 8 : 2) * device::warp_size(); }
 
-    unsigned int maxBlockSize(const TuneParam &) const { return 512; }
+    unsigned int maxBlockSize(const TuneParam &) const
+    {
+      return (wilson_use_reg_realloc ? 8 : 16) * device::warp_size();
+    }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
+      Dslash::arg.half_block_dim = tp.block.x / 2;
       Dslash::template instantiate<packShmem>(tp, stream);
     }
   };

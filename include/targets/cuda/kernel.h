@@ -200,6 +200,12 @@ namespace quda
     Kernel3D_impl<Functor, Arg, grid_stride>(arg);
   }
 
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  __launch_bounds__(256, 4) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3DLaunchBounds(Arg arg)
+  {
+    Kernel3D_impl<Functor, Arg, grid_stride>(arg);
+  }
+
   /**
      @brief Kernel3D is the entry point of the generic 3-d kernel.
      This is the specialization where the kernel argument struct is
@@ -214,6 +220,12 @@ namespace quda
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D()
+  {
+    Kernel3D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  }
+
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  __launch_bounds__(256, 4) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3DLaunchBounds()
   {
     Kernel3D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }

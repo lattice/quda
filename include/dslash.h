@@ -27,7 +27,8 @@ namespace quda
      kernel.  For the wilson class example above, the WilsonArg class
      defined in the same file is the corresponding argument class.
   */
-  template <template <int, bool, bool, KernelType, typename> class D, typename Arg, bool check_bounds = true>
+  template <template <int, bool, bool, KernelType, typename> class D, typename Arg, bool check_bounds = true,
+            bool launch_bounds = false>
   class Dslash : public TunableKernel3D
   {
 
@@ -247,9 +248,15 @@ namespace quda
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
-      launch_device<dslash_functor>(
-        tp, stream,
-        dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg, check_bounds>(arg, tp.block.x * tp.grid.x));
+      if constexpr (launch_bounds) {
+        launch_device_with_bounds<dslash_functor>(
+          tp, stream,
+          dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg, check_bounds>(arg, tp.block.x * tp.grid.x));
+      } else {
+        launch_device<dslash_functor>(
+          tp, stream,
+          dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg, check_bounds>(arg, tp.block.x * tp.grid.x));
+      }
     }
 
   public:
@@ -293,9 +300,9 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-      if (arg.dagger)
-        instantiate<P, nParity, true, xpay>(tp, stream);
-      else
+      if (arg.dagger) {
+        // instantiate<P, nParity, true, xpay>(tp, stream);
+      } else
         instantiate<P, nParity, false, xpay>(tp, stream);
     }
 
@@ -310,7 +317,7 @@ namespace quda
     {
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, 2, xpay>(tp, stream); break;
+      // case 2: instantiate<P, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
     }
@@ -324,9 +331,9 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-      if (arg.xpay)
-        instantiate<P, true>(tp, stream);
-      else
+      if (arg.xpay) {
+        // instantiate<P, true>(tp, stream);
+      } else
         instantiate<P, false>(tp, stream);
     }
 

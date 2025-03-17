@@ -442,6 +442,14 @@ namespace quda
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg);
     }
 
+    template <template <typename> class Functor, typename Arg>
+    void launch_device_with_bounds(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    {
+      const_cast<Arg &>(arg).threads.y = vector_length_y;
+      const_cast<Arg &>(arg).threads.z = vector_length_z;
+      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3DLaunchBounds), tp, stream, arg);
+    }
+
     /**
        @brief Launch kernel on the host performing the operation
        defined in the functor.

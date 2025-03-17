@@ -18,6 +18,7 @@ namespace quda
    */
   template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, bool distance_pc_ = false>
   struct WilsonArg : DslashArg<Float, nDim> {
+
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
@@ -47,6 +48,7 @@ namespace quda
     const int t0;
     const int comm_coord_dim_3;
     const int comm_dim_dim_3;
+    int_fastdiv half_block_dim;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
@@ -72,6 +74,7 @@ namespace quda
 
   constexpr bool wilson_use_async = true;
   constexpr int pipeline_depth = 4;
+  constexpr bool wilson_use_reg_realloc = false;
 
   constexpr int get_pipeline_index(int d, int dir)
   { // 0 for forward, 1 for backward
@@ -627,10 +630,12 @@ namespace quda
     template <KernelType mykernel_type = kernel_type>
     __device__ __host__ __forceinline__ void operator()(int, int src_idx, int parity)
     {
+
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-      int half_block_dim = target::block_dim().x / 2;
+      // int half_block_dim = target::block_dim().x / 2;
+      auto half_block_dim = arg.half_block_dim;
       int half_thread_idx = target::thread_idx().x % half_block_dim;
       int idx = target::block_idx().x * half_block_dim + half_thread_idx;
 
@@ -642,6 +647,7 @@ namespace quda
       const cuda::pipeline_role thread_role = is_producer ? cuda::pipeline_role::producer : cuda::pipeline_role::consumer;
 
 #ifdef __CUDA_ARCH__
+#pragma nv_diag_suppress static_var_with_dynamic_init
       __shared__ cuda::pipeline_shared_state<cuda::thread_scope::thread_scope_block, pipeline_depth> shared_state;
       auto block = cooperative_groups::this_thread_block();
       cuda::pipeline pipeline = cuda::make_pipeline(block, &shared_state, thread_role);
@@ -658,10 +664,22 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       if (is_producer) {
+#ifdef __CUDA_ARCH__
+        if (wilson_use_reg_realloc) {
+          constexpr int reg_count = pipeline_depth == 2 ? 32 : 40;
+          asm volatile("setmaxnreg.dec.sync.aligned.u32 %0;\n" : : "n"(reg_count));
+        }
+#endif
         // producer
         applyWilsonData<nParity, dagger, mykernel_type>(arg, coord, parity, idx, thread_dim, active, src_idx, cache,
                                                         pipeline);
       } else {
+#ifdef __CUDA_ARCH__
+        if (wilson_use_reg_realloc) {
+          constexpr int reg_count = pipeline_depth == 2 ? 96 : 88;
+          asm volatile("setmaxnreg.inc.sync.aligned.u32 %0;\n" : : "n"(reg_count));
+        }
+#endif
         // consumer
         Vector out;
         applyWilsonCompute<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx,
