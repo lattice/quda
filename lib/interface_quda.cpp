@@ -109,6 +109,8 @@ CloverField *cloverEigensolver = nullptr;
 GaugeField momResident;
 GaugeField *extendedGaugeResident = nullptr;
 
+
+
 namespace quda
 {
 
@@ -578,7 +580,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGauge);
   checkGaugeParam(param);
-
   if (!initialized) errorQuda("QUDA not initialized");
   if (getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
 
@@ -3778,7 +3779,10 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   profilerStop(__func__);
   popVerbosity();
 }
-
+//1st step inlink : original gauge links
+//2nd stpe inlink : unitarized fat links
+//fat7 V, W, U, IN
+//final fat7 + lepage (X), long links,     
 void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink, double *path_coeff, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileFatLink);
@@ -3791,8 +3795,9 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   GaugeField cpuLongLink(gParam); // create the host longlink
   gParam.gauge = ulink;
   GaugeField cpuUnitarizedLink(gParam);
+    //start with this vv
   gParam.link_type = param->type;
-  gParam.gauge = inlink;
+  gParam.gauge = inlink;//called "U"
   GaugeField cpuInLink(gParam); // create the host sitelink
 
   // create the device fields
@@ -3800,11 +3805,12 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(param->cuda_prec, true);
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField *cudaInLink = new GaugeField(gParam);
-
+  GaugeField *cudaInLink = new GaugeField(gParam); //called "U"
+  //GaugeField *v_link = new GaugeField(gParam);
   cudaInLink->copy(cpuInLink);
   GaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
 
+    //create everything above^^
   delete cudaInLink;
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -3819,7 +3825,7 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
     cpuLongLink.copy(longLink);
   }
 
-  GaugeField fatLink(gParam);
+  GaugeField fatLink(gParam); //first time to call fat7 V link
   fatKSLink(fatLink, *cudaInLinkEx, path_coeff);
   if (fatlink) cpuFatLink.copy(fatLink);
 
@@ -3857,6 +3863,102 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   delete cudaInLinkEx;
 }
 
+void unitarize_fat(GaugeField &FatLink, GaugeField &UnitarizedLink){
+    
+    const double unitarize_eps = 1e-14;
+    const double max_error = 1e-10;
+    const int reunit_allow_svd = 1;
+    const int reunit_svd_only = 0;
+    const double svd_rel_error = 1e-6;
+    const double svd_abs_error = 1e-6;
+    quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
+                                     svd_abs_error);
+
+    *num_failures_h = 0;
+    quda::unitarizeLinks(UnitarizedLink, FatLink, num_failures_d); // unitarize on the gpu
+    if (*num_failures_h > 0)
+      errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
+}
+
+void set_act_path(double (&act_path)[6], int i){
+
+    double tadpole_factor = 0.5;
+    double u1 = 1.0 / tadpole_factor;
+    double u2 = u1 * u1;
+    double u4 = u2 * u2;
+    double u6 = u4 * u2;
+    // First path: create V, W links
+    if (i == 0)
+    {
+        act_path[0] = 1.0 / 8.0;
+        act_path[1] = u2 * (0.0);
+        act_path[2] = u2 * (-1.0 / 8.0) * 0.5;
+        act_path[3] = u4 * (1.0 / 8.0) * 0.25 * 0.5;
+        act_path[4] = u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+        act_path[5] = u4 * (0.0);
+    }
+    else if (i == 1)
+    {
+        act_path[0] = (1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0);
+        act_path[1] = (-1.0 / 24.0);
+        act_path[2] = (-1.0 / 8.0) * 0.5;
+        act_path[3] = (1.0 / 8.0) * 0.25 * 0.5;
+        act_path[4] = (-1.0 / 8.0) * 0.125 * (1.0 / 6.0);
+        act_path[5] = (-2.0 / 16.0);
+    }
+    else if (i == 2)
+    {
+        act_path[0] = 1.0 / 8.0;
+        act_path[1] = -1.0 / 24.0;
+        act_path[2] = 0.0;
+        act_path[3] = 0.0;
+        act_path[4] = 0.0;
+        act_path[5] = 0.0;
+    }
+
+
+}
+    
+void computeKSLinkNew(void *fatlink, void *longlink, void *ulink, void *inlink, double *path_coeff)
+{
+    double act_path[6];
+    auto profile = pushProfile(profileFatLink);
+    GaugeFieldParam gParam(*gaugeSmeared);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
+    gParam.setPrecision(QUDA_HALF_PRECISION, true);
+    gParam.link_type = QUDA_GENERAL_LINKS;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;  
+    
+    gParam.gauge = fatlink;
+    GaugeField FatLink(gParam); // create the fatlink
+    gParam.gauge = longlink;
+    GaugeField LongLink(gParam); // create the longlink
+    gParam.gauge = ulink;
+    GaugeField UnitarizedLink(gParam);
+
+    
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.gauge = inlink;//called "U"
+    GaugeField *cudaInLink = new GaugeField(gParam);
+    GaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
+    delete cudaInLink;
+      
+
+    //first time to call fat7 V link
+    set_act_path(act_path,0);
+    fatKSLink(FatLink, *cudaInLinkEx, act_path);
+    unitarize_fat(FatLink, UnitarizedLink);
+    
+    delete cudaInLinkEx;
+    GaugeField *cudaInLinkEx2 = createExtendedGauge(UnitarizedLink, R, profileFatLink);
+    set_act_path(act_path,1);
+    longKSLink(LongLink, *cudaInLinkEx2, act_path);
+    fatKSLink(FatLink, *cudaInLinkEx2, act_path);
+    delete cudaInLinkEx2;
+    
+}
+    
 void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGaussianSmear);
@@ -5751,6 +5853,28 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     if (i_glob == 30) {
         // ColorSpinorField out;
         printfQuda("below vv is flowed adjoint\n");
+        // QudaGaugeParam gauge_param(*gaugePrecise);
+      // storage for CPU reference fat and long links w/non-zero Naik
+      // void *fat_reflink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
+      // void *long_reflink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
+    
+      // // Paths for step 1:
+      // void *vlink = nullptr;
+      // void *wlink = nullptr;
+    
+      // // Paths for step 2:
+      // void *fatlink = nullptr;
+      // void *longlink = nullptr;
+    
+      // // Place to accumulate Naiks
+      // void *fatlink_eps = nullptr;
+      // void *longlink_eps = nullptr;
+    
+      // void *qdp_sitelink[4] = {nullptr, nullptr, nullptr, nullptr};
+      // void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
+      // void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
+      // void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
+      // void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
         //create hisq
 // // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
 //       computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &gauge_param);
@@ -5766,10 +5890,12 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
 //         memset(fatlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
 //         memset(longlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
 //       }
-
+        
+      // computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &gauge_param);
       // // Create X and long links, 2nd path table set
-      // computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[1].data(), &gauge_param);
+      // computeKSLinkQuda(gaugeFatPrecise, gaugeLongPrecise, nullptr, gaugePrecise, act_path[1].data(), &gauge_param);
 
+      //milc_inlinks --> GaugeSmeared; use saveGaugeQuda to download to cpu
       // loadfatlongGaugeQuda
 
         
