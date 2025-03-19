@@ -1,10 +1,8 @@
 #include "multigrid.h"
+#include <int_list.hpp>
 
 namespace quda
 {
-
-  template <int...> struct IntList {
-  };
 
   template <int fineColor, int coarseColor, int... N>
   void CoarseOp2(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,

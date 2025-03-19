@@ -405,6 +405,7 @@ extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<bool> mg_setup_use_mma;
 extern quda::mgarray<bool> mg_dslash_use_mma;
+extern quda::mgarray<bool> mg_transfer_use_mma;
 extern quda::mgarray<QudaInverterType> setup_inv;
 extern quda::mgarray<QudaSolveType> coarse_solve_type;
 extern quda::mgarray<QudaSolveType> smoother_solve_type;

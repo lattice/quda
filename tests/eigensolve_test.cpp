@@ -38,8 +38,9 @@ void display_test_info(QudaEigParam &param)
   printfQuda("running the following test:\n");
 
   printfQuda("prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s      %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(param.cuda_prec_ritz),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
+  printfQuda("%s      %s            %s            %d/%d/%d          %d         %d\n",
+             get_prec_str(eig_inv_param.cuda_prec_eigensolver), get_recon_str(link_recon),
+             get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));

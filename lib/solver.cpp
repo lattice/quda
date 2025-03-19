@@ -281,9 +281,9 @@ namespace quda {
       if (space && space->evecs.size() != 0) {
         logQuda(QUDA_VERBOSE, "Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if ((!space->svd && param.eig_param.n_conv != (int)space->evecs.size())
-            || (space->svd && 2 * param.eig_param.n_conv != (int)space->evecs.size()))
-          errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(),
+        if ((!space->svd && (int)space->evecs.size() < param.eig_param.n_conv)
+            || (space->svd && (int)space->evecs.size() < (2 * param.eig_param.n_conv)))
+          errorQuda("Preserved deflation space size %lu is smaller than the necessary %d", space->evecs.size(),
                     param.eig_param.n_conv);
 
         // move vectors from preserved space to local space
@@ -527,8 +527,8 @@ namespace quda {
     switch (prec) {
     case QUDA_DOUBLE_PRECISION: eps = std::numeric_limits<double>::epsilon() / 2.; break;
     case QUDA_SINGLE_PRECISION: eps = std::numeric_limits<float>::epsilon() / 2.; break;
-    case QUDA_HALF_PRECISION: eps = pow(2., -13); break;
-    case QUDA_QUARTER_PRECISION: eps = pow(2., -6); break;
+    case QUDA_HALF_PRECISION: eps = std::pow(2., -13); break;
+    case QUDA_QUARTER_PRECISION: eps = std::pow(2., -6); break;
     default: errorQuda("Invalid precision %d", param.precision); break;
     }
     return eps;

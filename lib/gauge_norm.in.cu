@@ -1,6 +1,7 @@
 #include <gauge_field_order.h>
 #include <instantiate.h>
 #include <memory>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -49,8 +50,6 @@ namespace quda {
     }
     return norm_;
   }
-
-  template <int...> struct IntList { };
 
   template <typename T, bool fixed, int nColor, int...N>
   double norm(const GaugeField &u, int d, norm_type_ type, IntList<nColor, N...>)

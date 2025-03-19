@@ -110,6 +110,11 @@ TEST_P(StaggeredInvertTest, verify)
   // Single precision needs a tiny bump due to small host/device precision deviations
   if (prec == QUDA_SINGLE_PRECISION) verify_tol *= 1.03;
 
+  // account for summation error scaling with number of processors
+  auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
+  verify_tol *= (1 + log(quda::comm_size()) / log(dof));
+  tol_hq *= (1 + log(quda::comm_size()) / log(dof));
+
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], verify_tol); }
     if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }

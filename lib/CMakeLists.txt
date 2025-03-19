@@ -58,6 +58,7 @@ set (QUDA_OBJS
   clover_force.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
+  spin_duplicate.cu
   spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
@@ -182,15 +183,23 @@ configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
 configure_file(spinor_dilute.in.cu spinor_dilute.cu @ONLY)
+configure_file(spin_duplicate.in.cu spin_duplicate.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
 configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
 configure_file(dslash_coarse_mma.in.hpp dslash_coarse_mma.hpp @ONLY)
 configure_file(block_transpose.in.cu block_transpose.cu @ONLY)
+configure_file(multigrid.in.hpp multigrid.hpp @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
+  foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+    math(EXPR MOD "${QUDA_MULTIGRID_MRHS} % 8")
+    if(NOT (${QUDA_MULTIGRID_MRHS} GREATER_EQUAL "8" AND ${QUDA_MULTIGRID_MRHS} LESS_EQUAL "64" AND ${MOD} EQUAL "0"))
+      message(FATAL_ERROR "${QUDA_MULTIGRID_MRHS} is not a valid value for QUDA_MULTIGRID_MRHS_LIST")
+    endif()
+  endforeach()
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
     configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
@@ -226,6 +235,12 @@ if(QUDA_MULTIGRID)
          list(PREPEND QUDA_CU_OBJS "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
          list(PREPEND QUDA_CU_OBJS "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
          list(PREPEND QUDA_CU_OBJS "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+           list(PREPEND QUDA_CU_OBJS "prolongator_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu")
+           configure_file(prolongator_mma.in.cu "prolongator_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+           list(PREPEND QUDA_CU_OBJS "restrictor_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu")
+           configure_file(restrictor_mma.in.cu "restrictor_mma_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}_nvec${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+         endforeach()
       endif()
     endforeach()
   endforeach()
@@ -489,14 +504,6 @@ endif()
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
-
-if(QUDA_ENABLE_MMA)
-  target_compile_definitions(quda PUBLIC QUDA_ENABLE_MMA)
-endif()
-
-if(QUDA_MULTIGRID_SETUP_USE_SMMA)
-  target_compile_definitions(quda PUBLIC QUDA_MULTIGRID_SETUP_USE_SMMA)
-endif()
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
