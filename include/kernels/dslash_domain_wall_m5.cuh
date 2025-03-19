@@ -231,7 +231,7 @@ namespace quda
       // if using shared-memory caching then load spinor field for my site into cache
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
       using Cache = std::conditional_t<shared, SharedMemoryCache<HalfVector>, const Ftor &>;
-      Cache cache{ftor};
+      Cache cache {ftor};
 
       { // forwards direction
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -269,7 +269,7 @@ namespace quda
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
         if constexpr (shared) {
-	  half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + back_s, parity);
+          half_in = cache.load(threadIdx.x, local_src_idx * arg.Ls + back_s, parity);
         } else {
 	  if (!allthreads || active) {
 	    Vector full_in = arg.in[src_idx](back_idx, parity);
@@ -287,7 +287,7 @@ namespace quda
 
       // if using shared-memory caching then load spinor field for my site into cache
       using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
-      Cache cache{ftor};
+      Cache cache {ftor};
 
       if constexpr (shared) {
         if (sync) { cache.sync(); }
@@ -340,8 +340,10 @@ namespace quda
     using Arg = Arg_;
     const Arg &arg;
     using typename d5Params<Arg_>::Ops::KernelOpsT;
-    template <typename ...OpsArgs>
-    constexpr dslash5(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) { }
+    template <typename... OpsArgs>
+    constexpr dslash5(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -417,7 +419,7 @@ namespace quda
 
     // if using shared-memory caching then load spinor field for my site into cache
     using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
-    Cache cache{ftor};
+    Cache cache {ftor};
     if constexpr (shared) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       if (sync) { cache.sync(); }
@@ -488,7 +490,7 @@ namespace quda
 
     if constexpr (mobius_m5::use_half_vector()) {
       using Cache = std::conditional_t<shared, SharedMemoryCache<HalfVector>, const Ftor &>;
-      Cache cache{ftor};
+      Cache cache {ftor};
 
       { // first do R
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -552,7 +554,7 @@ namespace quda
       }
     } else { // use_half_vector
       using Cache = std::conditional_t<shared, SharedMemoryCache<Vector>, const Ftor &>;
-      Cache cache{ftor};
+      Cache cache {ftor};
       if (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);
@@ -610,17 +612,18 @@ namespace quda
      @param[in] arg Argument struct containing any meta data and accessors
   */
   template <typename Arg> struct dslash5invParams {
-    using Ops = std::conditional_t<mobius_m5::var_inverse(),
-      typename variableInvParams<Arg,mobius_m5::shared()>::Ops,
-      typename constantInvParams<Arg,mobius_m5::shared()>::Ops>;
+    using Ops = std::conditional_t<mobius_m5::var_inverse(), typename variableInvParams<Arg, mobius_m5::shared()>::Ops,
+                                   typename constantInvParams<Arg, mobius_m5::shared()>::Ops>;
   };
 
   template <typename Arg_> struct dslash5inv : dslash5invParams<Arg_>::Ops {
     using Arg = Arg_;
     const Arg &arg;
     using typename dslash5invParams<Arg>::Ops::KernelOpsT;
-    template <typename ...OpsArgs>
-    constexpr dslash5inv(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr dslash5inv(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

@@ -292,7 +292,7 @@ namespace quda {
         constexpr int Ls = Arg::Ls;
         const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-        SharedMemoryCache<half2> cache{*this};
+        SharedMemoryCache<half2> cache {*this};
 
         static_assert(Arg::block_dim_x * Ls / 32 < 32, "Number of threads in a threadblock should be less than 1024.");
 
@@ -440,7 +440,7 @@ namespace quda {
         } // while
       }
     };
-    
+
 #endif // QUDA_MMA_AVAILABLE
   }
 

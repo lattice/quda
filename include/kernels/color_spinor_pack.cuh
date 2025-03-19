@@ -163,8 +163,7 @@ namespace quda {
   };
 
   template <bool is_device> struct site_max {
-    template <typename Ftor>
-    inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &)
+    template <typename Ftor> inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &)
     {
       using Arg = typename Ftor::Arg;
       // on the host we require that both spin and color are fully thread local
@@ -197,7 +196,7 @@ namespace quda {
       using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
       constexpr int color_spin_threads = CacheDims<Arg>::color_spin_threads;
-      Cache<Arg> cache{ftor};
+      Cache<Arg> cache {ftor};
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -297,15 +296,16 @@ namespace quda {
     }
   }
 
-  template <typename Arg_> using GhostPackerOps =
-    std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoKernelOps>;
+  template <typename Arg_>
+  using GhostPackerOps = std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoKernelOps>;
 
   template <typename Arg_> struct GhostPacker : GhostPackerOps<Arg_> {
     using Arg = Arg_;
     const Arg &arg;
     using typename GhostPackerOps<Arg>::KernelOpsT;
-    template <typename ...Ops>
-    constexpr GhostPacker(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... Ops> constexpr GhostPacker(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>

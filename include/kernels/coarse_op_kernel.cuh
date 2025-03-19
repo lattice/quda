@@ -748,16 +748,16 @@ namespace quda {
           for (int ic = 0; ic < Arg::fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
         }
       } else {
-        real max = static_cast<real>(0.0);
+        real av_max = static_cast<real>(0.0);
 #pragma unroll
         for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
           for (int ic = 0; ic < Arg::fineColor; ic++) {
-            auto abs_max = quda::max(abs(AV(s, ic).real()), abs(AV(s, ic).imag()));
-            max = quda::max(abs_max, max);
+            auto abs_max = max(abs(AV(s, ic).real()), abs(AV(s, ic).imag()));
+            av_max = max(abs_max, av_max);
           }
         }
-        atomic_fetch_abs_max(arg.max, max);
+        atomic_fetch_abs_max(arg.max, av_max);
       }
     }
   };
@@ -884,16 +884,16 @@ namespace quda {
             for (int c = 0; c < Arg::fineColor; c++)
               arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
         } else {
-          real max = static_cast<real>(0.0);
+          real av_max = static_cast<real>(0.0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
             for (int c = 0; c < Arg::fineColor; c++) {
-              auto abs_max = quda::max(abs(AV(s, c).real()), abs(AV(s, c).imag()));
-              max = quda::max(abs_max, max);
+              auto abs_max = max(abs(AV(s, c).real()), abs(AV(s, c).imag()));
+              av_max = max(abs_max, av_max);
             }
           }
-          atomic_fetch_abs_max(arg.max, max);
+          atomic_fetch_abs_max(arg.max, av_max);
         }
       } else {
         // compute the clover inverse matrix with the already loaded clover matrix
@@ -910,16 +910,16 @@ namespace quda {
             for (int c = 0; c < Arg::fineColor; c++)
               arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
         } else {
-          real max = static_cast<real>(0.0);
+          real av_max = static_cast<real>(0.0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
             for (int c = 0; c < Arg::fineColor; c++) {
-              auto abs_max = quda::max(abs(AV(s, c).real()), abs(AV(s, c).imag()));
-              max = quda::max(abs_max, max);
+              auto abs_max = max(abs(AV(s, c).real()), abs(AV(s, c).imag()));
+              av_max = max(abs_max, av_max);
             }
           }
-          atomic_fetch_abs_max(arg.max, max);
+          atomic_fetch_abs_max(arg.max, av_max);
         }
       }
     }
@@ -1018,13 +1018,13 @@ namespace quda {
           arg.AV(parity, x_cb, nbr_parity, ic_f, ic_c) = out(0, ic_f);
         }
       } else {
-        real max = static_cast<real>(0.0);
+        real out_max = static_cast<real>(0.0);
 #pragma unroll
         for (int ic_f = 0; ic_f < Arg::fineColor; ic_f++) {
-          auto abs_max = quda::max(abs(out(0, ic_f).real()), abs(out(0, ic_f).imag()));
-          max = quda::max(abs_max, max);
+          auto abs_max = max(abs(out(0, ic_f).real()), abs(out(0, ic_f).imag()));
+          out_max = max(abs_max, out_max);
         }
-        atomic_fetch_abs_max(arg.max, max);
+        atomic_fetch_abs_max(arg.max, out_max);
       }
     }
   };
@@ -1405,7 +1405,7 @@ namespace quda {
       using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-      Cache<Arg> cache{ftor};
+      Cache<Arg> cache {ftor};
       auto &X = cache.data()[0];
       auto &Y = cache.data()[1];
 
@@ -1702,8 +1702,9 @@ namespace quda {
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     using typename storeCoarseSharedAtomic_impl<true>::Ops<Arg>::KernelOpsT;
-    template <typename ...Ops>
-    constexpr compute_vuv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
+    template <typename... Ops> constexpr compute_vuv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
 
     /**
        3-d parallelism
@@ -1737,8 +1738,9 @@ namespace quda {
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     using typename storeCoarseSharedAtomic_impl<true>::Ops<Arg_>::KernelOpsT;
-    template <typename ...Ops>
-    constexpr compute_vlv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
+    template <typename... Ops> constexpr compute_vlv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
 
     /**
        3-d parallelism

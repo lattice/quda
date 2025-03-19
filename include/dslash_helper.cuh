@@ -668,8 +668,10 @@ namespace quda
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
     using typename getKernelOps<typename Arg::D>::KernelOpsT;
-    template <typename ...OpsArgs>
-    constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg) { }
+    template <typename... OpsArgs>
+    constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg)
+    {
+    }
 
     template <bool allthreads = false>
     __forceinline__ __device__ void operator()(int, int s, int parity, bool active = true)

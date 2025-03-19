@@ -92,8 +92,8 @@ namespace quda
       }
     };
 
-    template <typename Arg> using eofa_dslash5Ops =
-      KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
+    template <typename Arg>
+    using eofa_dslash5Ops = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the D5 operator at given site
       @param[in] arg    Argument struct containing any meta data and accessors
@@ -104,8 +104,10 @@ namespace quda
     template <typename Arg> struct eofa_dslash5 : eofa_dslash5Ops<Arg> {
       const Arg &arg;
       using typename eofa_dslash5Ops<Arg>::KernelOpsT;
-      template <typename ...Ops>
-      constexpr eofa_dslash5(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
+      template <typename... Ops>
+      constexpr eofa_dslash5(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+      {
+      }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
@@ -117,7 +119,7 @@ namespace quda
         int src_idx = src_s / arg.Ls;
         int s = src_s % arg.Ls;
 
-        SharedMemoryCache<Vector> cache{*this};
+        SharedMemoryCache<Vector> cache {*this};
 
         Vector out;
 	if (!allthreads || active) {
@@ -178,8 +180,8 @@ namespace quda
       }
     };
 
-    template <typename Arg> using eofa_dslash5invOps =
-      KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
+    template <typename Arg>
+    using eofa_dslash5invOps = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the M5 inverse operator at a given site on the
       lattice.  This is the original algorithm as described in Kim and
@@ -195,8 +197,10 @@ namespace quda
     template <typename Arg> struct eofa_dslash5inv : eofa_dslash5invOps<Arg> {
       const Arg &arg;
       using typename eofa_dslash5invOps<Arg>::KernelOpsT;
-      template <typename ...Ops>
-      constexpr eofa_dslash5inv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
+      template <typename... Ops>
+      constexpr eofa_dslash5inv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+      {
+      }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
@@ -209,7 +213,7 @@ namespace quda
         int s = src_s % arg.Ls;
 
         const auto sherman_morrison = arg.sherman_morrison;
-        SharedMemoryCache<Vector> cache{*this};
+        SharedMemoryCache<Vector> cache {*this};
 	if (!allthreads || active) {
 	  cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
 	}

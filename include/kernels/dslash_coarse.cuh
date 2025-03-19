@@ -290,17 +290,15 @@ namespace quda {
   }
 
   template <bool is_device> struct dim_collapse {
-    template <typename T, typename Ftor> void operator()(T &out, int, int, const Ftor &ftor)
-    {
-      out *= -ftor.arg.kappa;
-    }
+    template <typename T, typename Ftor> void operator()(T &out, int, int, const Ftor &ftor) { out *= -ftor.arg.kappa; }
   };
 
   template <> struct dim_collapse<true> {
-    template <typename T, typename Ftor> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
+    template <typename T, typename Ftor>
+    __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
     {
       using Arg = typename Ftor::Arg;
-      SharedMemoryCache<T> cache{ftor};
+      SharedMemoryCache<T> cache {ftor};
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
 
@@ -335,8 +333,10 @@ namespace quda {
     using Arg = Arg_;
     const Arg &arg;
     using typename CoarseDslashParams<Arg>::Ops::KernelOpsT;
-    template <typename ...OpsArgs>
-    constexpr CoarseDslash(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr CoarseDslash(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>

@@ -163,7 +163,7 @@ namespace quda
     dslash_default {
 
     const Arg &arg;
-    template <typename Ftor> constexpr wilson(const Ftor &ftor) : arg(ftor.arg) {}
+    template <typename Ftor> constexpr wilson(const Ftor &ftor) : arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     // out(x) = M*in = (-D + m) * in(x-mu)

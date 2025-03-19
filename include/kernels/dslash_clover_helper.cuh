@@ -182,8 +182,9 @@ namespace quda {
     }
   };
 
-  template <typename Arg> using NdegTwistCloverApplyOps =
-    KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
+  template <typename Arg>
+  using NdegTwistCloverApplyOps
+    = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
 
   // if (!inverse) apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1) to the input spinor
   // else apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor
@@ -196,8 +197,10 @@ namespace quda {
     using Mat = HMatrix<typename Arg::real, N>;
     const Arg &arg;
     using typename NdegTwistCloverApplyOps<Arg>::KernelOpsT;
-    template <typename ...Ops>
-    constexpr NdegTwistCloverApply(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... Ops>
+    constexpr NdegTwistCloverApply(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
@@ -227,7 +230,7 @@ namespace quda {
       // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
       const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
 
-      SharedMemoryCache<half_fermion> cache{*this};
+      SharedMemoryCache<half_fermion> cache {*this};
 
       half_fermion in_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
@@ -283,5 +286,4 @@ namespace quda {
       }
     }
   };
-
 }

@@ -60,8 +60,10 @@ namespace quda
   template <typename Arg> struct BlockTransposeKernel : BlockTransposeKernelOps<Arg>::Ops {
     const Arg &arg;
     using typename BlockTransposeKernelOps<Arg>::Ops::KernelOpsT;
-    template <typename ...OpsArgs>
-    constexpr BlockTransposeKernel(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) { }
+    template <typename... OpsArgs>
+    constexpr BlockTransposeKernel(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -76,9 +78,9 @@ namespace quda
       int parity_color = target::block_idx().z;
       int color = parity_color % Arg::nColor;
       int parity = parity_color / Arg::nColor;
-      using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
+      using color_spinor_t = typename BlockTransposeKernelOps<Arg>::color_spinor_t;
 
-      typename BlockTransposeKernelOps<Arg>::CacheT cache{*this};
+      typename BlockTransposeKernelOps<Arg>::CacheT cache {*this};
 
       int x_offset = target::block_dim().x * target::block_idx().x;
       int v_offset = target::block_dim().y * target::block_idx().y;

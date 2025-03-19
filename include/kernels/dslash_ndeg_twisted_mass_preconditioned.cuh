@@ -49,8 +49,10 @@ namespace quda
   struct nDegTwistedMassPreconditioned : dslash_default, nDegTwistedMassPreconditionedParams<dagger, Arg>::Ops {
 
     const Arg &arg;
-    using typename nDegTwistedMassPreconditionedParams<dagger,Arg>::Ops::KernelOpsT;
-    template <typename Ftor> constexpr nDegTwistedMassPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
+    using typename nDegTwistedMassPreconditionedParams<dagger, Arg>::Ops::KernelOpsT;
+    template <typename Ftor> constexpr nDegTwistedMassPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg)
+    {
+    }
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
@@ -110,7 +112,7 @@ namespace quda
       }
 
       if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-        SharedMemoryCache<Vector> cache{*this};
+        SharedMemoryCache<Vector> cache {*this};
         if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
