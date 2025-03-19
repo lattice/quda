@@ -957,6 +957,8 @@ namespace quda
       param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);
       tunable.checkLaunchParam(param_default);
+      param_default.comment = "# default\n";
+      tunecache[key] = param_default;
       logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
               tunable.paramString(param_default).c_str());
 
