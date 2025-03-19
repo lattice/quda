@@ -407,26 +407,24 @@ void initRand()
 
   srand(17 * rank + 137);
 
-  if constexpr (use_hypercubic_host_rng()) {
-    // initialize the hypercubic RNG
-    std::array<int, 4> X = {xdim, ydim, zdim, tdim};
-    int volume = X[0] * X[1] * X[2] * X[3];
-    int volume_h = volume / 2;
+  // initialize the hypercubic RNG
+  std::array<int, 4> X = {xdim, ydim, zdim, tdim};
+  int volume = X[0] * X[1] * X[2] * X[3];
+  int volume_h = volume / 2;
 
-    host_rand.resize(volume);
-    std::array<uint64_t, 4> X_global;
-    for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
+  host_rand.resize(volume);
+  std::array<uint64_t, 4> X_global;
+  for (int d = 0; d < 4; d++) X_global[d] = static_cast<uint64_t>(X[d] * comm_dim(d));
 
-    for (int parity = 0; parity < 2; parity++)
-      for (int i = 0; i < volume_h; i++) {
-        // get the local coordinate
-        std::array<uint64_t, 4> x;
-        getCoords(x, i, X, parity);
-        for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
-        uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
-        host_rand[parity * volume_h + i] = std::mt19937_64(17ul * global_idx + 137);
-      }
-  }
+  for (int parity = 0; parity < 2; parity++)
+    for (int i = 0; i < volume_h; i++) {
+      // get the local coordinate
+      std::array<uint64_t, 4> x;
+      getCoords(x, i, X, parity);
+      for (int d = 0; d < 4; d++) x[d] += X[d] * comm_coord(d);
+      uint64_t global_idx = (((x[3] * X_global[2] + x[2]) * X_global[1]) + x[1]) * X_global[0] + x[0];
+      host_rand[parity * volume_h + i] = std::mt19937_64(17ul * global_idx + 137);
+    }
 }
 
 void setDims(int *X)

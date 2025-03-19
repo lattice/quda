@@ -1,20 +1,6 @@
 #pragma once
 
-#define HYPERCUBIC_RNG
-
-/**
- * @brief Constexpr of whether or not to use the host hypercubic RNG
- *
- * @return Whether or not to use the host hypercubic RNG
- */
-constexpr bool use_hypercubic_host_rng()
-{
-#ifdef HYPERCUBIC_RNG
-  return true;
-#else
-  return false;
-#endif
-}
+#include <random>
 
 /**
  * @brief Generate a uniform random number on [lower, upper)
@@ -28,19 +14,9 @@ constexpr bool use_hypercubic_host_rng()
  */
 template <typename real_t = double> real_t random_uniform_host(int i, int parity, real_t lower = 0, real_t upper = 1)
 {
-  if constexpr (use_hypercubic_host_rng()) {
-    // generates in [lower, upper)
-    std::uniform_real_distribution<real_t> dist {lower, upper};
-    return dist(host_rand[parity * Vh + i]);
-  } else {
-    real_t rand_num;
-    // rand() isn't guaranteed threadsafe
-#pragma omp critical
-    {
-      rand_num = ((upper - lower) * static_cast<real_t>(rand()) / RAND_MAX) + lower;
-    }
-    return rand_num;
-  }
+  // generates in [lower, upper)
+  std::uniform_real_distribution<real_t> dist {lower, upper};
+  return dist(host_rand[parity * Vh + i]);
 }
 
 /**
@@ -55,37 +31,6 @@ template <typename real_t = double> real_t random_uniform_host(int i, int parity
  */
 template <typename real_t = double> real_t random_gaussian_host(int i, int parity, real_t mean = 0, real_t stddev = 1)
 {
-  if constexpr (use_hypercubic_host_rng()) {
-    std::normal_distribution<real_t> dist {mean, stddev};
-    return dist(host_rand[parity * Vh + i]);
-  } else {
-    // Box-Muller generates two random numbers at a time, so cache
-    // a previous one if appropriate
-    static bool number_waiting = false;
-    static double backup_number = 0;
-
-    if (number_waiting) {
-      number_waiting = false;
-      return static_cast<real_t>(backup_number);
-    } else {
-      // uniform numbers on (0, 1)
-      int u1 = 0, u2 = 0;
-
-// rand() isn't guaranteed threadsafe
-#pragma omp critical
-      {
-        while (u1 == 0) { u1 = rand(); }
-        while (u2 == 0) { u2 = rand(); }
-      }
-
-      auto lnu1 = stddev * sqrt(-2. * log((double)u1 / RAND_MAX));
-      double sn, cs;
-      sincos(2. * M_PI * (double)u2 / RAND_MAX, &sn, &cs);
-
-      backup_number = lnu1 * sn + mean;
-      number_waiting = true;
-
-      return static_cast<real_t>(lnu1 * cs + mean);
-    }
-  }
+  std::normal_distribution<real_t> dist {mean, stddev};
+  return dist(host_rand[parity * Vh + i]);
 }
