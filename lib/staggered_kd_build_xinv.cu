@@ -121,7 +121,7 @@ namespace quda {
     // Step 1: build temporary Xinv field in QUDA_MILC_GAUGE_ORDER,
     // independent of field location. Xinv is always single precision
     // because it's an intermediate field.
-    std::unique_ptr<GaugeField> xInvMilcOrder(nullptr);
+    GaugeField xInvMilcOrder;
     {
       const int ndim = 4;
       lat_dim_t xc;
@@ -137,7 +137,7 @@ namespace quda {
       gParam.link_type = QUDA_COARSE_LINKS;
       gParam.t_boundary = QUDA_PERIODIC_T;
       gParam.create = QUDA_ZERO_FIELD_CREATE;
-      gParam.setPrecision( QUDA_SINGLE_PRECISION );
+      gParam.setPrecision(QUDA_SINGLE_PRECISION);
       gParam.nDim = ndim;
       gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -145,7 +145,7 @@ namespace quda {
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
       gParam.pad = 0;
 
-      xInvMilcOrder = std::make_unique<GaugeField>(gParam);
+      xInvMilcOrder = GaugeField(gParam);
     }
 
     // Step 2: build a host or device gauge field as appropriate, but
@@ -155,12 +155,12 @@ namespace quda {
     if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() == QUDA_RECONSTRUCT_NO && gauge.Precision() == QUDA_SINGLE_PRECISION)
       need_new_U = false;
 
-    std::unique_ptr<GaugeField> tmp_U(nullptr);
+    GaugeField tmp_U;
 
     if (need_new_U) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 
-        //First make a cpu gauge field from the cuda gauge field
+        // First make a cpu gauge field from the cuda gauge field
         int pad = 0;
         GaugeFieldParam gf_param(gauge.X(), QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
         gf_param.location = location;
@@ -169,41 +169,39 @@ namespace quda {
         gf_param.link_type = gauge.LinkType();
         gf_param.t_boundary = gauge.TBoundary();
         gf_param.anisotropy = gauge.Anisotropy();
-        gf_param.gauge = NULL;
         gf_param.create = QUDA_NULL_FIELD_CREATE;
         gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
         gf_param.nFace = 1;
         gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-        tmp_U = std::make_unique<GaugeField>(gf_param);
+        tmp_U = GaugeField(gf_param);
 
         //Copy the cuda gauge field to the cpu
-        tmp_U.get()->copy(gauge);
+        tmp_U.copy(gauge);
 
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
 
         // We can assume: gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != QUDA_SINGLE_PRECISION)
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+        gf_param.create = QUDA_NULL_FIELD_CREATE;
         gf_param.order = QUDA_FLOAT2_GAUGE_ORDER; // guaranteed for no recon
-        gf_param.setPrecision( QUDA_SINGLE_PRECISION );
-        tmp_U = std::make_unique<GaugeField>(gf_param);
+        gf_param.setPrecision(QUDA_SINGLE_PRECISION, true);
+        tmp_U = GaugeField(gf_param);
 
-        tmp_U->copy(gauge);
+        tmp_U.copy(gauge);
       }
     }
 
-    const GaugeField& U = need_new_U ? *tmp_U : reinterpret_cast<const GaugeField&>(gauge);
+    const GaugeField& U = need_new_U ? tmp_U : gauge;
 
     // Step 3: Create the X field based on Xinv, but switch to a native ordering for a GPU setup.
-    std::unique_ptr<GaugeField> tmp_X(nullptr);
-    GaugeFieldParam x_param(*xInvMilcOrder);
+    GaugeFieldParam x_param(xInvMilcOrder);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       x_param.setPrecision(x_param.Precision());
     }
-    tmp_X = std::make_unique<GaugeField>(x_param);
-    GaugeField& X = *tmp_X;
+    GaugeField X(x_param);
 
     // Step 4: Calculate X from U
     logQuda(QUDA_VERBOSE, "Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -214,34 +212,34 @@ namespace quda {
 
     // Step 5: Calculate Xinv
     if (dagger_approximation) {
-      xInvMilcOrder->copy(X);
+      xInvMilcOrder.copy(X);
     } else {
       // Logic copied from `coarse_op_preconditioned.cu`
-      const int n = xInvMilcOrder->Ncolor();
+      const int n = xInvMilcOrder.Ncolor();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         // FIXME: add support for double precision inverse
         // Reorder to MILC order for inversion, based on "coarse_op_preconditioned.cu"
-        GaugeFieldParam param(*xInvMilcOrder);
+        GaugeFieldParam param(xInvMilcOrder);
         param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
         param.setPrecision(QUDA_SINGLE_PRECISION);
         GaugeField X_(param);
 
         X_.copy(X);
 
-        Tunable::flops_global(invert(xInvMilcOrder->data(), X_.data(), n, X_.Volume(), X_.Precision(), X.Location())
+        Tunable::flops_global(invert(xInvMilcOrder.data(), X_.data(), n, X_.Volume(), X_.Precision(), X.Location())
                               + Tunable::flops_global());
 
       } else if (location == QUDA_CPU_FIELD_LOCATION) {
-        Tunable::flops_global(invert(xInvMilcOrder->data(), X.data(), n, X.Volume(), X.Precision(), X.Location())
+        Tunable::flops_global(invert(xInvMilcOrder.data(), X.data(), n, X.Volume(), X.Precision(), X.Location())
                               + Tunable::flops_global());
       }
 
-      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
+      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", xInvMilcOrder.norm2(0));
     }
 
     // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
     // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
-    ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
+    ReorderStaggeredKahlerDiracInverse(Xinv, xInvMilcOrder, dagger_approximation, mass);
 
     if (dagger_approximation) logQuda(QUDA_VERBOSE, "Using the dagger approximation to Xinv\n");
       logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
@@ -249,29 +247,6 @@ namespace quda {
     if (verify) {
       // to be implemented
     }
-  }
-
-  // Allocates and calculates the inverse KD block, returning Xinv
-  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, double mass,
-                                                                          bool dagger_approximation, bool verify)
-  {
-    GaugeFieldParam gParam(gauge);
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gParam.geometry = QUDA_KDINVERSE_GEOMETRY;
-    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.nFace = 0;
-    gParam.pad = 0;
-
-    // latter true is to force FLOAT2
-    gParam.setPrecision(gauge.Precision(), true);
-
-    std::shared_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField *>(new GaugeField(gParam)));
-
-    BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation, verify);
-
-    return Xinv;
   }
 
 } //namespace quda
