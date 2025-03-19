@@ -836,24 +836,6 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
                                      tempmat, newOprod->data_array().data);
 
   for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
-
-  /*
-  if (precision == QUDA_SINGLE_PRECISION) {
-    // allocate memory for temporary fields
-    Matrix<3, std::complex<float>> *tempmat[6];
-    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<Matrix<3, std::complex<float>> *>(safe_malloc(len * 18 *
-  precision)); } doHisqStaplesForceCPU<float>(X_, act_path_coeff, oprod.data_array<Matrix<3, std::complex<float>>
-  *>().data, link.data_array<Matrix<3, std::complex<float>> *>().data, tempmat, newOprod->data_array<Matrix<3,
-  std::complex<float>> *>().data); for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); } } else if (precision ==
-  QUDA_DOUBLE_PRECISION) {
-    // allocate memory for temporary fields
-    Matrix<3, std::complex<double>> *tempmat[6];
-    for (int i = 0; i < 6; i++) { tempmat[i] = static_cast<Matrix<3, std::complex<double>> *>(safe_malloc(len * 18 *
-  precision)); } doHisqStaplesForceCPU<double>(X_, act_path_coeff, oprod.data_array<Matrix<3, std::complex<double>>
-  *>().data, link.data_array<Matrix<3, std::complex<double>> *>().data, tempmat, newOprod->data_array<Matrix<3,
-  std::complex<double>> *>().data); for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); } } else { errorQuda("Unsupported
-  precision");
-  }*/
 }
 
 template <class real_t> struct ComputeLongLinkField {
