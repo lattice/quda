@@ -102,7 +102,7 @@ void dslash_reference_4d(void *out, const void *const *gauge, const void *const 
                          const void *const *fwdSpinor, const void *const *backSpinor, int parity, int dagger,
                          QudaPrecision precision, QudaPCType type)
 {
-  if (is_enabled_domain_wall) {
+  if (is_enabled_domain_wall()) {
     if (type == QUDA_4D_PC)
       instantiate_host<DslashReference4D, QUDA_4D_PC>(precision, out, gauge, ghostGauge, in, fwdSpinor, backSpinor,
                                                       parity, dagger);
