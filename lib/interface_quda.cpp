@@ -1458,7 +1458,7 @@ void Update_split_gauge(QudaInvertParam *param, const int is_asqtad, const bool 
   }
 
   if(update_split_gauge == 0 ){
-    printfQuda("===reuse split Gauge.\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Reuse split Gauge.\n");
     // swap to the buffered split gauge
     swapGaugeSplit(1);
     return ;
