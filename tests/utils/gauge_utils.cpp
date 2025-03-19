@@ -324,8 +324,6 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision)
 /**
  * @brief Constructs a random unitary gauge field
  *
- * FIXME: use gauge_random.cu routines to create a random field via a hypercubic distribution
- *
  * @tparam real_t Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field
  */
@@ -461,8 +459,6 @@ void applyRandomU1Phase(void *const *gauge, QudaPrecision precision)
 
 /**
  * @brief Constructs a "gauge field" of random (sane, invertable) matrices
- *
- * FIXME: use gauge_random.cu routines to create a random field via a hypercubic distribution
  *
  * @tparam real_t Floating point type of the gauge field
  * @param[out] gauge Generated QDP-ordered gauge field

@@ -91,8 +91,6 @@ void constructIdentityGaugeField(void *const *gauge, QudaPrecision precision);
 /**
  * @brief Constructs a random SU(3) gauge field
  *
- * FIXME: use gauge_random.cu routines to create a random field via a hypercubic distribution
- *
  * @param[out] gauge Generated QDP-ordered gauge field
  * @param[in] precision Gauge field floating point precision
  */
