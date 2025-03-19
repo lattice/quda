@@ -109,8 +109,14 @@ GaugeField momResident;
 GaugeField *extendedGaugeResident = nullptr;
 
 // callMultiSrcQuda related gauge split
+/** 
+  update_split_gauge : -1 delete buffer after usage, 0 split gauge in buf, 1 split gauge not in buf
+  update_split_gauge set to -1 if QudaGaugeParam.use_split_gauge_bkup == 0, 1 if QudaGaugeParam.use_split_gauge_bkup == 1
+  split_grid_bkup will be used to check whether split layout is changed or not
+  update_split_gauge > 0 and split gauge in buf, the original links will swap with *_bkup 
+  */
+int update_split_gauge = 0;
 int split_grid_bkup[QUDA_MAX_DIM];
-int update_split_grid = 1;// < 0 do not use split, 0 in buf, 1 not in buf
 quda::GaugeField   *collected_gauge = nullptr;
 quda::GaugeField   *collected_milc_fatlink_field = nullptr;
 quda::GaugeField   *collected_milc_longlink_field = nullptr;
@@ -775,8 +781,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     // Use the static R (which is defined at the very beginning of lib/interface_quda.cpp) here
     extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
   }
-  if(update_split_grid >= 0){
-    update_split_grid = 1;
+
+  // set update_split_gauge to reuse backup or not
+  if(param->use_split_gauge_bkup == 1){
+    update_split_gauge = 1;
+  }
+  else{
+    update_split_gauge = -1;
   }
 }
 
@@ -1353,117 +1364,98 @@ void freeCloverQuda(void)
 
 void flushChronoQuda(int i) { flushChrono(i); }
 
-//inline void Free_split_gauge(const int is_asqtad, const bool is_clover)
-inline void Free_split_gauge()
+// free the split gauge buffers, restore previous gauge links if keep_buffer == 1, could be used to swap back to split gauge
+void swapGaugeSplit(const int keep_buffer = 0)
 {
-  // Restore the gauge field
-  //if (!is_asqtad) {
-
-  //} else {
-  //  // freeGaugeQuda();
-  //}
-
   if(thin_links_bkup){
-    freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
-    gaugePrecise = thin_links_bkup->precise;
-    gaugeSloppy = thin_links_bkup->sloppy;
-    gaugePrecondition = thin_links_bkup->precondition;
-    gaugeRefinement = thin_links_bkup->refinement;
-    gaugeEigensolver = thin_links_bkup->eigensolver;
-    gaugeExtended = thin_links_bkup->extended;
-    delete thin_links_bkup;
-    thin_links_bkup = nullptr;
+    if(!keep_buffer) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+    std::swap(gaugePrecise, thin_links_bkup->precise);
+    std::swap(gaugeSloppy, thin_links_bkup->sloppy);
+    std::swap(gaugePrecondition, thin_links_bkup->precondition);
+    std::swap(gaugeRefinement, thin_links_bkup->refinement);
+    std::swap(gaugeEigensolver, thin_links_bkup->eigensolver);
+    std::swap(gaugeExtended, thin_links_bkup->extended);
+    if(!keep_buffer){
+      delete thin_links_bkup;
+      thin_links_bkup = nullptr;
+    }
   }
 
-
   if(fat_links_bkup){
-    freeUniqueGaugeQuda(QUDA_ASQTAD_FAT_LINKS);
+    if(!keep_buffer) freeUniqueGaugeQuda(QUDA_ASQTAD_FAT_LINKS);
     gaugeFatPrecise = fat_links_bkup->precise;
     gaugeFatSloppy = fat_links_bkup->sloppy;
     gaugeFatPrecondition = fat_links_bkup->precondition;
     gaugeFatRefinement = fat_links_bkup->refinement;
     gaugeFatEigensolver = fat_links_bkup->eigensolver;
     gaugeFatExtended = fat_links_bkup->extended;
-    delete fat_links_bkup;
-    fat_links_bkup = nullptr;
+    if(!keep_buffer){
+      delete fat_links_bkup;
+      fat_links_bkup = nullptr;
+    }
   }
 
   if(long_links_bkup){
-    freeUniqueGaugeQuda(QUDA_ASQTAD_LONG_LINKS);
-    gaugeLongPrecise = long_links_bkup->precise;
-    gaugeLongSloppy = long_links_bkup->sloppy;
-    gaugeLongPrecondition = long_links_bkup->precondition;
-    gaugeLongRefinement = long_links_bkup->refinement;
-    gaugeLongEigensolver = long_links_bkup->eigensolver;
-    gaugeLongExtended = long_links_bkup->extended;
-    delete long_links_bkup;
-    long_links_bkup = nullptr;
+    if(!keep_buffer) freeUniqueGaugeQuda(QUDA_ASQTAD_LONG_LINKS);
+    std::swap(gaugeLongPrecise, long_links_bkup->precise);
+    std::swap(gaugeLongSloppy, long_links_bkup->sloppy);
+    std::swap(gaugeLongPrecondition, long_links_bkup->precondition);
+    std::swap(gaugeLongRefinement, long_links_bkup->refinement);
+    std::swap(gaugeLongEigensolver, long_links_bkup->eigensolver);
+    std::swap(gaugeLongExtended, long_links_bkup->extended);
+    if(!keep_buffer){
+      delete long_links_bkup;
+      long_links_bkup = nullptr;
+    }
   }
 
-  //if (is_clover) {
-  //}
   if(clov_bkup){
-    freeCloverQuda();
-    cloverPrecise = clov_bkup->precise;
-    cloverSloppy = clov_bkup->sloppy;
-    cloverPrecondition = clov_bkup->precondition;
-    cloverRefinement = clov_bkup->refinement;
-    cloverEigensolver = clov_bkup->eigensolver;
-    delete clov_bkup;
-    clov_bkup= nullptr;
+    if(!keep_buffer) freeCloverQuda();
+    std::swap(cloverPrecise, clov_bkup->precise);
+    std::swap(cloverSloppy, clov_bkup->sloppy);
+    std::swap(cloverPrecondition, clov_bkup->precondition);
+    std::swap(cloverRefinement, clov_bkup->refinement);
+    std::swap(cloverEigensolver, clov_bkup->eigensolver);
+    if(!keep_buffer){
+      delete clov_bkup;
+      clov_bkup= nullptr;
+    }
   }
 
-  //swapped with Precise gauge pointers
-  //if(collected_gauge){
-  //  delete collected_gauge;
-  //  collected_gauge = nullptr;
-  //}
-  //if(collected_milc_fatlink_field){
-  //  delete collected_milc_fatlink_field;
-  //  collected_milc_fatlink_field = nullptr;
-  //}
-  //if(collected_milc_longlink_field){
-  //  delete collected_milc_longlink_field;
-  //  collected_milc_longlink_field = nullptr;
-  //}
-  //if(collected_clover){
-  //  delete collected_clover;
-  //  collected_clover = nullptr;
-  //}
-
-  collected_gauge = nullptr;
-  collected_milc_fatlink_field = nullptr;
-  collected_milc_longlink_field = nullptr;
-  collected_clover = nullptr;
-
+  if(!keep_buffer)
   for(int i=0;i<4;i++){
     split_grid_bkup[i] = 0;
   }
-  if(update_split_grid >= 0){
-    update_split_grid = 1;
+
+  if(!keep_buffer and update_split_gauge >= 0){
+    update_split_gauge = 1;
   }
 }
 
-inline void Update_split_gauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey& split_key)
+// Generate or swap to re-distributed gauge links 
+void Update_split_gauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey& split_key)
 {
-  profilerStart(__func__);
-  auto profile = pushProfile(profileUpdate_split_gauge, param);
-  profileUpdate_split_gauge.TPSTART(QUDA_PROFILE_PREAMBLE);
-  //CommKey split_key = {param->split_grid[0], param->split_grid[1], param->split_grid[2], param->split_grid[3]};
-
-  if(update_split_grid == 0){
+  if(update_split_gauge == 0){
     for(int i=0;i<4;i++){
       if(param->split_grid[i] != split_grid_bkup[i]){
-        update_split_grid = 1;
+        update_split_gauge = 1;
       }
     }
   }
 
-  if(update_split_grid == 0 ){
+  if(update_split_gauge == 0 ){
     printfQuda("===reuse split Gauge.\n");
+    // swap to the buffered split gauge
+    swapGaugeSplit(1);
     return ;
   }
-  Free_split_gauge();
+
+  profilerStart(__func__);
+  auto profile = pushProfile(profileUpdate_split_gauge, param);
+  profileUpdate_split_gauge.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+  // delete the buffered split gauge
+  swapGaugeSplit(0);
 
   thin_links_bkup = new GaugeBundleBackup;
   fat_links_bkup = new GaugeBundleBackup;
@@ -1587,8 +1579,8 @@ inline void Update_split_gauge(QudaInvertParam *param, const int is_asqtad, cons
   for(int i=0;i<4;i++){
     split_grid_bkup[i] = param->split_grid[i];
   }
-  if(update_split_grid >= 0){
-    update_split_grid = 0;
+  if(update_split_gauge >= 0){
+    update_split_gauge = 0;
   }
   profileUpdate_split_gauge.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profilerStop(__func__);
@@ -1601,7 +1593,7 @@ void endQuda(void)
   {
     auto profile = pushProfile(profileEnd);
 
-    Free_split_gauge();//restore Gauge Quda and free
+    swapGaugeSplit();//restore Gauge Quda and free
 
     freeGaugeQuda();
     freeCloverQuda();
@@ -3375,27 +3367,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
       || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
 
+    // split the gauges into split_key form
     Update_split_gauge(param, is_asqtad, is_clover, split_key);
-    //Update_split_gauge(param, is_asqtad, is_clover, split_key);
-    //return ;
-
-    //GaugeBundleBackup thin_links_bkup;
-    //GaugeBundleBackup fat_links_bkup;
-    //GaugeBundleBackup long_links_bkup;
-
-    //if (is_asqtad) {
-    //  if (!gaugeFatPrecise || !gaugeLongPrecise)
-    //    errorQuda("Both milc_fatlinks and milc_longlinks need to be non-null for asqtad-type dslash");
-
-    //  fat_links_bkup.backup(gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition, gaugeFatRefinement,
-    //                        gaugeFatEigensolver, gaugeFatExtended);
-    //  long_links_bkup.backup(gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition, gaugeLongRefinement,
-    //                         gaugeLongEigensolver, gaugeLongExtended);
-    //} else {
-    //  if (!gaugePrecise) errorQuda("h_gauge is null for a Wilson-type or naive staggered dslash");
-    //  thin_links_bkup.backup(gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
-    //                         gaugeExtended);
-    //}
 
     // Deal with Spinors
     bool pc_solution
@@ -3417,77 +3390,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       spinorParam.v = _hp_x[i];
       _h_x[i] = ColorSpinorField(spinorParam);
     }
-
-    //// Gauge fields/params
-    //GaugeFieldParam gf_param;
-    //GaugeFieldParam milc_fatlink_param;
-    //GaugeFieldParam milc_longlink_param;
-
-    //logQuda(QUDA_DEBUG_VERBOSE, "Spliting the grid into sub-partitions: (%2d,%2d,%2d,%2d) / (%2d,%2d,%2d,%2d)\n",
-    //        comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), split_key[0], split_key[1], split_key[2], split_key[3]);
-
-    //if (!is_asqtad)
-    //  gf_param = GaugeFieldParam(*(thin_links_bkup->precise));
-    //else {
-    //  milc_fatlink_param = GaugeFieldParam(*(fat_links_bkup->precise));
-    //  milc_longlink_param = GaugeFieldParam(*(long_links_bkup->precise));
-    //}
-
-    //for (int d = 0; d < CommKey::n_dim; d++) {
-    //  if (comm_dim(d) % split_key[d] != 0) {
-    //    errorQuda("Split not possible: %2d %% %2d != 0", comm_dim(d), split_key[d]);
-    //  }
-    //  if (!is_asqtad) {
-    //    gf_param.x[d] *= split_key[d];
-    //    gf_param.pad *= split_key[d];
-    //  } else {
-    //    milc_fatlink_param.x[d] *= split_key[d];
-    //    milc_longlink_param.x[d] *= split_key[d];
-    //  }
-    //}
-
-    //quda::GaugeField *collected_gauge = nullptr;
-    //quda::GaugeField *collected_milc_fatlink_field = nullptr;
-    //quda::GaugeField *collected_milc_longlink_field = nullptr;
-
-    //if (!is_asqtad) {
-    //  gf_param.create = QUDA_NULL_FIELD_CREATE;
-    //  collected_gauge = new quda::GaugeField(gf_param);
-    //  quda::split_field(*collected_gauge, {*(thin_links_bkup->precise)}, split_key);
-    //} else {
-    //  std::vector<quda::GaugeField *> v_g(1);
-
-    //  milc_fatlink_param.create = QUDA_NULL_FIELD_CREATE;
-    //  collected_milc_fatlink_field = new GaugeField(milc_fatlink_param);
-    //  quda::split_field(*collected_milc_fatlink_field, {*(fat_links_bkup->precise)}, split_key);
-
-    //  milc_longlink_param.create = QUDA_NULL_FIELD_CREATE;
-    //  collected_milc_longlink_field = new GaugeField(milc_longlink_param);
-    //  quda::split_field(*collected_milc_longlink_field, {*(long_links_bkup->precise)}, split_key);
-    //}
-
-    //  ------ Clover field
-    //
-    //quda::CloverField *collected_clover = nullptr;
-
-    //CloverBundleBackup clov_bkup;
-    //bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-    //  || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
-
-    //if (is_clover) {
-    //  if (param->clover_coeff == 0.0 && param->clover_csw == 0.0)
-    //    errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
-    //  if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
-
-    //  clov_bkup->backup(cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement, cloverEigensolver);
-
-    //  CloverFieldParam clover_param(*clov_bkup->precise);
-
-    //  for (int d = 0; d < CommKey::n_dim; d++) { clover_param.x[d] *= split_key[d]; }
-    //  clover_param.create = QUDA_NULL_FIELD_CREATE;
-    //  collected_clover = new CloverField(clover_param);
-    //  quda::split_field(*collected_clover, {*clov_bkup->precise}, split_key); // Clover uses 4d even-odd preconditioning.
-    //}
 
     profileInvertMultiSrc.TPSTART(QUDA_PROFILE_PREAMBLE);
 
@@ -3527,33 +3429,6 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     comm_barrier();
 
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_PREAMBLE);
-
-    //////// Load 'collected gauge field'
-    //logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading gauge field...\n");
-    //if (!is_asqtad) {
-    //  setupGaugeFields(collected_gauge, gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver,
-    //                   gaugeExtended, *thin_links_bkup, profile.profile);
-
-    //} else {
-    //  setupGaugeFields(collected_milc_fatlink_field, gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition,
-    //                   gaugeFatRefinement, gaugeFatEigensolver, gaugeFatExtended, *fat_links_bkup, profile.profile);
-
-    //  setupGaugeFields(collected_milc_longlink_field, gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition,
-    //                   gaugeLongRefinement, gaugeLongEigensolver, gaugeLongExtended, *long_links_bkup, profile.profile);
-    //}
-    //logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded gauge field...\n");
-
-    //// Load 'collected clover field'
-    //if (is_clover) {
-    //  logQuda(QUDA_DEBUG_VERBOSE, "Split grid loading clover field...\n");
-    //  setupCloverFields(collected_clover, cloverPrecise, cloverSloppy, cloverPrecondition, cloverRefinement,
-    //                    cloverEigensolver, *clov_bkup);
-    //  logQuda(QUDA_DEBUG_VERBOSE, "Split grid loaded clover field...\n");
-    //}
-
-    ////if (collected_gauge and collected_milc_fatlink_field and collected_milc_longlink_field and collected_clover){
-    ////  errorQuda("QUDA collected_gauge not initialized");
-    ////}
 
     // Make a copy of the params we can mess with
     auto param_copy = *param;
@@ -3599,52 +3474,15 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       for (int j = 0; j < num_sub_partition; j++) _h_x[n * num_sub_partition + j].copy(dev_buf[j]);
     }
 
-    if(update_split_grid < 0){
-      Free_split_gauge();
+    // swap back to original links, detete split gauge if update_split_gauge < 0
+    if(update_split_gauge < 0){
+      swapGaugeSplit(0);
+    }else{
+      swapGaugeSplit(1);
     }
 
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-
-    //// Restore the gauge field
-    //if (!is_asqtad) {
-
-    //  freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
-    //  gaugePrecise = thin_links_bkup.precise;
-    //  gaugeSloppy = thin_links_bkup.sloppy;
-    //  gaugePrecondition = thin_links_bkup.precondition;
-    //  gaugeRefinement = thin_links_bkup.refinement;
-    //  gaugeEigensolver = thin_links_bkup.eigensolver;
-    //  gaugeExtended = thin_links_bkup.extended;
-
-    //} else {
-    //  // freeGaugeQuda();
-
-    //  freeUniqueGaugeQuda(QUDA_ASQTAD_FAT_LINKS);
-    //  gaugeFatPrecise = fat_links_bkup.precise;
-    //  gaugeFatSloppy = fat_links_bkup.sloppy;
-    //  gaugeFatPrecondition = fat_links_bkup.precondition;
-    //  gaugeFatRefinement = fat_links_bkup.refinement;
-    //  gaugeFatEigensolver = fat_links_bkup.eigensolver;
-    //  gaugeFatExtended = fat_links_bkup.extended;
-
-    //  freeUniqueGaugeQuda(QUDA_ASQTAD_LONG_LINKS);
-    //  gaugeLongPrecise = long_links_bkup.precise;
-    //  gaugeLongSloppy = long_links_bkup.sloppy;
-    //  gaugeLongPrecondition = long_links_bkup.precondition;
-    //  gaugeLongRefinement = long_links_bkup.refinement;
-    //  gaugeLongEigensolver = long_links_bkup.eigensolver;
-    //  gaugeLongExtended = long_links_bkup.extended;
-    //}
-
-    //if (is_clover) {
-    //  freeCloverQuda();
-    //  cloverPrecise = clov_bkup.precise;
-    //  cloverSloppy = clov_bkup.sloppy;
-    //  cloverPrecondition = clov_bkup.precondition;
-    //  cloverRefinement = clov_bkup.refinement;
-    //  cloverEigensolver = clov_bkup.eigensolver;
-    //}
   }
 
   profilerStop(__func__);
