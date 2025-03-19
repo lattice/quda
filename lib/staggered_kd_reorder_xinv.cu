@@ -1,11 +1,10 @@
-#include <gauge_field.h>
-#include <blas_quda.h>
-#include <blas_lapack.h>
-#include <tunable_nd.h>
-#include <instantiate.h>
-
-#include <staggered_kd_build_xinv.h>
-#include <kernels/staggered_kd_reorder_xinv_kernel.cuh>
+#include "gauge_field.h"
+#include "blas_quda.h"
+#include "tunable_nd.h"
+#include "instantiate.h"
+#include "multigrid.h"
+#include "staggered_kd_build_xinv.h"
+#include "kernels/staggered_kd_reorder_xinv_kernel.cuh"
 
 namespace quda {
 
@@ -78,7 +77,7 @@ namespace quda {
 
   template<typename Float, int fineColor>
   struct calculateStaggeredGeometryReorder {
-    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const double mass) {
+    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, bool dagger_approximation, double mass) {
       // template on dagger approximation
       if (dagger_approximation)  {
         // Approximate the inverse with the dagger, multiplied by a rescale factor which
@@ -101,23 +100,14 @@ namespace quda {
     }
   };
 
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
-  /**
-     @brief Reorder the staggered Kahler-Dirac inverse from a coarse scalar layout to a fine KD geometry
 
-     @param fineXinv[out] KD inverse fine gauge in KD geometry
-     @param coarseXinv[in] KD inverse coarse lattice field
-     @param dagger_approximation[in] Whether or not to apply the dagger approximation
-     @param mass[in] Mass of staggered fermion (used for dagger approximation only)
-   */
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const double mass) {
+  // Reorder the staggered Kahler-Dirac inverse from a coarse scalar layout to a fine KD geometry
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv, bool dagger_approximation, double mass) {
     // Instantiate based on precision, number of colors
-    instantiate<calculateStaggeredGeometryReorder>(fineXinv, coarseXinv, dagger_approximation, mass);
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>() && is_enabled_multigrid())
+      instantiate<calculateStaggeredGeometryReorder>(fineXinv, coarseXinv, dagger_approximation, mass);
+    else
+      errorQuda("Staggered fermion support has not been built");
   }
-#else
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &, const bool, const double) {
-    errorQuda("Staggered fermion support has not been built");
-  }
-#endif
 
 } //namespace quda

@@ -1,11 +1,11 @@
-#include <gauge_field.h>
-#include <blas_quda.h>
-#include <blas_lapack.h>
-#include <tunable_nd.h>
-#include <instantiate.h>
-
-#include <staggered_kd_build_xinv.h>
-#include <kernels/staggered_coarse_op_kernel.cuh>
+#include "gauge_field.h"
+#include "blas_quda.h"
+#include "blas_lapack.h"
+#include "tunable_nd.h"
+#include "instantiate.h"
+#include "multigrid.h"
+#include "staggered_kd_build_xinv.h"
+#include "kernels/staggered_coarse_op_kernel.cuh"
 
 namespace quda {
 
@@ -84,7 +84,6 @@ namespace quda {
   };
 
 
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   /**
      @brief Build the Kahler-Dirac term from the fine gauge fields
 
@@ -92,29 +91,20 @@ namespace quda {
      @param g[in] fine gauge field (fat links for asqtad)
      @param mass[in] Mass of staggered fermion
    */
-  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
+  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, double mass)
   {
-    // Instantiate based on precision, number of colors
-    // need to swizzle `g` to the first argument to get the right fine nColor
-    instantiate<CalculateStaggeredKDBlock>(g, X, mass);
+    if constexpr (is_enabled<QUDA_STAGGERED_DSLASH>() && is_enabled_multigrid()) {
+      // Instantiate based on precision, number of colors
+      // need to swizzle `g` to the first argument to get the right fine nColor
+      instantiate<CalculateStaggeredKDBlock>(g, X, mass);
+    } else {
+      errorQuda("Staggered fermion multigrid support has not been built");
+    }
   }
-#else
-  void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
-  {
-    errorQuda("Staggered fermion multigrid support has not been built");
-  }
-#endif
 
-  /**
-     @brief Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated.
-
-     @param Xinv[out] KD inverse fine gauge in KD geometry
-     @param gauge[in] fine gauge field (fat links for asqtad)
-     @param mass[in] Mass of staggered fermion
-     @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
-   */
-  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const GaugeField &gauge, const double mass,
-                                        const bool dagger_approximation)
+  // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated.
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const GaugeField &gauge, double mass,
+                                        bool dagger_approximation, bool verify)
   {
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
@@ -254,13 +244,16 @@ namespace quda {
     ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
 
     if (dagger_approximation) logQuda(QUDA_VERBOSE, "Using the dagger approximation to Xinv\n");
-    logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
+      logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
+
+    if (verify) {
+      // to be implemented
+    }
   }
 
-
   // Allocates and calculates the inverse KD block, returning Xinv
-  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, const double mass,
-                                                                          const bool dagger_approximation)
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, double mass,
+                                                                          bool dagger_approximation, bool verify)
   {
     GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -276,7 +269,7 @@ namespace quda {
 
     std::shared_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField *>(new GaugeField(gParam)));
 
-    BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation);
+    BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation, verify);
 
     return Xinv;
   }

@@ -311,10 +311,10 @@ namespace quda {
     std::vector<ColorSpinorField> x_coarse;
 
     /** Kahler-Dirac Xinv */
-    std::shared_ptr<GaugeField> xInvKD;
+    GaugeField xInvKD = {};
 
     /** Kahler-Dirac Xinv, sloppy field */
-    std::shared_ptr<GaugeField> xInvKD_sloppy;
+    GaugeField xInvKD_sloppy = {};
 
     /** The fine operator used for computing inter-grid residuals */
     const Dirac *diracResidual = nullptr;
