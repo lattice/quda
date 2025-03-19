@@ -170,8 +170,43 @@ void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
   inv_param.return_clover_inverse = 1;
 }
 
-// Pre-declare the instantiation struct
-template <typename real_t> struct ConstructCloverField;
+/**
+ * @brief Construct a random (but reasonable) clover field
+ *
+ * @tparam real_t Floating point type
+ * @param[out] clover The clover field
+ * @param[in] norm Scale factor for clover field elements
+ * @param[in] diag Diagonal addition to the clover field
+ */
+template <typename real_t> struct ConstructCloverField {
+  void operator()(void *res, double norm, double diag)
+  {
+    for (auto i = 0lu; i < static_cast<size_t>(Vh); i++) {
+      for (auto parity = 0lu; parity < 2lu; parity++) {
+        real_t *clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
+        for (int j = 0; j < 72; j++) { clover_matrix[j] = random_uniform_host<real_t>(i, parity, -norm, norm); }
+
+        // impose clover symmetry on each chiral block
+        for (int ch = 0; ch < 2; ch++) {
+          clover_matrix[3 + 36 * ch] = -clover_matrix[0 + 36 * ch];
+          clover_matrix[4 + 36 * ch] = -clover_matrix[1 + 36 * ch];
+          clover_matrix[5 + 36 * ch] = -clover_matrix[2 + 36 * ch];
+          clover_matrix[30 + 36 * ch] = -clover_matrix[6 + 36 * ch];
+          clover_matrix[31 + 36 * ch] = -clover_matrix[7 + 36 * ch];
+          clover_matrix[32 + 36 * ch] = -clover_matrix[8 + 36 * ch];
+          clover_matrix[33 + 36 * ch] = -clover_matrix[9 + 36 * ch];
+          clover_matrix[34 + 36 * ch] = -clover_matrix[16 + 36 * ch];
+          clover_matrix[35 + 36 * ch] = -clover_matrix[17 + 36 * ch];
+        }
+
+        for (int j = 0; j < 6; j++) {
+          clover_matrix[j] += diag;
+          clover_matrix[j + 36] += diag;
+        }
+      }
+    }
+  }
+};
 
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision)
 {
@@ -875,44 +910,6 @@ double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecisio
   else
     return compareFloats_v2((float *)a, (float *)b, len, epsilon);
 }
-
-/**
- * @brief Construct a random (but reasonable) clover field
- *
- * @tparam real_t Floating point type
- * @param[out] clover The clover field
- * @param[in] norm Scale factor for clover field elements
- * @param[in] diag Diagonal addition to the clover field
- */
-template <typename real_t> struct ConstructCloverField {
-  void operator()(void *res, double norm, double diag)
-  {
-    for (auto i = 0lu; i < static_cast<size_t>(Vh); i++) {
-      for (auto parity = 0lu; parity < 2lu; parity++) {
-        real_t *clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
-        for (int j = 0; j < 72; j++) { clover_matrix[j] = random_uniform_host<real_t>(i, parity, -norm, norm); }
-
-        // impose clover symmetry on each chiral block
-        for (int ch = 0; ch < 2; ch++) {
-          clover_matrix[3 + 36 * ch] = -clover_matrix[0 + 36 * ch];
-          clover_matrix[4 + 36 * ch] = -clover_matrix[1 + 36 * ch];
-          clover_matrix[5 + 36 * ch] = -clover_matrix[2 + 36 * ch];
-          clover_matrix[30 + 36 * ch] = -clover_matrix[6 + 36 * ch];
-          clover_matrix[31 + 36 * ch] = -clover_matrix[7 + 36 * ch];
-          clover_matrix[32 + 36 * ch] = -clover_matrix[8 + 36 * ch];
-          clover_matrix[33 + 36 * ch] = -clover_matrix[9 + 36 * ch];
-          clover_matrix[34 + 36 * ch] = -clover_matrix[16 + 36 * ch];
-          clover_matrix[35 + 36 * ch] = -clover_matrix[17 + 36 * ch];
-        }
-
-        for (int j = 0; j < 6; j++) {
-          clover_matrix[j] += diag;
-          clover_matrix[j + 36] += diag;
-        }
-      }
-    }
-  }
-};
 
 template <typename Float> static void checkGauge(Float **oldG, Float **newG, double epsilon)
 {
