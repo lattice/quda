@@ -108,8 +108,8 @@ CloverField *cloverEigensolver = nullptr;
 GaugeField momResident;
 GaugeField *extendedGaugeResident = nullptr;
 
-// callMultiSrcQuda related gauge split
 /** 
+  callMultiSrcQuda related gauge split
   update_split_gauge : -1 delete buffer after usage, 0 split gauge in buf, 1 split gauge not in buf
   update_split_gauge set to -1 if QudaGaugeParam.use_split_gauge_bkup == 0, 1 if QudaGaugeParam.use_split_gauge_bkup == 1
   split_grid_bkup will be used to check whether split layout is changed or not
@@ -1363,6 +1363,20 @@ void freeCloverQuda(void)
 }
 
 void flushChronoQuda(int i) { flushChrono(i); }
+
+void flushPoolQuda(QudaMemoryType type)
+{
+  switch (type) {
+  case QUDA_MEMORY_DEVICE:
+    pool::flush_device();
+    break;
+  case QUDA_MEMORY_HOST_PINNED:
+    pool::flush_pinned();
+    break;
+  default:
+    errorQuda("MemoryType %d not supported", type);
+  }
+}
 
 // free the split gauge buffers, restore previous gauge links if keep_buffer == 1, could be used to swap back to split gauge
 void swapGaugeSplit(const int keep_buffer = 0)
@@ -3007,7 +3021,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param)
   Bprec = (mg_param.setup_location[0] == QUDA_CPU_FIELD_LOCATION && Bprec < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : Bprec);
   csParam.setPrecision(Bprec, Bprec, true);
   if (mg_param.setup_location[0] == QUDA_CPU_FIELD_LOCATION) csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
   if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD

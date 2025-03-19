@@ -300,6 +300,7 @@ extern int &ydim;
 extern int &zdim;
 extern int &tdim;
 extern int Lsdim;
+extern int use_split_gauge_bkup;
 extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
