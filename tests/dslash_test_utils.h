@@ -653,12 +653,12 @@ struct DslashTestWrapper {
         std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), kappa_5(Lsdim), kappa_mdwf(Lsdim), b5(Lsdim),
           c5(Lsdim);
         for (int xs = 0; xs < Lsdim; xs++) {
-          kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-          kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+          kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+          kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
           kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
           kappa_mdwf[xs] = -kappa_5[xs];
-          b5[xs] = inv_param.b_5[xs];
-          c5[xs] = inv_param.c_5[xs];
+          b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+          c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
         }
         switch (dtest_type) {
         case dslash_test_type::Dslash:
@@ -708,12 +708,12 @@ struct DslashTestWrapper {
         std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), kappa_5(Lsdim), kappa_mdwf(Lsdim), b5(Lsdim),
           c5(Lsdim);
         for (int xs = 0; xs < Lsdim; xs++) {
-          kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-          kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+          kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+          kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
           kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
           kappa_mdwf[xs] = -kappa_5[xs];
-          b5[xs] = inv_param.b_5[xs];
-          c5[xs] = inv_param.c_5[xs];
+          b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+          c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
         }
         switch (dtest_type) {
         case dslash_test_type::Dslash:

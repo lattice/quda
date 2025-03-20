@@ -183,6 +183,8 @@ int main(int argc, char **argv)
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs,
              inv_param.gflops / inv_param.secs, 0.0);
 
+  using complex = std::complex<double>;
+
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -238,10 +240,10 @@ int main(int argc, char **argv)
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
       std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), b5(Lsdim), c5(Lsdim);
       for (int xs = 0; xs < Lsdim; xs++) {
-        kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-        kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
-        b5[xs] = inv_param.b_5[xs];
-        c5[xs] = inv_param.c_5[xs];
+        kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+        kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
+        b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+        c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
       }
       mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec,
                 gauge_param, inv_param.mass, b5, c5);
