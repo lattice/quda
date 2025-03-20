@@ -612,7 +612,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout, 
   qudaState.initialized = true;
 }
 
-int in_quda_communicator(void)
+static int in_quda_communicator(void)
 {
    return qudaState.layout.quda_comm != MPI_COMM_NULL;
 }
@@ -691,8 +691,6 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
     loadCloverQuda(buf, NULL, &param);
   }
-
-  /*loadCloverQuda(clover, NULL, &param);*/
 }
 
 void openQCD_qudaCloverFree(void)
@@ -766,6 +764,22 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
 }
 
 
+static ColorSpinorField *openQCD_qudaSpinorAlloc(void)
+{
+  if (in_quda_communicator()) {
+    QudaInvertParam param = newOpenQCDParam();
+    ColorSpinorParam cpuParam(nullptr, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+    ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+    ColorSpinorField *out_d = new ColorSpinorField(cudaParam);
+    return out_d;
+  } else {
+    return nullptr;
+  }
+}
+
+
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 {
   void *out = qudaState.init.buffer_field(0, openQCD_field);
@@ -809,24 +823,15 @@ void *openQCD_qudaH2D(void *openQCD_field)
   return nullptr;
 }
 
+
 void openQCD_back_and_forth(void *h_in, void *h_out)
 {
   ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(h_in));
-
-  if (in_quda_communicator()) {
-    /* creates a zero-field on the GPU */
-    QudaInvertParam param = newOpenQCDParam();
-    ColorSpinorParam cudaParam(nullptr, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
-    cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-    ColorSpinorField out(cudaParam);
-
-    out = *in;
-    openQCD_qudaD2H(&out, h_out);
-  } else {
-    openQCD_qudaD2H(nullptr, h_out);
-  }
+  ColorSpinorField *out = openQCD_qudaSpinorAlloc();
+  IF_IN_COMM(*out = *in);
+  openQCD_qudaD2H(out, h_out);
   openQCD_qudaSpinorFree((void**) &in);
+  openQCD_qudaSpinorFree((void**) &out);
 }
 
 
@@ -883,42 +888,33 @@ double openQCD_qudaNorm_NoLoads(void *d_in) {
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
   ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2D(openQCD_in));
+  ColorSpinorField *out = openQCD_qudaSpinorAlloc();
 
+  /* gamma_i run within QUDA using QUDA fields */
   if (in_quda_communicator()) {
-
-    /* creates a zero-field on the GPU */
-    QudaInvertParam param = newOpenQCDParam();
-    ColorSpinorParam cpuParam(nullptr, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
-    ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
-    cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-    ColorSpinorField out(cudaParam);
-
-    /* gamma_i run within QUDA using QUDA fields */
     switch (dir) {
-    case 0: /* t direction */ gamma3(out, *in); break;
-    case 1: /* x direction */ gamma0(out, *in); break;
-    case 2: /* y direction */ gamma1(out, *in); break;
-    case 3: /* z direction */ gamma2(out, *in); break;
+    case 0: /* t direction */ gamma3(*out, *in); break;
+    case 1: /* x direction */ gamma0(*out, *in); break;
+    case 2: /* y direction */ gamma1(*out, *in); break;
+    case 3: /* z direction */ gamma2(*out, *in); break;
     case 4:
     case 5:
-      gamma5(out, *in);
+      gamma5(*out, *in);
       /* UKQCD uses a different convention for Gamma matrices:
        * gamma5_ukqcd = gammax gammay gammaz gammat,
        * gamma5_openqcd = gammat gammax gammay gammaz,
        * and thus
        * gamma5_openqcd = -1 * U gamma5_ukqcd U^dagger,
        * with U the transformation matrix from OpenQCD to UKQCD. */
-      blas::ax(-1.0, out);
+      blas::ax(-1.0, *out);
       break;
     default: errorQuda("Unknown gamma: %d\n", dir);
     }
-
-    openQCD_qudaD2H(&out, openQCD_out);
-  } else {
-    openQCD_qudaD2H(nullptr, openQCD_out);
   }
+
+  openQCD_qudaD2H(out, openQCD_out);
   openQCD_qudaSpinorFree((void**) &in);
+  openQCD_qudaSpinorFree((void**) &out);
 }
 
 
@@ -964,7 +960,6 @@ inline bool gauge_field_get_unset(void)
 inline bool clover_field_get_up2date(void)
 {
   dirac_parms_t dp = qudaState.layout.dirac_parms();
-
   bool test = gauge_field_get_up2date();
   return (test && qudaState.swd_ud_rev == qudaState.ud_rev && qudaState.swd_ad_rev == qudaState.ad_rev
           && qudaState.swd_kappa == 1.0 / (2.0 * (dp.m0 + 4.0)) && qudaState.swd_su3csw == dp.su3csw
@@ -984,10 +979,9 @@ inline bool mg_get_up2date(QudaInvertParam *param)
 {
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   dirac_parms_t dp = qudaState.layout.dirac_parms();
-
   int test = param->preconditioner != nullptr;
-  MPI_Bcast(&test, 1, MPI_INT, 0, qudaState.layout.world_comm);
 
+  MPI_Bcast(&test, 1, MPI_INT, 0, qudaState.layout.world_comm);
   return (test && gauge_field_get_up2date() && clover_field_get_up2date()
           && additional_prop->mg_ud_rev == qudaState.ud_rev && additional_prop->mg_ad_rev == qudaState.ad_rev
           && additional_prop->mg_kappa == 1.0 / (2.0 * (dp.m0 + 4.0)) && additional_prop->mg_su3csw == dp.su3csw
@@ -1004,7 +998,6 @@ inline void mg_set_revision(QudaInvertParam *param)
 {
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   dirac_parms_t dp = qudaState.layout.dirac_parms();
-
   additional_prop->mg_ud_rev = qudaState.ud_rev;
   additional_prop->mg_ad_rev = qudaState.ad_rev;
   additional_prop->mg_kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
@@ -1019,7 +1012,6 @@ inline void mg_set_revision(QudaInvertParam *param)
 inline void clover_field_set_revision(void)
 {
   dirac_parms_t dp = qudaState.layout.dirac_parms();
-
   qudaState.swd_ud_rev = qudaState.ud_rev;
   qudaState.swd_ad_rev = qudaState.ad_rev;
   qudaState.swd_kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
@@ -1186,7 +1178,6 @@ static void openQCD_qudaSolverUpdate(void *param_)
     if (param->clover_csw == 0.0) {
       IF_IN_COMM(logQuda(QUDA_VERBOSE, "Deallocating Clover field in QUDA ...\n"));
       openQCD_qudaCloverFree();
-      /*freeCloverQuda();*/
       qudaState.swd_ud_rev = 0;
       qudaState.swd_ad_rev = 0;
       qudaState.swd_kappa = 0.0;
@@ -1650,7 +1641,6 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
   void *in = qudaState.init.buffer_field(0, src);
   void *out = qudaState.init.buffer_field(1, dst);
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, src, in);
-  qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, dst, out);
 
   if (in_quda_communicator()) {
 
@@ -1689,11 +1679,9 @@ void openQCD_qudaDw(double mu, void *src, void *dst)
 
   void *in = qudaState.init.buffer_field(0, src);
   void *out = qudaState.init.buffer_field(1, dst);
+
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, src, in);
-  qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, dst, out);
-
   IF_IN_COMM(MatQuda(static_cast<char *>(out), static_cast<char *>(in), param));
-
   qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, out, dst);
 }
 
@@ -1857,7 +1845,9 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
   void *in = qudaState.init.buffer_field(0, source);
   void *out = qudaState.init.buffer_field(1, solution);
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, source, in);
-  qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solution, out);
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solution, out);
+  }
 
   IF_IN_COMM(logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n"));
   PUSH_RANGE("invertQuda", 5);
@@ -1892,7 +1882,9 @@ void *openQCD_qudaInvertWrapper(void*)
     void *in = qudaState.init.buffer_field(0, args.source);
     void *out = qudaState.init.buffer_field(1, args.solution);
     qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, args.source, in);
-    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, args.solution, out);
+    if (qudaState.async_params.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, args.solution, out);
+    }
 
     IF_IN_COMM(logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n"));
     PUSH_RANGE("invertQuda", 5);
