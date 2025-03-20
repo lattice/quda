@@ -11,6 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
+#include <kernel_ops.h>
 
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 
@@ -660,17 +661,21 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-  template <typename Arg> struct dslash_functor {
+  template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
-    constexpr dslash_functor(const Arg &arg) : arg(arg.arg) { }
+    using typename getKernelOps<typename Arg::D>::KernelOpsT;
+    template <typename... OpsArgs>
+    constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg)
+    {
+    }
 
     __forceinline__ __device__ void operator()(int, int s, int parity)
     {
-      typename Arg::D dslash(arg);
+      typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
