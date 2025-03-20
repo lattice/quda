@@ -657,12 +657,12 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
 
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
-
-  void *buffer = pool_pinned_malloc((4 * qudaState.init.volume + 7 * qudaState.init.bndry / 4) * 18 * prec);
-  saveGaugeQuda(buffer, &param);
-  qudaState.init.reorder_gauge_quda_to_openqcd(buffer, gauge);
-  pool_pinned_free(buffer);
+  void *buf = qudaState.init.buffer_field(0, gauge);
+  if (in_quda_communicator()) {
+    QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
+    saveGaugeQuda(buf, &param);
+  }
+  qudaState.layout.quda2openqcd(OPENQCD_FIELD_GAUGE, buf, gauge);
 }
 
 void openQCD_qudaGaugeFree(void)

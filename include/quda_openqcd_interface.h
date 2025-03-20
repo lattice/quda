@@ -147,7 +147,6 @@ typedef struct {
   int bndry;               /** BNDRY */
   int two_grids_equal;     /** Whether the QUDA and the openqxd process grids are equal or not */
   void *(*buffer_field)(int idx, void *field);        /** obtain buffer field */
-  void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
 } openQCD_QudaInitArgs_t;
 
 
