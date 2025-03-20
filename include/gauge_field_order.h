@@ -2379,25 +2379,6 @@ namespace quda {
 
       /**
        * @brief      Obtains the offset in Floats from the openQCD base pointer
-       *             to the gauge fields.  At this point, fields are already
-       *             reordered with a xyzt-lexicographical spacetime index, so
-       *             nothing special to do here.
-       *
-       * @param[in]  x       Checkerboard index coming from quda
-       * @param[in]  dir     The direction coming from quda
-       * @param[in]  parity  The parity coming from quda
-       *
-       * @return     The offset.
-       */
-      __device__ __host__ inline int getGaugeOffset_lexi(int x_cb, int dir, int parity) const
-      {
-        int x[4];
-        getCoords(x, x_cb, dim, parity);
-        return (4 * openqcd::lexi(x, dim, 4) + dir) * length;
-      }
-
-      /**
-       * @brief      Obtains the offset in Floats from the openQCD base pointer
        *             to the gauge fields.
        *
        * @param[in]  x_cb    Checkerboard index coming from quda
@@ -2440,7 +2421,7 @@ namespace quda {
 
       __device__ __host__ inline void save(const complex v[length / 2], int x_cb, int dir, int parity) const
       {
-        auto out = &gauge[getGaugeOffset_lexi(x_cb, dir, parity)];
+        auto out = &gauge[getGaugeOffset(x_cb, dir, parity)];
         block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 
