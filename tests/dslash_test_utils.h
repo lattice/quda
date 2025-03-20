@@ -366,6 +366,7 @@ struct DslashTestWrapper {
     const QudaDagType not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
     // compare to dslash reference implementation
     printfQuda("Calculating reference implementation...");
+    using complex = std::complex<double>;
 
     for (int i = 0; i < Nsrc; i++) {
       if (dslash_type == QUDA_WILSON_DSLASH) {
@@ -721,8 +722,9 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::M5:
           mdw_eofa_m5(spinorRef[i].data(), spinor[i].data(), parity, inv_param.dagger, inv_param.mass, inv_param.m5,
-                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+                      std::real(static_cast<complex>(inv_param.b_5[0])),
+                      std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                      inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
           break;
         case dslash_test_type::Dslash4pre:
           mdw_dslash_4_pre(spinorRef[i].data(), hostGauge, spinor[i].data(), parity, inv_param.dagger,
@@ -730,45 +732,49 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::M5inv:
           mdw_eofa_m5inv(spinorRef[i].data(), spinor[i].data(), parity, inv_param.dagger, inv_param.mass, inv_param.m5,
-                         (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                         inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
           break;
         case dslash_test_type::Mat:
           mdw_eofa_mat(spinorRef[i].data(), hostGauge, spinor[i].data(), inv_param.dagger, gauge_param.cpu_prec,
-                       gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                       (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                       inv_param.eofa_shift);
+                       gauge_param, inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         case dslash_test_type::MatDagMat:
           mdw_eofa_mat(spinorTmp[i].data(), hostGauge, spinor[i].data(), inv_param.dagger, gauge_param.cpu_prec,
-                       gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                       (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                       inv_param.eofa_shift);
-          mdw_eofa_mat(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), not_dagger, gauge_param.cpu_prec, gauge_param,
-                       inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
-                       inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                       gauge_param, inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
+          mdw_eofa_mat(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), not_dagger, gauge_param.cpu_prec,
+                       gauge_param, inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         case dslash_test_type::MatPC:
           mdw_eofa_matpc(spinorRef[i].data(), hostGauge, spinor[i].data(), inv_param.matpc_type, inv_param.dagger,
-                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                         (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                         inv_param.eofa_shift);
+                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5,
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         case dslash_test_type::MatPCDagMatPC:
           mdw_eofa_matpc(spinorTmp[i].data(), hostGauge, spinor[i].data(), inv_param.matpc_type, inv_param.dagger,
-                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                         (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                         inv_param.eofa_shift);
+                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5,
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift);
           mdw_eofa_matpc(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), inv_param.matpc_type, not_dagger,
-                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                         (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                         inv_param.eofa_shift);
+                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5,
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
         }
       } else {
-        printfQuda("Unsupported dslash_type\n");
-        exit(-1);
+        errorQuda("Unsupported dslash_type");
       }
     }
 
