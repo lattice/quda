@@ -121,6 +121,10 @@ TEST_P(InvertTest, verify)
   if (is_full_solution(::testing::get<3>(GetParam())) && is_preconditioned_solve(::testing::get<4>(GetParam())))
     tol *= 10;
 
+  // account for summation error scaling with number of processors
+  auto dof = 24lu * dim[0] * dim[1] * dim[2] * dim[3] * (is_chiral(inv_param.dslash_type) ? inv_param.Ls : 1);
+  tol *= (1 + log(quda::comm_size()) / log(dof));
+
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
     if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }

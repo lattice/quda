@@ -41,13 +41,24 @@ namespace quda
     }
   };
 
+  template <typename Arg> struct nDegTwistedCloverPreconditionedParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 2>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = KernelOps<Cache>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct nDegTwistedCloverPreconditioned : dslash_default {
-    
+  struct nDegTwistedCloverPreconditioned : dslash_default, nDegTwistedCloverPreconditionedParams<Arg>::Ops {
+
     const Arg &arg;
-    constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedCloverPreconditionedParams<Arg>::Ops::KernelOpsT;
+    template <typename Ftor>
+    constexpr nDegTwistedCloverPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
-  
+
     /**
        @brief Apply the preconditioned twisted-clover dslash
        out(x) = M*in = a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == false )
@@ -97,7 +108,7 @@ namespace quda
 
         int chirality = flavor; // relabel flavor as chirality
 
-        SharedMemoryCache<HalfVector> cache;
+        SharedMemoryCache<HalfVector> cache {*this};
 
         auto swizzle = [&](HalfVector x[2], int chirality) {
           if (chirality == 0)
@@ -125,7 +136,7 @@ namespace quda
           A_chi[flavor_] += arg.c * out_chi[1 - flavor_];
         }
 
-        if (arg.dynamic_clover) {
+        if constexpr (Arg::dynamic_clover) {
           HMat A2 = A.square();
           A2 += arg.b2_minus_c2;
           Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
