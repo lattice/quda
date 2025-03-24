@@ -41,7 +41,7 @@ namespace quda
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = KernelOps<Cache>; //std::conditional_t<kernel_type == INTERIOR_KERNEL, KernelOps<Cache>, NoKernelOps>;
+    using Ops = std::conditional_t<kernel_type == INTERIOR_KERNEL, KernelOps<Cache>, NoKernelOps>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -84,9 +84,10 @@ namespace quda
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+      if constexpr(mykernel_type == INTERIOR_KERNEL) {
+	if(arg.dd_x.isZero(coord)) {
         out = arg.a * out;
-      } else if (mykernel_type == INTERIOR_KERNEL) {
+      	} else {
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
         Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
@@ -115,7 +116,7 @@ namespace quda
 
         // add the Wilson part with normalisation
         out = tmp + arg.a * out;
-
+	}
       } else if (active) {
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out = x + arg.a * out;
