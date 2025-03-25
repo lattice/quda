@@ -52,7 +52,7 @@ typedef struct {
   openQCD_QudaInitArgs_t init;
   openQCD_QudaLayout_t layout;
   openQCD_QudaThread_t thread;
-  std::list<openQCD_qudaInvert_args_t> inv_args;
+  std::vector<openQCD_qudaInvert_args_t> inv_args;
   QudaInvertParam async_params;
   void *dirac_handle;                       /** void-pointer to QudaInvertParam struct for the Dirac operator.
                                              * Notice that this void pointer HAS to be directly before
@@ -1817,7 +1817,14 @@ void openQCD_qudaSolverPrintSetup(int id)
   }
 }
 
-double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status)
+double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status)
+{
+  double residual;
+  openQCD_qudaInvertMultiSrc(id, mu, &source, &solution, status, &residual);
+  return residual;
+}
+
+void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
@@ -1839,74 +1846,104 @@ double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *
     WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
   }
 
-  void *in = qudaState.init.buffer_field(0, source);
-  void *out = qudaState.init.buffer_field(1, solution);
-  qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, source, in);
-  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solution, out);
+  void **h_sources = (void**) malloc(param->num_src*sizeof(void*));
+  void **h_solutions = (void**) malloc(param->num_src*sizeof(void*));
+
+  for (int i = 0; i < param->num_src; ++i) {
+    h_sources[i] = qudaState.init.buffer_field(i, sources[i]);
+    h_solutions[i] = qudaState.init.buffer_field(i+param->num_src, solutions[i]);
+    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, sources[i], h_sources[i]);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solutions[i], h_solutions[i]);
+    }
   }
 
-  WITH_COMM(logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n"));
-  PUSH_RANGE("invertQuda", 5);
-  WITH_COMM(invertQuda(static_cast<char *>(out), static_cast<char *>(in), param));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "Calling invertMultiSrcQuda() ...\n"));
+  PUSH_RANGE("invertMultiSrcQuda", 5);
+  WITH_COMM(invertMultiSrcQuda(h_solutions, h_sources, param));
   POP_RANGE;
 
-  qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, out, solution);
+  for (int i = 0; i < param->num_src; ++i) {
+    qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, h_solutions[i], solutions[i]);
+    status[i] = param->true_res[i] <= param->tol ? param->iter : -1;
+    residual[i] = param->true_res[i];
+  }
 
-  *status = param->true_res[0] <= param->tol ? param->iter : -1;
+  if (!qudaState.init.two_grids_equal) {
+    MPI_Bcast(status, param->num_src, MPI_INT, 0, qudaState.layout.world_comm);
+    MPI_Bcast(residual, param->num_src, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+  }
 
-  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n"));
-  WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", param->true_res[0]));
-  WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", param->true_res_hq[0]));
-  WITH_COMM(logQuda(QUDA_VERBOSE, "  iter        = %d\n", param->iter));
-  WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", param->gflops));
-  WITH_COMM(logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", param->secs));
-  WITH_COMM(logQuda(QUDA_VERBOSE, "  status      = %d\n", *status));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaInvertMultiSrc()\n"));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  iter           = %d\n", param->iter));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops         = %.2e\n", param->gflops));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  secs           = %.2e\n", param->secs));
+  for (int i = 0; i < param->num_src; ++i) {
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res[%d]    = %.2e\n", i, param->true_res[i]));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq[%d] = %.2e\n", i, param->true_res_hq[i]));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", i, status[i]));
+  }
 
-  MPI_Bcast(status, 1, MPI_INT, 0, qudaState.layout.world_comm);
-  MPI_Bcast(param->true_res, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
-
-  return param->true_res[0];
+  free(h_sources);
+  free(h_solutions);
 }
 
-void *openQCD_qudaInvertWrapper(void*)
+static void *openQCD_qudaInvertAsyncWrapper(void*)
 {
   /* enable the thread to use QUDA */
   WITH_COMM(device::init_thread());
 
-  for (openQCD_qudaInvert_args_t& args : qudaState.inv_args) {
+  int Ns = qudaState.async_params.num_src;  /* num sources */
+  int Nd = qudaState.inv_args.size();       /* num dispatched */
+  int Nc = Nd > Ns ? ((Ns+Nd-1)/Ns) : 1;    /* num calls */
 
-    void *in = qudaState.init.buffer_field(0, args.source);
-    void *out = qudaState.init.buffer_field(1, args.solution);
-    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, args.source, in);
-    if (qudaState.async_params.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, args.solution, out);
+  void **h_sources = (void**) malloc(Ns*sizeof(void*));
+  void **h_solutions = (void**) malloc(Ns*sizeof(void*));
+
+  for (int c = 0; c < Nc; ++c) {
+    qudaState.async_params.num_src = (c+1==Nc && Nc>1 && Nd % Ns != 0) ? (Nd % Ns) : min(Nd, Ns);
+
+    for (int s = 0; s < qudaState.async_params.num_src; ++s) {
+      int i = c*Ns + s;
+      h_sources[s] = qudaState.init.buffer_field(s, qudaState.inv_args[i].source);
+      h_solutions[s] = qudaState.init.buffer_field(s+qudaState.async_params.num_src, qudaState.inv_args[i].solution);
+      qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, qudaState.inv_args[i].source, h_sources[s]);
+      if (qudaState.async_params.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, qudaState.inv_args[i].solution, h_solutions[s]);
+      }
     }
 
-    WITH_COMM(logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n"));
-    PUSH_RANGE("invertQuda", 5);
-    WITH_COMM(invertQuda(static_cast<char *>(out), static_cast<char *>(in), &qudaState.async_params));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "Calling invertMultiSrcQuda() ...\n"));
+    PUSH_RANGE("invertMultiSrcQuda", 5);
+    WITH_COMM(invertMultiSrcQuda(h_solutions, h_sources, &qudaState.async_params));
     POP_RANGE;
 
-    qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, out, args.solution);
+    for (int s = 0; s < qudaState.async_params.num_src; ++s) {
+      int i = c*Ns + s;
+      qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, h_solutions[s], qudaState.inv_args[i].solution);
 
-    if (in_comm()) {
-      *(args.status) = qudaState.async_params.true_res[0] <= qudaState.async_params.tol ? qudaState.async_params.iter : -1;
-      args.retval = qudaState.async_params.true_res[0];
+      if (in_comm()) {
+        *(qudaState.inv_args[i].status) = qudaState.async_params.true_res[s] <= qudaState.async_params.tol ? qudaState.async_params.iter : -1;
+        qudaState.inv_args[i].retval = qudaState.async_params.true_res[s];
+      }
     }
 
-    WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n"));
-    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", qudaState.async_params.true_res[0]));
-    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", qudaState.async_params.true_res_hq[0]));
-    WITH_COMM(logQuda(QUDA_VERBOSE, "  iter        = %d\n",   qudaState.async_params.iter));
-    WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", qudaState.async_params.gflops));
-    WITH_COMM(logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", qudaState.async_params.secs));
-    WITH_COMM(logQuda(QUDA_VERBOSE, "  status      = %d\n",   *(args.status)));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaInvertAsync...()\n"));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  iter           = %d\n", qudaState.async_params.iter));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops         = %.2e\n", qudaState.async_params.gflops));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  secs           = %.2e\n", qudaState.async_params.secs));
+    for (int s = 0; s < qudaState.async_params.num_src; ++s) {
+      int i = c*Ns + s;
+      WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res[%d]    = %.2e\n", s, qudaState.async_params.true_res[s]));
+      WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq[%d] = %.2e\n", s, qudaState.async_params.true_res_hq[s]));
+      WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", s, *(qudaState.inv_args[i].status)));
 
-    MPI_Bcast(args.status, 1, MPI_INT, 0, qudaState.layout.world_comm);
-    MPI_Bcast((void *)&args.retval, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+      MPI_Bcast(qudaState.inv_args[i].status, 1, MPI_INT, 0, qudaState.layout.world_comm);
+      MPI_Bcast((void *)&qudaState.inv_args[i].retval, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+    }
   }
-
+  free(h_sources);
+  free(h_solutions);
   return nullptr;
 }
 
@@ -1950,17 +1987,14 @@ void openQCD_qudaInvertAsyncDispatch(void *source, void *solution, int *status)
   qudaState.inv_args.push_back(args);
 }
 
-MPI_Comm openQCD_qudaInvertAsyncStart(OpenQCDSolveType type)
+MPI_Comm openQCD_qudaInvertAsyncStart(void)
 {
   check_mpi_init();
-
-  if (type != OPENQCD_SOLVE_SERIAL)
-    WITH_COMM(errorQuda("Currently only serial solves are allowed"));
 
   if (qudaState.thread.created == true)
     WITH_COMM(errorQuda("Thread already created"));
 
-  int rc = pthread_create(&qudaState.thread.thread, nullptr, openQCD_qudaInvertWrapper, nullptr);
+  int rc = pthread_create(&qudaState.thread.thread, nullptr, openQCD_qudaInvertAsyncWrapper, nullptr);
   if (rc != 0) {
     perror("Error in openQCD_qudaInvertStart");
     WITH_COMM(errorQuda("pthread_create failed"));

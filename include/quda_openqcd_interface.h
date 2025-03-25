@@ -60,7 +60,8 @@ extern "C" {
 #endif
 
 /**
- * Copied from flags.h
+ * OpenQCD inmitations of structs.
+ * Copied from flags.h, su3.h
  * #############################################
  */
 #ifndef FLAGS_H
@@ -81,6 +82,12 @@ typedef struct {
   int nfl;
 } flds_parms_t;
 #endif
+
+#ifndef SU3_H
+typedef struct {
+  double x[24];
+} spinor_dble;
+#endif
 /**
  * #############################################
  */
@@ -91,12 +98,6 @@ typedef enum OpenQCDGaugeGroup_s {
   OPENQCD_GAUGE_SU3xU1 = 3,
   OPENQCD_GAUGE_INVALID = QUDA_INVALID_ENUM
 } OpenQCDGaugeGroup;
-
-typedef enum OpenQCDSolveType_s {
-  OPENQCD_SOLVE_SERIAL = 1,
-  OPENQCD_SOLVE_MRHS = 2,
-  OPENQCD_SOLVE_INVALID = QUDA_INVALID_ENUM
-} OpenQCDSolveType;
 
 typedef enum OpenQCDFieldType_s {
   OPENQCD_FIELD_SPINOR = 1,
@@ -338,7 +339,7 @@ int openQCD_qudaSolverGetHash(int id);
 void openQCD_qudaSolverPrintSetup(int id);
 
 /**
- * @brief      Solve Ax=b for an Clover Wilson operator with a multigrid solver.
+ * @brief      Solve Ax=b for an Clover Wilson operator with a QUDA solver.
  *             All fields passed and returned are host (CPU) field in openQCD
  *             order.
  *
@@ -355,8 +356,29 @@ void openQCD_qudaSolverPrintSetup(int id);
  *
  * @return     Residual
  */
-double openQCD_qudaInvert(int id, double mu, void *source, void *solution, int *status);
+double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status);
 
+
+/**
+ * @brief      Solve Ax=b for an Clover Wilson operator with a QUDA solver. All
+ *             fields passed and returned are host (CPU) field in openQCD order.
+ *             The source and solution fields can be multiple fields, indicated
+ *             by num_src (see QudaInvertParam)
+ *
+ * @param[in]  id         The solver identifier in the input file, i.e.
+ *                        "Solver #". The input file is the one given by
+ *                        quda_init
+ * @param[in]  mu         Twisted mass parameter
+ * @param[in]  sources    The source(s)
+ * @param[out] solutions  The solution(s)
+ * @param[out] status     If the function is able to solve the Dirac equation to
+ *                        the desired accuracy (invert_param->tol), status[i]
+ *                        reports the total number of iteration steps for source
+ *                        i, where i = 0, ..., param->num_src-1. -1 indicates
+ *                        that the inversion failed.
+ * @param      residual   The num_src residuals
+ */
+void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
@@ -376,13 +398,11 @@ void openQCD_qudaInvertAsyncDispatch(void *source, void *solution, int *status);
  *             in order of their registration asynchronously. This spawns a
  *             thread with pthread_create that calls [[openQCD_qudaInvert]].
  *
- * @param[in]  type  Can only be OPENQCD_SOLVE_SERIAL at the moment.
- *
  * @return     The MPI communicator with which the main threads should
  *             communicate among ewach other until
  *             [[openQCD_qudaInvertAsyncWait]] has returned.
  */
-MPI_Comm openQCD_qudaInvertAsyncStart(OpenQCDSolveType type);
+MPI_Comm openQCD_qudaInvertAsyncStart(void);
 
 /**
  * @brief      Wait for the thread started with [[openQCD_qudaInvertAsyncStart]]
