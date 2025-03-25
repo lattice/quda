@@ -87,26 +87,11 @@ namespace quda {
 #endif
     }
 
-    template <typename T> constexpr auto getNative() { return QUDA_FLOAT2_CLOVER_ORDER; }
-    template <> constexpr auto getNative<float>() { return QUDA_FLOAT4_CLOVER_ORDER; }
-    template <> constexpr auto getNative<short>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_HALF); }
-    template <> constexpr auto getNative<int8_t>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_QUARTER); }
-
-    constexpr QudaCloverFieldOrder getNative(QudaPrecision precision)
-    {
-      switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return getNative<double>();
-      case QUDA_SINGLE_PRECISION: return getNative<float>();
-      case QUDA_HALF_PRECISION: return getNative<short>();
-      case QUDA_QUARTER_PRECISION: return getNative<int8_t>();
-      default: return QUDA_INVALID_CLOVER_ORDER;
-      }
-    }
-
-    constexpr bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
-    {
-      return order == getNative(precision);
-    }
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
 
   } // namespace clover
 
@@ -143,12 +128,9 @@ namespace quda {
     */
     void setPrecision(QudaPrecision precision, bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : clover::isNative(order, this->precision);
       this->precision = precision;
       this->ghost_precision = precision;
-
-      if (native) order = clover::getNative(precision);
+      if (force_native) order = QUDA_NATIVE_CLOVER_ORDER;
     }
 
     CloverFieldParam() = default;
@@ -344,7 +326,7 @@ namespace quda {
        @return True if the field is stored in an internal field order
        for the given precision.
     */
-    bool isNative() const { return clover::isNative(order, precision); }
+    bool isNative() const { return order == QUDA_NATIVE_CLOVER_ORDER; }
 
     /**
        @return Array storing trlog on each parity

@@ -304,14 +304,16 @@ namespace quda {
       return (j * stride + x) * N + i;
     };
 
-    template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct FloatNAccessor {
+    template <typename Float, int nColor, int nSpin> struct Accessor<Float, nColor, nSpin, QUDA_NATIVE_CLOVER_ORDER> {
       const Float *a;
       const int stride;
       const size_t offset_cb;
       const int compressed_block_size;
       static constexpr int N = nColor * nSpin / 2;
+      static constexpr int Nvec = clover::get_vector_order<Float>();
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
-      FloatNAccessor(const CloverField &A, bool inverse = false) :
+
+      Accessor(const CloverField &A, bool inverse = false) :
         a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
         stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
@@ -328,15 +330,15 @@ namespace quda {
         const Float *a_ = a + parity * offset_cb + stride * chirality * compressed_block_size;
 
         if (row == col) {
-          auto a = a_[indexFloatN<order>(recon.pack_compress_idx(row), stride, x)];
+          auto a = a_[indexFloatN<Nvec>(recon.pack_compress_idx(row), stride, x)];
           return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a, row));
         } else if (col < row) {
           // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = N + 2*k;
 
-          auto a = complex<Float>(a_[indexFloatN<order>(recon.pack_compress_idx(idx + 0), stride, x)],
-                                  a_[indexFloatN<order>(recon.pack_compress_idx(idx + 1), stride, x)]);
+          auto a = complex<Float>(a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 0), stride, x)],
+                                  a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 1), stride, x)]);
           return static_cast<Float>(2.0)
             * complex<Float>(recon.decompress(a.real(), idx), recon.decompress(a.imag(), idx + 1));
         } else {
@@ -345,8 +347,8 @@ namespace quda {
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
           int idx = N + 2*k;
 
-          auto a = complex<Float>(a_[indexFloatN<order>(recon.pack_compress_idx(idx + 0), stride, x)],
-                                  a_[indexFloatN<order>(recon.pack_compress_idx(idx + 1), stride, x)]);
+          auto a = complex<Float>(a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 0), stride, x)],
+                                  a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 1), stride, x)]);
           return static_cast<Float>(2.0)
             * complex<Float>(recon.decompress(a.real(), idx), -recon.decompress(a.imag(), idx + 1));
         }
@@ -368,33 +370,6 @@ namespace quda {
       }
 
       constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
-    };
-
-    template <typename Float, int nColor, int nSpin>
-    struct Accessor<Float, nColor, nSpin, QUDA_FLOAT2_CLOVER_ORDER>
-      : FloatNAccessor<Float, nColor, nSpin, QUDA_FLOAT2_CLOVER_ORDER> {
-      Accessor(const CloverField &A, bool inverse = false) :
-        FloatNAccessor<Float, nColor, nSpin, QUDA_FLOAT2_CLOVER_ORDER>(A, inverse)
-      {
-      }
-    };
-
-    template <typename Float, int nColor, int nSpin>
-    struct Accessor<Float, nColor, nSpin, QUDA_FLOAT4_CLOVER_ORDER>
-      : FloatNAccessor<Float, nColor, nSpin, QUDA_FLOAT4_CLOVER_ORDER> {
-      Accessor(const CloverField &A, bool inverse = false) :
-        FloatNAccessor<Float, nColor, nSpin, QUDA_FLOAT4_CLOVER_ORDER>(A, inverse)
-      {
-      }
-    };
-
-    template <typename Float, int nColor, int nSpin>
-    struct Accessor<Float, nColor, nSpin, QUDA_FLOAT8_CLOVER_ORDER>
-      : FloatNAccessor<Float, nColor, nSpin, QUDA_FLOAT8_CLOVER_ORDER> {
-      Accessor(const CloverField &A, bool inverse = false) :
-        FloatNAccessor<Float, nColor, nSpin, QUDA_FLOAT8_CLOVER_ORDER>(A, inverse)
-      {
-      }
     };
 
     template <typename Float, int nColor, int nSpin> struct Accessor<Float, nColor, nSpin, QUDA_PACKED_CLOVER_ORDER> {
@@ -599,7 +574,7 @@ namespace quda {
         static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
         static constexpr int M = (compressed_block + N - 1) / N; /** number of short vectors per chiral block we need to read */
         static constexpr int M_offset = compressed_block / N;    /** the block offset that contains the second chiral block */
-        static constexpr int M_rem = compressed_block % N;       /** the remainder of the chiral block not divisible by N */
+        static constexpr int Nrem = compressed_block % N; /** the remainder of the chiral block not divisible by N */
         Float *clover;
         norm_type nrm;
         norm_type nrm_inv;
@@ -631,7 +606,8 @@ namespace quda {
           bytes(clover.Bytes()),
           backup_h(nullptr)
         {
-          if (clover.Order() != N) errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
+          if (clover.Order() != QUDA_NATIVE_CLOVER_ORDER)
+            errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           if (clover.Reconstruct() != enable_reconstruct)
             errorQuda("Accessor reconstruct = %d does not match field reconstruct %d", enable_reconstruct,
                       clover.Reconstruct());
@@ -732,18 +708,18 @@ namespace quda {
             array<Float, N> vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], tmp[chirality * M_rem + i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], tmp[chirality * Nrem + i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
           }
 
-          if constexpr (M_rem) {
-            array<Float, M_rem> vecTmp;
+          if constexpr (Nrem) {
+            array<Float, Nrem> vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < M_rem; j++) copy_scaled(vecTmp[j], tmp[(1 - chirality) * M_offset * N + j]);
+            for (int j = 0; j < Nrem; j++) copy_scaled(vecTmp[j], tmp[(1 - chirality) * M_offset * N + j]);
 
-            auto *ptr = clover + (parity * offset + x) * N + volumeCB * (M_offset * N) + chirality * M_rem;
+            auto *ptr = clover + (parity * offset + x) * N + volumeCB * (M_offset * N) + chirality * Nrem;
             vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory
           }
         }
@@ -1018,22 +994,18 @@ namespace quda {
   struct clover_mapper {
   };
 
-  // double precision uses Float2
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<double, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<double, N, 2, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<double, N, QUDA_ORDER_DOUBLE, add_rho, enable_reconstruct>;
   };
 
-  // single precision uses Float4
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<float, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<float, N, 4, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<float, N, QUDA_ORDER_SINGLE, add_rho, enable_reconstruct>;
   };
 
-  // half precision uses QUDA_ORDER_FP (Float8 default)
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<short, N, add_rho, enable_reconstruct> {
     using type = clover::FloatNOrder<short, N, QUDA_ORDER_HALF, add_rho, enable_reconstruct>;
   };
 
-  // quarter precision uses QUDA_ORDER_FP (Float8 default)
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<int8_t, N, add_rho, enable_reconstruct> {
     using type = clover::FloatNOrder<int8_t, N, QUDA_ORDER_HALF, add_rho, enable_reconstruct>;
   };

@@ -72,7 +72,7 @@ namespace quda {
 
       constexpr QudaFieldOrder csOrder = QUDA_NATIVE_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_NATIVE_GAUGE_ORDER;
-      constexpr QudaCloverFieldOrder clOrder = QUDA_FLOAT4_CLOVER_ORDER;
+      constexpr QudaCloverFieldOrder clOrder = QUDA_NATIVE_CLOVER_ORDER;
 
       if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
