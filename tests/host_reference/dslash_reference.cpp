@@ -907,8 +907,8 @@ double verifyStaggeredTypeEigenvector(quda::ColorSpinorField &spinor, const std:
       printfQuda("Eigenvector %4d, t = %d lambda = %15.14e: tol %.2e, host residual = %.15e\n", i, t, l, eig_param.tol,
                  sqrt(nrm2[t] / src2[t]));
     }
-    auto total_nrm2 = std::accumulate(nrm2.begin(), nrm2.end(), 0);
-    auto total_src2 = std::accumulate(src2.begin(), src2.end(), 0);
+    auto total_nrm2 = std::accumulate(nrm2.begin(), nrm2.end(), 0.0);
+    auto total_src2 = std::accumulate(src2.begin(), src2.end(), 0.0);
 
     return sqrt(total_nrm2 / total_src2);
   } else {
