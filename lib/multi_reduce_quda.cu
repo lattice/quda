@@ -121,8 +121,8 @@ namespace quda {
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
           constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
-          constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
-          constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
+          constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
+          constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x0.Length() / M;
 

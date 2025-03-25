@@ -23,7 +23,7 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::get_vector_order<Float>(),
                                                     spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;

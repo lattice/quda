@@ -278,37 +278,6 @@ static_assert(QUDA_ORDER_QUARTER == 2 || QUDA_ORDER_QUARTER == 4 || QUDA_ORDER_Q
 #endif
 
 /**
- * @def QUDA_ORDER_FP
- * @brief This macro sets the data ordering for Wilson, gauge
- * (recon-8/9) and clover fixed-point fields
- */
-#define QUDA_ORDER_FP @QUDA_ORDER_FP@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
-#endif
-
-/**
- * @def QUDA_ORDER_SP
- * @brief This macro sets the data ordering for single-precision multigrid fields
- */
-#define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
-#endif
-
-/**
- * @def QUDA_ORDER_FP_MG
- * @brief This macro sets the data ordering for fixed-point multigrid fields
- */
-#define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
-#endif
-
-/**
  * @def QUDA_BUILD_NATIVE_FFT
  * @brief This macro is set by CMake if the native FFT library is used
  */

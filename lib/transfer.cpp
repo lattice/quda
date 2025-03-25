@@ -134,7 +134,7 @@ namespace quda {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
-    param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
+    param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER :
                                                                      QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision());
 

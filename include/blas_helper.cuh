@@ -99,20 +99,14 @@ namespace quda
        Helper struct that contains the meta data required for
        read and writing to a spinor field in the BLAS kernels.
        @tparam store_t Type used to store field in memory
-       @tparam N Length of vector
     */
-    template <typename store_t, int N, bool is_fixed> struct data_t {
-      store_t *spinor;
-      int stride;
-      unsigned int cb_offset;
-      data_t() :
-        spinor(nullptr),
-        stride(0),
-        cb_offset(0)
-      {}
-
+    template <typename store_t, bool is_fixed> struct data_t {
+      store_t *spinor = nullptr;
+      int stride = 0;
+      unsigned int cb_offset = 0;
+      data_t() = default;
       data_t(const ColorSpinorField &x) :
-        spinor(x.data<store_t *>()), stride(x.VolumeCB()), cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
+        spinor(x.data<store_t *>()), stride(x.VolumeCB()), cb_offset(x.Bytes() / (2 * sizeof(store_t)))
       {}
     };
 
@@ -122,28 +116,20 @@ namespace quda
        specialized variant for fixed-point fields where need to store
        the meta data for the norm field.
        @tparam store_t Type used to store field in memory
-       @tparam N Length of vector
     */
-    template <typename store_t, int N> struct data_t<store_t, N, true> {
+    template <typename store_t> struct data_t<store_t, true> {
       using norm_t = float;
-      store_t *spinor;
-      norm_t *norm;
-      int stride;
-      unsigned int cb_offset;
-      unsigned int cb_norm_offset;
-      data_t() :
-        spinor(nullptr),
-        norm(nullptr),
-        stride(0),
-        cb_offset(0),
-        cb_norm_offset(0)
-      {}
-
+      store_t *spinor = nullptr;
+      norm_t *norm = nullptr;
+      int stride = 0;
+      unsigned int cb_offset = 0;
+      unsigned int cb_norm_offset = 0;
+      data_t() = default;
       data_t(const ColorSpinorField &x) :
         spinor(x.data<store_t *>()),
         norm(static_cast<norm_t *>(x.Norm())),
         stride(x.VolumeCB()),
-        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N)),
+        cb_offset(x.Bytes() / (2 * sizeof(store_t))),
         cb_norm_offset(x.Bytes() / (2 * sizeof(norm_t)))
       {}
     };
@@ -156,10 +142,9 @@ namespace quda
     template <typename store_t, int N> struct Spinor {
       using Vector = typename VectorType<store_t, N>::type;
       using norm_t = float;
-      data_t<store_t, N, isFixed<store_t>::value> data;
+      data_t<store_t, isFixed<store_t>::value> data;
 
-      Spinor() {}
-
+      Spinor() = default;
       Spinor(const ColorSpinorField &x) : data(x) {}
 
       /**
@@ -234,32 +219,40 @@ namespace quda
           array<real, len> v_;
 
           constexpr int M = len / N;
+          constexpr int Nrem = len - M * N;
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
-            Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
+            auto vecTmp = vector_load<store_t, N>(data.spinor + parity * data.cb_offset, data.stride * i + x);
             // now copy into output and scale
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
+            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], vecTmp[j], nrm);
+          }
+          if constexpr (Nrem > 0) {
+            // first load from memory
+            auto vecTmp = vector_load<store_t, Nrem>(data.spinor + parity * data.cb_offset + data.stride * M * N, x);
+            // now copy into output and scale
+#pragma unroll
+            for (int j = 0; j < Nrem; j++) copy_and_scale(v_[M * N + j], vecTmp[j], nrm);
           }
 
+#pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
         } else {
           // specialized path for half precision staggered
-          using Vector = int4;
           auto cb_offset = data.cb_norm_offset / 4;
           norm_t nrm;
           array<real, len> v_;
 
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(data.spinor, parity * cb_offset + x);
+          auto vecTmp = vector_load<store_t, 8>(data.spinor, parity * cb_offset + x);
 
           // extract norm
-          memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
+          memcpy(&nrm, &vecTmp[6], sizeof(norm_t));
 
           // now copy into output and scale
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
+          for (int i = 0; i < len; i++) copy_and_scale(v_[i], vecTmp[i], nrm);
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -298,18 +291,27 @@ namespace quda
           }
 
           constexpr int M = len / N;
+          constexpr int Nrem = len - M * N;
 #pragma unroll
           for (int i = 0; i < M; i++) {
-            Vector vecTmp;
+            array<store_t, N> vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], v_[i * N + j]);
             // second do vectorized copy into memory
-            vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
+            vector_store(data.spinor + parity * data.cb_offset, data.stride * i + x, vecTmp);
+          }
+
+          if constexpr (Nrem > 0) {
+            array<store_t, Nrem> vecTmp;
+            // first do scalar copy converting into storage type
+#pragma unroll
+            for (int j = 0; j < Nrem; j++) copy_scaled(vecTmp[j], v_[M * N + j]);
+            // second do vectorized copy into memory
+            vector_store(data.spinor + parity * data.cb_offset + data.stride * M * N, x, vecTmp);
           }
         } else {
           // specialized path for half precision staggered
-          using Vector = int4;
           auto cb_offset = data.cb_norm_offset / 4;
           norm_t norm;
           norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
@@ -320,10 +322,10 @@ namespace quda
             v_[2 * i + 1] = scale_inv * v[i].imag();
           }
 
-          Vector vecTmp;
-          memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
+          array<store_t, 8> vecTmp;
+          memcpy(&vecTmp[6], &norm, sizeof(norm_t)); // pack the norm
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
+          for (int i = 0; i < len; i++) copy_scaled(vecTmp[i], v_[i]);
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }
@@ -339,42 +341,32 @@ namespace quda
        @tparam site_unroll Whether we enforce all site components must
        be unrolled onto the same thread (required for fixed-point precision)
     */
-    template <typename store_t, bool GPU, int nSpin, bool site_unroll> constexpr int n_vector() { return 0; }
+    template <typename store_t, bool GPU> constexpr int n_vector(int nSpin, int site_unroll) { return 0; }
 
     // native ordering
-    template <> constexpr int n_vector<double, true, 4, false>() { return 2; }
-    template <> constexpr int n_vector<double, true, 1, false>() { return 2; }
-
-    template <> constexpr int n_vector<double, true, 4, true>() { return 2; }
-    template <> constexpr int n_vector<double, true, 1, true>() { return 2; }
-
-    template <> constexpr int n_vector<float, true, 4, false>() { return 4; }
-    template <> constexpr int n_vector<float, true, 1, false>() { return 4; }
-
-    template <> constexpr int n_vector<float, true, 4, true>() { return 4; }
-    template <> constexpr int n_vector<float, true, 1, true>() { return 2; }
-
-    template <> constexpr int n_vector<short, true, 4, true>() { return QUDA_ORDER_FP; }
-    template <> constexpr int n_vector<short, true, 1, true>() { return 2; }
-
-    template <> constexpr int n_vector<int8_t, true, 4, true>() { return QUDA_ORDER_FP; }
-    template <> constexpr int n_vector<int8_t, true, 1, true>() { return 2; }
+    template <> constexpr int n_vector<double, true>(int, int) { return colorspinor::get_vector_order<double>(); }
+    template <> constexpr int n_vector<float, true>(int, int) { return colorspinor::get_vector_order<float>(); }
+    template <> constexpr int n_vector<short, true>(int, int) { return colorspinor::get_vector_order<short>(); }
+    template <> constexpr int n_vector<int8_t, true>(int, int) { return colorspinor::get_vector_order<int8_t>(); }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling
-    template <> constexpr int n_vector<double, false, 4, false>() { return 2; }
-    template <> constexpr int n_vector<double, false, 1, false>() { return 2; }
-    template <> constexpr int n_vector<float, false, 4, false>() { return 4; }
-    template <> constexpr int n_vector<float, false, 1, false>() { return 4; }
+    template <> constexpr int n_vector<double, false>(int nSpin, int site_unroll)
+    {
+      if (site_unroll) {
+        return nSpin * 6;
+      } else {
+        return 2;
+      }
+    }
 
-    // AoS ordering is used on CPU uses when we are site unrolling
-    template <> constexpr int n_vector<double, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<double, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<float, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<float, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<short, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<short, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<float, false>(int nSpin, int site_unroll)
+    {
+      if (site_unroll) {
+        return nSpin * 6;
+      } else {
+        return 4;
+      }
+    }
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,

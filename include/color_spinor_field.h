@@ -13,57 +13,11 @@ namespace quda
   namespace colorspinor
   {
 
-    template <typename T, int nSpin> constexpr auto getNative() { return QUDA_FLOAT2_FIELD_ORDER; }
-    template <> constexpr auto getNative<float, 4>() { return QUDA_FLOAT4_FIELD_ORDER; }
-
-    // fixed-point Wilson fields
-    template <> constexpr auto getNative<short, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
-    template <> constexpr auto getNative<int8_t, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
-
-    // fp32 multigrid fields
-    template <> constexpr auto getNative<float, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_SP_MG); }
-
-    // fixed-point multigrid fields
-    template <> constexpr auto getNative<short, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
-    template <> constexpr auto getNative<int8_t, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
-
-    template <typename T> constexpr auto getNative(int) { return QUDA_INVALID_FIELD_ORDER; }
-
-    template <> constexpr auto getNative<double>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<double, 1>() : nSpin == 2 ? getNative<double, 2>() : getNative<double, 4>();
-    }
-
-    template <> constexpr auto getNative<float>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<float, 1>() : nSpin == 2 ? getNative<float, 2>() : getNative<float, 4>();
-    }
-
-    template <> constexpr auto getNative<short>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<short, 1>() : nSpin == 2 ? getNative<short, 2>() : getNative<short, 4>();
-    }
-
-    template <> constexpr auto getNative<int8_t>(int nSpin)
-    {
-      return nSpin == 1 ? getNative<int8_t, 1>() : nSpin == 2 ? getNative<int8_t, 2>() : getNative<int8_t, 4>();
-    }
-
-    constexpr QudaFieldOrder getNative(QudaPrecision precision, int nSpin)
-    {
-      switch (precision) {
-      case QUDA_DOUBLE_PRECISION: return getNative<double>(nSpin);
-      case QUDA_SINGLE_PRECISION: return getNative<float>(nSpin);
-      case QUDA_HALF_PRECISION: return getNative<short>(nSpin);
-      case QUDA_QUARTER_PRECISION: return getNative<int8_t>(nSpin);
-      default: return QUDA_INVALID_FIELD_ORDER;
-      }
-    }
-
-    constexpr bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
-    {
-      return order == getNative(precision, nSpin);
-    }
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
 
   } // namespace colorspinor
 
@@ -161,13 +115,9 @@ namespace quda
     void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision = QUDA_INVALID_PRECISION,
                       bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : colorspinor::isNative(fieldOrder, this->precision, nSpin, nColor);
       this->precision = precision;
       this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
-
-      // if this is a native field order, let's preserve that status, else keep the same field order
-      if (native) fieldOrder = colorspinor::getNative(precision, nSpin);
+      if (force_native) fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     }
 
     ColorSpinorParam(const ColorSpinorField &a);
@@ -688,7 +638,7 @@ namespace quda
       field order, given the precision and the length of the spin
       dimension.
       */
-    bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
+    bool isNative() const { return fieldOrder == QUDA_NATIVE_FIELD_ORDER ? true : false; }
 
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }

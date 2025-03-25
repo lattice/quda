@@ -143,8 +143,8 @@ namespace quda {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
       } else {
-        constexpr auto vOrder = colorspinor::getNative<vFloat>(nSpin);
-        constexpr auto bOrder = colorspinor::getNative<bFloat>(nSpin);
+        constexpr auto vOrder = QUDA_NATIVE_FIELD_ORDER;
+        constexpr auto bOrder = QUDA_NATIVE_FIELD_ORDER;
         if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,vOrder,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,bOrder,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;

@@ -256,7 +256,7 @@ struct StaggeredDslashTestWrapper {
 
     // create device-size spinors
     ColorSpinorParam csParam(spinor[0]);
-    csParam.fieldOrder = colorspinor::getNative(inv_param.cuda_prec, 1);
+    csParam.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     csParam.pad = 0;
     csParam.setPrecision(inv_param.cuda_prec);
     csParam.location = QUDA_CUDA_FIELD_LOCATION;

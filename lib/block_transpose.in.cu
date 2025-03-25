@@ -85,7 +85,7 @@ namespace quda
           errorQuda("BlockTranspose does not support host invokation yet.");
         } else {
           constexpr auto vOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-          constexpr auto bOrder = colorspinor::getNative<bFloat>(nSpin);
+          constexpr auto bOrder = QUDA_NATIVE_FIELD_ORDER;
           if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
             typedef FieldOrderCB<real, nSpin, nColor, nVec, vOrder, vFloat, vFloat, disable_ghost> vAccessor;
             typedef FieldOrderCB<real, nSpin, nColor, 1, bOrder, bFloat, bFloat, disable_ghost> bAccessor;

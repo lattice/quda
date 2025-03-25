@@ -418,7 +418,7 @@ namespace quda {
     spinor_param.setPrecision(a.Precision());
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = colorspinor::getNative(a.Precision(), a.Nspin());
+    spinor_param.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = a.data(inverse);

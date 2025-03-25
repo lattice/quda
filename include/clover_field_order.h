@@ -1030,12 +1030,12 @@ namespace quda {
 
   // half precision uses QUDA_ORDER_FP (Float8 default)
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<short, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<short, N, QUDA_ORDER_FP, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<short, N, QUDA_ORDER_HALF, add_rho, enable_reconstruct>;
   };
 
   // quarter precision uses QUDA_ORDER_FP (Float8 default)
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<int8_t, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<int8_t, N, QUDA_ORDER_FP, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<int8_t, N, QUDA_ORDER_HALF, add_rho, enable_reconstruct>;
   };
 
 } // namespace quda

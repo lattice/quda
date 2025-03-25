@@ -310,15 +310,12 @@
   
 ! Degree of freedom ordering
 #define QudaFieldOrder integer(4)
-#define QUDA_FLOAT_FIELD_ORDER 1 // spin-color-complex-space
-#define QUDA_FLOAT2_FIELD_ORDER 2 // (spin-color-complex)/2-space-(spin-color-complex)%2
-#define QUDA_FLOAT4_FIELD_ORDER 4 // (spin-color-complex)/4-space-(spin-color-complex)%4
-#define QUDA_FLOAT8_FIELD_ORDER 8 // (spin-color-complex)/8-space-(spin-color-complex)%8
-#define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 9         // CPS/QDP++ ordering
-#define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 10        // QLA ordering (spin inside color)
-#define QUDA_QDPJIT_FIELD_ORDER 11                  // QDP field ordering (complex-color-spin-spacetime)
-#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 12         // QOP domain-wall ordering
-#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 13 // TIFR RHMC ordering
+#define QUDA_NATIVE_FIELD_ORDER 0                  // spin-color-complex-space
+#define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 1        // CPS/QDP++ ordering
+#define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 2        // QLA ordering (spin inside color)
+#define QUDA_QDPJIT_FIELD_ORDER 3                  // QDP field ordering (complex-color-spin-spacetime)
+#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 4         // QOP domain-wall ordering
+#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 5 // TIFR RHMC ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)

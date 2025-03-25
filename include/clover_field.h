@@ -89,8 +89,8 @@ namespace quda {
 
     template <typename T> constexpr auto getNative() { return QUDA_FLOAT2_CLOVER_ORDER; }
     template <> constexpr auto getNative<float>() { return QUDA_FLOAT4_CLOVER_ORDER; }
-    template <> constexpr auto getNative<short>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
-    template <> constexpr auto getNative<int8_t>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
+    template <> constexpr auto getNative<short>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_HALF); }
+    template <> constexpr auto getNative<int8_t>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_QUARTER); }
 
     constexpr QudaCloverFieldOrder getNative(QudaPrecision precision)
     {
