@@ -19,6 +19,13 @@ namespace quda
     template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
     template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
 
+    template <typename T, int length> constexpr int get_vector_order()
+    {
+      int N = get_vector_order<T>();
+      while (N > length) N /= 2;
+      return N;
+    }
+
   } // namespace colorspinor
 
   enum MemoryLocation { Device = 1, Host = 2, Remote = 4, Shmem = 8 };

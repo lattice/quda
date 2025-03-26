@@ -286,7 +286,7 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER> {
-      static constexpr int N = colorspinor::get_vector_order<Float>();
+      static constexpr int N = colorspinor::get_vector_order<Float, nSpin * nColor * 2>();
       int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
@@ -353,7 +353,7 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER> {
-      static constexpr int N = colorspinor::get_vector_order<Float>();
+      static constexpr int N = colorspinor::get_vector_order<Float, nSpin * nColor * nVec * 2>();
       int faceVolumeCB[4] = {};
       int ghostOffset[4] = {};
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
@@ -974,8 +974,7 @@ namespace quda
       }
     };
 
-    template <typename Float, int Ns, int Nc, int N, bool spin_project = false, bool huge_alloc = false,
-              bool disable_ghost = false>
+    template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false, bool disable_ghost = false>
     struct GhostNOrder {
       GhostNOrder() = default;
       GhostNOrder(const GhostNOrder &) = default;
@@ -983,15 +982,15 @@ namespace quda
       GhostNOrder &operator=(const GhostNOrder &) = default;
     };
 
-    template <typename Float, int Ns, int Nc, int N_, bool spin_project, bool huge_alloc>
-    struct GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, false> {
+    template <typename Float, int Ns, int Nc, bool spin_project, bool huge_alloc>
+    struct GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, false> {
       static constexpr int length = 2 * Ns * Nc;
       static constexpr int length_ghost = spin_project ? length / 2 : length;
       // if spin projecting, check that short vector length is compatible, if not halve the vector length
-      static constexpr int N = N_;
+      static constexpr int N = colorspinor::get_vector_order<Float, length_ghost>();
       static constexpr int M = length_ghost / N;
       static constexpr int Nrem = length_ghost - M * N;
-      using Accessor = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
+      using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using norm_type = float;
@@ -1123,15 +1122,14 @@ namespace quda
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false,
-              bool disable_ghost = false>
-    struct FloatNOrder : GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost> {
+    template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false, bool disable_ghost = false>
+    struct FloatNOrder : GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost> {
       static constexpr int length = 2 * Ns * Nc;
-      static constexpr int N = N_;
+      static constexpr int N = colorspinor::get_vector_order<Float, length>();
       static constexpr int M = length / N;
       static constexpr int Nrem = length - M * N;
-      using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc, disable_ghost>;
-      using GhostNOrder = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc, disable_ghost>;
+      using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
+      using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using AllocInt = typename AllocType<huge_alloc>::type;
@@ -1260,13 +1258,12 @@ namespace quda
       size_t Bytes() const { return offset * 2ll * sizeof(Float) * N; }
     };
 
-    template <int N, bool spin_project, bool huge_alloc>
-    struct GhostNOrder<short, 1, 3, N, spin_project, huge_alloc, false> {
+    template <bool spin_project, bool huge_alloc> struct GhostNOrder<short, 1, 3, spin_project, huge_alloc, false> {
       using Float = short;
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
       static constexpr int length_ghost = 2 * Ns * Nc;
-      using Accessor = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
+      using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using norm_type = float;
@@ -1372,15 +1369,15 @@ namespace quda
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <int N_, bool spin_project, bool huge_alloc, bool disable_ghost>
-    struct FloatNOrder<short, 1, 3, N_, spin_project, huge_alloc, disable_ghost>
-      : GhostNOrder<short, 1, 3, N_, spin_project, huge_alloc, disable_ghost> {
+    template <bool spin_project, bool huge_alloc, bool disable_ghost>
+    struct FloatNOrder<short, 1, 3, spin_project, huge_alloc, disable_ghost>
+      : GhostNOrder<short, 1, 3, spin_project, huge_alloc, disable_ghost> {
       using Float = short;
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
       static constexpr int length = 2 * Ns * Nc;
-      using Accessor = FloatNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
-      using GhostNOrder = GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost>;
+      using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
+      using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using AllocInt = typename AllocType<huge_alloc>::type;
@@ -1783,81 +1780,9 @@ namespace quda
 
   } // namespace colorspinor
 
-  // Use traits to reduce the template explosion
   template <typename T, int Ns, int Nc, bool project = false, bool huge_alloc = false, bool disable_ghost = false>
   struct colorspinor_mapper {
-  };
-
-  // double precision
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<double, 4, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<double, 4, Nc, QUDA_ORDER_DOUBLE, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<double, 4, Nc, true, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<double, 4, Nc, QUDA_ORDER_DOUBLE, true, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<double, 2, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<double, 2, Nc, QUDA_ORDER_DOUBLE, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<double, 1, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<double, 1, Nc, QUDA_ORDER_DOUBLE, false, huge_alloc, disable_ghost> type;
-  };
-
-  // single precision
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<float, 4, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<float, 4, Nc, QUDA_ORDER_SINGLE, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<float, 4, Nc, true, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<float, 4, Nc, QUDA_ORDER_SINGLE, true, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<float, 2, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<float, 2, Nc, QUDA_ORDER_SINGLE, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<float, 1, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<float, 1, Nc, QUDA_ORDER_SINGLE, false, huge_alloc, disable_ghost> type;
-  };
-
-  // half precision
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<short, 4, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, QUDA_ORDER_HALF, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<short, 4, Nc, true, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, QUDA_ORDER_HALF, true, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<short, 2, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<short, 2, Nc, QUDA_ORDER_HALF, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<short, 1, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<short, 1, Nc, QUDA_ORDER_HALF, false, huge_alloc, disable_ghost> type;
-  };
-
-  // quarter precision
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<int8_t, 4, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, QUDA_ORDER_QUARTER, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<int8_t, 4, Nc, true, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, QUDA_ORDER_QUARTER, true, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<int8_t, 2, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<int8_t, 2, Nc, QUDA_ORDER_QUARTER, false, huge_alloc, disable_ghost> type;
-  };
-  template <int Nc, bool huge_alloc, bool disable_ghost>
-  struct colorspinor_mapper<int8_t, 1, Nc, false, huge_alloc, disable_ghost> {
-    typedef colorspinor::FloatNOrder<int8_t, 1, Nc, QUDA_ORDER_QUARTER, false, huge_alloc, disable_ghost> type;
+    typedef colorspinor::FloatNOrder<T, Ns, Nc, project, huge_alloc, disable_ghost> type;
   };
 
   template <typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper {
@@ -1871,7 +1796,7 @@ namespace quda
 
   // specializations for native orderings
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_NATIVE_FIELD_ORDER, Ns, Nc> {
-    typedef colorspinor::FloatNOrder<T, Ns, Nc, colorspinor::get_vector_order<T>> type;
+    typedef colorspinor::FloatNOrder<T, Ns, Nc> type;
   };
 
 } // namespace quda

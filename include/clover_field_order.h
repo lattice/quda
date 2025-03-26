@@ -310,8 +310,8 @@ namespace quda {
       const size_t offset_cb;
       const int compressed_block_size;
       static constexpr int N = nColor * nSpin / 2;
-      static constexpr int Nvec = clover::get_vector_order<Float>();
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
+      static constexpr int Nvec = clover::get_vector_order<Float, 2 * decltype(recon)::compressed_block_size()>();
 
       Accessor(const CloverField &A, bool inverse = false) :
         a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
@@ -557,11 +557,11 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
     */
-      template <typename Float, int length, int N, bool add_rho = false,
-                bool enable_reconstruct_ = clover::reconstruct(), bool huge_alloc = false>
+      template <typename Float, int length, bool add_rho = false, bool enable_reconstruct_ = clover::reconstruct(),
+                bool huge_alloc = false>
       struct FloatNOrder {
         static constexpr bool enable_reconstruct = enable_reconstruct_;
-        using Accessor = FloatNOrder<Float, length, N, add_rho, enable_reconstruct, huge_alloc>;
+        using Accessor = FloatNOrder<Float, length, add_rho, enable_reconstruct, huge_alloc>;
         using real = typename mapper<Float>::type;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         typedef float norm_type;
@@ -572,6 +572,7 @@ namespace quda {
         static_assert(!enable_reconstruct || (enable_reconstruct && Nc == 3), "Reconstruct requires Nc=3");
         reconstruct_t<real, block, enable_reconstruct> recon;
         static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
+        static constexpr int N = clover::get_vector_order<real, 2 * compressed_block>();
         static constexpr int M = (compressed_block + N - 1) / N; /** number of short vectors per chiral block we need to read */
         static constexpr int M_offset = compressed_block / N;    /** the block offset that contains the second chiral block */
         static constexpr int Nrem = compressed_block % N; /** the remainder of the chiral block not divisible by N */
@@ -992,22 +993,7 @@ namespace quda {
   // Use traits to reduce the template explosion
   template <typename Float, int N = 72, bool add_rho = false, bool enable_reconstruct = clover::reconstruct()>
   struct clover_mapper {
-  };
-
-  template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<double, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<double, N, QUDA_ORDER_DOUBLE, add_rho, enable_reconstruct>;
-  };
-
-  template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<float, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<float, N, QUDA_ORDER_SINGLE, add_rho, enable_reconstruct>;
-  };
-
-  template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<short, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<short, N, QUDA_ORDER_HALF, add_rho, enable_reconstruct>;
-  };
-
-  template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<int8_t, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<int8_t, N, QUDA_ORDER_HALF, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<Float, N, add_rho, enable_reconstruct>;
   };
 
 } // namespace quda

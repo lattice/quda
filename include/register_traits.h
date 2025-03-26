@@ -254,7 +254,7 @@ namespace quda {
   };
   template <> struct VectorType<float, 4>{typedef float4 type; };
   template <> struct VectorType<float, 8> {
-    typedef float8 type;
+    typedef double4 type;
   };
 
   // single precision
@@ -278,6 +278,9 @@ namespace quda {
   template <> struct VectorType<short, 8> {
     typedef short8 type;
   };
+  template <> struct VectorType<short, 16> {
+    typedef double4 type;
+  };
 
   // quarter precision
   template <> struct VectorType<int8_t, 1> {
@@ -294,6 +297,9 @@ namespace quda {
   };
   template <> struct VectorType<int8_t, 8> {
     typedef char8 type;
+  };
+  template <> struct VectorType<int8_t, 16> {
+    typedef double2 type;
   };
 
   template<bool large_alloc> struct AllocType { };
