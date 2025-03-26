@@ -341,7 +341,7 @@ namespace quda
        @tparam site_unroll Whether we enforce all site components must
        be unrolled onto the same thread (required for fixed-point precision)
     */
-    template <typename store_t, bool GPU> constexpr int n_vector(int nSpin, int site_unroll) { return 0; }
+    template <typename store_t, bool GPU> constexpr int n_vector(int, int) { return 0; }
 
     // native ordering
     template <> constexpr int n_vector<double, true>(int, int) { return colorspinor::get_vector_order<double>(); }
