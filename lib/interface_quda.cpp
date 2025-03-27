@@ -5385,7 +5385,7 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
   gaugeSmeared->exchangeExtendedGhost(gaugeSmeared->R());
 
   // copy fout to h_out
-  for(size_t i = 0; i < nSpinors; i++) {
+  for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
     ColorSpinorField fout_h(cpuParam);
     fout_h = fout[i];
