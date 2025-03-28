@@ -32,9 +32,9 @@ namespace quda
     }
 
     // Set reasonable default for QR tol, supply warning if outside of this bound
-    if (qr_tol == 0) { qr_tol = tol * 1e-2; }
-    if (qr_tol > tol * 1e-2) {
-      warningQuda("QR tolerances greater than eig_tol * 1e-2 can cause instability in IRAM, please revise this option "
+    if (qr_tol == 0) { qr_tol = tol * 1e-3; }
+    if (qr_tol > tol * 1e-3) {
+      warningQuda("QR tolerances greater than eig_tol * 1e-3 can cause instability in IRAM, please revise this option "
                   "if instability is observed (eig_tol = %e, qr_tol = %e)",
                   tol, qr_tol);
     }
