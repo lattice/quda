@@ -277,7 +277,7 @@ struct StaggeredDslashTestWrapper {
     GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
     cpuLongParam.order = QUDA_QDP_GAUGE_ORDER;
     cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    if (dslash_type == QUDA_ASQTAD_DSLASH) cpuLong = GaugeField(cpuLongParam);
+    cpuLong = GaugeField(cpuLongParam);
 
     // Override link reconstruct as appropriate for staggered or asqtad
     if (is_staggered(dslash_type)) {
