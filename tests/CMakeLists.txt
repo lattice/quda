@@ -1094,7 +1094,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                        --dslash-type ${DIRAC_NAME}
                        --test Mat
-                       --dim 4 2 6 8
+                       --dim 4 4 6 8
                        --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
       if(polenv)
         set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
