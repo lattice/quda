@@ -1382,11 +1382,18 @@ namespace quda
                                            parity * offset + x_cb + volumeCB * j, pipe);
           }
         } else {
-#pragma unroll
-          for (int i = 0; i < M_ghost; i++) {
-            int j = i + c * M_ghost;
-            vector_load_async<GhostVector>(cache.template bulk<Vector>(i, stage), field,
-                                           (j % 2) + 2 * (parity * offset + x_cb + volumeCB * (j / 2)), pipe);
+          static_assert(M_ghost == 3, "M_ghost == 3");
+          static_assert(c == 0 || c == 1, "c == 0 || c == 1");
+          if constexpr (c == 0) {
+            vector_load_async<Vector>(cache.template bulk<Vector>(0, stage), field,
+                                      parity * offset + x_cb + volumeCB * 0, pipe);
+            vector_load_async<GhostVector>(cache.template bulk<Vector>(1, stage), field,
+                                           2 * (parity * offset + x_cb + volumeCB * 1), pipe);
+          } else if constexpr (c == 1) {
+            vector_load_async<Vector>(cache.template bulk<Vector>(0, stage), field,
+                                      parity * offset + x_cb + volumeCB * 2, pipe);
+            vector_load_async<GhostVector>(cache.template bulk<Vector>(1, stage), field,
+                                           1 + 2 * (parity * offset + x_cb + volumeCB * 1), pipe);
           }
         }
       }

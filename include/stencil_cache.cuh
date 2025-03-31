@@ -88,6 +88,7 @@ namespace quda
       return color_spinor;
     }
 
+    template <int c>
     __device__ __host__ inline auto load_color_spinor_half(int stage)
     {
       ColorSpinor<typename color_spinor_order_t::real, color_spinor_order_t::Nc, color_spinor_order_t::Ns / 2> color_spinor;
@@ -97,12 +98,21 @@ namespace quda
       using Vector = typename color_spinor_order_t::Vector;
       GhostVector vecTmp[color_spinor_order_t::M_ghost];
 
-#pragma unroll
-      for (int i = 0; i < color_spinor_order_t::M_ghost; i++) {
-        // first load from memory
-        vecTmp[i] = *reinterpret_cast<GhostVector *>(bulk<Vector>(i, stage));
+      if constexpr (sizeof(Vector) == sizeof(GhostVector)) {
+        for (int i = 0; i < color_spinor_order_t::M_ghost; i++) {
+          // first load from memory
+          vecTmp[i] = *reinterpret_cast<GhostVector *>(bulk<Vector>(i, stage));
+        }
+      } else {
+        static_assert(color_spinor_order_t::M_ghost == 3, "color_spinor_order_t::M_ghost == 3");
+        if constexpr (c == 0) {
+          reinterpret_cast<Vector *>(vecTmp)[0] = *reinterpret_cast<Vector *>(bulk<Vector>(0, stage));
+          vecTmp[2] = *reinterpret_cast<GhostVector *>(bulk<Vector>(1, stage));
+        } else if constexpr (c == 1) {
+          reinterpret_cast<Vector *>(&vecTmp[1])[0] = *reinterpret_cast<Vector *>(bulk<Vector>(0, stage));
+          vecTmp[0] = *reinterpret_cast<GhostVector *>(bulk<Vector>(1, stage));
+        }
       }
-
       color_spinor_order.unpack_half(color_spinor.data, vecTmp, nrm);
       return color_spinor;
     }

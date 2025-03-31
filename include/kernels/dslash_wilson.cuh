@@ -70,8 +70,8 @@ namespace quda
     }
   };
 
-  constexpr bool wilson_use_async = false;
-  constexpr int pipeline_depth = 8;
+  constexpr bool wilson_use_async = true;
+  constexpr int pipeline_depth = 2;
 
   constexpr int get_pipeline_index(int d, int dir)
   { // 0 for forward, 1 for backward
@@ -139,7 +139,7 @@ namespace quda
           arg.in[src_idx].cache(cache, get_pipeline_index(d, 0), pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb,
                                 their_spinor_parity);
         } else {
-          arg.in[src_idx].cache_half<(1 - proj_dir) / 2>(cache, get_pipeline_index(d, 0), pipe,
+          arg.in[src_idx].template cache_half<(1 - proj_dir) / 2>(cache, get_pipeline_index(d, 0), pipe,
                                                          fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
         }
       }
@@ -173,7 +173,7 @@ namespace quda
           arg.in[src_idx].cache(cache, get_pipeline_index(d, 1), pipe, back_idx + coord.s * arg.dc.volume_4d_cb,
                                 their_spinor_parity);
         } else {
-          arg.in[src_idx].cache_half<(1 - proj_dir) / 2>(cache, get_pipeline_index(d, 1), pipe,
+          arg.in[src_idx].template cache_half<(1 - proj_dir) / 2>(cache, get_pipeline_index(d, 1), pipe,
                                                          back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
         }
       }
@@ -206,7 +206,7 @@ namespace quda
           // load_forward(d + 1);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         } else {
-          HalfVector in = cache.load_color_spinor_half(get_pipeline_index(d, 0));
+          HalfVector in = cache.template load_color_spinor_half<(1 - proj_dir) / 2>(get_pipeline_index(d, 0));
           out += (U * (static_cast<real>(2.0) * in)).reconstruct(d, proj_dir);
         }
       }
@@ -239,7 +239,7 @@ namespace quda
           // load_backward(d + 1);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         } else {
-          HalfVector in = cache.load_color_spinor_half(get_pipeline_index(d, 1));
+          HalfVector in = cache.template load_color_spinor_half<(1 - proj_dir) / 2>(get_pipeline_index(d, 1));
           out += (conj(U) * (static_cast<real>(2.0) * in)).reconstruct(d, proj_dir);
         }
       }
