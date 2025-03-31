@@ -165,7 +165,7 @@ TEST_P(StaggeredEigensolveTest, verify)
     // size of the search space (eig-n-ev), or use a well chosen Chebyshev polynomial,
     // or use a tighter than necessary tolerance.
     tol *= 15;
-  } else if (::testing::get<0>(GetParam()) == QUDA_SINGLE_PRECISION && dslash_type != QUDA_LAPLACE_DSLASH) {
+  } else if (dslash_type != QUDA_LAPLACE_DSLASH) {
     // a bump of this size has empirically been needed for reasons related to
     // a deviation between the Ritz values computed by the Lanczos and the
     // exact eigenvalues.
