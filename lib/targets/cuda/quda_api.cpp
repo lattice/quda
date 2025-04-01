@@ -137,7 +137,9 @@ namespace quda
       auto search = cache.find(func);
       if (search == cache.end()) {
         cache.insert(func);
+#if 0
         qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+#endif
         cudaFuncAttributes attributes;
         qudaFuncGetAttributes(attributes, func);
         qudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
