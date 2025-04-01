@@ -8,6 +8,7 @@
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
 #include <kernels/spinor_reweight.cuh>
+#include <stencil_cache.cuh>
 
 namespace quda
 {
@@ -81,7 +82,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, Coord &local_coord, int parity, int idx,
                                               int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
@@ -91,6 +92,9 @@ namespace quda
 
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
+
+    auto block = target::block_dim();
+    VanillaSharedMemoryCache<Vector> cache(arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
 
     const int t = arg.comm_coord_dim_3 + coord[3];
     const int nt = arg.comm_dim_dim_3;
@@ -123,8 +127,23 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
+#if 0
           Vector in = arg.in[src_idx](fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-
+#else
+          Vector in;
+          if (arg.tb.cache_ext) {
+            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
+            in = cache.load(local_fwd_idx);
+          } else {
+            bool out_of_block = (local_coord[d] + 1) >= arg.tb.dim[d] && arg.tb.dim[d] < arg.dim[d];
+            if (out_of_block) {
+              in = arg.in[src_idx](fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+            } else {
+              int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
+              in = cache.load(local_fwd_idx);
+            }
+          }
+#endif
           out += fwd_coeff * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
@@ -151,12 +170,70 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
+#if 0
           Vector in = arg.in[src_idx](back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-
+#else
+          Vector in;
+          if (arg.tb.cache_ext) {
+            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
+            in = cache.load(local_fwd_idx);
+          } else {
+            bool out_of_block = (local_coord[d] - 1) < 0 && arg.tb.dim[d] < arg.dim[d];
+            if (out_of_block) {
+              in = arg.in[src_idx](back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+            } else {
+              int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
+              in = cache.load(local_fwd_idx);
+            }
+          }
+#endif
           out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
     } // nDim
+  }
+
+ template <typename Arg>
+  __host__ __device__ inline auto get_tb_coords_ex(const Arg &arg, int local_idx, int s, int parity)
+  {
+    Coord<4> coord;
+    Coord<4> local_coord;
+
+    int block_coord[4]; // coordinate of this threadblock in the threadblock grid
+
+    int block_idx = target::block_idx().x;
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      block_coord[d] = block_idx % arg.tb.grid_dim[d];
+      block_idx /= arg.tb.grid_dim[d];
+    }
+
+    int block_offset[4]; // global coordinate offset
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      block_offset[d] = block_coord[d] * arg.tb.dim[d];
+    }
+
+    int local_parity = (block_offset[0] + block_offset[1] + block_offset[2] + block_offset[3] + parity) % 2;
+
+    local_coord.X = getCoordsCB(local_coord, local_idx, arg.tb.dim_ex, arg.tb.Xex0h, local_parity);
+    local_coord.x_cb = local_idx;
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      // -1 for the boundary terms, % makes sure we get the around the world terms
+      coord[d] = (local_coord[d] - (arg.tb.dim[d] == arg.dim[d] ? 0 : 1) + block_offset[d] + arg.dim[d]) % arg.dim[d];
+    }
+    int index = 0;
+#pragma unroll
+    for (int d = 3; d >= 0; d--) {
+      index = index * arg.dim[d] + coord[d];
+    }
+    coord.X = index;
+    coord.x_cb = coord.X / 2;
+    coord.s = s;
+    local_coord.s = s;
+
+    return coord;
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
@@ -172,10 +249,15 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
+#if 0
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+#else
+      bool active = true;
+#endif
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
 
+#if 0
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
@@ -192,6 +274,46 @@ namespace quda
       }
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](xs, my_spinor_parity) = out;
+#else
+      // Load all interior color spinor fields
+      auto block = target::block_dim();
+      VanillaSharedMemoryCache<Vector> cache(arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
+      int local_idx = target::thread_idx().x;
+
+      while (local_idx < (arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb)) {
+        const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
+        Coord<4> coord;
+        if (arg.tb.cache_ext) {
+          // Get the coordinate with all the boundary conditions figured out
+          coord = get_tb_coords_ex(arg, local_idx, 0, 1 - (parity + arg.tb.parity_bit) % 2);
+        } else {
+          Coord<4> local_coord;
+          coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, 1 - parity, thread_dim, local_coord);
+        }
+        cache.save(arg.in[src_idx](coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity), local_idx);
+        local_idx += target::block_dim().x;
+      }
+      cache.sync();
+
+      local_idx = target::thread_idx().x;
+      while (local_idx < arg.tb.volume_4d_cb) {
+        Coord<4> local_coord;
+        auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, parity, thread_dim, local_coord);
+
+        const int my_spinor_parity = nParity == 2 ? parity : 0;
+        Vector out;
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, local_coord, parity, idx, thread_dim, active, src_idx);
+
+        int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
+        if (xpay) {
+          Vector x = arg.x[src_idx](xs, my_spinor_parity);
+          out = x + arg.a * out;
+        }
+        arg.out[src_idx](xs, my_spinor_parity) = out;
+
+        local_idx += target::block_dim().x;
+      }
+#endif
     }
   };
 

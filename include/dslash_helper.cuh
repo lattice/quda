@@ -84,6 +84,59 @@ namespace quda
     return !incomplete;
   }
 
+template <typename Coord, typename Arg>
+  __device__ __host__ inline int getCoordsCB_blocking(Coord &x, Coord &local_coord, int thread_idx_cb,
+    int block_idx, const Arg &arg, int parity)
+  {
+    int block_coord[4];
+
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      block_coord[d] = block_idx % arg.tb.grid_dim[d];
+      block_idx /= arg.tb.grid_dim[d];
+    }
+
+    int offset[4];
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      offset[d] = block_coord[d] * arg.tb.dim[d];
+    }
+
+    int local_parity = (offset[0] + offset[1] + offset[2] + offset[3] + parity) % 2;
+
+    local_coord.X = getCoordsCB(local_coord, thread_idx_cb, arg.tb.dim, arg.tb.X0h, local_parity);
+    // local_coord.x_cb = thread_idx_cb;
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      x[d] = local_coord[d] + offset[d];
+      if (arg.tb.cache_ext) {
+        // Get the extended coord
+        if (arg.tb.dim[d] != arg.dim[d]) {
+          local_coord[d] += 1;
+        }
+      }
+    }
+
+    if (arg.tb.cache_ext) {
+      int local_index = 0;
+#pragma unroll
+      for (int d = 3; d >= 0; d--) {
+        local_index = local_index * arg.tb.dim_ex[d] + local_coord[d];
+      }
+      local_coord.X = local_index;
+      local_coord.x_cb = local_index / 2;
+    } else {
+      local_coord.x_cb = thread_idx_cb;
+    }
+
+    int index = 0;
+#pragma unroll
+    for (int d = 3; d >= 0; d--) {
+      index = index * arg.dim[d] + x[d];
+    }
+    return index;
+  }
+
   /**
      @brief Compute the space-time coordinates we are at.
      @param[out] coord The computed space-time coordinates
@@ -96,7 +149,7 @@ namespace quda
      @return checkerboard space-time index
   */
   template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
-  __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
+  __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim, Coord<Arg::nDim> &local_coord)
   {
     constexpr auto nDim = Arg::nDim;
     Coord<nDim> coord;
@@ -109,8 +162,13 @@ namespace quda
       coord.x_cb = idx;
       if (nDim == 5)
         coord.X = getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
-      else
-        coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+      else {
+        // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+        int block_idx = target::block_idx().x;
+        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg, parity);
+        local_coord.s = s;
+        coord.x_cb = coord.X / 2;
+      }
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
@@ -237,6 +295,32 @@ namespace quda
     return true;
   }
 
+  struct thread_blocking_t {
+    int_fastdiv dim[5];
+    int_fastdiv X0h;
+
+    int_fastdiv grid_dim[5];
+
+    int_fastdiv dim_ex[5];
+    int_fastdiv Xex0h;
+
+    int volume_4d_cb;
+    int volume_4d_cb_ex;
+
+    int X1;
+    int X2X1;
+    int X3X2X1;
+
+    int X2X1mX1;
+    int X3X2X1mX2X1;
+    int X4X3X2X1mX3X2X1;
+    int X5X4X3X2X1mX4X3X2X1;
+
+    int parity_bit;
+
+    bool cache_ext;
+  };
+
   template <typename Float_, int nDim_, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
@@ -248,6 +332,8 @@ namespace quda
     const int nParity; // number of parities we're working on
     const int nFace;   // hard code to 1 for now
     const QudaReconstructType reconstruct;
+
+    thread_blocking_t tb;
 
     const int_fastdiv X0h;
     const int_fastdiv dim[5]; // full lattice dimensions
