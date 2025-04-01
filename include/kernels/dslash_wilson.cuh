@@ -94,7 +94,7 @@ namespace quda
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
     auto block = target::block_dim();
-    VanillaSharedMemoryCache<Vector> cache(arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
+    VanillaSharedMemoryCache<Vector> cache(0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
 
     const int t = arg.comm_coord_dim_3 + coord[3];
     const int nt = arg.comm_dim_dim_3;
@@ -131,7 +131,7 @@ namespace quda
           Vector in = arg.in[src_idx](fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 #else
           Vector in;
-          if (arg.tb.cache_ext) {
+          if (0) {
             int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
             in = cache.load(local_fwd_idx);
           } else {
@@ -174,7 +174,7 @@ namespace quda
           Vector in = arg.in[src_idx](back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 #else
           Vector in;
-          if (arg.tb.cache_ext) {
+          if (0) {
             int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
             in = cache.load(local_fwd_idx);
           } else {
@@ -277,13 +277,13 @@ namespace quda
 #else
       // Load all interior color spinor fields
       auto block = target::block_dim();
-      VanillaSharedMemoryCache<Vector> cache(arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
+      VanillaSharedMemoryCache<Vector> cache(0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
       int local_idx = target::thread_idx().x;
 
-      while (local_idx < (arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb)) {
+      while (local_idx < (0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb)) {
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
         Coord<4> coord;
-        if (arg.tb.cache_ext) {
+        if (0) {
           // Get the coordinate with all the boundary conditions figured out
           coord = get_tb_coords_ex(arg, local_idx, 0, 1 - (parity + arg.tb.parity_bit) % 2);
         } else {
