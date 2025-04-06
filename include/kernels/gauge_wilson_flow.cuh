@@ -30,15 +30,17 @@ namespace quda
     int border[4];
     int_fastdiv E[4];
     const real epsilon;
+    const real anisotropy;
     const real coeff1x1;
     const real coeff2x1;
 
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon, const real anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
       in(in),
       epsilon(epsilon),
+      anisotropy(anisotropy),
       coeff1x1(5.0 / 3.0),
       coeff2x1(-1.0 / 12.0)
     {
@@ -72,14 +74,14 @@ namespace quda
     static_assert(Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW);
     if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim);
+      computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim, arg.anisotropy);
     } else if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
       typename computeStapleOpsWF<Arg>::StapOp Stap {ftor};
       typename computeStapleOpsWF<Arg>::RectOp Rect {ftor};
-      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
+      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim, arg.anisotropy);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
     }
     return Z;
@@ -260,6 +262,7 @@ namespace quda
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
   template <typename Arg_> struct WFlow : computeStapleOpsWF<Arg_>::Ops {
     using Arg = Arg_;
+    using real = typename Arg_::real;
     using typename computeStapleOpsWF<Arg>::Ops::KernelOpsT;
     const Arg &arg;
     template <typename... OpsArgs> constexpr WFlow(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
@@ -269,7 +272,6 @@ namespace quda
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::real;
       using Link = Matrix<complex<real>, Arg::nColor>;
       complex<real> im(0.0, -1.0);
 

@@ -862,6 +862,7 @@ extern "C" {
     unsigned int n_steps; /**< The total number of smearing steps to perform. */
     double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
                              Wilson/Symanzik flow */
+    double smear_anisotropy; /** Used in anisotropic Wilson/Symanzik flow **/
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/

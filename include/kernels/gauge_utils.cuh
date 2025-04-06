@@ -23,10 +23,13 @@ namespace quda
   using computeStapleOps = KernelOps<thread_array<int, 4>>;
   template <typename Ftor, typename Staple, typename Int>
   __host__ __device__ inline void computeStaple(const Ftor &ftor, const int *x, const Int *X, const int parity,
-                                                const int nu, Staple &staple, const int dir_ignore)
+                                                const int nu, Staple &staple, const int dir_ignore,
+						const double anisotropy = 1.0)
   {
     const auto &arg = ftor.arg;
     using Link = typename get_type<Staple>::type;
+    using real = typename Ftor::real;
+    real coeff;
     staple = Link();
 
     thread_array<int, 4> dx {ftor};
@@ -35,6 +38,10 @@ namespace quda
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
+
+      coeff = 1.0;
+      if(mu==3) coeff = anisotropy*anisotropy;
+
       if (mu != nu && mu != dir_ignore) {
         {
           // Get link U_{\mu}(x)
@@ -51,7 +58,7 @@ namespace quda
           dx[nu]--;
 
           // staple += U_{\mu}(x) * U_{\nu}(x+\mu) * U^\dag_{\mu}(x+\nu)
-          staple = staple + U1 * U2 * conj(U3);
+          staple = staple + coeff * U1 * U2 * conj(U3);
         }
 
         {
@@ -70,7 +77,7 @@ namespace quda
           dx[mu]++;
 
           // staple += U^\dag_{\mu}(x-\mu) * U_{\nu}(x-\mu) * U_{\mu}(x-\mu+\nu)
-          staple = staple + conj(U1) * U2 * U3;
+          staple = staple + coeff * conj(U1) * U2 * U3;
         }
       }
     }
@@ -102,10 +109,12 @@ namespace quda
   template <typename Ftor, typename Staple, typename Rectangle, typename Int>
   __host__ __device__ inline void computeStapleRectangle(const Ftor &ftor, const int *x, const Int *X, const int parity,
                                                          const int nu, Staple &staple, Rectangle &rectangle,
-                                                         const int dir_ignore)
+                                                         const int dir_ignore, const double anisotropy = 1.0)
   {
     const auto &arg = ftor.arg;
     using Link = typename get_type<Staple>::type;
+    using real = typename Ftor::real;
+    real coeff;
     staple = Link();
     rectangle = Link();
 
@@ -114,6 +123,10 @@ namespace quda
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological
       // measurements which will include the temporal direction.
+      
+      coeff = 1.0;
+      if(mu==3) coeff = anisotropy*anisotropy;
+
       if (mu != nu && mu != dir_ignore) {
         // RECTANGLE calculation
         // This is done in three parts. For some link U_nu(x) there are
@@ -154,14 +167,14 @@ namespace quda
 	  Link U3 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 	
 	  // Complete R12b
-	  rectangle = rectangle + U1 * U2 * conj(U3);
+	  rectangle = rectangle + coeff * U1 * U2 * conj(U3);
 	  
 	  // Get link U_mu(x)
 	  dx[nu]--; //0,0
 	  U1 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 	  
 	  //Complete Wilson staple
-	  staple = staple + U1 * U2 * conj(U3);
+	  staple = staple + coeff * U1 * U2 * conj(U3);
 	  
 	  dx[mu]++; //1,0
 	  dx[nu]++; //1,1
@@ -178,7 +191,7 @@ namespace quda
 	  U2 = U2 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
 	  
 	  // complete R21f
-	  rectangle = rectangle + U2;
+	  rectangle = rectangle + coeff * U2;
 	  
 	  dx[nu]--; //0,0
 	  U2 = U1;
@@ -195,7 +208,7 @@ namespace quda
 	  U2 = U2 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
 	  
 	  // Complete R21s
-	  rectangle = rectangle + U2 * conj(U3);
+	  rectangle = rectangle + coeff * U2 * conj(U3);
 	}
         //--------//
         // -ve mu //
@@ -223,14 +236,14 @@ namespace quda
 	  Link U3 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 	
 	  // Complete R12b
-	  rectangle = rectangle + U1 * U2 * U3;
+	  rectangle = rectangle + coeff * U1 * U2 * U3;
 	  
 	  dx[nu]--; //-1,0
 	  // Get link U_mu(x-mu)
 	  U1 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 	  
 	  // Complete Wilson staple
-	  staple = staple + conj(U1) * U2 * U3;
+	  staple = staple + coeff * conj(U1) * U2 * U3;
 	  
 	  dx[nu]++; //-1,1
 	  // Accumulate forward staple in U2
@@ -243,7 +256,7 @@ namespace quda
 	  U2 = U2 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
 	  
 	  // Complete R21f
-	  rectangle = rectangle + U2;
+	  rectangle = rectangle + coeff * U2;
 	  
 	  dx[nu]--; //0,0
 	  dx[mu]--; //-1,0
@@ -256,7 +269,7 @@ namespace quda
 	  U2 = U2 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
 	  
 	  // Complete R21s
-	  rectangle = rectangle + U2 * U3;
+	  rectangle = rectangle + coeff * U2 * U3;
 	  
 	  //reset dx
 	  dx[nu]--; //-2,0

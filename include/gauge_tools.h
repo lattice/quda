@@ -142,8 +142,9 @@ namespace quda
      @param[in] in Input gauge field
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
+     @param[in] smear_anisotropy for anisotropic Wilson or Symanzik flow
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type, double smear_anisotropy);
 
   /**
      @brief Apply Wilson Flow fourth-order steps to the gauge field.
@@ -156,8 +157,9 @@ namespace quda
      @param[in] in Input gauge field
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
+     @param[in] smear_anisotropy for anisotropic Wilson or Symanzik flow
   */
-  void WFlowStepFourthOrder(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
+  void WFlowStepFourthOrder(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type, double smear_anisotropy);
   
   /**
      @brief Apply intermediary Wilson Flow steps W1, W2 or Vt to the gauge field.

@@ -5231,7 +5231,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
     // https://arxiv.org/abs/1006.4518v3
     // This uses 3-stage third order Runge-Kutta integration
     if (i > 0) std::swap(in, out); // output from prior step becomes input for next step
-    WFlowStep(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type);
+    WFlowStep(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy);
 
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.
@@ -5320,7 +5320,7 @@ void performWFlowFourthOrderQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObse
     // Perform Wilson Flow steps using 6-stage fourth order Runge-Kutta integration
     // Coefficients from Berland, Bogey, and Bailly, Computers and Fluids 35 (2006) 1459-1463
     if (i > 0) std::swap(in, out); // output from prior step becomes input for next step
-    WFlowStepFourthOrder(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type);
+    WFlowStepFourthOrder(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy);
 
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.

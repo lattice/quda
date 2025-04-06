@@ -43,6 +43,7 @@ namespace quda
 
   template <typename Arg> struct APE : computeStapleOps {
     const Arg &arg;
+    using real = typename Arg::Float;
     template <typename... OpsArgs> constexpr APE(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
     {
     }
@@ -50,7 +51,6 @@ namespace quda
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
