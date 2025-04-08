@@ -1172,6 +1172,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(rho, 0.0);
   P(epsilon, 0.0);
   P(smear_anisotropy, 1.0);
+  P(rk_order, 3);
   P(restart, QUDA_BOOLEAN_FALSE);
   P(t0, 0.0);
   P(alpha1, 0.0);
@@ -1185,6 +1186,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
   P(smear_anisotropy, INVALID_DOUBLE);
+  P(rk_order, (unsigned int)INVALID_INT);
   P(restart, QUDA_BOOLEAN_INVALID);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);

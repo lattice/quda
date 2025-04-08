@@ -86,8 +86,8 @@ namespace quda
     }
     return Z;
   }
-
-  template <typename Link, typename Ftor>
+  
+    template <typename Link, typename Ftor>
   __host__ __device__ inline auto computeW1Step(const Ftor &ftor, Link &U, const int *x, const int parity,
                                                 const int x_cb, const int dir)
   {
@@ -139,124 +139,29 @@ namespace quda
     Z2 *= arg.epsilon;
     return Z2;
   }
-
-  template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeF1Step(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                                const int x_cb, const int dir)
-  {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor.arg;
-    // Compute staples and Z0
-    Link Z0 = computeStaple(ftor, x, parity, dir);
-    U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z0 *= conj(U);
-    // Store Z0 in temp
-    arg.temp(dir, x_cb, parity) = Z0;
-    Z0 *= static_cast<typename Arg::real>(0.032918605146) * arg.epsilon;
-    return Z0;
-  }
-
-  template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeF2Step(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                                const int x_cb, const int dir)
-  {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor.arg;
-    // Compute SU^\dagger
-    Link Z1 = computeStaple(ftor, x, parity, dir);
-    U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z1 *= conj(U);
-    // Retrieve Z0 stored in temp and multiply by a_1
-    Link Z0 = arg.temp(dir, x_cb, parity);
-    Z0 *= static_cast<typename Arg::real>(0.737101392796);
-    Z1 = Z1 - Z0;
-    // Store Z1 in temp
-    arg.temp(dir, x_cb, parity) = Z1;
-    // Return b_1*epsilon*Z1
-    Z1 *= static_cast<typename Arg::real>(0.823256998200) * arg.epsilon;
-    return Z1;
-  }
-
-  template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeF3Step(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                                const int x_cb, const int dir)
-  {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor.arg;
-    // Compute SU^\dagger
-    Link Z2 = computeStaple(ftor, x, parity, dir);
-    U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z2 *= conj(U);
-    // Retrieve Z1 stored in temp and multiply by a_2
-    Link Z1 = arg.temp(dir, x_cb, parity);
-    Z1 *= static_cast<typename Arg::real>(1.634740794341);
-    Z2 = Z2 - Z1;
-    // Store Z2 in temp
-    arg.temp(dir, x_cb, parity) = Z2;
-    // Return b_2*epsilon*Z2
-    Z2 *= static_cast<typename Arg::real>(0.381530948900) * arg.epsilon;
-    return Z2;
-  }
-
-  template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeF4Step(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                                const int x_cb, const int dir)
-  {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor.arg;
-    // Compute SU^\dagger
-    Link Z3 = computeStaple(ftor, x, parity, dir);
-    U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z3 *= conj(U);
-    // Retrieve Z2 stored in temp and multiply by a_3
-    Link Z2 = arg.temp(dir, x_cb, parity);
-    Z2 *= static_cast<typename Arg::real>(0.744739003780);
-    Z3 = Z3 - Z2;
-    // Store Z3 in temp
-    arg.temp(dir, x_cb, parity) = Z3;
-    // Return b_3*epsilon*Z3
-    Z3 *= static_cast<typename Arg::real>(0.200092213184) * arg.epsilon;
-    return Z3;
-  }
-
-  template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeF5Step(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                                const int x_cb, const int dir)
-  {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor.arg;
-    // Compute SU^\dagger
-    Link Z4 = computeStaple(ftor, x, parity, dir);
-    U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z4 *= conj(U);
-    // Retrieve Z3 stored in temp and multiply by a_4
-    Link Z3 = arg.temp(dir, x_cb, parity);
-    Z3 *= static_cast<typename Arg::real>(1.469897351522);
-    Z4 = Z4 - Z3;
-    // Store Z4 in temp
-    arg.temp(dir, x_cb, parity) = Z4;
-    // Return b_4*epsilon*Z4
-    Z4 *= static_cast<typename Arg::real>(1.718581042715) * arg.epsilon;
-    return Z4;
-  }
   
   template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeF6Step(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                                const int x_cb, const int dir)
+  __host__ __device__ inline auto computeWStep(const Ftor &ftor, Link &U, const int *x, const int parity,
+                                        const int x_cb, const int dir, const double coeff_a, const double coeff_b,
+                                        const bool get_stored, const bool do_store)
   {
     using Arg = typename Ftor::Arg;
     const Arg &arg = ftor.arg;
     // Compute SU^\dagger
-    Link Z5 = computeStaple(ftor, x, parity, dir);
+    Link Z = computeStaple(ftor, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z5 *= conj(U);
-    // Retrieve Z4 stored in temp and multiply by a_5
-    Link Z4 = arg.temp(dir, x_cb, parity);
-    Z4 *= static_cast<typename Arg::real>(2.813971388035);
-    Z5 = Z5 - Z4;
-    // Return b_5*epsilon*Z5
-    Z5 *= static_cast<typename Arg::real>(0.27) * arg.epsilon;
-    return Z5;
+    Z *= conj(U);
+    if( get_stored ) {
+      // Retrieve previous Z stored in temp and multiply by coeff_a
+      Link Z0 = arg.temp(dir, x_cb, parity);
+      Z0 *= static_cast<typename Arg::real>(coeff_a);
+      Z = Z - Z0;
+    }
+    // Store Z in temp for next stage
+    if( do_store ) arg.temp(dir, x_cb, parity) = Z;
+    // Return coeff_b*epsilon*Z
+    Z *= static_cast<typename Arg::real>(coeff_b) * arg.epsilon;
+    return Z;
   }
 
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
@@ -285,12 +190,12 @@ namespace quda
       case WFLOW_STEP_W1: Z = computeW1Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_W2: Z = computeW2Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_VT: Z = computeVtStep(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_1: Z = computeF1Step(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_2: Z = computeF2Step(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_3: Z = computeF3Step(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_4: Z = computeF4Step(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_5: Z = computeF5Step(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_6: Z = computeF6Step(*this, U, x, parity, x_cb, dir); break;
+      case WFLOW_4THORDER_STEP_1: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.0, 0.032918605146, false, true); break;
+      case WFLOW_4THORDER_STEP_2: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.737101392796, 0.823256998200, true, true); break;
+      case WFLOW_4THORDER_STEP_3: Z = computeWStep(*this, U, x, parity, x_cb, dir, 1.634740794341, 0.381530948900, true, true); break;
+      case WFLOW_4THORDER_STEP_4: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.744739003780, 0.200092213184, true, true); break;
+      case WFLOW_4THORDER_STEP_5: Z = computeWStep(*this, U, x, parity, x_cb, dir, 1.469897351522, 1.718581042715, true, true); break;
+      case WFLOW_4THORDER_STEP_6: Z = computeWStep(*this, U, x, parity, x_cb, dir, 2.813971388035, 0.27, true, false); break;
       }
 
       // Compute anti-hermitian projection of Z, exponentiate, update U

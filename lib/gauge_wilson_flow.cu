@@ -173,7 +173,7 @@ namespace quda {
     }
   }; // GaugeWFlowStep
 
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type, const double smear_anisotropy)
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type, const double smear_anisotropy, const int rk_order)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
@@ -183,49 +183,43 @@ namespace quda {
       errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
     
     // Set each step type as an arg parameter, update halos if needed
-    // Step W1
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_STEP_W1);
-    out.exchangeExtendedGhost(out.R(), false);
+    switch (rk_order) {
+    case 3: // Use 3-stage third-order Runga-Kutta integration
+      // Step W1
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_STEP_W1);
+      out.exchangeExtendedGhost(out.R(), false);
 
-    // Step W2
-    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_STEP_W2);
-    in.exchangeExtendedGhost(in.R(), false);
+      // Step W2
+      instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_STEP_W2);
+      in.exchangeExtendedGhost(in.R(), false);
 
-    // Step Vt
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_STEP_VT);
-    out.exchangeExtendedGhost(out.R(), false);
-  
-  }
+      // Step Vt
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_STEP_VT);
+      out.exchangeExtendedGhost(out.R(), false);
+      break;
+    case 4: // Use 6-stage fourth-order Runga-Kutta integration
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_1);
+      out.exchangeExtendedGhost(out.R(), false);
+    
+      instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_2);
+      in.exchangeExtendedGhost(in.R(), false);
+    
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_3);
+      out.exchangeExtendedGhost(out.R(), false);
+    
+      instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_4);
+      in.exchangeExtendedGhost(in.R(), false);
+    
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_5);
+      out.exchangeExtendedGhost(out.R(), false);
+    
+      instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_6);
+      in.exchangeExtendedGhost(in.R(), false);
 
-  void WFlowStepFourthOrder(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type, const double smear_anisotropy)
-  {
-    checkPrecision(out, temp, in);
-    checkReconstruct(out, in);
-    checkNative(out, in);
-    if (temp.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Temporary vector must not use reconstruct");
-    if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
-      errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
-
-    // Fourth order steps:
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_1);
-    out.exchangeExtendedGhost(out.R(), false);
-    
-    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_2);
-    in.exchangeExtendedGhost(in.R(), false);
-    
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_3);
-    out.exchangeExtendedGhost(out.R(), false);
-    
-    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_4);
-    in.exchangeExtendedGhost(in.R(), false);
-    
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_5);
-    out.exchangeExtendedGhost(out.R(), false);
-    
-    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_4THORDER_STEP_6);
-    in.exchangeExtendedGhost(in.R(), false);
-
-    out = in;    
+      out = in;
+      break;
+      default : errorQuda("Unsupported Runga-Kutta order %d", rk_order);
+    }
   }
 
   void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon,
