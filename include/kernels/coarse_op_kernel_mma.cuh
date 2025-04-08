@@ -11,6 +11,7 @@
 #include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
+#include <kernel_ops_target.h>
 
 namespace quda
 {
@@ -161,7 +162,8 @@ namespace quda
 
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
-          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
+	  KernelOps<BlockReduce<unsigned, block_dim>> ops{};
+          unsigned aggregate = BlockReduce<unsigned, block_dim>{ops}.Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }
