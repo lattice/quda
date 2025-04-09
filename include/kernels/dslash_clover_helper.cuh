@@ -181,18 +181,26 @@ namespace quda {
       arg.out[src_idx](x_cb, spinor_parity) = out;
     }
   };
-  
+
+  template <typename Arg>
+  using NdegTwistCloverApplyOps
+    = KernelOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>>>;
+
   // if (!inverse) apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1) to the input spinor
   // else apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor
   // noting that appropriate signs are carried by a and b depending on inverse
-  template <typename Arg> struct NdegTwistCloverApply {
+  template <typename Arg> struct NdegTwistCloverApply : NdegTwistCloverApplyOps<Arg> {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
     const Arg &arg;
-    constexpr NdegTwistCloverApply(const Arg &arg) : arg(arg) {}
+    using typename NdegTwistCloverApplyOps<Arg>::KernelOpsT;
+    template <typename... Ops>
+    constexpr NdegTwistCloverApply(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int src_flavor, int parity)
@@ -215,7 +223,7 @@ namespace quda {
 
       Mat A = arg.clover(x_cb, clover_parity, chirality);
 
-      SharedMemoryCache<half_fermion> cache;
+      SharedMemoryCache<half_fermion> cache {*this};
 
       half_fermion in_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
@@ -266,5 +274,4 @@ namespace quda {
       arg.out[src_idx](my_flavor_idx, spinor_parity) = out;
     }
   };
-
 }

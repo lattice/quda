@@ -574,6 +574,49 @@ void freeUniqueSloppyGaugeUtility(GaugeField *&precise, GaugeField *&sloppy, Gau
 void freeUniqueGaugeUtility(GaugeField *&precise, GaugeField *&sloppy, GaugeField *&precondition, GaugeField *&refinement,
                             GaugeField *&eigensolver, GaugeField *&extended, bool preserve_precise);
 
+/**
+ * Make extendedGaugeResident up to date with gaugePrecise. If new_gauge is true, a new extended gauge will
+ * be created from gaugePrecise and then assigned to extendedGaugeResident. If new_gauge is false, parameters
+ * of extendedGaugeResident will be checked against input ones. If they are different, a new extended gauge
+ * with these parameters will be created and assigned to extendedGaugeResident. If extendedGaugeResident has
+ * not been allocated, a new extended gauge will be created only if new_gauge is false (for those who do not
+ * want to allocate the extra field).
+ * @param new_gauge[in] Flag to indicate if a new gauge field has being loaded as gaugePrecise
+ * @param R[in] R parameter for createExtendedGauge()
+ * @param profile[in] profile parameter for createExtendedGauge()
+ * @param redundant_comms[in] redundant_comms parameter for createExtendedGauge()
+ * @param recon[in] recon parameter for createExtendedGauge()
+ */
+void updateExtendedGaugeResident(bool new_gauge, const lat_dim_t &R, TimeProfile &profile, bool redundant_comms = false,
+                                 QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID)
+{
+  if (!gaugePrecise) errorQuda("No resident gauge field allocated");
+  if (extendedGaugeResident) {
+    if (new_gauge) {
+      delete extendedGaugeResident;
+      extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profile, redundant_comms, recon);
+    } else if ((recon != QUDA_RECONSTRUCT_INVALID && recon != extendedGaugeResident->Reconstruct())
+               || (R[0] != extendedGaugeResident->R()[0]) || R[1] != extendedGaugeResident->R()[1]
+               || R[2] != extendedGaugeResident->R()[2] || R[3] != extendedGaugeResident->R()[3]) {
+      delete extendedGaugeResident;
+      extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profile, redundant_comms, recon);
+    }
+  } else if (!new_gauge) {
+    extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profile, redundant_comms, recon);
+  }
+}
+
+/**
+ * Make extendedGaugeResident up to date with gaugePrecise. If the extended gauge field has already been
+ * allocated, it could be assigned to extendedGaugeResident directly.
+ * @param extendedGauge[in] Already created extended gauge field
+ */
+void updateExtendedGaugeResident(GaugeField *extendedGauge)
+{
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = extendedGauge;
+}
+
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGauge);
@@ -729,6 +772,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeEigensolver = eigensolver;
 
       if(param->overlap) gaugeExtended = extended;
+      updateExtendedGaugeResident(true, R, profileGauge);
       break;
     case QUDA_ASQTAD_FAT_LINKS:
       gaugeFatPrecise = precise;
@@ -759,14 +803,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   delete in;
-
-  if (extendedGaugeResident) {
-    // updated the resident gauge field if needed
-    QudaReconstructType recon = extendedGaugeResident->Reconstruct();
-    delete extendedGaugeResident;
-    // Use the static R (which is defined at the very beginning of lib/interface_quda.cpp) here
-    extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
-  }
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -3947,17 +3983,16 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     std::exchange(*gaugePrecise, cudaSiteLink);
   }
 
+  if (qudaGaugeParam->make_resident_gauge) {
+    updateExtendedGaugeResident(cudaGauge);
+  } else {
+    delete cudaGauge;
+  }
+
   if (qudaGaugeParam->make_resident_mom && !qudaGaugeParam->use_resident_mom)
     std::exchange(momResident, cudaMom);
   else if (!qudaGaugeParam->make_resident_mom)
     momResident = GaugeField();
-
-  if (qudaGaugeParam->make_resident_gauge) {
-    if (extendedGaugeResident) delete extendedGaugeResident;
-    extendedGaugeResident = cudaGauge;
-  } else {
-    delete cudaGauge;
-  }
 
   return 0;
 }
@@ -4018,8 +4053,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   }
 
   if (qudaGaugeParam->make_resident_gauge) {
-    if (extendedGaugeResident) delete extendedGaugeResident;
-    extendedGaugeResident = cudaGauge;
+    updateExtendedGaugeResident(cudaGauge);
   } else {
     delete cudaGauge;
   }
@@ -4071,8 +4105,9 @@ void createCloverQuda(QudaInvertParam* invertParam)
   // for clover we optimize to only send depth 1 halos in y/z/t (FIXME - make work for x, make robust in general)
   lat_dim_t R;
   for (int d=0; d<4; d++) R[d] = (d==0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
-  GaugeField *gauge
-    = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, getProfile(), false, recon);
+  // FIXME always preserve the extended gauge
+  updateExtendedGaugeResident(false, R, profileClover, false, recon);
+  GaugeField *gauge = extendedGaugeResident;
 
   GaugeField *ex = gauge;
   if (gauge->Precision() < cloverPrecise->Precision()) {
@@ -4097,9 +4132,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
   cloverInvert(*cloverPrecise, cloverPrecise->Reconstruct());
 
   if (ex != gauge) delete ex;
-
-  // FIXME always preserve the extended gauge
-  extendedGaugeResident = gauge;
 }
 
 void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
@@ -4614,10 +4646,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
     errorQuda("solutionResident.size() %lu does not match number of shifts %d", solutionResident.size(), nvector);
 
   // Make sure extendedGaugeResident has the correct R
-  if (extendedGaugeResident) delete extendedGaugeResident;
   lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
-  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, getProfile());
+  updateExtendedGaugeResident(false, R, profileCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
@@ -4689,10 +4720,9 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coef
   }
 
   // Make sure extendedGaugeResident has the correct R
-  if (extendedGaugeResident) delete extendedGaugeResident;
   lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = (d == 0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
-  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileTMCloverForce);
+  updateExtendedGaugeResident(false, R, profileTMCloverForce);
   GaugeField &gaugeEx = *extendedGaugeResident;
 
   computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
@@ -4750,6 +4780,7 @@ void updateGaugeFieldQuda(void *gauge, void *momentum, double dt, int conj_mom, 
     if (gaugePrecise) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, u_out);
+    updateExtendedGaugeResident(true, R, profileGaugeUpdate);
   }
 
   if (param->make_resident_mom && !param->use_resident_mom)
@@ -4794,6 +4825,8 @@ void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaGauge);
   }
+
+  if (param->make_resident_gauge) { updateExtendedGaugeResident(true, R, profileProject); }
 }
 
 void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param)
@@ -4831,6 +4864,8 @@ void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param)
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaGauge);
   }
+
+  if (param->make_resident_gauge) { updateExtendedGaugeResident(true, R, profilePhase); }
 }
 
 // evaluate the momentum action
@@ -4872,10 +4907,7 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   if (!gaugePrecise) errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
   quda::gaugeGauss(*gaugePrecise, seed, sigma);
 
-  if (extendedGaugeResident) {
-    extendedGaugeResident->copy(*gaugePrecise);
-    extendedGaugeResident->exchangeExtendedGhost(R, profileGauss, redundant_comms);
-  }
+  updateExtendedGaugeResident(true, R, profileGauss);
 }
 
 void gaussMomQuda(unsigned long long seed, double sigma)
@@ -4894,8 +4926,8 @@ void plaqQuda(double plaq[3])
 
   if (!gaugePrecise) errorQuda("Cannot compute plaquette as there is no resident gauge field");
 
-  GaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
-  extendedGaugeResident = data;
+  updateExtendedGaugeResident(false, R, profilePlaq);
+  GaugeField *data = extendedGaugeResident;
 
   double3 plaq3 = quda::plaquette(*data);
   plaq[0] = plaq3.x;
@@ -4913,6 +4945,8 @@ void polyakovLoopQuda(double ploop[2], int dir)
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase
+    = extendedGaugeResident->StaggeredPhaseApplied() ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
   ploop[0] = obsParam.ploop[0];
   ploop[1] = obsParam.ploop[1];
@@ -4923,12 +4957,6 @@ void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, in
 {
   if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
 
-  if (extendedGaugeResident) delete extendedGaugeResident;
-  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
-
-  // informed by gauge path code; apply / remove gauge as appropriate
-  if (extendedGaugeResident->StaggeredPhaseApplied()) extendedGaugeResident->removeStaggeredPhase();
-
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
   obsParam.traces = traces;
@@ -4938,6 +4966,8 @@ void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, in
   obsParam.num_paths = num_paths;
   obsParam.max_length = max_length;
   obsParam.factor = factor;
+  obsParam.remove_staggered_phase
+    = extendedGaugeResident->StaggeredPhaseApplied() ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
 }
 
@@ -4947,8 +4977,7 @@ void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, in
 void copyExtendedResidentGaugeQuda(void *resident_gauge)
 {
   if (!gaugePrecise) errorQuda("Cannot perform deep copy of resident gauge field as there is no resident gauge field");
-  extendedGaugeResident
-    = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
+  updateExtendedGaugeResident(false, R, profilePlaq);
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
@@ -5237,8 +5266,8 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
 // perform forward gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246 (Appendix D)
 // the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)
-void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                      QudaGaugeObservableParam *obs_param)
+void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                      QudaGaugeObservableParam *obs_param, const size_t nSpinors)
 {
 
   auto profile = pushProfile(profileGFlow);
@@ -5273,15 +5302,25 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   precise = GaugeField(gParam_helper);
 
   // spinor fields
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-  ColorSpinorField fin_h(cpuParam);
-
-  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField fin(deviceParam);
-  fin = fin_h;
-
-  deviceParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField fout(deviceParam);
+  std::vector<ColorSpinorField> fin_h, fin, fout;
+  // auxilliary fermion fields [0], [1], [2] and [3]
+  std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+    fin_h.push_back(ColorSpinorField(cpuParam));
+    ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+    fin.push_back(ColorSpinorField(deviceParam));
+    fin[i] = fin_h[i];
+    deviceParam.create = QUDA_NULL_FIELD_CREATE;
+    fout.push_back(ColorSpinorField(deviceParam));
+    f_temp0.push_back(ColorSpinorField(deviceParam));
+    f_temp1.push_back(ColorSpinorField(deviceParam));
+    f_temp2.push_back(ColorSpinorField(deviceParam));
+    f_temp3.push_back(ColorSpinorField(deviceParam));
+    f_temp4.push_back(ColorSpinorField(deviceParam));
+    // set [3] = input spinor
+    f_temp3[i] = fin[i];
+  }
 
   int parity = 0;
 
@@ -5293,29 +5332,21 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
-  // auxilliary fermion fields [0], [1], [2] and [3]
-  ColorSpinorField f_temp0(deviceParam);
-  ColorSpinorField f_temp1(deviceParam);
-  ColorSpinorField f_temp2(deviceParam);
-  ColorSpinorField f_temp3(deviceParam);
-  ColorSpinorField f_temp4(deviceParam);
-
-  // set [3] = input spinor
-  f_temp3 = fin;
-
   int measurement_n = 0; // The nth measurement to take
 
   gaugeObservables(gin, obs_param[measurement_n]);
 
-  logQuda(QUDA_SUMMARIZE, "flow t, plaquette, norm(f_spinor)\n");
-  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e\n", smear_param->t0, obs_param[0].plaquette[0], blas::norm2(fin));
+  logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0);
+  logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[0].plaquette[0]);
+  for (size_t i = 0; i < nSpinors; i++) {
+    logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", i, blas::norm2(fin[i]));
+  }
 
   // loop, iterations of gf
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
 
     if (i > 0) std::swap(gin, gout); // output from prior step becomes input for next step
 
-    // init auxilliary fields [0], [1] and [2] as [3]
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
@@ -5335,7 +5366,6 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     // apply step W1 of gauge field flow part
     GFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
 
-    // STEP 2
     // [3] <- [1]
     f_temp3 = f_temp1;
 
@@ -5377,8 +5407,11 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.
       gaugeObservables(gout, obs_param[measurement_n]);
-      logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-              obs_param[measurement_n].plaquette[0], blas::norm2(fout));
+      logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0 + smear_param->epsilon * (i + 1));
+      logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[measurement_n].plaquette[0]);
+      for (size_t j = 0; j < nSpinors; j++) {
+        logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", j, blas::norm2(fout[j]));
+      }
     }
   } /* end of one iteration of GF application */
 
@@ -5386,10 +5419,12 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   copyExtendedGauge(*gaugeSmeared, gout, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(gaugeSmeared->R());
 
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField fout_h(cpuParam);
-  fout_h = fout;
+  // copy fout to h_out
+  for (size_t i = 0; i < nSpinors; i++) {
+    ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+    ColorSpinorField fout_h(cpuParam);
+    fout_h = fout[i];
+  }
 
   popOutputPrefix();
 
@@ -5882,8 +5917,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
     freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaInGauge);
-    if (extendedGaugeResident) delete extendedGaugeResident;
-    extendedGaugeResident = cudaInGaugeEx;
+    updateExtendedGaugeResident(cudaInGaugeEx);
   } else {
     delete cudaInGaugeEx;
   }
@@ -5921,6 +5955,7 @@ int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const u
     freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaInGauge);
+    updateExtendedGaugeResident(true, R, GaugeFixFFTQuda);
   }
 
   return 0;
@@ -6070,7 +6105,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 
   GaugeField *gauge = nullptr;
   if (!gaugeSmeared) {
-    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
+    updateExtendedGaugeResident(false, R, profileGaugeObs);
     gauge = extendedGaugeResident;
   } else {
     gauge = gaugeSmeared;
@@ -6085,6 +6120,9 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   }
 
   gaugeObservables(*gauge, *param);
+
+  // Restore the staggered phase
+  if (param->remove_staggered_phase == QUDA_BOOLEAN_TRUE) { gauge->applyStaggeredPhase(); }
 }
 
 static void check_param(double _Complex *host_sinks, void **host_quark, int n_quark, int tile_quark, void **host_evec,
