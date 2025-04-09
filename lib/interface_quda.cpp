@@ -3874,6 +3874,7 @@ void unitarize_fat(GaugeField &FatLink, GaugeField &UnitarizedLink){
     quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
                                      svd_abs_error);
 
+    int *num_failures_h = static_cast<int *>(pool_pinned_malloc(sizeof(int)));
     *num_failures_h = 0;
     quda::unitarizeLinks(UnitarizedLink, FatLink, num_failures_d); // unitarize on the gpu
     if (*num_failures_h > 0)
@@ -3919,7 +3920,7 @@ void set_act_path(double (&act_path)[6], int i){
 
 }
     
-void computeKSLinkNew(void *fatlink, void *longlink, void *ulink, void *inlink, double *path_coeff)
+void computeKSLinkNew(void *fatlink, void *longlink, void *ulink, void *inlink)
 {
     double act_path[6];
     auto profile = pushProfile(profileFatLink);
@@ -3957,6 +3958,28 @@ void computeKSLinkNew(void *fatlink, void *longlink, void *ulink, void *inlink, 
     fatKSLink(FatLink, *cudaInLinkEx2, act_path);
     delete cudaInLinkEx2;
     
+}
+
+void computeKSLinkO(GaugeField &FatLink, GaugeField &LongLink, GaugeField &ULink, GaugeField &InLink){
+    double act_path[6];
+    GaugeFieldParam gParam(*gaugeSmeared);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
+    gParam.link_type = QUDA_GENERAL_LINKS;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO; 
+    gParam.gauge = ULink.data();
+    GaugeField *cudaInLink = new GaugeField(gParam);
+    GaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
+    delete cudaInLink;
+    set_act_path(act_path,0);
+    fatKSLink(FatLink, *cudaInLinkEx, act_path);
+    unitarize_fat(FatLink,ULink);
+    delete cudaInLinkEx;
+    GaugeField *cudaInLinkEx2 = createExtendedGauge(ULink, R, profileFatLink);
+    set_act_path(act_path,1);
+    longKSLink(LongLink, *cudaInLinkEx2, act_path);
+    fatKSLink(FatLink, *cudaInLinkEx2, act_path);
+    delete cudaInLinkEx2;
 }
     
 void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
@@ -5759,7 +5782,7 @@ void gfEvolve(ColorSpinorField &f_temp3,std::vector<std::reference_wrapper<Gauge
     
 }
     
-void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
+void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf, QudaGaugeParam *gauge_param)
 { 
   const GaugeField gin = gf_list[0].get();
   GaugeField &g_W0 = gf_list[0].get();
@@ -5853,53 +5876,28 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     if (i_glob == 30) {
         // ColorSpinorField out;
         printfQuda("below vv is flowed adjoint\n");
-        // QudaGaugeParam gauge_param(*gaugePrecise);
-      // storage for CPU reference fat and long links w/non-zero Naik
-      // void *fat_reflink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
-      // void *long_reflink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
-    
-      // // Paths for step 1:
-      // void *vlink = nullptr;
-      // void *wlink = nullptr;
-    
-      // // Paths for step 2:
-      // void *fatlink = nullptr;
-      // void *longlink = nullptr;
-    
-      // // Place to accumulate Naiks
-      // void *fatlink_eps = nullptr;
-      // void *longlink_eps = nullptr;
-    
-      // void *qdp_sitelink[4] = {nullptr, nullptr, nullptr, nullptr};
-      // void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
-      // void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
-      // void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
-      // void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
-        //create hisq
-// // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-//       computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &gauge_param);
-
-//       if (n_naiks > 1) {
-//         // Create Naiks, 3rd path table set
-//         computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[2].data(), &gauge_param);
-
-//         // Rescale+copy Naiks into Naik field
-//         cpu_axy(gauge_param.cuda_prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
-//         cpu_axy(gauge_param.cuda_prec, eps_naik, longlink, longlink_eps, V * 4 * gauge_site_size);
-//       } else {
-//         memset(fatlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
-//         memset(longlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
-//       }
-        
-      // computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &gauge_param);
-      // // Create X and long links, 2nd path table set
-      // computeKSLinkQuda(gaugeFatPrecise, gaugeLongPrecise, nullptr, gaugePrecise, act_path[1].data(), &gauge_param);
-
-      //milc_inlinks --> GaugeSmeared; use saveGaugeQuda to download to cpu
-      // loadfatlongGaugeQuda
-
-        
         f_temp3.PrintVector(0,300,0);
+
+        GaugeField inlink = *gaugeSmeared;
+        GaugeField fatlink = *gaugeSmeared;
+        GaugeField longlink = *gaugeSmeared;
+        GaugeField ulink = *gaugeSmeared;
+        computeKSLinkO(fatlink,longlink,ulink,inlink);
+
+        // QudaGaugeParam gauge_param = newQudaGaugeParam();
+        // gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+
+        // GaugeFieldParam gParam(gauge_param, fatlink, QUDA_GENERAL_LINKS);
+        GaugeFieldParam gParam(*gaugeSmeared);
+        gParam.location = QUDA_CPU_FIELD_LOCATION;
+        gParam.order = QUDA_MILC_GAUGE_ORDER;
+        GaugeField cpuFatLink(gParam); // create the host fatlink
+        cpuFatLink.copy(fatlink);
+        GaugeField cpuLongLink(gParam); // create the host fatlink
+        cpuLongLink.copy(longlink);
+        
+        loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
+        
         invertQuda(f_temp4.data(),f_temp3.data(),inv_param);
         printfQuda("below vv is solved spinor\n");
         f_temp4.PrintVector(0,300,0);
@@ -5910,6 +5908,15 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
         f_temp4.PrintVector(0,300,0);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(f_temp4,f_temp3);
         printfQuda("well soemthing happened %1.5e \n",PsiPsibarR[0]);
+
+        // GaugeFieldParam gParam(*gaugeSmeared);
+        gParam.location = QUDA_CPU_FIELD_LOCATION;
+        gParam.order = QUDA_MILC_GAUGE_ORDER;
+        cpuFatLink.copy(*gaugeSmeared);
+        cpuLongLink.copy(*gaugeSmeared);
+        
+        loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
+        
     } 
 
   }
@@ -5965,7 +5972,7 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 }
 
-void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param){
+void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaGaugeParam *gauge_param){
 
   auto profile = pushProfile(profileAdjGFlowHier);
   pushOutputPrefix("performAdjGFlowQudaHier: ");
@@ -6077,7 +6084,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
       logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
-      adjSafeEvolve(sf_list,gf_list,smear_param,inv_param,hier_list.back(),profileAdjGFlowHier,meas_cinf);
+      adjSafeEvolve(sf_list,gf_list,smear_param,inv_param,hier_list.back(),profileAdjGFlowHier,meas_cinf,gauge_param);
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
       for (int j = 0; j < (int) hier_list.size(); j++ ){
@@ -6095,7 +6102,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
               
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,smear_param,inv_param,hier_list[i],profileAdjGFlowHier,meas_cinf);
+             adjSafeEvolve(sf_list,gf_list,smear_param,inv_param,hier_list[i],profileAdjGFlowHier,meas_cinf,gauge_param);
 
              logQuda(QUDA_DEBUG_VERBOSE," block number %d successfully deployed \n",i);
             }

@@ -274,7 +274,7 @@ int main(int argc, char **argv)
      
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
-    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param);
+    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, &gauge_param);
     host_hier_timer.stop();
     host_safe_timer.start();
     performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
