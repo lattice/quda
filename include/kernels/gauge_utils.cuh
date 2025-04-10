@@ -20,6 +20,7 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (2*18 + 4*198) = dims*828
+  // Note: ops count does not include scalar-matrix mults coming from anisotropy implementation
   using computeStapleOps = KernelOps<thread_array<int, 4>>;
   template <typename Ftor, typename Staple, typename Int>
   __host__ __device__ inline void computeStaple(const Ftor &ftor, const int *x, const Int *X, const int parity,
@@ -105,6 +106,7 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
+  // Note: ops count does not include scalar-matrix mults coming from anisotropy implementation
   using computeStapleRectangleOps = KernelOps<thread_array<int, 4>>;
   template <typename Ftor, typename Staple, typename Rectangle, typename Int>
   __host__ __device__ inline void computeStapleRectangle(const Ftor &ftor, const int *x, const Int *X, const int parity,
