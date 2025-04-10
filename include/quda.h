@@ -836,6 +836,7 @@ extern "C" {
     QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
     double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_rectangle;        /**< Whether to compute the rectangle */
     QudaBoolean compute_polyakov_loop;    /**< Whether to compute the temporal Polyakov loop */
     double ploop[2];                      /**< Real and imaginary part of temporal Polyakov loop */
     QudaBoolean compute_gauge_loop_trace; /**< Whether to compute gauge loop traces */

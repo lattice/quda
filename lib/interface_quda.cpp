@@ -5204,59 +5204,92 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   gaugeObservables(in, obs_param[measurement_n]);
 
-  // Assume first six rectangles are spatial and last six are temporal
-  double rect_s = 0.0;
-  double rect_t = 0.0;
-  for (int i = 0; i < 6; i++) {
-    double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-    std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-    rect_s += traces_.real();
-  }
-  for (int i = 6; i < 12; i++) {
-    double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-    std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-    rect_t += traces_.real();
-  }
-  rect_s /= 6.0;
-  rect_t /= 6.0;
+  QudaBoolean compute_plaq = obs_param[measurement_n].compute_plaquette;
+  QudaBoolean compute_rect = obs_param[measurement_n].compute_rectangle;
+  QudaBoolean compute_ploop = obs_param[measurement_n].compute_polyakov_loop;
+  QudaBoolean compute_charge = obs_param[measurement_n].compute_qcharge;
 
-  logQuda(QUDA_SUMMARIZE, "flow t, Clover_t, Clover_s, Plaq_t, Plaq_s, Rect_t, Rect_s, charge\n");
-  logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->t0,
-		  obs_param[0].energy[2], obs_param[0].energy[1],
-		  obs_param[0].plaquette[2]*3.0,obs_param[0].plaquette[1]*3.0,
-	  	  rect_t, rect_s, obs_param[0].qcharge);
+  // Print observables header
+  printf("performWFlowQuda: flow t, Clover_t, Clover_s");
+  if( compute_plaq ) printf(", Plaq_t, Plaq_s");
+  if( compute_rect ) printf(", Rect_t, Rect_s");
+  if( compute_ploop ) printf(", Ploop_r, Ploop_i");
+  if( compute_charge ) printf(", charge");
+  printf("\n");
+
+  double rect_s;
+  double rect_t;
+  if( obs_param[measurement_n].compute_rectangle ) {
+    // Assume first six rectangles are spatial and last six are temporal
+    rect_s = 0.0;
+    rect_t = 0.0;
+    for (int i = 0; i < 6; i++) {
+      double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+      rect_s += traces_.real();
+    }
+    for (int i = 6; i < 12; i++) {
+      double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+      rect_t += traces_.real();
+    }
+    rect_s /= 6.0;
+    rect_t /= 6.0;
+  } // if compute_rectangle
+
+  // Print initial values
+  printf("performWFlowQuda: %le %.16e %+.16e", smear_param->t0,
+                  obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+  if( compute_plaq ) printf(" %+.16e %+.16e", 
+                  obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0);
+  if( compute_rect ) printf(" %+.16e %+.16e", rect_t, rect_s);
+  if( compute_ploop ) printf(" %+.16e %+.16e", 
+                  obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+  if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
+  printf("\n");
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
-    // Perform W1, W2, and Vt Wilson Flow steps as defined in
-    // https://arxiv.org/abs/1006.4518v3
-    // This uses 3-stage third order Runge-Kutta integration
+    // This uses 3-stage third order or 6-stage fourth order Runge-Kutta integration
     if (i > 0) std::swap(in, out); // output from prior step becomes input for next step
     WFlowStep(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy, smear_param->rk_order);
 
     if ((i + 1) % smear_param->meas_interval == 0) {
-      measurement_n++; // increment measurements.
+      measurement_n++; // increment measurements
+
+      compute_plaq = obs_param[measurement_n].compute_plaquette;
+      compute_rect = obs_param[measurement_n].compute_rectangle;
+      compute_ploop = obs_param[measurement_n].compute_polyakov_loop;
+      compute_charge = obs_param[measurement_n].compute_qcharge;
+
       gaugeObservables(out, obs_param[measurement_n]);
 
-      // Assume first six rectangles are spatial and last six are temporal
-      double rect_s = 0.0;
-      double rect_t = 0.0;
-      for (int i = 0; i < 6; i++) {
-        double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-        std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-        rect_s += traces_.real();
+      if( obs_param[measurement_n].compute_rectangle ) {
+        // Assume first six rectangles are spatial and last six are temporal
+        rect_s = 0.0;
+        rect_t = 0.0;
+        for (int i = 0; i < 6; i++) {
+          double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+          std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+          rect_s += traces_.real();
+        }
+        for (int i = 6; i < 12; i++) {
+          double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
+          std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+          rect_t += traces_.real();
+        }
+        rect_s /= 6.0;
+        rect_t /= 6.0;
       }
-      for (int i = 6; i < 12; i++) {
-        double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-        std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-        rect_t += traces_.real();
-      }
-      rect_s /= 6.0;
-      rect_t /= 6.0;
+      printf("performWFlowQuda: %le %.16e %+.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
+                  obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+      if( compute_plaq ) printf(" %+.16e %+.16e", 
+                  obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0);
+      if( compute_rect ) printf(" %+.16e %+.16e", rect_t, rect_s);
+      if( compute_ploop ) printf(" %+.16e %+.16e", 
+                  obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+      if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
+      printf("\n");
 
-      logQuda(QUDA_SUMMARIZE, "%le %.16e %+.16e %+.16e %+.16e %+.16e %+.16e %+.16e\n", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-                  obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1],
-                  obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0,
-                  rect_t, rect_s, obs_param[measurement_n].qcharge);
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
