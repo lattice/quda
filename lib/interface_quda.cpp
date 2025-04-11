@@ -111,7 +111,7 @@ GaugeField *extendedGaugeResident = nullptr;
 /** 
   callMultiSrcQuda related gauge split
   update_split_gauge : -1 delete buffer after usage, 0 split gauge in buf, 1 split gauge not in buf
-  update_split_gauge set to -1 if QudaGaugeParam.use_split_gauge_bkup == 0, 1 if QudaGaugeParam.use_split_gauge_bkup == 1
+  update_split_gauge set to -1 if QudaGaugeParam.use_split_gauge_bkup == QUDA_BOOLEAN_FALSE, 1 if QudaGaugeParam.use_split_gauge_bkup == QUDA_BOOLEAN_TRUE
   split_grid_bkup will be used to check whether split layout is changed or not
   update_split_gauge > 0 and split gauge in buf, the original links will swap with *_bkup 
   */
@@ -650,7 +650,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // set update_split_gauge to reuse backup or not and free the buf if needed
   // always update the flag even gauge reuse with checksum
   // better way would be do the checks more consistently along with clover/stagger
-  if(param->use_split_gauge_bkup == 1){
+  if(param->use_split_gauge_bkup == QUDA_BOOLEAN_TRUE){
     update_split_gauge = 1;
   }
   else{
