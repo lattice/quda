@@ -28,10 +28,18 @@ namespace quda
 
      @param[in] U The gauge field upon which to compute the plaquette
      @return double3 variable returning (plaquette, spatial plaquette,
-     temporal plaquette) site averages normalized such that each
-     plaquette is in the range [0,1]
+     temporal plaquette) site averages
    */
   double3 plaquette(const GaugeField &U);
+  
+  /**
+     @brief Compute the plaquette and rectangle (1x2 + 2x1) of the gauge field
+
+     @param[in] U The gauge field upon which to compute the plaquette and rectangle
+     @return double4 variable returning (spatial plaquette, temporal plaquette,
+     spatial rectangle, temporal rectangle) site averages
+   */
+  double4 plaquetteRectangle(const GaugeField &U);
 
   /**
      @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U

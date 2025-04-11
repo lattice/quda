@@ -5217,32 +5217,13 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   if( compute_charge ) printf(", charge");
   printf("\n");
 
-  double rect_s;
-  double rect_t;
-  if( obs_param[measurement_n].compute_rectangle ) {
-    // Assume first six rectangles are spatial and last six are temporal
-    rect_s = 0.0;
-    rect_t = 0.0;
-    for (int i = 0; i < 6; i++) {
-      double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-      rect_s += traces_.real();
-    }
-    for (int i = 6; i < 12; i++) {
-      double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-      rect_t += traces_.real();
-    }
-    rect_s /= 6.0;
-    rect_t /= 6.0;
-  } // if compute_rectangle
-
   // Print initial values
   printf("performWFlowQuda: %le %.16e %+.16e", smear_param->t0,
                   obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
   if( compute_plaq ) printf(" %+.16e %+.16e", 
                   obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0);
-  if( compute_rect ) printf(" %+.16e %+.16e", rect_t, rect_s);
+  if( compute_rect ) printf(" %+.16e %+.16e", 
+                  obs_param[measurement_n].rectangle[2]*3.0,obs_param[measurement_n].rectangle[1]*3.0);
   if( compute_ploop ) printf(" %+.16e %+.16e", 
                   obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
   if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
@@ -5263,28 +5244,12 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
       gaugeObservables(out, obs_param[measurement_n]);
 
-      if( obs_param[measurement_n].compute_rectangle ) {
-        // Assume first six rectangles are spatial and last six are temporal
-        rect_s = 0.0;
-        rect_t = 0.0;
-        for (int i = 0; i < 6; i++) {
-          double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-          std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-          rect_s += traces_.real();
-        }
-        for (int i = 6; i < 12; i++) {
-          double *t_ptr = (double *)(&obs_param[measurement_n].traces[i]);
-          std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-          rect_t += traces_.real();
-        }
-        rect_s /= 6.0;
-        rect_t /= 6.0;
-      }
       printf("performWFlowQuda: %le %.16e %+.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
                   obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
       if( compute_plaq ) printf(" %+.16e %+.16e", 
                   obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0);
-      if( compute_rect ) printf(" %+.16e %+.16e", rect_t, rect_s);
+      if( compute_rect ) printf(" %+.16e %+.16e", 
+                  obs_param[measurement_n].rectangle[2]*3.0,obs_param[measurement_n].rectangle[1]*3.0);
       if( compute_ploop ) printf(" %+.16e %+.16e", 
                   obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
       if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
