@@ -865,7 +865,7 @@ extern "C" {
     double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
                              Wilson/Symanzik flow */
     double smear_anisotropy; /** Used in anisotropic Wilson/Symanzik flow **/
-    unsigned int rk_order; /** Order of the Runga-Kutta integrator: 3 or 4 **/
+    unsigned int rk_order;   /** Order of the Runga-Kutta integrator: 3 or 4 **/
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/
@@ -1694,7 +1694,7 @@ extern "C" {
    * observables we are making and the resulting observables.
    */
   void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
-  
+
   /**
    * Performs Gradient Flow (gauge + fermion) on gaugePrecise and stores it in gaugeSmeared
    * @param[out] h_out Output fermion field set

@@ -31,7 +31,7 @@ namespace quda
      temporal plaquette) site averages
    */
   double3 plaquette(const GaugeField &U);
-  
+
   /**
      @brief Compute the plaquette and rectangle (1x2 + 2x1) of the gauge field
 
@@ -153,8 +153,9 @@ namespace quda
      @param[in] smear_anisotropy for anisotropic Wilson or Symanzik flow
      @param[in] rk_order Order of the Runga-Kutta integrator
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type, double smear_anisotropy, int rk_order);
-  
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
+                 double smear_anisotropy, int rk_order);
+
   /**
      @brief Apply intermediary Wilson Flow steps W1, W2 or Vt to the gauge field.
      This routine assumes that the input and output fields are

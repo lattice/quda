@@ -5240,28 +5240,28 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   // Print observables header
   printf("performWFlowQuda: flow t, Energy_t, Energy_s");
-  if( compute_plaq ) printf(", Plaq_t, Plaq_s");
-  if( compute_rect ) printf(", Rect_t, Rect_s");
-  if( compute_ploop ) printf(", Ploop_r, Ploop_i");
-  if( compute_charge ) printf(", charge");
+  if (compute_plaq) printf(", Plaq_t, Plaq_s");
+  if (compute_rect) printf(", Rect_t, Rect_s");
+  if (compute_ploop) printf(", Ploop_r, Ploop_i");
+  if (compute_charge) printf(", charge");
   printf("\n");
 
   // Print initial values
-  printf("performWFlowQuda: %le %.16e %+.16e", smear_param->t0,
-                  obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
-  if( compute_plaq ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].plaquette[2],obs_param[measurement_n].plaquette[1]);
-  if( compute_rect ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].rectangle[2],obs_param[measurement_n].rectangle[1]);
-  if( compute_ploop ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
-  if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
+  printf("performWFlowQuda: %le %.16e %+.16e", smear_param->t0, obs_param[measurement_n].energy[2],
+         obs_param[measurement_n].energy[1]);
+  if (compute_plaq)
+    printf(" %+.16e %+.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+  if (compute_rect)
+    printf(" %+.16e %+.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
+  if (compute_ploop) printf(" %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+  if (compute_charge) printf(" %+.16e", obs_param[measurement_n].qcharge);
   printf("\n");
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     // This uses 3-stage third order or 6-stage fourth order Runge-Kutta integration
     if (i > 0) std::swap(in, out); // output from prior step becomes input for next step
-    WFlowStep(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy, smear_param->rk_order);
+    WFlowStep(out, gaugeTemp, in, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
+              smear_param->rk_order);
 
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements
@@ -5274,16 +5274,14 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
       gaugeObservables(out, obs_param[measurement_n]);
 
       printf("performWFlowQuda: %le %.16e %+.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-                  obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
-      if( compute_plaq ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].plaquette[2],obs_param[measurement_n].plaquette[1]);
-      if( compute_rect ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].rectangle[2],obs_param[measurement_n].rectangle[1]);
-      if( compute_ploop ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
-      if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
+             obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+      if (compute_plaq)
+        printf(" %+.16e %+.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+      if (compute_rect)
+        printf(" %+.16e %+.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
+      if (compute_ploop) printf(" %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+      if (compute_charge) printf(" %+.16e", obs_param[measurement_n].qcharge);
       printf("\n");
-
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
