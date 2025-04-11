@@ -230,7 +230,7 @@ int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 int eig_max_ortho_attempts = 10;
 double eig_tol = 1e-6;
-double eig_qr_tol = 1e-11;
+double eig_qr_tol = 0;
 bool eig_use_eigen_qr = true;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
@@ -837,7 +837,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")
     ->transform(CLI::QUDACheckedTransformer(eig_spectrum_map));
   opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver (default 1e-6)");
-  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default 1e-11)");
+  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default eig_tol * 1e-2)");
 
   opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
@@ -974,7 +974,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-eig-tol", mg_eig_tol, CLI::PositiveNumber,
                          "The tolerance to use in the eigensolver (default 1e-6)");
   quda_app->add_mgoption(opgroup, "--mg-eig-qr-tol", mg_eig_qr_tol, CLI::PositiveNumber,
-                         "The tolerance to use in the QR (default 1e-11)");
+                         "The tolerance to use in the QR (default eig_tol * 1e-2)");
 
   quda_app->add_mgoption(opgroup, "--mg-eig-type", mg_eig_type, CLI::QUDACheckedTransformer(eig_type_map),
                          "The type of eigensolver to use (default trlm)");
