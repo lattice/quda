@@ -5210,7 +5210,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   QudaBoolean compute_charge = obs_param[measurement_n].compute_qcharge;
 
   // Print observables header
-  printf("performWFlowQuda: flow t, Clover_t, Clover_s");
+  printf("performWFlowQuda: flow t, Energy_t, Energy_s");
   if( compute_plaq ) printf(", Plaq_t, Plaq_s");
   if( compute_rect ) printf(", Rect_t, Rect_s");
   if( compute_ploop ) printf(", Ploop_r, Ploop_i");
@@ -5221,9 +5221,9 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   printf("performWFlowQuda: %le %.16e %+.16e", smear_param->t0,
                   obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
   if( compute_plaq ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0);
+                  obs_param[measurement_n].plaquette[2],obs_param[measurement_n].plaquette[1]);
   if( compute_rect ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].rectangle[2]*3.0,obs_param[measurement_n].rectangle[1]*3.0);
+                  obs_param[measurement_n].rectangle[2],obs_param[measurement_n].rectangle[1]);
   if( compute_ploop ) printf(" %+.16e %+.16e", 
                   obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
   if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
@@ -5247,9 +5247,9 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
       printf("performWFlowQuda: %le %.16e %+.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
                   obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
       if( compute_plaq ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].plaquette[2]*3.0,obs_param[measurement_n].plaquette[1]*3.0);
+                  obs_param[measurement_n].plaquette[2],obs_param[measurement_n].plaquette[1]);
       if( compute_rect ) printf(" %+.16e %+.16e", 
-                  obs_param[measurement_n].rectangle[2]*3.0,obs_param[measurement_n].rectangle[1]*3.0);
+                  obs_param[measurement_n].rectangle[2],obs_param[measurement_n].rectangle[1]);
       if( compute_ploop ) printf(" %+.16e %+.16e", 
                   obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
       if( compute_charge ) printf(" %+.16e", obs_param[measurement_n].qcharge);
