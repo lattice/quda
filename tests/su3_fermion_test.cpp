@@ -240,9 +240,14 @@ int main(int argc, char **argv)
 //       check_norm.data<double *>()[i] = -1.*check.data<double *>()[i];
 //   }
 
+  
+
   check_safe = quda::ColorSpinorField(cs_param);
   check_hier = quda::ColorSpinorField(cs_param);
   check_fwd = quda::ColorSpinorField(cs_param);
+
+  void *check_arr[] = {check.data()};
+  void *check_fwdarr[] = {check_fwd.data()};
 
   printf("Inspecting the very first element of the random fermion we will use:\n");
   check.PrintVector(0,0,0);
@@ -281,7 +286,7 @@ int main(int argc, char **argv)
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
-    performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
+    performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param,1);
     host_fwd_timer.stop();
       
     printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
