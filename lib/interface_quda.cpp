@@ -5248,12 +5248,15 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   // Print initial values
   logQuda(QUDA_SUMMARIZE, "performWFlowQuda: %le %.16e %+.16e", smear_param->t0, obs_param[measurement_n].energy[2],
-         obs_param[measurement_n].energy[1]);
+          obs_param[measurement_n].energy[1]);
   if (compute_plaq)
-    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].plaquette[2],
+            obs_param[measurement_n].plaquette[1]);
   if (compute_rect)
-    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
-  if (compute_ploop) logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].rectangle[2],
+            obs_param[measurement_n].rectangle[1]);
+  if (compute_ploop)
+    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
   if (compute_charge) logQuda(QUDA_SUMMARIZE, " %+.16e", obs_param[measurement_n].qcharge);
   logQuda(QUDA_SUMMARIZE, "\n");
 
@@ -5274,12 +5277,15 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
       gaugeObservables(out, obs_param[measurement_n]);
 
       logQuda(QUDA_SUMMARIZE, "performWFlowQuda: %le %.16e %+.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-             obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+              obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
       if (compute_plaq)
-        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].plaquette[2],
+                obs_param[measurement_n].plaquette[1]);
       if (compute_rect)
-        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
-      if (compute_ploop) logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].rectangle[2],
+                obs_param[measurement_n].rectangle[1]);
+      if (compute_ploop)
+        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
       if (compute_charge) logQuda(QUDA_SUMMARIZE, " %+.16e", obs_param[measurement_n].qcharge);
       logQuda(QUDA_SUMMARIZE, "\n");
     }
