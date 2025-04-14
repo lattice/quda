@@ -163,7 +163,7 @@ std::vector<double> eigensolve(test_t test_param)
   eig_inv_param.solution_type = eig_param.use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
   // whether we are using the resident smeared gauge or not
-  eig_param.use_smeared_gauge = gauge_smear;
+  eig_param.invert_param->use_smeared_gauge = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     int dimension = laplace3D < 4 ? 3 : 4;

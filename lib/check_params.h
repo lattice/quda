@@ -175,7 +175,6 @@ void printQudaEigParam(QudaEigParam *param) {
   P(preserve_deflation, QUDA_BOOLEAN_FALSE);
   P(preserve_deflation_space, 0);
   P(preserve_evals, QUDA_BOOLEAN_TRUE);
-  P(use_smeared_gauge, false);
   P(use_dagger, QUDA_BOOLEAN_FALSE);
   P(use_norm_op, QUDA_BOOLEAN_FALSE);
   P(compute_svd, QUDA_BOOLEAN_FALSE);
@@ -373,6 +372,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
   P(covdev_mu, INVALID_INT);
+  P(use_smeared_gauge, QUDA_BOOLEAN_FALSE);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
