@@ -151,14 +151,12 @@ namespace quda {
       // only counts number of mat-muls per thread
       long long threads = in.LocalVolume() * wflow_dim;
       long long mat_flops = nColor * nColor * (8 * nColor - 2);
-      long long mat_muls = 1; // 1 comes from Z * conj(U) term
+      long long mat_muls = 4; // 1 from Z * conj(U) term, 2 in exponentiate_iQ(Z), and 1 from exponentiate_iQ(Z) * U
       switch (wflow_type) { // Add mat-muls coming from staple calculation
       case QUDA_GAUGE_SMEAR_WILSON_FLOW: mat_muls += 4 * (wflow_dim - 1); break;
       case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: mat_muls += 28 * (wflow_dim - 1); break;
       default : errorQuda("Unknown Wilson Flow type");
       }
-      // Leon: This seems to miss the two mat-muls occurring in exponentiate_iQ(Z)
-      // as well as the 1 mat-mul of exponentiate_iQ(Z) * U
       return mat_muls * mat_flops * threads;
     }
 
@@ -175,7 +173,7 @@ namespace quda {
       auto temp_io = 1;
       // Middle steps have an additional store or retrieve to or from temp
       if( step_type==WFLOW_STEP_W2 || step_type==WFLOW_4THORDER_STEP_2 || step_type==WFLOW_4THORDER_STEP_3 
-      || step_type==WFLOW_4THORDER_STEP_4 || step_type==WFLOW_4THORDER_STEP_5 ); temp_io += 1;
+      || step_type==WFLOW_4THORDER_STEP_4 || step_type==WFLOW_4THORDER_STEP_5 ) temp_io += 1;
       return ((1 + (wflow_dim - 1) * links) * in.Bytes() + out.Bytes() + temp_io * temp.Bytes());
     }
   }; // GaugeWFlowStep

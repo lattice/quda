@@ -38,7 +38,6 @@ namespace quda {
       // All of the above * 6 (number of planes) * volume
       return 6ll*u.Volume()*(10 * Nc * Nc * (8 * Nc - 2) + 2 * Nc);
     }
-    // LEON FIXME: I don't know what I'm doing here
     long long bytes() const { return u.Bytes(); }
   };
 
