@@ -28,7 +28,8 @@ namespace quda
 
      @param[in] U The gauge field upon which to compute the plaquette
      @return double3 variable returning (plaquette, spatial plaquette,
-     temporal plaquette) site averages
+     temporal plaquette) site averages normalized such that each
+     plaquette is in the range [0,1]
    */
   double3 plaquette(const GaugeField &U);
 
@@ -37,7 +38,8 @@ namespace quda
 
      @param[in] U The gauge field upon which to compute the plaquette and rectangle
      @return double4 variable returning (spatial plaquette, temporal plaquette,
-     spatial rectangle, temporal rectangle) site averages
+     spatial rectangle, temporal rectangle) site averages normalized such that each
+     plaquette and rectangle is in the range [0,1]
    */
   double4 plaquetteRectangle(const GaugeField &U);
 
