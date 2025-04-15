@@ -24,8 +24,8 @@ namespace quda
     int border[4];
     const Float alpha;
     const int dir_ignore;
-    const Float tolerance;
     const Float anisotropy;
+    const Float tolerance;
 
     GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, const Float anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
