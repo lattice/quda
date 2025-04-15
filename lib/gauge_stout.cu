@@ -12,8 +12,8 @@ namespace quda {
     const bool improved;
     const Float rho;
     const Float epsilon;
-    const Float anisotropy;
     const int dir_ignore;
+    const Float anisotropy;
     const int stoutDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
