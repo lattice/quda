@@ -52,8 +52,7 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-// CURAND random generator initialization
-std::shared_ptr<quda::RNG> randstates;
+quda::RNG randstates;
 QudaGaugeParam gauge_param;
 quda::GaugeField cpuGauge = {};
 quda::GaugeField gauge = {};
@@ -109,7 +108,7 @@ void init_gauge(int argc, char **argv)
   gaugeEx = quda::GaugeField(gParamEx);
 
   // initialize the device-side RNG
-  randstates = std::make_shared<quda::RNG>(gaugeEx, 1234);
+  randstates = quda::RNG(gaugeEx, 1234);
 
   if (latfile.size() > 0 || heatbath_initialize_on_host) {
     // Load or fill the gauge fields from the host
@@ -128,7 +127,7 @@ void init_gauge(int argc, char **argv)
     if (heatbath_coldstart)
       InitGaugeField(gaugeEx);
     else
-      InitGaugeField(gaugeEx, *randstates);
+      InitGaugeField(gaugeEx, randstates);
   }
 }
 
@@ -149,7 +148,7 @@ void teardown_gauge()
   }
 
   // clean up the RNG
-  randstates.reset();
+  randstates = {};
 
   cpuGauge = {};
   gauge = {};
@@ -207,7 +206,7 @@ void heatbath_test()
     // Do a warmup if requested
     if (nwarm > 0) {
       for (int step = 1; step <= nwarm; ++step) {
-        Monte(gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+        Monte(gaugeEx, randstates, beta_value, nhbsteps, novrsteps);
         quda::unitarizeLinks(gaugeEx, &num_failures_d);
         if (num_failures_h > 0) errorQuda("Error in the unitarization, %d failures", num_failures_h);
       }
@@ -217,7 +216,7 @@ void heatbath_test()
     printfQuda("step=0 plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
 
     for (int step = 1; step <= nsteps; ++step) {
-      Monte(gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+      Monte(gaugeEx, randstates, beta_value, nhbsteps, novrsteps);
 
       // Reunitarize gauge links...
       quda::unitarizeLinks(gaugeEx, &num_failures_d);
