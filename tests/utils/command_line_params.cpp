@@ -40,7 +40,7 @@ int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
-int use_split_gauge_bkup = 0;
+int use_split_gauge_bkup = 1;
 
 bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
