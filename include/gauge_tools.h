@@ -106,8 +106,9 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] alpha smearing parameter
      @param[in] dir_ignore ignored direction
+     @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha, int dir_ignore);
+  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha, int dir_ignore, double smear_anisotropy);
 
   /**
      @brief Apply STOUT smearing to the gauge field
@@ -116,8 +117,9 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] rho smearing parameter
      @param[in] dir_ignore ignored direction
+     @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, int dir_ignore);
+  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, int dir_ignore, double smear_anisotropy);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
@@ -127,8 +129,9 @@ namespace quda
      @param[in] rho smearing parameter
      @param[in] epsilon smearing parameter
      @param[in] dir_ignore ignored direction
+     @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore, double smear_anisotropy);
 
   /**
      @brief Apply HYP smearing to the gauge field

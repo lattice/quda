@@ -864,7 +864,7 @@ extern "C" {
     unsigned int n_steps; /**< The total number of smearing steps to perform. */
     double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
                              Wilson/Symanzik flow */
-    double smear_anisotropy; /** Used in anisotropic Wilson/Symanzik flow **/
+    double smear_anisotropy; /** Used in anisotropic Wilson/Symanzik flow and APE, STOUT, and OvrimpSTOUT **/
     unsigned int rk_order;   /** Order of the Runga-Kutta integrator: 3 or 4 **/
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
