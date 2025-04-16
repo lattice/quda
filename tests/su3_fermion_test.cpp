@@ -28,10 +28,11 @@ double gauge_smear_alpha3 = 0.3;
 int gauge_smear_steps = 50;
 int gauge_n_save = 3;
 int hier_threshold = 6;
-QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
+QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
 int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
 bool su_project = true;
+
 
 void display_test_info()
 {
@@ -133,7 +134,7 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_sloppy == QUDA_INVALID_PRECISION) {prec = QUDA_DOUBLE_PRECISION; prec_sloppy = prec;}
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
