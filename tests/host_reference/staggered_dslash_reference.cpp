@@ -42,14 +42,14 @@ template <typename real_t> struct StaggeredDslashReference {
     if (laplace3D < 4 && dslash_type != QUDA_LAPLACE_DSLASH)
       errorQuda("laplace3D = %d only supported for Laplace dslash (%d requested)", laplace3D, dslash_type);
 
-    real_t *res = reinterpret_cast<real_t *>(res_);
-    const real_t *const *fatlink = reinterpret_cast<const real_t *const *>(fatlink_);
-    const real_t *const *longlink = reinterpret_cast<const real_t *const *>(longlink_);
-    const real_t *const *ghostFatlink = reinterpret_cast<const real_t *const *>(ghostFatlink_);
-    const real_t *const *ghostLonglink = reinterpret_cast<const real_t *const *>(ghostLonglink_);
-    const real_t *spinorField = reinterpret_cast<const real_t *>(spinorField_);
-    const real_t *const *fwd_nbr_spinor = reinterpret_cast<const real_t *const *>(fwd_nbr_spinor_);
-    const real_t *const *back_nbr_spinor = reinterpret_cast<const real_t *const *>(back_nbr_spinor_);
+    auto res = reinterpret_cast<real_t *>(res_);
+    auto fatlink = reinterpret_cast<const real_t *const *>(fatlink_);
+    auto longlink = reinterpret_cast<const real_t *const *>(longlink_);
+    auto ghostFatlink = reinterpret_cast<const real_t *const *>(ghostFatlink_);
+    auto ghostLonglink = reinterpret_cast<const real_t *const *>(ghostLonglink_);
+    auto spinorField = reinterpret_cast<const real_t *>(spinorField_);
+    auto fwd_nbr_spinor = reinterpret_cast<const real_t *const *>(fwd_nbr_spinor_);
+    auto back_nbr_spinor = reinterpret_cast<const real_t *const *>(back_nbr_spinor_);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;

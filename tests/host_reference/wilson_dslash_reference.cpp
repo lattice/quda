@@ -46,12 +46,12 @@ template <typename real_t> struct DslashReference {
   void operator()(void *res_, const void *const *gaugeFull_, const void *const *ghostGauge_, const void *spinorField_,
                   const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
   {
-    real_t *res = reinterpret_cast<real_t *>(res_);
-    const real_t *const *gaugeFull = reinterpret_cast<const real_t *const *>(gaugeFull_);
-    const real_t *const *ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
-    const real_t *spinorField = reinterpret_cast<const real_t *>(spinorField_);
-    const real_t *const *fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
-    const real_t *const *backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
+    auto res = reinterpret_cast<real_t *>(res_);
+    auto gaugeFull = reinterpret_cast<const real_t *const *>(gaugeFull_);
+    auto ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
+    auto spinorField = reinterpret_cast<const real_t *>(spinorField_);
+    auto fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
+    auto backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;

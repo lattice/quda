@@ -25,12 +25,12 @@ template <typename real_t> void cloverReference(real_t *out, const real_t *clove
 
 #pragma omp parallel for
   for (int i = 0; i < Vh; i++) {
-    const complex *In = reinterpret_cast<const complex *>(&in[i * nSpin * nColor * 2]);
-    complex *Out = reinterpret_cast<complex *>(&out[i * nSpin * nColor * 2]);
+    const auto In = reinterpret_cast<const complex *>(&in[i * nSpin * nColor * 2]);
+    auto Out = reinterpret_cast<complex *>(&out[i * nSpin * nColor * 2]);
 
     for (int chi = 0; chi < nSpin / 2; chi++) {
       const real_t *D = &clover[((parity * Vh + i) * 2 + chi) * chiralBlock];
-      const complex *L = reinterpret_cast<const complex *>(&D[N]);
+      const auto L = reinterpret_cast<const complex *>(&D[N]);
 
       for (int s_col = 0; s_col < nSpin / 2; s_col++) { // 2 spins per chiral block
         for (int c_col = 0; c_col < nColor; c_col++) {

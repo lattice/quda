@@ -100,8 +100,8 @@ void createMomCPU(void *mom, QudaPrecision precision, double max_val)
 template <typename real_t> struct CompareMomentum {
   int operator()(const void *momA_, const void *momB_, int len)
   {
-    const real_t *momA = reinterpret_cast<const real_t *>(momA_);
-    const real_t *momB = reinterpret_cast<const real_t *>(momB_);
+    auto momA = reinterpret_cast<const real_t *>(momA_);
+    auto momB = reinterpret_cast<const real_t *>(momB_);
 
     const int fail_check = 16;
     int fail[fail_check];
@@ -204,7 +204,7 @@ template <typename real_t> struct MomentumAction {
   {
     double action = 0.0;
     for (int i = 0; i < len; i++) {
-      const real_t *mom = reinterpret_cast<const real_t *>(mom_) + i * mom_site_size;
+      auto mom = reinterpret_cast<const real_t *>(mom_) + i * mom_site_size;
       double local = 0.0;
       for (int j = 0; j < 6; j++) local += mom[j] * mom[j];
       for (int j = 6; j < 9; j++) local += 0.5 * mom[j] * mom[j];

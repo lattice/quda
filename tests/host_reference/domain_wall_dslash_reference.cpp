@@ -36,12 +36,12 @@ template <typename real_t, QudaPCType type> struct DslashReference4D {
   void operator()(void *out_, const void *const *gauge_, const void *const *ghostGauge_, const void *in_,
                   const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
   {
-    real_t *out = reinterpret_cast<real_t *>(out_);
-    const real_t *const *gauge = reinterpret_cast<const real_t *const *>(gauge_);
-    const real_t *const *ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
-    const real_t *in = reinterpret_cast<const real_t *>(in_);
-    const real_t *const *fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
-    const real_t *const *backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
+    auto out = reinterpret_cast<real_t *>(out_);
+    auto gauge = reinterpret_cast<const real_t *const *>(gauge_);
+    auto ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
+    auto in = reinterpret_cast<const real_t *>(in_);
+    auto fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
+    auto backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
 
 #pragma omp parallel for
     for (auto i = 0lu; i < V5h * spinor_site_size; i++) out[i] = 0.0;
@@ -171,8 +171,8 @@ template <typename real_t> struct MdwEofaM5 {
   void operator()(void *out_, const void *in_, int parity, int dagger, real_t mferm, real_t m5, real_t b, real_t c,
                   real_t mq1, real_t mq2, real_t mq3, int eofa_pm, real_t eofa_shift)
   {
-    real_t *out = reinterpret_cast<real_t *>(out_);
-    const real_t *in = reinterpret_cast<const real_t *>(in_);
+    auto out = reinterpret_cast<real_t *>(out_);
+    auto in = reinterpret_cast<const real_t *>(in_);
 
     real_t alpha = b + c;
     real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
@@ -267,8 +267,8 @@ void mdw_eofa_m5(void *out, const void *in, int parity, int dagger, double mferm
 template <typename real_t, QudaPCType type> struct DslashReference5th {
   void operator()(void *out_, const void *in_, int parity, int dagger, real_t mferm, bool zero_initialize = false)
   {
-    real_t *out = reinterpret_cast<real_t *>(out_);
-    const real_t *in = reinterpret_cast<const real_t *>(in_);
+    auto out = reinterpret_cast<real_t *>(out_);
+    auto in = reinterpret_cast<const real_t *>(in_);
 
 #pragma omp parallel for
     for (int i = 0; i < V5h; i++) {
@@ -334,8 +334,8 @@ void dslash_reference_5th(void *out, const void *in, int parity, int dagger, dou
 template <typename real_t> struct DslashReference5thInv {
   void operator()(void *out_, const void *in_, int, int dagger, real_t mferm, const std::vector<double> &kappa)
   {
-    real_t *out = reinterpret_cast<real_t *>(out_);
-    const real_t *in = reinterpret_cast<const real_t *>(in_);
+    auto out = reinterpret_cast<real_t *>(out_);
+    auto in = reinterpret_cast<const real_t *>(in_);
 
     std::vector<double> inv_Ftr(Ls), Ftr(Ls);
     for (int xs = 0; xs < Ls; xs++) {
@@ -424,8 +424,8 @@ template <typename real_t> struct MDslashReference5thInv {
                   const std::vector<std::complex<double>> &kappa_)
   {
     using complex = std::complex<real_t>;
-    complex *out = reinterpret_cast<std::complex<real_t> *>(out_);
-    const complex *in = reinterpret_cast<const complex *>(in_);
+    auto out = reinterpret_cast<std::complex<real_t> *>(out_);
+    auto in = reinterpret_cast<const complex *>(in_);
 
     std::vector<complex> inv_Ftr(Ls), Ftr(Ls), kappa(Ls);
     real_t one = 1, two = 2;
@@ -524,8 +524,8 @@ template <typename real_t> struct MdwEofaM5Inv {
   void operator()(void *out_, const void *in_, int parity, int dagger, real_t mferm, real_t m5, real_t b, real_t c,
                   real_t mq1, real_t mq2, real_t mq3, int eofa_pm, real_t eofa_shift)
   {
-    real_t *out = reinterpret_cast<real_t *>(out_);
-    const real_t *in = reinterpret_cast<const real_t *>(in_);
+    auto out = reinterpret_cast<real_t *>(out_);
+    auto in = reinterpret_cast<const real_t *>(in_);
 
     real_t alpha = b + c;
     real_t eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
@@ -749,10 +749,8 @@ void mdw_dslash_5(void *out, const void *const *, const void *in, int parity, in
 {
   dslash_reference_5th(out, in, parity, dagger, mferm, precision, QUDA_4D_PC, zero_initialize);
   for (int xs = 0; xs < Ls; xs++) {
-    std::complex<double> *in_offset
-      = reinterpret_cast<std::complex<double> *>((char *)in + precision * Vh * spinor_site_size * xs);
-    std::complex<double> *out_offset
-      = reinterpret_cast<std::complex<double> *>((char *)out + precision * Vh * spinor_site_size * xs);
+    auto in_offset = reinterpret_cast<std::complex<double> *>((char *)in + precision * Vh * spinor_site_size * xs);
+    auto out_offset = reinterpret_cast<std::complex<double> *>((char *)out + precision * Vh * spinor_site_size * xs);
     cxpay(in_offset, kappa[xs], out_offset, Vh * spinor_site_size, precision);
   }
 }

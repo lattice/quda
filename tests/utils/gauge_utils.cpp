@@ -20,7 +20,7 @@
 template <typename real_t> struct ApplyGaugeSpatialAnisotropy {
   void operator()(void *const *gauge_, int Vh, double anisotropy)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
     auto inv_anisotropy = 1.0 / anisotropy;
     for (int d = 0; d < 3; d++) {
 #pragma omp parallel for
@@ -55,7 +55,7 @@ void applyGaugeSpatialAnisotropy(real_t *const *gauge, int Vh, double anisotropy
 template <typename real_t> struct ApplyGaugeTemporalBCs {
   void operator()(void *const *gauge_, int Vh, QudaTboundary t_boundary, bool three_link = false)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
     if (t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
       int lower_bound = (Z[0] / 2) * Z[1] * Z[2];
       lower_bound *= three_link ? (Z[3] - 3) : (Z[3] - 1);
@@ -98,7 +98,7 @@ void applyGaugeTemporalBCs(void *const *gauge, int Vh, QudaTboundary t_boundary,
 template <typename real_t> struct EmulateGaugeTemporalGauge {
   void operator()(void *const *gauge_, int Vh)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
@@ -144,7 +144,7 @@ void emulateGaugeTemporalGauge(void *const *gauge, int Vh, QudaPrecision precisi
 template <typename real_t> struct ApplyGaugeLongLinkScaling {
   void operator()(void *const *gauge_, int Vh, double tadpole_coeff)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     real_t inv_scale = -1.0 / (24.0 * tadpole_coeff * tadpole_coeff);
     for (int d = 0; d < 4; d++) {
@@ -242,7 +242,7 @@ template <typename real_t> struct ApplyGaugeStaggeredPhase {
   void operator()(void *const *gauge_, int Vh, const int X[], QudaTboundary t_boundary = QUDA_ANTI_PERIODIC_T,
                   QudaStaggeredPhase phase_type = QUDA_STAGGERED_PHASE_MILC)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     int X1 = X[0];
     int X2 = X[1];
@@ -292,7 +292,7 @@ void applyGaugeFieldScaling(void *const *gauge, int Vh, const QudaGaugeParam &pa
 template <typename real_t> struct ConstructIdentityGaugeField {
   void operator()(void *const *gauge_)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     real_t *gaugeOdd[4], *gaugeEven[4];
     for (int dir = 0; dir < 4; dir++) {
@@ -332,7 +332,7 @@ template <typename real_t> struct ConstructRandomSU3GaugeField {
   {
     using complex = std::complex<real_t>;
 
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     real_t *gaugeOdd[4], *gaugeEven[4];
     for (int dir = 0; dir < 4; dir++) {
@@ -430,7 +430,7 @@ void constructRandomSU3GaugeField(void *const *gauge, QudaPrecision precision)
 template <typename real_t> struct ApplyRandomU1Phase {
   void operator()(void *const *gauge_)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     for (int dir = 0; dir < 4; dir++) {
       for (int i = 0; i < Vh; i++) {
@@ -440,8 +440,7 @@ template <typename real_t> struct ApplyRandomU1Phase {
           std::complex<real_t> u1 = std::polar(static_cast<real_t>(1), phase);
 
           // rescale bottom row
-          std::complex<real_t> *link
-            = reinterpret_cast<std::complex<real_t> *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
+          auto link = reinterpret_cast<std::complex<real_t> *>(gauge[dir] + (parity * Vh + i) * gauge_site_size);
           constexpr int m = 2;          // bottom row
           for (int n = 0; n < 3; n++) { // 3 columns
             link[m * 3 + n] *= u1;
@@ -466,7 +465,7 @@ void applyRandomU1Phase(void *const *gauge, QudaPrecision precision)
 template <typename real_t> struct ConstructRandomMatrixGaugeField {
   void operator()(void *const *gauge_)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
 
     // Encapsulate creating a random matrix in a lambda to simplify making sure
     // the matrix is invertable
@@ -480,7 +479,7 @@ template <typename real_t> struct ConstructRandomMatrixGaugeField {
     };
 
     auto isReasonable = [](real_t *link) -> bool {
-      std::complex<real_t> *mat = reinterpret_cast<std::complex<real_t> *>(link);
+      auto mat = reinterpret_cast<std::complex<real_t> *>(link);
 
       auto det = mat[0 * 3 + 0] * (mat[1 * 3 + 1] * mat[2 * 3 + 2] - mat[1 * 3 + 2] * mat[2 * 3 + 1])
         - mat[0 * 3 + 1] * (mat[1 * 3 + 0] * mat[2 * 3 + 2] - mat[1 * 3 + 2] * mat[2 * 3 + 0])
@@ -521,7 +520,7 @@ void constructRandomMatrixGaugeField(void *const *gauge, QudaPrecision precision
 template <typename real_t> struct AddNoiseToGaugeField {
   void operator()(void *const *gauge_, double noise_max)
   {
-    real_t *const *gauge = reinterpret_cast<real_t *const *>(gauge_);
+    auto gauge = reinterpret_cast<real_t *const *>(gauge_);
     // originally in createNoisyLinkCPU in tests/hisq_unitarize_force_test.cpp
     for (int dir = 0; dir < 4; ++dir) {
 #pragma omp parallel for

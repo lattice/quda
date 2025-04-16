@@ -183,7 +183,7 @@ template <typename real_t> struct ConstructCloverField {
   {
     for (auto i = 0lu; i < static_cast<size_t>(Vh); i++) {
       for (auto parity = 0lu; parity < 2lu; parity++) {
-        real_t *clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
+        auto clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
         for (int j = 0; j < 72; j++) { clover_matrix[j] = random_uniform_host<real_t>(i, parity, -norm, norm); }
 
         // impose clover symmetry on each chiral block
