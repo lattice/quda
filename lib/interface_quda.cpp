@@ -5182,10 +5182,15 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     switch (smear_param->smear_type) {
-    case QUDA_GAUGE_SMEAR_APE: APEStep(*gaugeSmeared, tmp, smear_param->alpha, dir_ignore, smear_param->smear_anisotropy); break;
-    case QUDA_GAUGE_SMEAR_STOUT: STOUTStep(*gaugeSmeared, tmp, smear_param->rho, dir_ignore, smear_param->smear_anisotropy); break;
+    case QUDA_GAUGE_SMEAR_APE:
+      APEStep(*gaugeSmeared, tmp, smear_param->alpha, dir_ignore, smear_param->smear_anisotropy);
+      break;
+    case QUDA_GAUGE_SMEAR_STOUT:
+      STOUTStep(*gaugeSmeared, tmp, smear_param->rho, dir_ignore, smear_param->smear_anisotropy);
+      break;
     case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
-      OvrImpSTOUTStep(*gaugeSmeared, tmp, smear_param->rho, smear_param->epsilon, dir_ignore, smear_param->smear_anisotropy);
+      OvrImpSTOUTStep(*gaugeSmeared, tmp, smear_param->rho, smear_param->epsilon, dir_ignore,
+                      smear_param->smear_anisotropy);
       break;
     case QUDA_GAUGE_SMEAR_HYP:
       HYPStep(*gaugeSmeared, tmp, smear_param->alpha1, smear_param->alpha2, smear_param->alpha3, dir_ignore);

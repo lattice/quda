@@ -131,7 +131,8 @@ namespace quda
      @param[in] dir_ignore ignored direction
      @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore, double smear_anisotropy);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore,
+                       double smear_anisotropy);
 
   /**
      @brief Apply HYP smearing to the gauge field
