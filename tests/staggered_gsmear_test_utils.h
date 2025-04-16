@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 
 #include <quda.h>
 #include <tune_quda.h>

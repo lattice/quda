@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cassert>
 
 #include <quda.h>
 #include <gauge_field.h>
@@ -12,7 +13,6 @@
 #include <unitarization_links.h>
 #include <ks_improved_force.h>
 
-#include <assert.h>
 #include <gtest/gtest.h>
 #include <tune_quda.h>
 

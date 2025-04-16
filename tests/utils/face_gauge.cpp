@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
-#include <string.h>
+#include <cstring>
 #include <sys/time.h>
-#include <assert.h>
+#include <cassert>
 
 #include <comm_quda.h>
 
