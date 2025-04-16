@@ -15,7 +15,7 @@ namespace quda {
   class RNG
   {
 
-    bool is_initialized;             /*! @brief whether or not the RNG is initialized */
+    bool is_initialized = false;     /*! @brief whether or not the RNG is initialized */
     size_t size;                     /*! @brief number of rand states */
     std::shared_ptr<RNGState> state; /*! array with current rand rng state */
     RNGState *backup_state;          /*! array for backup of current rand rng state */
