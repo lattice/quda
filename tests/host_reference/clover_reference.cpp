@@ -8,8 +8,6 @@
 #include "wilson_dslash_reference.h"
 #include "instantiate_host.hpp"
 
-using namespace quda;
-
 /**
  * @brief Apply the clover matrix field to a spinor field
  * @tparam real_t The floating-point type used for the computation
