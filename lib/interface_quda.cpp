@@ -5716,6 +5716,12 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   auto profile = pushProfile(profileAdjGFlowHier);
   pushOutputPrefix("performAdjGFlowQudaHier: ");
   checkGaugeSmearParam(smear_param);
+
+  if (smear_param->n_steps <= smear_param->adj_n_save ) {
+      
+      errorQuda("Not good practice to have adj_n_save (%d) >= n_steps (%d); adj_n_save should be manually altered to min(nsteps, %d): \n",smear_param->n_steps,smear_param->adj_n_save,smear_param->n_steps - 1);
+      
+  }
     
   // pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);

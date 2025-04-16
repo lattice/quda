@@ -1160,12 +1160,6 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
     errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
     
-  if (param->n_steps <= param->adj_n_save ) {
-      
-      errorQuda("Not good practice to have adj_n_save (%d) >= n_steps (%d); adj_n_save should be manually altered to min(nsteps, %d): \n",param->n_steps,param->adj_n_save,param->n_steps - 1);
-      
-  }
-    
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif

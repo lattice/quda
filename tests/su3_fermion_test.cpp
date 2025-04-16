@@ -226,21 +226,7 @@ int main(int argc, char **argv)
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   check = quda::ColorSpinorField(cs_param);
   //Add noise to spinor
-  quda::RNG rng(check, 1234);
-  spinorNoise(check, rng, QUDA_NOISE_GAUSS);
-
-//  Example of how to construct a spinor that is the complex conjugate of check. 
-//  quda::ColorSpinorField check_norm(cs_param);
-//   #pragma omp parallel for
-//   for (int i = 0; i < V * 24; i++) { 
-      
-//       if (i % 2 == 0)
-//       check_norm.data<double *>()[i] = check.data<double *>()[i];
-//       else
-//       check_norm.data<double *>()[i] = -1.*check.data<double *>()[i];
-//   }
-
-  
+  spinorNoise(check, 1234, QUDA_NOISE_GAUSS);
 
   check_safe = quda::ColorSpinorField(cs_param);
   check_hier = quda::ColorSpinorField(cs_param);
@@ -328,6 +314,9 @@ int main(int argc, char **argv)
   printf("<check,fwd_check> is %1.5e, %1.5e \n",trace_fwd.real(), trace_fwd.imag());
   printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
 
+  if (method_adj_check > gauge_smear_steps*gauge_smear_steps || method_adj_check > gauge_smear_steps*gauge_smear_steps)
+  errorQuda("results above precision failed\n");
+
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
   for (int dir = 0; dir < 4; dir++) {
@@ -335,6 +324,11 @@ int main(int argc, char **argv)
     host_free(new_gauge[dir]);
   }
 
+  check = {};
+  check_hier = {};
+  check_safe = {};
+  check_fwd = {};
+    
   freeGaugeQuda();
   endQuda();
 
