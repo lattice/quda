@@ -3,15 +3,17 @@
 #include <string.h>
 
 #include <quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
 #include <gauge_field.h>
 #include <instantiate.h>
+#include <gtest/gtest.h>
+#include <timer.h>
+#include <gauge_path_quda.h>
+
+#include "command_line_params.h"
+#include "host_utils.h"
+#include "momentum_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
-#include <gauge_path_quda.h>
-#include <timer.h>
-#include <gtest/gtest.h>
 #include "test.h"
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -138,7 +140,7 @@ void gauge_force_test(force_test_t test_param)
   quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   quda::GaugeField U_milc(param);
@@ -224,7 +226,7 @@ void gauge_force_test(force_test_t test_param)
   if (compute_force) {
     logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
     auto action_quda = momActionQuda(mom, &gauge_param);
-    auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
+    auto action_ref = momentumActionCPU(refmom, 4 * V, gauge_param.cpu_prec);
     force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
     logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
             force_deviation);
@@ -284,7 +286,7 @@ void gauge_loop_test(loop_test_t loop_param)
   quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   quda::GaugeField U_milc(param);
