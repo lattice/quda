@@ -5846,7 +5846,8 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       for (unsigned int j = 0; j < (unsigned int) hier_list[i]; j++){
           if (j > 0) std::swap(gout,gin);
 
-          WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
+          WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type,smear_param->smear_anisotropy,
+              smear_param->rk_order);
 
       }
       gauge_stages[i + 1] = gout;
@@ -5903,7 +5904,8 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
       for (unsigned int j = 0; j < (unsigned int) hier_list[ret_idx]; j++){
           if (j > 0) std::swap(g_2,g_1);
-          WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type);
+          WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
+              smear_param->rk_order);
       }
 
       gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
