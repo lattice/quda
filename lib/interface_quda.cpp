@@ -5597,8 +5597,6 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
     
-  // f_temp3 = fin;
-    
   for (unsigned int j = 0; j < ns_safe ; j++)
   {
       for (unsigned int i = 0; i < ns_safe - j; i++) {
