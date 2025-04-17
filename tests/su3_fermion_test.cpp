@@ -218,7 +218,7 @@ int main(int argc, char **argv)
   quda::ColorSpinorField check,check_safe,check_hier,check_fwd;  
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  invParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+  invParam.cuda_prec = prec;
   invParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invParam.dirac_order = QUDA_DIRAC_ORDER;
   invParam.verbosity = verbosity;
