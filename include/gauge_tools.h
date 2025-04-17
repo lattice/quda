@@ -34,6 +34,16 @@ namespace quda
   double3 plaquette(const GaugeField &U);
 
   /**
+     @brief Compute the plaquette and rectangle (1x2 + 2x1) of the gauge field
+
+     @param[in] U The gauge field upon which to compute the plaquette and rectangle
+     @return double4 variable returning (spatial plaquette, temporal plaquette,
+     spatial rectangle, temporal rectangle) site averages normalized such that each
+     plaquette and rectangle is in the range [0,1]
+   */
+  double4 plaquetteRectangle(const GaugeField &U);
+
+  /**
      @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U
      is a momentum field, then we generate random Gaussian distributed
      field in the Lie algebra using the anti-Hermitation convention.
@@ -96,8 +106,9 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] alpha smearing parameter
      @param[in] dir_ignore ignored direction
+     @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha, int dir_ignore);
+  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha, int dir_ignore, double smear_anisotropy);
 
   /**
      @brief Apply STOUT smearing to the gauge field
@@ -106,8 +117,9 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] rho smearing parameter
      @param[in] dir_ignore ignored direction
+     @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, int dir_ignore);
+  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, int dir_ignore, double smear_anisotropy);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
@@ -117,8 +129,10 @@ namespace quda
      @param[in] rho smearing parameter
      @param[in] epsilon smearing parameter
      @param[in] dir_ignore ignored direction
+     @param[in] smear_anisotropy for anisotropic smearing (treats dir=3 differently)
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon, int dir_ignore,
+                       double smear_anisotropy);
 
   /**
      @brief Apply HYP smearing to the gauge field
@@ -132,7 +146,7 @@ namespace quda
   void HYPStep(GaugeField &dataDs, GaugeField &dataOr, double alpha1, double alpha2, double alpha3, int dir_ignore);
 
   /**
-     @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field.
+     @brief Apply Wilson Flow steps to the gauge field.
      This routine assumes that the input and output fields are
      extended, with the input field being exchanged prior to calling
      this function.  On exit from this routine, the output field will
@@ -142,8 +156,11 @@ namespace quda
      @param[in] in Input gauge field
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
+     @param[in] smear_anisotropy for anisotropic Wilson or Symanzik flow
+     @param[in] rk_order Order of the Runga-Kutta integrator
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
+                 double smear_anisotropy, int rk_order);
 
   /**
      @brief Apply intermediary Wilson Flow steps W1, W2 or Vt to the gauge field.

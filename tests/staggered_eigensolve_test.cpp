@@ -7,18 +7,29 @@
 #include <quda.h>
 
 // External headers
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
-#include <qio_field.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "staggered_gauge_utils.h"
+#include "llfat_utils.h"
 #include "test.h"
 
+// Place params above "eigensolve_test_gtest.hpp" so they
+// are visible therein.
 QudaGaugeParam gauge_param;
 QudaInvertParam eig_inv_param;
 QudaEigParam eig_param;
+
+using quda::GaugeField;
+using quda::GaugeFieldParam;
+
+GaugeField cpuInQDP = {};
+GaugeField cpuFatQDP = {};
+GaugeField cpuLongQDP = {};
+GaugeField cpuFatMILC = {};
+GaugeField cpuLongMILC = {};
+QudaPrecision last_prec = QUDA_INVALID_PRECISION;
 
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <staggered_eigensolve_test_gtest.hpp>
@@ -64,11 +75,6 @@ void display_test_info(QudaEigParam &param)
              dimPartitioned(3));
 }
 
-GaugeField cpuFatQDP = {};
-GaugeField cpuLongQDP = {};
-GaugeField cpuFatMILC = {};
-GaugeField cpuLongMILC = {};
-
 void init()
 {
   // Set QUDA internal parameters
@@ -102,7 +108,7 @@ void init()
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField cpuIn = GaugeField(cpuParam);
+  cpuInQDP = GaugeField(cpuParam);
   cpuFatQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
   cpuFatMILC = GaugeField(cpuParam);
@@ -114,7 +120,7 @@ void init()
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
   cpuLongMILC = GaugeField(cpuParam);
 
-  void *qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
+  void *qdp_inlink[4] = {cpuInQDP.data(0), cpuInQDP.data(1), cpuInQDP.data(2), cpuInQDP.data(3)};
   void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
   void *qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, true);
@@ -123,29 +129,31 @@ void init()
   cpuFatMILC = cpuFatQDP;
   cpuLongMILC = cpuLongQDP;
 
-  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
-  // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
-  // gauge fields with different parameters.
-  double plaq[3];
-  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    // Compute fat link plaquette
-    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }
-
-  freeGaugeQuda();
-
-  loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
-
-  // now copy back to QDP aliases, since these are used for the reference dslash
-  cpuFatQDP = cpuFatMILC;
-  cpuLongQDP = cpuLongMILC;
-  // ensure QDP alias has exchanged ghosts
+  // Make sure QDP fields have exchanged ghosts because they are used
+  // for the reference dslash
+  cpuInQDP.exchangeGhost();
   cpuFatQDP.exchangeGhost();
   cpuLongQDP.exchangeGhost();
+
+  if (!enable_testing) {
+    // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
+    // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
+    // gauge fields with different parameters.
+    double plaq[3];
+    computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // Compute fat link plaquette
+      computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+      printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+    }
+
+    freeGaugeQuda();
+
+    // Load the gauge field to the device
+    loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
+  }
 
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
@@ -154,17 +162,40 @@ void init()
 std::vector<double> eigensolve(test_t test_param)
 {
   // Collect testing parameters from gtest
-  eig_param.eig_type = ::testing::get<0>(test_param);
-  eig_param.use_norm_op = ::testing::get<1>(test_param);
-  eig_param.use_pc = ::testing::get<2>(test_param);
-  eig_param.compute_svd = ::testing::get<3>(test_param);
-  eig_param.spectrum = ::testing::get<4>(test_param);
+  eig_inv_param.cuda_prec = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_eigensolver = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_sloppy = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_precondition = ::testing::get<0>(test_param);
+  eig_inv_param.cuda_prec_refinement_sloppy = ::testing::get<0>(test_param);
+  eig_param.eig_type = ::testing::get<1>(test_param);
+  eig_param.use_norm_op = ::testing::get<2>(test_param);
+  eig_param.use_pc = ::testing::get<3>(test_param);
+  eig_param.compute_svd = ::testing::get<4>(test_param);
+  eig_param.spectrum = ::testing::get<5>(test_param);
 
+  // For preconditioned matrices, spinors are only half the normal length.
+  // QUDA constructs spinors based on the "solution type" which is
+  // strictly an inverter option. For QUDA_MATPC_SOLUTION, the inverter
+  // will not reconstruct the full solution, hence spinors are half length.
+  // For QUDA_MAT_SOLUTION the inverter will return the full solution,
+  // hence spinors are normal length.
+  // For the eigensolver, we must emulate these conditions. Therefore, if
+  // the user requests a preconditioned solve, we need only half length spinors.
+  // For full matrices, we need full length spinors.
   eig_inv_param.solution_type = eig_param.use_pc ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
-  // whether we are using the resident smeared gauge or not
+  // For Laplace tests, we add support for gauge smearing
   eig_param.use_smeared_gauge = gauge_smear;
 
+  if (enable_testing && dslash_type == QUDA_LAPLACE_DSLASH) {
+    if (eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) {
+      laplace3D = 3;
+    } else {
+      laplace3D = 4;
+    }
+  }
+
+  // For Laplace tests, we need to set the kappa parameter
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     int dimension = laplace3D < 4 ? 3 : 4;
     eig_inv_param.kappa = 1.0 / (2 * dimension + mass);
@@ -185,7 +216,8 @@ std::vector<double> eigensolve(test_t test_param)
   if (enable_testing) {
     eig_use_poly_acc = false;
     eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
-    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 0;
+    eig_block_size != 4 ? eig_param.block_size = eig_block_size : eig_param.block_size = 4;
+    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
   }
 
   logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
@@ -246,6 +278,7 @@ std::vector<double> eigensolve(test_t test_param)
   if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
+
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
@@ -253,8 +286,8 @@ std::vector<double> eigensolve(test_t test_param)
   for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
 
   // Complex eigenvalues
-  int n_batch = laplace3D == 3 ? eig_param.ortho_dim_size_local * comm_dim(3) : 1;
-  std::vector<__complex__ double> evals(eig_n_conv * n_batch);
+  int n_batch = laplace3D == 3 ? eig_param.ortho_dim_size_local * quda::comm_dim(3) : 1;
+  std::vector<double _Complex> evals(eig_n_conv * n_batch);
   // Vector construct END
   //----------------------------------------------------------------------------
 
@@ -266,11 +299,13 @@ std::vector<double> eigensolve(test_t test_param)
   // precision is double, the routine will use ARPACK rather than the GPU.
   quda::host_timer_t host_timer;
   host_timer.start();
+  if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
+    errorQuda("ARPACK check only available in double precision");
+  }
+
   eigensolveQuda(host_evecs_ptr.data(), evals.data(), &eig_param);
   host_timer.stop();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
-
-  // Perform host side verification of eigenvector if requested.
 
   std::vector<double> residua(eig_n_conv, 0.0);
   // Perform host side verification of eigenvector if requested.
@@ -295,6 +330,7 @@ std::vector<double> eigensolve(test_t test_param)
 
 void cleanup()
 {
+  cpuInQDP = {};
   cpuFatQDP = {};
   cpuLongQDP = {};
   cpuFatMILC = {};
@@ -350,38 +386,11 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
-  if (enable_testing) {
-    // We need to force a well-behaved operator + reasonable convergence, otherwise
-    // the staggered tests will fail. These checks are designed to be consistent
-    // with what's in [src]/tests/CMakeFiles.txt, which have been "sanity checked"
-    bool changes = false;
-    if (!compute_fatlong) {
-      compute_fatlong = true;
-      changes = true;
-    }
-
-    double expected_tol = (prec == QUDA_SINGLE_PRECISION) ? 1e-4 : 1e-5;
-    if (eig_tol != expected_tol) {
-      eig_tol = expected_tol;
-      changes = true;
-    }
-    if (niter != 1000) {
-      niter = 1000;
-      changes = true;
-    }
-    if (eig_n_kr != 256) {
-      eig_n_kr = 256;
-      changes = true;
-    }
-    if (eig_block_size != 4) { eig_block_size = 4; }
-
-    if (changes) {
-      printfQuda("For gtest, various defaults are changed:\n");
-      printfQuda("  --compute-fat-long true\n");
-      printfQuda("  --eig-tol (1e-5 for double, 1e-4 for single)\n");
-      printfQuda("  --niter 1000\n");
-      printfQuda("  --eig-n-kr 256\n");
-    }
+  if (enable_testing && !compute_fatlong) {
+    // We need to force computing fat and long links, otherwise some operators end up
+    // excessively ill-conditioned
+    compute_fatlong = true;
+    warningQuda("Enabling fat/long link builds for gtest");
   }
 
   init();
@@ -392,8 +401,8 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    eigensolve(
-      test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
+    eigensolve(test_t {prec, eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd,
+                       eig_param.spectrum});
   }
 
   cleanup();

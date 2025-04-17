@@ -68,7 +68,7 @@ static void llfat_test()
   void *milc_sitelink_ex;
   milc_sitelink_ex = (void *)safe_malloc(4 * V_ex * gauge_site_size * host_gauge_data_type_size);
 
-  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
+  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_MILC);
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
     for (int i = 0; i < V; ++i) {
