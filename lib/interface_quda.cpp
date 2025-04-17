@@ -5238,10 +5238,10 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   gaugeObservables(in, obs_param[measurement_n]);
 
-  QudaBoolean compute_plaq = obs_param[measurement_n].compute_plaquette;
-  QudaBoolean compute_rect = obs_param[measurement_n].compute_rectangle;
-  QudaBoolean compute_ploop = obs_param[measurement_n].compute_polyakov_loop;
-  QudaBoolean compute_charge = obs_param[measurement_n].compute_qcharge;
+  auto compute_plaq = obs_param[measurement_n].compute_plaquette;
+  auto compute_rect = obs_param[measurement_n].compute_rectangle;
+  auto compute_ploop = obs_param[measurement_n].compute_polyakov_loop;
+  auto compute_charge = obs_param[measurement_n].compute_qcharge;
 
   // Print observables header
   logQuda(QUDA_SUMMARIZE, "performWFlowQuda: flow t, Energy_t, Energy_s");
