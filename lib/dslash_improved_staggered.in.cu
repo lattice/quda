@@ -2,7 +2,7 @@
 
 namespace quda
 {
-  constexpr QudaPrecision precision = QUDA_ @QUDA_DSLASH_PREC@_PRECISION;
+  constexpr QudaPrecision precision = QUDA_@QUDA_DSLASH_PREC@_PRECISION;
   constexpr int nColor = @QUDA_DSLASH_NCOLOR@;
   constexpr int reconI = @QUDA_DSLASH_RECONI@;
   constexpr bool distance_pc = @QUDA_DSLASH_DISTANCE@;
