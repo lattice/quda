@@ -3,14 +3,19 @@
 #include <math.h>
 #include <string.h>
 
-#include <host_utils.h>
 #include <quda_internal.h>
 #include <quda.h>
 #include <util_quda.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
 #include <unitarization_links.h>
+#include <qio_field.h>
+
 #include "misc.h"
+#include "host_utils.h"
+#include "command_line_params.h"
+#include "gauge_utils.h"
+#include "staggered_gauge_utils.h"
+#include "rng_utils.hpp"
+#include "llfat_utils.h"
 
 extern double tadpole_factor;
 // Unitarization coefficients
@@ -20,6 +25,148 @@ static bool reunit_svd_only = false;
 static double svd_rel_error = 1e-4;
 static double svd_abs_error = 1e-4;
 static double max_allowed_error = 1e-11;
+
+void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, GaugeFieldConstructionType type,
+                                QudaPrecision precision, QudaGaugeParam &param, QudaDslashType dslash_type)
+{
+  if (type == GaugeFieldConstructionType::UNIT_GAUGE) {
+    // Set fatlink to the identity matrix
+    constructIdentityGaugeField(fatlink, precision);
+
+    // Apply anisotropy, temporal boundary conditions, and emulate temporal
+    // gauge fixing as appropriate
+    applyGaugeFieldScaling(fatlink, Vh, param, precision);
+
+    // Repeat for the longlink field
+    constructIdentityGaugeField(longlink, precision);
+    applyGaugeFieldScaling(longlink, Vh, param, precision);
+
+    // apply MILC phases... and temporal boundary conditions? again?
+    applyGaugeFieldScaling_long(fatlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
+
+    // also apply MILC phases and temporal boundary conditions (again?)
+    if (dslash_type == QUDA_ASQTAD_DSLASH && !compute_fatlong) {
+      applyGaugeFieldScaling_long(longlink, Vh, param, dslash_type, precision);
+    }
+
+  } else if (type == GaugeFieldConstructionType::RANDOM_GAUGE) {
+    // if doing naive staggered then set to long links so that the staggered phase is applied
+    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+
+    constructRandomGaugeField(fatlink, param, precision, dslash_type);
+
+    param.type = QUDA_ASQTAD_LONG_LINKS;
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      constructRandomGaugeField(longlink, param, precision, dslash_type);
+      // incorporate non-trivial phase into long links
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < Vh; ++i) {
+          for (int parity = 0; parity < 2; parity++) {
+            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+            std::complex<double> z = std::polar(1.0, phase);
+            for (auto j = 0lu; j < gauge_site_size; j += 2) {
+              if (precision == QUDA_DOUBLE_PRECISION) {
+                std::complex<double> *l
+                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              } else {
+                std::complex<float> *l
+                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              }
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // if doing naive staggered then set to long links so that the staggered phase is applied
+    param.type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+
+    constructRandomGaugeField(fatlink, param, precision, dslash_type);
+
+    param.type = QUDA_ASQTAD_LONG_LINKS;
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      constructRandomGaugeField(longlink, param, precision, dslash_type);
+
+      // incorporate non-trivial phase into long links
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < Vh; ++i) {
+          for (int parity = 0; parity < 2; parity++) {
+            double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
+            std::complex<double> z = std::polar(1.0, phase);
+            for (auto j = 0lu; j < gauge_site_size; j += 2) {
+              if (precision == QUDA_DOUBLE_PRECISION) {
+                std::complex<double> *l
+                  = (std::complex<double> *)(&(((double *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              } else {
+                std::complex<float> *l
+                  = (std::complex<float> *)(&(((float *)longlink[dir])[(parity * Vh + i) * gauge_site_size + j]));
+                *l *= z;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // set all links to zero to emulate the 1-link operator (needed for host comparison)
+  // FIXME: may break host comparison
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    for (int dir = 0; dir < 4; ++dir) { memset(longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size); }
+  }
+}
+
+void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu)
+{
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  // load a field WITHOUT PHASES
+  if (latfile.size() > 0) {
+    // load in the command line supplied gauge field using QIO and LIME
+    read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+      applyGaugeFieldScaling_long(qdp_inlink, Vh, gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+    }
+  } else {
+    GaugeFieldConstructionType construct_type
+      = (unit_gauge) ? GaugeFieldConstructionType::UNIT_GAUGE : GaugeFieldConstructionType::RANDOM_GAUGE;
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param, gauge_param.cpu_prec);
+    } else {
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink, construct_type, gauge_param.cpu_prec, gauge_param,
+                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+    }
+  }
+
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+    }
+  } else {
+    // QUDA_ASQTAD_DSLASH
+    if (compute_fatlong) {
+      if (compute_on_gpu)
+        computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
+      else
+        computeFatLongCPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
+    } else {
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+  }
+}
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
@@ -157,8 +304,8 @@ template <class T> void setActionPaths(T &act_paths)
   // Set unitarization coefficients //
   ////////////////////////////////////
 
-  setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
-                             svd_abs_error);
+  quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
+                                   svd_abs_error);
 }
 
 void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,

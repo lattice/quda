@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cassert>
 
 #include <quda.h>
 #include <gauge_field.h>
@@ -12,7 +13,6 @@
 #include <unitarization_links.h>
 #include <ks_improved_force.h>
 
-#include <assert.h>
 #include <gtest/gtest.h>
 #include <tune_quda.h>
 
@@ -178,7 +178,7 @@ struct HisqStencilTestWrapper {
     for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
     // Note: this could be replaced with loading a gauge field
-    createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, 0); // 0 -> no phases
+    createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
 
     ///////////////////////
     // Perform CPU Build //

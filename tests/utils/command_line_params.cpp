@@ -226,7 +226,7 @@ int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 int eig_max_ortho_attempts = 10;
 double eig_tol = 1e-6;
-double eig_qr_tol = 1e-11;
+double eig_qr_tol = 0;
 bool eig_use_eigen_qr = true;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
@@ -285,6 +285,7 @@ int heatbath_num_steps = 10;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
+bool heatbath_initialize_on_host = true;
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -833,7 +834,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")
     ->transform(CLI::QUDACheckedTransformer(eig_spectrum_map));
   opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver (default 1e-6)");
-  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default 1e-11)");
+  opgroup->add_option("--eig-qr-tol", eig_qr_tol, "The tolerance to use in the qr (default eig_tol * 1e-2)");
 
   opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
@@ -970,7 +971,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-eig-tol", mg_eig_tol, CLI::PositiveNumber,
                          "The tolerance to use in the eigensolver (default 1e-6)");
   quda_app->add_mgoption(opgroup, "--mg-eig-qr-tol", mg_eig_qr_tol, CLI::PositiveNumber,
-                         "The tolerance to use in the QR (default 1e-11)");
+                         "The tolerance to use in the QR (default eig_tol * 1e-2)");
 
   quda_app->add_mgoption(opgroup, "--mg-eig-type", mg_eig_type, CLI::QUDACheckedTransformer(eig_type_map),
                          "The type of eigensolver to use (default trlm)");
@@ -1191,6 +1192,8 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
                       "Whether to use a cold or hot start in heatbath test (default false)");
+  opgroup->add_option("--heatbath-initialize-on-host", heatbath_initialize_on_host,
+                      "Whether to initialize the gauge field on the host or on the device (default true == host)");
   opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
                       "Number of heatbath hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,

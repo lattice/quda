@@ -5,17 +5,19 @@
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
+#include <cassert>
 
 #include <quda.h>
+#include <tune_quda.h>
 #include <gauge_field.h>
 #include <dirac_quda.h>
+
+#include <gtest/gtest.h>
+
 #include <misc.h>
 #include <host_utils.h>
-#include <command_line_params.h>
-
-#include <assert.h>
-#include <gtest/gtest.h>
-#include <tune_quda.h>
+#include "gauge_utils.h"
+#include "command_line_params.h"
 
 using namespace quda;
 

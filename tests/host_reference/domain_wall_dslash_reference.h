@@ -4,6 +4,18 @@
 #include <color_spinor_field.h>
 
 /**
+   @brief Helper function that returns whether we have enabled domain wall fermions
+  */
+constexpr bool is_enabled_domain_wall()
+{
+#ifdef GPU_DOMAIN_WALL_DIRAC
+  return true;
+#else
+  return false;
+#endif
+}
+
+/**
  * @brief Apply the preconditioned 5-d domain wall dslash, e.g., D_ee * \psi_e + D_eo * \psi_o or D_oo * \psi_o + D_oe * \psi_e
  *
  * @param[out] out Host output rhs
@@ -21,7 +33,7 @@ void dw_dslash(void *out, const void *const *gauge, const void *in, int parity, 
 /**
  * @brief Apply the 4-d Dslash (Wilson) to all fifth dimensional slices for a 4-d data layout
  *
- * @param out Host output rhs
+ * @param[out] out Host output rhs
  * @param[in] gauge Gauge links
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe
@@ -36,7 +48,7 @@ void dslash_4_4d(void *out, const void *const *gauge, const void *in, int parity
 /**
  * @brief Apply the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
- * @param out Host output rhs
+ * @param[out] out Host output rhs
  * @param[in] gauge Gauge links
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe
@@ -52,7 +64,7 @@ void dw_dslash_5_4d(void *out, const void *const *gauge, const void *in, int par
 /**
  * @brief Apply the inverse of the Ls dimension portion (m5) of the domain wall dslash in a 4-d data layout
  *
- * @param out Host output rhs
+ * @param[out] out Host output rhs
  * @param[in] gauge Gauge links
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe
@@ -63,12 +75,12 @@ void dw_dslash_5_4d(void *out, const void *const *gauge, const void *in, int par
  * @param[in] kappa Kappa values for each 5th dimension slice
  */
 void dslash_5_inv(void *out, const void *const *gauge, const void *in, int parity, int dagger, QudaPrecision precision,
-                  const QudaGaugeParam &gauge_param, double mferm, double *kappa);
+                  const QudaGaugeParam &gauge_param, double mferm, const std::vector<double> &kappa);
 
 /**
  * @brief Apply the inverse of the Ls dimension portion (m5) of the Mobius dslash
  *
- * @param out Host output rhs
+ * @param[out] out Host output rhs
  * @param[in] gauge Gauge links
  * @param[in] in Host input spinor
  * @param[in] parity 0 for D_eo, 1 for D_oe
@@ -80,7 +92,7 @@ void dslash_5_inv(void *out, const void *const *gauge, const void *in, int parit
  */
 void mdw_dslash_5_inv(void *out, const void *const *gauge, const void *in, int parity, int dagger,
                       QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm,
-                      const double _Complex *kappa);
+                      const std::vector<std::complex<double>> &kappa);
 
 /**
  * @brief Apply the Ls dimension portion (m5) of the Mobius dslash
@@ -97,7 +109,8 @@ void mdw_dslash_5_inv(void *out, const void *const *gauge, const void *in, int p
  * @param[in] zero_initialize Whether or not to zero initialize or accumulate into the output rhs
  */
 void mdw_dslash_5(void *out, const void *const *gauge, const void *in, int parity, int dagger, QudaPrecision precision,
-                  const QudaGaugeParam &gauge_param, double mferm, const double _Complex *kappa, bool zero_initialize);
+                  const QudaGaugeParam &gauge_param, double mferm, const std::vector<std::complex<double>> &kappa,
+                  bool zero_initialize);
 
 /**
  * @brief Apply the Ls dimension portion of D_eo/D_oe (i.e., the b + c * D5) for the Mobius dslash
@@ -116,7 +129,8 @@ void mdw_dslash_5(void *out, const void *const *gauge, const void *in, int parit
  */
 void mdw_dslash_4_pre(void *out, const void *const *gauge, const void *in, int parity, int dagger,
                       QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm,
-                      const double _Complex *b5, const double _Complex *c5, bool zero_initialize);
+                      const std::vector<std::complex<double>> &b5, const std::vector<std::complex<double>> &c5,
+                      bool zero_initialize);
 
 /**
  * @brief Apply the full-parity 5-d domain wall operator
@@ -163,9 +177,10 @@ void dw_4d_mat(void *out, const void *const *gauge, const void *in, double kappa
  * @param[in] b5 Array of b5 values for each fifth dimensional slice
  * @param[in] c5 Array of c5 values for each fifth dimensional slice
  */
-void mdw_mat(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
-             const double _Complex *kappa_c, int dagger, QudaPrecision precision, const QudaGaugeParam &gauge_param,
-             double mferm, const double _Complex *b5, const double _Complex *c5);
+void mdw_mat(void *out, const void *const *gauge, const void *in, const std::vector<std::complex<double>> &kappa_b,
+             const std::vector<std::complex<double>> &kappa_c, int dagger, QudaPrecision precision,
+             const QudaGaugeParam &gauge_param, double mferm, const std::vector<std::complex<double>> &b5,
+             const std::vector<std::complex<double>> &c5);
 
 /**
  * @brief Apply the M^dag M for the full-parity 5-d domain wall operator
@@ -230,9 +245,10 @@ void dw_4d_matpc(void *out, const void *const *gauge, const void *in, double kap
  * @param[in] b5 Array of b5 values for each fifth dimensional slice
  * @param[in] c5 Array of c5 values for each fifth dimensional slice
  */
-void mdw_matpc(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
-               const double _Complex *kappa_c, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
-               const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5, const double _Complex *c5);
+void mdw_matpc(void *out, const void *const *gauge, const void *in, const std::vector<std::complex<double>> &kappa_b,
+               const std::vector<std::complex<double>> &kappa_c, QudaMatPCType matpc_type, int dagger,
+               QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm,
+               const std::vector<std::complex<double>> &b5, const std::vector<std::complex<double>> &c5);
 
 /**
  * @brief Apply the local portion of the preconditioned M^dag M for the Mobius operator
@@ -250,10 +266,10 @@ void mdw_matpc(void *out, const void *const *gauge, const void *in, const double
  * @param[in] b5 Array of b5 values for each fifth dimensional slice
  * @param[in] c5 Array of c5 values for each fifth dimensional slice
  */
-void mdw_mdagm_local(void *out, const void *const *gauge, const void *in, const double _Complex *kappa_b,
-                     const double _Complex *kappa_c, QudaMatPCType matpc_type, QudaPrecision precision,
-                     const QudaGaugeParam &gauge_param, double mferm, const double _Complex *b5,
-                     const double _Complex *c5);
+void mdw_mdagm_local(void *out, const void *const *gauge, const void *in,
+                     const std::vector<std::complex<double>> &kappa_b, const std::vector<std::complex<double>> &kappa_c,
+                     QudaMatPCType matpc_type, QudaPrecision precision, const QudaGaugeParam &gauge_param, double mferm,
+                     const std::vector<std::complex<double>> &b5, const std::vector<std::complex<double>> &c5);
 
 /**
  * @brief Apply the Ls dimension portion (m5) of the eofa Mobius dslash
