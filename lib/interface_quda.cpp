@@ -5693,7 +5693,6 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
         if (hier_list[i] > threshold){
             
             temp_list = get_hier_list(hier_list[i], n_b, diff+1,false);
-            // for (int ii = 0; ii< temp_list.size();ii++) printf("tempf %d \n",temp_list[ii]);
             hier_list.erase(hier_list.begin()+i);
             hier_list.insert(hier_list.begin()+i, temp_list.begin(),temp_list.end());
             result = i;
