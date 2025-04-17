@@ -78,7 +78,7 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = halo.Volume();
-        flops_ = (num_dir * in.Nspin() * mv_flops +                  // SU(3) matrix-vector multiplies
+        flops_ = (num_dir * in.Nspin() * mv_flops + // SU(3) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
           * sites; // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites;
@@ -100,7 +100,8 @@ namespace quda
     virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int spinor_bytes
+        = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
       int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2 * spinor_bytes; // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
@@ -163,14 +164,12 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
       if (in.Nspin() == 1) {
         constexpr int nSpin = 1;
-        LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity,
-                                                                 comm_override);
+        LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
       } else if (in.Nspin() == 4) {
         constexpr int nSpin = 4;
-        LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity,
-                                                                 comm_override);
+        LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
         dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
       } else {

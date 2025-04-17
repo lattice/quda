@@ -16,7 +16,7 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
       auto dummy = DistanceType<false>();
-      instantiate<NdegTwistedMassApply>(out, in, x, U, a, b, c, parity, dagger, comm_override,dummy,profile);
+      instantiate<NdegTwistedMassApply>(out, in, x, U, a, b, c, parity, dagger, comm_override, dummy, profile);
     } else {
       errorQuda("Non-degenerate twisted-mass operator has not been built");
     }

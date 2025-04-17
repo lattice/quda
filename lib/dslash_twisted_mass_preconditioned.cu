@@ -21,8 +21,8 @@ namespace quda
   {
     auto dummy = DistanceType<false>();
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      instantiate<TwistedMassPreconditionedApply>(out, in, x, U, a, b, xpay, parity, dagger, asymmetric, comm_override, dummy,
-                                                  profile);
+      instantiate<TwistedMassPreconditionedApply>(out, in, x, U, a, b, xpay, parity, dagger, asymmetric, comm_override,
+                                                  dummy, profile);
     } else {
       errorQuda("Twisted-mass operator has not been built");
     }

@@ -50,7 +50,8 @@ namespace quda
       Dslash::setParam(tp);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
-      if (arg.nParity != 1) errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
+      if (arg.nParity != 1)
+        errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
 
       if (arg.dagger) {
         if (arg.xpay)
@@ -59,7 +60,8 @@ namespace quda
           Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
       } else {
         if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp,
+                                                                                                               stream);
         else
           Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), false>(tp, stream);
       }
@@ -103,7 +105,7 @@ namespace quda
                                        double c, bool xpay, int parity, bool dagger, bool asymmetric,
                                        const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
 #ifdef SIGNATURE_ONLY
-    ;
+      ;
 #else
     {
       constexpr int nDim = 4;

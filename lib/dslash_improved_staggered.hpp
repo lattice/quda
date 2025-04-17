@@ -108,7 +108,8 @@ namespace quda
     {
       int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in.Precision();
       int gauge_bytes_long = L.Reconstruct() * in.Precision();
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int spinor_bytes
+        = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
         + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
       int num_dir = 2 * 4;      // set to 4-d since we take care of 5-d fermions in derived classes where necessary
@@ -148,20 +149,19 @@ namespace quda
       }
       return bytes_;
     }
-
   };
 
   template <bool distance_pc> struct DistanceType {
   };
 
-
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
     template <bool distance_pc>
     ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                            cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
-                           int parity, bool dagger, const int *comm_override,DistanceType<distance_pc>, TimeProfile &profile)
+                           int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>,
+                           TimeProfile &profile)
 #ifdef SIGNATURE_ONLY
-    ;
+      ;
 #else
     {
       constexpr int nDim = 4;

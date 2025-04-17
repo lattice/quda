@@ -15,7 +15,8 @@ namespace quda
      @brief Parameter structure for driving the Staggered Dslash operator
   */
   template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_u_,
-            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC, int n_src_tile = MAX_MULTI_RHS_TILE>
+            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC,
+            int n_src_tile = MAX_MULTI_RHS_TILE>
   struct StaggeredArg : DslashArg<Float, nDim, DDArg, n_src_tile> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
@@ -56,8 +57,8 @@ namespace quda
     StaggeredArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L, double a,
                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim, DDArg, n_src_tile>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1,
-                                    spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg, n_src_tile>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true,
+                                                improved_ ? 3 : 1, spin_project, comm_override),
       halo_pack(halo, improved_ ? 3 : 1),
       halo(halo, improved_ ? 3 : 1),
       U(U),
@@ -222,10 +223,10 @@ namespace quda
 
       array<Vector, n_src_tile> out;
       if (arg.dd_out.isZero(coord)) {
-	if (mykernel_type != EXTERIOR_KERNEL_ALL || active) 
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active)
 #pragma unroll
-           for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity) = out[s]; }
-	return; 
+          for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity) = out[s]; }
+        return;
       }
 
       applyStaggered<nParity, mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
@@ -235,8 +236,7 @@ namespace quda
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = -out;
-      }
-      else if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
           Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);

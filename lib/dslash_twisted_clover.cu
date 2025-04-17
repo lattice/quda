@@ -2,7 +2,6 @@
 #include <dslash_twisted_clover.hpp>
 #undef SIGNATURE_ONLY
 
-
 /**
    This is the basic gauged twisted-clover operator
 */

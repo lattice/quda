@@ -43,7 +43,7 @@ protected:
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
 
     if (::testing::get<3>(GetParam()) == 0 && ::testing::get<4>(GetParam()) > 0) return true;
-    if (!ctest_domain_decomposition && ::testing::get<3>(GetParam())>0) return true;
+    if (!ctest_domain_decomposition && ::testing::get<3>(GetParam()) > 0) return true;
 
     return false;
   }

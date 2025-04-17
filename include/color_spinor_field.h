@@ -461,12 +461,12 @@ namespace quda
     /**
        @brief Returns DDParam (const version)
      */
-    const DDParam& DD() const { return dd; }
+    const DDParam &DD() const { return dd; }
 
     /**
        @brief Returns DDParam (non const version)
      */
-    DDParam& DD() { return dd; }
+    DDParam &DD() { return dd; }
 
     /**
        @brief Sets DDParam from a given DDParam

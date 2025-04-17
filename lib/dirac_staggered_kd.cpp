@@ -45,7 +45,7 @@ namespace quda
   // Full staggered operator
   void DiracStaggeredKD::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     // Due to the staggered convention, the staggered part is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
     // ( -D_oe   2m    ) (x_o) = (b_o)
@@ -79,7 +79,7 @@ namespace quda
 
   void DiracStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet	  
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

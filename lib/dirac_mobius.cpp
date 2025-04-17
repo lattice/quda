@@ -99,7 +99,7 @@ namespace quda {
 
   void DiracMobius::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
 
     // zMobius breaks the following code. Refer to the zMobius check in DiracMobius::DiracMobius(param)
@@ -122,7 +122,7 @@ namespace quda {
 
   void DiracMobius::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -270,7 +270,7 @@ namespace quda {
   // Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
   void DiracMobiusPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
 
     // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
@@ -331,7 +331,7 @@ namespace quda {
 
   void DiracMobiusPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     auto tmp2 = getFieldTmp(out);
 
@@ -356,7 +356,7 @@ namespace quda {
 
   void DiracMobiusPC::MMdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     Mdag(tmp, in);
     M(out, tmp);
@@ -407,7 +407,7 @@ namespace quda {
 
   void DiracMobiusPC::MdagMLocal(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     if (zMobius) errorQuda("DiracMobiusPC::MdagMLocal doesn't currently support zMobius");
 
     lat_dim_t shift0 = {0, 0, 0, 0};
@@ -551,7 +551,7 @@ namespace quda {
 
   void DiracMobiusEofa::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
 
     // FIXME broken for variable coefficients
@@ -575,7 +575,7 @@ namespace quda {
 
   void DiracMobiusEofa::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -633,7 +633,7 @@ namespace quda {
   // Apply the even-odd preconditioned mobius DWF EOFA operator
   void DiracMobiusEofaPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
 
     // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
@@ -714,7 +714,7 @@ namespace quda {
 
   void DiracMobiusEofaPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);
@@ -723,7 +723,7 @@ namespace quda {
   // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
   void DiracMobiusEofaPC::full_dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp1 = getFieldTmp(out);
     auto tmp2 = getFieldTmp(out);

@@ -21,8 +21,8 @@ namespace quda
       }
       auto dummy = DistanceType<false>();
       // L must be first gauge field argument since we template on long reconstruct
-      instantiate<ImprovedStaggeredApply, ReconstructStaggered>(out, in, x, L, U, a, parity, dagger, comm_override, dummy, 
-                                                                profile);
+      instantiate<ImprovedStaggeredApply, ReconstructStaggered>(out, in, x, L, U, a, parity, dagger, comm_override,
+                                                                dummy, profile);
     } else {
       errorQuda("Improved staggered operator has not been built");
     }

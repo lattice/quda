@@ -60,7 +60,7 @@ namespace quda {
   void DiracWilson::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
 
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
     M(tmp, in);
@@ -113,7 +113,7 @@ namespace quda {
 
   void DiracWilsonPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet	  
+    assertNoDD(out, in); // TODO: DD not supported yet
     double kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(out);
 
@@ -130,7 +130,7 @@ namespace quda {
 
   void DiracWilsonPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    assertNoDD(out,in); // TODO: DD not supported yet
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

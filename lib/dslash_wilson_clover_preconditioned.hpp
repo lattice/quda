@@ -125,7 +125,7 @@ namespace quda
                                     double a, double alpha0, int t0, int parity, bool dagger, const int *comm_override,
                                     DistanceType<distance_pc>, TimeProfile &profile)
 #ifdef SIGNATURE_ONLY
-    ;
+      ;
 #else
     {
       constexpr int nDim = 4;

@@ -2,7 +2,6 @@
 #include <dslash_staggered.hpp>
 #undef SIGNATURE_ONLY
 
-
 /**
    This is a staggered Dirac operator
 */

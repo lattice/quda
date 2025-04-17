@@ -41,7 +41,8 @@ namespace quda
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = std::conditional_t<kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL, KernelOps<Cache>, NoKernelOps>;
+    using Ops
+      = std::conditional_t<kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL, KernelOps<Cache>, NoKernelOps>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -75,7 +76,7 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
-      
+
       if (arg.dd_out.isZero(coord)) {
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
         return;
@@ -85,9 +86,9 @@ namespace quda
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
-	if (arg.dd_x.isZero(coord)) {
+        if (arg.dd_x.isZero(coord)) {
           out = arg.a * out;
-      	} else {
+        } else {
           // apply the chiral and flavor twists
           // use consistent load order across s to ensure better cache locality
           Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
@@ -104,7 +105,7 @@ namespace quda
             HalfVector x_chi = x.chiral_project(chirality);
             HalfVector Ax_chi = A * x_chi;
             // i * mu * gamma_5 * tau_3
-            const complex<real> b(0.0, (chirality^flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+            const complex<real> b(0.0, (chirality ^ flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
             Ax_chi += b * x_chi;
             tmp += Ax_chi.chiral_reconstruct(chirality);
           }
@@ -116,7 +117,7 @@ namespace quda
 
           // add the Wilson part with normalisation
           out = tmp + arg.a * out;
-	}
+        }
       } else if (active) {
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out = x + arg.a * out;

@@ -720,7 +720,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
-    even->dd=dd;
+    even->dd = dd;
     return *even;
   }
 
@@ -728,7 +728,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
-    odd->dd=dd;
+    odd->dd = dd;
     return *odd;
   }
 
@@ -736,7 +736,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
-    even->dd=dd;
+    even->dd = dd;
     return *even;
   }
 
@@ -744,7 +744,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
-    odd->dd=dd;
+    odd->dd = dd;
     return *odd;
   }
 

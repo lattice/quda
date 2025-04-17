@@ -52,7 +52,8 @@ namespace quda
 
     long long bytes() const
     {
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int spinor_bytes
+        = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
@@ -71,9 +72,9 @@ namespace quda
     template <bool distance_pc>
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
-                      bool dagger, const int *comm_override,DistanceType<distance_pc>, TimeProfile &profile)
-    #ifdef SIGNATURE_ONLY
-          ;
+                      bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
+#ifdef SIGNATURE_ONLY
+      ;
 #else
     {
       constexpr int nDim = 5;

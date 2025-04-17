@@ -16,8 +16,8 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>()) {
       auto dummy = DistanceType<false>();
-      instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, x, U, A, a, b, parity, dagger, comm_override, dummy,
-                                                               profile);
+      instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, x, U, A, a, b, parity, dagger, comm_override,
+                                                               dummy, profile);
     } else {
       errorQuda("Clover Hasenbusch Twist operator has not been built");
     }
@@ -35,8 +35,8 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>()) {
       auto dummy = DistanceType<false>();
-      instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, x, U, A, a, b, parity, dagger, comm_override, dummy,
-                                                             profile);
+      instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, x, U, A, a, b, parity, dagger, comm_override,
+                                                             dummy, profile);
     } else {
       errorQuda("Clover Hasenbusch Twist operator has not been built");
     }

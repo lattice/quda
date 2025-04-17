@@ -32,7 +32,6 @@ namespace quda
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
 
-
       // Setting the value of block_dim and checking if blocks are local
       bool local = true;
       for (int i = 0; i < QUDA_MAX_DIM; i++) {
@@ -105,7 +104,7 @@ namespace quda
       vector<double> delta2(b.size(), param.delta * param.delta);
 
       if (!param.do_block_schwarz() && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ
-	    	      && (node_parity + step) % 2 == 0) {
+          && (node_parity + step) % 2 == 0) {
         // for multiplicative Schwarz we alternate updates depending on node parity
       } else {
 
@@ -114,23 +113,23 @@ namespace quda
         if (param.do_block_schwarz()) {
           if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
             for (auto i = 0u; i < b.size(); i++) {
-            // Red or black active
+              // Red or black active
               (Ar[i]).DD(DD::reset, DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
               (r_sloppy[i]).DD(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
-	    }
+            }
           } else {
             // Both red and black active but no hopping
             for (auto i = 0u; i < b.size(); i++) {
               (Ar[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
               (r_sloppy[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
-	    }
+            }
           }
         }
 
         blas::zero(x_sloppy); // can get rid of this for a special first update kernel
-        auto c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2  
+        auto c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
         for (auto i = 0u; i < b.size(); i++) {
-	  scale[i] = c2[i] > 0.0 ? sqrt(c2[i]) : 1.0;
+          scale[i] = c2[i] > 0.0 ? sqrt(c2[i]) : 1.0;
           scale_inv[i] = 1.0 / scale[i];
           // domain-wise normalization of the initial residual to prevent underflow
           if (c2[i] > 0.0) r2[i] = 1.0; // by definition by this is now true
@@ -174,7 +173,7 @@ namespace quda
           for (auto i = 0u; i < Ar.size(); i++) {
             (Ar[i]).DD(DD::reset);
             (r_sloppy[i]).DD(DD::reset);
-	  }
+          }
         }
 
         commGlobalReductionPop(); // renable global reductions for outer solver

@@ -21,7 +21,8 @@ namespace quda
   {
     if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
       auto dummy = DistanceType<false>();
-      instantiate<TwistedCloverPreconditionedApply>(out, in, x, U, C, a, b, xpay, parity, dagger, comm_override, dummy, profile);
+      instantiate<TwistedCloverPreconditionedApply>(out, in, x, U, C, a, b, xpay, parity, dagger, comm_override, dummy,
+                                                    profile);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }

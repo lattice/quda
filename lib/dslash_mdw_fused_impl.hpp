@@ -21,7 +21,8 @@ namespace quda
 
 #ifdef QUDA_MMA_AVAILABLE
 
-    template <class store_t, int nColor, typename DDArg, QudaReconstructType recon, int Ls_> class FusedDslash : public TunableGridStrideKernel2D
+    template <class store_t, int nColor, typename DDArg, QudaReconstructType recon, int Ls_>
+    class FusedDslash : public TunableGridStrideKernel2D
     {
       ColorSpinorField &out;
       const ColorSpinorField &in;

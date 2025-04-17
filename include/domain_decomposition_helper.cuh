@@ -29,7 +29,6 @@ namespace quda
 
     // Whether do hopping with field at neighboring coord
     template <typename Coord> constexpr bool doHopping(const Coord &, int, int) const { return true; }
-    
   };
 
   inline std::ostream &operator<<(std::ostream &out, const DDNo &)
@@ -43,9 +42,9 @@ namespace quda
   struct DDRedBlack {
 
     const int_fastdiv block_dim[QUDA_MAX_DIM]; // the size of the block per direction
-    const bool red_active;         // if red blocks are active
-    const bool black_active;       // if black blocks are active
-    const bool block_hopping;      // if hopping between red and black is allowed
+    const bool red_active;                     // if red blocks are active
+    const bool black_active;                   // if black blocks are active
+    const bool block_hopping;                  // if hopping between red and black is allowed
 
     DDRedBlack(const DDParam &dd) :
       block_dim {dd.block_dim[0], dd.block_dim[1], dd.block_dim[2], dd.block_dim[3]},
@@ -117,12 +116,11 @@ namespace quda
     }
   };
 
-
   inline std::ostream &operator<<(std::ostream &out, const DDRedBlack &arg)
   {
-    out << "Domain decomposition is set: red active: "<<arg.red_active<<" black active: "<<arg.black_active ;
-    out << " Domain[0] " << arg.block_dim[0] << " Domain[1] " << arg.block_dim[1]; 
-    out << " Domain[2] " << arg.block_dim[2] << " Domain[3] " << arg.block_dim[3]<<std::endl;
+    out << "Domain decomposition is set: red active: " << arg.red_active << " black active: " << arg.black_active;
+    out << " Domain[0] " << arg.block_dim[0] << " Domain[1] " << arg.block_dim[1];
+    out << " Domain[2] " << arg.block_dim[2] << " Domain[3] " << arg.block_dim[3] << std::endl;
 
     return out;
   }
