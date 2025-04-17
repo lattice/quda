@@ -316,8 +316,25 @@ int main(int argc, char **argv)
   printf("<check,fwd_check> is %1.5e, %1.5e \n",trace_fwd.real(), trace_fwd.imag());
   printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
 
-  if (method_adj_check > gauge_smear_steps*gauge_smear_steps || method_adj_check > gauge_smear_steps*gauge_smear_steps)
-  errorQuda("results above precision failed\n");
+  double eps = 0.0;
+  switch (prec) {
+    case QUDA_DOUBLE_PRECISION: eps = 1.11e-16; break;
+    case QUDA_SINGLE_PRECISION: eps = 5.96e-08; break;
+    case QUDA_HALF_PRECISION: eps = 2e-3; break;
+    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
+    default: errorQuda("Invalid precision %d", prec);
+  } 
+
+    
+  if (method_adj_check > gauge_smear_steps*gauge_smear_steps*eps)
+  errorQuda("adjoint safe/hier match precision failed\n");
+  else
+  printf("adjoint safe/hier match precision passed!\n");    
+
+  if (trace_diff_err > gauge_smear_steps*gauge_smear_steps*eps)
+  errorQuda("fractional error precision failed\n");
+  else
+  printf("fractional error precision passed!\n");    
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
