@@ -5259,25 +5259,35 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   c << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[1];
   print_string = a.str() + " " + b.str() + " " + c.str();
   if (compute_plaq) {
-    a.str(""); a.clear(); b.str(""); b.clear();
+    a.str("");
+    a.clear();
+    b.str("");
+    b.clear();
     a << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[2];
     b << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[1];
     print_string += " " + a.str() + " " + b.str();
   }
   if (compute_rect) {
-    a.str(""); a.clear(); b.str(""); b.clear();
+    a.str("");
+    a.clear();
+    b.str("");
+    b.clear();
     a << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[2];
     b << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[1];
     print_string += " " + a.str() + " " + b.str();
   }
   if (compute_ploop) {
-    a.str(""); a.clear(); b.str(""); b.clear();
+    a.str("");
+    a.clear();
+    b.str("");
+    b.clear();
     a << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[0];
     b << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[1];
     print_string += " " + a.str() + " " + b.str();
   }
   if (compute_charge) {
-    a.str(""); a.clear();
+    a.str("");
+    a.clear();
     a << std::fixed << std::setprecision(16) << obs_param[measurement_n].qcharge;
     print_string += " " + a.str();
   }
@@ -5300,31 +5310,46 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
       gaugeObservables(out, obs_param[measurement_n]);
 
-      a.str(""); a.clear(); b.str(""); b.clear(); c.str(""); c.clear();
+      a.str("");
+      a.clear();
+      b.str("");
+      b.clear();
+      c.str("");
+      c.clear();
       a << std::fixed << std::setprecision(6) << (smear_param->t0 + smear_param->epsilon * (i + 1));
       b << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[2];
       c << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[1];
       print_string = a.str() + " " + b.str() + " " + c.str();
       if (compute_plaq) {
-        a.str(""); a.clear(); b.str(""); b.clear();
+        a.str("");
+        a.clear();
+        b.str("");
+        b.clear();
         a << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[2];
         b << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[1];
         print_string += " " + a.str() + " " + b.str();
       }
       if (compute_rect) {
-        a.str(""); a.clear(); b.str(""); b.clear();
+        a.str("");
+        a.clear();
+        b.str("");
+        b.clear();
         a << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[2];
         b << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[1];
         print_string += " " + a.str() + " " + b.str();
       }
       if (compute_ploop) {
-        a.str(""); a.clear(); b.str(""); b.clear();
+        a.str("");
+        a.clear();
+        b.str("");
+        b.clear();
         a << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[0];
         b << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[1];
         print_string += " " + a.str() + " " + b.str();
       }
       if (compute_charge) {
-        a.str(""); a.clear();
+        a.str("");
+        a.clear();
         a << std::fixed << std::setprecision(16) << obs_param[measurement_n].qcharge;
         print_string += " " + a.str();
       }

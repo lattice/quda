@@ -87,23 +87,29 @@ namespace quda {
         case WFLOW_STEP_VT:
           launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_STEP_VT>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_1:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_1>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_1:
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_1>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_2:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_2>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_2:
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_2>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_3:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_3>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_3:
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_3>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_4:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_4>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_4:
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_4>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_5:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_5>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_5:
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_5>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_6:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_6>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_6:
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_WILSON_FLOW, WFLOW_FOURTH_ORDER_STEP_6>(out, temp, in, epsilon, anisotropy));
           break;
         }
         break;
@@ -119,23 +125,35 @@ namespace quda {
         case WFLOW_STEP_VT:
           launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_VT>(out, temp, in, epsilon, anisotropy));
           break;
-	case WFLOW_FOURTH_ORDER_STEP_1:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_1>(out, temp, in, epsilon, anisotropy));
+        case WFLOW_FOURTH_ORDER_STEP_1:
+          launch<WFlow>(
+            tp, stream,
+            Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_1>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_FOURTH_ORDER_STEP_2:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_2>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(
+            tp, stream,
+            Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_2>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_FOURTH_ORDER_STEP_3:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_3>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(
+            tp, stream,
+            Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_3>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_FOURTH_ORDER_STEP_4:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_4>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(
+            tp, stream,
+            Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_4>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_FOURTH_ORDER_STEP_5:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_5>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(
+            tp, stream,
+            Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_5>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_FOURTH_ORDER_STEP_6:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_6>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(
+            tp, stream,
+            Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_FOURTH_ORDER_STEP_6>(out, temp, in, epsilon, anisotropy));
           break;
         }
         break;
@@ -172,13 +190,15 @@ namespace quda {
       // First and last steps have 1 store (retrieve) to (from) temp
       auto temp_io = 1;
       // Middle steps have an additional store or retrieve to or from temp
-      if( step_type==WFLOW_STEP_W2 || step_type==WFLOW_FOURTH_ORDER_STEP_2 || step_type==WFLOW_FOURTH_ORDER_STEP_3 
-      || step_type==WFLOW_FOURTH_ORDER_STEP_4 || step_type==WFLOW_FOURTH_ORDER_STEP_5 ) temp_io += 1;
+      if (step_type == WFLOW_STEP_W2 || step_type == WFLOW_FOURTH_ORDER_STEP_2 || step_type == WFLOW_FOURTH_ORDER_STEP_3
+          || step_type == WFLOW_FOURTH_ORDER_STEP_4 || step_type == WFLOW_FOURTH_ORDER_STEP_5)
+        temp_io += 1;
       return ((1 + (wflow_dim - 1) * links) * in.Bytes() + out.Bytes() + temp_io * temp.Bytes());
     }
   }; // GaugeWFlowStep
 
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type, double smear_anisotropy, int rk_order)
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
+                 double smear_anisotropy, int rk_order)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
@@ -205,19 +225,19 @@ namespace quda {
     case 4: // Use 6-stage fourth-order Runga-Kutta integration
       instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_FOURTH_ORDER_STEP_1);
       out.exchangeExtendedGhost(out.R(), false);
-    
+
       instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_FOURTH_ORDER_STEP_2);
       in.exchangeExtendedGhost(in.R(), false);
-    
+
       instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_FOURTH_ORDER_STEP_3);
       out.exchangeExtendedGhost(out.R(), false);
-    
+
       instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_FOURTH_ORDER_STEP_4);
       in.exchangeExtendedGhost(in.R(), false);
-    
+
       instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_anisotropy, smear_type, WFLOW_FOURTH_ORDER_STEP_5);
       out.exchangeExtendedGhost(out.R(), false);
-    
+
       instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_anisotropy, smear_type, WFLOW_FOURTH_ORDER_STEP_6);
       in.exchangeExtendedGhost(in.R(), false);
 
@@ -227,8 +247,8 @@ namespace quda {
     }
   }
 
-  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon,
-                 QudaGaugeSmearType smear_type, QudaWFlowStepType step_type)
+  void GFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type,
+                 QudaWFlowStepType step_type)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);

@@ -27,7 +27,8 @@ namespace quda {
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon, int dir_ignore, double anisotropy) :
+    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon, int dir_ignore,
+               double anisotropy) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
@@ -101,7 +102,8 @@ namespace quda {
     out.exchangeExtendedGhost(out.R(), false);
   }
 
-  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, double rho, double epsilon, int dir_ignore, double smear_anisotropy)
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField &in, double rho, double epsilon, int dir_ignore,
+                       double smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
