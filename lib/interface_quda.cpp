@@ -5720,7 +5720,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
   }
     
-  // pushVerbosity(inv_param->verbosity);
+  pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (smear_param->restart) {

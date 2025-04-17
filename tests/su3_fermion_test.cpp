@@ -221,6 +221,7 @@ int main(int argc, char **argv)
   invParam.cuda_prec = QUDA_DOUBLE_PRECISION;
   invParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invParam.dirac_order = QUDA_DIRAC_ORDER;
+  invParam.verbosity = verbosity;
 
   quda::ColorSpinorParam cs_param;
 
