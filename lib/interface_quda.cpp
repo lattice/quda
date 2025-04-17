@@ -5650,7 +5650,6 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     blas::axpy(1.,f_temp2, f_temp0);
     blas::axpy(1.,f_temp1, f_temp0);
     
-    // fout = f_temp0;
     //redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
     
