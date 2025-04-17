@@ -1,0 +1,81 @@
+name: rocm_ghactions_build
+
+on:
+  pull_request:
+    branches: [ "develop" ]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  BUILD_TYPE: STRICT
+
+jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Remove unnecessary files
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - name: Install software
+        run: |
+          sudo apt-get update
+          wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | gpg --dearmor | sudo tee /etc/apt/keyrings/rocm.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.3.4 $(lsb_release -cs) main" | sudo tee --append /etc/apt/sources.list.d/rocm.list
+          echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends ninja-build cmake libopenmpi-dev hipfft-dev hiprand-dev rocrand-dev hipblas-dev rocblas-dev hipcub-dev rocprim-dev rocm-llvm hip-dev hipcc rocm-device-libs
+
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: |
+          cmake \
+            -B ${{github.workspace}}/build \
+            -GNinja \
+            -DQUDA_TARGET_TYPE="HIP" \
+            -DQUDA_GPU_ARCH=gfx90a \
+            -DROCM_PATH=/opt/rocm \
+            -DCMAKE_PREFIX_PATH=/opt/rocm \
+            -DQUDA_DIRAC_CLOVER=ON \
+            -DQUDA_DIRAC_CLOVER_HASENBUSCH=OFF \
+            -DQUDA_DIRAC_DOMAIN_WALL=ON \
+            -DQUDA_DIRAC_NDEG_TWISTED_MASS=OFF \
+            -DQUDA_DIRAC_STAGGERED=ON \
+            -DQUDA_DIRAC_TWISTED_MASS=OFF \
+            -DQUDA_DIRAC_TWISTED_CLOVER=OFF \
+            -DQUDA_DIRAC_WILSON=ON \
+            -DQUDA_DIRAC_LAPLACE=ON \
+            -DQUDA_CLOVER_DYNAMIC=ON \
+            -DQUDA_COVDEV=ON \
+            -DQUDA_FAST_COMPILE_REDUCE=ON \
+            -DQUDA_FAST_COMPILE_DSLASH=ON \
+            -DQUDA_QDPJIT=OFF \
+            -DQUDA_INTERFACE_QDPJIT=OFF \
+            -DQUDA_INTERFACE_MILC=ON \
+            -DQUDA_INTERFACE_CPS=OFF \
+            -DQUDA_INTERFACE_QDP=ON \
+            -DQUDA_INTERFACE_TIFR=OFF \
+            -DQUDA_QMP=ON \
+            -DQUDA_DOWNLOAD_USQCD=ON \
+            -DQUDA_OPENMP=OFF \
+            -DQUDA_MULTIGRID=ON \
+            -DQUDA_DOWNLOAD_EIGEN=ON \
+            -DQUDA_PRECISION=8 \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_CXX_COMPILER="/opt/rocm/bin/amdclang++" \
+            -DCMAKE_C_COMPILER="/opt/rocm/bin/amdclang" \
+            -DCMAKE_HIP_COMPILER="/opt/rocm/bin/amdclang++" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DQUDA_BUILD_SHAREDLIB=ON \
+            -DQUDA_BUILD_ALL_TESTS=ON \
+            -DQUDA_CTEST_DISABLE_BENCHMARKS=ON \
+            -DCMAKE_C_STANDARD=99
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build
+
+      - name: Install
+        run: cmake --install ${{github.workspace}}/build
