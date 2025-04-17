@@ -5865,7 +5865,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
           if (j > 0) std::swap(g_2,g_1);
           WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type);
       }
-      // break;
+
       gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
       logQuda(QUDA_DEBUG_VERBOSE,"recycled gauge field placed *before* index %d\n\n",ret_idx + 1);
       gf_list.at(0) = std::ref(gauge_stages.back());
