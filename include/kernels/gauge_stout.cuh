@@ -28,17 +28,15 @@ namespace quda
     const Float staple_coeff;
     const Float rectangle_coeff;
     const int dir_ignore;
-    const Float anisotropy;
 
-    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon, int dir_ignore, const Float anisotropy) :
+    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon, int dir_ignore) :
       kernel_param(dim3(1, 2, stoutDim)),
       out(out),
       in(in),
       rho(rho),
       staple_coeff(rho * (5.0 - 2.0 * epsilon) / 3.0),
       rectangle_coeff(rho * (1.0 - epsilon) / 12.0),
-      dir_ignore(dir_ignore),
-      anisotropy(anisotropy)
+      dir_ignore(dir_ignore)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
@@ -76,7 +74,7 @@ namespace quda
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
+      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -159,7 +157,7 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(*this, x, X, parity, dir, Stap, Rect, arg.dir_ignore, arg.anisotropy);
+      computeStapleRectangle(*this, x, X, parity, dir, Stap, Rect, arg.dir_ignore);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);

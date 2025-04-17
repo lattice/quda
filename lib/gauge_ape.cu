@@ -12,20 +12,18 @@ namespace quda {
     const GaugeField &in;
     const Float alpha;
     const int dir_ignore;
-    const Float anisotropy;
     const int apeDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
     unsigned int sharedBytesPerThread() const { return 4 * sizeof(int); } // for thread_array
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeAPE(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, const double anisotropy) :
+    GaugeAPE(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
       alpha(static_cast<Float>(alpha)),
       dir_ignore(dir_ignore),
-      anisotropy(anisotropy),
       apeDim((dir_ignore == 4) ? 4 : 3)
     {
       strcat(aux, ",dir_ignore=");
@@ -38,9 +36,9 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (apeDim == 3) {
-        launch<APE>(tp, stream, GaugeAPEArg<Float, nColor, recon, 3>(out, in, alpha, dir_ignore, anisotropy));
+        launch<APE>(tp, stream, GaugeAPEArg<Float, nColor, recon, 3>(out, in, alpha, dir_ignore));
       } else if (apeDim == 4) {
-        launch<APE>(tp, stream, GaugeAPEArg<Float, nColor, recon, 4>(out, in, alpha, dir_ignore, anisotropy));
+        launch<APE>(tp, stream, GaugeAPEArg<Float, nColor, recon, 4>(out, in, alpha, dir_ignore));
       }
     }
 
@@ -61,7 +59,7 @@ namespace quda {
 
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, GaugeField &in, double alpha, int dir_ignore, const double smear_anisotropy)
+  void APEStep(GaugeField &out, GaugeField &in, double alpha, int dir_ignore)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
@@ -72,7 +70,7 @@ namespace quda {
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeAPE>(out, in, alpha, dir_ignore, smear_anisotropy);
+    instantiate<GaugeAPE>(out, in, alpha, dir_ignore);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
