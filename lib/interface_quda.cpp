@@ -5466,9 +5466,6 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   GaugeField &g_W1 = gaugeW1;
   GaugeField &g_W2 = gaugeW2;
   GaugeField &g_VT = gaugeVT;
-
-  //necessary?
-  if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   
   // helper gauge field for Laplace operator
   GaugeField precise;
