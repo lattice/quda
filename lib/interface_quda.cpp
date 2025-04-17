@@ -5250,7 +5250,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   if (compute_ploop) print_string += ", Ploop_r, Ploop_i";
   if (compute_charge) print_string += ", charge";
   print_string += "\n";
-  printfQuda(print_string.c_str());
+  printfQuda("%s", print_string.c_str());
 
   // Print initial values
   std::ostringstream a, b, c;
@@ -5292,7 +5292,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
     print_string += " " + a.str();
   }
   print_string += "\n";
-  printfQuda(print_string.c_str());
+  printfQuda("%s", print_string.c_str());
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     // This uses 3-stage third order or 6-stage fourth order Runge-Kutta integration
@@ -5354,7 +5354,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
         print_string += " " + a.str();
       }
       print_string += "\n";
-      printfQuda(print_string.c_str());
+      printfQuda("%s", print_string.c_str());
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
