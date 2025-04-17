@@ -30,17 +30,15 @@ namespace quda
     int border[4];
     int_fastdiv E[4];
     const real epsilon;
-    const real anisotropy;
     const real coeff1x1;
     const real coeff2x1;
 
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon, const real anisotropy) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
       in(in),
       epsilon(epsilon),
-      anisotropy(anisotropy),
       coeff1x1(5.0 / 3.0),
       coeff2x1(-1.0 / 12.0)
     {
@@ -74,20 +72,20 @@ namespace quda
     static_assert(Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW);
     if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim, arg.anisotropy);
+      computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim);
     } else if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
       typename computeStapleOpsWF<Arg>::StapOp Stap {ftor};
       typename computeStapleOpsWF<Arg>::RectOp Rect {ftor};
-      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim, arg.anisotropy);
+      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
     }
     return Z;
   }
-  
-    template <typename Link, typename Ftor>
+
+  template <typename Link, typename Ftor>
   __host__ __device__ inline auto computeW1Step(const Ftor &ftor, Link &U, const int *x, const int parity,
                                                 const int x_cb, const int dir)
   {
@@ -139,35 +137,10 @@ namespace quda
     Z2 *= arg.epsilon;
     return Z2;
   }
-  
-  template <typename Link, typename Ftor>
-  __host__ __device__ inline auto computeWStep(const Ftor &ftor, Link &U, const int *x, const int parity,
-                                        const int x_cb, const int dir, const double coeff_a, const double coeff_b,
-                                        const bool get_stored, const bool do_store)
-  {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor.arg;
-    // Compute SU^\dagger
-    Link Z = computeStaple(ftor, x, parity, dir);
-    U = arg.in(dir, linkIndex(x, arg.E), parity);
-    Z *= conj(U);
-    if( get_stored ) {
-      // Retrieve previous Z stored in temp and multiply by coeff_a
-      Link Z0 = arg.temp(dir, x_cb, parity);
-      Z0 *= static_cast<typename Arg::real>(coeff_a);
-      Z = Z - Z0;
-    }
-    // Store Z in temp for next stage
-    if( do_store ) arg.temp(dir, x_cb, parity) = Z;
-    // Return coeff_b*epsilon*Z
-    Z *= static_cast<typename Arg::real>(coeff_b) * arg.epsilon;
-    return Z;
-  }
 
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
   template <typename Arg_> struct WFlow : computeStapleOpsWF<Arg_>::Ops {
     using Arg = Arg_;
-    using real = typename Arg_::real;
     using typename computeStapleOpsWF<Arg>::Ops::KernelOpsT;
     const Arg &arg;
     template <typename... OpsArgs> constexpr WFlow(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
@@ -177,6 +150,7 @@ namespace quda
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
+      using real = typename Arg::real;
       using Link = Matrix<complex<real>, Arg::nColor>;
       complex<real> im(0.0, -1.0);
 
@@ -190,12 +164,6 @@ namespace quda
       case WFLOW_STEP_W1: Z = computeW1Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_W2: Z = computeW2Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_VT: Z = computeVtStep(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_1: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.0, 0.032918605146, false, true); break;
-      case WFLOW_4THORDER_STEP_2: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.737101392796, 0.823256998200, true, true); break;
-      case WFLOW_4THORDER_STEP_3: Z = computeWStep(*this, U, x, parity, x_cb, dir, 1.634740794341, 0.381530948900, true, true); break;
-      case WFLOW_4THORDER_STEP_4: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.744739003780, 0.200092213184, true, true); break;
-      case WFLOW_4THORDER_STEP_5: Z = computeWStep(*this, U, x, parity, x_cb, dir, 1.469897351522, 1.718581042715, true, true); break;
-      case WFLOW_4THORDER_STEP_6: Z = computeWStep(*this, U, x, parity, x_cb, dir, 2.813971388035, 0.27, true, false); break;
       }
 
       // Compute anti-hermitian projection of Z, exponentiate, update U

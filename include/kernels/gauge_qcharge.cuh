@@ -70,9 +70,7 @@ namespace quda
       // unroll computation
 #pragma unroll
       for (int i=0; i<3; i++) {
-        auto tmp_s = F[i] - n_inv * getTrace(F[i]) * iden;
-        auto tmp_t = F[5 - i] - n_inv * getTrace(F[5 - i]) * iden;
-        Qi[i] = getTrace(tmp_s * tmp_t).real();
+        Qi[i] = getTrace(F[i] * F[5 - i]).real();
       }
 
       // apply correct levi-civita symbol
