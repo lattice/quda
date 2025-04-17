@@ -81,9 +81,9 @@ namespace quda
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector, typename Cache>
   __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, Coord &local_coord, int parity, int idx,
-                                              int thread_dim, bool &active, int src_idx)
+                                              int thread_dim, bool &active, int src_idx, Cache &cache)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -93,8 +93,8 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-    auto block = target::block_dim();
-    VanillaSharedMemoryCache<Vector> cache(0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
+    // auto block = target::block_dim();
+    // VanillaSharedMemoryCache<Vector> cache(0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
 
     const int t = arg.comm_coord_dim_3 + coord[3];
     const int nt = arg.comm_dim_dim_3;
@@ -277,8 +277,10 @@ namespace quda
 #else
       // Load all interior color spinor fields
       auto block = target::block_dim();
-      VanillaSharedMemoryCache<Vector> cache(0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
+      VanillaSharedMemoryCache<typename Arg::F> cache(arg.in[src_idx], 0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
       int local_idx = target::thread_idx().x;
+
+      cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
 
       while (local_idx < (0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb)) {
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
@@ -290,9 +292,11 @@ namespace quda
           Coord<4> local_coord;
           coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, 1 - parity, thread_dim, local_coord);
         }
-        cache.save(arg.in[src_idx](coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity), local_idx);
+        // cache.save(arg.in[src_idx](coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity), local_idx);
+        arg.in[src_idx].cache(cache, pipe, coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity, local_idx);
         local_idx += target::block_dim().x;
       }
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
       cache.sync();
 
       local_idx = target::thread_idx().x;
@@ -302,7 +306,7 @@ namespace quda
 
         const int my_spinor_parity = nParity == 2 ? parity : 0;
         Vector out;
-        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, local_coord, parity, idx, thread_dim, active, src_idx);
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, local_coord, parity, idx, thread_dim, active, src_idx, cache);
 
         int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
         if (xpay) {

@@ -132,7 +132,11 @@ namespace quda
             prod *= p[d];
           }
         }
-        return prod * 24 * 4 / 2;
+        int smem_size = sizeof(typename Arg::Float) * 24 * prod / 2;
+        if (isFixed<typename Arg::Float>::value) {
+          smem_size += sizeof(float) * prod / 2;
+        }
+        return smem_size;
       } else {
         return 0;
       }

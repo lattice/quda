@@ -1190,18 +1190,27 @@ namespace quda
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false,
+    template <typename Float_, int Ns_, int Nc_, int N_, bool spin_project = false, bool huge_alloc = false,
               bool disable_ghost = false>
-    struct FloatNOrder : GhostNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc, disable_ghost> {
+    struct FloatNOrder : GhostNOrder<Float_, Ns_, Nc_, N_, spin_project, huge_alloc, disable_ghost> {
+      static constexpr int Ns = Ns_;
+      static constexpr int Nc = Nc_;
+      using Float = Float_;
       static_assert((2 * Ns * Nc) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
       static constexpr int length = 2 * Ns * Nc;
       static constexpr int N = N_;
       static constexpr int M = length / N;
+
+      static constexpr int length_ghost = spin_project ? length / 2 : length;
+      static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N / 2;
+      static constexpr int M_ghost = length_ghost / N_ghost;
+
       using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc, disable_ghost>;
       using GhostNOrder = GhostNOrder<Float, Ns, Nc, N, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using Vector = typename VectorType<Float, N>::type;
+      using GhostVector = typename VectorType<Float, N_ghost>::type;
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
       Float *field = nullptr;
@@ -1236,20 +1245,31 @@ namespace quda
 
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
-        real v[length];
 #ifndef LEGACY_ACCESSOR_NORM
         auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
         auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
 #endif
         norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
+        Vector vecTmp[M];
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
+          vecTmp[i] = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
+        }
+
+        unpack(out, vecTmp, nrm);
+      }
+
+      __device__ __host__ inline void unpack(complex out[length / 2], const Vector vecTmp[M], norm_type nrm) const
+      {
+        real v[length];
+
+#pragma unroll
+        for (int i = 0; i < M; i++) {
           // now copy into output and scale
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<const Float *>(&vecTmp[i])[j], nrm);
         }
 
 #pragma unroll
@@ -1308,6 +1328,23 @@ namespace quda
       __device__ __host__ inline auto operator()(int x_cb, int parity) const
       {
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
+
+      template <class Cache, class Pipe>
+      __device__ __host__ inline void cache(Cache &cache, Pipe& pipe, int x_cb, int parity, int j) const
+      {
+#ifndef LEGACY_ACCESSOR_NORM
+        auto norm_offset = offset * (sizeof(Float) * N / sizeof(norm_type));
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+#endif
+        if (isFixed<Float>::value) {
+          vector_load_async<float>(cache.norm(j), norm, x_cb + parity * norm_offset, pipe);
+        }
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          vector_load_async<Vector>(cache.template bulk<Vector>(i, j), field, parity * offset + x_cb + volumeCB * i,
+                                    pipe);
+        }
       }
 
       size_t Bytes() const { return offset * 2ll * sizeof(Vector) * N; }

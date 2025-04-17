@@ -2,6 +2,7 @@
 
 #include <register_traits.h>
 #include <inline_ptx.h>
+#include <cuda/pipeline>
 
 namespace quda
 {
@@ -49,6 +50,21 @@ namespace quda
       float2 tmp;
       operator()(tmp, ptr, idx);
       memcpy(&value, &tmp, sizeof(float2));
+    }
+  };
+
+  // pre-declaration of vector_load that we wish to specialize
+  template <bool> struct vector_load_async_impl;
+
+  // CUDA specializations of the vector_load_async
+  template <> struct vector_load_async_impl<true> {
+    template <typename T, class Pipe> __device__ inline void operator()(T *out, const T *ptr, int idx, Pipe &pipe)
+    {
+#if 0
+      cuda::memcpy_async(out, &ptr[idx], sizeof(T), pipe);
+#else
+      cp_async_cached_shared_global<sizeof(T)>(reinterpret_cast<char *>(out), reinterpret_cast<const char *>(&ptr[idx]));
+#endif
     }
   };
 

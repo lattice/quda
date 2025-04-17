@@ -8,9 +8,21 @@
 namespace quda
 {
 
-  template <typename T>
+  template <typename color_spinor_order_t>
   class VanillaSharedMemoryCache
   {
+    const color_spinor_order_t &color_spinor_order;
+
+    using bulk_t = array<typename color_spinor_order_t::Vector, color_spinor_order_t::M>;
+    using norm_t = float;
+
+    using Float = typename color_spinor_order_t::Float;
+
+    static constexpr size_t norm_bytes = isFixed<Float>::value ? sizeof(norm_t) : 0;
+    static constexpr size_t bytes = sizeof(bulk_t) + norm_bytes;
+
+    void *_bulk_ptr;
+    void *_norm_ptr;
 
     /**
        @brief This is a dummy instantiation for the host compiler
@@ -49,25 +61,18 @@ namespace quda
       __device__ inline void operator()() { __syncthreads(); }
     };
 
-    using atom_t = atom_t<T>;
-    static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
-
-    // The number of elements of type atom_t that we break T into for optimal shared-memory access
-    static constexpr int n_element = sizeof(T) / sizeof(atom_t);
-
     const int stride;
-    atom_t *cache; // the underlying shared memory pointer
-
-  public:
-    using value_type = T;
 
   public:
     /**
        @brief Constructor for SharedMemoryCache.
     */
-    __device__ __host__ VanillaSharedMemoryCache(int stride_):
-      stride(stride_), cache(reinterpret_cast<atom_t *>(target::dispatch<cache_dynamic>()))
+    __device__ __host__ VanillaSharedMemoryCache(const color_spinor_order_t &color_spinor_order, int stride_):
+      color_spinor_order(color_spinor_order), stride(stride_)
     {
+      char *cache = target::dispatch<cache_dynamic>();
+      _bulk_ptr = cache;
+      _norm_ptr = cache + stride * sizeof(bulk_t);
     }
 
     /**
@@ -75,22 +80,32 @@ namespace quda
     */
     __device__ __host__ void sync() const { target::dispatch<sync_impl>(); }
 
-    __device__ __host__ inline void save(const T &a, int j)
-    {
-      atom_t tmp[n_element];
-      memcpy(tmp, (void *)&a, sizeof(T));
-#pragma unroll
-      for (int i = 0; i < n_element; i++) cache[i * stride + j] = tmp[i];
+    template <class vector_t>
+    __device__ __host__ vector_t *bulk(int index, int j) {
+      return &reinterpret_cast<vector_t *>(_bulk_ptr)[index * stride + j];
+      // return &reinterpret_cast<vector_t *>(_bulk_ptr[stage])[(warp_id * color_spinor_order_t::M + index) * 32 + lane_id];
     }
 
-    __device__ __host__ inline auto load(int j) const
+    __device__ __host__ norm_t *norm(int j) {
+      return &reinterpret_cast<norm_t *>(_norm_ptr)[j];
+    }
+
+    __device__ __host__ inline auto load(int j)
     {
-      atom_t tmp[n_element];
+      ColorSpinor<typename color_spinor_order_t::real, color_spinor_order_t::Nc, color_spinor_order_t::Ns> color_spinor;
+
+      norm_t nrm = isFixed<Float>::value ? *norm(j) : 0.0;
+      using Vector = typename color_spinor_order_t::Vector;
+      Vector vecTmp[color_spinor_order_t::M];
+
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = cache[i * stride + j];
-      T a;
-      memcpy((void *)&a, tmp, sizeof(T));
-      return a;
+      for (int i = 0; i < color_spinor_order_t::M; i++) {
+        // first load from memory
+        vecTmp[i] = *bulk<Vector>(i, j);
+      }
+
+      color_spinor_order.unpack(color_spinor.data, vecTmp, nrm);
+      return color_spinor;
     }
 
   };

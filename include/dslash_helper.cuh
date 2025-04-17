@@ -109,7 +109,7 @@ template <typename Coord, typename Arg>
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       x[d] = local_coord[d] + offset[d];
-      if (arg.tb.cache_ext) {
+      if (0) {
         // Get the extended coord
         if (arg.tb.dim[d] != arg.dim[d]) {
           local_coord[d] += 1;
@@ -117,7 +117,7 @@ template <typename Coord, typename Arg>
       }
     }
 
-    if (arg.tb.cache_ext) {
+    if (0) {
       int local_index = 0;
 #pragma unroll
       for (int d = 3; d >= 0; d--) {
