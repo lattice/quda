@@ -34,7 +34,7 @@ namespace quda
     const real coeff1x1;
     const real coeff2x1;
 
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon, const real anisotropy) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, real epsilon, real anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
@@ -184,18 +184,22 @@ namespace quda
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
+      
+      // Coefficients for fourth order integrator
+      double coeff_a[] = {0.0, 0.737101392796, 1.634740794341, 0.744739003780, 1.469897351522, 2.813971388035};
+      double coeff_b[] = {0.032918605146, 0.823256998200, 0.381530948900, 0.200092213184, 1.718581042715, 0.27};
 
       Link U, Z;
       switch (arg.step_type) {
       case WFLOW_STEP_W1: Z = computeW1Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_W2: Z = computeW2Step(*this, U, x, parity, x_cb, dir); break;
       case WFLOW_STEP_VT: Z = computeVtStep(*this, U, x, parity, x_cb, dir); break;
-      case WFLOW_4THORDER_STEP_1: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.0, 0.032918605146, false, true); break;
-      case WFLOW_4THORDER_STEP_2: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.737101392796, 0.823256998200, true, true); break;
-      case WFLOW_4THORDER_STEP_3: Z = computeWStep(*this, U, x, parity, x_cb, dir, 1.634740794341, 0.381530948900, true, true); break;
-      case WFLOW_4THORDER_STEP_4: Z = computeWStep(*this, U, x, parity, x_cb, dir, 0.744739003780, 0.200092213184, true, true); break;
-      case WFLOW_4THORDER_STEP_5: Z = computeWStep(*this, U, x, parity, x_cb, dir, 1.469897351522, 1.718581042715, true, true); break;
-      case WFLOW_4THORDER_STEP_6: Z = computeWStep(*this, U, x, parity, x_cb, dir, 2.813971388035, 0.27, true, false); break;
+      case WFLOW_FOURTH_ORDER_STEP_1: Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[0], coeff_b[0], false, true); break;
+      case WFLOW_FOURTH_ORDER_STEP_2: Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[1], coeff_b[1], true, true); break;
+      case WFLOW_FOURTH_ORDER_STEP_3: Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[2], coeff_b[2], true, true); break;
+      case WFLOW_FOURTH_ORDER_STEP_4: Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[3], coeff_b[3], true, true); break;
+      case WFLOW_FOURTH_ORDER_STEP_5: Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[4], coeff_b[4], true, true); break;
+      case WFLOW_FOURTH_ORDER_STEP_6: Z = computeWStep(*this, U, x, parity, x_cb, dir, coeff_a[5], coeff_b[5], true, false); break;
       }
 
       // Compute anti-hermitian projection of Z, exponentiate, update U

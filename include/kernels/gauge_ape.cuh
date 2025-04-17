@@ -27,7 +27,7 @@ namespace quda
     const Float anisotropy;
     const Float tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, const Float anisotropy) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, Float anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),

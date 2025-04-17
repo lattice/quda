@@ -19,7 +19,7 @@ namespace quda {
 
   public:
     // (2,3/4): 2 for parity in the y thread dim, 3 or 4 corresponds to mapping direction to the z thread dim
-    GaugeAPE(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, const double anisotropy) :
+    GaugeAPE(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, double anisotropy) :
       TunableKernel3D(in, 2, (dir_ignore == 4) ? 4 : 3),
       out(out),
       in(in),
@@ -61,7 +61,7 @@ namespace quda {
 
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, GaugeField &in, double alpha, int dir_ignore, const double smear_anisotropy)
+  void APEStep(GaugeField &out, GaugeField &in, double alpha, int dir_ignore, double smear_anisotropy)
   {
     checkPrecision(out, in);
     checkReconstruct(out, in);
