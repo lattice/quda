@@ -3,13 +3,13 @@
 namespace quda
 {
 
-  constexpr QudaPrecision precision = QUDA_ @QUDA_DSLASH_PREC @_PRECISION;
-  constexpr int nColor = @QUDA_DSLASH_NCOLOR @;
-  constexpr int reconI = @QUDA_DSLASH_RECONI @;
+  constexpr QudaPrecision precision = QUDA_ @QUDA_DSLASH_PREC@_PRECISION;
+  constexpr int nColor = @QUDA_DSLASH_NCOLOR@;
+  constexpr int reconI = @QUDA_DSLASH_RECONI@;
 
-  typedef @QUDA_DSLASH_DDARG @DDArg;
+  typedef @QUDA_DSLASH_DDARG@ DDArg;
   typedef precision_type_mapper<precision>::type Float;
-  constexpr bool distance_pc = @QUDA_DSLASH_DISTANCE @;
+  constexpr bool distance_pc = @QUDA_DSLASH_DISTANCE@;
 
   template struct DomainWall5DApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
