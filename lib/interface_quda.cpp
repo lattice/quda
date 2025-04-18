@@ -5244,55 +5244,26 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   auto compute_charge = obs_param[measurement_n].compute_qcharge;
 
   // Print observables header
-  std::string print_string = "flow t, Energy_t, Energy_s";
-  if (compute_plaq) print_string += ", Plaq_t, Plaq_s";
-  if (compute_rect) print_string += ", Rect_t, Rect_s";
-  if (compute_ploop) print_string += ", Ploop_r, Ploop_i";
-  if (compute_charge) print_string += ", charge";
-  print_string += "\n";
-  printfQuda("%s", print_string.c_str());
+  char print_string[500];
+  char* p = print_string;
+  p += sprintf(p, "flow t, Energy_t, Energy_s");
+  if (compute_plaq) p += sprintf(p, ", Plaq_t, Plaq_s");
+  if (compute_rect) p += sprintf(p, ", Rect_t, Rect_s");
+  if (compute_ploop) p += sprintf(p, ", Ploop_r, Ploop_i");
+  if (compute_charge) p += sprintf(p, ", charge");
+  p += sprintf(p, "\n");
+  logQuda(getVerbosity(), "%s", print_string);
 
   // Print initial values
-  std::ostringstream a, b, c;
-  a << std::fixed << std::setprecision(6) << smear_param->t0;
-  b << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[2];
-  c << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[1];
-  print_string = a.str() + " " + b.str() + " " + c.str();
-  if (compute_plaq) {
-    a.str("");
-    a.clear();
-    b.str("");
-    b.clear();
-    a << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[2];
-    b << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[1];
-    print_string += " " + a.str() + " " + b.str();
-  }
-  if (compute_rect) {
-    a.str("");
-    a.clear();
-    b.str("");
-    b.clear();
-    a << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[2];
-    b << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[1];
-    print_string += " " + a.str() + " " + b.str();
-  }
-  if (compute_ploop) {
-    a.str("");
-    a.clear();
-    b.str("");
-    b.clear();
-    a << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[0];
-    b << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[1];
-    print_string += " " + a.str() + " " + b.str();
-  }
-  if (compute_charge) {
-    a.str("");
-    a.clear();
-    a << std::fixed << std::setprecision(16) << obs_param[measurement_n].qcharge;
-    print_string += " " + a.str();
-  }
-  print_string += "\n";
-  printfQuda("%s", print_string.c_str());
+  print_string[0] = '\0'; // Clear print buffer
+  p = print_string;       // Reset pointer
+  p += sprintf(p, "%le %.16e %.16e", smear_param->t0, obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+  if (compute_plaq) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+  if (compute_rect) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
+  if (compute_ploop) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+  if (compute_charge) p += sprintf(p, " %.16e", obs_param[measurement_n].qcharge);
+  p += sprintf(p, "%s", "\n");
+  logQuda(getVerbosity(), "%s", print_string);
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     // This uses 3-stage third order or 6-stage fourth order Runge-Kutta integration
@@ -5310,51 +5281,16 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
       gaugeObservables(out, obs_param[measurement_n]);
 
-      a.str("");
-      a.clear();
-      b.str("");
-      b.clear();
-      c.str("");
-      c.clear();
-      a << std::fixed << std::setprecision(6) << (smear_param->t0 + smear_param->epsilon * (i + 1));
-      b << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[2];
-      c << std::fixed << std::setprecision(16) << obs_param[measurement_n].energy[1];
-      print_string = a.str() + " " + b.str() + " " + c.str();
-      if (compute_plaq) {
-        a.str("");
-        a.clear();
-        b.str("");
-        b.clear();
-        a << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[2];
-        b << std::fixed << std::setprecision(16) << obs_param[measurement_n].plaquette[1];
-        print_string += " " + a.str() + " " + b.str();
-      }
-      if (compute_rect) {
-        a.str("");
-        a.clear();
-        b.str("");
-        b.clear();
-        a << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[2];
-        b << std::fixed << std::setprecision(16) << obs_param[measurement_n].rectangle[1];
-        print_string += " " + a.str() + " " + b.str();
-      }
-      if (compute_ploop) {
-        a.str("");
-        a.clear();
-        b.str("");
-        b.clear();
-        a << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[0];
-        b << std::fixed << std::setprecision(16) << obs_param[measurement_n].ploop[1];
-        print_string += " " + a.str() + " " + b.str();
-      }
-      if (compute_charge) {
-        a.str("");
-        a.clear();
-        a << std::fixed << std::setprecision(16) << obs_param[measurement_n].qcharge;
-        print_string += " " + a.str();
-      }
-      print_string += "\n";
-      printfQuda("%s", print_string.c_str());
+      // Print observables
+      print_string[0] = '\0'; // Clear print buffer
+      p = print_string;       // Reset pointer
+      p += sprintf(p, "%le %.16e %.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)), obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+      if (compute_plaq) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+      if (compute_rect) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
+      if (compute_ploop) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+      if (compute_charge) p += sprintf(p, " %.16e", obs_param[measurement_n].qcharge);
+      p += sprintf(p, "%s", "\n");
+      logQuda(getVerbosity(), "%s", print_string);
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 
