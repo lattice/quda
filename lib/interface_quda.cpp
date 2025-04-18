@@ -5245,7 +5245,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   // Print observables header
   char print_string[500];
-  char* p = print_string;
+  char *p = print_string;
   p += sprintf(p, "flow t, Energy_t, Energy_s");
   if (compute_plaq) p += sprintf(p, ", Plaq_t, Plaq_s");
   if (compute_rect) p += sprintf(p, ", Rect_t, Rect_s");
@@ -5257,10 +5257,14 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   // Print initial values
   print_string[0] = '\0'; // Clear print buffer
   p = print_string;       // Reset pointer
-  p += sprintf(p, "%le %.16e %.16e", smear_param->t0, obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
-  if (compute_plaq) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
-  if (compute_rect) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
-  if (compute_ploop) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+  p += sprintf(p, "%le %.16e %.16e", smear_param->t0, obs_param[measurement_n].energy[2],
+               obs_param[measurement_n].energy[1]);
+  if (compute_plaq)
+    p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+  if (compute_rect)
+    p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
+  if (compute_ploop)
+    p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
   if (compute_charge) p += sprintf(p, " %.16e", obs_param[measurement_n].qcharge);
   p += sprintf(p, "%s", "\n");
   logQuda(getVerbosity(), "%s", print_string);
@@ -5284,10 +5288,14 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
       // Print observables
       print_string[0] = '\0'; // Clear print buffer
       p = print_string;       // Reset pointer
-      p += sprintf(p, "%le %.16e %.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)), obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
-      if (compute_plaq) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
-      if (compute_rect) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
-      if (compute_ploop) p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+      p += sprintf(p, "%le %.16e %.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
+                   obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+      if (compute_plaq)
+        p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
+      if (compute_rect)
+        p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
+      if (compute_ploop)
+        p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
       if (compute_charge) p += sprintf(p, " %.16e", obs_param[measurement_n].qcharge);
       p += sprintf(p, "%s", "\n");
       logQuda(getVerbosity(), "%s", print_string);
