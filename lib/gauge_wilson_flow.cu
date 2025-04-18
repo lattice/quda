@@ -4,7 +4,8 @@
 #include <kernels/gauge_wilson_flow.cuh>
 #include <instantiate.h>
 
-namespace quda {
+namespace quda
+{
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowStep : TunableKernel3D
   {
@@ -19,8 +20,10 @@ namespace quda {
     const QudaWFlowStepType step_type;
 
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int maxSharedBytesPerBlock() const {
-      return wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? maxDynamicSharedBytesPerBlock() : TunableKernel3D::maxSharedBytesPerBlock();
+    unsigned int maxSharedBytesPerBlock() const
+    {
+      return wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? maxDynamicSharedBytesPerBlock() :
+                                                            TunableKernel3D::maxSharedBytesPerBlock();
     }
 
     unsigned int sharedBytesPerThread() const
@@ -47,9 +50,9 @@ namespace quda {
       getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       strcat(aux, comm_dim_partitioned_string());
       switch (wflow_type) {
-      case QUDA_GAUGE_SMEAR_WILSON_FLOW: strcat(aux,",computeWFlowStepWilson"); break;
-      case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: strcat(aux,",computeWFlowStepSymanzik"); break;
-      default : errorQuda("Unknown Wilson Flow type %d", wflow_type);
+      case QUDA_GAUGE_SMEAR_WILSON_FLOW: strcat(aux, ",computeWFlowStepWilson"); break;
+      case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: strcat(aux, ",computeWFlowStepSymanzik"); break;
+      default: errorQuda("Unknown Wilson Flow type %d", wflow_type);
       }
       switch (step_type) {
       case WFLOW_STEP_W1: strcat(aux, "_W1"); break;
@@ -61,7 +64,7 @@ namespace quda {
       case WFLOW_FOURTH_ORDER_STEP_4: strcat(aux, "_F4"); break;
       case WFLOW_FOURTH_ORDER_STEP_5: strcat(aux, "_F5"); break;
       case WFLOW_FOURTH_ORDER_STEP_6: strcat(aux, "_F6"); break;
-      default : errorQuda("Unknown Wilson Flow step type %d", step_type);
+      default: errorQuda("Unknown Wilson Flow step type %d", step_type);
       }
 
       apply(device::get_default_stream());
@@ -117,13 +120,16 @@ namespace quda {
         tp.set_max_shared_bytes = true;
         switch (step_type) {
         case WFLOW_STEP_W1:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_W1>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_W1>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_STEP_W2:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_W2>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_W2>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_STEP_VT:
-          launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_VT>(out, temp, in, epsilon, anisotropy));
+          launch<WFlow>(tp, stream,
+                        Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_VT>(out, temp, in, epsilon, anisotropy));
           break;
         case WFLOW_FOURTH_ORDER_STEP_1:
           launch<WFlow>(
@@ -161,8 +167,16 @@ namespace quda {
       }
     }
 
-    void preTune() { out.backup(); temp.backup(); }
-    void postTune() { out.restore(); temp.restore(); }
+    void preTune()
+    {
+      out.backup();
+      temp.backup();
+    }
+    void postTune()
+    {
+      out.restore();
+      temp.restore();
+    }
 
     long long flops() const
     {
@@ -170,10 +184,10 @@ namespace quda {
       long long threads = in.LocalVolume() * wflow_dim;
       long long mat_flops = nColor * nColor * (8 * nColor - 2);
       long long mat_muls = 4; // 1 from Z * conj(U) term, 2 in exponentiate_iQ(Z), and 1 from exponentiate_iQ(Z) * U
-      switch (wflow_type) { // Add mat-muls coming from staple calculation
+      switch (wflow_type) {   // Add mat-muls coming from staple calculation
       case QUDA_GAUGE_SMEAR_WILSON_FLOW: mat_muls += 4 * (wflow_dim - 1); break;
       case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: mat_muls += 28 * (wflow_dim - 1); break;
-      default : errorQuda("Unknown Wilson Flow type");
+      default: errorQuda("Unknown Wilson Flow type");
       }
       return mat_muls * mat_flops * threads;
     }
@@ -184,7 +198,7 @@ namespace quda {
       switch (wflow_type) {
       case QUDA_GAUGE_SMEAR_WILSON_FLOW: links = 6; break;
       case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: links = 24; break;
-      default : errorQuda("Unknown Wilson Flow type");
+      default: errorQuda("Unknown Wilson Flow type");
       }
       // Leon: I am not certain that the byte counting is correct here!
       // First and last steps have 1 store (retrieve) to (from) temp
@@ -206,7 +220,7 @@ namespace quda {
     if (temp.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Temporary vector must not use reconstruct");
     if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
       errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
-    
+
     // Set each step type as an arg parameter, update halos if needed
     switch (rk_order) {
     case 3: // Use 3-stage third-order Runga-Kutta integration
@@ -243,7 +257,7 @@ namespace quda {
 
       out = in;
       break;
-      default : errorQuda("Unsupported Runga-Kutta order %d", rk_order);
+    default: errorQuda("Unsupported Runga-Kutta order %d", rk_order);
     }
   }
 
@@ -260,4 +274,4 @@ namespace quda {
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, 1.0, smear_type, step_type);
     out.exchangeExtendedGhost(out.R(), false);
   }
-}
+} // namespace quda
