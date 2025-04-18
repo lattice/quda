@@ -126,11 +126,19 @@ namespace quda {
     static_assert(_Copy_size == 4 || _Copy_size == 8 || _Copy_size == 16,
                   "cp.async.shared.global requires a copy size of 4, 8, or 16.");
 
-    asm volatile("cp.async.ca.shared.global [%0], [%1], %2, %2;"
-                 :
-                 : "r"(static_cast<uint32_t>(__cvta_generic_to_shared(__dest))),
-                   "l"(static_cast<uint64_t>(__cvta_generic_to_global(__src))), "n"(_Copy_size)
-                 : "memory");
+    if constexpr (_Copy_size == 16) {
+      asm volatile("cp.async.cg.shared.global [%0], [%1], %2, %2;"
+                   :
+                   : "r"(static_cast<uint32_t>(__cvta_generic_to_shared(__dest))),
+                     "l"(static_cast<uint64_t>(__cvta_generic_to_global(__src))), "n"(_Copy_size)
+                   : "memory");
+    } else {
+      asm volatile("cp.async.ca.shared.global [%0], [%1], %2, %2;"
+                   :
+                   : "r"(static_cast<uint32_t>(__cvta_generic_to_shared(__dest))),
+                     "l"(static_cast<uint64_t>(__cvta_generic_to_global(__src))), "n"(_Copy_size)
+                   : "memory");
+    }
   }
 
 } // namespace quda

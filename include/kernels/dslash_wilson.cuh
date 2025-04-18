@@ -114,7 +114,7 @@ namespace quda
         const bool ghost
             = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if (doHalo<kernel_type>(d) && ghost) {
+        if (0 && doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
             ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
@@ -156,7 +156,7 @@ namespace quda
 
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if (doHalo<kernel_type>(d) && ghost) {
+        if (0 && doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
             ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;

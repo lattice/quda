@@ -8,8 +8,7 @@
 namespace quda
 {
 
-  template <typename color_spinor_order_t>
-  class VanillaSharedMemoryCache
+  template <typename color_spinor_order_t> class VanillaSharedMemoryCache
   {
     const color_spinor_order_t &color_spinor_order;
 
@@ -40,13 +39,13 @@ namespace quda
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline char* operator()()
+      __device__ inline char *operator()()
       {
         extern __shared__ char cache__[];
         return reinterpret_cast<char *>(cache__);
       }
     };
-  
+
     /**
        @brief Dummy instantiation for the host compiler
     */
@@ -67,7 +66,7 @@ namespace quda
     /**
        @brief Constructor for SharedMemoryCache.
     */
-    __device__ __host__ VanillaSharedMemoryCache(const color_spinor_order_t &color_spinor_order, int stride_):
+    __device__ __host__ VanillaSharedMemoryCache(const color_spinor_order_t &color_spinor_order, int stride_) :
       color_spinor_order(color_spinor_order), stride(stride_)
     {
       char *cache = target::dispatch<cache_dynamic>();
@@ -80,15 +79,13 @@ namespace quda
     */
     __device__ __host__ void sync() const { target::dispatch<sync_impl>(); }
 
-    template <class vector_t>
-    __device__ __host__ vector_t *bulk(int index, int j) {
+    template <class vector_t> __device__ __host__ vector_t *bulk(int index, int j)
+    {
       return &reinterpret_cast<vector_t *>(_bulk_ptr)[index * stride + j];
       // return &reinterpret_cast<vector_t *>(_bulk_ptr[stage])[(warp_id * color_spinor_order_t::M + index) * 32 + lane_id];
     }
 
-    __device__ __host__ norm_t *norm(int j) {
-      return &reinterpret_cast<norm_t *>(_norm_ptr)[j];
-    }
+    __device__ __host__ norm_t *norm(int j) { return &reinterpret_cast<norm_t *>(_norm_ptr)[j]; }
 
     __device__ __host__ inline auto load(int j)
     {
@@ -107,7 +104,6 @@ namespace quda
       color_spinor_order.unpack(color_spinor.data, vecTmp, nrm);
       return color_spinor;
     }
-
   };
 
 } // namespace quda
