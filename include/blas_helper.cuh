@@ -50,8 +50,8 @@ namespace quda
 
 #ifdef QUAD_SUM
   __host__ __device__ inline double set(doubledouble &a) { return a.head(); }
-  __host__ __device__ inline double2 set(doubledouble2 &a) { return make_double2(a.x.head(), a.y.head()); }
-  __host__ __device__ inline double3 set(doubledouble3 &a) { return make_double3(a.x.head(), a.y.head(), a.z.head()); }
+  __host__ __device__ inline double2 set(doubledouble2 &a) { return {a.x.head(), a.y.head()}; }
+  __host__ __device__ inline double3 set(doubledouble3 &a) { return {a.x.head(), a.y.head(), a.z.head()}; }
   __host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.head(); }
   __host__ __device__ inline void sum(double2 &a, doubledouble2 &b)
   {

@@ -416,11 +416,11 @@ namespace quda
 
           typedef cuDoubleComplex Z;
 
-          const Z alpha = make_double2((double)(static_cast<std::complex<double>>(blas_param.alpha).real()),
-                                       (double)(static_cast<std::complex<double>>(blas_param.alpha).imag()));
+          const Z alpha = {static_cast<std::complex<double>>(blas_param.alpha).real(),
+                           static_cast<std::complex<double>>(blas_param.alpha).imag()};
 
-          const Z beta = make_double2((double)(static_cast<std::complex<double>>(blas_param.beta).real()),
-                                      (double)(static_cast<std::complex<double>>(blas_param.beta).imag()));
+          const Z beta = {static_cast<std::complex<double>>(blas_param.beta).real(),
+                          static_cast<std::complex<double>>(blas_param.beta).imag()};
 
           cublasStatus_t error;
           if (batch > 1) {
@@ -443,11 +443,11 @@ namespace quda
 
           typedef cuFloatComplex C;
 
-          const C alpha = make_float2((float)(static_cast<std::complex<double>>(blas_param.alpha).real()),
-                                      (float)(static_cast<std::complex<double>>(blas_param.alpha).imag()));
+          const C alpha = {(float)static_cast<std::complex<double>>(blas_param.alpha).real(),
+                           (float)static_cast<std::complex<double>>(blas_param.alpha).imag()};
 
-          const C beta = make_float2((float)(static_cast<std::complex<double>>(blas_param.beta).real()),
-                                     (float)(static_cast<std::complex<double>>(blas_param.beta).imag()));
+          const C beta = {(float)static_cast<std::complex<double>>(blas_param.beta).real(),
+                          (float)static_cast<std::complex<double>>(blas_param.beta).imag()};
 
           cublasStatus_t error;
           if (batch > 1) {
