@@ -32,7 +32,7 @@ namespace quda
       load_cached_float2(value, reinterpret_cast<const float2 *>(ptr) + idx);
     }
 
-#if __COMPUTE_CAPABILITY__ >= 10000
+#if __COMPUTE_CAPABILITY__ >= 1000
     __device__ inline void operator()(double4 &value, const void *ptr, int idx)
     {
       load_cached_double4(value, reinterpret_cast<const double4 *>(ptr) + idx);
@@ -69,7 +69,7 @@ namespace quda
       reinterpret_cast<T *>(ptr)[idx] = value;
     }
 
-#if __COMPUTE_CAPABILITY__ >= 10000
+#if __COMPUTE_CAPABILITY__ >= 1000
     __device__ inline void operator()(void *ptr, int idx, const double4 &value)
     {
       store_streaming_double4(reinterpret_cast<double4 *>(ptr) + idx, value.x, value.y, value.z, value.w);
