@@ -18,6 +18,13 @@ namespace quda {
   // If you're bored...
   // http://docs.nvidia.com/cuda/parallel-thread-execution/index.html#data-movement-and-conversion-instructions-st
 
+  __device__ inline void load_streaming_double4(double4 &a, const double4* addr)
+  {
+    double x, y, z, w;
+    asm("ld.cs.global.v4.f64 {%0, %1, %2, %3}, [%4+0];" : "=d"(x), "=d"(y), "=d"(z), "=d"(w) : __PTR(addr));
+    a.x = x; a.y = y, a.z = z, a.w = w;
+  }
+
   __device__ inline void load_streaming_double2(double2 &a, const double2* addr)
   {
     double x, y;
@@ -89,6 +96,13 @@ namespace quda {
     a.x = x; a.y = y;
   }
 
+  __device__ inline void load_cached_double4(double4 &a, const double4* addr)
+  {
+    double x, y, z, w;
+    asm("ld.ca.global.v4.f64 {%0, %1, %2, %3}, [%4+0];" : "=d"(x), "=d"(y), "=d"(z), "=d"(w) : __PTR(addr));
+    a.x = x; a.y = y; a.z = z; a.w = w;
+  }
+
   __device__ inline void load_cached_double2(double2 &a, const double2* addr)
   {
     double x, y;
@@ -104,6 +118,11 @@ namespace quda {
   __device__ inline void store_streaming_short4(short4* addr, short x, short y, short z, short w)
   {
     asm("st.cs.global.v4.s16 [%0+0], {%1, %2, %3, %4};" :: __PTR(addr), "h"(x), "h"(y), "h"(z), "h"(w));
+  }
+
+  __device__ inline void store_streaming_double4(double4* addr, double x, double y, double z, double w)
+  {
+    asm("st.cs.global.v4.f64 [%0+0], {%1, %2, %3, %4};" :: __PTR(addr), "d"(x), "d"(y), "d"(z), "d"(w));
   }
 
   __device__ inline void store_streaming_double2(double2* addr, double x, double y)
