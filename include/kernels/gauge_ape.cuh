@@ -8,8 +8,7 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_>
-  struct GaugeAPEArg : kernel_param<> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_> struct GaugeAPEArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -27,7 +26,7 @@ namespace quda
     const Float anisotropy;
     const Float tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, const Float anisotropy) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, Float anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),

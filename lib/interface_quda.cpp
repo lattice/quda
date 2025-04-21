@@ -5213,7 +5213,7 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
 void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
 {
   auto profile = pushProfile(profileWFlow);
-  pushOutputPrefix("");
+  pushOutputPrefix("performWFlowQuda: ");
   checkGaugeSmearParam(smear_param);
 
   if (smear_param->restart) {
@@ -5238,32 +5238,36 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
   gaugeObservables(in, obs_param[measurement_n]);
 
-  QudaBoolean compute_plaq = obs_param[measurement_n].compute_plaquette;
-  QudaBoolean compute_rect = obs_param[measurement_n].compute_rectangle;
-  QudaBoolean compute_ploop = obs_param[measurement_n].compute_polyakov_loop;
-  QudaBoolean compute_charge = obs_param[measurement_n].compute_qcharge;
+  auto compute_plaq = obs_param[measurement_n].compute_plaquette;
+  auto compute_rect = obs_param[measurement_n].compute_rectangle;
+  auto compute_ploop = obs_param[measurement_n].compute_polyakov_loop;
+  auto compute_charge = obs_param[measurement_n].compute_qcharge;
 
   // Print observables header
-  logQuda(QUDA_SUMMARIZE, "performWFlowQuda: flow t, Energy_t, Energy_s");
-  if (compute_plaq) logQuda(QUDA_SUMMARIZE, ", Plaq_t, Plaq_s");
-  if (compute_rect) logQuda(QUDA_SUMMARIZE, ", Rect_t, Rect_s");
-  if (compute_ploop) logQuda(QUDA_SUMMARIZE, ", Ploop_r, Ploop_i");
-  if (compute_charge) logQuda(QUDA_SUMMARIZE, ", charge");
-  logQuda(QUDA_SUMMARIZE, "\n");
+  char print_string[500];
+  char *p = print_string;
+  p += sprintf(p, "flow t, Energy_t, Energy_s");
+  if (compute_plaq) p += sprintf(p, ", Plaq_t, Plaq_s");
+  if (compute_rect) p += sprintf(p, ", Rect_t, Rect_s");
+  if (compute_ploop) p += sprintf(p, ", Ploop_r, Ploop_i");
+  if (compute_charge) p += sprintf(p, ", charge");
+  p += sprintf(p, "\n");
+  logQuda(getVerbosity(), "%s", print_string);
 
   // Print initial values
-  logQuda(QUDA_SUMMARIZE, "performWFlowQuda: %le %.16e %+.16e", smear_param->t0, obs_param[measurement_n].energy[2],
-          obs_param[measurement_n].energy[1]);
+  print_string[0] = '\0'; // Clear print buffer
+  p = print_string;       // Reset pointer
+  p += sprintf(p, "%le %.16e %.16e", smear_param->t0, obs_param[measurement_n].energy[2],
+               obs_param[measurement_n].energy[1]);
   if (compute_plaq)
-    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].plaquette[2],
-            obs_param[measurement_n].plaquette[1]);
+    p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
   if (compute_rect)
-    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].rectangle[2],
-            obs_param[measurement_n].rectangle[1]);
+    p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
   if (compute_ploop)
-    logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
-  if (compute_charge) logQuda(QUDA_SUMMARIZE, " %+.16e", obs_param[measurement_n].qcharge);
-  logQuda(QUDA_SUMMARIZE, "\n");
+    p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+  if (compute_charge) p += sprintf(p, " %.16e", obs_param[measurement_n].qcharge);
+  p += sprintf(p, "%s", "\n");
+  logQuda(getVerbosity(), "%s", print_string);
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     // This uses 3-stage third order or 6-stage fourth order Runge-Kutta integration
@@ -5281,18 +5285,20 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 
       gaugeObservables(out, obs_param[measurement_n]);
 
-      logQuda(QUDA_SUMMARIZE, "performWFlowQuda: %le %.16e %+.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
-              obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
+      // Print observables
+      print_string[0] = '\0'; // Clear print buffer
+      p = print_string;       // Reset pointer
+      p += sprintf(p, "%le %.16e %.16e", (smear_param->t0 + smear_param->epsilon * (i + 1)),
+                   obs_param[measurement_n].energy[2], obs_param[measurement_n].energy[1]);
       if (compute_plaq)
-        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].plaquette[2],
-                obs_param[measurement_n].plaquette[1]);
+        p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].plaquette[2], obs_param[measurement_n].plaquette[1]);
       if (compute_rect)
-        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].rectangle[2],
-                obs_param[measurement_n].rectangle[1]);
+        p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].rectangle[2], obs_param[measurement_n].rectangle[1]);
       if (compute_ploop)
-        logQuda(QUDA_SUMMARIZE, " %+.16e %+.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
-      if (compute_charge) logQuda(QUDA_SUMMARIZE, " %+.16e", obs_param[measurement_n].qcharge);
-      logQuda(QUDA_SUMMARIZE, "\n");
+        p += sprintf(p, " %.16e %.16e", obs_param[measurement_n].ploop[0], obs_param[measurement_n].ploop[1]);
+      if (compute_charge) p += sprintf(p, " %.16e", obs_param[measurement_n].qcharge);
+      p += sprintf(p, "%s", "\n");
+      logQuda(getVerbosity(), "%s", print_string);
     }
   }
   // copy out to gaugeSmeared so that flowed gauge can be saved to host and WFlow can be restarted 

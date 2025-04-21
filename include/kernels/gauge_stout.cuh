@@ -30,7 +30,7 @@ namespace quda
     const int dir_ignore;
     const Float anisotropy;
 
-    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon, int dir_ignore, const Float anisotropy) :
+    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon, int dir_ignore, Float anisotropy) :
       kernel_param(dim3(1, 2, stoutDim)),
       out(out),
       in(in),
