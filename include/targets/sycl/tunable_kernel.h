@@ -51,6 +51,7 @@ namespace quda {
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
       }
 #endif
+      checkSharedBytes<Functor>(tp, arg);
       using launcher_t = qudaError_t(*)(const TuneParam &, const qudaStream_t &, const Arg &);
       auto f = reinterpret_cast<launcher_t>(const_cast<void *>(kernel.func));
       launch_error = f(tp, stream, arg);
