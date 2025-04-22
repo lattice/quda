@@ -46,7 +46,7 @@ namespace quda
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      checkSharedBytes(tp);
+      checkSharedBytes<Functor>(tp, arg);
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
@@ -64,7 +64,7 @@ namespace quda
     std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      checkSharedBytes(tp);
+      checkSharedBytes<Functor>(tp, arg);
 #ifdef JITIFY
       // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
@@ -86,7 +86,7 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
     {
-      checkSharedBytes(tp);
+      checkSharedBytes<Functor>(tp, arg);
       constexpr bool grid_stride = false;
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }

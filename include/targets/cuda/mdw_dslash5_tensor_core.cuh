@@ -252,8 +252,8 @@ namespace quda
     warp_max[0] = fmaxf(warp_max[0], warp_max[1]);
 
     constexpr int block_dim = 2;
-    KernelOps<BlockReduce<float, block_dim>> ops{};
-    return BlockReduce<float, block_dim>{ops}.AllMax(warp_max[0]) / target_scale;
+    KernelOps<BlockReduce<float, block_dim>> ops {};
+    return BlockReduce<float, block_dim> {ops}.AllMax(warp_max[0]) / target_scale;
   }
 
   // Actually does more than the function name suggests.

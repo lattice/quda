@@ -128,12 +128,13 @@ namespace quda
     const int batch;
 
   public:
-    template <typename ...U> __device__ __host__ constexpr
-    BlockReduce(KernelOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
+    template <typename... U>
+    __device__ __host__ constexpr BlockReduce(KernelOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch)
+    {
       checkKernelOps<BlockReduce_t>(ops);
     }
 
-    constexpr BlockReduce(const BlockReduce<T,block_dim,batch_size> &) = delete;
+    constexpr BlockReduce(const BlockReduce<T, block_dim, batch_size> &) = delete;
 
     /**
        @brief Perform a block-wide sum reduction

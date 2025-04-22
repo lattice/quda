@@ -86,7 +86,7 @@ namespace quda {
     static constexpr int block_dim = 1;
     using BlockReduceDot = BlockReduce<dot_t, block_dim>;
     using BlockReduceNorm = BlockReduce<typename Arg::sum_t, block_dim>;
-    using Ops = KernelOps<BlockReduceDot,BlockReduceNorm>;
+    using Ops = KernelOps<BlockReduceDot, BlockReduceNorm>;
   };
 
   template <typename Arg> struct BlockOrtho_ : BlockOrtho_Params<Arg>::Ops {
@@ -114,8 +114,10 @@ namespace quda {
     using real = typename Arg::real;
 
     using typename BlockOrtho_Params<Arg>::Ops::KernelOpsT;
-    template <typename ...OpsArgs>
-    constexpr BlockOrtho_(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename... OpsArgs>
+    constexpr BlockOrtho_(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void load(ColorSpinor<real, nColor, spinBlock> &v, int parity, int x_cb, int chirality, int i)
@@ -156,8 +158,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      typename BlockOrtho_Params<Arg>::BlockReduceDot dot_reducer{*this};
-      typename BlockOrtho_Params<Arg>::BlockReduceNorm norm_reducer{*this};
+      typename BlockOrtho_Params<Arg>::BlockReduceDot dot_reducer {*this};
+      typename BlockOrtho_Params<Arg>::BlockReduceNorm norm_reducer {*this};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
