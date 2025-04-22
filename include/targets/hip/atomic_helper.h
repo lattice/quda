@@ -54,7 +54,7 @@ namespace quda
   }
 
   template <typename T>
-  __device__ __host__ inline void atomic_add_local(T *addr, T val)
+  __device__ __host__ inline void atomic_add_shared(T *addr, T val)
   {
     atomic_fetch_add(addr, val);
   }

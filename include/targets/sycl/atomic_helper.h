@@ -113,7 +113,7 @@ __device__ __host__ inline void atomic_fetch_add(T *addr, U val)
 }
 
 template <typename T, typename U>
-__device__ __host__ inline void atomic_add_local(T *addr, U val)
+__device__ __host__ inline void atomic_add_shared(T *addr, U val)
 {
   auto ar = makeAtomicRefL(addr);
   ar += val;
