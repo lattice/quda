@@ -3,9 +3,6 @@
 #include <quda_api.h>
 #include <algorithm>
 
-#define HOSTDEVICE __host__ __device__
-#define HostDevice __host__ __device__
-
 namespace quda
 {
 

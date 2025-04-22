@@ -283,7 +283,6 @@ namespace quda
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
-    //T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
     KernelOps<BlockReduce> ops{};
     T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 

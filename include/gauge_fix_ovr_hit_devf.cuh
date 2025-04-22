@@ -83,16 +83,12 @@ namespace quda {
         //Retrieve the four SU(2) parameters...
         // a0
         atomic_add_local(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
-        //atomic_add_local(&elems(0,tid), (link(p,p)).x + (link(q,q)).x); //a0
         // a1
         atomic_add_local(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
-        //atomic_add_local(&elems(1,tid), (link(p,q).y + link(q,p).y) * asq); //a1
         // a2
         atomic_add_local(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
-        //atomic_add_local(&elems(2,tid), (link(p,q).x - link(q,p).x) * asq); //a2
         // a3
         atomic_add_local(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
-        //atomic_add_local(&elems(3,tid), (link(p,p).y - link(q,q).y) * asq); //a3
       } //FLOP per lattice site = gauge_dir * 2 * (4 + 7) = gauge_dir * 22
 
       cache.sync();

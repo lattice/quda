@@ -159,8 +159,7 @@ namespace quda
     } // nDim
   }
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson :
-    dslash_default {
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr wilson(const Ftor &ftor) : arg(ftor.arg) { }
