@@ -10,8 +10,6 @@
 #include <reduce_helper.h>
 #include <kernel_ops_target.h>
 
-#define CHECK_SHARED_BYTES
-
 namespace quda {
 
   /**
@@ -37,20 +35,6 @@ namespace quda {
     inline qudaError_t
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-#ifdef CHECK_SHARED_BYTES
-      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
-      auto sizeCu = std::max(sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, sharedBytesPerBlock(tp));
-      if (sizeOps != sizeCu) {
-	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
-	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  cu: %u\n", sizeOps, sizeCu);
-      }
-      if (sizeOps > tp.shared_bytes) {
-	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
-	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, tp.shared_bytes);
-      }
-#endif
       checkSharedBytes<Functor>(tp, arg);
       using launcher_t = qudaError_t(*)(const TuneParam &, const qudaStream_t &, const Arg &);
       auto f = reinterpret_cast<launcher_t>(const_cast<void *>(kernel.func));
