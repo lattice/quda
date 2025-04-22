@@ -45,7 +45,7 @@ namespace quda
     for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
   }
 
-  template <typename T> __device__ __host__ inline void atomic_add_local(T *addr, T val)
+  template <typename T> __device__ __host__ inline void atomic_add_shared(T *addr, T val)
   {
     atomic_fetch_add(addr, val);
   }
