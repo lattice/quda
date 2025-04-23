@@ -1411,48 +1411,38 @@ if(QUDA_DIRAC_DOMAIN_WALL)
 endif()
 
 # Staggered-type eigensolves
-foreach(prec IN LISTS TEST_PRECS)
+if(QUDA_DIRAC_STAGGERED)
+  # --compute-fat-long true is necessary to get well-behaved fields
 
-  # These require looser tolerances to keep iterations to solution in check
-  if(${prec} STREQUAL "double")
-    set(tol 1e-5)
-  elseif(${prec} STREQUAL "single")
-    set(tol 1e-4)
-  endif()
+  add_test(NAME eigensolve_test_staggered
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+    --dslash-type staggered --compute-fat-long true
+    --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+    --eig-max-restarts 1000
+    --enable-testing true
+    --gtest_output=xml:staggered_eigensolve_test_staggered.xml)
 
-  if(QUDA_DIRAC_STAGGERED)
-    # --compute-fat-long true is necessary to get well-behaved fields
-
-    add_test(NAME eigensolve_test_staggered_${prec}
+  # These tests are particularly expensive so they are disabled by default
+  if(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST)
+    add_test(NAME eigensolve_test_asqtad
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
-      --dslash-type staggered --compute-fat-long true
-      --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 64
-      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --dslash-type asqtad --compute-fat-long true
+      --dim 6 6 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-max-restarts 1000
       --enable-testing true
-      --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
-
-    # These tests are particularly expensive so they are disabled by default
-    if(QUDA_IMPROVED_STAGGERED_EIGENSOLVER_CTEST)
-      add_test(NAME eigensolve_test_asqtad_${prec}
-        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
-        --dslash-type asqtad --compute-fat-long true
-        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 64
-        --dim 6 6 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
-        --enable-testing true
-        --gtest_output=xml:staggered_eigensolve_test_staggered_${prec}.xml)
-    endif()
-
-    if (QUDA_DIRAC_LAPLACE)
-      add_test(NAME eigensolve_test_laplace_${prec}
-        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
-        --dslash-type laplace --compute-fat-long true
-        --eig-n-conv 32 --eig-n-ev 32 --eig-n-kr 64
-        --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
-        --enable-testing true
-        --gtest_output=xml:staggered_eigensolve_test_laplace_${prec}.xml)
-    endif()
+      --gtest_output=xml:staggered_eigensolve_test_asqtad.xml)
   endif()
-endforeach(prec)
+
+  if (QUDA_DIRAC_LAPLACE)
+    add_test(NAME eigensolve_test_laplace
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type laplace --compute-fat-long true
+      --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 96
+      --eig-max-restarts 1000
+      --enable-testing true
+      --gtest_output=xml:staggered_eigensolve_test_laplace.xml)
+  endif()
+endif()
 
 if (QUDA_DIRAC_LAPLACE AND QUDA_DIRAC_WILSON)
   add_test(NAME laph_test

@@ -244,7 +244,6 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
       oddBit = 1;
       half_index = i - Vh;
     }
-    // int x4 = x4_from_full_index(i);
 
     int sid = half_index;
     int za = sid / X1h;
@@ -336,8 +335,6 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
     int x[4] = {x1, x2, x3, x4};
     int space_con[4] = {(x4 * X3X2 + x3 * X2 + x2) / 2, (x4 * X3X1 + x3 * X1 + x1) / 2, (x4 * X2X1 + x2 * X1 + x1) / 2,
                         (x3 * X2X1 + x2 * X1 + x1) / 2};
-
-    // int x4 = x4_from_full_index(i);
 
     auto fat1 = ((su3_matrix *)fatlink[mu]) + i;
 

@@ -98,7 +98,7 @@ static int unitarize_link_test(int &test_rc)
   void *sitelink[4];
   for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
 
-  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
+  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, SiteLinkType::SITELINK_PHASE_MILC);
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     double *link = reinterpret_cast<double *>(inlink);

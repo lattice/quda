@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cassert>
 #include <algorithm>
 
 #include <quda.h>
@@ -17,7 +18,6 @@
 #include <staggered_gauge_utils.h>
 
 #include "dslash_test_helpers.h"
-#include <assert.h>
 #include <gtest/gtest.h>
 #include <tune_quda.h>
 #include "test.h"

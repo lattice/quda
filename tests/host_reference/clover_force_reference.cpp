@@ -10,6 +10,7 @@
 
 #include "clover_force_reference.h"
 #include "host_utils.h"
+#include "momentum_utils.h"
 #include "index_utils.hpp"
 #include "misc.h"
 #include "dslash_reference.h"

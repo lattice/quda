@@ -108,9 +108,7 @@ namespace quda
      that need tagging.  This can be used as an alternative in cases
      where the operations are only conditionally used.
    */
-  struct NoKernelOps {
-    using KernelOpsT = NoKernelOps;
-  };
+  using NoKernelOps = KernelOps<>;
 
   /**
      @brief getKernelOps<T> is used to get the KernelOps type from a
@@ -212,5 +210,13 @@ namespace quda
   template <class T, class enable = void> struct get_type {
     using type = T;
   };
+
+  // forward declarations of op types to be defined by target
+  struct op_blockSync;
+  template <typename T> struct op_warp_combine;
+
+  // only types for convenience
+  using only_blockSync = KernelOps<op_blockSync>;
+  template <typename T> using only_warp_combine = KernelOps<op_warp_combine<T>>;
 
 } // namespace quda

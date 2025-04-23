@@ -8,8 +8,7 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_>
-  struct GaugeAPEArg : kernel_param<> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_> struct GaugeAPEArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -24,14 +23,16 @@ namespace quda
     int border[4];
     const Float alpha;
     const int dir_ignore;
+    const Float anisotropy;
     const Float tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, Float anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),
       alpha(alpha),
       dir_ignore(dir_ignore),
+      anisotropy(anisotropy),
       tolerance(in.toleranceSU3())
     {
       for (int dir = 0; dir < 4; ++dir) {
@@ -43,6 +44,7 @@ namespace quda
 
   template <typename Arg> struct APE : computeStapleOps {
     const Arg &arg;
+    using real = typename Arg::Float;
     template <typename... OpsArgs> constexpr APE(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
     {
     }
@@ -50,7 +52,6 @@ namespace quda
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
@@ -67,7 +68,7 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore);
+      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
