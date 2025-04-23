@@ -16,6 +16,12 @@ namespace quda
     return arr;
   }
 
+  /**
+     @brief Return the supported number of nVec (right hand sides) to use for
+     MMA-enabled MRHS kernels.  This correponds to the smallest size
+     at least as large as the requested vector size.
+     @return The instantiated nVec to use
+  */
   inline int instantiated_nVec_to_use(int input_nVec)
   {
     // clang-format off
@@ -29,7 +35,21 @@ namespace quda
     return 0;
   }
 
-  template <class F> auto create_color_spinor_copy(cvector_ref<F> &fs, int nVec, QudaFieldOrder order)
+  /**
+     @brief Create a temporary container that corresponds to an
+     MMA-ordered copy of an input ColorSpinorField set.  If the input
+     set is already in the appropriate order we instead create a set
+     that is a reference to input (which allows us to avoid the
+     subsequent copy overhead).  Since MMA-ordered ColorSpinorFields
+     do not support fixed-point storage, precision is upgraded to
+     single if necesary.  This function is the inverse of
+     create_color_spinor_expand.
+     @param[in,out] fs The input vector set
+     @param[in] nVec The number of vectors packed into the returned
+     container
+     @param[in] order The field order we employ in the returned container
+  */
+  template <class F> auto create_color_spinor_collapse(cvector_ref<F> &fs, int nVec, QudaFieldOrder order)
   {
     ColorSpinorParam param(fs[0]);
     if (fs.size() == 1 && fs.FieldOrder() == order && fs[0].Nvec() == nVec) {
@@ -47,7 +67,17 @@ namespace quda
     return getFieldTmp<ColorSpinorField>(param);
   }
 
-  template <class F> auto expand_color_spinor(cvector_ref<F> &fs, int nColor)
+  /**
+     @brief Create a temporary vector container of native-ordered
+     ColorSpinorFields from the MMA-ordered input set.  If the input
+     set is not in the expected order, or its true number of colors
+     doesn't match the requested, then we instead create a reference
+     wrapper around the input.  This function is the inverse of
+     create_color_spinor_collapse.
+     @param[in,out] fs The input vector set
+     @param[in] nColor The true number of colors of an unpacked field
+   */
+  template <class F> auto create_color_spinor_expand(cvector_ref<F> &fs, int nColor)
   {
     if (fs.size() == 1 && fs.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
         && fs[0].Ncolor() / fs[0].Nvec() == nColor) {
@@ -86,14 +116,6 @@ namespace quda
         op(out_offseted, in_offseted, instantiated_nVec);
       }
     }
-  }
-
-  inline auto create_color_spinor_copy(const ColorSpinorField &f, QudaFieldOrder order)
-  {
-    ColorSpinorParam param(f);
-    param.create = QUDA_NULL_FIELD_CREATE;
-    param.fieldOrder = order;
-    return getFieldTmp<ColorSpinorField>(param);
   }
 
 } // namespace quda

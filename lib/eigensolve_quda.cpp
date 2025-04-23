@@ -551,8 +551,9 @@ namespace quda
                                cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                                bool accumulate) const
   {
-    auto src = expand_color_spinor(src_, evecs.Ncolor());
-    auto sol = expand_color_spinor(sol_, evecs.Ncolor());
+    // Deflation cannot be done directly on collapsed vectors so we need to expand these 
+    auto src = create_color_spinor_expand(src_, evecs.Ncolor());
+    auto sol = create_color_spinor_expand(sol_, evecs.Ncolor());
     BlockTransposeBackward(src_[0], src);
     if (accumulate) BlockTransposeBackward(sol_[0], sol);
 
@@ -641,8 +642,9 @@ namespace quda
                             cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                             bool accumulate) const
   {
-    auto src = expand_color_spinor(src_, evecs.Ncolor());
-    auto sol = expand_color_spinor(sol_, evecs.Ncolor());
+    // Deflation cannot be done directly on collapsed vectors so we need to expand these 
+    auto src = create_color_spinor_expand(src_, evecs.Ncolor());
+    auto sol = create_color_spinor_expand(sol_, evecs.Ncolor());
     BlockTransposeBackward(src_[0], src);
     if (accumulate) BlockTransposeBackward(sol_[0], sol);
 

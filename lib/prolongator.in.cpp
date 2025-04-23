@@ -30,8 +30,8 @@ namespace quda
           constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
           auto op = [&](cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, int nVec) {
-            auto v_in = create_color_spinor_copy(in, nVec, csOrder);
-            auto v_out = create_color_spinor_copy(out, nVec, csOrder);
+            auto v_in = create_color_spinor_collapse(in, nVec, csOrder);
+            auto v_out = create_color_spinor_collapse(out, nVec, csOrder);
             BlockTransposeForward(v_in, in);
 
             // clang-format off

@@ -115,9 +115,9 @@ namespace quda
                                                             inB.begin() + std::min(offset + instantiated_nVec, size)};
 
           constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-          auto v_inA = create_color_spinor_copy(inA_offseted, instantiated_nVec, csOrder);
-          auto v_inB = create_color_spinor_copy(inB_offseted, instantiated_nVec, csOrder);
-          auto v_out = create_color_spinor_copy(out_offseted, instantiated_nVec, csOrder);
+          auto v_inA = create_color_spinor_collapse(inA_offseted, instantiated_nVec, csOrder);
+          auto v_inB = create_color_spinor_collapse(inB_offseted, instantiated_nVec, csOrder);
+          auto v_out = create_color_spinor_collapse(out_offseted, instantiated_nVec, csOrder);
 
           if (dslash) { BlockTransposeForward(v_inA, inA_offseted); }
           if (clover) { BlockTransposeForward(v_inB, inB_offseted); }
