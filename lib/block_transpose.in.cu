@@ -90,8 +90,10 @@ namespace quda
             typedef FieldOrderCB<real, nSpin, nColor, nVec, vOrder, vFloat, vFloat, disable_ghost> vAccessor;
             typedef FieldOrderCB<real, nSpin, nColor, 1, bOrder, bFloat, bFloat, disable_ghost, true> bAccessor;
             if constexpr (std::is_const_v<v_t>) {
-              if constexpr (std::is_same_v<bFloat, short>) errorQuda("Half precision write not supported");
-              else launch_device_<const vAccessor, bAccessor>(tp, stream);
+              if constexpr (std::is_same_v<bFloat, short>)
+                errorQuda("Half precision write not supported");
+              else
+                launch_device_<const vAccessor, bAccessor>(tp, stream);
             } else {
               launch_device_<vAccessor, bAccessor>(tp, stream);
             }
