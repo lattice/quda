@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cassert>
+#include <test.h>
+#include <algorithm>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -9,20 +12,15 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
-
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <covdev_reference.h>
 #include <gauge_field.h>
 
-#include <assert.h>
-
-#include <test.h>
-#include <algorithm>
-
-#include <covdev_test_gtest.hpp>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "covdev_reference.h"
+#include "covdev_test_gtest.hpp"
 
 using namespace quda;
 
