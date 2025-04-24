@@ -1735,6 +1735,11 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
+  // Pass this along to qudaInvertMsrcMG as a single-source solve
+  qudaInvertMsrcMG(external_precision, quda_precision, mass, inv_args, target_residual, target_fermilab_residual,
+                   fatlink, longlink, mg_pack_ptr, mg_rebuild_type, &source, &solution, final_residual,
+                   final_fermilab_residual, num_iters, 1);
+  /*
   // FIXME: Flip the sign of the mass to fix a consistency issue between
   // MILC, QUDA full parity dslash operator
   mass = -mass;
@@ -1842,6 +1847,149 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res[0];
   *final_fermilab_residual = invertParam.true_res_hq[0];
+
+  if (!create_quda_gauge) invalidateGaugeQuda();
+  */
+
+  qudamilc_called<false>(__func__, verbosity);
+}
+
+void qudaInvertMsrcMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                      double target_residual, double target_fermilab_residual, const void *const fatlink,
+                      const void *const longlink, void *mg_pack_ptr, int mg_rebuild_type, void **sourceArray,
+                      void **solutionArray, double *const final_residual, double *const final_fermilab_residual,
+                      int *num_iters, int num_src)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  // FIXME: Flip the sign of the mass to fix a consistency issue between
+  // MILC, QUDA full parity dslash operator
+  mass = -mass;
+
+  milcMultigridPack *mg_pack = (milcMultigridPack *)(mg_pack_ptr);
+
+  if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
+
+  // static const QudaVerbosity verbosity = getVerbosity();
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = QUDA_SINGLE_PRECISION; // required for MG
+
+  QudaGaugeParam fat_param = newQudaGaugeParam();
+  QudaGaugeParam long_param = newQudaGaugeParam();
+  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
+                 inv_args.tadpole, inv_args.naik_epsilon);
+
+  fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
+  fat_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
+  fat_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
+
+  long_param.type = QUDA_ASQTAD_LONG_LINKS;
+  long_param.cuda_prec_refinement_sloppy = long_param.cuda_prec_sloppy;
+  long_param.cuda_prec_precondition = mg_pack->preconditioner_precision;
+  long_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  QudaParity local_parity = inv_args.evenodd; // ignored, just needed to set some defaults
+  const double reliable_delta = 1e-4;
+
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
+                  target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
+                  QUDA_GCR_INVERTER, &invertParam);
+  invertParam.num_src = num_src;
+
+  invertParam.inv_type = QUDA_GCR_INVERTER;
+  invertParam.preconditioner = mg_pack->mg_preconditioner;
+  invertParam.inv_type_precondition = QUDA_MG_INVERTER;
+  invertParam.solution_type = QUDA_MAT_SOLUTION;
+  invertParam.solve_type = QUDA_DIRECT_SOLVE;
+  invertParam.verbosity_precondition = QUDA_VERBOSE;
+
+  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // req'd
+  invertParam.cuda_prec_precondition = mg_pack->preconditioner_precision;
+  invertParam.gcrNkrylov = 15;
+  invertParam.pipeline = 16; // pipeline, get from file
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) {
+    invalidateGaugeQuda();
+    invalidate_quda_mg = true;
+  }
+
+  if (mass != mg_pack->last_mass) {
+    mg_pack->mg_param.invert_param->mass = mass;
+    mg_pack->last_mass = mass;
+    invalidateGaugeQuda();
+    invalidate_quda_mg = true;
+  }
+
+  if (invalidate_quda_gauge || !create_quda_gauge || invalidate_quda_mg) {
+    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
+    if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
+    invalidate_quda_gauge = false;
+
+    // FIXME: hack to reset gaugeFatPrecise (see interface_quda.cpp), etc.
+    // Solution is to have a version of this that _only_
+    // rebuilds the Dirac matrices, I believe.
+    if (mg_rebuild_type == 1) {
+      if (verbosity >= QUDA_VERBOSE) printfQuda("Performing a full MG solver update\n");
+      mg_pack->mg_param.thin_update_only = QUDA_BOOLEAN_FALSE;
+    } else {
+      if (verbosity >= QUDA_VERBOSE) printfQuda("Performing a thin MG solver update\n");
+      mg_pack->mg_param.thin_update_only = QUDA_BOOLEAN_TRUE;
+    }
+    updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    invalidate_quda_mg = false;
+  }
+
+  if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
+
+  int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
+  void **sln_pointer = (void **)safe_malloc(num_src * sizeof(void *));
+  void **src_pointer = (void **)safe_malloc(num_src * sizeof(void *));
+
+  for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
+  for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
+
+  // FIXME: due to sign convention woes passing in an initial
+  // guess is currently broken. Needs a sign flip to fix.
+  // MG is fast enough we won't worry...
+
+  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+
+  // FIXME: Flip sign on solution to correct for mass convention
+  int cv_size = localDim[0] * localDim[1] * localDim[2] * localDim[3] * 3 * 2; // (dimension * Nc = 3 * cplx)
+  for (int k = 0; k < num_src; ++k) {
+    if (host_precision == QUDA_DOUBLE_PRECISION) {
+      auto soln = (double *)(solutionArray[k]);
+      for (long i = 0; i < cv_size; i++) { soln[i] = -soln[i]; }
+    } else {
+      auto soln = (float *)(solutionArray[k]);
+      for (long i = 0; i < cv_size; i++) { soln[i] = -soln[i]; }
+    }
+  }
+
+  host_free(sln_pointer);
+  host_free(src_pointer);
+
+  // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
+  // convention in `generic_ks/d_congrad5_fn_milc.c` (commit 414fb31). Here, a block solve
+  // is emulated as a series of sequential solves. Each individual solve overrides the
+  // final tolerance and iteration counts from the previous solve. Therefore, num_iters
+  // as well as the tolerances come from the last solve.
+
+  // invertParam.iter is the total number of iterations for the block solver, which is ~=
+  // to the number of iterations the last rhs would take.
+  *num_iters = invertParam.iter;
+
+  // MILC only cares about a single residual, which happens to be the last one as described above.
+  *final_residual = invertParam.true_res[num_src - 1];
+  *final_fermilab_residual = invertParam.true_res_hq[num_src - 1];
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 

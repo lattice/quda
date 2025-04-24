@@ -488,6 +488,37 @@ extern "C" {
                     void *solution, double *const final_residual, double *const final_fermilab_residual, int *num_iters);
 
   /**
+   * Solve Ax=b for an improved staggered operator using MG with many right-hand sides.
+   * All fields are fields passed and returned are host (CPU)
+   * field in MILC order.  This function requires that persistent
+   * gauge and clover fields have been created prior. It also
+   * requires a multigrid parameter built from qudaSetupMultigrid
+   * This interface is experimental.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] mass Fermion mass parameter
+   * @param[in] inv_args Struct setting some solver metadata
+   * @param[in] target_residual Target residual
+   * @param[in] target_relative_residual Target Fermilab residual
+   * @param[in] milc_fatlink Fat-link field on the host
+   * @param[in] milc_longlink Long-link field on the host
+   * @param[in] mg_pack_ptr MG preconditioner structure created by qudaSetupMultigrid
+   * @param[in] mg_rebuild_type whether to do a full (1) or thin (0) MG rebuild
+   * @param[in] sourceArray Array of right-hand side source fields
+   * @param[out] solutionArray Array of solution spinor fields
+   * @param[in] final_residual True residual
+   * @param[in] final_relative_residual True Fermilab residual
+   * @param[in] num_iters Number of iterations taken
+   * @param[in] num_src Number of source fields
+   */
+  void qudaInvertMsrcMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                        double target_residual, double target_fermilab_residual, const void *const milc_fatlink,
+                        const void *const milc_longlink, void *mg_pack_ptr, int mg_rebuild_type, void **sourceArray,
+                        void **solutionArray, double *const final_residual, double *const final_fermilab_residual,
+                        int *num_iters, int num_src);
+
+  /**
    * Clean up a staggered/HISQ multigrid object, freeing all internal
    * fields and otherwise allocated memory.
    *
