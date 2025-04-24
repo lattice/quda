@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-
+#include <array>
 #include "quda.h"
 
 namespace quda
@@ -326,6 +326,86 @@ namespace quda
       } else {
         return QUDA_INVALID_VERBOSITY;
       }
+    }
+
+    /**
+     * @brief Parses an input from a multigrid commands file that is general across the entire preconditioner
+     *
+     * @tparam Parser Type of the parser lambda that processes the second argument
+     * @param[out] error_code Set to 1 if insufficient arguments are provided
+     * @param[in] input_line Vector of strings containing the input arguments
+     * @param[in] key The expected first argument to match against
+     * @param[in] parse Parser lambda that processes the second argument
+     * @return true if the key matches and parsing was successful, false otherwise
+     */
+    template <typename Parser>
+    bool parse_2_args(int &error_code, const std::vector<std::string> &input_line, const char *key, Parser &&parse)
+    {
+      if (strcmp(input_line[0].c_str(), key) == 0) {
+        if (input_line.size() < 2) {
+          error_code = 1;
+          return false;
+        } else {
+          parse(input_line[1].c_str());
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * @brief Parses an input from a multigrid commands file that's applied to a specific level
+     *
+     * @tparam Parser Type of the parser lambda that processes the second and third arguments
+     * @param[out] error_code Set to 1 if insufficient arguments are provided
+     * @param[in] input_line Vector of strings containing the input arguments
+     * @param[in] key The expected first argument to match against
+     * @param[in] parse Parser lambda that processes the second argument, which is the preconditioner level, and third
+     * argument, which is a value
+     * @return true if the key matches and parsing was successful, false otherwise
+     */
+    template <typename Parser>
+    bool parse_3_args(int &error_code, const std::vector<std::string> &input_line, const char *key, Parser &&parse)
+    {
+      if (strcmp(input_line[0].c_str(), key) == 0) {
+        if (input_line.size() < 3) {
+          error_code = 1;
+          return false;
+        } else {
+          parse(atoi(input_line[1].c_str()), input_line[2].c_str());
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * @brief Parses an input from a multigrid commands file that's applied to a specific level and has four geometric
+     * parameters
+     *
+     * @tparam Parser Type of the parser lambda that processes the second argument and geometric parameters
+     * @param[out] error_code Set to 1 if insufficient arguments are provided
+     * @param[in] input_line Vector of strings containing the input arguments
+     * @param[in] key The expected first argument to match against
+     * @param[in] parse Parser lambda that processes the second argument, which is the preconditioner level, and four
+     * geometric parameters
+     * @return true if the key matches and parsing was successful, false otherwise
+     */
+    template <typename Parser>
+    bool parse_3_geo_args(int &error_code, const std::vector<std::string> &input_line, const char *key, Parser &&parse)
+    {
+      if (strcmp(input_line[0].c_str(), key) == 0) {
+        if (input_line.size() < 6) {
+          error_code = 1;
+          return false;
+        } else {
+          std::array<const char *, 4> vals
+            = {input_line[2].c_str(), input_line[3].c_str(), input_line[4].c_str(), input_line[5].c_str()};
+          parse(atoi(input_line[1].c_str()), vals);
+          return true;
+        }
+      }
+      return false;
     }
 
     /**

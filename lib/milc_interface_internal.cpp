@@ -1,7 +1,7 @@
 #include <string.h>
 #include <vector>
 #include <fstream>
-
+#include <array>
 #include "quda.h"
 #include "quda_internal.h"
 #include "milc_interface_internal.hpp"
@@ -15,250 +15,95 @@ namespace quda
     int error_code = 0; // no error
                         // 1 = wrong number of arguments
 
-    if (strcmp(input_line[0].c_str(), "mg_levels") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        mg_levels = atoi(input_line[1].c_str());
-      }
-
-    } else if (strcmp(input_line[0].c_str(), "verify_results") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        verify_results = input_line[1][0] == 't' ? true : false;
-      }
-
-    } else if (strcmp(input_line[0].c_str(), "preconditioner_precision") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        preconditioner_precision = getQudaPrecision(input_line[1].c_str());
-      }
-
-    } else if (strcmp(input_line[0].c_str(), "optimized_kd") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        optimized_kd = getQudaTransferType(input_line[1].c_str());
-      }
-    } else if (strcmp(input_line[0].c_str(), "use_mma") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        if (input_line[1][0] == 't') {
-          for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-            setup_use_mma[i] = true;
-            dslash_use_mma[i] = true;
-          }
-        } else {
-          for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-            setup_use_mma[i] = false;
-            dslash_use_mma[i] = false;
-          }
-        }
-      }
-    } else if (strcmp(input_line[0].c_str(), "allow_truncation") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        allow_truncation = input_line[1][0] == 't' ? true : false;
-      }
-    } else if (strcmp(input_line[0].c_str(), "dagger_approximation") == 0) {
-      if (input_line.size() < 2) {
-        error_code = 1;
-      } else {
-        dagger_approximation = input_line[1][0] == 't' ? true : false;
-      }
-    } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
-      if (input_line.size() < 3) {
-        error_code = 1;
-      } else {
-        mg_verbosity[atoi(input_line[1].c_str())] = getQudaVerbosity(input_line[2].c_str());
-      }
-
-    } else /* Begin Setup */
-      if (strcmp(input_line[0].c_str(), "nvec") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          nvec[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "geo_block_size") == 0) {
-        if (input_line.size() < 6) {
-          error_code = 1;
-        } else {
-          for (int d = 0; d < 4; d++) geo_block_size[atoi(input_line[1].c_str())][d] = atoi(input_line[2 + d].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "setup_inv") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          setup_inv[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "setup_tol") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          setup_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "setup_maxiter") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          setup_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "setup_ca_basis_size") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          setup_ca_basis_size[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "mg_vec_infile") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          strcpy(mg_vec_infile[atoi(input_line[1].c_str())], input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "mg_vec_outfile") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          strcpy(mg_vec_outfile[atoi(input_line[1].c_str())], input_line[2].c_str());
-        }
-
-      } else if (strcmp(input_line[0].c_str(), "mg_vec_partfile") == 0) {
-        if (input_line.size() < 3) {
-          error_code = 1;
-        } else {
-          mg_vec_partfile[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
-        }
-      } else /* Begin Solvers */
-        if (strcmp(input_line[0].c_str(), "coarse_solve_type") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            coarse_solve_type[atoi(input_line[1].c_str())] = getQudaSolveType(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            coarse_solver[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "coarse_solver_tol") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            coarse_solver_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "coarse_solver_maxiter") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            coarse_solver_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "coarse_solver_ca_basis_size") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            coarse_solver_ca_basis_size[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "smoother_type") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            smoother_type[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "nu_pre") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            nu_pre[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-          }
-
-        } else if (strcmp(input_line[0].c_str(), "nu_post") == 0) {
-          if (input_line.size() < 3) {
-            error_code = 1;
-          } else {
-            nu_post[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
-          }
-
-        } else /* Begin Deflation */
-          if (strcmp(input_line[0].c_str(), "deflate_n_ev") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_n_ev = atoi(input_line[1].c_str());
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_n_kr") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_n_kr = atoi(input_line[1].c_str());
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_max_restarts") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_max_restarts = atoi(input_line[1].c_str());
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_tol") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_tol = atof(input_line[1].c_str());
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_use_poly_acc") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_use_poly_acc = input_line[1][0] == 't' ? true : false;
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_a_min") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_a_min = atof(input_line[1].c_str());
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_poly_deg") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_poly_deg = atoi(input_line[1].c_str());
-            }
-
-          } else if (strcmp(input_line[0].c_str(), "deflate_vec_partfile") == 0) {
-            if (input_line.size() < 2) {
-              error_code = 1;
-            } else {
-              deflate_vec_partfile = input_line[1][0] == 't' ? true : false;
-            }
-          } else {
-            printf("Invalid option %s\n", input_line[0].c_str());
-            return false;
-          }
+    if (parse_2_args(error_code, input_line, "mg_levels", [&](const char *input) { mg_levels = atoi(input); })) {
+    } else if (parse_2_args(error_code, input_line, "verify_results",
+                            [&](const char *input) { verify_results = input[0] == 't' ? true : false; })) {
+    } else if (parse_2_args(error_code, input_line, "preconditioner_precision",
+                            [&](const char *input) { preconditioner_precision = getQudaPrecision(input); })) {
+    } else if (parse_2_args(error_code, input_line, "optimized_kd",
+                            [&](const char *input) { optimized_kd = getQudaTransferType(input); })) {
+    } else if (parse_2_args(error_code, input_line, "use_mma", [&](const char *input) {
+                 if (input[0] == 't') {
+                   for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+                     setup_use_mma[i] = true;
+                     dslash_use_mma[i] = true;
+                   }
+                 } else {
+                   for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+                     setup_use_mma[i] = false;
+                     dslash_use_mma[i] = false;
+                   }
+                 }
+               })) {
+    } else if (parse_2_args(error_code, input_line, "allow_truncation",
+                            [&](const char *input) { allow_truncation = input[0] == 't' ? true : false; })) {
+    } else if (parse_2_args(error_code, input_line, "dagger_approximation",
+                            [&](const char *input) { dagger_approximation = input[0] == 't' ? true : false; })) {
+    } else if (parse_3_args(error_code, input_line, "mg_verbosity",
+                            [&](int level, const char *input) { mg_verbosity[level] = getQudaVerbosity(input); })) {
+    }
+    /* begin setup */
+    else if (parse_3_args(error_code, input_line, "nvec",
+                          [&](int level, const char *input) { nvec[level] = atoi(input); })) {
+    } else if (parse_3_geo_args(error_code, input_line, "geo_block_size", [&](int level, std::array<const char *, 4> vals) {
+                 for (int d = 0; d < 4; d++) geo_block_size[level][d] = atoi(vals[d]);
+               })) {
+    } else if (parse_3_args(error_code, input_line, "setup_inv",
+                            [&](int level, const char *input) { setup_inv[level] = getQudaInverterType(input); })) {
+    } else if (parse_3_args(error_code, input_line, "setup_tol",
+                            [&](int level, const char *input) { setup_tol[level] = atof(input); })) {
+    } else if (parse_3_args(error_code, input_line, "setup_maxiter",
+                            [&](int level, const char *input) { setup_maxiter[level] = atoi(input); })) {
+    } else if (parse_3_args(error_code, input_line, "setup_ca_basis_size",
+                            [&](int level, const char *input) { setup_ca_basis_size[level] = atoi(input); })) {
+    } else if (parse_3_args(error_code, input_line, "mg_vec_infile",
+                            [&](int level, const char *input) { strcpy(mg_vec_infile[level], input); })) {
+    } else if (parse_3_args(error_code, input_line, "mg_vec_outfile",
+                            [&](int level, const char *input) { strcpy(mg_vec_outfile[level], input); })) {
+    } else if (parse_3_args(error_code, input_line, "mg_vec_partfile", [&](int level, const char *input) {
+                 mg_vec_partfile[level] = input[0] == 't' ? true : false;
+               })) {
+    }
+    /* begin solvers */
+    else if (parse_3_args(error_code, input_line, "coarse_solve_type",
+                          [&](int level, const char *input) { coarse_solve_type[level] = getQudaSolveType(input); })) {
+    } else if (parse_3_args(error_code, input_line, "coarse_solver",
+                            [&](int level, const char *input) { coarse_solver[level] = getQudaInverterType(input); })) {
+    } else if (parse_3_args(error_code, input_line, "coarse_solver_tol",
+                            [&](int level, const char *input) { coarse_solver_tol[level] = atof(input); })) {
+    } else if (parse_3_args(error_code, input_line, "coarse_solver_maxiter",
+                            [&](int level, const char *input) { coarse_solver_maxiter[level] = atoi(input); })) {
+    } else if (parse_3_args(error_code, input_line, "coarse_solver_ca_basis_size",
+                            [&](int level, const char *input) { coarse_solver_ca_basis_size[level] = atoi(input); })) {
+    } else if (parse_3_args(error_code, input_line, "smoother_type",
+                            [&](int level, const char *input) { smoother_type[level] = getQudaInverterType(input); })) {
+    } else if (parse_3_args(error_code, input_line, "nu_pre",
+                            [&](int level, const char *input) { nu_pre[level] = atoi(input); })) {
+    } else if (parse_3_args(error_code, input_line, "nu_post",
+                            [&](int level, const char *input) { nu_post[level] = atoi(input); })) {
+    }
+    /* Begin deflation */
+    else if (parse_2_args(error_code, input_line, "deflate_n_ev", [&](const char *input) { deflate_n_ev = atoi(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_n_kr",
+                            [&](const char *input) { deflate_n_kr = atoi(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_max_restarts",
+                            [&](const char *input) { deflate_max_restarts = atoi(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_tol", [&](const char *input) { deflate_tol = atof(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_use_poly_acc",
+                            [&](const char *input) { deflate_use_poly_acc = input[0] == 't' ? true : false; })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_a_min",
+                            [&](const char *input) { deflate_a_min = atof(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_poly_deg",
+                            [&](const char *input) { deflate_poly_deg = atoi(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_vec_partfile",
+                            [&](const char *input) { deflate_vec_partfile = input[0] == 't' ? true : false; })) {
+    } else {
+      printf("Invalid option %s\n", input_line[0].c_str());
+      return false;
+    }
 
     if (error_code == 1) {
+      // intentionally printf b/c we're only runing this on rank zero
       printf("Input option %s has an invalid number of arguments\n", input_line[0].c_str());
       return false;
     }
@@ -272,7 +117,7 @@ namespace quda
     mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
     if ((mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type)
         && !(mg_eig_param.spectrum == QUDA_SPECTRUM_LR_EIG || mg_eig_param.spectrum == QUDA_SPECTRUM_SR_EIG)) {
-      errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
+      errorQuda("Only a real spectrum type (LR or SR) can be passed to a Lanczos type solver");
     }
 
     mg_eig_param.n_ev = input_struct.deflate_n_ev; // mg_eig_n_ev[level];
