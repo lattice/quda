@@ -103,7 +103,7 @@ namespace quda
     }
 
     if (error_code == 1) {
-      // intentionally printf b/c we're only runing this on rank zero
+      // intentionally printf b/c we're only running this on rank zero
       printf("Input option %s has an invalid number of arguments\n", input_line[0].c_str());
       return false;
     }
