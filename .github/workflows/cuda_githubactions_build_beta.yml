@@ -44,7 +44,7 @@ jobs:
       - name: Configure CMake
         run: >
           cmake 
-          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.6/bin/nvcc
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc
           -DCMAKE_CXX_COMPILER=${{matrix.compiler}}
           -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
