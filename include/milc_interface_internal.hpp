@@ -18,6 +18,7 @@ namespace quda
       optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
     bool setup_use_mma[QUDA_MAX_MG_LEVEL];  // accelerate setup using MMA routines
     bool dslash_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate dslash using MMA routines
+    bool transfer_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate transfer using MMA routines
     bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
     bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
@@ -94,6 +95,7 @@ namespace quda
 
         setup_use_mma[i] = true;
         dslash_use_mma[i] = true;
+        transfer_use_mma[i] = false; // FIXME: currently slower due to reordering
 
         coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
         coarse_solver[i] = QUDA_GCR_INVERTER;

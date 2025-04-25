@@ -27,11 +27,13 @@ namespace quda
                    for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
                      setup_use_mma[i] = true;
                      dslash_use_mma[i] = true;
+                     // transfer_use_mma[i] = true; // FIXME, stick with default for now
                    }
                  } else {
                    for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
                      setup_use_mma[i] = false;
                      dslash_use_mma[i] = false;
+                     // transfer_use_mma[i] = false; // FIXME, stick with default for now
                    }
                  }
                })) {
@@ -249,15 +251,15 @@ namespace quda
     auto solve_type = QUDA_DIRECT_SOLVE;
     inv_param.solve_type = solve_type;
 
-    mg_param.invert_param = &inv_param;
-    mg_param.n_level = mg_levels; // set from file
-
     // whether or not we allow dropping a long link when an aggregation size is smaller than 3
     mg_param.allow_truncation = input_struct.allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // whether or not we use the dagger approximation
     mg_param.staggered_kd_dagger_approximation
       = input_struct.dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+    mg_param.invert_param = &inv_param;
+    mg_param.n_level = mg_levels; // set from file
 
     for (int i = 0; i < mg_param.n_level; i++) {
 
@@ -270,9 +272,6 @@ namespace quda
         for (int j = 0; j < 4; j++) { mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j]; }
       }
 
-      mg_param.setup_use_mma[i] = input_struct.setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      mg_param.dslash_use_mma[i] = input_struct.dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
       // mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       if (i == mg_param.n_level - 1 && input_struct.nvec[i] > 0) {
         mg_param.use_eig_solver[i] = QUDA_BOOLEAN_TRUE;
@@ -281,6 +280,9 @@ namespace quda
       }
 
       mg_param.verbosity[i] = input_struct.mg_verbosity[i];
+      mg_param.setup_use_mma[i] = input_struct.setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      mg_param.dslash_use_mma[i] = input_struct.dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      mg_param.transfer_use_mma[i] = input_struct.transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       mg_param.setup_inv_type[i] = input_struct.setup_inv[i];
       mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
       mg_param.setup_tol[i] = input_struct.setup_tol[i];
