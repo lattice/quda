@@ -10,8 +10,8 @@ namespace quda
 
   constexpr Dslash5Type dslash5_type = Dslash5Type::@QUDA_DSLASH_DWTYPE@;
 
-  typedef @QUDA_DSLASH_DDARG@ DDArg;
-  typedef precision_type_mapper<precision>::type Float;
+  using DDArg = @QUDA_DSLASH_DDARG@;
+  using Float = precision_type_mapper<precision>::type;
 
   template struct DomainWall4DApplyFusedM5<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 

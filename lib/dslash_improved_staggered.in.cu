@@ -7,8 +7,8 @@ namespace quda
   constexpr int reconI = @QUDA_DSLASH_RECONI@;
   constexpr bool distance_pc = @QUDA_DSLASH_DISTANCE@;
 
-  typedef @QUDA_DSLASH_DDARG@ DDArg;
-  typedef precision_type_mapper<precision>::type Float;
+  using DDArg = @QUDA_DSLASH_DDARG@;
+  using Float = precision_type_mapper<precision>::type;
 
   template struct ImprovedStaggeredApply<Float, nColor, DDArg, ReconstructStaggered::recon[reconI]>;
 
