@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <complex.h>
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
