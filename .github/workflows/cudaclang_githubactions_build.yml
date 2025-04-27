@@ -58,6 +58,14 @@ jobs:
           -GNinja
           -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
+      - name: Upload cmake report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmake-report
+          path: ${{github.workspace}}/build 
+
+
       - name: Build
         run: cmake --build ${{github.workspace}}/build
 
