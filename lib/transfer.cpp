@@ -147,6 +147,8 @@ namespace quda {
     if (b == _use_mma) return;
     _use_mma = b;
     if (_use_mma) {
+      if (transfer_type != QUDA_TRANSFER_AGGREGATE)
+        errorQuda("MMA transfer is not supported by transfer type %d, set transfer_mma to false", transfer_type);
       ColorSpinorParam param(V);
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       V_mma = {param};
