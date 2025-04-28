@@ -235,7 +235,9 @@ namespace quda
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
-        out = -out;
+        for (auto s = 0; s < n_src_tile; s++) {
+          out[s] = -out[s];
+        }
       } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
