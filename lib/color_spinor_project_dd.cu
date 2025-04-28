@@ -44,35 +44,9 @@ namespace quda
     long long bytes() const { return out.Bytes(); }
   };
 
-  template <typename P, typename DDArg> void projectDD(P &p, DDArg &dd, const ColorSpinorField &meta)
-  {
-    Coord<4> coord;
-    int X[4] = {meta.full_dim(0), meta.full_dim(1), meta.full_dim(2), meta.full_dim(3)};
-    int commCoord[4] = {comm_coord(0) * X[0], comm_coord(1) * X[1], comm_coord(2) * X[2], comm_coord(3) * X[3]};
-
-    for (int parity = 0; parity < p.Nparity(); parity++) {
-      for (int x_cb = 0; x_cb < p.VolumeCB(); x_cb++) {
-        getCoords(coord, x_cb, X, parity);
-        for (int i = 0; i < coord.size(); i++) { coord.gx[i] = commCoord[i] + coord.x[i]; }
-
-        if (dd.isZero(coord)) {
-          for (int s = 0; s < p.Nspin(); s++)
-            for (int c = 0; c < p.Ncolor(); c++) p(parity, x_cb, s, c) = 0;
-        }
-      }
-    }
-  }
-
   template <typename Float, typename DDArg, int nSpin, int nColor, typename Order>
   void genericProjectDD(ColorSpinorField &a)
   {
-    /* Reference CPU implementation
-    if (a.Location() == QUDA_CPU_FIELD_LOCATION and a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      FieldOrderCB<Float, nSpin, nColor, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> A(a);
-      DDArg dd(a);
-      return projectDD(A, dd, a);
-    } */
-
     ProjectDD<Float, DDArg, nSpin, nColor, Order> A(a);
   }
 
