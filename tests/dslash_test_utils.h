@@ -88,11 +88,11 @@ struct DslashTestWrapper {
   static inline bool test_domain_decomposition = false;
   int num_src = 1;
 
-  static inline int dd_col = 0;
+  static inline QudaDomainDecompositionColor dd_col = QUDA_DD_COLOR_RED_RED;
 
   const bool transfer = false;
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon, int dd_value, int dd_color)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon, QudaDomainDecompositionType dd_value, QudaDomainDecompositionColor dd_color)
   {
     if (first_time) {
       gauge_param = newQudaGaugeParam();
@@ -284,32 +284,26 @@ struct DslashTestWrapper {
     inv_param.verbosity = verbosity;
   }
 
-  void init_domain_decomposition(int value, int color)
+  void init_domain_decomposition(QudaDomainDecompositionType value, QudaDomainDecompositionColor color)
   {
-    if (value == 0) {
+    if (value == QUDA_NO_DD) {
       test_domain_decomposition = false;
       return;
     }
     test_domain_decomposition = true;
     dd_col = color;
 
-    if (value < 3) {
+    if (value == QUDA_DDBLOCK_HALFLOCALL) {
       dd_red_black = true;
-
       // dd_block_size is half of the local lattice
-      if (value == 1) {
-        for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
-        return;
-      }
-
-      // dd_block_size is half of the global lattice
-      if (value == 2) {
-        for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
-        return;
-      }
-
-    } else {
-      dd_red_black = false;
+      for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
+      return;
+    }
+    // dd_block_size is half of the global lattice
+    else if (value == QUDA_DDBLOCK_HALFGLOBALL) {
+      dd_red_black = true;
+      for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
+      return;
     }
     errorQuda("Unexpected value for domain decomposition (%d)", value);
   }
@@ -868,8 +862,8 @@ struct DslashTestWrapper {
         blas::zero(cudaSpinorOut);
         blas::zero(cudaSpinorTmp);
 
-        spinor.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
-        out.DD(DD::reset, DD::red_black_type, dd_col / 2 == 1 ? DD::red_active : DD::black_active);
+        spinor.DD(DD::reset, DD::red_black_type, (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_RED_BLACK ) ? DD::red_active : DD::black_active);
+        out.DD(DD::reset, DD::red_black_type,    (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_BLACK_RED ) ? DD::red_active : DD::black_active);
 
         for (int i = 0; i < niter; i++) {
           host_timer.start();
@@ -899,7 +893,7 @@ struct DslashTestWrapper {
         if (niter < 2) { // HACK: when benchmarking we do not produce reference solution
           // We also test that Dyx is same as D applied to projected in and out spinors
           blas::copy(tmp, cudaSpinor);
-          tmp.DD(DD::reset, DD::red_black_type, dd_col % 2 == 0 ? DD::red_active : DD::black_active);
+          tmp.DD(DD::reset, DD::red_black_type, (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_RED_BLACK ) ? DD::red_active : DD::black_active);
           tmp.projectDD();
           tmp.DD(DD::reset);
 
@@ -914,7 +908,7 @@ struct DslashTestWrapper {
             errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
           }
 
-          out.DD(DD::reset, DD::red_black_type, dd_col / 2 == 1 ? DD::red_active : DD::black_active);
+          out.DD(DD::reset, DD::red_black_type,  (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_BLACK_RED ) ? DD::red_active : DD::black_active);
           out.projectDD();
           out.DD(DD::reset);
 
@@ -1209,9 +1203,11 @@ struct DslashTestWrapper {
         auto norm_cpu = blas::norm2(spinorRef[n]);
         auto norm_cpu_quda = blas::norm2(spinorOut[n]);
         auto max_deviation = blas::max_deviation(spinorRef[n], spinorOut[n]);
-        printfQuda("Results for (D-PDP)_{%d,%d}*spinor: reference = %f, QUDA = %f, L2 relative deviation = %e, max "
+        printfQuda("Results for (D-PDP)_{%s,%s}*spinor: reference = %f, QUDA = %f, L2 relative deviation = %e, max "
                    "deviation = %e\n",
-                   dd_col % 2, dd_col / 2, norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu),
+                   (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_RED_BLACK ) ? "red" : "black", 
+                   (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_BLACK_RED ) ? "red" : "black", 
+                   norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu),
                    max_deviation[0]);
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[n], spinorOut[n]))));
       }
