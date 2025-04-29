@@ -44,7 +44,7 @@ namespace quda
     LaplaceArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                const ColorSpinorField &halo, const GaugeField &U, int dir, double a, double b,
                cvector_ref<const ColorSpinorField> &x, int parity, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, 1, false, comm_override),
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, false, a != 0.0 ? true : false, false, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),

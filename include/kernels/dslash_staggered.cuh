@@ -16,7 +16,7 @@ namespace quda
   */
   template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
             bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC, int n_src_tile = MAX_MULTI_RHS_TILE>
-  struct StaggeredArg : DslashArg<Float, nDim, n_src_tile> {
+  struct StaggeredArg : DslashArg<Float, nDim, improved_ ? 3 : 1, n_src_tile> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -55,14 +55,9 @@ namespace quda
     StaggeredArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L, double a,
                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim, n_src_tile>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true,
-                                         improved_ ? 3 : 1, spin_project, comm_override),
-      halo_pack(halo, improved_ ? 3 : 1),
-      halo(halo, improved_ ? 3 : 1),
-      U(U),
-      L(L),
-      a(a),
-      tboundary(U.TBoundary()),
+      DslashArg<Float, nDim, improved ? 3 : 1, n_src_tile>
+      (out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, spin_project, comm_override),
+      halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U), L(L), a(a), tboundary(U.TBoundary()),
       is_first_time_slice(comm_coord(3) == 0 ? true : false),
       is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
       dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
@@ -214,9 +209,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      auto coord = arg.improved ? getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, 0, parity, thread_dim) :
-                                  getCoords<QUDA_4D_PC, mykernel_type, Arg, 1>(arg, idx, 0, parity, thread_dim);
-
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       array<Vector, n_src_tile> out;

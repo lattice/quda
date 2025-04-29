@@ -15,7 +15,7 @@ namespace quda
      @brief Parameter structure for driving the covariant derivative operator
   */
   template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct StaggeredQSmearArg : DslashArg<Float, nDim> {
+  struct StaggeredQSmearArg : DslashArg<Float, nDim, 3> {
     static constexpr int nColor = 3;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
@@ -49,7 +49,7 @@ namespace quda
     StaggeredQSmearArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                        const ColorSpinorField &halo, const GaugeField &U, int t0, bool is_t0_kernel, int parity,
                        int dir, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, 3, false, comm_override),
+      DslashArg<Float, nDim, 3>(out, in, halo, U, in, parity, dagger, false, false, comm_override),
       halo_pack(halo, 3),
       halo(halo, 3),
       U(U),
@@ -198,7 +198,7 @@ namespace quda
         }
       }
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;

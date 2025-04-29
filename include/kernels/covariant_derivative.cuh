@@ -40,7 +40,7 @@ namespace quda
 
     CovDevArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, int mu, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, spin_project, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),

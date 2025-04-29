@@ -94,7 +94,7 @@ namespace quda
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
+  template <QudaPCType pc_type, KernelType kernel_type, typename Arg>
   __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
   {
     constexpr auto nDim = Arg::nDim;
@@ -113,41 +113,41 @@ namespace quda
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_size = nface_ * arg.dc.ghostFaceCB[kernel_type] * Ls;
+      const int face_size = Arg::nFace * arg.dc.ghostFaceCB[kernel_type] * Ls;
       const int face_num = idx >= face_size;
       idx -= face_num * face_size;
-      coordsFromFaceIndex<nDim, pc_type, kernel_type, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+      coordsFromFaceIndex<nDim, pc_type, kernel_type, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
       // work out which dimension this thread corresponds to, then compute coords
       if (idx < arg.threadDimMapUpper[0] * Ls) { // x face
         dim = 0;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 0, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 0, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1] * Ls) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1] * Ls;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 1, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 1, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2] * Ls) { // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2] * Ls;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 2, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 2, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3] * Ls;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 3, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 3, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       }
     }
     coord.s = s;
@@ -236,16 +236,16 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_, int n_src_tile_ = 1> struct DslashArg {
+  template <typename Float_, int nDim_, int nFace_ = 1, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
     static constexpr int nDim = nDim_;
+    static constexpr int nFace = nFace_;
     static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
-    const int nFace;   // hard code to 1 for now
     const QudaReconstructType reconstruct;
 
     const int_fastdiv X0h;
@@ -304,7 +304,7 @@ namespace quda
     // constructor needed for staggered to set xpay from derived class
     DslashArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool xpay,
-              int nFace, int spin_project, const int *comm_override,
+              int spin_project, const int *comm_override,
 #ifdef NVSHMEM_COMMS
               int shmem_ = 0) :
 #else
@@ -312,7 +312,6 @@ namespace quda
 #endif
       parity(parity),
       nParity(in.SiteSubset()),
-      nFace(nFace),
       reconstruct(U.Reconstruct()),
       X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
       dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
@@ -413,7 +412,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
+  template <typename Float, int nDim, int nFace, int n_src_tile>
+  std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim, nFace, n_src_tile> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;

@@ -49,8 +49,7 @@ namespace quda
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
               const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
-      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project,
-                             comm_override),
+      DslashArg<Float, nDim>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, spin_project, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -107,7 +106,7 @@ namespace quda
         constexpr int proj_dir = dagger ? +1 : -1;
 
         const bool ghost
-            = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
