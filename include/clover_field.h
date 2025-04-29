@@ -95,9 +95,16 @@ namespace quda {
 
     template <typename T, int length> constexpr int get_vector_order()
     {
-      int N = get_vector_order<T>();
-      while (N > length) N /= 2;
-      return N;
+      constexpr int N = get_vector_order<T>();
+      if constexpr (N == 0) {                    // legacy path, greatest vector size that is a divisor of length
+        int Nvec = length & (~(length - 1));     // greatest vector size that is a divisor of length
+        while (Nvec * sizeof(T) > 16) Nvec /= 2; // ensure we don't choose a size greater than 16 bytes
+        return Nvec;
+      } else {
+        int Nvec = N;
+        while (Nvec > length) Nvec /= 2;
+        return Nvec;
+      }
     }
 
   } // namespace clover
