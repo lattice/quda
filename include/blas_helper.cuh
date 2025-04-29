@@ -344,10 +344,10 @@ namespace quda
     template <typename store_t, bool GPU> constexpr int n_vector(int, int) { return 0; }
 
     // native ordering
-    template <> constexpr int n_vector<double, true>(int, int) { return colorspinor::get_vector_order<double>(); }
-    template <> constexpr int n_vector<float, true>(int, int) { return colorspinor::get_vector_order<float>(); }
-    template <> constexpr int n_vector<short, true>(int, int) { return colorspinor::get_vector_order<short>(); }
-    template <> constexpr int n_vector<int8_t, true>(int, int) { return colorspinor::get_vector_order<int8_t>(); }
+    template <> constexpr int n_vector<double, true>(int, int) { return colorspinor::get_vector_order<double, 4>(); }
+    template <> constexpr int n_vector<float, true>(int, int) { return colorspinor::get_vector_order<float, 8>(); }
+    template <> constexpr int n_vector<short, true>(int, int) { return colorspinor::get_vector_order<short, 16>(); }
+    template <> constexpr int n_vector<int8_t, true>(int, int) { return colorspinor::get_vector_order<int8_t, 16>(); }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling
     template <> constexpr int n_vector<double, false>(int nSpin, int site_unroll)
