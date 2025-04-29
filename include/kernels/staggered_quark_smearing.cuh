@@ -108,12 +108,12 @@ namespace quda
         {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost
-            = (coord[d] + 2 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg); // 1=>2
+            = (coord[d] + 2 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg); // 1=>2
 
           if (doHalo<kernel_type>(d) && ghost) { //?
 
             const int ghost_idx
-              = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 2); // check nFace=2, requires improved staggered fields
+              = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 2); // check nFace=2, requires improved staggered fields
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in
               = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity); //?
@@ -121,7 +121,7 @@ namespace quda
             out = mv_add(U, in, out);
 
           } else if (doBulk<kernel_type>() && !ghost) { // doBulk
-            const int _2hop_fwd_idx = linkIndexP2(coord, arg.dim, d);
+            const int _2hop_fwd_idx = linkIndexP2(coord, arg.dc.X, d);
             const Vector in_2hop = arg.in[src_idx](_2hop_fwd_idx, their_spinor_parity);
             const Link U_2link = arg.U(d, coord.x_cb, parity);
             out = mv_add(U_2link, in_2hop, out);
@@ -135,7 +135,7 @@ namespace quda
 
             // when updating replace arg.nFace with 1 here
             const int ghost_idx
-              = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 2); // check nFace=2, requires improved staggered field
+              = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 2); // check nFace=2, requires improved staggered field
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
             const Vector in
               = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -144,7 +144,7 @@ namespace quda
 
           } else if (doBulk<kernel_type>() && !ghost) { //?
 
-            const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);
+            const int _2hop_back_idx = linkIndexM2(coord, arg.dc.X, d);
             const int _2hop_gauge_idx = _2hop_back_idx;
 
             const Link U_2link = arg.U(d, _2hop_gauge_idx, parity);

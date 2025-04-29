@@ -62,12 +62,12 @@ namespace quda
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
         const bool ghost
-            = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+            = (coord[d] + arg.nFace >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) :
             idx;
 
           Link U = arg.U(d, coord.x_cb, parity);
@@ -104,7 +104,7 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) :
             idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);

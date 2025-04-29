@@ -122,10 +122,10 @@ namespace quda {
       }
     } else if (dir == 1) {
       switch (dim) { // forwards boundary
-      case 0: is_boundary = coord[0] + arg.nFace >= arg.dim[0]; break;
-      case 1: is_boundary = coord[1] + arg.nFace >= arg.dim[1]; break;
-      case 2: is_boundary = coord[2] + arg.nFace >= arg.dim[2]; break;
-      case 3: is_boundary = coord[3] + arg.nFace >= arg.dim[3]; break;
+      case 0: is_boundary = coord[0] + arg.nFace >= arg.dc.X[0]; break;
+      case 1: is_boundary = coord[1] + arg.nFace >= arg.dc.X[1]; break;
+      case 2: is_boundary = coord[2] + arg.nFace >= arg.dc.X[2]; break;
+      case 3: is_boundary = coord[3] + arg.nFace >= arg.dc.X[3]; break;
       }
     }
     return is_boundary;
@@ -252,7 +252,7 @@ namespace quda {
   {
     switch (dir) {
     case +1: // positive direction
-      switch (mu) {
+      switch (mu) { //  this is questionable
       case 0: return (x[0] == arg.X[0] - 1 ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
       case 1: return (x[1] == arg.X[1] - 1 ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
       case 2: return (x[2] == arg.X[2] - 1 ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
@@ -953,7 +953,7 @@ namespace quda {
         phase == QUDA_STAGGERED_PHASE_MILC || phase == QUDA_STAGGERED_PHASE_TIFR, "Unsupported staggered phase");
     real sign;
 
-    const auto *X = arg.dim;
+    const auto *X = arg.dc.X;
     if (phase == QUDA_STAGGERED_PHASE_MILC) {
       switch (dim) {
       case 0: sign = (coords[3]) % 2 == 0 ? static_cast<real>(1.0) : static_cast<real>(-1.0); break;

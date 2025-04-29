@@ -56,8 +56,8 @@ namespace quda
       a(a),
       alpha0(alpha0),
       t0(t0),
-      comm_coord_dim_3(comm_coord(3) * this->dim[3]),
-      comm_dim_dim_3(comm_dim(3) * this->dim[3])
+      comm_coord_dim_3(comm_coord(3) * this->dc.X[3]),
+      comm_dim_dim_3(comm_dim(3) * this->dc.X[3])
     {
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
@@ -106,12 +106,12 @@ namespace quda
         constexpr int proj_dir = dagger ? +1 : -1;
 
         const bool ghost
-          = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+            = (coord[d] + arg.nFace >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) : idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
@@ -138,7 +138,7 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) : idx;
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);

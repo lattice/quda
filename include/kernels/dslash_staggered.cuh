@@ -93,9 +93,9 @@ namespace quda
 
       // standard - forward direction
       {
-        const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = (coord[d] + 1 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
           const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -104,7 +104,7 @@ namespace quda
             out[s] = mv_add(U, in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+          const int fwd_idx = linkIndexP1(coord, arg.dc.X, d);
           const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -116,9 +116,9 @@ namespace quda
 
       // improved - forward direction
       if (arg.improved) {
-        const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = (coord[d] + 3 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
           const Link L = arg.L(d, coord.x_cb, parity);
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -127,7 +127,7 @@ namespace quda
             out[s] = mv_add(L, in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
+          const int fwd3_idx = linkIndexP3(coord, arg.dc.X, d);
           const Link L = arg.L(d, coord.x_cb, parity);
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -142,8 +142,8 @@ namespace quda
         const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
+          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
+          const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 3) : ghost_idx2;
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
             arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
 #pragma unroll
@@ -153,7 +153,7 @@ namespace quda
             out[s] = mv_add(conj(U), -in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int back_idx = linkIndexM1(coord, arg.dc.X, d);
           const int gauge_idx = back_idx;
           const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
             arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
@@ -170,7 +170,7 @@ namespace quda
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           // when updating replace arg.nFace with 1 here
-          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -179,7 +179,7 @@ namespace quda
             out[s] = mv_add(conj(L), -in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int back3_idx = linkIndexM3(coord, arg.dim, d);
+          const int back3_idx = linkIndexM3(coord, arg.dc.X, d);
           const int gauge_idx = back3_idx;
           const Link L = arg.L(d, gauge_idx, 1 - parity);
 #pragma unroll

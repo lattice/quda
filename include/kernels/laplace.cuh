@@ -86,19 +86,19 @@ namespace quda
       if (d != dir) {
         {
           // Forward gather - compute fwd offset for vector fetch
-          const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          const bool ghost = (coord[d] + 1 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 	  
           if (doHalo<kernel_type>(d) && ghost) {
 	    
-            // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-            const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+            // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
+            const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
             out += U * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
-            const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+            const int fwd_idx = linkIndexP1(coord, arg.dc.X, d);
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
 
@@ -108,15 +108,15 @@ namespace quda
         {
           // Backward gather - compute back offset for spinor and gauge fetch
 
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int back_idx = linkIndexM1(coord, arg.dc.X, d);
           const int gauge_idx = back_idx;
 
           const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
           if (doHalo<kernel_type>(d) && ghost) {
 
-            // const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+            // const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dc.X, d, arg.nFace);
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
             const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);

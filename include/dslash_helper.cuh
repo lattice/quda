@@ -102,14 +102,14 @@ namespace quda
     dim = kernel_type; // keep compiler happy
 
     // only for 5-d checkerboarding where we need to include the fifth dimension
-    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dim[4] : 1);
+    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dc.X[4] : 1);
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;
       if (nDim == 5)
-        coord.X = getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
+        coord.X = getCoords5CB(coord, idx, arg.dc.X, arg.X0h, parity, pc_type);
       else
-        coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+        coord.X = getCoordsCB(coord, idx, arg.dc.X, arg.X0h, parity);
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
@@ -164,7 +164,7 @@ namespace quda
   */
   template <int dim, typename Coord, typename Arg> inline __host__ __device__ bool inBoundary(const Coord &coord, const Arg &arg)
   {
-    return ((coord[dim] >= arg.dim[dim] - arg.nFace) || (coord[dim] < arg.nFace));
+    return ((coord[dim] >= arg.dc.X[dim] - arg.nFace) || (coord[dim] < arg.nFace));
   }
 
   /**
@@ -249,7 +249,6 @@ namespace quda
     const QudaReconstructType reconstruct;
 
     const int_fastdiv X0h;
-    const int_fastdiv dim[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 
@@ -314,7 +313,6 @@ namespace quda
       nParity(in.SiteSubset()),
       reconstruct(U.Reconstruct()),
       X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
-      dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
       volumeCB(in.VolumeCB()),
       dagger(dagger),
       xpay(xpay),
@@ -420,8 +418,8 @@ namespace quda
     out << "nFace = " << arg.nFace << std::endl;
     out << "reconstruct = " << arg.reconstruct << std::endl;
     out << "X0h = " << arg.X0h << std::endl;
-    out << "dim = { ";
-    for (int i = 0; i < 5; i++) out << arg.dim[i] << (i < 4 ? ", " : " }");
+    out << "dc.X = { ";
+    for (int i = 0; i < 5; i++) out << arg.dc.X[i] << (i < 4 ? ", " : " }");
     out << std::endl;
     out << "commDim = { ";
     for (int i = 0; i < 4; i++) out << arg.commDim[i] << (i < 3 ? ", " : " }");

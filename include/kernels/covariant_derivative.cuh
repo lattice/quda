@@ -79,13 +79,13 @@ namespace quda
     if (mu < 4) { // Forward gather - compute fwd offset for vector fetch
 
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
-      const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+      const bool ghost = (coord[d] + 1 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
       const Link U = arg.U(d, coord.x_cb, parity);
 
       if (doHalo<kernel_type>(d) && ghost) {
 
-        const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+        const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
         const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
         out += U * in;
@@ -104,7 +104,7 @@ namespace quda
 
       if (doHalo<kernel_type>(d) && ghost) {
 
-        const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+        const int ghost_idx = ghostFaceIndex<0>(coord, arg.dc.X, d, arg.nFace);
         const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
         const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
