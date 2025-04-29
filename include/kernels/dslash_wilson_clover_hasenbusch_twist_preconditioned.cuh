@@ -80,7 +80,7 @@ namespace quda
 
       if (isComplete<mykernel_type>(arg, coord) && active) {
 
-        if (!Arg::clov_inv and arg.dd_x.isZero(coord)) {
+        if (!Arg::clov_inv && arg.dd_x.isZero(coord)) {
           out = arg.a * out;
         } else if (!Arg::clov_inv) {
           Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
@@ -118,7 +118,7 @@ namespace quda
         // At this point: out = x + k A^{-1} D in or out = x + k D in
         //
         // now we must add on i g_5 b A x
-        if (not arg.dd_x.isZero(coord)) {
+        if (!arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
           x.toRel();
           Vector tmp;

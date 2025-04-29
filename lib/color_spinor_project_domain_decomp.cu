@@ -7,7 +7,7 @@
 #include <instantiate.h>
 #include <domain_decomposition_helper.cuh>
 #include <tunable_nd.h>
-#include <kernels/color_spinor_project_dd.cuh>
+#include <kernels/color_spinor_project_domain_decomp.cuh>
 
 namespace quda
 {

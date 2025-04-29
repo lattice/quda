@@ -122,7 +122,7 @@ namespace quda
       }
 
       // improved - forward direction
-      if (arg.improved and arg.dd_in.doHopping(coord, d, +3)) {
+      if (arg.improved && arg.dd_in.doHopping(coord, d, +3)) {
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
@@ -173,7 +173,7 @@ namespace quda
       }
 
       // improved - backward direction
-      if (arg.improved and arg.dd_in.doHopping(coord, d, -3)) {
+      if (arg.improved && arg.dd_in.doHopping(coord, d, -3)) {
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           // when updating replace arg.nFace with 1 here

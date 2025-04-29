@@ -91,7 +91,7 @@ namespace quda
       else // defined in dslash_twisted_mass_preconditioned
         applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL && not arg.dd_x.isZero(coord)) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
 
         if (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
           // use consistent load order across s to ensure better cache locality

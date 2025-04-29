@@ -48,11 +48,11 @@ namespace quda
 
     DDRedBlack(const DDParam &dd) :
       block_dim {dd.block_dim[0], dd.block_dim[1], dd.block_dim[2], dd.block_dim[3]},
-      red_active(dd.type == QUDA_DD_NO or dd.is(DD::red_active)),
-      black_active(dd.type == QUDA_DD_NO or dd.is(DD::black_active)),
-      block_hopping(dd.type == QUDA_DD_NO or not dd.is(DD::no_block_hopping))
+      red_active(dd.type == QUDA_DD_NO || dd.is(DD::red_active)),
+      black_active(dd.type == QUDA_DD_NO || dd.is(DD::black_active)),
+      block_hopping(dd.type == QUDA_DD_NO || !dd.is(DD::no_block_hopping))
     {
-      if (dd.type != QUDA_DD_NO and dd.type != QUDA_DD_RED_BLACK) { errorQuda("Unsupported type %d", dd.type); }
+      if (dd.type != QUDA_DD_NO && dd.type != QUDA_DD_RED_BLACK) { errorQuda("Unsupported type %d", dd.type); }
     }
 
     constexpr bool operator!() const { return false; }
@@ -60,12 +60,12 @@ namespace quda
     // Whether comms are required along given direction
     template <typename DDArg, typename Arg> constexpr bool commDim(int d, const DDArg &dd, const Arg &arg) const
     {
-      if (not red_active and not black_active) return false;
-      if (not dd.red_active and not dd.black_active) return false;
+      if (not red_active && !black_active) return false;
+      if (not dd.red_active && !dd.black_active) return false;
       if (arg.dim[d] % block_dim[d] == 0) {
-        if (not red_active and not dd.red_active) return false;
-        if (not black_active and not dd.black_active) return false;
-        if (not block_hopping and not dd.block_hopping) return false;
+        if (not red_active && !dd.red_active) return false;
+        if (not black_active && !dd.black_active) return false;
+        if (not block_hopping && !dd.block_hopping) return false;
       }
       return true;
     }
@@ -94,8 +94,8 @@ namespace quda
       bool is_black = block_parity(x);
       bool is_red = not is_black;
 
-      if (is_red and red_active) return false;
-      if (is_black and black_active) return false;
+      if (is_red && red_active) return false;
+      if (is_black && black_active) return false;
       return true;
     }
 
@@ -106,11 +106,11 @@ namespace quda
       bool is_border = on_border(x, mu, dist);
 
       if (!is_border) { // Within block
-        if (is_red and red_active) return true;
-        if (is_black and black_active) return true;
+        if (is_red && red_active) return true;
+        if (is_black && black_active) return true;
       } else if (block_hopping) { // Between blocks
-        if (is_red and black_active) return true;
-        if (is_black and red_active) return true;
+        if (is_red && black_active) return true;
+        if (is_black && red_active) return true;
       }
       return false;
     }

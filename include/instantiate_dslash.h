@@ -54,9 +54,9 @@ namespace quda
   inline void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                           cvector_ref<const ColorSpinorField> &x, const GaugeField &U, Args &&...args)
   {
-    if (out.DD().type == QUDA_DD_NO and in.DD().type == QUDA_DD_NO) {
+    if (out.DD().type == QUDA_DD_NO && in.DD().type == QUDA_DD_NO) {
       instantiate<Apply, Recon, Float, 3, DDNo>(out, in, x, U, args...);
-    } else if (out.DD().type == QUDA_DD_RED_BLACK or in.DD().type == QUDA_DD_RED_BLACK) {
+    } else if (out.DD().type == QUDA_DD_RED_BLACK || in.DD().type == QUDA_DD_RED_BLACK) {
       if constexpr (is_enabled(QUDA_DD_RED_BLACK))
         instantiate<Apply, Recon, Float, 3, DDRedBlack>(out, in, x, U, args...);
       else

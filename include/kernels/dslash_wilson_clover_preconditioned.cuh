@@ -98,7 +98,7 @@ namespace quda
 
         tmp.toNonRel(); // switch back to non-chiral basis
 
-        if (xpay and arg.dd_x.isZero(coord)) {
+        if (xpay && arg.dd_x.isZero(coord)) {
           out = arg.a * tmp;
         } else if (xpay) {
           Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);

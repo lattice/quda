@@ -39,7 +39,7 @@ namespace quda
         local &= (param.do_block_schwarz() && x.full_dim(i) % csParam.dd.block_dim[i] == 0);
       }
       // Disabling global_reduction if blocks are local and we do block_schwarz
-      if (param.do_block_schwarz() and param.global_reduction) param.global_reduction = not local;
+      if (param.do_block_schwarz() && param.global_reduction) param.global_reduction = !local;
 
       resize(Ar, b.size(), csParam);
       resize(x_sloppy, b.size(), csParam);

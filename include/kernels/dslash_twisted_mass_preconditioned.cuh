@@ -174,7 +174,7 @@ namespace quda
       else // special dslash for symmetric dagger
         applyWilsonTM<nParity, dagger, 1, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL && not arg.dd_x.isZero(coord)) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         if (!dagger || Arg::asymmetric) {
           out += arg.a_inv * (x + arg.b_inv * x.igamma(4)); // apply inverse twist which is undone below

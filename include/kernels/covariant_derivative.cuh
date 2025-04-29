@@ -77,7 +77,7 @@ namespace quda
 
     const int d = mu % 4;
 
-    if (mu < 4 and arg.dd_in.doHopping(coord, d, +1)) {
+    if (mu < 4 && arg.dd_in.doHopping(coord, d, +1)) {
       // Forward gather - compute fwd offset for vector fetch
 
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
@@ -97,7 +97,7 @@ namespace quda
         out += U * in;
       }
 
-    } else if (mu >= 4 and arg.dd_in.doHopping(coord, d, -1)) {
+    } else if (mu >= 4 && arg.dd_in.doHopping(coord, d, -1)) {
       // Backward gather - compute back offset for spinor and gauge fetch
 
       const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);

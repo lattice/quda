@@ -55,7 +55,7 @@ namespace quda
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (mykernel_type == INTERIOR_KERNEL and arg.dd_x.isZero(coord)) {
+      if (mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = arg.a * out;
       } else if (mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);

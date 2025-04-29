@@ -157,7 +157,7 @@ namespace quda
         Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         tmp.toNonRel(); // switch back to non-chiral basis
 
-        if (xpay and not arg.dd_x.isZero(coord)) {
+        if (xpay && !arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {
