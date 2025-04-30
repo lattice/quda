@@ -11,17 +11,35 @@ namespace quda
   // Structure used to handle loading from input file
   struct mgInputStruct {
 
+    /** Total number of multigrid levels   */
     int mg_levels = 4;
+
+    /** Whether to perform correctness checks on multigrid setup */
     bool verify_results = true;
-    QudaPrecision preconditioner_precision = QUDA_HALF_PRECISION; // precision for near-nulls, coarse links
-    QudaTransferType optimized_kd = QUDA_TRANSFER_OPTIMIZED_KD; // use the optimized KD operator (true), naive coarsened
-                                                                // operator (false), or optimized dropped links (drop)
-    bool setup_use_mma[QUDA_MAX_MG_LEVEL];  // accelerate setup using MMA routines
-    bool dslash_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate dslash using MMA routines
-    bool transfer_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate transfer using MMA routines
-    bool allow_truncation = false;     // allow dropping the long links for small (less than three) aggregate directions
-    bool dagger_approximation = false; // use the dagger approximation to Xinv, which is X^dagger
-    int block_solver_batch_size = -1;  // number of rhs to solve at once in the block solver, -1 means all
+
+    /** Precision for near-nulls, coarse links */
+    QudaPrecision preconditioner_precision = QUDA_HALF_PRECISION;
+
+    /** Use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop) */
+    QudaTransferType optimized_kd = QUDA_TRANSFER_OPTIMIZED_KD;
+
+    /** Whether to accelerate setup using MMA routines */
+    bool setup_use_mma[QUDA_MAX_MG_LEVEL] = {true, true, true, true, true};
+
+    /** Whether to accelerate dslash using MMA routines */
+    bool dslash_use_mma[QUDA_MAX_MG_LEVEL] = {true, true, true, true, true};
+
+    /** Whether to accelerate transfer using MMA routines; currently set to false b/c it's generally not faster for now */
+    bool transfer_use_mma[QUDA_MAX_MG_LEVEL] = {false, false, false, false, false};
+
+    /** Whether to allow dropping the long links for small (less than three) aggregate directions */
+    bool allow_truncation = false;
+
+    /** Whether to use the dagger approximation to Xinv */
+    bool dagger_approximation = false;
+
+    /** Number of rhs to solve at once in the block solver, -1 means all */
+    int block_solver_batch_size = -1;
 
     /**
      * Setup:
@@ -32,15 +50,34 @@ namespace quda
      * We do reuse `nvec` on the coarsest level to specify the size of coarsest-level deflation basis
      * For reference: geo_block_size[0] does get defined internally (1 1 1 1 for optimized, 2 2 2 2 for coarse KD)
      */
-    int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, reused for deflation size on last level
-    QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
-    double setup_tol[QUDA_MAX_MG_LEVEL];           // ignored on first and last level
-    double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
-    int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];    // ignored on first and last level
-    char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
-    char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
-    bool mg_vec_partfile[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
-    int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (values on first level are prescribed)
+
+    /** Number of vectors to use for the setup solver; ignored on first level, reused for deflation size on last level */
+    int nvec[QUDA_MAX_MG_LEVEL] = {24, 24, 24, 24, 24};
+
+    /** Solver type for the setup solver */
+    QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]
+      = {QUDA_CGNR_INVERTER, QUDA_CGNR_INVERTER, QUDA_CGNR_INVERTER, QUDA_CGNR_INVERTER, QUDA_CGNR_INVERTER};
+
+    /** Tolerance for the setup solver; ignored on first and last level */
+    double setup_tol[QUDA_MAX_MG_LEVEL] = {1e-5, 1e-5, 1e-5, 1e-5, 1e-5};
+
+    /** Maximum number of iterations for the setup solver; ignored on first and last level */
+    double setup_maxiter[QUDA_MAX_MG_LEVEL] = {500, 500, 500, 500, 500};
+
+    /** Size of the basis for communications avoiding solvers (CA-GCR, etc); ignored on first and last level */
+    int setup_ca_basis_size[QUDA_MAX_MG_LEVEL] = {4, 4, 4, 4, 4};
+
+    /** Input file for loading pre-existing near-null vectors; ignored on first and last level */
+    char mg_vec_infile[QUDA_MAX_MG_LEVEL][256] = {"", "", "", "", ""};
+
+    /** Output file for saving near-null vectors after generation; ignored on first and last level */
+    char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256] = {"", "", "", "", ""};
+
+    /** Whether or not to save near-null vectors in partfile or not; loading will autodetect; ignored on first and last level */
+    bool mg_vec_partfile[QUDA_MAX_MG_LEVEL] = {false, false, false, false, false};
+
+    /** The aggregation size for each multigrid level; ignored on first and last level, the first level's values are prescribed */
+    int geo_block_size[QUDA_MAX_MG_LEVEL][4];
 
     /**
      * Solve:
@@ -52,64 +89,65 @@ namespace quda
      * The smoother types are ignored for the coarsest level because, by definition, there is no
      * still coarser operator to smooth
      */
-    QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
-    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];  // ignored on first level
-    double coarse_solver_tol[QUDA_MAX_MG_LEVEL];        // ignored on first level
-    int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first level
-    int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL]; // only used last level
-    QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];  // all but last level
-    int nu_pre[QUDA_MAX_MG_LEVEL];                      // all but last level
-    int nu_post[QUDA_MAX_MG_LEVEL];                     // all but last level
 
-    // Misc
-    QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
+    /** Whether to use the full or preconditioned operator and solver; ignored on the first and second level because it's prescribed */
+    QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]
+      = {QUDA_DIRECT_PC_SOLVE, QUDA_DIRECT_PC_SOLVE, QUDA_DIRECT_PC_SOLVE, QUDA_DIRECT_PC_SOLVE, QUDA_DIRECT_PC_SOLVE};
+
+    /** Solver type for the MG solve, currently only GCR is supported */
+    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL]
+      = {QUDA_GCR_INVERTER, QUDA_GCR_INVERTER, QUDA_GCR_INVERTER, QUDA_GCR_INVERTER, QUDA_GCR_INVERTER};
+
+    /** Tolerance for the coarse solver; ignored on the first level because it's prescribed by the external solve */
+    double coarse_solver_tol[QUDA_MAX_MG_LEVEL] = {0.25, 0.25, 0.25, 0.25, 0.25};
+
+    /** Maximum number of iterations for each coarse solve; ignored on the first level because it's prescribed by the external solve */
+    int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL] = {16, 16, 16, 16, 16};
+
+    /** Size of the basis for communications avoiding solvers (CA-GCR, etc), only used for the last level */
+    int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL] = {16, 16, 16, 16, 16};
+
+    /** Solver type to use for the MG smoother, ignored on the last level */
+    QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL]
+      = {QUDA_CA_GCR_INVERTER, QUDA_CA_GCR_INVERTER, QUDA_CA_GCR_INVERTER, QUDA_CA_GCR_INVERTER, QUDA_CA_GCR_INVERTER};
+
+    /** Number of pre-smoothing iterations to perform on all levels; ignored on the last level b/c there's no smoother */
+    int nu_pre[QUDA_MAX_MG_LEVEL] = {0, 0, 0, 0, 0};
+
+    /** Number of post-smoothing iterations to perform on all levels; ignored on the last level b/c there's no smoother */
+    int nu_post[QUDA_MAX_MG_LEVEL] = {2, 2, 2, 2, 2};
+
+    /** Verbosity values to use on each level */
+    QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]
+      = {QUDA_SUMMARIZE, QUDA_SUMMARIZE, QUDA_SUMMARIZE, QUDA_SUMMARIZE, QUDA_SUMMARIZE};
 
     // Coarsest level deflation
+
+    /** Size of initial factorization; desired eigenvectors plus 2 is "typical" */
     int deflate_n_ev = 66;
+
+    /** Size of Krylov space after extension; 1.5 or 2 times the desired number of eigenvectors is "typical" */
     int deflate_n_kr = 128;
+
+    /** Number of times to restart the eigensolver before exiting */
     int deflate_max_restarts = 50;
+
+    /** Target tolerance of the eigenvalues */
     double deflate_tol = 1e-5;
+
+    /** Whether or not to use polynomial acceleration */
     bool deflate_use_poly_acc = false;
-    double deflate_a_min = 1e-2; // ignored if no polynomial acceleration
-    int deflate_poly_deg = 50;   // ignored if no polynomial acceleration
+
+    /** Bottom of Chebyshev window, eigenvalues below this value are enhanced -> converge more easily; ignored if
+     * there's no polynomial acceleration */
+    double deflate_a_min = 1e-2;
+
+    /** Degree of the polynomial used for acceleration; larger values trade better resolution of eigenvalues against
+     * cost; ignored if there's no polynomial acceleration */
+    int deflate_poly_deg = 50;
+
+    /** Whether or not to save eigenvectors in partfile format or not */
     bool deflate_vec_partfile = false;
-
-    /**
-     * @brief Sets default values for all multigrid array parameters
-     */
-    void setArrayDefaults()
-    {
-      // set dummy values so all elements are initialized
-      // some of these values get immediately overriden in the
-      // constructor, in some cases with identical values:
-      // this is to separate "initializing" with "best practices"
-      for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-        nvec[i] = 24;
-        setup_inv[i] = QUDA_CGNR_INVERTER;
-        setup_tol[i] = 1e-5;
-        setup_maxiter[i] = 500;
-        setup_ca_basis_size[i] = 4;
-        mg_vec_infile[i][0] = 0;
-        mg_vec_outfile[i][0] = 0;
-        mg_vec_partfile[i] = false;
-        for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
-
-        setup_use_mma[i] = true;
-        dslash_use_mma[i] = true;
-        transfer_use_mma[i] = false; // FIXME: currently slower due to reordering
-
-        coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
-        coarse_solver[i] = QUDA_GCR_INVERTER;
-        coarse_solver_tol[i] = 0.25;
-        coarse_solver_maxiter[i] = 16;
-        coarse_solver_ca_basis_size[i] = 16;
-        smoother_type[i] = QUDA_CA_GCR_INVERTER;
-        nu_pre[i] = 0;
-        nu_post[i] = 2;
-
-        mg_verbosity[i] = QUDA_SUMMARIZE;
-      }
-    }
 
     /**
      * @brief Sets best-practice defaults for multigrid parameters
@@ -210,10 +248,13 @@ namespace quda
     // set defaults
     mgInputStruct()
     {
-      /* initialize internal arrays to valid values */
-      setArrayDefaults();
+      /* Initialize the aggregation sizes, this one's a bit too painful
+         to include as a default value */
+      for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+        for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
+      }
 
-      /* from there, set some defaults for best practices */
+      /* Set some defaults for best practices */
       setBestPracticeDefaults();
     }
 
