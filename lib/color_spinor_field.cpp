@@ -373,11 +373,10 @@ namespace quda
       }
 
       dc.Vh = (X[3] * X[2] * X[1] * X[0]) / 2;
-      dc.ghostFace[0] = X[1] * X[2] * X[3];
-      dc.ghostFace[1] = X[0] * X[2] * X[3];
-      dc.ghostFace[2] = X[0] * X[1] * X[3];
-      dc.ghostFace[3] = X[0] * X[1] * X[2];
-      for (int d = 0; d < 4; d++) dc.ghostFaceCB[d] = dc.ghostFace[d] / 2;
+      dc.ghostFaceCB[0] = X[1] * X[2] * X[3] / 2;
+      dc.ghostFaceCB[1] = X[0] * X[2] * X[3] / 2;
+      dc.ghostFaceCB[2] = X[0] * X[1] * X[3] / 2;
+      dc.ghostFaceCB[3] = X[0] * X[1] * X[2] / 2;
 
       dc.X2X1 = X[1] * X[0];
       dc.X3X2X1 = X[2] * X[1] * X[0];

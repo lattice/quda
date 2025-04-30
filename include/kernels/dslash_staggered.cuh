@@ -99,8 +99,7 @@ namespace quda
           const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
-            Vector in
-              = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            Vector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
             out[s] = mv_add(U, in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
@@ -123,7 +122,7 @@ namespace quda
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
-              = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+              = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
             out[s] = mv_add(L, in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
@@ -148,8 +147,7 @@ namespace quda
             arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
-            Vector in
-              = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+            Vector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
             out[s] = mv_add(conj(U), -in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
@@ -169,13 +167,12 @@ namespace quda
       if (arg.improved) {
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
-          // when updating replace arg.nFace with 1 here
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
-              = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.nFace * arg.dc.ghostFaceCB[d], their_spinor_parity);
+              = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
             out[s] = mv_add(conj(L), -in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {

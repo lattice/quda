@@ -113,7 +113,7 @@ namespace quda
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_size = Arg::nFace * arg.dc.ghostFaceCB[kernel_type] * Ls;
+      const int face_size = arg.dc.ghostFaceCB[kernel_type] * Ls;
       const int face_num = idx >= face_size;
       idx -= face_num * face_size;
       coordsFromFaceIndex<nDim, pc_type, kernel_type, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
@@ -123,28 +123,28 @@ namespace quda
       // work out which dimension this thread corresponds to, then compute coords
       if (idx < arg.threadDimMapUpper[0] * Ls) { // x face
         dim = 0;
-        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
         coordsFromFaceIndex<nDim, pc_type, 0, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1] * Ls) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1] * Ls;
-        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
         coordsFromFaceIndex<nDim, pc_type, 1, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2] * Ls) { // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2] * Ls;
-        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
         coordsFromFaceIndex<nDim, pc_type, 2, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3] * Ls;
-        const int face_size = Arg::nFace * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
         coordsFromFaceIndex<nDim, pc_type, 3, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
@@ -260,27 +260,27 @@ namespace quda
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
     int_fastdiv threads; // number of threads in x-thread dimension
-    int_fastdiv exterior_threads; // number of threads in x-thread dimension for fused exterior dslash
-    int threadDimMapLower[4];
-    int threadDimMapUpper[4];
+    int_fastdiv exterior_threads = 0; // number of threads in x-thread dimension for fused exterior dslash
+    int threadDimMapLower[4] = {};
+    int threadDimMapUpper[4] = {};
 
     int_fastdiv n_src;
     int_fastdiv Ls;
 
     // these are set with symmetric preconditioned twisted-mass dagger
     // operator for the packing (which needs to a do a twist)
-    real twist_a; // scale factor
-    real twist_b; // chiral twist
-    real twist_c; // flavor twist
+    real twist_a = 0.0; // scale factor
+    real twist_b = 0.0; // chiral twist
+    real twist_c = 0.0; // flavor twist
 
-    int pack_threads; // really number of face sites we have to pack
-    int_fastdiv blocks_per_dir;
+    int pack_threads = 0; // really number of face sites we have to pack
+    int_fastdiv blocks_per_dir = 1;
     int sites_per_block;
-    int dim_map[4];
-    int active_dims;
-    int pack_blocks; // total number of blocks used for packing in the dslash
-    int exterior_dims; // dimension to run in the exterior Dslash
-    int exterior_blocks;
+    int dim_map[4] = {};
+    int active_dims = 0;
+    int pack_blocks = 0;   // total number of blocks used for packing in the dslash
+    int exterior_dims = 0; // dimension to run in the exterior Dslash
+    int exterior_blocks = 0;
 
     // for shmem ...
     static constexpr bool packkernel = false;
@@ -292,7 +292,7 @@ namespace quda
     dslash::shmem_sync_t counter = 0;
 #else
     int shmem;
-    dslash::shmem_sync_t counter;
+    dslash::shmem_sync_t counter = 0;
     dslash::shmem_sync_t *sync_arr;
     dslash::shmem_interior_done_t &interior_done;
     dslash::shmem_interior_count_t &interior_count;
@@ -318,24 +318,10 @@ namespace quda
       xpay(xpay),
       kernel_type(INTERIOR_KERNEL),
       threads(in.VolumeCB()),
-      exterior_threads(0),
-      threadDimMapLower {},
-      threadDimMapUpper {},
       n_src(in.size()),
-      Ls(halo.X(4) / in.size()),
-      twist_a(0.0),
-      twist_b(0.0),
-      twist_c(0.0),
-      pack_threads(0),
-      blocks_per_dir(1),
-      dim_map {},
-      active_dims(0),
-      pack_blocks(0),
-      exterior_dims(0),
-      exterior_blocks(0),
-#ifndef NVSHMEM_COMMS
-      counter(0)
-#else
+      Ls(halo.X(4) / in.size())
+#ifdef NVSHMEM_COMMS
+      ,
       shmem(shmem_),
       counter(dslash::get_dslash_shmem_sync_counter()),
       sync_arr(dslash::get_dslash_shmem_sync_arr()),
@@ -362,7 +348,9 @@ namespace quda
         halo.createComms(nFace, spin_project);
       }
       dc = halo.getDslashConstant();
+
       for (int dim = 0; dim < 4; dim++) {
+        dc.ghostFaceCB[dim] *= nFace;
         for (int dir = 0; dir < 2; dir++) {
           neighbor_ranks[2 * dim + dir] = commDim[dim] ? comm_neighbor_rank(dir, dim) : -1;
           bytes[2 * dim + dir] = halo.GhostFaceBytes(dim);
@@ -379,7 +367,7 @@ namespace quda
         pack_threads = 0;
         for (int i = 0; i < 4; i++) {
           if (!commDim[i]) continue;
-          pack_threads += 2 * nFace * dc.ghostFaceCB[i]; // 2 for fwd/back faces
+          pack_threads += 2 * dc.ghostFaceCB[i]; // 2 for fwd/back faces
           dim_map[d++] = i;
         }
         active_dims = d;
