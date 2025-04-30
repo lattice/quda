@@ -40,9 +40,6 @@ namespace quda
     int X3X2X1mX2X1;
     int X4X3X2X1mX3X2X1;
     int X5X4X3X2X1mX4X3X2X1;
-    int X4X3X2X1hmX3X2X1h;
-
-    int_fastdiv dims[4][3];
   };
 
   /**

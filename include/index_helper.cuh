@@ -838,7 +838,6 @@ namespace quda {
   constexpr int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
-    const auto *dims = arg.dc.dims[dim]; // dimensions of the face
     const auto &V4 = arg.dc.volume_4d;   // 4-d volume
 
     // intrinsic parity of the face depends on offset of first element
@@ -850,6 +849,14 @@ namespace quda {
     // first compute src index, then find 4-d index from remainder
     int s = face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
+
+    int dims[3] = {};
+    int d2 = 0;
+#pragma unroll
+    for (int d1 = 0; d1 < 3; d1++) { // this will evaluate at compile time
+      if (d1 == dim) continue;
+      dims[d1] = arg.dc.X[d2++];
+    }
 
     /*y,z,t here are face indexes in new order*/
     int aux1 = face_idx / dims[0];
