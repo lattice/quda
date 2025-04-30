@@ -17,6 +17,11 @@ namespace quda
 
       static __device__ __host__ constexpr int inline pad_size(int) { return 0; }
 
+      static constexpr bool do_rescale()
+      {
+        return true; // false because we use FP16
+      }
+
       static constexpr int MMA_M = 16;
       static constexpr int MMA_N = 16;
       static constexpr int MMA_K = 4;

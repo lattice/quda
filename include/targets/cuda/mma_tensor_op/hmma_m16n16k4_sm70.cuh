@@ -22,6 +22,11 @@ namespace quda
 
       static __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 
+      static constexpr bool do_rescale()
+      {
+        return true; // true because we use FP16
+      }
+
       static constexpr int MMA_M = 16;
       static constexpr int MMA_N = 16;
       static constexpr int MMA_K = 4;
@@ -150,6 +155,12 @@ namespace quda
           for (int i = 0; i < 8; i++) { reg[i] *= alpha; }
         }
 
+        __device__ inline void axpy(float alpha, OperandC x)
+        {
+#pragma unroll
+          for (int i = 0; i < 8; i++) { reg[i] += alpha * x.reg[i]; }
+        }
+
         template <int ldc>
         __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
         {
@@ -189,7 +200,7 @@ namespace quda
                                                   GmemOperandC &cc, const OperandC &op_c_real,
                                                   const OperandC &op_c_imag, op_t op)
       {
-        using store_t = typename GmemOperandC::store_type;
+        using store_t = typename GmemOperandC::store_t;
 
         const int row = warp_row + wrm.row_offset + (wrm.quad_thread % 2);
         const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
@@ -210,15 +221,19 @@ namespace quda
               auto scale = cc.get_scale();
               s = {f2i_round<store_t>(op_c_real.reg[i * 2 + 0] * scale),
                    f2i_round<store_t>(-op_c_imag.reg[i * 2 + 0] * scale)};
-              op(&ptr[(n_index + 0) * ldc + m_index], s);
+              if (!check_bounds || (m_index < M && (n_index + 0) < N)) { op(&ptr[(n_index + 0) * ldc + m_index], s); }
+              // op(&ptr[(n_index + 0) * ldc + m_index], s);
               s = {f2i_round<store_t>(op_c_real.reg[i * 2 + 1] * scale),
                    f2i_round<store_t>(-op_c_imag.reg[i * 2 + 1] * scale)};
-              op(&ptr[(n_index + 1) * ldc + m_index], s);
+              if (!check_bounds || (m_index < M && (n_index + 1) < N)) { op(&ptr[(n_index + 1) * ldc + m_index], s); }
+              // op(&ptr[(n_index + 1) * ldc + m_index], s);
             } else {
               s = {op_c_real.reg[i * 2 + 0], -op_c_imag.reg[i * 2 + 0]};
-              op(&ptr[(n_index + 0) * ldc + m_index], s);
+              if (!check_bounds || (m_index < M && (n_index + 0) < N)) { op(&ptr[(n_index + 0) * ldc + m_index], s); }
+              // op(&ptr[(n_index + 0) * ldc + m_index], s);
               s = {op_c_real.reg[i * 2 + 1], -op_c_imag.reg[i * 2 + 1]};
-              op(&ptr[(n_index + 1) * ldc + m_index], s);
+              if (!check_bounds || (m_index < M && (n_index + 1) < N)) { op(&ptr[(n_index + 1) * ldc + m_index], s); }
+              // op(&ptr[(n_index + 1) * ldc + m_index], s);
             }
           } else {
             using array_t = typename VectorType<store_t, 4>::type; // array<store_t, 4>;

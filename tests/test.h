@@ -2,6 +2,7 @@
 #include <host_utils.h>
 #include <gtest/gtest.h>
 #include <command_line_params.h>
+#include "asan.h"
 
 struct quda_test {
 

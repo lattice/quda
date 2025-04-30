@@ -34,6 +34,7 @@ namespace quda
     n_conv = eig_param->n_conv;
     n_ev_deflate = (eig_param->n_ev_deflate == -1 ? n_conv : eig_param->n_ev_deflate);
     tol = eig_param->tol;
+    qr_tol = eig_param->qr_tol;
     reverse = false;
 
     // Algorithm variables
@@ -104,6 +105,10 @@ namespace quda
       logQuda(QUDA_VERBOSE, "Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param);
       break;
+    case QUDA_EIG_TR_LANCZOS_3D:
+      logQuda(QUDA_VERBOSE, "Creating TR Lanczos 3-d eigensolver\n");
+      eig_solver = new TRLM3D(mat, eig_param);
+      break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       logQuda(QUDA_VERBOSE, "Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param);
@@ -142,11 +147,11 @@ namespace quda
   {
     // Use 0th vector to extract meta data for the RNG.
     RNG rng(kSpace[0], 1234);
+    // If the spinor contains valid initial data from the user preserve it, else populate with rands.
+    // We use `!isfinite || norm == 0` instead of `isnormal` because subnormal vectors are still numerically legal
+    auto norm = blas::norm2({kSpace.begin(), kSpace.begin() + block_size});
     for (int b = 0; b < block_size; b++) {
-      // If the spinor contains valid initial data from the user preserve it, else populate with rands.
-      // We use `!isfinite || norm == 0` instead of `isnormal` because subnormal vectors are still numerically legal
-      auto norm = blas::norm2(kSpace[b]);
-      if (!std::isfinite(norm) || norm == 0.0) { spinorNoise(kSpace[b], rng, QUDA_NOISE_UNIFORM); }
+      if (!std::isfinite(norm[b]) || norm[b] == 0.0) { spinorNoise(kSpace[b], rng, QUDA_NOISE_UNIFORM); }
     }
 
     bool orthed = false;
@@ -192,6 +197,7 @@ namespace quda
 
     logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum.c_str());
     logQuda(QUDA_VERBOSE, "tol %.4e\n", tol);
+    if (qr_tol != 0) logQuda(QUDA_VERBOSE, "qr_tol %.4e\n", qr_tol);
     logQuda(QUDA_VERBOSE, "n_conv %d\n", n_conv);
     logQuda(QUDA_VERBOSE, "n_ev %d\n", n_ev);
     logQuda(QUDA_VERBOSE, "n_kr %d\n", n_kr);
@@ -236,7 +242,7 @@ namespace quda
     int n_eig = n_conv;
     if (compute_svd) n_eig *= 2;
     kSpace.resize(n_eig);
-    evals.resize(n_conv);
+    if (eig_param->eig_type != QUDA_EIG_TR_LANCZOS_3D) evals.resize(n_conv);
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -496,13 +502,14 @@ namespace quda
   {
     logQuda(QUDA_SUMMARIZE, "Computing SVD of M\n");
 
+    auto batch_size = eig_param->compute_evals_batch_size;
     int n_conv = eig_param->n_conv;
     if (evecs.size() < (unsigned int)(2 * n_conv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_conv);
 
-    std::vector<double> sigma_tmp(n_conv);
-
-    for (int i = 0; i < n_conv; i++) {
+    for (int i = 0; i < n_conv; i += batch_size) {
+      auto lower = i;
+      auto upper = i + batch_size < n_conv ? i + batch_size : n_conv;
 
       // This function assumes that you have computed the eigenvectors
       // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
@@ -515,22 +522,27 @@ namespace quda
       //--------------------------------------------------------------------------
 
       // Lambda already contains the square root of the eigenvalue of the norm op.
-      Complex lambda = evals[i];
 
       // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat.Expose()->M(evecs[n_conv + i], evecs[i]);
+      mat.Expose()->M({evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper},
+                      {evecs.begin() + lower, evecs.begin() + upper});
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      sigma_tmp[i] = sqrt(blas::norm2(evecs[n_conv + i]));
+      auto sigma = blas::norm2({evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper});
+      decltype(sigma) sigma_inv(sigma.size());
+      for (auto j = 0u; j < sigma.size(); j++) {
+        sigma[j] = sqrt(sigma[j]);
+        sigma_inv[j] = 1.0 / sigma[j];
+      }
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      blas::ax(1.0 / sigma_tmp[i], evecs[n_conv + i]);
+      blas::ax(sigma_inv, {evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper});
 
-      logQuda(QUDA_SUMMARIZE, "Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
-              sigma_tmp[i] - sqrt(abs(lambda.real())));
-
-      evals[i] = sigma_tmp[i];
-      //--------------------------------------------------------------------------
+      for (auto j = 0u; j < sigma.size(); j++) {
+        logQuda(QUDA_SUMMARIZE, "Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i + j, sigma[j],
+                sigma[j] - sqrt(abs(evals[i + j].real())));
+        evals[i + j] = sigma[j];
+      }
     }
   }
 
@@ -563,42 +575,57 @@ namespace quda
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
     //    vec_defl = Sum_i (R_i)^{-1} * A_i
-    if (!accumulate) for (auto &x : sol) blas::zero(x);
-    for (int i = 0; i < n_defl; i++) s[i] /= evals[i].real();
+    for (auto j = 0u; j < src.size(); j++)
+      for (int i = 0; i < n_defl; i++) { s[i * src.size() + j] /= evals[i].real(); }
 
+    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    if (!accumulate) blas::zero(sol);
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
   void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    if (size > (int)evecs.size())
+    if (size == 0) size = n_conv;
+    auto batch_size = eig_param->compute_evals_batch_size;
+
+    if (size > static_cast<int>(evecs.size()))
       errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+
+    // allocate space if needed for computing the evals
+    if (size + batch_size > static_cast<int>(evecs.size())) resize(evecs, size + batch_size, QUDA_NULL_FIELD_CREATE);
+
     // we make sure that we have enough space for eigenvalues
     // required for coarse-grid deflated solver used from within tmLQCD or PLEGMA with
     // `preserve_deflation` enabled
     if (size > (int)evals.size()) evals.resize(size);
 
-    ColorSpinorParam csParamClone(evecs[0]);
-    csParamClone.create = QUDA_NULL_FIELD_CREATE;
-    ColorSpinorField temp(csParamClone);
+    for (int i = 0; i < size; i += batch_size) {
+      auto lower = i;
+      auto upper = i + batch_size < size ? i + batch_size : size;
 
-    for (int i = 0; i < size; i++) {
+      auto temp = {evecs.begin() + size, evecs.begin() + size + upper - lower};
+
       // r = A * v_i
-      mat(temp, evecs[i]);
+      mat(temp, {evecs.begin() + lower, evecs.begin() + upper});
 
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      evals[i] = blas::cDotProduct(evecs[i], temp) / sqrt(blas::norm2(evecs[i]));
+      auto vtAv = blas::cDotProduct({evecs.begin() + lower, evecs.begin() + upper}, temp);
+      auto v2 = blas::norm2({evecs.begin() + lower, evecs.begin() + upper});
+      for (auto j = 0u; j < v2.size(); j++) evals[i + j] = vtAv[j] / sqrt(v2[j]);
       // Measure ||lambda_i*v_i - A*v_i||
       Complex n_unit(-1.0, 0.0);
-      blas::caxpby(evals[i], evecs[i], n_unit, temp);
-      residua[i] = sqrt(blas::norm2(temp));
-      // eig_param->invert_param->true_res_offset[i] = residua[i];
+      auto res = blas::caxpbyNorm({evals.begin() + lower, evals.begin() + upper},
+                                  {evecs.begin() + lower, evecs.begin() + upper}, n_unit, temp);
+      for (auto j = 0u; j < v2.size(); j++) residua[i + j] = sqrt(res[j]);
 
       // If size = n_conv, this routine is called post sort
-      if (size == n_conv)
-        logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", i, evals[i].real(),
-                evals[i].imag(), abs(evals[i]), residua[i]);
+      if (size == n_conv) {
+        for (int j = lower; j < upper; j++) {
+          logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", j, evals[j].real(),
+                  evals[j].imag(), abs(evals[j]), residua[j]);
+        }
+      }
     }
   }
 
@@ -624,11 +651,11 @@ namespace quda
     blas::block::cDotProduct(s, {evecs.begin(), evecs.begin() + n_defl}, {src.begin(), src.end()});
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+    for (auto j = 0u; j < src.size(); j++)
+      for (int i = 0; i < n_defl; i++) { s[i * src.size() + j] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    if (!accumulate) for (auto &x : sol) blas::zero(x);
-
+    if (!accumulate) blas::zero(sol);
     blas::block::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
@@ -663,7 +690,7 @@ namespace quda
       case QUDA_SPECTRUM_SR_EIG: printfQuda("'SR' -> sort with real(x) in increasing algebraic order, smallest first.\n"); break;
       case QUDA_SPECTRUM_LI_EIG: printfQuda("'LI' -> sort with imag(x) in decreasing algebraic order, largest first.\n"); break;
       case QUDA_SPECTRUM_SI_EIG: printfQuda("'SI' -> sort with imag(x) in increasing algebraic order, smallest first\n"); break;
-      default: errorQuda("Unkown spectrum type requested: %d", spec_type);
+      default: errorQuda("Unknown spectrum type requested: %d", spec_type);
       }
     }
 

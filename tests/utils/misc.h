@@ -1,6 +1,7 @@
 #pragma once
 #include <quda.h>
 #include <string>
+#include <vector>
 
 const char *get_quda_ver_str();
 const char *get_recon_str(QudaReconstructType recon);
@@ -14,7 +15,26 @@ const char *get_matpc_str(QudaMatPCType);
 const char *get_solution_str(QudaSolutionType);
 const char *get_solve_str(QudaSolveType);
 const char *get_schwarz_str(QudaSchwarzType);
+
+/**
+   @brief Return a string corresponding to a QudaDslashType enum
+   @param[in] type A QudaDslashType
+   @return Corresponding string
+ */
 const char *get_dslash_str(QudaDslashType type);
+
+/**
+   @brief Return a std::vector of dslash types
+   @return std::vector of all dslash types
+ */
+std::vector<const char *> get_dslash_str_list();
+
+/**
+   @brief Return a QudaDslashType based on a string
+   @param[in] str Name of a dslash type
+   @return Corresponding QudaDslashType
+ */
+QudaDslashType get_dslash_from_str(const char *str);
 const char *get_flavor_str(QudaTwistFlavorType type);
 const char *get_solver_str(QudaInverterType type);
 const char *get_eig_spectrum_str(QudaEigSpectrumType type);

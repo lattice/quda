@@ -97,6 +97,7 @@ namespace quda
     nColor = param.nColor;
     nSpin = param.nSpin;
     nVec = param.nVec;
+    nVec_actual = param.nVec_actual;
     twistFlavor = param.twistFlavor;
 
     if (param.pc_type != QUDA_5D_PC && param.pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", param.pc_type);
@@ -226,9 +227,11 @@ namespace quda
     alloc = std::exchange(src.alloc, false);
     reference = std::exchange(src.reference, false);
     ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
+    nFace_allocated = std::exchange(src.nFace_allocated, 0);
     nColor = std::exchange(src.nColor, 0);
     nSpin = std::exchange(src.nSpin, 0);
     nVec = std::exchange(src.nVec, 0);
+    nVec_actual = std::exchange(src.nVec_actual, 0);
     twistFlavor = std::exchange(src.twistFlavor, QUDA_TWIST_INVALID);
     pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
     suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
@@ -292,6 +295,7 @@ namespace quda
       std::stringstream aux_ss;
       aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",order=" << fieldOrder
              << ",Ns=" << nSpin << ",Nc=" << nColor;
+      if (nVec > 1) aux_ss << ",nVec=" << nVec;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
       if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
@@ -307,7 +311,8 @@ namespace quda
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
     if (ghost_precision == QUDA_INVALID_PRECISION) errorQuda("Invalid requested ghost precision");
-    if (ghost_precision_allocated == ghost_precision) return;
+    if (ghost_precision_allocated == ghost_precision && nFace_allocated == nFace &&
+        spin_project_allocated == spin_project) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
     int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
@@ -400,7 +405,10 @@ namespace quda
       dc.dims[3][1] = X[1];
       dc.dims[3][2] = X[2];
     }
+
+    spin_project_allocated = spin_project;
     ghost_precision_allocated = ghost_precision;
+    nFace_allocated = nFace;
   } // createGhostZone
 
   void ColorSpinorField::zero() { qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); }
@@ -519,6 +527,7 @@ namespace quda
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.nVec = nVec;
+    param.nVec_actual = nVec_actual;
     param.twistFlavor = twistFlavor;
     param.fieldOrder = fieldOrder;
     param.setPrecision(precision, ghost_precision); // intentionally called here and not in LatticeField
@@ -819,7 +828,8 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
-  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
+  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v, int nFace,
+                                                                  bool spin_project)
   {
     // first create a dummy batched field
     ColorSpinorParam param(v[0]);
@@ -837,9 +847,12 @@ namespace quda
     FieldKey<ColorSpinorField> key;
     key.volume = v.VolString();
     key.aux = v.AuxString();
-    char aux[32];
-    strcpy(aux, ",ghost_batch=");
-    u32toa(aux + 13, v.size());
+    char aux[48];
+    strcpy(aux, ",nFace=");
+    u32toa(aux + 7, nFace);
+    strcpy(aux + 8, ",ghost_batch=");
+    u32toa(aux + 21, v.size());
+    if (spin_project && v.Nspin() > 1) strcat(aux, ",spin_project");
     key.aux += aux;
 
     return FieldTmp<ColorSpinorField>(key, param);
@@ -1560,6 +1573,8 @@ namespace quda
     out << "init = " << a.init << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
+    out << "nVec = " << a.nVec << std::endl;
+    out << "nVec_actual = " << a.nVec_actual << std::endl;
     out << "twistFlavor = " << a.twistFlavor << std::endl;
     out << "nDim = " << a.nDim << std::endl;
     for (int d = 0; d < a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;

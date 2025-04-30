@@ -11,13 +11,9 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
+#include <kernel_ops.h>
 
-#if defined(_NVHPC_CUDA)
-#include <constant_kernel_arg.h>
-constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::FALSE;
-#else
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
-#endif
 
 #include <kernel.h>
 
@@ -100,7 +96,7 @@ namespace quda
      @return checkerboard space-time index
   */
   template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
-  __host__ __device__ inline auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
+  __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
   {
     constexpr auto nDim = Arg::nDim;
     Coord<nDim> coord;
@@ -241,11 +237,12 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_> struct DslashArg {
+  template <typename Float_, int nDim_, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
     static constexpr int nDim = nDim_;
+    static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -269,6 +266,7 @@ namespace quda
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
+    int_fastdiv n_src;
     int_fastdiv Ls;
 
     // these are set with symmetric preconditioned twisted-mass dagger
@@ -327,6 +325,7 @@ namespace quda
       exterior_threads(0),
       threadDimMapLower {},
       threadDimMapUpper {},
+      n_src(in.size()),
       Ls(halo.X(4) / in.size()),
       twist_a(0.0),
       twist_b(0.0),
@@ -614,7 +613,7 @@ namespace quda
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
         int parity = nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
-#ifdef QUDA_DSLASH_FAST_COMPILE
+#ifdef QUDA_FAST_COMPILE_DSLASH
         dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
 #else
         switch (parity) {
@@ -650,8 +649,9 @@ namespace quda
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
-      kernel_param(dim3(threads_x, arg.dc.Ls, arg.nParity)),
-      arg(arg) { }
+      kernel_param(dim3(threads_x, (arg.dc.Ls + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity)), arg(arg)
+    {
+    }
   };
 
   /**
@@ -661,17 +661,21 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-  template <typename Arg> struct dslash_functor {
+  template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
-    constexpr dslash_functor(const Arg &arg) : arg(arg.arg) { }
+    using typename getKernelOps<typename Arg::D>::KernelOpsT;
+    template <typename... OpsArgs>
+    constexpr dslash_functor(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg.arg)
+    {
+    }
 
     __forceinline__ __device__ void operator()(int, int s, int parity)
     {
-      typename Arg::D dslash(arg);
+      typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
@@ -697,7 +701,7 @@ namespace quda
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
         if (x_cb >= arg.threads) return;
 
-#ifdef QUDA_DSLASH_FAST_COMPILE
+#ifdef QUDA_FAST_COMPILE_DSLASH
         dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
 #else
         switch (parity) {

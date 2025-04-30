@@ -1,6 +1,7 @@
 #include <quda_internal.h>
 #include <timer.h>
 #include <tune_quda.h>
+#include "monitor.h"
 
 #ifdef INTERFACE_NVTX
 #include "nvtx3/nvToolsExt.h"
@@ -240,15 +241,44 @@ namespace quda {
 
   static std::stack<TimeProfile *> tp_stack;
 
-  pushProfile::pushProfile(TimeProfile &profile, double &secs, double &gflops) :
-    profile(profile), secs(secs), gflops(gflops), flops(Tunable::flops_global())
+  static double double_dummy;
 
+  pushProfile::pushProfile(TimeProfile &profile, QudaInvertParam *param) :
+    profile(profile),
+    secs(param ? param->secs : double_dummy),
+    gflops(param ? param->gflops : double_dummy),
+    energy(param ? param->energy : double_dummy),
+    power(param ? param->power : double_dummy),
+    temp(param ? param->temp : double_dummy),
+    clock(param ? param->clock : double_dummy),
+    flops(Tunable::flops_global())
   {
     if (profile.Name() != getProfile().Name()) {
       // only push to stack if this profile not already the active one
       profile.TPSTART(QUDA_PROFILE_TOTAL);
       tp_stack.push(&profile);
       active = true;
+      monitor_start = monitor::size();
+    }
+  }
+
+  pushProfile::pushProfile(TimeProfile &profile, QudaQuarkSmearParam *param) :
+    profile(profile),
+    secs(param ? param->secs : double_dummy),
+    gflops(param ? param->gflops : double_dummy),
+    energy(param ? param->energy : double_dummy),
+    power(param ? param->power : double_dummy),
+    temp(param ? param->temp : double_dummy),
+    clock(param ? param->clock : double_dummy),
+    flops(Tunable::flops_global())
+  {
+    if (profile.Name() != getProfile().Name()) {
+      // only push to stack if this profile not already the active one
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
+      tp_stack.push(&profile);
+      active = true;
+      comm_barrier();
+      monitor_start = monitor::size();
     }
   }
 
@@ -260,9 +290,37 @@ namespace quda {
       if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
       tp_stack.pop();
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
+
       secs = profile.Last(QUDA_PROFILE_TOTAL);
+      comm_allreduce_max(secs);
+
       gflops = (Tunable::flops_global() - flops) * 1e-9;
-      if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
+      if (&gflops != &double_dummy) comm_allreduce_sum(gflops);
+
+      // make sure all processes will start
+      std::vector<double> monitor_start_global = {static_cast<double>(monitor_start)};
+      comm_allreduce_min(monitor_start_global);
+      if (monitor_start_global[0] > 0) {
+        monitor_end = monitor::size();
+        auto mean_state = monitor::mean(monitor_start, monitor_end);
+        energy = mean_state.energy;
+        comm_allreduce_sum(energy);
+
+        power = mean_state.power;
+        comm_allreduce_sum(power);
+        power /= comm_size();
+
+        temp = mean_state.temp;
+        comm_allreduce_sum(temp);
+        temp /= comm_size();
+
+        clock = mean_state.clock;
+        comm_allreduce_sum(clock);
+        clock /= comm_size();
+      }
+
+      // cache is written out even if a long benchmarking job gets interrupted
+      saveTuneCache();
     }
   }
 

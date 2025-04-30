@@ -1,4 +1,3 @@
-#include <complex.h>
 #include <blas_lapack.h>
 #include <timer.h>
 #ifdef NATIVE_LAPACK_LIB

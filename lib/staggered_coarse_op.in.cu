@@ -115,16 +115,18 @@ namespace quda {
 
     // Create a field UV which holds U*V.  Has roughly the same structure as V,
     // though we need to double the spin for the KD operator to keep track of from even vs from odd.
-    ColorSpinorParam UVparam(T.Vectors(location));
+    ColorSpinorParam UVparam(T.Vectors());
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.nSpin = uvSpin;
-    UVparam.setPrecision(T.Vectors(location).Precision());
+    UVparam.setPrecision(T.Vectors().Precision());
     UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
-    ColorSpinorField *av = (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ? ColorSpinorField::Create(UVparam) : &const_cast<ColorSpinorField&>(T.Vectors(location));
+    ColorSpinorField *av = (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ?
+      ColorSpinorField::Create(UVparam) :
+      &const_cast<ColorSpinorField &>(T.Vectors());
 
     GaugeField *Yatomic = &Y;
     GaugeField *Xatomic = &X;
@@ -158,8 +160,7 @@ namespace quda {
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
 
-      if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+      if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       using V = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>;
@@ -168,7 +169,7 @@ namespace quda {
       using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
       using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
 
-      const ColorSpinorField &v = T.Vectors(Y.Location());
+      const ColorSpinorField &v = T.Vectors();
 
       V vAccessor(const_cast<ColorSpinorField&>(v), nFace);
       F uvAccessor(*uv, nFace);
@@ -182,7 +183,7 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(*Xatomic);
       
       // the repeated xinvAccessor is intentional
-      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
         lAccessor, xinvAccessor, xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
         kappa, mass, mu_dummy, mu_factor_dummy, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
@@ -192,8 +193,7 @@ namespace quda {
       constexpr QudaFieldOrder csOrder = colorspinor::getNative<vFloat>(fineSpin);
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
 
-      if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+      if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       using V = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false>;
@@ -202,7 +202,7 @@ namespace quda {
       using gCoarse = typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat>;
       using gCoarseAtomic = typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType>;
 
-      const ColorSpinorField &v = T.Vectors(Y.Location());
+      const ColorSpinorField &v = T.Vectors();
 
       V vAccessor(const_cast<ColorSpinorField &>(v), nFace);
       F uvAccessor(*uv, nFace);
@@ -216,7 +216,7 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(*Xatomic);
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
-      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
         lAccessor, xinvAccessor, xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
         kappa, mass, mu_dummy, mu_factor_dummy, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
@@ -227,7 +227,7 @@ namespace quda {
     if (Yatomic != &Y) delete Yatomic;
     if (Xatomic != &X) delete Xatomic;
 
-    if (av != nullptr && &T.Vectors(location) != av) delete av;
+    if (av != nullptr && &T.Vectors() != av) delete av;
     if (uv != nullptr) delete uv;
   }
 
@@ -253,7 +253,7 @@ namespace quda {
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    if (T.Vectors(X.Location()).Nspin() != 1) errorQuda("Unsupported number of spins %d", T.Vectors(X.Location()).Nspin());
+    if (T.Vectors().Nspin() != 1) errorQuda("Unsupported number of spins %d", T.Vectors().Nspin());
     constexpr int fineSpin = 1;
     constexpr int coarseSpin = 2;
 
@@ -310,7 +310,7 @@ namespace quda {
                                                  const GaugeField &longGauge, const GaugeField &XinvKD, double mass,
                                                  bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    QudaPrecision precision = checkPrecision(T.Vectors(X.Location()), X, Y);
+    QudaPrecision precision = checkPrecision(T.Vectors(), X, Y);
     QudaFieldLocation location = checkLocation(Y, X);
 
     // sanity check long link coarsening

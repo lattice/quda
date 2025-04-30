@@ -17,6 +17,8 @@
 // google test
 #include <gtest/gtest.h>
 
+#include "test.h"
+
 using namespace quda;
 
 /**

@@ -130,7 +130,7 @@ namespace quda {
         return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
       }
 
-      long long flops() const override { return f.flops() * x.Length(); }
+      long long flops() const override { return f.flops() * x.Length() * x.size(); }
       long long bytes() const override
       {
         return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +

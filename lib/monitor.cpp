@@ -20,7 +20,7 @@ namespace quda
        Linked list that we record the evolving state of the device being
        monitored
      */
-    static std::list<device::state_t> state_history;
+    static std::vector<device::state_t> state_history;
 
     /**
        @brief Return the time period for the monitor measurements.
@@ -77,6 +77,10 @@ namespace quda
       while (is_running.load()) {
         auto state = device::get_state();
         state_history.push_back(state);
+
+        // periodically reserve larger state size to avoid push_back cost
+        if (state_history.size() % 100000 == 0) state_history.reserve(state_history.size() + 100000);
+
         std::this_thread::sleep_for(get_period());
       }
     }
@@ -98,6 +102,8 @@ namespace quda
 
       if (is_enabled()) {
         warningQuda("Enabling device monitoring");
+        // pre-reserve state_history size to avoid push_back cost
+        state_history.reserve(10000);
         start_time = std::chrono::high_resolution_clock::now();
 
         try { // spawn monitoring thread and release
@@ -185,6 +191,43 @@ namespace quda
       }
 
       monitor_file.close();
+    }
+
+    size_t size() { return is_enabled() ? state_history.size() : 0; }
+
+    state_t mean(size_t start, size_t end)
+    {
+      state_t mean;
+      double last_power = 0.0;
+      std::chrono::time_point<std::chrono::high_resolution_clock> last_time;
+
+      if (start > 0 && end > start) {
+        auto start_time = state_history[start - 1].time;
+        auto end_time = state_history[end - 1].time;
+        for (auto i = start; i < end; i++) {
+          auto &state = state_history[i];
+          if (i - start > 0) {
+            std::chrono::duration<float, std::chrono::seconds::period> diff = state.time - last_time;
+
+            // potential for non-uniform samples distribution, so integrate rather than sum
+            mean.power += state.power * diff.count();
+            mean.temp += state.temp * diff.count();
+            mean.clock += state.clock * diff.count();
+
+            // trapezoidal integration to compute energy
+            mean.energy += 0.5 * (state.power + last_power) * diff.count();
+          }
+          last_power = state.power;
+          last_time = state.time;
+        }
+
+        std::chrono::duration<float, std::chrono::seconds::period> duration = end_time - start_time;
+        mean.power /= duration.count();
+        mean.temp /= duration.count();
+        mean.clock /= duration.count();
+      }
+
+      return mean;
     }
 
   } // namespace monitor

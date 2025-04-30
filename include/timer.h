@@ -241,14 +241,20 @@ namespace quda {
      the profile stack, and be popped when its destructor is called.
    */
   struct pushProfile {
-    static inline double secs_dummy = 0;
-    static inline double gflops_dummy = 0;
     TimeProfile &profile;
     double &secs;
     double &gflops;
+    double &energy;
+    double &power;
+    double &temp;
+    double &clock;
     uint64_t flops;
     bool active = false;
-    pushProfile(TimeProfile &profile, double &secs = secs_dummy, double &gflops = gflops_dummy);
+    size_t monitor_start;
+    size_t monitor_end;
+
+    pushProfile(TimeProfile &profile, QudaInvertParam *param = nullptr);
+    pushProfile(TimeProfile &profile, QudaQuarkSmearParam *param);
     virtual ~pushProfile();
   };
 

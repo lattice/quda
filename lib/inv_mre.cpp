@@ -106,8 +106,7 @@ namespace quda
     }
 
     // if operator hasn't already been applied then apply
-    if (apply_mat)
-      for (int i = 0; i < N; i++) mat(q[i], p[i]);
+    if (apply_mat) mat(q, p);
 
     // Solution coefficient vectors
     std::vector<Complex> alpha(N);
@@ -128,7 +127,7 @@ namespace quda
       // compute the residual only if we're going to print it
       ColorSpinorField r(b);
       for (auto &a : alpha) a = -a;
-      blas::caxpy(alpha, q, r);
+      blas::block::caxpy(alpha, q, r);
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 

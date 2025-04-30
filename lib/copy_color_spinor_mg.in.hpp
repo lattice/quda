@@ -13,11 +13,13 @@
 #include <tunable_nd.h>
 #include <kernels/copy_color_spinor_mg.cuh>
 #include <multigrid.h>
+#include <int_list.hpp>
 
 namespace quda {
 
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>
-  class CopySpinor : TunableKernel1D {
+  class CopySpinor : TunableKernel3D
+  {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     FloatOut *Out;
@@ -27,12 +29,8 @@ namespace quda {
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    CopySpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location, FloatOut* Out, FloatIn* In) :
-      TunableKernel1D(in, location),
-      out(out),
-      in(in),
-      Out(Out),
-      In(In)
+    CopySpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location, FloatOut *Out, FloatIn *In) :
+      TunableKernel3D(in, in.Nspin(), in.Ncolor(), location), out(out), in(in), Out(Out), In(In)
     {
       apply(device::get_default_stream());
     }
@@ -44,7 +42,6 @@ namespace quda {
       launch<CopySpinor_, enable_host>(tp, stream, CopyArg<Ns, Nc, OutOrder, InOrder>(out, in, Out, In));
     }
 
-    long long flops() const { return 0; }
     long long bytes() const { return in.Bytes() + out.Bytes(); }
   };
 
@@ -167,9 +164,6 @@ namespace quda {
     }
 
   }
-
-  template <int...> struct IntList {
-  };
 
   template <int fineColor, typename dst_t, typename src_t, typename param_t, int coarseColor, int... N>
   bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<coarseColor, N...>)

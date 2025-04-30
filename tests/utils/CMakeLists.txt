@@ -3,10 +3,13 @@ target_sources(
   quda_test PRIVATE
   command_line_params.cpp
   face_gauge.cpp
+  gauge_utils.cpp
   host_blas.cpp
   host_utils.cpp
+  index_utils.cpp
   llfat_utils.cpp
   misc.cpp
+  momentum_utils.cpp
   set_params.cpp
   staggered_gauge_utils.cpp
   staggered_host_utils.cpp)

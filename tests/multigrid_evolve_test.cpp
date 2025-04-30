@@ -11,11 +11,12 @@
 #include <pgauge_monte.h>
 #include <unitarization_links.h>
 
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "wilson_dslash_reference.h"
+#include "domain_wall_dslash_reference.h"
 #include "misc.h"
 
 namespace quda
@@ -63,6 +64,7 @@ void display_test_info()
     printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
     printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
     printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
+    printfQuda(" - level %d null-space vector batch size %d\n", i + 1, nvec_batch[i]);
   }
 
   printfQuda("Outer solver paramers\n");
@@ -151,7 +153,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaEigParam mg_eig_param[mg_levels];
+  std::vector<QudaEigParam> mg_eig_param(mg_levels);
 
   if (inv_multigrid) {
     setQudaMgSolveTypes();

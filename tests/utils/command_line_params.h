@@ -3,6 +3,7 @@
 #include <CLI11.hpp>
 #include <array>
 #include <quda.h>
+#include "misc.h"
 
 // for compatibility while porting - remove later
 extern void usage(char **);
@@ -311,6 +312,7 @@ extern int Msrc;
 extern int Nsrc_tile;
 extern int Msrc_tile;
 extern int niter;
+extern int nrepeat;
 extern int maxiter_precondition;
 extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;
@@ -324,6 +326,7 @@ extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
 extern quda::mgarray<int> nvec;
+extern quda::mgarray<int> nvec_batch;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
 extern quda::mgarray<bool> mg_vec_partfile;
@@ -402,6 +405,7 @@ extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<bool> mg_setup_use_mma;
 extern quda::mgarray<bool> mg_dslash_use_mma;
+extern quda::mgarray<bool> mg_transfer_use_mma;
 extern quda::mgarray<QudaInverterType> setup_inv;
 extern quda::mgarray<QudaSolveType> coarse_solve_type;
 extern quda::mgarray<QudaSolveType> smoother_solve_type;
@@ -460,6 +464,7 @@ extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
 extern int eig_ortho_block_size;
+extern int eig_evals_batch_size;
 extern int eig_block_size;
 extern int eig_n_ev;
 extern int eig_n_kr;
@@ -497,6 +502,7 @@ extern bool eig_partfile;
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_ortho_block_size;
+extern quda::mgarray<int> mg_eig_evals_batch_size;
 extern quda::mgarray<int> mg_eig_block_size;
 extern quda::mgarray<int> mg_eig_n_ev_deflate;
 extern quda::mgarray<int> mg_eig_n_ev;
@@ -529,6 +535,7 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+extern bool heatbath_initialize_on_host;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;
@@ -550,10 +557,14 @@ extern double eofa_mq3;
 extern double gauge_smear_rho;
 extern double gauge_smear_epsilon;
 extern double gauge_smear_alpha;
+extern double gauge_smear_alpha1;
+extern double gauge_smear_alpha2;
+extern double gauge_smear_alpha3;
 extern int gauge_smear_steps;
-extern QudaWFlowType wflow_type;
+extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;
+extern bool su_project;
 
 extern double smear_coeff;
 extern int    smear_n_steps;

@@ -30,6 +30,7 @@ namespace quda {
 
     inline void copy(cvector_ref<ColorSpinorField> &dst, cvector_ref<const ColorSpinorField> &src)
     {
+      if (dst.size() != src.size()) errorQuda("Mismatched vector sets %lu != %lu", dst.size(), src.size());
       for (auto i = 0u; i < src.size(); i++) { dst[i].copy(src[i]); }
     }
 
@@ -293,7 +294,7 @@ namespace quda {
 
     inline array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      return max_deviation(cvector_ref<const ColorSpinorField>(x), cvector_ref<const ColorSpinorField>(y));
+      return max_deviation(cvector_ref<const ColorSpinorField>(x), cvector_ref<const ColorSpinorField>(y))[0];
     }
 
     /**
@@ -302,13 +303,15 @@ namespace quda {
     */
     cvector<double> norm1(cvector_ref<const ColorSpinorField> &x);
 
+    inline double norm1(const ColorSpinorField &x) { return norm1(cvector_ref<const ColorSpinorField> {x})[0]; }
+
     /**
        @brief Compute the L2 norm (||x||^2) of a field
        @param[in] x The field we are reducing
     */
     cvector<double> norm2(cvector_ref<const ColorSpinorField> &x);
 
-    inline double norm2(const ColorSpinorField &x) { return norm2(cvector_ref<const ColorSpinorField> {x}); }
+    inline double norm2(const ColorSpinorField &x) { return norm2(cvector_ref<const ColorSpinorField> {x})[0]; }
 
     /**
        @brief Compute y += a * x and then (x, y)
@@ -319,6 +322,11 @@ namespace quda {
     cvector<double> axpyReDot(cvector<double> &a, cvector_ref<const ColorSpinorField> &x,
                               cvector_ref<ColorSpinorField> &y);
 
+    inline double axpyReDot(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return axpyReDot(cvector<double>(a), cvector_ref<const ColorSpinorField>(x), y)[0];
+    }
+
     /**
        @brief Compute the real-valued inner product (x, y)
        @param[in] x input vector
@@ -328,7 +336,7 @@ namespace quda {
 
     inline double reDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      return reDotProduct(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y});
+      return reDotProduct(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y})[0];
     }
 
     /**
@@ -342,6 +350,12 @@ namespace quda {
     cvector<double> axpbyzNorm(cvector<double> &a, cvector_ref<const ColorSpinorField> &x, cvector<double> &b,
                                cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
+    inline double axpbyzNorm(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y,
+                             ColorSpinorField &z)
+    {
+      return axpbyzNorm(cvector<double>(a), cvector_ref<const ColorSpinorField>(x), cvector<double>(b), y, z)[0];
+    }
+
     /**
        @brief Compute y += a * x and then ||y||^2
        @param[in] a scalar multiplier
@@ -354,6 +368,11 @@ namespace quda {
       return axpbyzNorm(a, x, 1.0, y, y);
     }
 
+    inline double axpyNorm(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return axpyNorm(a, cvector_ref<const ColorSpinorField> {x}, cvector_ref<ColorSpinorField> {y})[0];
+    }
+
     /**
        @brief Compute the complex-valued inner product (x, y)
        @param[in] x input vector
@@ -363,7 +382,7 @@ namespace quda {
 
     inline Complex cDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      return cDotProduct(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y});
+      return cDotProduct(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y})[0];
     }
 
     /**
@@ -372,6 +391,11 @@ namespace quda {
        @param[in] y input vector
     */
     cvector<double4> cDotProductNormAB(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y);
+
+    inline double4 cDotProductNormAB(const ColorSpinorField &x, const ColorSpinorField &y)
+    {
+      return cDotProductNormAB(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y})[0];
+    }
 
     /**
        @brief Return complex-valued inner product (x,y) and ||x||^2
@@ -387,6 +411,11 @@ namespace quda {
       return a;
     }
 
+    inline double3 cDotProductNormA(const ColorSpinorField &x, const ColorSpinorField &y)
+    {
+      return cDotProductNormA(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y})[0];
+    }
+
     /**
        @brief Return complex-valued inner product (x,y) and ||y||^2
        @param[in] x input vector
@@ -399,6 +428,11 @@ namespace quda {
       vector<double3> a(a4.size());
       for (auto i = 0u; i < a4.size(); i++) a[i] = {a4[i].x, a4[i].y, a4[i].w};
       return a;
+    }
+
+    inline double3 cDotProductNormB(const ColorSpinorField &x, const ColorSpinorField &y)
+    {
+      return cDotProductNormB(cvector_ref<const ColorSpinorField> {x}, cvector_ref<const ColorSpinorField> {y})[0];
     }
 
     /**
@@ -417,6 +451,14 @@ namespace quda {
                                                     cvector_ref<ColorSpinorField> &z,
                                                     cvector_ref<const ColorSpinorField> &w,
                                                     cvector_ref<const ColorSpinorField> &u);
+
+    inline double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, const ColorSpinorField &x, const Complex &b,
+                                                  ColorSpinorField &y, ColorSpinorField &z, const ColorSpinorField &w,
+                                                  const ColorSpinorField &u)
+    {
+      return caxpbypzYmbwcDotProductUYNormY(cvector<Complex>(a), cvector_ref<const ColorSpinorField>(x), b, y, z, w,
+                                            u)[0];
+    }
 
     /**
        @brief Compute y = a * x + b * y and then ||y||^2
@@ -440,6 +482,11 @@ namespace quda {
       return caxpbyNorm(a, x, 1.0, y);
     }
 
+    inline double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return caxpyNorm(a, cvector_ref<const ColorSpinorField> {x}, cvector_ref<ColorSpinorField> {y})[0];
+    }
+
     /**
        @brief Compute y -= x and then ||y||^2
        @param[in] x input vector
@@ -448,6 +495,11 @@ namespace quda {
     inline cvector<double> xmyNorm(cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y)
     {
       return caxpbyNorm(1.0, x, -1.0, y);
+    }
+
+    inline double xmyNorm(const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return xmyNorm(cvector_ref<const ColorSpinorField> {x}, cvector_ref<ColorSpinorField> {y})[0];
     }
 
     /**
@@ -461,6 +513,12 @@ namespace quda {
     cvector<double> cabxpyzAxNorm(cvector<double> &a, cvector<Complex> &b, cvector_ref<ColorSpinorField> &x,
                                   cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
+    inline double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, const ColorSpinorField &y,
+                                ColorSpinorField &z)
+    {
+      return cabxpyzAxNorm(cvector<double>(a), cvector<Complex>(b), cvector_ref<ColorSpinorField>(x), y, z)[0];
+    }
+
     /**
        @brief Compute y += a * x and the resulting complex-valued inner product (z, y)
        @param[in] a scalar multiplier
@@ -471,6 +529,11 @@ namespace quda {
     cvector<Complex> caxpyDotzy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
                                 cvector_ref<ColorSpinorField> &y, cvector_ref<const ColorSpinorField> &z);
 
+    inline Complex caxpyDotzy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
+    {
+      return caxpyDotzy(cvector<Complex>(a), cvector_ref<const ColorSpinorField>(x), y, z)[0];
+    }
+
     /**
        @brief Compute y += a * x and then compute ||y||^2 and
        real-valued inner product (y_out, y_out-y_in)
@@ -480,6 +543,11 @@ namespace quda {
     */
     cvector<double2> axpyCGNorm(cvector<double> &a, cvector_ref<const ColorSpinorField> &x,
                                 cvector_ref<ColorSpinorField> &y);
+
+    inline double2 axpyCGNorm(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return axpyCGNorm(cvector<double>(a), cvector_ref<const ColorSpinorField>(x), y)[0];
+    }
 
     /**
        @brief Computes ||x||^2, ||r||^2 and the MILC/FNAL heavy quark
@@ -492,7 +560,7 @@ namespace quda {
 
     inline double3 HeavyQuarkResidualNorm(const ColorSpinorField &x, const ColorSpinorField &r)
     {
-      return HeavyQuarkResidualNorm(cvector_ref<const ColorSpinorField>(x), cvector_ref<const ColorSpinorField>(r));
+      return HeavyQuarkResidualNorm(cvector_ref<const ColorSpinorField>(x), cvector_ref<const ColorSpinorField>(r))[0];
     }
 
     /**
@@ -510,7 +578,7 @@ namespace quda {
                                              const ColorSpinorField &r)
     {
       return xpyHeavyQuarkResidualNorm(cvector_ref<const ColorSpinorField>(x), cvector_ref<const ColorSpinorField>(y),
-                                       cvector_ref<const ColorSpinorField>(r));
+                                       cvector_ref<const ColorSpinorField>(r))[0];
     }
 
     /**
@@ -522,6 +590,11 @@ namespace quda {
     cvector<double3> tripleCGReduction(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
                                        cvector_ref<const ColorSpinorField> &z);
 
+    inline double3 tripleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
+    {
+      return tripleCGReduction(cvector_ref<const ColorSpinorField>(x), y, z)[0];
+    }
+
     /**
        @brief Computes ||x||^2, ||y||^2, the real-valued inner product (y, z), and ||z||^2
        @param[in] x input vector
@@ -530,6 +603,11 @@ namespace quda {
     */
     cvector<double4> quadrupleCGReduction(cvector_ref<const ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &y,
                                           cvector_ref<const ColorSpinorField> &z);
+
+    inline double4 quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
+    {
+      return quadrupleCGReduction(cvector_ref<const ColorSpinorField>(x), y, z)[0];
+    }
 
     /**
        @brief Computes z = x, w = y, x += a * y, y -= a * v and ||y||^2
@@ -543,6 +621,12 @@ namespace quda {
     cvector<double> quadrupleCG3InitNorm(cvector<double> &a, cvector_ref<ColorSpinorField> &x,
                                          cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                          cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v);
+
+    inline double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                                       ColorSpinorField &w, const ColorSpinorField &v)
+    {
+      return quadrupleCG3InitNorm(cvector<double>(a), cvector_ref<ColorSpinorField>(x), y, z, w, v)[0];
+    }
 
     /**
        @brief Computes x = b * (x + a * y) + ( 1 - b) * z,
@@ -559,6 +643,12 @@ namespace quda {
     cvector<double> quadrupleCG3UpdateNorm(cvector<double> &a, cvector<double> &b, cvector_ref<ColorSpinorField> &x,
                                            cvector_ref<ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z,
                                            cvector_ref<ColorSpinorField> &w, cvector_ref<const ColorSpinorField> &v);
+
+    inline double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
+                                         ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
+    {
+      return quadrupleCG3UpdateNorm(cvector<double>(a), b, cvector_ref<ColorSpinorField>(x), y, z, w, v)[0];
+    }
 
     namespace block
     {

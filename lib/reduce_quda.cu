@@ -135,7 +135,7 @@ namespace quda {
         if (r.write.V) v.restore();
       }
 
-      long long flops() const override { return r.flops() * x.Length(); }
+      long long flops() const override { return r.flops() * x.Length() * x.size(); }
 
       long long bytes() const override
       {

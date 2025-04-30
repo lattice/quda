@@ -125,6 +125,7 @@ namespace quda
     int nColor = 0; // Number of colors of the field
     int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
+    int nVec_actual = 1; // The actual number of packed vectors (that are not zero padded)
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
     QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
@@ -241,6 +242,7 @@ namespace quda
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),
       nVec(cpuParam.nVec),
+      nVec_actual(cpuParam.nVec_actual),
       twistFlavor(cpuParam.twistFlavor),
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER),
@@ -280,6 +282,8 @@ namespace quda
       //! for deflation etc.
       if (is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
+
+    void change_dim(int D, int d) { x[D] = d; }
   };
 
   struct DslashConstant;
@@ -313,9 +317,16 @@ namespace quda
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
 
+    /** Used to keep local track of nFace in createGhostZone */
+    mutable int nFace_allocated = 0;
+
+    /** Used to keep local track of spin_project in createGhostZone */
+    mutable bool spin_project_allocated = false;
+
     int nColor = 0;
     int nSpin = 0;
     int nVec = 0;
+    mutable int nVec_actual = 0;
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID;
 
@@ -453,6 +464,8 @@ namespace quda
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     int Nvec() const { return nVec; }
+    int Nvec_actual() const { return nVec_actual; }
+    void Nvec_actual(int nVec_actual) const { this->nVec_actual = nVec_actual; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int *X() const { return x.data; }
@@ -769,9 +782,12 @@ namespace quda
     /**
       @brief Create a dummy field used for batched communication
       @param[in] v Vector of fields we which to batch together
+      @param[in] nFace The depth of the face in each dimension and direction
+      @param[in] nFace The depth of the face in each dimension and direction
+      @param[in] spin_project Whether we are spin projecting
       @return Dummy (nDim+1)-dimensional field
      */
-    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v);
+    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v, int nFace = 1, bool spin_project = true);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -943,6 +959,36 @@ namespace quda
   void resize(std::vector<ColorSpinorField> &v, size_t new_size, QudaFieldCreate create,
               const ColorSpinorField &src = ColorSpinorField());
 
+  /**
+     @brief Create a vector of fields that aliases another vector of
+     fields' storage.  The alias field can use a different precision
+     than this field, though it cannot be greater.  This
+     functionality is useful for the case where we have multiple
+     temporaries in different precisions, but do not need them
+     simultaneously.  Use this functionality with caution.
+     @param[out] alias The vector of aliased fields
+     @param[in] v The vector of fields to alias
+     @param[in] param Parameters for the alias field
+  */
+  void create_alias(cvector_ref<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param = ColorSpinorParam());
+
+  /**
+     @brief Create a vector of fields that aliases another vector of
+     fields' storage.  The alias field can use a different precision
+     than this field, though it cannot be greater.  This functionality
+     is useful for the case where we have multiple temporaries in
+     different precisions, but do not need them simultaneously.  This
+     variant is used with std::vector as opposed to vector_ref, and
+     allows for correct resizing.  Use this functionality with
+     caution.
+     @param[out] alias The vector of aliased fields
+     @param[in] v The vector of fields to alias
+     @param[in] param Parameters for the alias field
+  */
+  void create_alias(std::vector<ColorSpinorField> &alias, cvector_ref<const ColorSpinorField> &v,
+                    const ColorSpinorParam &param = ColorSpinorParam());
+
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
                               void *Dst = nullptr, const void *Src = nullptr);
 
@@ -989,6 +1035,8 @@ namespace quda
   */
   class RNG;
 
+  void spinDuplicate(cvector_ref<ColorSpinorField> &v, const ColorSpinorField &src);
+
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
      @param[out] src The colorspinorfield
@@ -1023,6 +1071,38 @@ namespace quda
      @param[in] t0 The parameter for distance preconditioning
   */
   void spinorDistanceReweight(ColorSpinorField &src, double alpha0, int t0);
+
+  /**
+     @brief Helper function for determining if the spin of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If spin is unique return the number of spins
+   */
+  inline int Spin_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    int nSpin = 0;
+    if (a.Nspin() == b.Nspin())
+      nSpin = a.Nspin();
+    else
+      errorQuda("Spin %d %d do not match (%s:%d in %s())", a.Nspin(), b.Nspin(), file, line, func);
+    return nSpin;
+  }
+
+  /**
+     @brief Helper function for determining if the spin of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check spin on
+     @return If spins is unique return the number of spins
+   */
+  template <typename... Args>
+  inline int Spin_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
+                   const Args &...args)
+  {
+    return Spin_(func, file, line, a, b) & Spin_(func, file, line, a, args...);
+  }
+
+#define checkSpin(...) Spin_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the preconditioning

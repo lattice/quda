@@ -418,17 +418,17 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a[MAX_MULTI_RHS] = {};
-      double3 *Ar3;
+      double4 *Ar4;
       caxpyxmazMR_(cvector<double> &a, cvector<double> &, cvector<double> &) :
-        Ar3(static_cast<double3 *>(reducer::get_device_buffer()))
+        Ar4(static_cast<double4 *>(reducer::get_device_buffer()))
       {
         for (auto i = 0u; i < a.size(); i++) this->a[i] = a[i];
       }
 
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &, int j) const
       {
-        auto ar3 = Ar3[j];
-        auto aj = a[j].real() * complex<real>((real)ar3.x, (real)ar3.y) * ((real)1.0 / (real)ar3.z);
+        auto ar4 = Ar4[j];
+        auto aj = a[j].real() * complex<real>((real)ar4.x, (real)ar4.y) * ((real)1.0 / (real)ar4.z);
 
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {

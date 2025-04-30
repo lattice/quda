@@ -1,3 +1,4 @@
+#include "test.h"
 #include "hisq_stencil_test_utils.h"
 
 using namespace quda;

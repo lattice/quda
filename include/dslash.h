@@ -67,6 +67,10 @@ namespace quda
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
       setRHSstring(aux_base, in.size());
+      strcat(aux_base, ",n_rhs_tile=");
+      char tile_str[16];
+      i32toa(tile_str, Arg::n_src_tile);
+      strcat(aux_base, tile_str);
     }
 
     /**
@@ -156,8 +160,8 @@ namespace quda
       }
     }
 
-    virtual int blockStep() const override { return 16; }
-    virtual int blockMin() const override { return 16; }
+    virtual int blockStep() const override { return (arg.shmem & 64) ? 8 : 16; }
+    virtual int blockMin() const override { return (arg.shmem & 64) ? 8 : 16; }
 
     unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
@@ -207,13 +211,12 @@ namespace quda
 
     virtual void initTuneParam(TuneParam &param) const override
     {
-      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+      /* for nvshmem uber kernels the current synchronization requires us to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly */
-      if (arg.shmem & 64) {
-        step_y = vector_length_y;
-        step_z = vector_length_z;
-      }
+      step_y = arg.shmem & 64 ? vector_length_y : step_y_bkup;
+      step_z = arg.shmem & 64 ? vector_length_z : step_z_bkup;
+
       TunableKernel3D::initTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
@@ -225,10 +228,9 @@ namespace quda
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
        * z components explicitly. */
-      if (arg.shmem & 64) {
-        step_y = vector_length_y;
-        step_z = vector_length_z;
-      }
+      step_y = arg.shmem & 64 ? vector_length_y : step_y_bkup;
+      step_z = arg.shmem & 64 ? vector_length_z : step_z_bkup;
+
       TunableKernel3D::defaultTuneParam(param);
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
@@ -331,7 +333,13 @@ namespace quda
 
     Dslash(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
            const ColorSpinorField &halo, const std::string &app_base = "") :
-      TunableKernel3D(in[0], halo.X(4), arg.nParity), arg(arg), out(out), in(in), halo(halo), nDimComms(4), dslashParam(arg)
+      TunableKernel3D(in[0], (halo.X(4) + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity),
+      arg(arg),
+      out(out),
+      in(in),
+      halo(halo),
+      nDimComms(4),
+      dslashParam(arg)
     {
       if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
         errorQuda("CPU Fields not supported in Dslash framework yet");

@@ -7,13 +7,15 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <timer.h>
 //#include <color_spinor_field.h> // convenient quark field container
 
-#include <misc.h>
-#include <timer.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "test.h"
 
 // Place params above "eigensolve_test_gtest.hpp" so they
 // are visible therein.
@@ -36,8 +38,9 @@ void display_test_info(QudaEigParam &param)
   printfQuda("running the following test:\n");
 
   printfQuda("prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s      %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(param.cuda_prec_ritz),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
+  printfQuda("%s      %s            %s            %d/%d/%d          %d         %d\n",
+             get_prec_str(eig_inv_param.cuda_prec_eigensolver), get_recon_str(link_recon),
+             get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));
@@ -190,17 +193,14 @@ std::vector<double> eigensolve(test_t test_param)
   // Host side arrays to store the eigenpairs computed by QUDA
   int n_eig = eig_n_conv;
   if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
-  std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
 
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
-  for (int i = 0; i < n_eig; i++) {
-    evecs[i] = quda::ColorSpinorField(cs_param);
-    host_evecs_ptr[i] = evecs[i].data();
-  }
+  std::vector<quda::ColorSpinorField> evecs(n_eig, cs_param);
+  for (int i = 0; i < n_eig; i++) host_evecs_ptr[i] = evecs[i].data();
 
   // Complex eigenvalues
   std::vector<__complex__ double> evals(eig_n_conv);

@@ -89,7 +89,8 @@ int main(int argc, char **argv)
     if (!is_staggered(dslash_type) && !is_laplace(dslash_type))
       errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   } else {
-    if (is_laplace(dslash_type)) errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_LAPLACE=ON");
+    if (is_laplace(dslash_type))
+      errorQuda("The Laplace dslash is not enabled, cmake configure with -DQUDA_DIRAC_LAPLACE=ON");
     if (!is_staggered(dslash_type)) errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 

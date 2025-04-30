@@ -5,12 +5,16 @@
 
 void setGaugeSmearParam(QudaGaugeSmearParam &smear_param)
 {
+  smear_param.smear_type = gauge_smear_type;
   smear_param.alpha = gauge_smear_alpha;
   smear_param.rho = gauge_smear_rho;
   smear_param.epsilon = gauge_smear_epsilon;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.meas_interval = measurement_interval;
-  smear_param.smear_type = gauge_smear_type;
+  smear_param.alpha1 = gauge_smear_alpha1;
+  smear_param.alpha2 = gauge_smear_alpha2;
+  smear_param.alpha3 = gauge_smear_alpha3;
+  smear_param.dir_ignore = gauge_smear_dir_ignore;
   smear_param.struct_size = sizeof(smear_param);
 }
 
@@ -125,22 +129,26 @@ void setInvertParam(QudaInvertParam &inv_param)
 {
   // Set dslash type
   inv_param.dslash_type = dslash_type;
+  int dimension = laplace3D < 4 ? 3 : 4;
 
   // Use kappa or mass normalisation
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / (8 + mass);
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / (2 * dimension + mass);
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 8.0;
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 2 * dimension;
   }
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
     printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
 
   // Use 3D or 4D laplace
   inv_param.laplace3D = laplace3D;
+
+  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
+    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
 
   // Some fermion specific parameters
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -332,6 +340,7 @@ void setEigParam(QudaEigParam &eig_param)
   }
 
   eig_param.ortho_block_size = eig_ortho_block_size;
+  eig_param.compute_evals_batch_size = eig_evals_batch_size;
   eig_param.block_size
     = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
@@ -453,6 +462,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_use_mma[i] = mg_transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
@@ -471,6 +481,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_vec_batch[i] = nvec_batch[i] == 0 ? 1 : nvec_batch[i]; // default to batch size 1 if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.block_ortho_two_pass[i]
       = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
@@ -598,9 +609,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.location[i] = solver_location[i];
     mg_param.setup_location[i] = setup_location[i];
   }
-
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
@@ -789,6 +797,8 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.n_ev = mg_eig_n_ev[level];
   mg_eig_param.n_kr = mg_eig_n_kr[level];
   mg_eig_param.n_conv = nvec[level];
+  mg_eig_param.compute_evals_batch_size
+    = mg_eig_evals_batch_size[level] ? mg_eig_evals_batch_size[level] : eig_evals_batch_size;
 
   // Inverters will deflate only this number of vectors.
   if (mg_eig_n_ev_deflate[level] > 0 && mg_eig_n_ev_deflate[level] < mg_eig_param.n_conv)
@@ -928,8 +938,12 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   // Solver params
   inv_param.verbosity = verbosity;
   inv_param.mass = mass;
-  inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
+  int dimension = laplace3D < 4 ? 3 : 4;
+  inv_param.kappa = 1.0 / (2 * dimension + mass); // for Laplace operator
   inv_param.laplace3D = laplace3D;              // for Laplace operator
+
+  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
+    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
 
   // outer solver parameters
   inv_param.inv_type = inv_type;
@@ -941,8 +955,10 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.use_sloppy_partial_accumulator = false;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
+  inv_param.max_res_increase = max_res_increase;
+  inv_param.max_res_increase_total = max_res_increase_total;
 
-  inv_param.Ls = 1; // Nsrc
+  inv_param.Ls = 1;
 
   if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");
@@ -990,7 +1006,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+  inv_param.mass_normalization = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_KAPPA_NORMALIZATION : QUDA_MASS_NORMALIZATION;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = prec;
@@ -1061,6 +1077,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_use_mma[i] = mg_transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
@@ -1078,6 +1095,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i]; // default to 64 vectors if not set
+    mg_param.n_vec_batch[i] = nvec_batch[i] == 0 ? 1 : nvec_batch[i]; // default to batch size 1 if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.block_ortho_two_pass[i]
       = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
@@ -1206,9 +1224,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     nu_pre[i] = 2;
     nu_post[i] = 2;
   }
-
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;

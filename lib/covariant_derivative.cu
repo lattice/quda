@@ -140,7 +140,7 @@ namespace quda
 
     {
       constexpr int nDim = 4;
-      auto halo = ColorSpinorField::create_comms_batch(in);
+      auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
       if (in.Nspin() == 4) {
         CovDevArg<Float, 4, nColor, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
         CovDev<decltype(arg)> covDev(arg, out, in, halo);

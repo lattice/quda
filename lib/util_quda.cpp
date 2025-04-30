@@ -51,22 +51,51 @@ bool getRankVerbosity() {
   return rank_verbosity;
 }
 
-// default has autotuning enabled but can be overridden with the QUDA_ENABLE_TUNING environment variable
-QudaTune getTuning() {
-  static bool init = false;
-  static QudaTune tune = QUDA_TUNE_YES;
+static bool tune = true;
 
+// default has autotuning enabled but can be overridden with the QUDA_ENABLE_TUNING environment variable
+bool getTuning()
+{
+  static bool init = false;
   if (!init) {
     char *enable_tuning = getenv("QUDA_ENABLE_TUNING");
-    if (!enable_tuning || strcmp(enable_tuning,"0")!=0) {
-      tune = QUDA_TUNE_YES;
+    if (!enable_tuning || strcmp(enable_tuning, "0") != 0) {
+      tune = true;
     } else {
-      tune = QUDA_TUNE_NO;
+      tune = false;
     }
     init = true;
   }
 
   return tune;
+}
+
+void setTuning(bool tuning)
+{
+  // first check if tuning is disabled, in which case we do nothing
+  static bool init = false;
+  static bool tune_disable = false;
+  if (!init) {
+    char *enable_tuning = getenv("QUDA_ENABLE_TUNING");
+    tune_disable = (enable_tuning && strcmp(enable_tuning, "0") == 0);
+    init = true;
+  }
+  if (!tune_disable) tune = tuning;
+}
+
+static std::stack<bool> tstack;
+
+void pushTuning(bool tuning)
+{
+  tstack.push(getTuning());
+  setTuning(tuning);
+}
+
+void popTuning()
+{
+  if (tstack.empty()) errorQuda("popTuning() called with empty stack");
+  setTuning(tstack.top());
+  tstack.pop();
 }
 
 void setOutputPrefix(const char *prefix)
@@ -79,7 +108,6 @@ void setOutputFile(FILE *outfile)
 {
   outfile_ = outfile;
 }
-
 
 static std::stack<QudaVerbosity> vstack;
 

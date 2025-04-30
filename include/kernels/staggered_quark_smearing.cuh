@@ -161,7 +161,7 @@ namespace quda
   struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
-    constexpr staggered_qsmear(const Arg &arg) : arg(arg) { }
+    template <typename Ftor> constexpr staggered_qsmear(const Ftor &ftor) : arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -179,9 +179,9 @@ namespace quda
       if (arg.is_t0_kernel) {
         if (arg.t0 < 0) return;
 
-        if (mykernel_type == INTERIOR_KERNEL) {
+        if constexpr (mykernel_type == INTERIOR_KERNEL) {
           idx += arg.t0 * arg.t0_offset;
-        } else if (mykernel_type != EXTERIOR_KERNEL_ALL) {
+        } else if constexpr (mykernel_type != EXTERIOR_KERNEL_ALL) {
           if (idx >= arg.t0_face_size[mykernel_type])
             idx += arg.face_size[mykernel_type] - arg.t0_face_size[mykernel_type];
           idx += arg.t0 * arg.t0_face_offset[mykernel_type];

@@ -472,7 +472,7 @@ namespace quda
     */
     template <typename Float, typename storeFloat, bool block_float_, typename norm_t> struct fieldorder_wrapper {
       using value_type = Float;      /**< Compute type */
-      using store_type = storeFloat; /**< Storage type */
+      using store_t = storeFloat;    /**< Storage type */
       complex<storeFloat> *v;        /**< Field memory address this wrapper encompasses */
       const int idx;                 /**< Index into field */
     private:
@@ -581,7 +581,6 @@ namespace quda
        */
       __device__ __host__ inline auto get_scale() const
       {
-        static_assert(block_float == false, "Orders with block_float == true should not call the get_scale method.");
         return block_float ? static_cast<Float>(1) / norm[norm_idx] : scale;
       }
 
@@ -858,6 +857,8 @@ namespace quda
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
 
+      using store_t = storeFloat;
+
       field<Float, storeFloat, fixed, block_float> v;
       unsigned int volumeCB = 0;
 
@@ -969,16 +970,19 @@ namespace quda
         norm_t *norm = nullptr;
         int norm_offset = 0;
         if constexpr (fixed) {
-          if constexpr (block_float) {
+          if constexpr (fixed && block_float && nColor == 3 && nSpin == 1 && nVec == 1) {
             norm = v.norm;
-            norm_offset = v.norm_offset;
+            norm_offset = parity * v.norm_offset + 4 * x_cb + 3;
+          } else if constexpr (block_float) {
+            norm = v.norm;
+            norm_offset = parity * v.norm_offset + x_cb;
           } else {
             scale = v.scale;
             scale_inv = v.scale_inv;
           }
         }
         return fieldorder_wrapper<Float, storeFloat, block_float, norm_t>(
-          v.v, accessor.index(parity, x_cb, s, c, n, volumeCB), scale, scale_inv, norm, parity * norm_offset + x_cb);
+          v.v, accessor.index(parity, x_cb, s, c, n, volumeCB), scale, scale_inv, norm, norm_offset);
       }
 
       /** Returns the number of field colors */
@@ -1799,8 +1803,8 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
-                                    field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x]);
+            v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x],
+                                    field[(((1 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x]);
           }
         }
       }
@@ -1809,8 +1813,8 @@ namespace quda
       {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].real();
-            field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].imag();
+            field[(((0 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x] = v[s * Nc + c].real();
+            field[(((1 * Nc + c) * Ns + s) * 2 + parity) * volumeCB + x] = v[s * Nc + c].imag();
           }
         }
       }

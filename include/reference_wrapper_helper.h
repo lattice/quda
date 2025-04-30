@@ -246,11 +246,8 @@ namespace quda
        @param[in] first Begin iterator
        @param[in] last End iterator
      */
-    template <class U, std::enable_if_t<is_iterator_v<U>>* = nullptr>
-    vector_ref(U first, U last)
+    template <class U, std::enable_if_t<is_iterator_v<U>> * = nullptr> vector_ref(U first, U last) : vector(first, last)
     {
-      vector::reserve(last - first);
-      for (auto it = first; it != last; it++) vector::push_back(*it);
     }
 
     /**
@@ -491,6 +488,16 @@ namespace quda
     vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) { }
 
     /**
+       Constructor from pair of iterators
+       @param[in] first Begin iterator
+       @param[in] last End iterator
+     */
+    template <class U, std::enable_if_t<is_iterator_v<U>> * = nullptr>
+    vector(U first, U last) : std::vector<T>(first, last)
+    {
+    }
+
+    /**
        @brief Constructor using std::vector initialization
        @param[in] u Vector we are copying from
     */
@@ -530,12 +537,42 @@ namespace quda
     /**
        @brief Cast to scalar.  Only works if the vector size is 1.
     */
-    operator T() const
+    explicit operator T() const
     {
       if (std::vector<T>::size() != 1) errorQuda("Cast to scalar failed since size = %lu", std::vector<T>::size());
       return std::vector<T>::operator[](0);
     }
+
+    bool operator<(const vector<T> &v) const
+    {
+      for (auto i = 0u; i < v.size(); i++)
+        if (this->operator[](i) >= v[i]) return false;
+      return true;
+    }
+
+    bool operator>(const vector<T> &v) const
+    {
+      for (auto i = 0u; i < v.size(); i++)
+        if (this->operator[](i) <= v[i]) return false;
+      return true;
+    }
+
+    vector<T> operator-() const
+    {
+      vector<T> negative(*this);
+      for (auto &v : negative) v = -v;
+      return negative;
+    }
+
+    vector<T> operator*(const T &u) const
+    {
+      vector<T> multiplied(*this);
+      for (auto &v : multiplied) v *= u;
+      return multiplied;
+    }
   };
+
+  template <class T, class U> vector<U> operator*(const T &a, const vector<U> &b) { return b * a; }
 
   template <class T> using cvector = const vector<T>;
 

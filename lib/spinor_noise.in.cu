@@ -3,6 +3,7 @@
 #include <tunable_nd.h>
 #include <kernels/spinor_noise.cuh>
 #include <instantiate.h>
+#include <int_list.hpp>
 
 namespace quda {
 
@@ -41,8 +42,6 @@ namespace quda {
     void preTune() { rng.backup(); }
     void postTune(){ rng.restore(); }
   };
-
-  template <int...> struct IntList { };
 
   template <typename real, int Ns, int Nc, int...N>
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type, IntList<Nc, N...>)

@@ -36,14 +36,22 @@ namespace quda
       checkLocation(U, A);
       }
   };
-  
+
+  template <KernelType kernel_type, typename Arg> struct nDegTwistedCloverParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = std::conditional_t<kernel_type == INTERIOR_KERNEL, KernelOps<Cache>, NoKernelOps>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct nDegTwistedClover : dslash_default {
-    
+  struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<kernel_type, Arg>::Ops {
+
     const Arg &arg;
-    constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedCloverParams<kernel_type, Arg>::Ops::KernelOpsT;
+    template <typename Ftor> constexpr nDegTwistedClover(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
-    
+
     /**
        @brief Apply the non-degenerate twisted-clover dslash
        out(x) = M*in = a * D * in + (A(x) + i*b*gamma_5*tau_3 + c*tau_1)*x
@@ -58,29 +66,28 @@ namespace quda
 
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
-
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
-      
+
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
-      
+
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (mykernel_type == INTERIOR_KERNEL) {
+      if constexpr (mykernel_type == INTERIOR_KERNEL) {
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
         Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
-        SharedMemoryCache<Vector> cache;
+        SharedMemoryCache<Vector> cache {*this};
         cache.save(x);
 
         x.toRel(); // switch to chiral basis
-        
+
         Vector tmp;
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
