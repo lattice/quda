@@ -41,6 +41,8 @@ namespace quda
                             [&](const char *input) { allow_truncation = input[0] == 't' ? true : false; })) {
     } else if (parse_2_args(error_code, input_line, "dagger_approximation",
                             [&](const char *input) { dagger_approximation = input[0] == 't' ? true : false; })) {
+    } else if (parse_2_args(error_code, input_line, "block_solver_batch_size",
+                            [&](const char *input) { block_solver_batch_size = atoi(input); })) {
     } else if (parse_3_args(error_code, input_line, "mg_verbosity",
                             [&](int level, const char *input) { mg_verbosity[level] = getQudaVerbosity(input); })) {
     }
@@ -162,8 +164,7 @@ namespace quda
     static const QudaVerbosity verbosity = getVerbosity();
     QudaMultigridParam &mg_param = mg_pack->mg_param;
 
-    // Create an input struct
-    mgInputStruct input_struct;
+    auto &input_struct = mg_pack->input_struct;
 
     // Load input struct on rank 0
     if (comm_rank() == 0) {

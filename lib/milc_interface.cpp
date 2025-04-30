@@ -1787,7 +1787,6 @@ void qudaInvertMsrcMG(int external_precision, int quda_precision, double mass, Q
   setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, target_residual,
                   target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_GCR_INVERTER, &invertParam);
-  invertParam.num_src = num_src;
 
   invertParam.inv_type = QUDA_GCR_INVERTER;
   invertParam.preconditioner = mg_pack->mg_preconditioner;
@@ -1839,17 +1838,27 @@ void qudaInvertMsrcMG(int external_precision, int quda_precision, double mass, Q
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
 
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
-  void **sln_pointer = (void **)safe_malloc(num_src * sizeof(void *));
-  void **src_pointer = (void **)safe_malloc(num_src * sizeof(void *));
 
-  for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
-  for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
+  // Perform the solve one batch at a time
+  int batch_size = mg_pack->input_struct.block_solver_batch_size;
+  if (batch_size == -1) batch_size = num_src;
 
-  // FIXME: due to sign convention woes passing in an initial
-  // guess is currently broken. Needs a sign flip to fix.
-  // MG is fast enough we won't worry...
+  // Allocate space for the solution and source vectors
+  void **sln_pointer = (void **)safe_malloc(batch_size * sizeof(void *));
+  void **src_pointer = (void **)safe_malloc(batch_size * sizeof(void *));
 
-  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+  for (int b = 0; b < num_src; b += batch_size) {
+    int batch_src = std::min(batch_size, num_src - b);
+    invertParam.num_src = batch_src;
+
+    for (int i = 0; i < batch_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[b + i]) + quark_offset;
+    for (int i = 0; i < batch_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[b + i]) + quark_offset;
+
+    // FIXME: due to sign convention woes passing in an initial
+    // guess is currently broken. Needs a sign flip to fix.
+    // MG is fast enough we won't worry...
+    invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+  }
 
   // FIXME: Flip sign on solution to correct for mass convention
   int cv_size = localDim[0] * localDim[1] * localDim[2] * localDim[3] * 3 * 2; // (dimension * Nc = 3 * cplx)

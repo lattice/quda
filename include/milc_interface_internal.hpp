@@ -11,16 +11,17 @@ namespace quda
   // Structure used to handle loading from input file
   struct mgInputStruct {
 
-    int mg_levels;
-    bool verify_results;
-    QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
-    QudaTransferType
-      optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
+    int mg_levels = 4;
+    bool verify_results = true;
+    QudaPrecision preconditioner_precision = QUDA_HALF_PRECISION; // precision for near-nulls, coarse links
+    QudaTransferType optimized_kd = QUDA_TRANSFER_OPTIMIZED_KD; // use the optimized KD operator (true), naive coarsened
+                                                                // operator (false), or optimized dropped links (drop)
     bool setup_use_mma[QUDA_MAX_MG_LEVEL];  // accelerate setup using MMA routines
     bool dslash_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate dslash using MMA routines
     bool transfer_use_mma[QUDA_MAX_MG_LEVEL]; // accelerate transfer using MMA routines
-    bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
-    bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
+    bool allow_truncation = false;     // allow dropping the long links for small (less than three) aggregate directions
+    bool dagger_approximation = false; // use the dagger approximation to Xinv, which is X^dagger
+    int block_solver_batch_size = -1;  // number of rhs to solve at once in the block solver, -1 means all
 
     /**
      * Setup:
@@ -64,14 +65,14 @@ namespace quda
     QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
 
     // Coarsest level deflation
-    int deflate_n_ev;
-    int deflate_n_kr;
-    int deflate_max_restarts;
-    double deflate_tol;
-    bool deflate_use_poly_acc;
-    double deflate_a_min; // ignored if no polynomial acceleration
-    int deflate_poly_deg; // ignored if no polynomial acceleration
-    bool deflate_vec_partfile;
+    int deflate_n_ev = 66;
+    int deflate_n_kr = 128;
+    int deflate_max_restarts = 50;
+    double deflate_tol = 1e-5;
+    bool deflate_use_poly_acc = false;
+    double deflate_a_min = 1e-2; // ignored if no polynomial acceleration
+    int deflate_poly_deg = 50;   // ignored if no polynomial acceleration
+    bool deflate_vec_partfile = false;
 
     /**
      * @brief Sets default values for all multigrid array parameters
@@ -207,21 +208,7 @@ namespace quda
     }
 
     // set defaults
-    mgInputStruct() :
-      mg_levels(4),
-      verify_results(true),
-      preconditioner_precision(QUDA_HALF_PRECISION),
-      optimized_kd(QUDA_TRANSFER_OPTIMIZED_KD),
-      allow_truncation(false),
-      dagger_approximation(false),
-      deflate_n_ev(66),
-      deflate_n_kr(128),
-      deflate_max_restarts(50),
-      deflate_tol(1e-5),
-      deflate_use_poly_acc(false),
-      deflate_a_min(1e-2),
-      deflate_poly_deg(50),
-      deflate_vec_partfile(false)
+    mgInputStruct()
     {
       /* initialize internal arrays to valid values */
       setArrayDefaults();
@@ -429,6 +416,7 @@ namespace quda
     QudaPrecision preconditioner_precision;
     double last_mass;
     void *mg_preconditioner;
+    mgInputStruct input_struct;
   };
 
   /**
