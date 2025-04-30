@@ -147,9 +147,6 @@ void setInvertParam(QudaInvertParam &inv_param)
   // Use 3D or 4D laplace
   inv_param.laplace3D = laplace3D;
 
-  if (Nsrc < Nsrc_tile || Nsrc % Nsrc_tile != 0)
-    errorQuda("Invalid combination Nsrc = %d Nsrc_tile = %d", Nsrc, Nsrc_tile);
-
   // Some fermion specific parameters
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
