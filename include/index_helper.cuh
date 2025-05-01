@@ -122,10 +122,10 @@ namespace quda {
       }
     } else if (dir == 1) {
       switch (dim) { // forwards boundary
-      case 0: is_boundary = coord[0] + arg.nFace >= arg.dc.X[0]; break;
-      case 1: is_boundary = coord[1] + arg.nFace >= arg.dc.X[1]; break;
-      case 2: is_boundary = coord[2] + arg.nFace >= arg.dc.X[2]; break;
-      case 3: is_boundary = coord[3] + arg.nFace >= arg.dc.X[3]; break;
+      case 0: is_boundary = coord[0] + arg.nFace >= arg.dim[0]; break;
+      case 1: is_boundary = coord[1] + arg.nFace >= arg.dim[1]; break;
+      case 2: is_boundary = coord[2] + arg.nFace >= arg.dim[2]; break;
+      case 3: is_boundary = coord[3] + arg.nFace >= arg.dim[3]; break;
       }
     }
     return is_boundary;
