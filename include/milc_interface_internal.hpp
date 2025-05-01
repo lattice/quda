@@ -135,6 +135,9 @@ namespace quda
     /** Target tolerance of the eigenvalues */
     double deflate_tol = 1e-5;
 
+    /** Block size for the eigensolver; if it's 1 the eigensolver is TRLM, if it's greater than 1 it uses block TRLM */
+    int deflate_block_size = 1;
+
     /** Whether or not to use polynomial acceleration */
     bool deflate_use_poly_acc = false;
 
@@ -240,6 +243,7 @@ namespace quda
       deflate_n_kr = 128;
       deflate_tol = 1e-3;
       deflate_max_restarts = 50;
+      deflate_block_size = 1; // TRLM, > 1 is block TRLM
       deflate_use_poly_acc = false;
       deflate_a_min = 1e-2;
       deflate_poly_deg = 20;

@@ -93,6 +93,8 @@ namespace quda
     } else if (parse_2_args(error_code, input_line, "deflate_max_restarts",
                             [&](const char *input) { deflate_max_restarts = atoi(input); })) {
     } else if (parse_2_args(error_code, input_line, "deflate_tol", [&](const char *input) { deflate_tol = atof(input); })) {
+    } else if (parse_2_args(error_code, input_line, "deflate_block_size",
+                            [&](const char *input) { deflate_block_size = atoi(input); })) {
     } else if (parse_2_args(error_code, input_line, "deflate_use_poly_acc",
                             [&](const char *input) { deflate_use_poly_acc = input[0] == 't' ? true : false; })) {
     } else if (parse_2_args(error_code, input_line, "deflate_a_min",
@@ -117,9 +119,9 @@ namespace quda
 
   void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, const mgInputStruct &input_struct, int level)
   {
-    mg_eig_param.eig_type = QUDA_EIG_TR_LANCZOS;  // mg_eig_type[level];
+    mg_eig_param.eig_type = (input_struct.deflate_block_size > 1) ? QUDA_EIG_BLK_TR_LANCZOS : QUDA_EIG_TR_LANCZOS;  // mg_eig_type[level];
     mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
-    if ((mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type)
+    if ((mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS)
         && !(mg_eig_param.spectrum == QUDA_SPECTRUM_LR_EIG || mg_eig_param.spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only a real spectrum type (LR or SR) can be passed to a Lanczos type solver");
     }
@@ -130,6 +132,8 @@ namespace quda
     mg_eig_param.n_ev_deflate = -1; // deflate everything that converged
     mg_eig_param.compute_evals_batch_size
       = (input_struct.nvec[level] % 16 == 0) ? 16 : 1; // compute the eigenvalues in appropriate batches
+    mg_eig_param.block_size
+      = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : input_struct.deflate_block_size; // mg_eig_block_size[level];
     mg_eig_param.batched_rotate = 0;                   // mg_eig_batched_rotate[level];
     mg_eig_param.require_convergence
       = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
