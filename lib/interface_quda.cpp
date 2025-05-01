@@ -5518,8 +5518,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   return 0;
 }
 
-void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore, double omega,
-                                QudaGaugeParam *param)
+void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeFixParam *fix_param, QudaGaugeParam *param)
 {
   auto profile = pushProfile(GaugeFixOVRQuda);
   checkGaugeParam(param);
@@ -5552,26 +5551,32 @@ void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int max
   GaugeField *cudaOutGaugeEx = createExtendedGauge(cudaOutGauge, R, GaugeFixOVRQuda);
 
   double functional_old = DBL_EPSILON, functional, theta, diff, criterion, quality[2];
-  bool compute_theta = param->gauge_fix_compute_theta ? true : false;
-  bool use_theta = param->gauge_fix_use_theta ? true : false;
-  if (use_theta && !compute_theta) { errorQuda("gauge_fix_compute_theta must be true if gauge_fix_use_theta is true"); }
-  gaugeFixingQuality(quality, *cudaInGaugeEx, dir_ignore, compute_theta);
+  bool compute_theta = fix_param->compute_theta;
+  bool use_theta = fix_param->use_theta;
+  if (use_theta && !compute_theta) { errorQuda("compute_theta must be true if use_theta is true"); }
+  gaugeFixingQuality(quality, *cudaInGaugeEx, fix_param->dir_ignore, compute_theta);
   functional = quality[0];
   theta = quality[1];
   diff = (functional - functional_old) / functional_old;
   criterion = use_theta ? theta : diff;
   int iter = 0;
   logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
-  while (iter < maxiter && criterion > tol) {
-    gaugeFixingOVR2(*cudaRotationEx, *cudaInGaugeEx, omega, dir_ignore);
+  while (iter < fix_param->maxiter && criterion > fix_param->tol) {
+    gaugeFixingOVR2(*cudaRotationEx, *cudaInGaugeEx, fix_param->omega, fix_param->dir_ignore);
     gaugeRotation(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx);
-    gaugeFixingQuality(quality, *cudaOutGaugeEx, dir_ignore, compute_theta);
+    gaugeFixingQuality(quality, *cudaOutGaugeEx, fix_param->dir_ignore, compute_theta);
     functional_old = functional;
     functional = quality[0];
     theta = quality[1];
     diff = (functional - functional_old) / functional_old;
     criterion = use_theta ? theta : diff;
     iter++;
+    if (iter % fix_param->verbose_interval == 0) {
+      logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
+              theta);
+    }
+  }
+  if (iter % fix_param->verbose_interval != 0 && iter < fix_param->maxiter) {
     logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
   }
 

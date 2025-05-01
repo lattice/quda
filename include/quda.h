@@ -881,6 +881,18 @@ extern "C" {
                                         A negative value means 3D for APE/STOUT and 4D for OVRIMP_STOUT/HYP */
   } QudaGaugeSmearParam;
 
+  typedef struct QudaGaugeFixParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct */
+    double tol;           /**< Tolerance of the fixing */
+    int maxiter;          /**< The maximum number of fixing steps to perform. */
+    int dir_ignore;       /**< The direction to be ignored by the fixing algorithm */
+    double omega;         /**< Parameter used for OVR algorithm */
+    double alpha;         /**< Parameter used for FFT algorithm */
+    int verbose_interval; /**< Interval at which to print the gauge fixing progress */
+    bool compute_theta;   /**< Compute theta as the quality metric */
+    bool use_theta;       /**< Use theta as the criterion */
+  } QudaGaugeFixParam;
+
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
@@ -1775,8 +1787,7 @@ extern "C" {
    * @param[in] omega The over-relaxation parameter, most common value is 1.5 or 1.7
    * @param[in] param Parameters of the external fields
    */
-  void computeGaugeFixingOVR2Quda(void *rotation, void *gauge, double tol, int maxiter, int dir_ignore, double omega,
-                                  QudaGaugeParam *param);
+  void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeFixParam *fix_param, QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

@@ -1,7 +1,6 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <su3_project.cuh>
 #include <kernel.h>
 #include <kernels/gauge_utils.cuh>
 
@@ -42,9 +41,17 @@ namespace quda
     }
   };
 
-  // g' = \frac{K^\dagger g^\dagger}{\sqrt{\det(K^\dagger g^\dagger)}} g = \frac{K^\dagger}{\sqrt{\det(K^\dagger)}}
-  template <int su2_index, bool over_relaxation, typename Link, typename Float>
-  __device__ __host__ inline void minimize_gK(Link &g, Link &gK, Float versors[4], Float omega)
+  /**
+   * @brief Maximize the real trace of UW in SU(2) subgroups and apply
+   * the result to U. Note it's equivalent to a closest unitary matrix
+   * problem in SU(2) subgroups.
+   * U' = \argmax_{U}\mathfrak{Re}\mathrm{Tr}(UV) = \argmin_{U}||U-V^\dagger||_F^2
+   * Specifically, for GL(2,C) matrices, we have
+   * U = \frac{V^\dagger}{\sqrt{\det(V^\dagger)}}
+   * Also accepts the over-relaxation parameter for gauge fixing
+   */
+  template <int su2_index, typename Float, typename Arg>
+  __host__ __device__ inline void argmaxReTrUW(Matrix<complex<Float>, 3> &U, Matrix<complex<Float>, 3> &W, const Arg &arg)
   {
     int i1, i2;
     switch (su2_index) {
@@ -54,35 +61,70 @@ namespace quda
     default: break;
     }
 
-    versors[0] = gK(i1, i1).real() + gK(i2, i2).real();
-    versors[1] = gK(i1, i1).imag() - gK(i2, i2).imag();
-    versors[2] = gK(i1, i2).real() - gK(i2, i1).real();
-    versors[3] = gK(i1, i2).imag() + gK(i2, i1).imag();
+    Matrix<complex<Float>, 3> V = U * W;
+    Float versors[4];
+
+    versors[0] = V(i1, i1).real() + V(i2, i2).real();
+    versors[1] = V(i1, i1).imag() - V(i2, i2).imag();
+    versors[2] = V(i1, i2).real() - V(i2, i1).real();
+    versors[3] = V(i1, i2).imag() + V(i2, i1).imag();
 
     Float norm
       = sqrt(versors[0] * versors[0] + versors[1] * versors[1] + versors[2] * versors[2] + versors[3] * versors[3]);
-    versors[0] /= norm;
+    if (norm > arg.tolerance) {
+      Float inv_norm = 1.0 / norm;
+      versors[0] *= inv_norm;
 #pragma unroll
-    for (int i = 1; i < 4; ++i) { versors[i] /= -norm; }
+      for (int i = 1; i < 4; ++i) { versors[i] *= -inv_norm; }
+    } else {
+      versors[0] = 1.0;
+#pragma unroll
+      for (int i = 1; i < 4; ++i) { versors[i] = 0.0; }
+    }
 
-    if constexpr (over_relaxation) {
+    if constexpr (Arg::over_relaxation) {
       Float sin_angle, cos_angle;
       Float angle = acos(versors[0]);
-      sincos(omega * angle, &sin_angle, &cos_angle);
+      sincos(arg.omega * angle, &sin_angle, &cos_angle);
       Float coeff = sin_angle / sin(angle);
       versors[0] = cos_angle;
 #pragma unroll
       for (int i = 1; i < 4; ++i) { versors[i] *= coeff; }
     }
 
-    setIdentity(&gK);
-    gK(i1, i1) = complex(versors[0], versors[1]);
-    gK(i2, i2) = complex(versors[0], -versors[1]);
-    gK(i1, i2) = complex(versors[2], versors[3]);
-    gK(i2, i1) = complex(-versors[2], versors[3]);
+    setIdentity(&V);
+    V(i1, i1) = complex(versors[0], versors[1]);
+    V(i2, i2) = complex(versors[0], -versors[1]);
+    V(i1, i2) = complex(versors[2], versors[3]);
+    V(i2, i1) = complex(-versors[2], versors[3]);
 
-    g = gK * g;
+    U = V * U;
   }
+
+  // /**
+  //  * @brief Solving the closest unitary matrix in SU(2) subgroups.
+  //  * This is another way to project the input matrix on the SU(3) group.
+  //  */
+  // template <typename Float, typename Arg>
+  // __host__ __device__ inline void closestSu3(Matrix<complex<Float>,3> &in, Float tol)
+  // {
+  //   Matrix<complex<Float>, 3> out;
+  //   setIdentity(&out);
+
+  //   constexpr int max_iter = 100;
+  //   int i = 0;
+  //   Float old_retr, retr = getTrace(in).real();
+  //   do { // iterate until matrix is unitary
+  //     // loop over SU(2) subgroup indices
+  //     argmaxReTrUW<0, Float>(out, in);
+  //     argmaxReTrUW<1, Float>(out, in);
+  //     argmaxReTrUW<2, Float>(out, in);
+  //     old_retr = retr;
+  //     retr = getTrace(out * in).real();
+  //   } while (abs(retr - old_retr) / old_retr > tol && ++i < max_iter);
+
+  //   in = out;
+  // }
 
   template <typename Arg> struct GaugeFix {
     const Arg &arg;
@@ -119,15 +161,10 @@ namespace quda
         }
       }
 
-      real versors[4];
       // loop over SU(2) subgroup indices
-      tmp = g * K;
-      minimize_gK<0, Arg::over_relaxation>(g, tmp, versors, arg.omega);
-      tmp = g * K;
-      minimize_gK<1, Arg::over_relaxation>(g, tmp, versors, arg.omega);
-      tmp = g * K;
-      minimize_gK<2, Arg::over_relaxation>(g, tmp, versors, arg.omega);
-      polarSu3(g, arg.tolerance);
+      argmaxReTrUW<0, real>(g, K, arg);
+      argmaxReTrUW<1, real>(g, K, arg);
+      argmaxReTrUW<2, real>(g, K, arg);
 
       arg.rot(0, linkIndex(x, X), parity) = g;
     }
