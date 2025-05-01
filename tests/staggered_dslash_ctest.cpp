@@ -11,10 +11,10 @@ using ::testing::Range;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, int, int>>
+class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>>
 {
 protected:
-  ::testing::tuple<int, int, int, int, int> param;
+  ::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor> param;
 
   bool skip()
   {
@@ -68,8 +68,8 @@ public:
     }
     updateR();
 
-    int dd_value = ::testing::get<3>(GetParam());
-    int dd_color = ::testing::get<4>(GetParam());
+    QudaDomainDecompositionType dd_value = ::testing::get<3>(GetParam());
+    QudaDomainDecompositionColor dd_color = ::testing::get<4>(GetParam());
 
     dslash_test_wrapper.init_ctest(prec, recon, dd_value, dd_color);
     display_test_info(prec, recon);
@@ -169,28 +169,29 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, int, int>> param)
+std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>> param)
 {
   const int prec = ::testing::get<0>(param.param);
   const int recon = ::testing::get<1>(param.param);
   const int part = ::testing::get<2>(param.param);
-  const int dd = ::testing::get<3>(param.param);
-  const int col = ::testing::get<4>(param.param);
+  const QudaDomainDecompositionType dd = ::testing::get<3>(param.param);
+  const QudaDomainDecompositionColor col = ::testing::get<4>(param.param);
   std::stringstream ss;
   // ss << get_dslash_str(dslash_type) << "_";
   ss << get_prec_str(getPrecision(prec));
   ss << "_r" << recon;
   ss << "_partition" << part;
-  if (dd > 0) {
+  if (dd != QUDA_NO_DD) {
     switch (dd) {
-    case 1: ss << "_dd_local"; break;
-    case 2: ss << "_dd_global"; break;
+    case QUDA_DDBLOCK_HALFLOCALL: ss << "_dd_local"; break;
+    case QUDA_DDBLOCK_HALFGLOBALL: ss << "_dd_global"; break;
+    default: break;
     }
     switch (col) {
-    case 0: ss << "_red_red"; break;
-    case 1: ss << "_black_red"; break;
-    case 2: ss << "_red_black"; break;
-    case 3: ss << "_black_black"; break;
+    case QUDA_DD_COLOR_RED_RED: ss << "_red_red"; break;
+    case QUDA_DD_COLOR_BLACK_RED: ss << "_black_red"; break;
+    case QUDA_DD_COLOR_RED_BLACK: ss << "_red_black"; break;
+    case QUDA_DD_COLOR_BLACK_BLACK: ss << "_black_black"; break;
     }
   } else if (col > 0) {
     ss << "_skipped" << col;
@@ -215,7 +216,7 @@ std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<i
 INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, N_PARTITIONS), Range(0, N_DD_TESTS), Range(0, N_DD_COLS)),
+                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD, QUDA_DDBLOCK_HALFLOCALL, QUDA_DDBLOCK_HALFGLOBALL), ::testing::Values(QUDA_DD_COLOR_RED_RED, QUDA_DD_COLOR_BLACK_RED, QUDA_DD_COLOR_RED_BLACK, QUDA_DD_COLOR_BLACK_BLACK)),
                          getstaggereddslashtestname);
 
 #undef N_PARTITIONS

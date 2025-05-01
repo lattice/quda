@@ -105,7 +105,7 @@ struct StaggeredDslashTestWrapper {
     }
   }
 
-  void init_ctest(int precision, QudaReconstructType link_recon_, int dd_value, int dd_color)
+  void init_ctest(int precision, QudaReconstructType link_recon_, QudaDomainDecompositionType dd_value, QudaDomainDecompositionColor dd_color)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -225,33 +225,29 @@ struct StaggeredDslashTestWrapper {
     setVerbosity(verbosity);
   }
 
-  void init_domain_decomposition(int value, int color)
+  void init_domain_decomposition(QudaDomainDecompositionType value, QudaDomainDecompositionColor color)
   {
-    if (value == 0) {
+    if (value == QUDA_NO_DD) {
       test_domain_decomposition = false;
       return;
     }
     test_domain_decomposition = true;
     dd_col = color;
 
-    if (value < 3) {
+    // dd_block_size is half of the local lattice
+    if (value == QUDA_DDBLOCK_HALFLOCALL) {
       dd_red_black = true;
 
-      // dd_block_size is half of the local lattice
-      if (value == 1) {
-        for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
-        return;
-      }
-
-      // dd_block_size is half of the global lattice
-      if (value == 2) {
-        for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
-        return;
-      }
-
-    } else {
-      dd_red_black = false;
+      for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
+      return;
     }
+
+    // dd_block_size is half of the global lattice
+    if (value == QUDA_DDBLOCK_HALFGLOBALL) {
+      for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
+      return;
+    }
+
     errorQuda("Unexpected value for domain decomposition (%d)", value);
   }
 
