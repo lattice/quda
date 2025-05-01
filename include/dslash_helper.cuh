@@ -151,20 +151,14 @@ namespace quda
       }
     }
     coord.s = s;
+
+#pragma unroll
+    for (int d = 0; d < nDim; d++) {
+      coord.in_boundary[1][d] = coord[d] + arg.nFace >= arg.dc.X[d];
+      coord.in_boundary[0][d] = coord[d] - arg.nFace < 0;
+    }
+
     return coord;
-  }
-
-  /**
-     @brief Compute whether the provided coordinate is within the halo
-     region boundary of a given dimension.
-
-     @param[in] coord Coordinates
-     @param[in] Arg Dslash argument struct
-     @return True if in boundary, else false
-  */
-  template <int dim, typename Coord, typename Arg> inline __host__ __device__ bool inBoundary(const Coord &coord, const Arg &arg)
-  {
-    return ((coord[dim] >= arg.dc.X[dim] - arg.nFace) || (coord[dim] < arg.nFace));
   }
 
   /**
@@ -212,20 +206,20 @@ namespace quda
 
       case 2: // threadDim = Z
         if (!arg.commDim[3]) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.commDim[3] && (coord.in_boundary[0][3] || coord.in_boundary[1][3])) return false;
         break;
 
       case 1: // threadDim = Y
         if ((!arg.commDim[3]) && (!arg.commDim[2])) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
+        if (arg.commDim[3] && (coord.in_boundary[0][3] || coord.in_boundary[1][3])) return false;
+        if (arg.commDim[2] && (coord.in_boundary[0][2] || coord.in_boundary[1][2])) return false;
         break;
 
       case 0: // threadDim = X
         if ((!arg.commDim[3]) && (!arg.commDim[2]) && (!arg.commDim[1])) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
-        if (arg.commDim[1] && inBoundary<1>(coord, arg)) return false;
+        if (arg.commDim[3] && (coord.in_boundary[0][3] || coord.in_boundary[1][3])) return false;
+        if (arg.commDim[2] && (coord.in_boundary[0][2] || coord.in_boundary[1][2])) return false;
+        if (arg.commDim[1] && (coord.in_boundary[0][1] || coord.in_boundary[1][1])) return false;
         break;
 
       default: break;

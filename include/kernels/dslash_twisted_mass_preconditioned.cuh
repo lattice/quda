@@ -61,8 +61,7 @@ namespace quda
       {                              // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
-        const bool ghost
-            = (coord[d] + arg.nFace >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
@@ -99,7 +98,7 @@ namespace quda
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = back_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
-        const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours

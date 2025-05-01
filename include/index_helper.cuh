@@ -236,6 +236,7 @@ namespace quda {
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
+    array_2d<bool, 2, nDim> in_boundary = {};
   };
 
   /**
@@ -252,20 +253,20 @@ namespace quda {
   {
     switch (dir) {
     case +1: // positive direction
-      switch (mu) { //  this is questionable
-      case 0: return (x[0] == arg.X[0] - 1 ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
-      case 1: return (x[1] == arg.X[1] - 1 ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
-      case 2: return (x[2] == arg.X[2] - 1 ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
-      case 3: return (x[3] == arg.X[3] - 1 ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
-      case 4: return (x[4] == arg.X[4] - 1 ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
+      switch (mu) {
+      case 0: return (x.in_boundary[1][0] ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
+      case 1: return (x.in_boundary[1][1] ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
+      case 2: return (x.in_boundary[1][2] ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
+      case 3: return (x.in_boundary[1][3] ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
+      case 4: return (x.in_boundary[1][4] ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
       }
     case -1:
       switch (mu) {
-      case 0: return (x[0] == 0 ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
-      case 1: return (x[1] == 0 ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
-      case 2: return (x[2] == 0 ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
-      case 3: return (x[3] == 0 ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
-      case 4: return (x[4] == 0 ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
+      case 0: return (x.in_boundary[0][0] ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
+      case 1: return (x.in_boundary[0][1] ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
+      case 2: return (x.in_boundary[0][2] ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
+      case 3: return (x.in_boundary[0][3] ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
+      case 4: return (x.in_boundary[0][4] ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
       }
     }
     return 0; // should never reach here
@@ -851,11 +852,11 @@ namespace quda {
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
 
     int dims[3] = {};
-    int d2 = 0;
+    int d1 = 0;
 #pragma unroll
-    for (int d1 = 0; d1 < 3; d1++) { // this will evaluate at compile time
-      if (d1 == dim) continue;
-      dims[d1] = arg.dc.X[d2++];
+    for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
+      if (d2 == dim) continue;
+      dims[d1++] = arg.dc.X[d2];
     }
 
     /*y,z,t here are face indexes in new order*/

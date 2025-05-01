@@ -115,7 +115,7 @@ namespace quda
 
       // improved - forward direction
       if (arg.improved) {
-        const bool ghost = (coord[d] + 3 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
           const Link L = arg.L(d, coord.x_cb, parity);
@@ -165,7 +165,7 @@ namespace quda
 
       // improved - backward direction
       if (arg.improved) {
-        const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
