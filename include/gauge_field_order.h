@@ -1547,9 +1547,9 @@ namespace quda {
         Reconstruct<length, Float, recon, ghostExchange_, stag_phase> reconstruct;
         static constexpr int reconLen = recon;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
-        static constexpr int N = gauge::get_vector_order<Float, reconLen>();
-        static constexpr int M = reconLen / N;
-        static constexpr int Nrem = reconLen - M * N - hasPhase;
+        static constexpr int N = gauge::get_vector_order<Float, reconLen - hasPhase>();
+        static constexpr int M = (reconLen - hasPhase) / N;
+        static constexpr int Nrem = reconLen - hasPhase - M * N;
         static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");
         Float *gauge;
         const AllocInt offset;
