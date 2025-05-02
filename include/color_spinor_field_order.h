@@ -1276,7 +1276,7 @@ namespace quda
       GhostNOrder(const ColorSpinorField &a, int nFace = 1, Float **ghost_ = 0)
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
-        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost(), a.SiteSubset());
       }
 
       GhostNOrder &operator=(const GhostNOrder &) = default;
