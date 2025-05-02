@@ -243,7 +243,6 @@ namespace quda
     const QudaReconstructType reconstruct;
 
     const int_fastdiv X0h;
-    const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 
     const bool dagger; // dagger
@@ -307,7 +306,6 @@ namespace quda
       nParity(in.SiteSubset()),
       reconstruct(U.Reconstruct()),
       X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
-      volumeCB(in.VolumeCB()),
       dagger(dagger),
       xpay(xpay),
       kernel_type(INTERIOR_KERNEL),

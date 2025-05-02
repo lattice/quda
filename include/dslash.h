@@ -136,12 +136,12 @@ namespace quda
         }
       }
 
-      arg.halo.resetGhost(ghost);
+      arg.halo.resetGhost(ghost, halo.SiteSubset());
 
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
-        arg.halo_pack.resetGhost(this->packBuffer);
+        arg.halo_pack.resetGhost(this->packBuffer, halo.SiteSubset());
         tp.grid.x += arg.pack_blocks;
         arg.counter = dslash::get_dslash_shmem_sync_counter();
       }

@@ -994,7 +994,6 @@ namespace quda
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using norm_type = float;
-      int nParity;
       array<int, 4> faceVolumeCB = {};
       mutable array<Float *, 8> ghost = {};
       mutable array<norm_type *, 8> ghost_norm = {};
@@ -1002,15 +1001,15 @@ namespace quda
       GhostNOrder() = default;
       GhostNOrder(const GhostNOrder &) = default;
 
-      GhostNOrder(const ColorSpinorField &a, int nFace = 1, Float **ghost_ = 0) : nParity(a.SiteSubset())
+      GhostNOrder(const ColorSpinorField &a, int nFace = 1, Float **ghost_ = 0)
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
-        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost(), a.SiteSubset());
       }
 
       GhostNOrder &operator=(const GhostNOrder &) = default;
 
-      void resetGhost(void *const *ghost_) const
+      void resetGhost(void *const *ghost_, int nParity) const
       {
         for (int dim = 0; dim < 4; dim++) {
           for (int dir = 0; dir < 2; dir++) {
@@ -1267,7 +1266,6 @@ namespace quda
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using norm_type = float;
-      int nParity;
       array<int, 4> faceVolumeCB = {};
       mutable array<Float *, 8> ghost = {};
       mutable array<norm_type *, 8> ghost_norm = {};
@@ -1275,7 +1273,7 @@ namespace quda
       GhostNOrder() = default;
       GhostNOrder(const GhostNOrder &) = default;
 
-      GhostNOrder(const ColorSpinorField &a, int nFace = 1, Float **ghost_ = 0) : nParity(a.SiteSubset())
+      GhostNOrder(const ColorSpinorField &a, int nFace = 1, Float **ghost_ = 0)
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
         resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
@@ -1283,7 +1281,7 @@ namespace quda
 
       GhostNOrder &operator=(const GhostNOrder &) = default;
 
-      void resetGhost(void *const *ghost_) const
+      void resetGhost(void *const *ghost_, int) const
       {
         for (int dim = 0; dim < 4; dim++) {
           for (int dir = 0; dir < 2; dir++) {

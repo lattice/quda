@@ -70,7 +70,7 @@ namespace quda {
           ghost[2 * dim + dir] = (char *)x_halo.Ghost2() + x_halo.GhostOffset(dim, dir);
         }
       }
-      this->x_halo.resetGhost(ghost);
+      this->x_halo.resetGhost(ghost, x_halo.SiteSubset());
       ColorSpinorField::bufferIndex = (1 - ColorSpinorField::bufferIndex);
 
       for (int dim = 0; dim < 4; dim++) {
@@ -78,7 +78,7 @@ namespace quda {
           ghost[2 * dim + dir] = (char *)p_halo.Ghost2() + p_halo.GhostOffset(dim, dir);
         }
       }
-      this->p_halo.resetGhost(ghost);
+      this->p_halo.resetGhost(ghost, x_halo.SiteSubset());
       ColorSpinorField::bufferIndex = (1 - ColorSpinorField::bufferIndex);
     }
   };
