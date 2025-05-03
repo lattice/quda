@@ -8,7 +8,7 @@ namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, int parity_, bool over_relaxation_>
-  struct GaugeFixArg : kernel_param<> {
+  struct FixGaugeArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -26,7 +26,7 @@ namespace quda
     const int dir_ignore;
     const Float tolerance;
 
-    GaugeFixArg(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore) :
+    FixGaugeArg(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore) :
       kernel_param(dim3(u.LocalVolumeCB())),
       rot(rot),
       u(u),
@@ -126,9 +126,9 @@ namespace quda
   //   in = out;
   // }
 
-  template <typename Arg> struct GaugeFix {
+  template <typename Arg> struct FixGauge {
     const Arg &arg;
-    constexpr GaugeFix(const Arg &arg) : arg(arg) { }
+    constexpr FixGauge(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

@@ -59,7 +59,7 @@ set (QUDA_OBJS
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp
   spin_duplicate.cu
-  spinor_noise.cu spinor_dilute.cu spinor_reweight.cu
+  spinor_noise.cu spinor_dilute.cu spinor_reweight.cu spinor_rotate.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -86,7 +86,7 @@ set (QUDA_OBJS
   inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu gauge_fix_ovr2.cu gauge_fix_quality.cu
-  gauge_rotation.cu pgauge_det_trace.cu clover_outer_product.cu
+  gauge_rotate.cu pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu

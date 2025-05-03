@@ -1065,6 +1065,13 @@ namespace quda
                     const lat_dim_t &local_block = {});
 
   /**
+   * @brief Rotate spinor field \psi(x) with rotation field g(x).
+   * @param[in,out] src Rotated spinor field \psi'(x) = g(x)\psi(x)
+   * @param[in] rot Rotation field g(x)
+   */
+  void spinorRotate(ColorSpinorField &src, const GaugeField &rot);
+
+  /**
      @brief Reweight a color spinor for distance preconditioning
      @param[out] src The colorspinorfield
      @param[in] alpha0 The parameter for distance preconditioning, negative value means a inversed reweighting

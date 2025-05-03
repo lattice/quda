@@ -7,8 +7,7 @@
 
 namespace quda
 {
-
-  template <typename Float_, int nColor_, QudaReconstructType recon_> struct GaugeRotateArg : kernel_param<> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct RotateGaugeArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -22,19 +21,19 @@ namespace quda
     int X[4]; // grid dimensions
     int border[4];
 
-    GaugeRotateArg(GaugeField &out, const GaugeField &in, const GaugeField &rot) :
+    RotateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &rot) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, 4)), out(out), in(in), rot(rot)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        border[dir] = in.R()[dir];
-        X[dir] = in.X()[dir] - border[dir] * 2;
+        border[dir] = rot.R()[dir];
+        X[dir] = rot.X()[dir] - border[dir] * 2;
       }
     }
   };
 
-  template <typename Arg> struct GaugeRotate {
+  template <typename Arg> struct RotateGauge {
     const Arg &arg;
-    constexpr GaugeRotate(const Arg &arg) : arg(arg) { }
+    constexpr RotateGauge(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

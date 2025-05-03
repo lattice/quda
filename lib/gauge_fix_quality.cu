@@ -55,7 +55,7 @@ namespace quda
 
   }; // GaugeFixingQuality
 
-  void gaugeFixingQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta)
+  void gaugeFixQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta)
   {
     if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 

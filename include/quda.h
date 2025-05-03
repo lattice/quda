@@ -1789,6 +1789,9 @@ extern "C" {
    */
   void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeFixParam *fix_param, QudaGaugeParam *param);
 
+  void spinorRotateQuda(void *spinor, void *rotation, QudaInvertParam *inv_param, QudaGaugeParam *param);
+  void gaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed

@@ -10,7 +10,7 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeFixingOVR : TunableKernel1D
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeFix : TunableKernel1D
   {
     GaugeField &rot;
     const GaugeField &u;
@@ -21,7 +21,7 @@ namespace quda
     unsigned int minThreads() const { return u.LocalVolumeCB(); }
 
   public:
-    GaugeFixingOVR(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore, int parity) :
+    GaugeFix(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore, int parity) :
       TunableKernel1D(u),
       rot(rot),
       u(u),
@@ -41,19 +41,19 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (omega == 1.0) {
         if (parity == 0) {
-          GaugeFixArg<Float, nColor, recon, 0, false> arg(rot, u, omega, dir_ignore);
-          launch<GaugeFix>(tp, stream, arg);
+          FixGaugeArg<Float, nColor, recon, 0, false> arg(rot, u, omega, dir_ignore);
+          launch<FixGauge>(tp, stream, arg);
         } else if (parity == 1) {
-          GaugeFixArg<Float, nColor, recon, 1, false> arg(rot, u, omega, dir_ignore);
-          launch<GaugeFix>(tp, stream, arg);
+          FixGaugeArg<Float, nColor, recon, 1, false> arg(rot, u, omega, dir_ignore);
+          launch<FixGauge>(tp, stream, arg);
         }
       } else {
         if (parity == 0) {
-          GaugeFixArg<Float, nColor, recon, 0, true> arg(rot, u, omega, dir_ignore);
-          launch<GaugeFix>(tp, stream, arg);
+          FixGaugeArg<Float, nColor, recon, 0, true> arg(rot, u, omega, dir_ignore);
+          launch<FixGauge>(tp, stream, arg);
         } else if (parity == 1) {
-          GaugeFixArg<Float, nColor, recon, 1, true> arg(rot, u, omega, dir_ignore);
-          launch<GaugeFix>(tp, stream, arg);
+          FixGaugeArg<Float, nColor, recon, 1, true> arg(rot, u, omega, dir_ignore);
+          launch<FixGauge>(tp, stream, arg);
         }
       }
     }
@@ -73,9 +73,9 @@ namespace quda
         * u.LocalVolume();
     }
 
-  }; // GaugeFixingOVR
+  }; // GaugeFix
 
-  void gaugeFixingOVR2(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore)
+  void gaugeFixOVRStep(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore)
   {
     checkPrecision(rot, u);
     checkReconstruct(rot, u);
@@ -84,9 +84,9 @@ namespace quda
     if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeFixingOVR>(rot, u, omega, dir_ignore, 0);
+    instantiate<GaugeFix>(rot, u, omega, dir_ignore, 0);
     rot.exchangeExtendedGhost(rot.R(), false);
-    instantiate<GaugeFixingOVR>(rot, u, omega, dir_ignore, 1);
+    instantiate<GaugeFix>(rot, u, omega, dir_ignore, 1);
     rot.exchangeExtendedGhost(rot.R(), false);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }

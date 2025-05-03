@@ -5,12 +5,12 @@
 #include <comm_quda.h>
 #include <instantiate.h>
 #include <tunable_nd.h>
-#include <kernels/gauge_rotation.cuh>
+#include <kernels/gauge_rotate.cuh>
 
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeRotation : TunableKernel3D
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeRotate : TunableKernel3D
   {
     GaugeField &out;
     const GaugeField &in;
@@ -19,7 +19,7 @@ namespace quda
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
   public:
-    GaugeRotation(GaugeField &out, const GaugeField &in, const GaugeField &rot) :
+    GaugeRotate(GaugeField &out, const GaugeField &in, const GaugeField &rot) :
       TunableKernel3D(in, 2, 4), out(out), in(in), rot(rot)
     {
       apply(device::get_default_stream());
@@ -28,7 +28,7 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<GaugeRotate>(tp, stream, GaugeRotateArg<Float, nColor, recon>(out, in, rot));
+      launch<RotateGauge>(tp, stream, RotateGaugeArg<Float, nColor, recon>(out, in, rot));
     }
 
     void preTune() { out.backup(); } // defensive measure in case they alias
@@ -43,16 +43,16 @@ namespace quda
         * 4 * in.LocalVolume();
     }
 
-  }; // GaugeRotate
+  }; // RotateGauge
 
-  void gaugeRotation(GaugeField &out, const GaugeField &in, const GaugeField &rot)
+  void gaugeRotate(GaugeField &out, const GaugeField &in, const GaugeField &rot)
   {
     checkPrecision(out, in, rot);
     checkReconstruct(out, in, rot);
     checkNative(out, in, rot);
 
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugeRotation>(out, in, rot);
+    instantiate<GaugeRotate>(out, in, rot);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
