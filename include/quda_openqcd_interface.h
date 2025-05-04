@@ -75,6 +75,7 @@ typedef struct {
 typedef struct {
   int qhat;
   double m0, su3csw, u1csw, cF[2], theta[3];
+  double mu;     /* mu: twisted mass */
 } dirac_parms_t;
 
 typedef struct {
@@ -277,22 +278,20 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
  *             setup to a field. All fields passed and returned are host (CPU)
  *             fields in openQCD order.
  *
- * @param[in]  mu    Twisted mass parameter
  * @param[in]  in    Input spinor (host pointer)
  * @param[out] out   Output spinor (host pointer)
  */
-void openQCD_qudaDw(double mu, void *in, void *out);
+void openQCD_qudaDw(void *in, void *out);
 
 /**
  * @brief      Apply the Dirac operator that corresponds to the current openQxD
  *             setup to a field. All fields passed and returned are devicde
  *             (GPU) fields returned by openQCD_qudaH2D().
  *
- * @param[in]  mu     Twisted mass parameter
  * @param[in]  d_in   Input spinor (device pointer)
  * @param[out] d_out  Output spinor (device pointer)
  */
-void openQCD_qudaDw_NoLoads(double mu, void *d_in, void *d_out);
+void openQCD_qudaDw_NoLoads(void *d_in, void *d_out);
 
 /**
  * Setup the solver interface to quda.  This function parses the file given by
@@ -346,7 +345,6 @@ void openQCD_qudaSolverPrintSetup(int id);
  * @param[in]  id        The solver identifier in the input file, i.e.
  *                       "Solver #". The input file is the one given by
  *                       quda_init
- * @param[in]  mu        Twisted mass parameter
  * @param[in]  source    The source
  * @param[out] solution  The solution
  * @param[out] status    If the function is able to solve the Dirac equation to
@@ -356,7 +354,7 @@ void openQCD_qudaSolverPrintSetup(int id);
  *
  * @return     Residual
  */
-double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status);
+double openQCD_qudaInvert(int id, spinor_dble* source, spinor_dble* solution, int *status);
 
 
 /**
@@ -368,7 +366,6 @@ double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* s
  * @param[in]  id         The solver identifier in the input file, i.e.
  *                        "Solver #". The input file is the one given by
  *                        quda_init
- * @param[in]  mu         Twisted mass parameter
  * @param[in]  sources    The source(s)
  * @param[out] solutions  The solution(s)
  * @param[out] status     If the function is able to solve the Dirac equation to
@@ -378,7 +375,7 @@ double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* s
  *                        that the inversion failed.
  * @param      residual   The num_src residuals
  */
-void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual);
+void openQCD_qudaInvertMultiSrc(int id, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
@@ -512,8 +509,10 @@ void openQCD_qudaGaugeFree(void);
  *                     field multiplied by kappa and we have to reverse this
  *                     when loading ours)
  * @param[in]  csw     The csw coefficient of the clover field
+ * 
+ * @param[in]  mu      The twisted-mass parameter
  */
-void openQCD_qudaCloverLoad(void *clover, double kappa, double csw);
+void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu);
 
 /**
  * @brief      Free the clover field allocated in quda.

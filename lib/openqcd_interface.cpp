@@ -674,7 +674,7 @@ void openQCD_qudaGaugeFree(void)
   qudaState.swd_ad_rev = -1;
 }
 
-void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
+void openQCD_qudaCloverLoad(void *clover, double kappa, double csw, double mu)
 {
   QudaInvertParam param = newOpenQCDParam();
   param.clover_order = QUDA_OPENQCD_CLOVER_ORDER;
@@ -689,6 +689,13 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
 
   void *buf = qudaState.init.buffer_field(0, clover);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
+    param.mu = mu;
+    
+    if (fabs(mu) > 0.0) {
+          param.twist_flavor = QUDA_TWIST_SINGLET;
+          param.dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+    }
+
     loadCloverQuda(buf, NULL, &param);
   }
 }
@@ -767,7 +774,9 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
 static ColorSpinorField *openQCD_qudaSpinorAlloc(void)
 {
   if (in_comm()) {
-    QudaInvertParam param = newOpenQCDParam();
+    /* QudaInvertParam param = newOpenQCDParam(); */
+    QudaInvertParam *param1 = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+    QudaInvertParam & param = *param1;
     ColorSpinorParam cpuParam(nullptr, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
     ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -786,7 +795,10 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 
   if (in_comm()) {
     /* sets up the necessary parameters */
-    QudaInvertParam param = newOpenQCDParam();
+    /* QudaInvertParam param = newOpenQCDParam(); */
+    QudaInvertParam *param1 = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+    QudaInvertParam & param = *param1;
+
 
     /* creates a field on the CPU */
     ColorSpinorParam cpuParam(out, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
@@ -806,7 +818,9 @@ void *openQCD_qudaH2D(void *openQCD_field)
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in)) {
 
     /* sets up the necessary parameters */
-    QudaInvertParam param = newOpenQCDParam();
+    /* QudaInvertParam param = newOpenQCDParam(); */
+    QudaInvertParam *param1 = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
+    QudaInvertParam & param = *param1;
 
     /* creates a field on the CPU */
     ColorSpinorParam cpuParam(in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
@@ -1207,7 +1221,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
         WITH_COMM(logQuda(QUDA_VERBOSE, "Loading Clover field from openQCD ...\n"));
         void *h_sw = qudaState.layout.h_sw();
         PUSH_RANGE("openQCD_qudaCloverLoad", 3);
-        openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw);
+        openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw, param->mu);
         POP_RANGE;
         clover_field_set_revision();
 
@@ -1286,7 +1300,6 @@ static void *openQCD_qudaSolverReadIn(int id)
   param->gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   param->dslash_type = QUDA_WILSON_DSLASH;
   param->kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
-  param->mu = 0.0;
   param->dagger = QUDA_DAG_NO;
   param->solution_type = QUDA_MAT_SOLUTION;
   param->solve_type = QUDA_DIRECT_SOLVE;
@@ -1296,6 +1309,12 @@ static void *openQCD_qudaSolverReadIn(int id)
   param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
   set_su3csw(param, dp.su3csw);
+
+  param->mu = dp.mu;
+  if( fabs(param->mu) > 0.0 ) {
+        param->twist_flavor = QUDA_TWIST_SINGLET;
+        param->dslash_type = QUDA_TWISTED_CLOVER_DSLASH;
+  }
 
   if (my_rank == 0 && id != -1) {
 
@@ -1322,7 +1341,7 @@ static void *openQCD_qudaSolverReadIn(int id)
 
     param->inv_type = kv.get<QudaInverterType>(section, "inv_type", param->inv_type);
     param->kappa = kv.get<double>(section, "kappa", param->kappa);
-    param->mu = kv.get<double>(section, "mu", param->mu);
+    /* param->mu = kv.get<double>(section, "mu", param->mu); Already set mu from upper section */
     param->tm_rho = kv.get<double>(section, "tm_rho", param->tm_rho);
     param->epsilon = kv.get<double>(section, "epsilon", param->epsilon);
     param->twist_flavor = kv.get<QudaTwistFlavorType>(section, "twist_flavor", param->twist_flavor);
@@ -1660,14 +1679,13 @@ void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
   qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, out, dst);
 }
 
-void openQCD_qudaDw(double mu, void *src, void *dst)
+void openQCD_qudaDw(void *src, void *dst)
 {
   if (gauge_field_get_unset()) {
     WITH_COMM(errorQuda("Gauge field not populated in openQxD."));
   }
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
-  param->mu = mu;
 
   if (!openQCD_qudaInvertParamCheck(param)) {
     WITH_COMM(errorQuda("QudaInvertParam struct check failed, parameters/fields between openQxD and QUDA are not in sync."));
@@ -1685,14 +1703,13 @@ void openQCD_qudaDw(double mu, void *src, void *dst)
   qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, out, dst);
 }
 
-void openQCD_qudaDw_NoLoads(double mu, void *d_in, void *d_out)
+void openQCD_qudaDw_NoLoads(void *d_in, void *d_out)
 {
   if (gauge_field_get_unset()) {
     WITH_COMM(errorQuda("Gauge field not populated in openQxD."));
   }
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(-1));
-  param->mu = mu;
 
   if (!openQCD_qudaInvertParamCheck(param)) {
     WITH_COMM(errorQuda("QudaInvertParam struct check failed, parameters/fields between openQxD and QUDA are not in sync."));
@@ -1817,14 +1834,14 @@ void openQCD_qudaSolverPrintSetup(int id)
   }
 }
 
-double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status)
+double openQCD_qudaInvert(int id, spinor_dble* source, spinor_dble* solution, int *status)
 {
   double residual;
-  openQCD_qudaInvertMultiSrc(id, mu, &source, &solution, status, &residual);
+  openQCD_qudaInvertMultiSrc(id, &source, &solution, status, &residual);
   return residual;
 }
 
-void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
+void openQCD_qudaInvertMultiSrc(int id, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
@@ -1840,7 +1857,6 @@ void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor
   }
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
-  param->mu = mu;
 
   if (!openQCD_qudaInvertParamCheck(param)) {
     WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
