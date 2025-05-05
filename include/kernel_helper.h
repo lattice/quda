@@ -17,6 +17,7 @@ namespace quda
   template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE, bool check_bounds_ = true> struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
     static constexpr bool check_bounds = check_bounds_;
+    static constexpr int max_regs = 0; // by default we don't limit register count
     dim3 threads;          /** number of active threads required */
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */
