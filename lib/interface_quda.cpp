@@ -227,9 +227,9 @@ static TimeProfile profileEnd("endQuda");
 //!< Profiler for GaugeFixing
 static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
 static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
-static TimeProfile profileGaugeFix("gaugeFixQuda");
-static TimeProfile profileGaugeRotate("gaugeRotateQuda");
-static TimeProfile profileSpinorRotate("spinorRotateQuda");
+static TimeProfile profileGaugeFix("performGaugeFixQuda");
+static TimeProfile profileGaugeRotate("performGaugeRotateQuda");
+static TimeProfile profileSpinorRotate("performFermionRotateQuda");
 
 //!< Profiler for toal time spend between init and end
 static TimeProfile profileInit2End("initQuda-endQuda",false);
@@ -1575,6 +1575,7 @@ namespace quda {
     case QUDA_COVDEV_DSLASH:
       diracParam.type = QUDA_GAUGE_COVDEV_DIRAC;
       diracParam.covdev_mu = inv_param->covdev_mu;
+      diracParam.covdev_shift = inv_param->covdev_shift;
       break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
@@ -5521,7 +5522,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   return 0;
 }
 
-void spinorRotateQuda(void *spinor, void *rotation, QudaInvertParam *inv_param, QudaGaugeParam *param)
+void performFermionRotateQuda(void *spinor, void *rotation, QudaInvertParam *inv_param, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileSpinorRotate);
   checkGaugeParam(param);
@@ -5550,7 +5551,7 @@ void spinorRotateQuda(void *spinor, void *rotation, QudaInvertParam *inv_param, 
   cpuSpinor.copy(cudaSpinor);
 }
 
-void gaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
+void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGaugeRotate);
   checkGaugeParam(param);

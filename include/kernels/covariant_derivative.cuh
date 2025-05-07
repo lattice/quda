@@ -14,7 +14,7 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariant derivative operator
   */
-  template <typename Float, int nSpin_, int nColor_, QudaReconstructType reconstruct_, int nDim>
+  template <typename Float, int nSpin_, int nColor_, QudaReconstructType reconstruct_, int nDim, bool shift_>
   struct CovDevArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
@@ -29,6 +29,8 @@ namespace quda
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+
+    static constexpr bool shift = shift_;
 
     typedef typename mapper<Float>::type real;
 
@@ -82,18 +84,18 @@ namespace quda
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-      const Link U = arg.U(d, coord.x_cb, parity);
+      const Link U = Arg::shift ? Link() : arg.U(d, coord.x_cb, parity);
 
       if (doHalo<kernel_type>(d) && ghost) {
 
         const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
         const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-        out += U * in;
+        out += Arg::shift ? in : U * in;
       } else if (doBulk<kernel_type>() && !ghost) {
 
         const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
-        out += U * in;
+        out += Arg::shift ? in : U * in;
       }
 
     } else { // Backward gather - compute back offset for spinor and gauge fetch
@@ -106,16 +108,16 @@ namespace quda
       if (doHalo<kernel_type>(d) && ghost) {
 
         const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-        const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
+        const Link U = Arg::shift ? Link() : arg.U.Ghost(d, ghost_idx, 1 - parity);
         const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-        out += conj(U) * in;
+        out += Arg::shift ? in : conj(U) * in;
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        const Link U = arg.U(d, gauge_idx, 1 - parity);
+        const Link U = Arg::shift ? Link() : arg.U(d, gauge_idx, 1 - parity);
         const Vector in = arg.in[src_idx](back_idx, their_spinor_parity);
 
-        out += conj(U) * in;
+        out += Arg::shift ? in : conj(U) * in;
       }
     } // Forward/backward derivative
   }

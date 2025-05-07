@@ -44,6 +44,7 @@ namespace quda {
     GaugeField *longGauge; // used by staggered only
     int laplace3D;
     int covdev_mu;
+    bool covdev_shift;
     CloverField *clover;
     GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
@@ -111,6 +112,7 @@ namespace quda {
       printfQuda("mass = %g\n", mass);
       printfQuda("laplace3D = %d\n", laplace3D);
       printfQuda("covdev_mu = %d\n", covdev_mu);
+      printfQuda("covdev_shift = %d\n", covdev_shift);
       printfQuda("m5 = %g\n", m5);
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
@@ -2240,6 +2242,7 @@ public:
 
   protected:
     int covdev_mu;
+    int covdev_shift;
 
   public:
     GaugeCovDev(const DiracParam &param);
@@ -2252,6 +2255,11 @@ public:
                           QudaParity parity, int mu) const;
     virtual void MCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const;
     virtual void MdagMCD(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const;
+
+    virtual void DslashS(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+                         int mu) const;
+    virtual void MS(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const;
+    virtual void MdagMS(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int mu) const;
 
     virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                         QudaParity parity) const override;

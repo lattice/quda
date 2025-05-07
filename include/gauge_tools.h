@@ -179,22 +179,6 @@ namespace quda
                  QudaWFlowStepType step_type);
 
   /**
-   * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
-   * @param[in,out] data, quda gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this
-   * value is zero then the method stops when iteration reachs the
-   * maximum number of steps defined by Nsteps
-   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
-   */
-  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
-
-  /**
    * @brief Rotate gauge field U_\mu(x) with rotation field g(x).
    * @param[in,out] out Rotated gauge field U'_\mu(x) = g(x)U_\mu(x)g^\dagger(x+\hat{\mu})
    * @param[in] in Gauge field U_\mu(x)
@@ -219,6 +203,22 @@ namespace quda
    * @param[in] compute_theta Set to true to compute the theta value as the criterion
    */
   void gaugeFixQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta);
+
+  /**
+   * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
+   * @param[in,out] data, quda gauge field
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
+   * @param[in] tolerance, torelance value to stop the method, if this
+   * value is zero then the method stops when iteration reachs the
+   * maximum number of steps defined by Nsteps
+   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
+   */
+  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

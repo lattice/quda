@@ -180,7 +180,8 @@ namespace quda
       LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
       nColor(3),
       nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
-             || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
+             || ((inv_param.dslash_type == QUDA_LAPLACE_DSLASH || inv_param.dslash_type == QUDA_COVDEV_DSLASH)
+                 && inv_param.staggered)) ?
               1 :
               4),
       twistFlavor(inv_param.twist_flavor),
