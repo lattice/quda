@@ -1,25 +1,12 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
-#include <string.h>
-
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-#include <comm_quda.h>
+#include <util_quda.h>
 
-#include "timer.h"
-#include "util_quda.h"
 #include "host_utils.h"
 #include "gauge_utils.h"
 #include "command_line_params.h"
 #include "dslash_reference.h"
 #include "misc.h"
-
-// In a typical application, quda.h is the only QUDA header required.
-#include <quda.h>
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
