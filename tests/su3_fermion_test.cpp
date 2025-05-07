@@ -61,7 +61,6 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-
   auto app = make_app();
   add_su3_option_group(app);
 
@@ -142,6 +141,8 @@ int main(int argc, char **argv)
 
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+  if (gauge_smear_type != QUDA_GAUGE_SMEAR_WILSON_FLOW && gauge_smear_type != QUDA_GAUGE_SMEAR_SYMANZIK_FLOW)
+    errorQuda("Smear type %d not supported - only Wilson or Symanzik supported", gauge_smear_type);
   smear_param.smear_type = gauge_smear_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
