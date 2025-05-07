@@ -853,7 +853,7 @@ namespace quda {
 
     int dims[3] = {};
     int d1 = 0;
-#pragma unroll
+#pragma unroll 4
     for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
       if (d2 == dim) continue;
       dims[d1++] = arg.dc.X[d2];
