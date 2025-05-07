@@ -23,6 +23,9 @@ namespace quda
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
 
@@ -97,6 +100,9 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);
 

@@ -21,6 +21,9 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __forceinline__ __device__ void Kernel1D_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     Functor<Arg> f(arg);
 
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -103,6 +106,9 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __forceinline__ __device__ void Kernel2D_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     Functor<Arg> f(arg);
 
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -188,6 +194,9 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __forceinline__ __device__ void Kernel3D_impl(const Arg &arg)
   {
+#ifdef QUDA_SHARED_MEMORY_SPILL
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
+#endif
     Functor<Arg> f(arg);
 
     auto i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -277,6 +286,7 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool dummy = false>
   __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(const __grid_constant__ Arg arg)
   {
+    if constexpr (Arg::spill_shared) asm(".pragma \"enable_smem_spilling\";");
     Functor<Arg> f(arg);
     f();
   }

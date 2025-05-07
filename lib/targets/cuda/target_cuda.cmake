@@ -144,6 +144,11 @@ else()
 endif()
 message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
 
+# Enable shared memory spilling
+option(QUDA_SHARED_MEMORY_SPILL "enable shared memory spilling?" OFF)
+mark_as_advanced(QUDA_SHARED_MEMORY_SPILL)
+message(STATUS "Shared memory spilling: ${QUDA_SHARED_MEMORY_SPILL}")
+
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
