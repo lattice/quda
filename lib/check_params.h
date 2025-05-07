@@ -1161,7 +1161,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
 #if defined CHECK_PARAM
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
     errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
-    
+
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif
@@ -1177,8 +1177,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(smear_anisotropy, 1.0);
   P(rk_order, 3);
   P(restart, QUDA_BOOLEAN_FALSE);
-  P(adj_n_save,5);
-  P(hier_threshold,6);
+  P(adj_n_save, 5);
+  P(hier_threshold, 6);
   P(t0, 0.0);
   P(alpha1, 0.0);
   P(alpha2, 0.0);
@@ -1193,8 +1193,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(smear_anisotropy, INVALID_DOUBLE);
   P(rk_order, (unsigned int)INVALID_INT);
   P(restart, QUDA_BOOLEAN_INVALID);
-  P(adj_n_save,(unsigned int)INVALID_INT);
-  P(hier_threshold,(unsigned int)INVALID_INT);
+  P(adj_n_save, (unsigned int)INVALID_INT);
+  P(hier_threshold, (unsigned int)INVALID_INT);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);
   P(alpha2, INVALID_DOUBLE);

@@ -16,7 +16,6 @@
 #include "dslash_reference.h"
 #include "misc.h"
 
-
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
@@ -74,7 +73,10 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) {prec = QUDA_DOUBLE_PRECISION; prec_sloppy = prec;}
+  if (prec_sloppy == QUDA_INVALID_PRECISION) {
+    prec = QUDA_DOUBLE_PRECISION;
+    prec_sloppy = prec;
+  }
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
@@ -104,7 +106,7 @@ int main(int argc, char **argv)
   saveGaugeQuda(new_gauge, &gauge_param);
   // start the timer
   quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
-    
+
   // The commented out section is all geared towards gauge observables, so unlikely to be needed for now
   // // Prepare various perf info
   // long long flops_plaquette = 6ll * 597 * V;
@@ -156,8 +158,7 @@ int main(int argc, char **argv)
   smear_param.alpha3 = gauge_smear_alpha3;
   smear_param.dir_ignore = gauge_smear_dir_ignore;
 
-
-  quda::ColorSpinorField check,check_safe,check_hier,check_fwd;  
+  quda::ColorSpinorField check, check_safe, check_hier, check_fwd;
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   invParam.cuda_prec = prec;
@@ -169,7 +170,7 @@ int main(int argc, char **argv)
 
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   check = quda::ColorSpinorField(cs_param);
-  //Add noise to spinor
+  // Add noise to spinor
   spinorNoise(check, 1234, QUDA_NOISE_GAUSS);
 
   check_safe = quda::ColorSpinorField(cs_param);
@@ -180,15 +181,15 @@ int main(int argc, char **argv)
   void *check_fwdarr[] = {check_fwd.data()};
 
   printf("Inspecting the very first element of the random fermion we will use:\n");
-  check.PrintVector(0,0,0);
+  check.PrintVector(0, 0, 0);
   printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
   printf("Hierarchical method:\n");
-  check_hier.PrintVector(0,0,0);
+  check_hier.PrintVector(0, 0, 0);
   printf("Safe method:\n");
-  check_safe.PrintVector(0,0,0);
+  check_safe.PrintVector(0, 0, 0);
   printf("Forward method:\n");
-  check_fwd.PrintVector(0,0,0);
-     
+  check_fwd.PrintVector(0, 0, 0);
+
   host_timer.start(); // start the timer
   switch (smear_param.smear_type) {
   case QUDA_GAUGE_SMEAR_APE:
@@ -198,7 +199,7 @@ int main(int argc, char **argv)
     performGaugeSmearQuda(&smear_param, obs_param);
     break;
   }
-  
+
     // Here we use a typical use case which is different from simple smearing in that
     // the user will want to compute the plaquette values to compute the gauge energy.
   case QUDA_GAUGE_SMEAR_WILSON_FLOW:
@@ -206,77 +207,78 @@ int main(int argc, char **argv)
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
-     
+
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
-    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param);
+    performAdjGFlowHier(check_hier.data(), check.data(), &invParam, &smear_param);
     host_hier_timer.stop();
     host_safe_timer.start();
-    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
+    performAdjGFlowSafe(check_safe.data(), check.data(), &invParam, &smear_param);
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
-    performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param,1);
+    performGFlowQuda(check_fwdarr, check_arr, &invParam, &smear_param, obs_param, 1);
     host_fwd_timer.stop();
-      
-    printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
-    printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
-    printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());   
-      
+
+    printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());
+    printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());
+    printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());
+
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
 
   host_timer.stop(); // stop the timer
-   
+
   printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
   printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
   printf("Hierarchical method:\n");
-  check_hier.PrintVector(0,0,0);
+  check_hier.PrintVector(0, 0, 0);
   printf("Safe method:\n");
-  check_safe.PrintVector(0,0,0);
+  check_safe.PrintVector(0, 0, 0);
   printf("Forward method:\n");
-  check_fwd.PrintVector(0,0,0);
+  check_fwd.PrintVector(0, 0, 0);
 
   double method_adj_diff = 0.;
   /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
-  for (int i = 0; i < V * 24; i++) { 
-      method_adj_diff += pow(fabs(check_safe.data<double *>()[i] - check_hier.data<double *>()[i]), 2);
+  for (int i = 0; i < V * 24; i++) {
+    method_adj_diff += pow(fabs(check_safe.data<double *>()[i] - check_hier.data<double *>()[i]), 2);
   }
-  double method_adj_check = sqrt(method_adj_diff)/(V*24.);
-  printf("Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n", method_adj_check);
-    
-  std::complex<double>trace_fwd,trace_adj;
-  trace_fwd = twoColorSpinorContract(check.data<std::complex<double>*>(), check_fwd.data<std::complex<double>*>());
-  trace_adj = twoColorSpinorContract(check.data<std::complex<double>*>(), check_safe.data<std::complex<double>*>()); 
+  double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
+  printf(
+    "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n",
+    method_adj_check);
 
-  auto trace_diff_err = 2.*std::fabs(trace_fwd - std::conj(trace_adj))/std::fabs(trace_fwd + std::conj(trace_adj));
+  std::complex<double> trace_fwd, trace_adj;
+  trace_fwd = twoColorSpinorContract(check.data<std::complex<double> *>(), check_fwd.data<std::complex<double> *>());
+  trace_adj = twoColorSpinorContract(check.data<std::complex<double> *>(), check_safe.data<std::complex<double> *>());
+
+  auto trace_diff_err = 2. * std::fabs(trace_fwd - std::conj(trace_adj)) / std::fabs(trace_fwd + std::conj(trace_adj));
 
   printf("The two numbers below should be complex conjugates of one another\n");
-  printf("<check,adj_check> is %1.5e, %1.5e \n",trace_adj.real(), trace_adj.imag());
-  printf("<check,fwd_check> is %1.5e, %1.5e \n",trace_fwd.real(), trace_fwd.imag());
+  printf("<check,adj_check> is %1.5e, %1.5e \n", trace_adj.real(), trace_adj.imag());
+  printf("<check,fwd_check> is %1.5e, %1.5e \n", trace_fwd.real(), trace_fwd.imag());
   printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
 
   double eps = 0.0;
   switch (prec) {
-    case QUDA_DOUBLE_PRECISION: eps = 1.11e-16; break;
-    case QUDA_SINGLE_PRECISION: eps = 5.96e-08; break;
-    case QUDA_HALF_PRECISION: eps = 2e-3; break;
-    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
-    default: errorQuda("Invalid precision %d", prec);
-  } 
+  case QUDA_DOUBLE_PRECISION: eps = 1.11e-16; break;
+  case QUDA_SINGLE_PRECISION: eps = 5.96e-08; break;
+  case QUDA_HALF_PRECISION: eps = 2e-3; break;
+  case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
+  default: errorQuda("Invalid precision %d", prec);
+  }
 
-    
-  if (method_adj_check > gauge_smear_steps*gauge_smear_steps*eps)
-  errorQuda("adjoint safe/hier match precision failed\n");
+  if (method_adj_check > gauge_smear_steps * gauge_smear_steps * eps)
+    errorQuda("adjoint safe/hier match precision failed\n");
   else
-  printf("adjoint safe/hier match precision passed!\n");    
+    printf("adjoint safe/hier match precision passed!\n");
 
-  if (trace_diff_err > gauge_smear_steps*gauge_smear_steps*eps)
-  errorQuda("fractional error precision failed\n");
+  if (trace_diff_err > gauge_smear_steps * gauge_smear_steps * eps)
+    errorQuda("fractional error precision failed\n");
   else
-  printf("fractional error precision passed!\n");    
+    printf("fractional error precision passed!\n");
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
@@ -289,7 +291,7 @@ int main(int argc, char **argv)
   check_hier = {};
   check_safe = {};
   check_fwd = {};
-    
+
   freeGaugeQuda();
   endQuda();
 
