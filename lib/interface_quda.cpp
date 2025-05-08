@@ -111,16 +111,15 @@ GaugeField *extendedGaugeResident = nullptr;
 /** 
  * callMultiSrcQuda related gauge split
  * update_split_gauge : 
- *   QUDA_UPDATE_SPLITE_GAUGE_OFF delete buffer after usage
- *   QUDA_UPDATE_SPLITE_GAUGE_FALSE split gauge in buf
- *   QUDA_UPDATE_SPLITE_GAUGE_TRUE  split gauge not in buf, need to call split
- * update_split_gauge set to QUDA_UPDATE_SPLITE_GAUGE_OFF if QudaGaugeParam.use_split_gauge_bkup == QUDA_BOOLEAN_FALSE, QUDA_UPDATE_SPLITE_GAUGE_TRUE if QudaGaugeParam.use_split_gauge_bkup == QUDA_BOOLEAN_TRUE
- * update_split_gauge != QUDA_UPDATE_SPLITE_GAUGE_OFF and split gauge in buf, the original links will swap with *_bkup 
+ * - QUDA_UPDATE_SPLITE_GAUGE_TRUE: the input gauge fields will be split and the buffered (split) gauges will be updated accordingly;
+ * - QUDA_UPDATE_SPLITE_GAUGE_FALSE: the input gauge fields will not be split and the buffered (split) gauges will be used for split grid solves;
+ * - QUDA_UPDATE_SPLITE_GAUGE_OFF: nothing will be done.
+ 
  * split_grid_bkup will be used to check whether split layout is changed or not
  * change in gauge precsions will need loadGaugeQuda which results in re-distribute
  * assumed no change in clover parameters
  */
-QudaUpdateSpliteGauge update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_OFF;
+QudaUpdateSplitGauge update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_OFF;
 int split_grid_bkup[QUDA_MAX_DIM];
 quda::GaugeField   *collected_gauge = nullptr;
 quda::GaugeField   *collected_milc_fatlink_field = nullptr;
@@ -602,9 +601,9 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
 
 /**
  * If keep_buffer == true :
- *   Swap between current gauges with the buffered ones (possibly splitted gauges or original gauges)
+ *   Swap the current gauges with the buffered ones (possibly split gauges or original gauges)
  * If keep_buffer == false:
- *   Delete current splitted gauges and then swap the gauges in buffers to Quda gauges
+ *   Delete the current split gauges and then swap the gauges in buffers with the current gauges
  */
 void swapGaugeSplit(const bool keep_buffer );
 
@@ -688,11 +687,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // set update_split_gauge to reuse backup or not and free the buf if needed
   // always update the flag even gauge reuse with checksum
   // better way would be do the checks more consistently along with clover/stagger
-  if(param->use_split_gauge_bkup == QUDA_BOOLEAN_TRUE){
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+  if(param->use_split_gauge_bkup == true){
+    update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   }
   else{
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_OFF;
+    update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_OFF;
     freeGaugeSplit(); // free the buf when not using
   }
 
@@ -984,8 +983,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     for (auto i = 0; i < 2; i++) inv_param->trlogA[i] = cloverPrecise->TrLog()[i];
 
     // update split gauge when clover field updated
-    if(update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_FALSE){
-      update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+    if(update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_FALSE){
+      update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
     }
   } else {
     logQuda(QUDA_VERBOSE, "Gauge field unchanged - using cached clover field\n");
@@ -1457,7 +1456,7 @@ void endQuda(void)
   {
     auto profile = pushProfile(profileEnd);
 
-    freeGaugeSplit();// free split Gauge and restore original Gauge 
+    freeGaugeSplit(); // free the split gauges and restore the original gauges
 
     freeGaugeQuda();
     freeCloverQuda();
@@ -3241,26 +3240,26 @@ void swapGaugeSplit(const bool keep_buffer)
     }
   }
 
-  if(!keep_buffer and update_split_gauge != QUDA_UPDATE_SPLITE_GAUGE_OFF){
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+  if(!keep_buffer and update_split_gauge != QUDA_UPDATE_SPLIT_GAUGE_OFF){
+    update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   }
 }
 
 void freeGaugeSplit()
 {
-  // swap current gauge with the splitted ones if splits are not null
+  // swap current gauges with the split ones if split ones are not null
   swapGaugeSplit(true);
 
-  // free the splitted gauge and swap to loaded gauge, if splits are not null
+  // free the split gauges and swap the split gauges with the buffered gauges, if split gauges are not null
   swapGaugeSplit(false);
 }
 
 void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is_clover, CommKey& split_key)
 {
-  if(update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_FALSE){
+  if(update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_FALSE){
     for(int i=0;i<4;i++){
       if(param->split_grid[i] != split_grid_bkup[i]){
-        update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+        update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
       }
     }
   }
@@ -3270,13 +3269,13 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
   if(clov_bkup){is_clover_bkup = 1;}
   if(long_links_bkup or fat_links_bkup){is_asqtad_bkup = 1;}
 
-  if(update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_FALSE and is_clover_bkup == is_clover and is_asqtad_bkup == is_asqtad){
+  if(update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_FALSE and is_clover_bkup == is_clover and is_asqtad_bkup == is_asqtad){
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Reuse split Gauge.\n");
     // swap to the buffered split gauge
     swapGaugeSplit(true);
     return ;
   }else{
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+    update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   }
 
   profilerStart(__func__);
@@ -3405,8 +3404,8 @@ void UpdateSplitGauge(QudaInvertParam *param, const int is_asqtad, const bool is
     split_grid_bkup[i] = param->split_grid[i];
   }
 
-  if(update_split_gauge != QUDA_UPDATE_SPLITE_GAUGE_OFF){
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_FALSE;
+  if(update_split_gauge != QUDA_UPDATE_SPLIT_GAUGE_OFF){
+    update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_FALSE;
   }
   profileUpdateSplitGauge.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profilerStop(__func__);
@@ -3569,8 +3568,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       for (int j = 0; j < num_sub_partition; j++) _h_x[n * num_sub_partition + j].copy(dev_buf[j]);
     }
 
-    // swap back to original links, detete split gauge if update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_OFF
-    if(update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_OFF){
+    // switch back to the original links, detete split gauge if update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_OFF
+    if(update_split_gauge == QUDA_UPDATE_SPLIT_GAUGE_OFF){
       // do not use freeGaugeSplit which have additional swap
       swapGaugeSplit(false);
     }else{
