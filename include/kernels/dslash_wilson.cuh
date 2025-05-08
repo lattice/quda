@@ -9,6 +9,7 @@
 #include <kernels/dslash_pack.cuh> // for the packing kernel
 #include <kernels/spinor_reweight.cuh>
 #include <stencil_cache.cuh>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -47,6 +48,8 @@ namespace quda
     const int t0;
     const int comm_coord_dim_3;
     const int comm_dim_dim_3;
+
+    tma_descriptor_t tma_desc;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
@@ -280,6 +283,7 @@ namespace quda
       VanillaSharedMemoryCache<typename Arg::F> cache(arg.in[src_idx], 0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb);
       int local_idx = target::thread_idx().x;
 
+#if 0
       cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
 
       while (local_idx < (0 ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb)) {
@@ -298,6 +302,49 @@ namespace quda
       }
       cuda::pipeline_consumer_wait_prior<1>(pipe);
       cache.sync();
+#else
+      barrier_t *bar = (barrier_t *)(cache._norm_ptr);
+  #ifdef __CUDA_ARCH__
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        // Initialize barrier. All `blockDim.x` threads in block participate.
+        init(bar, blockDim.x * blockDim.y * blockDim.z);
+        // Make initialized barrier visible in async proxy.
+        cde::fence_proxy_async_shared_cta();
+      }
+  #endif
+      // Syncthreads so initialized barrier is visible to all threads.
+      cache.sync();
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+        int block_idx = target::block_idx().x;
+        int block_coord[4]; // coordinate of this threadblock in the threadblock grid
+  #pragma unroll
+        for (int d = 0; d < 4; d++) {
+          block_coord[d] = block_idx % arg.tb.grid_dim[d];
+          block_idx /= arg.tb.grid_dim[d];
+        }
+
+        int block_offset[4]; // global coordinate offset
+  #pragma unroll
+        for (int d = 0; d < 4; d++) {
+          block_offset[d] = block_coord[d] * arg.tb.dim[d];
+        }
+        tma_load_gmem_5d(cache._bulk_ptr, &arg.tma_desc.map,
+          block_offset[0] / 2 * 16, block_offset[1], block_offset[2], block_offset[3], 0, bar);
+      }
+  #ifdef __CUDA_ARCH__
+      barrier_t::arrival_token token;
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
+        // Arrive on the barrier and tell how many bytes are expected to come in.
+        int bytes = arg.tb.dim[0] * arg.tb.dim[1] * arg.tb.dim[2] * arg.tb.dim[3] / 2 * 96;
+        token = cuda::device::barrier_arrive_tx(*bar, 1, bytes);
+      } else {
+        // Other threads just arrive.
+        token = bar->arrive();
+      }
+      // Wait for the data to have arrived. This also serves as a __syncthreads()
+      bar->wait(std::move(token));
+  #endif
+#endif
 
       local_idx = target::thread_idx().x;
       while (local_idx < arg.tb.volume_4d_cb) {

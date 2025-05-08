@@ -82,6 +82,8 @@ namespace quda
       data_type = CU_TENSOR_MAP_DATA_TYPE_FLOAT32;
     } else if constexpr (std::is_same_v<T, short>) {
       data_type = CU_TENSOR_MAP_DATA_TYPE_UINT16;
+    } else if constexpr (std::is_same_v<T, int8_t>) {
+      data_type = CU_TENSOR_MAP_DATA_TYPE_UINT8;
     } else {
       errorQuda("Unexpected data type for TMA descriptor creation.");
     }
@@ -177,6 +179,12 @@ namespace quda
   {
     static_assert(box_a <= tma_box_limit);
     static_assert(box_b <= tma_box_limit);
+    cde::cp_async_bulk_tensor_5d_global_to_shared(smem_ptr, map, offset_a, offset_b, offset_c, offset_d, offset_e, *bar);
+  }
+
+  __device__ void inline tma_load_gmem_5d(void *smem_ptr, const CUtensorMap *map, int offset_a,
+                                                 int offset_b, int offset_c, int offset_d, int offset_e, barrier_t *bar)
+  {
     cde::cp_async_bulk_tensor_5d_global_to_shared(smem_ptr, map, offset_a, offset_b, offset_c, offset_d, offset_e, *bar);
   }
 

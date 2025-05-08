@@ -195,7 +195,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(const __grid_constant__ Arg arg)
   {
     Kernel3D_impl<Functor, Arg, grid_stride>(arg);
   }

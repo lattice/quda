@@ -20,9 +20,6 @@ namespace quda
     static constexpr size_t norm_bytes = isFixed<Float>::value ? sizeof(norm_t) : 0;
     static constexpr size_t bytes = sizeof(bulk_t) + norm_bytes;
 
-    void *_bulk_ptr;
-    void *_norm_ptr;
-
     /**
        @brief This is a dummy instantiation for the host compiler
     */
@@ -41,7 +38,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline char *operator()()
       {
-        extern __shared__ char cache__[];
+        __align__(128) extern __shared__ char cache__[];
         return reinterpret_cast<char *>(cache__);
       }
     };
@@ -63,6 +60,10 @@ namespace quda
     const int stride;
 
   public:
+
+    void *_bulk_ptr;
+    void *_norm_ptr;
+
     /**
        @brief Constructor for SharedMemoryCache.
     */

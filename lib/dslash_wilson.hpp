@@ -112,6 +112,16 @@ namespace quda
         arg.tb.volume_4d_cb = p[3] * p[2] * p[1] * p[0] / 2;
         arg.tb.volume_4d_cb_ex = arg.tb.dim_ex[3] * arg.tb.dim_ex[2] * arg.tb.dim_ex[1] * arg.tb.dim_ex[0] / 2;
 
+        std::array<size_t, 5> tensor_size = {arg.dim[0] / 2 * 16, arg.dim[1], arg.dim[2], arg.dim[3], 6};
+        std::array<size_t, 5> box_size = {p[0] / 2 * 16, p[1], p[2], p[3], 6};
+
+        printf("tensor = %lu %lu %lu %lu %lu, box = %lu %lu %lu %lu %lu\n",
+          tensor_size[0], tensor_size[1], tensor_size[2], tensor_size[3], tensor_size[4],
+          box_size[0], box_size[1], box_size[2], box_size[3], box_size[4]);
+
+        tma_descriptor_key_t<5> key = {tensor_size, box_size, arg.in[0].field};
+        arg.tma_desc = get_tma_descriptor<int8_t, 5>(key);
+
         arg.threads = tp.block.x * tp.grid.x;
         tp.set_max_shared_bytes = true;
       }
@@ -136,7 +146,7 @@ namespace quda
         if (isFixed<typename Arg::Float>::value) {
           smem_size += sizeof(float) * prod / 2;
         }
-        return smem_size;
+        return smem_size + 8;
       } else {
         return 0;
       }
