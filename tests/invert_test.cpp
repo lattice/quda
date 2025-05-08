@@ -9,10 +9,11 @@
 #include <color_spinor_field.h> // convenient quark field container
 
 // External headers
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
 #include "test.h"
 
 QudaGaugeParam gauge_param;

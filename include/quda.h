@@ -837,6 +837,8 @@ extern "C" {
     QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
     double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_rectangle;        /**< Whether to compute the rectangle */
+    double rectangle[3];                  /**< Total, spatial and temporal rectangle, respectively */
     QudaBoolean compute_polyakov_loop;    /**< Whether to compute the temporal Polyakov loop */
     double ploop[2];                      /**< Real and imaginary part of temporal Polyakov loop */
     QudaBoolean compute_gauge_loop_trace; /**< Whether to compute gauge loop traces */
@@ -863,6 +865,8 @@ extern "C" {
     unsigned int n_steps; /**< The total number of smearing steps to perform. */
     double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
                              Wilson/Symanzik flow */
+    double smear_anisotropy; /** Used in anisotropic Wilson/Symanzik flow and APE, STOUT, and OvrimpSTOUT **/
+    unsigned int rk_order;   /** Order of the Runga-Kutta integrator: 3 or 4 **/
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/

@@ -1,10 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include "invert_quda.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <string>
+
+#include <util_quda.h>
+#include <invert_quda.h>
+#include <enum_quda.h>
+
 #include "misc.h"
-#include <assert.h>
-#include "util_quda.h"
-#include <host_utils.h>
 
 const char *get_verbosity_str(QudaVerbosity type)
 {

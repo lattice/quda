@@ -1112,6 +1112,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #ifdef INIT_PARAM
   P(su_project, QUDA_BOOLEAN_FALSE);
   P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_rectangle, QUDA_BOOLEAN_FALSE);
   P(compute_polyakov_loop, QUDA_BOOLEAN_FALSE);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_FALSE);
   P(traces, nullptr);
@@ -1128,6 +1129,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_rectangle, QUDA_BOOLEAN_INVALID);
   P(compute_polyakov_loop, QUDA_BOOLEAN_INVALID);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_INVALID);
   if (param->compute_gauge_loop_trace == QUDA_BOOLEAN_TRUE) {
@@ -1173,6 +1175,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, 0.0);
   P(rho, 0.0);
   P(epsilon, 0.0);
+  P(smear_anisotropy, 1.0);
+  P(rk_order, 3);
   P(restart, QUDA_BOOLEAN_FALSE);
   P(t0, 0.0);
   P(alpha1, 0.0);
@@ -1185,6 +1189,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, INVALID_DOUBLE);
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(smear_anisotropy, INVALID_DOUBLE);
+  P(rk_order, (unsigned int)INVALID_INT);
   P(restart, QUDA_BOOLEAN_INVALID);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);

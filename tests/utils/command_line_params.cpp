@@ -286,6 +286,7 @@ int heatbath_num_steps = 10;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
+bool heatbath_initialize_on_host = true;
 // GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -1193,6 +1194,8 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
                       "Whether to use a cold or hot start in heatbath test (default false)");
+  opgroup->add_option("--heatbath-initialize-on-host", heatbath_initialize_on_host,
+                      "Whether to initialize the gauge field on the host or on the device (default true == host)");
   opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
                       "Number of heatbath hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,

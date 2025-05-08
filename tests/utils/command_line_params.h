@@ -536,6 +536,7 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+extern bool heatbath_initialize_on_host;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;
