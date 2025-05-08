@@ -75,7 +75,7 @@ namespace quda
 
   }; // GaugeFix
 
-  void gaugeFixOVRStep(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore)
+  void gaugeFixOVRStep(GaugeField &rot, GaugeField &u, double omega, int dir_ignore)
   {
     checkPrecision(rot, u);
     checkReconstruct(rot, u);
@@ -84,10 +84,11 @@ namespace quda
     if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    // u.exchangeExtendedGhost(u.R(), false); // u will not change during the gauge fixing
+    rot.exchangeExtendedGhost(rot.R(), false);
     instantiate<GaugeFix>(rot, u, omega, dir_ignore, 0);
     rot.exchangeExtendedGhost(rot.R(), false);
     instantiate<GaugeFix>(rot, u, omega, dir_ignore, 1);
-    rot.exchangeExtendedGhost(rot.R(), false);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 

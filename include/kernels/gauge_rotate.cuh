@@ -20,13 +20,15 @@ namespace quda
 
     int X[4]; // grid dimensions
     int border[4];
+    int border_rot[4];
 
     RotateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &rot) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, 4)), out(out), in(in), rot(rot)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        border[dir] = rot.R()[dir];
-        X[dir] = rot.X()[dir] - border[dir] * 2;
+        border[dir] = in.R()[dir];
+        border_rot[dir] = rot.R()[dir];
+        X[dir] = in.X()[dir] - border[dir] * 2;
       }
     }
   };
@@ -42,21 +44,26 @@ namespace quda
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-      int x[4];
+      int x[4], X[4], xr[4], Xr[4];
+      for (int dr = 0; dr < 4; ++dr) {
+        X[dr] = arg.X[dr];
+        Xr[dr] = arg.X[dr];
+      }
       getCoords(x, x_cb, X, parity);
+      getCoords(xr, x_cb, Xr, parity);
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
+        xr[dr] += arg.border_rot[dr];
+        Xr[dr] += 2 * arg.border_rot[dr];
       }
 
       Link g, U;
       U = arg.in(dir, linkIndex(x, X), parity);
-      g = arg.rot(0, linkIndex(x, X), parity);
+      g = arg.rot(0, linkIndex(xr, Xr), parity);
       U = g * U;
-      g = arg.rot(0, linkIndexP1(x, X, dir), 1 - parity);
+      g = arg.rot(0, linkIndexP1(xr, Xr, dir), 1 - parity);
       U = U * conj(g);
 
       arg.out(dir, linkIndex(x, X), parity) = U;

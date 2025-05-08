@@ -45,16 +45,16 @@ namespace quda
 
   }; // RotateGauge
 
-  void gaugeRotate(GaugeField &out, const GaugeField &in, const GaugeField &rot)
+  void gaugeRotate(GaugeField &out, GaugeField &in, GaugeField &rot)
   {
     checkPrecision(out, in, rot);
     checkReconstruct(out, in, rot);
     checkNative(out, in, rot);
 
+    rot.exchangeExtendedGhost(rot.R(), false);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeRotate>(out, in, rot);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-    out.exchangeExtendedGhost(out.R(), false);
   }
 
 } // namespace quda

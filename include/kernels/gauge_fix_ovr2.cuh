@@ -138,9 +138,8 @@ namespace quda
       constexpr int parity = Arg::parity;
 
       // compute spacetime and local coords
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-      int x[4];
+      int x[4], X[4];
+      for (int dr = 0; dr < 4; ++dr) { X[dr] = arg.X[dr]; }
       getCoords(x, x_cb, X, parity);
       for (int dr = 0; dr < 4; ++dr) {
         x[dr] += arg.border[dr];

@@ -168,7 +168,7 @@ namespace quda
   };
 
   // Apply the covariant derivative operator
-  // out(x) = U_{\mu}(x)in(x+\mu) for mu = 0...3
+  // out(x) = U_\mu(x)in(x+\mu) for mu = 0...3
   // out(x) = U^\dagger_{\mu'}(x-\mu')in(x-\mu') for mu = 4...7 and we set mu' = mu-4
   void ApplyCovDev(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
                    int mu, int parity, bool dagger, bool shift, const int *comm_override, TimeProfile &profile)

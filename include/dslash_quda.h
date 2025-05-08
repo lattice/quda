@@ -797,7 +797,7 @@ namespace quda
      @param[in] mu Direction of the derivative. For mu > 3 it goes backwards
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
-     @param[in] shift_only Whether to apply the shift instead of the full covariant derivative
+     @param[in] shift Whether to apply the shift instead of the covariant derivative
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */

@@ -84,40 +84,57 @@ namespace quda
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-      const Link U = Arg::shift ? Link() : arg.U(d, coord.x_cb, parity);
-
       if (doHalo<kernel_type>(d) && ghost) {
 
         const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
         const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-        out += Arg::shift ? in : U * in;
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const Link U = arg.U(d, coord.x_cb, parity);
+          out += U * in;
+        }
       } else if (doBulk<kernel_type>() && !ghost) {
 
         const Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
-        out += Arg::shift ? in : U * in;
+
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const Link U = arg.U(d, coord.x_cb, parity);
+          out += U * in;
+        }
       }
 
     } else { // Backward gather - compute back offset for spinor and gauge fetch
 
       const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-      const int gauge_idx = back_idx;
 
       const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
       if (doHalo<kernel_type>(d) && ghost) {
 
         const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-        const Link U = Arg::shift ? Link() : arg.U.Ghost(d, ghost_idx, 1 - parity);
         const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-        out += Arg::shift ? in : conj(U) * in;
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
+          out += conj(U) * in;
+        }
       } else if (doBulk<kernel_type>() && !ghost) {
 
-        const Link U = Arg::shift ? Link() : arg.U(d, gauge_idx, 1 - parity);
         const Vector in = arg.in[src_idx](back_idx, their_spinor_parity);
 
-        out += Arg::shift ? in : conj(U) * in;
+        if constexpr (Arg::shift) {
+          out += in;
+        } else {
+          const int gauge_idx = back_idx;
+          const Link U = Arg::shift ? Link() : arg.U(d, gauge_idx, 1 - parity);
+          out += conj(U) * in;
+        }
       }
     } // Forward/backward derivative
   }

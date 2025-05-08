@@ -142,8 +142,8 @@ extern "C" {
 
     int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
     int covdev_mu; /**< Apply forward/backward covariant derivative in direction mu(mu<=3)/mu-4(mu>3) */
-    bool covdev_shift; /**< Apply shift instead of covariant derivative */
-    bool staggered;    /**< If the input field is staggered or not for QUDA_DSLASH_LAPLACE and QUDA_DSLASH_COVDEV */
+    bool covdev_shift; /**< Apply the shift instead of the covariant derivative */
+    bool staggered;    /**< If the input field is staggered or not for Laplace and CovDev */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -1781,17 +1781,21 @@ extern "C" {
 
   /**
    * @brief Gauge fixing with over-relaxation.
+   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
+   * @param[in,out] gauge Gauge field U_\mu(x) to be fixed
    * @param[in,out] rotation Rotation field g(x) to fix the gauge
-   * @param[in] gauge Gauge field U_\mu(x)
-   * @param[in] tol Torelance of the gauge fixing quality
-   * @param[in] maxiter Maximum number of iterations to perform the gauge fixing
-   * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
-   * @param[in] omega The over-relaxation parameter, most common value is 1.5 or 1.7
+   * @param[in] param Parameters of the external fields
+   * @param[in] fix_param Parameters of the gauge fixing algorithm
+   */
+  void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, QudaGaugeFixParam *fix_param);
+
+  /**
+   * @brief Rotate gauge field U_\mu(x) with the rotation field g(x)
+   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
+   * @param[in,out] gauge Gauge field U_\mu(x) to be rotated
+   * @param[in] rotation Rotation field g(x)
    * @param[in] param Parameters of the external fields
    */
-  void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeFixParam *fix_param, QudaGaugeParam *param);
-
-  void performFermionRotateQuda(void *spinor, void *rotation, QudaInvertParam *inv_param, QudaGaugeParam *param);
   void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param);
 
   /**

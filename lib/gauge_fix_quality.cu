@@ -45,8 +45,8 @@ namespace quda
         GaugeFixQualityArg<Float, nColor, recon, false> arg(u, dir_ignore);
         launch<GaugeFixQuality>(value, tp, stream, arg);
       }
-      quality[0] = value[0] / static_cast<double>(fixDim * u.Ncolor() * u.Volume());
-      quality[1] = value[1] / static_cast<double>(u.Ncolor() * u.Volume());
+      quality[0] = value[0] / static_cast<double>(fixDim * u.Ncolor() * u.LocalVolume() * comm_size());
+      quality[1] = value[1] / static_cast<double>(u.Ncolor() * u.LocalVolume() * comm_size());
     }
 
     long long flops() const { return u.Ncolor() * u.LocalVolume(); }
@@ -55,10 +55,11 @@ namespace quda
 
   }; // GaugeFixingQuality
 
-  void gaugeFixQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta)
+  void gaugeFixQuality(double quality[2], GaugeField &u, int dir_ignore, bool compute_theta)
   {
     if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 
+    if (compute_theta) { u.exchangeExtendedGhost(u.R(), false); }
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFixingQuality>(u, quality, dir_ignore, compute_theta);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
