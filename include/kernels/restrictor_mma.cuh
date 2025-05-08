@@ -77,14 +77,6 @@ namespace quda
         errorQuda("vector set size %d greater than max size %d", out.Nvec(), get_max_multi_rhs());
       if (out.Nvec() != nVec) { errorQuda("out.Nvec() (%d) != nVec (%d)", out.Nvec(), nVec); }
       if (in.Nvec() != nVec) { errorQuda("in.Nvec() (%d) != nVec (%d)", in.Nvec(), nVec); }
-
-      if (fineSpin == 1 && aggregate_size_cb % aggregate_per_block != 0) {
-        printfQuda("Invalid aggregate_size_cb(=%d) and aggregate_per_block(=%d)\n", static_cast<int>(aggregate_size_cb),
-                   aggregate_per_block);
-      }
-      if (fineSpin > 1 && aggregate_size % aggregate_per_block != 0) {
-        printfQuda("Invalid aggregate_size(=%d) and aggregate_per_block(=%d)\n", aggregate_size, aggregate_per_block);
-      }
     }
   };
 
