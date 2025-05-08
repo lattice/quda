@@ -964,6 +964,46 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
     checkGauge((float **)oldG, (float **)newG, epsilon);
 }
 
+std::complex<double> twoColorSpinorContract(std::complex<double> *spinor1, std::complex<double> *spinor2)
+{
+  int col_inc = 3;
+
+  std::vector<int> col_st {0, 1, 2};
+  std::vector<int> row_st {0, 3, 6};
+
+  std::vector<complex<double>> test_contract(9 * V);
+  complex<double> trace = {0., 0.};
+  double trace_re, trace_im;
+  for (int i = 0; i < V; i++) {
+
+    for (int ii = 0; ii < 9; ii++) {
+      int which_col_idx = (ii % 3), which_row_idx = (ii - (ii % 3)) / 3;
+
+      std::complex<double> dot = {0., 0.};
+
+      for (int i_s = 0; i_s < 4; i_s++) {
+
+        int s_row_idx = i * 12 + col_st[which_row_idx] + i_s * col_inc;
+        int s_col_idx = i * 12 + col_st[which_col_idx] + i_s * col_inc;
+
+        auto m1 = std::conj(spinor1[s_row_idx]);
+        auto m2 = spinor2[s_col_idx];
+
+        dot += m1 * m2;
+      }
+      test_contract[i * 9 + ii] = dot;
+    }
+    trace += (test_contract[i * 9] + test_contract[i * 9 + 4] + test_contract[i * 9 + 8]);
+  }
+  trace_re = trace.real();
+  trace_im = trace.imag();
+  quda::comm_allreduce_sum(trace_re);
+  quda::comm_allreduce_sum(trace_im);
+
+  std::complex<double> trace_fin = {trace_re, trace_im};
+  return trace_fin;
+}
+
 void createSiteLinkCPU(void *const *gauge, QudaPrecision precision, SiteLinkType phase)
 {
   if (phase == SiteLinkType::SITELINK_PHASE_NO) {
