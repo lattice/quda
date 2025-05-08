@@ -1,93 +1,51 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 #include <util_quda.h>
+#include <instantiate.h>
 
 #include "host_utils.h"
 #include "gauge_utils.h"
 #include "command_line_params.h"
 #include "dslash_reference.h"
 #include "misc.h"
+#include "test.h"
 
-void display_test_info()
+using test_t = ::testing::tuple<QudaPrecision, QudaGaugeSmearType>;
+
+class SU3FermionTest : public ::testing::TestWithParam<test_t>
 {
-  printfQuda("running the following test:\n");
+protected:
+  QudaPrecision precision;
+  QudaGaugeSmearType smear_type;
 
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
-             tdim);
+public:
+  SU3FermionTest() : precision(::testing::get<0>(GetParam())), smear_type(::testing::get<1>(GetParam())) { }
+};
 
-  // Specific test
-  printfQuda("\n%s smearing\n", get_gauge_smear_str(gauge_smear_type));
-  switch (gauge_smear_type) {
-  case QUDA_GAUGE_SMEAR_APE: printfQuda(" - alpha %f\n", gauge_smear_alpha); break;
-  case QUDA_GAUGE_SMEAR_STOUT: printfQuda(" - rho %f\n", gauge_smear_rho); break;
-  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
-    printfQuda(" - rho %f\n", gauge_smear_rho);
-    printfQuda(" - epsilon %f\n", gauge_smear_epsilon);
-    break;
-  case QUDA_GAUGE_SMEAR_HYP:
-    printfQuda(" - alpha1 %f\n", gauge_smear_alpha1);
-    printfQuda(" - alpha2 %f\n", gauge_smear_alpha2);
-    printfQuda(" - alpha3 %f\n", gauge_smear_alpha3);
-    break;
-  case QUDA_GAUGE_SMEAR_WILSON_FLOW:
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
-  default: errorQuda("Undefined test type %d given", test_type);
-  }
-  printfQuda(" - smearing steps %d\n", gauge_smear_steps);
-  printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
-  printfQuda(" - Measurement interval %d\n", measurement_interval);
+int argc_copy;
+char **argv_copy;
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-  return;
-}
-
-int main(int argc, char **argv)
+void run(test_t param)
 {
-  auto app = make_app();
-  add_su3_option_group(app);
+  prec = ::testing::get<0>(param);
+  gauge_smear_type = ::testing::get<1>(param);
 
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
+  using namespace quda;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) {
-    prec = QUDA_DOUBLE_PRECISION;
-    prec_sloppy = prec;
-  }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  setDims(gauge_param.X);
-
-  // All user inputs are now defined
-  display_test_info();
 
   void *gauge[4], *new_gauge[4];
-
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  initQuda(device_ordinal);
-
-  setVerbosity(verbosity);
-
-  // call srand() with a rank-dependent seed
-  initRand();
-
-  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  constructHostGaugeField(gauge, gauge_param, argc_copy, argv_copy);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
@@ -148,7 +106,7 @@ int main(int argc, char **argv)
   quda::ColorSpinorField check, check_safe, check_hier, check_fwd;
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  invParam.cuda_prec = prec;
+  invParam.cuda_prec = cuda_prec;
   invParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invParam.dirac_order = QUDA_DIRAC_ORDER;
   invParam.verbosity = verbosity;
@@ -234,7 +192,7 @@ int main(int argc, char **argv)
   }
   double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
   printf(
-    "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e \n",
+    "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e\n",
     method_adj_check);
 
   std::complex<double> trace_fwd, trace_adj;
@@ -257,15 +215,17 @@ int main(int argc, char **argv)
   default: errorQuda("Invalid precision %d", prec);
   }
 
+  printfQuda("Checking adjoint safe/hier match\n");
+  EXPECT_LE(method_adj_check, gauge_smear_steps * gauge_smear_steps * eps);
   if (method_adj_check > gauge_smear_steps * gauge_smear_steps * eps)
-    errorQuda("adjoint safe/hier match precision failed\n");
-  else
-    printf("adjoint safe/hier match precision passed!\n");
+    warningQuda("Adjoint safe/hier difference %e greater than tolerance %e\n", method_adj_check,
+                gauge_smear_steps * gauge_smear_steps * eps);
 
+  printfQuda("Checking fractional error\n");
+  EXPECT_LE(trace_diff_err, gauge_smear_steps * gauge_smear_steps * eps);
   if (trace_diff_err > gauge_smear_steps * gauge_smear_steps * eps)
-    errorQuda("fractional error precision failed\n");
-  else
-    printf("fractional error precision passed!\n");
+    warningQuda("Fractional error %e greater than tolerance %e\n", trace_diff_err,
+                gauge_smear_steps * gauge_smear_steps * eps);
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
@@ -280,8 +240,77 @@ int main(int argc, char **argv)
   check_fwd = {};
 
   freeGaugeQuda();
-  endQuda();
+}
 
-  finalizeComms();
-  return 0;
+TEST_P(SU3FermionTest, verify)
+{
+  if (!quda::is_enabled(precision)) GTEST_SKIP();
+  run(GetParam());
+}
+
+struct su3_fermion_test : quda_test {
+
+  void display_info() const override
+  {
+    quda_test::display_info();
+    printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
+    printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
+               get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+               tdim);
+
+    // Specific test
+    printfQuda("\n%s smearing\n", get_gauge_smear_str(gauge_smear_type));
+    switch (gauge_smear_type) {
+    case QUDA_GAUGE_SMEAR_APE: printfQuda(" - alpha %f\n", gauge_smear_alpha); break;
+    case QUDA_GAUGE_SMEAR_STOUT: printfQuda(" - rho %f\n", gauge_smear_rho); break;
+    case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
+      printfQuda(" - rho %f\n", gauge_smear_rho);
+      printfQuda(" - epsilon %f\n", gauge_smear_epsilon);
+      break;
+    case QUDA_GAUGE_SMEAR_HYP:
+      printfQuda(" - alpha1 %f\n", gauge_smear_alpha1);
+      printfQuda(" - alpha2 %f\n", gauge_smear_alpha2);
+      printfQuda(" - alpha3 %f\n", gauge_smear_alpha3);
+      break;
+    case QUDA_GAUGE_SMEAR_WILSON_FLOW:
+    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
+    default: errorQuda("Undefined test type %d given", test_type);
+    }
+    printfQuda(" - smearing steps %d\n", gauge_smear_steps);
+    printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+  }
+
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
+  {
+    quda_test::add_command_line_group(app);
+    add_su3_option_group(app);
+  }
+
+  su3_fermion_test(int argc, char **argv) : quda_test("SU3 Fermion Test", argc, argv) { }
+};
+
+auto test_str = [](testing::TestParamInfo<test_t> param) {
+  return std::string(get_prec_str(::testing::get<0>(param.param))) + "_"
+    + get_gauge_smear_str(::testing::get<1>(param.param));
+};
+
+INSTANTIATE_TEST_SUITE_P(Flow, SU3FermionTest,
+                         ::testing::Combine(::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                            ::testing::Values(QUDA_GAUGE_SMEAR_WILSON_FLOW,
+                                                              QUDA_GAUGE_SMEAR_SYMANZIK_FLOW)),
+                         test_str);
+
+int main(int argc, char **argv)
+{
+  argc_copy = argc;
+  argv_copy = argv;
+
+  su3_fermion_test test(argc, argv);
+  test.init();
+  if (enable_testing) {
+    return test.execute();
+  } else {
+    run(test_t {prec, gauge_smear_type});
+  };
 }
