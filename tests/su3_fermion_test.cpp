@@ -88,8 +88,6 @@ void run(test_t param)
 
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
-  if (gauge_smear_type != QUDA_GAUGE_SMEAR_WILSON_FLOW && gauge_smear_type != QUDA_GAUGE_SMEAR_SYMANZIK_FLOW)
-    errorQuda("Smear type %d not supported - only Wilson or Symanzik supported", gauge_smear_type);
   smear_param.smear_type = gauge_smear_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
@@ -206,14 +204,7 @@ void run(test_t param)
   printf("<check,fwd_check> is %1.5e, %1.5e \n", trace_fwd.real(), trace_fwd.imag());
   printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
 
-  double eps = 0.0;
-  switch (prec) {
-  case QUDA_DOUBLE_PRECISION: eps = 1.11e-16; break;
-  case QUDA_SINGLE_PRECISION: eps = 5.96e-08; break;
-  case QUDA_HALF_PRECISION: eps = 2e-3; break;
-  case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
-  default: errorQuda("Invalid precision %d", prec);
-  }
+  auto eps = getTolerance(prec);
 
   printfQuda("Checking adjoint safe/hier match\n");
   EXPECT_LE(method_adj_check, gauge_smear_steps * gauge_smear_steps * eps);
@@ -311,6 +302,10 @@ int main(int argc, char **argv)
   if (enable_testing) {
     return test.execute();
   } else {
+    if (gauge_smear_type != QUDA_GAUGE_SMEAR_WILSON_FLOW && gauge_smear_type != QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
+      warningQuda("Smear type %s not supported, setting to Wilson Flow", get_gauge_smear_str(gauge_smear_type));
+      gauge_smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
+    }
     run(test_t {prec, gauge_smear_type});
   };
 }
