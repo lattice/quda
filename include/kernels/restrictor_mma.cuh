@@ -79,11 +79,11 @@ namespace quda
       if (in.Nvec() != nVec) { errorQuda("in.Nvec() (%d) != nVec (%d)", in.Nvec(), nVec); }
 
       if (fineSpin == 1 && aggregate_size_cb % aggregate_per_block != 0) {
-        errorQuda("Invalid aggregate_size_cb(=%d) and aggregate_per_block(=%d)", static_cast<int>(aggregate_size_cb),
-                  aggregate_per_block);
+        printfQuda("Invalid aggregate_size_cb(=%d) and aggregate_per_block(=%d)\n", static_cast<int>(aggregate_size_cb),
+                   aggregate_per_block);
       }
       if (fineSpin > 1 && aggregate_size % aggregate_per_block != 0) {
-        errorQuda("Invalid aggregate_size(=%d) and aggregate_per_block(=%d)", aggregate_size, aggregate_per_block);
+        printfQuda("Invalid aggregate_size(=%d) and aggregate_per_block(=%d)\n", aggregate_size, aggregate_per_block);
       }
     }
   };
@@ -106,35 +106,49 @@ namespace quda
       thread_idx /= Arg::fineColor;
       int x_fine_offset = thread_idx + aggregate_k_offset;
       int x_fine_offset_limit = (Arg::fineSpin == 1 ? static_cast<int>(arg.aggregate_size_cb) : arg.aggregate_size);
-      if (x_fine_offset < x_fine_offset_limit && b) {
-
-        int parity;
-        int x_fine_cb_offset;
-        if constexpr (Arg::fineSpin == 1) {
-          x_fine_cb_offset = x_fine_offset;
-          parity = coarse_spin;
-        } else {
-          const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
-          x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
-          parity = arg.nParity == 2 ? parity_offset : arg.parity;
-        }
-
-        // look-up map is ordered as (coarse-block-id + fine-point-id),
-        // with fine-point-id parity ordered
-        const int x_fine = coarse_to_fine[parity * arg.aggregate_size_cb + x_fine_cb_offset];
-        const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
-
-        const int v_parity = (gmem.Nparity() == 2) ? parity : 0;
-
-        int fine_spin = (Arg::fineSpin == 1 ? 0 : fine_spin_block + coarse_spin * Arg::spin_block_factor);
-        auto a_gmem = gmem(v_parity, x_fine_cb, fine_spin, fine_color, contiguous + contiguous_dim_offset);
-        complex<typename gmem_obj_t::store_t> a[elements_per_thread];
-        mma::batch_load_t<complex<typename gmem_obj_t::store_t>, elements_per_thread>::load(a, a_gmem.data());
+      if (b) {
 
         int smem_m = contiguous;
         int smem_k = (thread_idx * Arg::spin_block_factor + fine_spin_block) * Arg::fineColor + fine_color;
-        float scale_inv = a_gmem.get_scale_inv();
-        op(smem_m, smem_k, a, scale_inv);
+
+        if (x_fine_offset < x_fine_offset_limit) {
+
+          int parity;
+          int x_fine_cb_offset;
+          if constexpr (Arg::fineSpin == 1) {
+            x_fine_cb_offset = x_fine_offset;
+            parity = coarse_spin;
+          } else {
+            const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
+            x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
+            parity = arg.nParity == 2 ? parity_offset : arg.parity;
+          }
+
+          // look-up map is ordered as (coarse-block-id + fine-point-id),
+          // with fine-point-id parity ordered
+          const int x_fine = coarse_to_fine[parity * arg.aggregate_size_cb + x_fine_cb_offset];
+          const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
+
+          const int v_parity = (gmem.Nparity() == 2) ? parity : 0;
+
+          int fine_spin = (Arg::fineSpin == 1 ? 0 : fine_spin_block + coarse_spin * Arg::spin_block_factor);
+          auto a_gmem = gmem(v_parity, x_fine_cb, fine_spin, fine_color, contiguous + contiguous_dim_offset);
+          complex<typename gmem_obj_t::store_t> a[elements_per_thread];
+          mma::batch_load_t<complex<typename gmem_obj_t::store_t>, elements_per_thread>::load(a, a_gmem.data());
+
+          // int smem_m = contiguous;
+          // int smem_k = (thread_idx * Arg::spin_block_factor + fine_spin_block) * Arg::fineColor + fine_color;
+          float scale_inv = a_gmem.get_scale_inv();
+          op(smem_m, smem_k, a, scale_inv);
+        } else {
+          float scale_inv = 0;
+          complex<typename gmem_obj_t::store_t> a[elements_per_thread];
+#pragma unroll
+          for (int i = 0; i < elements_per_thread; i++) {
+            a[i] = complex<typename gmem_obj_t::store_t>(0, 0);
+          }
+          op(smem_m, smem_k, a, scale_inv);
+        }
       }
 
       thread += Arg::block_y * Arg::block_z;
