@@ -238,6 +238,7 @@ namespace quda
     static constexpr int nFace = nFace_;
     static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
     static constexpr int max_regs = 0; // by default we don't limit register count
+    static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -625,6 +626,7 @@ namespace quda
     static constexpr bool xpay = xpay_;
     static constexpr KernelType kernel_type = kernel_type_;
     static constexpr int max_regs = Arg::max_regs;
+    static constexpr bool spill_shared = Arg::spill_shared;
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
