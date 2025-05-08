@@ -28,12 +28,14 @@ namespace quda
                      setup_use_mma[i] = true;
                      dslash_use_mma[i] = true;
                      // transfer_use_mma[i] = true; // FIXME, stick with default for now
+                     // collapse_mrhs[i] = true; // FIXME, stick with default for now
                    }
                  } else {
                    for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
                      setup_use_mma[i] = false;
                      dslash_use_mma[i] = false;
                      // transfer_use_mma[i] = false; // FIXME, stick with default for now
+                     // collapse_mrhs[i] = false; // FIXME, stick with default for now
                    }
                  }
                })) {
@@ -119,7 +121,8 @@ namespace quda
 
   void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, const mgInputStruct &input_struct, int level)
   {
-    mg_eig_param.eig_type = (input_struct.deflate_block_size > 1) ? QUDA_EIG_BLK_TR_LANCZOS : QUDA_EIG_TR_LANCZOS;  // mg_eig_type[level];
+    mg_eig_param.eig_type
+      = (input_struct.deflate_block_size > 1) ? QUDA_EIG_BLK_TR_LANCZOS : QUDA_EIG_TR_LANCZOS; // mg_eig_type[level];
     mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
     if ((mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS)
         && !(mg_eig_param.spectrum == QUDA_SPECTRUM_LR_EIG || mg_eig_param.spectrum == QUDA_SPECTRUM_SR_EIG)) {
@@ -133,8 +136,10 @@ namespace quda
     mg_eig_param.compute_evals_batch_size
       = (input_struct.nvec[level] % 16 == 0) ? 16 : 1; // compute the eigenvalues in appropriate batches
     mg_eig_param.block_size
-      = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : input_struct.deflate_block_size; // mg_eig_block_size[level];
-    mg_eig_param.batched_rotate = 0;                   // mg_eig_batched_rotate[level];
+      = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
+      1 :
+      input_struct.deflate_block_size; // mg_eig_block_size[level];
+    mg_eig_param.batched_rotate = 0;   // mg_eig_batched_rotate[level];
     mg_eig_param.require_convergence
       = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -288,6 +293,7 @@ namespace quda
       mg_param.setup_use_mma[i] = input_struct.setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       mg_param.dslash_use_mma[i] = input_struct.dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       mg_param.transfer_use_mma[i] = input_struct.transfer_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      mg_param.collapse_mrhs[i] = input_struct.collapse_mrhs[i];
       mg_param.setup_inv_type[i] = input_struct.setup_inv[i];
       mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
       mg_param.setup_tol[i] = input_struct.setup_tol[i];
