@@ -139,8 +139,10 @@ namespace quda
 
       // compute spacetime and local coords
       int x[4], X[4];
+#pragma unroll
       for (int dr = 0; dr < 4; ++dr) { X[dr] = arg.X[dr]; }
       getCoords(x, x_cb, X, parity);
+#pragma unroll
       for (int dr = 0; dr < 4; ++dr) {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];

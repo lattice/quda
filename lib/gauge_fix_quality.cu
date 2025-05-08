@@ -30,6 +30,8 @@ namespace quda
     {
       strcat(aux, ",dir_ignore=");
       i32toa(aux + strlen(aux), dir_ignore);
+      strcat(aux, ",compute_theta=");
+      i32toa(aux + strlen(aux), compute_theta);
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
     }
@@ -49,17 +51,18 @@ namespace quda
       quality[1] = value[1] / static_cast<double>(u.Ncolor() * u.LocalVolume() * comm_size());
     }
 
-    long long flops() const { return u.Ncolor() * u.LocalVolume(); }
-
-    long long bytes() const { return fixDim * u.Reconstruct() * u.Precision() * u.LocalVolume(); }
+    long long flops() const { return 0; }
+    long long bytes() const
+    {
+      return fixDim * u.Reconstruct() * u.Precision() * u.LocalVolume() * (compute_theta ? 2 : 1);
+    }
 
   }; // GaugeFixingQuality
 
-  void gaugeFixQuality(double quality[2], GaugeField &u, int dir_ignore, bool compute_theta)
+  void gaugeFixQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta)
   {
     if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 
-    if (compute_theta) { u.exchangeExtendedGhost(u.R(), false); }
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFixingQuality>(u, quality, dir_ignore, compute_theta);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);

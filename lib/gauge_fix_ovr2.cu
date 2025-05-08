@@ -32,6 +32,10 @@ namespace quda
     {
       strcat(aux, ",dir_ignore=");
       i32toa(aux + strlen(aux), dir_ignore);
+      strcat(aux, ",parity=");
+      i32toa(aux + strlen(aux), parity);
+      strcat(aux, ",over_relaxation=");
+      i32toa(aux + strlen(aux), omega == 1.0);
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
     }
@@ -64,18 +68,18 @@ namespace quda
     long long flops() const
     {
       auto mat_flops = u.Ncolor() * u.Ncolor() * (8ll * u.Ncolor() - 2ll);
-      return (2 + (fixDim - 1) * 4) * mat_flops * fixDim * u.LocalVolume();
+      return (fixDim * 2 + 2 * 3) * mat_flops * u.LocalVolumeCB();
     }
 
     long long bytes() const // 2 links per dim, 2 rot in per dim, 1 rot in, 1 rot out.
     {
-      return ((fixDim * 2) * u.Reconstruct() * u.Precision() + (fixDim * 2 + 1 + 1) * rot.Reconstruct() * rot.Precision())
-        * u.LocalVolume();
+      return ((fixDim * 2) * u.Reconstruct() * u.Precision() + (1 + fixDim * 2 + 1) * rot.Reconstruct() * rot.Precision())
+        * u.LocalVolumeCB();
     }
 
   }; // GaugeFix
 
-  void gaugeFixOVRStep(GaugeField &rot, GaugeField &u, double omega, int dir_ignore)
+  void gaugeFixOVRStep(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore)
   {
     checkPrecision(rot, u);
     checkReconstruct(rot, u);
@@ -83,13 +87,15 @@ namespace quda
 
     if (dir_ignore < 0 || dir_ignore > 3) { dir_ignore = 4; }
 
+    // loop over parity
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    // u.exchangeExtendedGhost(u.R(), false); // u will not change during the gauge fixing
-    rot.exchangeExtendedGhost(rot.R(), false);
     instantiate<GaugeFix>(rot, u, omega, dir_ignore, 0);
-    rot.exchangeExtendedGhost(rot.R(), false);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    rot.exchangeExtendedGhost(rot.R(), getProfile(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFix>(rot, u, omega, dir_ignore, 1);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    rot.exchangeExtendedGhost(rot.R(), getProfile(), false);
   }
 
 } // namespace quda

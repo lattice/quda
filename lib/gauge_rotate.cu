@@ -34,8 +34,11 @@ namespace quda
     void preTune() { out.backup(); } // defensive measure in case they alias
     void postTune() { out.restore(); }
 
-    long long flops() const { return 0; }
-
+    long long flops() const
+    {
+      auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2ll);
+      return 2 * mat_flops * 4 * in.LocalVolume();
+    }
     long long bytes() const // 2 rot, 1 in, 1 out, per dim.
     {
       return (2 * rot.Reconstruct() * rot.Precision() + in.Reconstruct() * in.Precision()
@@ -45,16 +48,16 @@ namespace quda
 
   }; // RotateGauge
 
-  void gaugeRotate(GaugeField &out, GaugeField &in, GaugeField &rot)
+  void gaugeRotate(GaugeField &out, const GaugeField &in, const GaugeField &rot)
   {
     checkPrecision(out, in, rot);
     checkReconstruct(out, in, rot);
     checkNative(out, in, rot);
 
-    rot.exchangeExtendedGhost(rot.R(), false);
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeRotate>(out, in, rot);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    out.exchangeExtendedGhost(out.R(), getProfile(), false);
   }
 
 } // namespace quda

@@ -185,7 +185,7 @@ namespace quda
    * @param[in] in Gauge field U_\mu(x)
    * @param[in] rot Rotation field g(x)
    */
-  void gaugeRotate(GaugeField &out, GaugeField &in, GaugeField &rot);
+  void gaugeRotate(GaugeField &out, const GaugeField &in, const GaugeField &rot);
 
   /**
    * @brief Gauge fixing with over-relaxation.
@@ -194,7 +194,7 @@ namespace quda
    * @param[in] omega The over-relaxation parameter, most common value is 1.5 or 1.7
    * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
    */
-  void gaugeFixOVRStep(GaugeField &rot, GaugeField &u, double omega, int dir_ignore);
+  void gaugeFixOVRStep(GaugeField &rot, const GaugeField &u, double omega, int dir_ignore);
 
   /**
    * @brief Compute the gauge fixing quality, functional or theta is considered as the criterion.
@@ -203,7 +203,7 @@ namespace quda
    * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
    * @param[in] compute_theta Set to true to compute the theta value as the criterion
    */
-  void gaugeFixQuality(double quality[2], GaugeField &u, int dir_ignore, bool compute_theta);
+  void gaugeFixQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

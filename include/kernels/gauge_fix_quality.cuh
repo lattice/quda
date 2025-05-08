@@ -17,18 +17,18 @@ namespace quda
     static constexpr bool compute_theta = compute_theta_;
     typedef typename gauge_mapper<Float, recon>::type Gauge;
 
-    const Gauge U;
+    const Gauge u;
 
     int X[4]; // grid dimensions
     int border[4];
     const int dir_ignore;
 
-    GaugeFixQualityArg(const GaugeField &U, int dir_ignore) :
-      ReduceArg<reduce_t>(dim3(U.LocalVolumeCB(), 2)), U(U), dir_ignore(dir_ignore)
+    GaugeFixQualityArg(const GaugeField &u, int dir_ignore) :
+      ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2)), u(u), dir_ignore(dir_ignore)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        border[dir] = U.R()[dir];
-        X[dir] = U.X()[dir] - border[dir] * 2;
+        border[dir] = u.R()[dir];
+        X[dir] = u.X()[dir] - border[dir] * 2;
       }
     }
   };
@@ -49,10 +49,9 @@ namespace quda
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
-      int X[4];
+      int x[4], X[4];
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-      int x[4];
       getCoords(x, x_cb, X, parity);
 #pragma unroll
       for (int dr = 0; dr < 4; ++dr) {
@@ -64,7 +63,7 @@ namespace quda
 #pragma unroll
       for (int dir = 0; dir < 4; ++dir) {
         if (dir != arg.dir_ignore) {
-          U = arg.U(dir, linkIndex(x, X), parity);
+          U = arg.u(dir, linkIndex(x, X), parity);
           V += U;
         }
       }
@@ -74,7 +73,7 @@ namespace quda
 #pragma unroll
         for (int dir = 0; dir < 4; ++dir) {
           if (dir != arg.dir_ignore) {
-            U = arg.U(dir, linkIndexM1(x, X, dir), 1 - parity);
+            U = arg.u(dir, linkIndexM1(x, X, dir), 1 - parity);
             V -= U;
           }
         }
