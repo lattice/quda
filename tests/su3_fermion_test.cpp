@@ -32,6 +32,8 @@ void run(test_t param)
 
   using namespace quda;
 
+  if (!is_enabled_spin(4)) errorQuda("Test requires Wilson-type fermion enablement");
+
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
