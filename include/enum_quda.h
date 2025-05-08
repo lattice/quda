@@ -648,6 +648,13 @@ typedef enum QudaWFlowStepType_s {
   WFLOW_FOURTH_ORDER_STEP_6,
 } QudaWFlowStepType;
 
+//Used by update_split_gauge
+typedef enum QudaUpdateSpliteGauge_s {
+  QUDA_UPDATE_SPLITE_GAUGE_OFF,
+  QUDA_UPDATE_SPLITE_GAUGE_TRUE  = 1,
+  QUDA_UPDATE_SPLITE_GAUGE_FALSE = 0,
+} QudaUpdateSpliteGauge;
+
 #ifdef __cplusplus
 }
 #endif

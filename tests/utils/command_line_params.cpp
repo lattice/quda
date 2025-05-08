@@ -572,7 +572,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
-  quda_app->add_option("--use_split_gauge_bkup", use_split_gauge_bkup, "Use gauge split buff or not");
+  quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");
 
