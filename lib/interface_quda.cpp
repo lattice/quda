@@ -662,16 +662,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   auto profile = pushProfile(profileGauge);
   checkGaugeParam(param);
 
-  // set update_split_gauge to reuse backup or not and free the buf if needed
-  // always update the flag even gauge reuse with checksum
-  // better way would be do the checks more consistently along with clover/stagger
-  if(param->use_split_gauge_bkup == QUDA_BOOLEAN_TRUE){
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
-  }
-  else{
-    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_OFF;
-    freeGaugeSplit(); // free the buf when not using
-  }
 
   if (!initialized) errorQuda("QUDA not initialized");
   if (getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
@@ -693,6 +683,17 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     }
     checksum = in_checksum;
     invalidate_clover = true;
+  }
+
+  // set update_split_gauge to reuse backup or not and free the buf if needed
+  // always update the flag even gauge reuse with checksum
+  // better way would be do the checks more consistently along with clover/stagger
+  if(param->use_split_gauge_bkup == QUDA_BOOLEAN_TRUE){
+    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+  }
+  else{
+    update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_OFF;
+    freeGaugeSplit(); // free the buf when not using
   }
 
   // free any current gauge field before new allocations to reduce memory overhead
@@ -981,6 +982,11 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     }
 
     for (auto i = 0; i < 2; i++) inv_param->trlogA[i] = cloverPrecise->TrLog()[i];
+
+    // update split gauge when clover field updated
+    if(update_split_gauge == QUDA_UPDATE_SPLITE_GAUGE_FALSE){
+      update_split_gauge = QUDA_UPDATE_SPLITE_GAUGE_TRUE;
+    }
   } else {
     logQuda(QUDA_VERBOSE, "Gauge field unchanged - using cached clover field\n");
   }
