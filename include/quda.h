@@ -877,6 +877,8 @@ extern "C" {
     double alpha3;                 /**< The coefficient used in HYP smearing step 1*/
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+    unsigned int adj_n_save; /**< How many intermediate gauge fields to save at each large nblock to perform adj flow*/
+    unsigned int hier_threshold;   /**< Minimum *hierarchical* threshold for adj gradient flow*/
     QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
     double t0;                     /**< Starting flow time for Wilson flow */
     int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
@@ -1722,6 +1724,26 @@ extern "C" {
    */
   void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
                         QudaGaugeObservableParam *obs_param, const size_t nSpinors);
+
+  /**
+   * Performs Adjoint Gradient Flow (gauge + fermion) the "safe" way on gaugePrecise and stores it in gaugeSmeared
+   * @param[out] h_out Output fermion field
+   * @param[in] h_in Input fermion field
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */
+  void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param);
+
+  /**
+   * Performs Adjoint Gradient Flow (gauge + fermion) the Hierarchical way on gaugePrecise and stores it in gaugeSmeared
+   * @param[out] h_out Output fermion field
+   * @param[in] h_in Input fermion field
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */
+  void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param);
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
