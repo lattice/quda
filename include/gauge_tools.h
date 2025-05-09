@@ -200,10 +200,11 @@ namespace quda
    * @brief Compute the gauge fixing quality, functional or theta is considered as the criterion.
    * @param[in,out] quality The functional and theta value
    * @param[in] u Fixed gauge field
+   * @param[in] rot Rotation field
    * @param[in] dir_ignore The ignored direction, 3 (Coulomb gauge) and 4 (Landau gauge) are common choices
    * @param[in] compute_theta Set to true to compute the theta value as the criterion
    */
-  void gaugeFixQuality(double quality[2], const GaugeField &u, int dir_ignore, bool compute_theta);
+  void gaugeFixQuality(double quality[2], const GaugeField &rot, const GaugeField &u, int dir_ignore, bool compute_theta);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

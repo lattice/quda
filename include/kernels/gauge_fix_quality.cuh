@@ -18,13 +18,14 @@ namespace quda
     typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     const Gauge u;
+    const Gauge rot;
 
     int X[4]; // grid dimensions
     int border[4];
     const int dir_ignore;
 
-    GaugeFixQualityArg(const GaugeField &u, int dir_ignore) :
-      ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2)), u(u), dir_ignore(dir_ignore)
+    GaugeFixQualityArg(const GaugeField &u, const GaugeField &rot, int dir_ignore) :
+      ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2)), u(u), rot(rot), dir_ignore(dir_ignore)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = u.R()[dir];
@@ -59,24 +60,28 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      Link U, V;
+      Link g0, g, U, V;
+      g0 = arg.rot(0, linkIndex(x, X), parity);
 #pragma unroll
       for (int dir = 0; dir < 4; ++dir) {
         if (dir != arg.dir_ignore) {
+          g = arg.rot(0, linkIndexP1(x, X, dir), 1 - parity);
           U = arg.u(dir, linkIndex(x, X), parity);
-          V += U;
+          V += U * conj(g);
         }
       }
-      quality[0] = getTrace(V).real();
+      quality[0] = getTrace(g0 * V).real();
 
       if constexpr (Arg::compute_theta) {
 #pragma unroll
         for (int dir = 0; dir < 4; ++dir) {
           if (dir != arg.dir_ignore) {
+            g = arg.rot(0, linkIndexM1(x, X, dir), 1 - parity);
             U = arg.u(dir, linkIndexM1(x, X, dir), 1 - parity);
-            V -= U;
+            V += conj(g * U);
           }
         }
+        V = g0 * V;
         V -= conj(V);
         SubTraceUnit(V);
         quality[1] = getRealTraceUVdagger(V, V);

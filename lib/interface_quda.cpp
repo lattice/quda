@@ -5485,8 +5485,8 @@ void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGaugeRotate);
   checkGaugeParam(param);
-  lat_dim_t R;
-  for (int d = 0; d < 4; d++) { R[d] = (redundant_comms || commDimPartitioned(d)); }
+  lat_dim_t R1;
+  for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
 
   GaugeFieldParam gParam(*param);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -5502,9 +5502,6 @@ void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
   gParam.link_type = param->type;
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(gParam.Precision(), true);
-  // gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  // gParam.pad = param->ga_pad;
-  // gParam.nFace = 1;
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   GaugeField cudaRotation(gParam);
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
@@ -5514,21 +5511,17 @@ void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
   cudaRotation.copy(cpuRotation);
   if (!param->use_resident_gauge) { cudaInGauge.copy(cpuGauge); }
 
-  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R, profileGaugeRotate);
-  GaugeField *cudaGaugeEx = createExtendedGauge(cudaInGauge, R, profileGaugeRotate);
+  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R1, profileGaugeRotate);
 
-  gaugeRotate(*cudaGaugeEx, *cudaGaugeEx, *cudaRotationEx);
+  gaugeRotate(cudaOutGauge, cudaInGauge, *cudaRotationEx);
 
   delete cudaRotationEx;
-  copyExtendedGauge(cudaOutGauge, *cudaGaugeEx, QUDA_CUDA_FIELD_LOCATION);
   if (param->return_result_gauge) { cpuGauge.copy(cudaOutGauge); }
   if (param->make_resident_gauge) {
     freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaOutGauge);
-    updateExtendedGaugeResident(cudaGaugeEx);
-  } else {
-    delete cudaGaugeEx;
+    updateExtendedGaugeResident(true, R, profileGaugeRotate);
   }
 }
 
@@ -5536,8 +5529,8 @@ void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, Qud
 {
   auto profile = pushProfile(profileGaugeFix);
   checkGaugeParam(param);
-  lat_dim_t R;
-  for (int d = 0; d < 4; d++) { R[d] = (redundant_comms || commDimPartitioned(d)); }
+  lat_dim_t R1;
+  for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
 
   GaugeFieldParam gParam(*param);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -5558,25 +5551,20 @@ void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, Qud
   GaugeField cudaRotation(gParam);
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
   GaugeField cudaInGauge = param->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
-  GaugeField cudaOutGauge(gParam);
+  GaugeField cudaOutGauge
+    = (param->make_resident_gauge || param->return_result_gauge) ? GaugeField(gParam) : GaugeField();
 
   cudaRotation.copy(cpuRotation);
-  if (!param->use_resident_gauge) {
-    cudaInGauge.copy(cpuGauge);
-  } else {
-    updateExtendedGaugeResident(false, R, profileGaugeFix);
-  }
+  if (!param->use_resident_gauge) { cudaInGauge.copy(cpuGauge); }
 
-  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R, profileGaugeFix);
-  GaugeField *cudaInGaugeEx
-    = param->use_resident_gauge ? extendedGaugeResident : createExtendedGauge(cudaInGauge, R, profileGaugeFix);
-  GaugeField *cudaOutGaugeEx = createExtendedGauge(cudaInGauge, R, profileGaugeFix);
+  GaugeField *cudaRotationEx = createExtendedGauge(cudaRotation, R1, profileGaugeFix);
+  GaugeField *cudaInGaugeEx = createExtendedGauge(cudaInGauge, R1, profileGaugeFix);
 
   double functional_old, functional, theta, diff, criterion, quality[2];
   bool compute_theta = fix_param->compute_theta;
   bool use_theta = fix_param->use_theta;
   if (use_theta && !compute_theta) { errorQuda("compute_theta must be true if use_theta is true"); }
-  gaugeFixQuality(quality, *cudaOutGaugeEx, fix_param->dir_ignore, compute_theta);
+  gaugeFixQuality(quality, *cudaRotationEx, *cudaInGaugeEx, fix_param->dir_ignore, compute_theta);
   functional = quality[0];
   theta = quality[1];
   diff = 1.0;
@@ -5585,8 +5573,7 @@ void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, Qud
   logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
   while (iter < fix_param->maxiter && criterion > fix_param->tol) {
     gaugeFixOVRStep(*cudaRotationEx, *cudaInGaugeEx, fix_param->omega, fix_param->dir_ignore);
-    gaugeRotate(*cudaOutGaugeEx, *cudaInGaugeEx, *cudaRotationEx);
-    gaugeFixQuality(quality, *cudaOutGaugeEx, fix_param->dir_ignore, compute_theta);
+    gaugeFixQuality(quality, *cudaRotationEx, *cudaInGaugeEx, fix_param->dir_ignore, compute_theta);
     functional_old = functional;
     functional = quality[0];
     theta = quality[1];
@@ -5605,18 +5592,18 @@ void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, Qud
   // copy the field back to the host
   copyExtendedGauge(cudaRotation, *cudaRotationEx, QUDA_CUDA_FIELD_LOCATION);
   cpuRotation.copy(cudaRotation);
-  copyExtendedGauge(cudaOutGauge, *cudaOutGaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  if (param->make_resident_gauge || param->return_result_gauge) {
+    gaugeRotate(cudaOutGauge, cudaInGauge, *cudaRotationEx);
+  }
   if (param->return_result_gauge) { cpuGauge.copy(cudaOutGauge); }
 
   delete cudaRotationEx;
-  if (!param->use_resident_gauge) { delete cudaInGaugeEx; }
+  delete cudaInGaugeEx;
   if (param->make_resident_gauge) {
     freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaOutGauge);
-    updateExtendedGaugeResident(cudaOutGaugeEx);
-  } else {
-    delete cudaOutGaugeEx;
+    updateExtendedGaugeResident(true, R, profileGaugeFix);
   }
 }
 

@@ -25,8 +25,8 @@ namespace quda
       kernel_param(dim3(in.LocalVolumeCB(), 2, 4)), out(out), in(in), rot(rot)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        border[dir] = in.R()[dir];
-        X[dir] = in.X()[dir] - border[dir] * 2;
+        border[dir] = rot.R()[dir];
+        X[dir] = rot.X()[dir] - border[dir] * 2;
       }
     }
   };
@@ -53,13 +53,13 @@ namespace quda
       }
 
       Link g, U;
-      U = arg.in(dir, linkIndex(x, X), parity);
+      U = arg.in(dir, x_cb, parity);
       g = arg.rot(0, linkIndex(x, X), parity);
       U = g * U;
       g = arg.rot(0, linkIndexP1(x, X, dir), 1 - parity);
       U = U * conj(g);
 
-      arg.out(dir, linkIndex(x, X), parity) = U;
+      arg.out(dir, x_cb, parity) = U;
     }
   };
 } // namespace quda

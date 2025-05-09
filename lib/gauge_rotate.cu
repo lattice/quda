@@ -57,7 +57,6 @@ namespace quda
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeRotate>(out, in, rot);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-    out.exchangeExtendedGhost(out.R(), getProfile(), false);
   }
 
 } // namespace quda
