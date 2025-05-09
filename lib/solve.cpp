@@ -113,7 +113,7 @@ namespace quda
       }
       if (param.inv_type == QUDA_MG_INVERTER) errorQuda("Multigrid solver doesn't support distance preconditioning");
 
-      if (param.cuda_prec != QUDA_DOUBLE_PRECISION || param.cuda_prec_sloppy != QUDA_DOUBLE_PRECISION) {
+      if (param.cuda_prec != QUDA_DOUBLE_PRECISION) {
         warningQuda(
           "Using single or half (sloppy) precision in distance preconditioning sometimes makes the solver diverge");
       }
@@ -134,6 +134,9 @@ namespace quda
     bool direct_solve = (param.solve_type == QUDA_DIRECT_SOLVE) || (param.solve_type == QUDA_DIRECT_PC_SOLVE);
     bool norm_error_solve = (param.solve_type == QUDA_NORMERR_SOLVE) || (param.solve_type == QUDA_NORMERR_PC_SOLVE);
 
+    bool distance_pc = (param.distance_pc_alpha0 != 0.0 && param.distance_pc_t0 >= 0);
+    distanceReweight(b, param, true);
+
     auto nb = blas::norm2(b);
     for (auto &bi : nb) {
       if (bi == 0.0) errorQuda("Source has zero norm");
@@ -144,7 +147,8 @@ namespace quda
       for (auto &xi : x_norm) logQuda(QUDA_VERBOSE, "Initial guess: %g\n", xi);
     }
     // rescale the source and solution vectors to help prevent the onset of underflow
-    if (param.solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    // and force to normalize the source if distance preconditioning is used
+    if (param.solver_normalization == QUDA_SOURCE_NORMALIZATION || distance_pc) {
       auto nb_inv(nb);
       for (auto &bi : nb_inv) bi = 1 / sqrt(bi);
       blas::ax(nb_inv, b);
@@ -152,7 +156,6 @@ namespace quda
     }
 
     massRescale(b, param, false);
-    distanceReweight(b, param, true);
 
     std::vector<ColorSpinorField> in(b.size());
     std::vector<ColorSpinorField> out(b.size());
@@ -295,9 +298,7 @@ namespace quda
 
     dirac.reconstruct(x, b, param.solution_type);
 
-    distanceReweight(x, param, false);
-
-    if (param.solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    if (param.solver_normalization == QUDA_SOURCE_NORMALIZATION || distance_pc) {
       // rescale the solution
       for (auto &bi : nb) bi = sqrt(bi);
       blas::ax(nb, x);
@@ -313,6 +314,8 @@ namespace quda
       param.action[0] = action[0].real();
       param.action[1] = action[0].imag();
     }
+
+    distanceReweight(x, param, false);
 
     getProfile().TPSTOP(QUDA_PROFILE_EPILOGUE);
   }

@@ -94,10 +94,10 @@ namespace quda
 
     const int t = arg.comm_coord_dim_3 + coord[3];
     const int nt = arg.comm_dim_dim_3;
-    real fwd_coeff_3
-      = Arg::distance_pc ? distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
-    real bwd_coeff_3
-      = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
+    real fwd_coeff_3 = Arg::distance_pc ? static_cast<real>(distanceWeight(arg, t + 1, nt) / distanceWeight(arg, t, nt)) :
+                                          static_cast<real>(1.0);
+    real bwd_coeff_3 = Arg::distance_pc ? static_cast<real>(distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt)) :
+                                          static_cast<real>(1.0);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
