@@ -6,6 +6,12 @@
 namespace quda
 {
 
+#if (CUDA_VERSION >= 12040)
+#define MAXNREG(x) __maxnreg__(x)
+#else
+#define MAXNREG(x)
+#endif
+
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
      kernel.  Functors that utilize this kernel have a
@@ -44,7 +50,8 @@ namespace quda
   /**
      @brief Kernel1D is the entry point of the generic 1-d kernel.
      This is the specialization where the kernel argument struct is
-     passed by value directly to the kernel.
+     passed by value directly to the kernel and a max register count
+     is specified.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -54,12 +61,25 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __maxnreg__(Arg::max_regs) __global__
+  MAXNREG(Arg::max_regs) __global__
   std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel1D(Arg arg)
   {
     Kernel1D_impl<Functor, Arg, grid_stride>(arg);
   }
 
+  /**
+     @brief Kernel1D is the entry point of the generic 1-d kernel.
+     This is the specialization where the kernel argument struct is
+     passed by value directly to the kernel and no max register count
+     is specified.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread.
+     @param[in] arg Kernel argument
+   */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel1D(Arg arg)
   {
@@ -69,7 +89,8 @@ namespace quda
   /**
      @brief Kernel1D is the entry point of the generic 1-d kernel.
      This is the specialization where the kernel argument struct is
-     copied to the device prior to kernel launch.
+     copied to the device prior to kernel launch and a max register
+     count is specified.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -79,12 +100,25 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __maxnreg__(Arg::max_regs) __global__
+  MAXNREG(Arg::max_regs) __global__
   std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel1D()
   {
     Kernel1D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
 
+  /**
+     @brief Kernel1D is the entry point of the generic 1-d kernel.
+     This is the specialization where the kernel argument struct is
+     copied to the device prior to kernel launch and no max register
+     count is specified.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread.
+     @param[in] arg Kernel argument
+   */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel1D()
   {
@@ -132,7 +166,8 @@ namespace quda
   /**
      @brief Kernel2D is the entry point of the generic 2-d kernel.
      This is the specialization where the kernel argument struct is
-     passed by value directly to the kernel.
+     passed by value directly to the kernel and a max register count
+     is specified.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -142,12 +177,25 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __maxnreg__(Arg::max_regs) __global__
+  MAXNREG(Arg::max_regs) __global__
   std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel2D(Arg arg)
   {
     Kernel2D_impl<Functor, Arg, grid_stride>(arg);
   }
 
+  /**
+     @brief Kernel2D is the entry point of the generic 2-d kernel.
+     This is the specialization where the kernel argument struct is
+     passed by value directly to the kernel and no max register count
+     is specified.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel2D(Arg arg)
   {
@@ -157,7 +205,8 @@ namespace quda
   /**
      @brief Kernel2D is the entry point of the generic 2-d kernel.
      This is the specialization where the kernel argument struct is
-     copied to the device prior to kernel launch.
+     copied to the device prior to kernel launch and a max register
+     count is specified.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -167,12 +216,25 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __maxnreg__(Arg::max_regs) __global__
+  MAXNREG(Arg::max_regs) __global__
   std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel2D()
   {
     Kernel2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
 
+  /**
+     @brief Kernel2D is the entry point of the generic 2-d kernel.
+     This is the specialization where the kernel argument struct is
+     copied to the device prior to kernel launch and not max register
+     count is specified.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel2D()
   {
@@ -222,7 +284,8 @@ namespace quda
   /**
      @brief Kernel3D is the entry point of the generic 3-d kernel.
      This is the specialization where the kernel argument struct is
-     passed by value directly to the kernel.
+     passed by value directly to the kernel and a max register count
+     is specified.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -232,12 +295,25 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __maxnreg__(Arg::max_regs) __global__
+  MAXNREG(Arg::max_regs) __global__
   std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel3D(Arg arg)
   {
     Kernel3D_impl<Functor, Arg, grid_stride>(arg);
   }
 
+  /**
+     @brief Kernel3D is the entry point of the generic 3-d kernel.
+     This is the specialization where the kernel argument struct is
+     passed by value directly to the kernel and no max register count
+     is specified.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Kernel3D(Arg arg)
   {
@@ -247,7 +323,8 @@ namespace quda
   /**
      @brief Kernel3D is the entry point of the generic 3-d kernel.
      This is the specialization where the kernel argument struct is
-     passed by value directly to the kernel.
+     passed by value directly to the kernel and a max register count
+     is specified.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -257,12 +334,25 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __maxnreg__(Arg::max_regs) __global__
+  MAXNREG(Arg::max_regs) __global__
   std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Kernel3D()
   {
     Kernel3D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
 
+  /**
+     @brief Kernel3D is the entry point of the generic 3-d kernel.
+     This is the specialization where the kernel argument struct is
+     passed by value directly to the kernel and no max register count
+     is specified.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs == 0), void> Kernel3D()
   {
