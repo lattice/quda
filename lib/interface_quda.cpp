@@ -5971,7 +5971,7 @@ void performGaugeRotateQuda(void *rotation, void *gauge, QudaGaugeParam *param)
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.link_type = param->type;
   gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(gParam.Precision(), true);
+  gParam.setPrecision(param->cuda_prec, true);
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   GaugeField cudaRotation(gParam);
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
@@ -6017,7 +6017,7 @@ void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, Qud
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.link_type = param->type;
   gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(gParam.Precision(), true);
+  gParam.setPrecision(param->cuda_prec, true);
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   GaugeField cudaRotation(gParam);
   gParam.geometry = QUDA_VECTOR_GEOMETRY;

@@ -25,14 +25,22 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<ColdStart>(tp, stream, InitGaugeColdArg<Float, nColor, recon>(U));
+      if (U.Geometry() == QUDA_SCALAR_GEOMETRY) {
+        launch<ColdStart>(tp, stream, InitGaugeColdArg<Float, nColor, recon, QUDA_SCALAR_GEOMETRY>(U));
+      } else if (U.Geometry() == QUDA_VECTOR_GEOMETRY) {
+        launch<ColdStart>(tp, stream, InitGaugeColdArg<Float, nColor, recon, QUDA_VECTOR_GEOMETRY>(U));
+      } else if (U.Geometry() == QUDA_TENSOR_GEOMETRY) {
+        launch<ColdStart>(tp, stream, InitGaugeColdArg<Float, nColor, recon, QUDA_TENSOR_GEOMETRY>(U));
+      } else {
+        errorQuda("Unsupported geometry %d\n", U.Geometry());
+      }
     }
 
     long long flops() const { return 0; }
     long long bytes() const { return U.Bytes(); }
   };
 
-  template<typename Float, int nColors, QudaReconstructType recon>
+  template<typename Float, int nColor, QudaReconstructType recon>
   class InitGaugeHot : TunableKernel1D {
     const GaugeField &U;
     RNG &rng;
@@ -52,7 +60,15 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<HotStart>(tp, stream, InitGaugeHotArg<Float, nColors, recon>(U, rng.State()));
+      if (U.Geometry() == QUDA_SCALAR_GEOMETRY) {
+        launch<HotStart>(tp, stream, InitGaugeHotArg<Float, nColor, recon, QUDA_SCALAR_GEOMETRY>(U, rng.State()));
+      } else if (U.Geometry() == QUDA_VECTOR_GEOMETRY) {
+        launch<HotStart>(tp, stream, InitGaugeHotArg<Float, nColor, recon, QUDA_VECTOR_GEOMETRY>(U, rng.State()));
+      } else if (U.Geometry() == QUDA_TENSOR_GEOMETRY) {
+        launch<HotStart>(tp, stream, InitGaugeHotArg<Float, nColor, recon, QUDA_TENSOR_GEOMETRY>(U, rng.State()));
+      } else {
+        errorQuda("Unsupported geometry %d\n", U.Geometry());
+      }
     }
 
     void preTune() { rng.backup(); }

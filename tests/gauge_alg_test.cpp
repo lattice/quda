@@ -76,6 +76,60 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
     return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
   }
 
+  void gaugeFixOVR_v2(GaugeField &gauge, int dir_ignore, double tol, int maxiter, double omega, bool use_theta, int verbose_interval) {
+    lat_dim_t R = {0, 0, 0, 0};
+    for (int d = 0; d < 4; d++) { if (comm_dim_partitioned(d)) R[d] = 2; }
+    GaugeFieldParam gauge_field_param(param, nullptr);
+    gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gauge_field_param.location = QUDA_CUDA_FIELD_LOCATION;
+    gauge_field_param.create = QUDA_NULL_FIELD_CREATE;
+    gauge_field_param.reconstruct = param.reconstruct;
+    gauge_field_param.setPrecision(precision, true);
+    gauge_field_param.geometry = QUDA_SCALAR_GEOMETRY;
+    GaugeField *tmp = new GaugeField(gauge_field_param);
+    InitGaugeField(*tmp);
+    static TimeProfile GaugeFix("GaugeFix");
+    GaugeField *rot = createExtendedGauge(*tmp, R, GaugeFix);
+    delete tmp;
+    gauge_field_param.geometry = QUDA_VECTOR_GEOMETRY;
+    tmp = new GaugeField(gauge_field_param);
+    copyExtendedGauge(*tmp, gauge, QUDA_CUDA_FIELD_LOCATION);
+
+    double functional_old, functional, theta, diff, criterion, quality[2];
+    bool compute_theta = true;
+    if (use_theta && !compute_theta) { errorQuda("compute_theta must be true if use_theta is true"); }
+    gaugeFixQuality(quality, *rot, gauge, dir_ignore, compute_theta);
+    functional = quality[0];
+    theta = quality[1];
+    diff = 1.0;
+    criterion = use_theta ? theta : diff;
+    int iter = 0;
+    logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
+    while (iter < maxiter && criterion > tol) {
+      gaugeFixOVRStep(*rot, gauge, omega, dir_ignore);
+      gaugeFixQuality(quality, *rot, gauge, dir_ignore, compute_theta);
+      functional_old = functional;
+      functional = quality[0];
+      theta = quality[1];
+      diff = fabs((functional - functional_old) / functional_old);
+      criterion = use_theta ? theta : diff;
+      iter++;
+      if (iter % verbose_interval == 0) {
+        logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
+                theta);
+      }
+    }
+    if (iter % verbose_interval != 0 && iter < maxiter) {
+      logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
+    }
+
+    gaugeRotate(*tmp, *tmp, *rot);
+    delete rot;
+    copyExtendedGauge(gauge, *tmp, QUDA_CUDA_FIELD_LOCATION);
+    delete tmp;
+    gauge.exchangeExtendedGhost(gauge.R(), false);
+  }
+
   virtual void SetUp()
   {
 #ifndef QUDA_BUILD_NATIVE_FFT // skip FFT tests if FFT not available
@@ -201,6 +255,7 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
         break;
       case 1: run_ovr(); break;
       case 2: run_fft(); break;
+      case 3: run_ovr2(); break;
       default: errorQuda("Invalid test type %d", test_type);
       }
 
@@ -257,6 +312,18 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
       } else {
         errorQuda("Cannot perform FFT gauge fixing with MPI partitions.");
       }
+    }
+  }
+  virtual void run_ovr2()
+  {
+    if (execute) {
+      gaugeFixOVR_v2(*U, gf_gauge_dir, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_verbosity_interval);
+      auto plaq_gf = plaquette(*U);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+      // Save if output string is specified
+      if (gauge_store) save_gauge();
     }
   }
 
@@ -353,6 +420,30 @@ TEST_P(GaugeAlgTest, Coulomb_FFT)
       printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
       ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
     }
+  }
+}
+
+TEST_P(GaugeAlgTest, Landau_Overrelaxation_v2)
+{
+  if (execute) {
+    printfQuda("Landau gauge fixing with overrelaxation v2\n");
+    gaugeFixOVR_v2(*U, 4, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_verbosity_interval);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  }
+}
+
+TEST_P(GaugeAlgTest, Coulomb_Overrelaxation_v2)
+{
+  if (execute) {
+    printfQuda("Coulomb gauge fixing with overrelaxation v2\n");
+    gaugeFixOVR_v2(*U, 3, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_verbosity_interval);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
 
