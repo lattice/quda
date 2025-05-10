@@ -34,8 +34,7 @@ namespace quda
       i32toa(aux + strlen(aux), dir_ignore);
       strcat(aux, ",parity=");
       i32toa(aux + strlen(aux), parity);
-      strcat(aux, ",over_relaxation=");
-      i32toa(aux + strlen(aux), omega == 1.0);
+      if (omega != 1.0) { strcat(aux, ",over_relaxation"); }
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
     }

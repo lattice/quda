@@ -1107,6 +1107,15 @@ extern "C" {
   QudaGaugeSmearParam newQudaGaugeSmearParam(void);
 
   /**
+   * A new QudaGaugeFixParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeFixParam fix_param = newQudaGaugeFixParam();
+   */
+  QudaGaugeFixParam newQudaGaugeFixParam(void);
+
+  /**
    * A new QudaBLASParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
    * using this function.  Typical usage is as follows:
@@ -1144,6 +1153,18 @@ extern "C" {
    * @param param The QudaGaugeObservableParam whose elements we are to print.
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
+
+  /**
+   * Print the members of QudaGaugeSmearParam.
+   * @param param The QudaGaugeSmearParam whose elements we are to print.
+   */
+  void printQudaGaugeSmearParam(QudaGaugeSmearParam *param);
+
+  /**
+   * Print the members of QudaGaugeFixParam.
+   * @param param The QudaGaugeFixParam whose elements we are to print.
+   */
+  void printQudaGaugeFixParam(QudaGaugeFixParam *param);
 
   /**
    * Print the members of QudaBLASParam.
@@ -1785,6 +1806,25 @@ extern "C" {
                       const int *const mom_modes, const QudaFFTSymmType *const fft_type);
 
   /**
+   * @brief Rotate gauge field U_\mu(x) with the rotation field g(x)
+   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
+   * @param[in] rotation Rotation field g(x) to rotate the gauge
+   * @param[in,out] gauge Gauge field U_\mu(x) to be rotated
+   * @param[in] param Parameters of the external fields
+   */
+  void performGaugeRotateQuda(void *rotation, void *gauge, QudaGaugeParam *param);
+
+  /**
+   * @brief Gauge fixing with over-relaxation.
+   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
+   * @param[in,out] rotation Rotation field g(x) to fix the gauge
+   * @param[in,out] gauge Gauge field U_\mu(x) to be fixed
+   * @param[in] param Parameters of the external fields
+   * @param[in] fix_param Parameters of the gauge fixing algorithm
+   */
+  void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, QudaGaugeFixParam *fix_param);
+
+  /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
@@ -1800,25 +1840,6 @@ extern "C" {
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
-
-  /**
-   * @brief Gauge fixing with over-relaxation.
-   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
-   * @param[in,out] gauge Gauge field U_\mu(x) to be fixed
-   * @param[in,out] rotation Rotation field g(x) to fix the gauge
-   * @param[in] param Parameters of the external fields
-   * @param[in] fix_param Parameters of the gauge fixing algorithm
-   */
-  void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, QudaGaugeFixParam *fix_param);
-
-  /**
-   * @brief Rotate gauge field U_\mu(x) with the rotation field g(x)
-   * U'_\mu(x) = g(x) U_\mu(x) g^\dagger(x+\mu)
-   * @param[in,out] gauge Gauge field U_\mu(x) to be rotated
-   * @param[in] rotation Rotation field g(x)
-   * @param[in] param Parameters of the external fields
-   */
-  void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

@@ -1218,6 +1218,48 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
 }
 
 #if defined INIT_PARAM
+QudaGaugeFixParam newQudaGaugeFixParam(void)
+{
+  QudaGaugeFixParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeFixParam(QudaGaugeFixParam *param)
+{
+#else
+void printQudaGaugeFixParam(QudaGaugeFixParam *param)
+{
+  printfQuda("QUDA Gauge Fix Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeFixParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+  // P(fix_type, QUDA_GAUGE_FIX_INVALID);
+  P(tol, INVALID_DOUBLE);
+  P(maxiter, INVALID_INT);
+  P(dir_ignore, INVALID_INT);
+
+#ifdef INIT_PARAM
+  P(omega, 1.0);
+  P(alpha, 0.0);
+  P(verbose_interval, 1);
+  P(compute_theta, true);
+  P(use_theta, false);
+#else
+  P(omega, INVALID_DOUBLE);
+  P(alpha, INVALID_DOUBLE);
+  P(verbose_interval, INVALID_INT);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
 QudaBLASParam newQudaBLASParam(void)
 {
   QudaBLASParam ret;

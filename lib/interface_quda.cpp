@@ -141,7 +141,13 @@ static TimeProfile profileInvert("invertQuda");
 static TimeProfile profileInvertMultiSrc("invertMultiSrcQuda");
 
 //!< Profiler for invertMultiShiftQuda
-static TimeProfile profileMulti("invertMultiShiftQuda");
+static TimeProfile profileInvertMultiShift("invertMultiShiftQuda");
+
+//!< Profiler for MatQuda
+static TimeProfile profileMat("MatQuda");
+
+//!< Profiler for MatDagMatQuda
+static TimeProfile profileMatDagMat("MatDagMatQuda");
 
 //!< Profiler for eigensolveQuda
 static TimeProfile profileEigensolve("eigensolveQuda");
@@ -227,15 +233,18 @@ static TimeProfile profileMomAction("momActionQuda");
 //!< Profiler for sink projection
 static TimeProfile profileSinkProject("sinkProjectQuda");
 
+//!< Profiler for performGaugeRotateQuda
+static TimeProfile profileGaugeRotate("performGaugeRotateQuda");
+
+//!< Profiler for performGaugeFixQuda
+static TimeProfile profileGaugeFix("performGaugeFixQuda");
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
 //!< Profiler for GaugeFixing
 static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
 static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
-static TimeProfile profileGaugeFix("performGaugeFixQuda");
-static TimeProfile profileGaugeRotate("performGaugeRotateQuda");
-static TimeProfile profileSpinorRotate("performFermionRotateQuda");
 
 //!< Profiler for toal time spend between init and end
 static TimeProfile profileInit2End("initQuda-endQuda",false);
@@ -1451,7 +1460,9 @@ void endQuda(void)
     profileDslash.Print();
     profileInvert.Print();
     profileInvertMultiSrc.Print();
-    profileMulti.Print();
+    profileInvertMultiShift.Print();
+    profileMat.Print();
+    profileMatDagMat.Print();
     profileEigensolve.Print();
     profileFatLink.Print();
     profileGaugeForce.Print();
@@ -2297,6 +2308,7 @@ void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam *param)
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  auto profile = pushProfile(profileMat, inv_param);
   pushVerbosity(inv_param->verbosity);
 
   const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
@@ -2324,6 +2336,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   ColorSpinorField out(cudaParam);
 
+  profileMat.TPSTART(QUDA_PROFILE_COMPUTE);
+
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
@@ -2349,6 +2363,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     }
   }
 
+  profileMat.TPSTOP(QUDA_PROFILE_COMPUTE);
+
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
   ColorSpinorField out_h(cpuParam);
@@ -2361,6 +2377,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  auto profile = pushProfile(profileMatDagMat, inv_param);
   pushVerbosity(inv_param->verbosity);
 
   const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
@@ -2390,6 +2407,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   //  double kappa = inv_param->kappa;
   //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
 
+  profileMatDagMat.TPSTART(QUDA_PROFILE_COMPUTE);
+
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
@@ -2414,6 +2433,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
       blas::ax(0.25/(kappa*kappa), out);
     }
   }
+
+  profileMatDagMat.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
@@ -3470,7 +3491,7 @@ void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, Quda
  */
 void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 {
-  auto profile = pushProfile(profileMulti, param);
+  auto profile = pushProfile(profileInvertMultiShift, param);
   profilerStart(__func__);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -3603,7 +3624,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   std::vector<ColorSpinorField> &x = solutionResident;
   std::vector<ColorSpinorField> p;
 
-  profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
+  profileInvertMultiShift.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   // Check source norms
   double nb = blas::norm2(b);
@@ -3619,7 +3640,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 
   // rescale
   massRescale(b, *param, true);
-  profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileInvertMultiShift.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   DiracMatrix *m, *mSloppy;
 
@@ -3778,11 +3799,11 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
     if (!param->make_resident_solution) h_x[i] = x[i];
   }
 
-  profileMulti.TPSTART(QUDA_PROFILE_EPILOGUE);
+  profileInvertMultiShift.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   if (!param->make_resident_solution) solutionResident.clear();
 
-  profileMulti.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  profileInvertMultiShift.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   delete d;
   delete dSloppy;
@@ -5930,7 +5951,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   popOutputPrefix();
 }
 
-void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
+void performGaugeRotateQuda(void *rotation, void *gauge, QudaGaugeParam *param)
 {
   auto profile = pushProfile(profileGaugeRotate);
   checkGaugeParam(param);
@@ -5974,10 +5995,11 @@ void performGaugeRotateQuda(void *gauge, void *rotation, QudaGaugeParam *param)
   }
 }
 
-void performGaugeFixQuda(void *gauge, void *rotation, QudaGaugeParam *param, QudaGaugeFixParam *fix_param)
+void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, QudaGaugeFixParam *fix_param)
 {
   auto profile = pushProfile(profileGaugeFix);
   checkGaugeParam(param);
+  checkGaugeFixParam(fix_param);
   lat_dim_t R1;
   for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
 

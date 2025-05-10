@@ -32,8 +32,7 @@ namespace quda
     {
       strcat(aux, ",dir_ignore=");
       i32toa(aux + strlen(aux), dir_ignore);
-      strcat(aux, ",compute_theta=");
-      i32toa(aux + strlen(aux), compute_theta);
+      if (compute_theta) { strcat(aux, ",compute_theta"); }
       strcat(aux, comm_dim_partitioned_string());
       apply(device::get_default_stream());
     }

@@ -128,6 +128,7 @@ namespace quda
       auto key = Dslash::tuneKey();
       strcat(key.aux, ",mu=");
       u32toa(key.aux + strlen(key.aux), arg.mu);
+      if constexpr (Arg::shift) { strcat(key.aux, ",shift"); }
       return key;
     }
   };
