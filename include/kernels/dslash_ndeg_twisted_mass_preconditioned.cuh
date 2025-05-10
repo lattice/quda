@@ -38,11 +38,21 @@ namespace quda
     }
   };
 
+  template <bool dagger, typename Arg> struct nDegTwistedMassPreconditionedParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = std::conditional_t<!dagger || Arg::asymmetric, KernelOps<Cache>, NoKernelOps>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedMassPreconditioned : dslash_default {
+  struct nDegTwistedMassPreconditioned : dslash_default, nDegTwistedMassPreconditionedParams<dagger, Arg>::Ops {
 
     const Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedMassPreconditionedParams<dagger, Arg>::Ops::KernelOpsT;
+    template <typename Ftor> constexpr nDegTwistedMassPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg)
+    {
+    }
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
@@ -97,9 +107,9 @@ namespace quda
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out += x;
       }
-      
-      if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-        SharedMemoryCache<Vector> cache;
+
+      if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
+        SharedMemoryCache<Vector> cache {*this};
         if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
@@ -116,7 +126,6 @@ namespace quda
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

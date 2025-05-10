@@ -163,8 +163,9 @@ namespace quda {
   };
 
   template <bool is_device> struct site_max {
-    template <typename Arg> inline auto operator()(typename Arg::real thread_max, Arg &)
+    template <typename Ftor> inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &)
     {
+      using Arg = typename Ftor::Arg;
       // on the host we require that both spin and color are fully thread local
       constexpr int Ms = spins_per_thread<is_device>(Arg::nSpin);
       constexpr int Mc = colors_per_thread<is_device>(Arg::nColor);
@@ -187,12 +188,15 @@ namespace quda {
         return block;
       }
     };
+    template <typename Arg> using Cache = SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
+    template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
 
-    template <typename Arg> __device__ inline auto operator()(typename Arg::real thread_max, Arg &)
+    template <typename Ftor> __device__ inline auto operator()(typename Ftor::Arg::real thread_max, const Ftor &ftor)
     {
+      using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
       constexpr int color_spin_threads = CacheDims<Arg>::color_spin_threads;
-      SharedMemoryCache<real, CacheDims<Arg>> cache;
+      Cache<Arg> cache {ftor};
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -205,21 +209,23 @@ namespace quda {
     }
   };
 
-  template <typename Arg> __device__ __host__ inline std::enable_if_t<!Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &, int, int, int, int, int)
+  template <typename Ftor>
+  __device__ __host__ inline std::enable_if_t<!Ftor::Arg::block_float, typename Ftor::Arg::real>
+  compute_site_max(const Ftor &, int, int, int, int, int)
   {
-    return static_cast<typename Arg::real>(1.0); // dummy return for non-block float
+    return static_cast<typename Ftor::Arg::real>(1.0); // dummy return for non-block float
   }
 
   /**
      Compute the max element over the spin-color components of a given site.
   */
-  template <typename Arg> __device__ __host__ inline std::enable_if_t<Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &arg, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block)
+  template <typename Ftor>
+  __device__ __host__ inline std::enable_if_t<Ftor::Arg::block_float, typename Ftor::Arg::real>
+  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block)
   {
-    using real = typename Arg::real;
-    const int Ms = spins_per_thread(Arg::nSpin);
-    const int Mc = colors_per_thread(Arg::nColor);
+    using real = typename Ftor::Arg::real;
+    const int Ms = spins_per_thread(Ftor::Arg::nSpin);
+    const int Mc = colors_per_thread(Ftor::Arg::nColor);
     complex<real> thread_max = {0.0, 0.0};
 
 #pragma unroll
@@ -228,13 +234,13 @@ namespace quda {
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
         int c = color_block + color_local;
-        complex<real> z = arg.in[src_idx](spinor_parity, x_cb, s, c);
-        thread_max.real(std::max(thread_max.real(), std::abs(z.real())));
-        thread_max.imag(std::max(thread_max.imag(), std::abs(z.imag())));
+        complex<real> z = ftor.arg.in[src_idx](spinor_parity, x_cb, s, c);
+        thread_max.real(max(thread_max.real(), abs(z.real())));
+        thread_max.imag(max(thread_max.imag(), abs(z.imag())));
       }
     }
 
-    return target::dispatch<site_max>(std::max(thread_max.real(), thread_max.imag()), arg);
+    return target::dispatch<site_max>(max(thread_max.real(), thread_max.imag()), ftor);
   }
 
   /**
@@ -288,9 +294,16 @@ namespace quda {
     }
   }
 
-  template <typename Arg> struct GhostPacker {
+  template <typename Arg_>
+  using GhostPackerOps = std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoKernelOps>;
+
+  template <typename Arg_> struct GhostPacker : GhostPackerOps<Arg_> {
+    using Arg = Arg_;
     const Arg &arg;
-    constexpr GhostPacker(const Arg &arg) : arg(arg) {}
+    using typename GhostPackerOps<Arg>::KernelOpsT;
+    template <typename... Ops> constexpr GhostPacker(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int tid, int spin_color_block, int parity)
@@ -309,7 +322,7 @@ namespace quda {
 
       int src_idx;
       int x_cb = indexFromFaceIndex(src_idx, dim, dir, ghost_idx, parity, arg);
-      auto max = compute_site_max<Arg>(arg, src_idx, x_cb, spinor_parity, spin_block, color_block);
+      auto max = compute_site_max(*this, src_idx, x_cb, spinor_parity, spin_block, color_block);
 
 #pragma unroll
       for (int spin_local=0; spin_local<Ms; spin_local++) {

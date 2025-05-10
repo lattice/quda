@@ -28,7 +28,7 @@ set (QUDA_OBJS
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cgnr.cpp inv_cgne.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
@@ -80,7 +80,7 @@ set (QUDA_OBJS
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
-  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
+  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
   inv_gmresdr_quda.cpp

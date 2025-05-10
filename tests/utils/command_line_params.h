@@ -535,6 +535,7 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+extern bool heatbath_initialize_on_host;
 
 extern int gf_gauge_dir;
 extern int gf_maxiter;
@@ -560,6 +561,8 @@ extern double gauge_smear_alpha1;
 extern double gauge_smear_alpha2;
 extern double gauge_smear_alpha3;
 extern int gauge_smear_steps;
+extern int gauge_n_save;
+extern int hier_threshold;
 extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;

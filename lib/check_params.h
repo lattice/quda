@@ -1110,6 +1110,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #ifdef INIT_PARAM
   P(su_project, QUDA_BOOLEAN_FALSE);
   P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_rectangle, QUDA_BOOLEAN_FALSE);
   P(compute_polyakov_loop, QUDA_BOOLEAN_FALSE);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_FALSE);
   P(traces, nullptr);
@@ -1126,6 +1127,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_rectangle, QUDA_BOOLEAN_INVALID);
   P(compute_polyakov_loop, QUDA_BOOLEAN_INVALID);
   P(compute_gauge_loop_trace, QUDA_BOOLEAN_INVALID);
   if (param->compute_gauge_loop_trace == QUDA_BOOLEAN_TRUE) {
@@ -1159,18 +1161,7 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
 #if defined CHECK_PARAM
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
     errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
-    
-  if (param->n_steps <= param->adj_n_save ) {
-      
-      logQuda(QUDA_SUMMARIZE,"Not good practice to adj_n_save (%d) >= n_steps (%d); adj_n_save manually altered: \n",param->n_steps,param->adj_n_save);
-      if (param->n_steps == 1)
-      param->adj_n_save = param->n_steps;
-      else
-      param->adj_n_save = param->n_steps - 1;
-      logQuda(QUDA_SUMMARIZE,"adj_n_save (%d) ; n_steps (%d) \n\n",param->n_steps,param->adj_n_save);
-      
-  }
-    
+
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif
@@ -1183,9 +1174,11 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, 0.0);
   P(rho, 0.0);
   P(epsilon, 0.0);
+  P(smear_anisotropy, 1.0);
+  P(rk_order, 3);
   P(restart, QUDA_BOOLEAN_FALSE);
-  P(adj_n_save,5);
-  P(hier_threshold,6);
+  P(adj_n_save, 5);
+  P(hier_threshold, 6);
   P(t0, 0.0);
   P(alpha1, 0.0);
   P(alpha2, 0.0);
@@ -1197,9 +1190,11 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, INVALID_DOUBLE);
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(smear_anisotropy, INVALID_DOUBLE);
+  P(rk_order, (unsigned int)INVALID_INT);
   P(restart, QUDA_BOOLEAN_INVALID);
-  P(adj_n_save,(unsigned int)INVALID_INT);
-  P(hier_threshold,(unsigned int)INVALID_INT);
+  P(adj_n_save, (unsigned int)INVALID_INT);
+  P(hier_threshold, (unsigned int)INVALID_INT);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);
   P(alpha2, INVALID_DOUBLE);

@@ -1,10 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include "invert_quda.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <string>
+
+#include <util_quda.h>
+#include <invert_quda.h>
+#include <enum_quda.h>
+
 #include "misc.h"
-#include <assert.h>
-#include "util_quda.h"
-#include <host_utils.h>
 
 const char *get_verbosity_str(QudaVerbosity type)
 {
@@ -237,10 +240,10 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   switch (type) {
   case QUDA_GAUGE_SMEAR_APE: ret = "APE"; break;
   case QUDA_GAUGE_SMEAR_STOUT: ret = "Stout"; break;
-  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over Improved"; break;
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over_Improved"; break;
   case QUDA_GAUGE_SMEAR_HYP: ret = "HYP"; break;
-  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson Flow"; break;
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik Flow"; break;
+  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson_Flow"; break;
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik_Flow"; break;
   default: ret = "unknown"; break;
   }
 
