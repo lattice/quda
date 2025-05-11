@@ -892,9 +892,10 @@ extern "C" {
     int dir_ignore;       /**< The direction to be ignored by the fixing algorithm */
     double omega;         /**< Parameter used for OVR algorithm */
     double alpha;         /**< Parameter used for FFT algorithm */
+    int reunit_interval;  /**< Interval at which to reunitarize the rotation field */
     int verbose_interval; /**< Interval at which to print the gauge fixing progress */
     bool compute_theta;   /**< Compute theta as the quality metric */
-    bool use_theta;       /**< Use theta as the criterion */
+    bool use_theta;       /**< Use theta instead of relative difference of functional as the criterion */
   } QudaGaugeFixParam;
 
   typedef struct QudaBLASParam_s {

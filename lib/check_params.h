@@ -1245,12 +1245,14 @@ void printQudaGaugeFixParam(QudaGaugeFixParam *param)
 #ifdef INIT_PARAM
   P(omega, 1.0);
   P(alpha, 0.0);
-  P(verbose_interval, 1);
+  P(reunit_interval, 10);
+  P(verbose_interval, 100);
   P(compute_theta, true);
   P(use_theta, false);
 #else
   P(omega, INVALID_DOUBLE);
   P(alpha, INVALID_DOUBLE);
+  P(reunit_interval, INVALID_INT);
   P(verbose_interval, INVALID_INT);
 #endif
 

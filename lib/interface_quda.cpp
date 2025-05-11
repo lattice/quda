@@ -6000,6 +6000,8 @@ void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, Qud
   auto profile = pushProfile(profileGaugeFix);
   checkGaugeParam(param);
   checkGaugeFixParam(fix_param);
+  int *reunit_fails_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  int *reunit_fails_d = static_cast<int *>(get_mapped_device_pointer(reunit_fails_h));
   lat_dim_t R1;
   for (int d = 0; d < 4; d++) { R1[d] = (redundant_comms || commDimPartitioned(d)); }
 
@@ -6051,13 +6053,26 @@ void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, Qud
     diff = fabs((functional - functional_old) / functional_old);
     criterion = use_theta ? theta : diff;
     iter++;
+    if (iter % fix_param->reunit_interval == 0) {
+      *reunit_fails_h = 0;
+      unitarizeLinks(*cudaRotationEx, *cudaRotationEx, reunit_fails_d);
+      if (*reunit_fails_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *reunit_fails_h);
+    }
     if (iter % fix_param->verbose_interval == 0) {
       logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
               theta);
     }
   }
-  if (iter % fix_param->verbose_interval != 0 && iter < fix_param->maxiter) {
-    logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
+  if (iter < fix_param->maxiter) {
+    if (iter % fix_param->reunit_interval != 0) {
+      *reunit_fails_h = 0;
+      unitarizeLinks(*cudaRotationEx, *cudaRotationEx, reunit_fails_d);
+      if (*reunit_fails_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *reunit_fails_h);
+    }
+    if (iter % fix_param->verbose_interval != 0) {
+      logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
+              theta);
+    }
   }
 
   // copy the field back to the host
@@ -6068,6 +6083,7 @@ void performGaugeFixQuda(void *rotation, void *gauge, QudaGaugeParam *param, Qud
   }
   if (param->return_result_gauge) { cpuGauge.copy(cudaOutGauge); }
 
+  host_free(reunit_fails_h);
   delete cudaRotationEx;
   delete cudaInGaugeEx;
   if (param->make_resident_gauge) {

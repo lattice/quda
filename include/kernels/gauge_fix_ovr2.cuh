@@ -62,17 +62,17 @@ namespace quda
     }
 
     Matrix<complex<Float>, 3> V = U * W;
-    Float versors[4];
+    double versors[4]; // use double to avoid precision issues
 
-    versors[0] = V(i1, i1).real() + V(i2, i2).real();
-    versors[1] = V(i1, i1).imag() - V(i2, i2).imag();
-    versors[2] = V(i1, i2).real() - V(i2, i1).real();
-    versors[3] = V(i1, i2).imag() + V(i2, i1).imag();
+    versors[0] = static_cast<double>(V(i1, i1).real() + V(i2, i2).real());
+    versors[1] = static_cast<double>(V(i1, i1).imag() - V(i2, i2).imag());
+    versors[2] = static_cast<double>(V(i1, i2).real() - V(i2, i1).real());
+    versors[3] = static_cast<double>(V(i1, i2).imag() + V(i2, i1).imag());
 
-    Float norm
+    double norm
       = sqrt(versors[0] * versors[0] + versors[1] * versors[1] + versors[2] * versors[2] + versors[3] * versors[3]);
     if (norm > arg.tolerance) {
-      Float inv_norm = 1.0 / norm;
+      double inv_norm = 1.0 / norm;
       versors[0] *= inv_norm;
 #pragma unroll
       for (int i = 1; i < 4; ++i) { versors[i] *= -inv_norm; }
@@ -83,20 +83,33 @@ namespace quda
     }
 
     if constexpr (Arg::over_relaxation) {
-      Float sin_angle, cos_angle;
-      Float angle = acos(versors[0]);
-      sincos(arg.omega * angle, &sin_angle, &cos_angle);
-      Float coeff = sin_angle / sin(angle);
-      versors[0] = cos_angle;
+      // a workaround for fp32 numerical issues
+      // clamp versors[0] to [-1, 1] to avoid NaN in acos
+      // if (versors[0] > 1.0) {
+      //   versors[0] = 1.0;
+      // } else if (versors[0] < -1.0) {
+      //   versors[0] = -1.0;
+      // }
+      double angle = acos(versors[0]);
+      double sin_angle = sin(angle);
+      double sin_omega_angle, cos_omega_angle;
+      sincos(arg.omega * angle, &sin_omega_angle, &cos_omega_angle);
+      versors[0] = cos_omega_angle;
+      if (sin_angle > arg.tolerance) {
+        double coeff = sin_omega_angle / sin_angle;
 #pragma unroll
-      for (int i = 1; i < 4; ++i) { versors[i] *= coeff; }
+        for (int i = 1; i < 4; ++i) { versors[i] *= coeff; }
+      } else {
+#pragma unroll
+        for (int i = 1; i < 4; ++i) { versors[i] = 0.0; }
+      }
     }
 
     setIdentity(&V);
-    V(i1, i1) = complex(versors[0], versors[1]);
-    V(i2, i2) = complex(versors[0], -versors[1]);
-    V(i1, i2) = complex(versors[2], versors[3]);
-    V(i2, i1) = complex(-versors[2], versors[3]);
+    V(i1, i1) = complex(static_cast<Float>(versors[0]), static_cast<Float>(versors[1]));
+    V(i2, i2) = complex(static_cast<Float>(versors[0]), static_cast<Float>(-versors[1]));
+    V(i1, i2) = complex(static_cast<Float>(versors[2]), static_cast<Float>(versors[3]));
+    V(i2, i1) = complex(static_cast<Float>(-versors[2]), static_cast<Float>(versors[3]));
 
     U = V * U;
   }

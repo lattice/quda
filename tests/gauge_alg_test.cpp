@@ -76,9 +76,14 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
     return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
   }
 
-  void gaugeFixOVR_v2(GaugeField &gauge, int dir_ignore, double tol, int maxiter, double omega, bool use_theta, int verbose_interval) {
+  void gaugeFixOVR_v2(GaugeField &gauge, int dir_ignore, double tol, int maxiter, double omega, bool use_theta,
+                      int reunit_interval, int verbose_interval)
+  {
     lat_dim_t R = {0, 0, 0, 0};
     for (int d = 0; d < 4; d++) { if (comm_dim_partitioned(d)) R[d] = 2; }
+    int *reunit_fails_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+    int *reunit_fails_d = static_cast<int *>(get_mapped_device_pointer(reunit_fails_h));
+
     GaugeFieldParam gauge_field_param(param, nullptr);
     gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gauge_field_param.location = QUDA_CUDA_FIELD_LOCATION;
@@ -114,15 +119,29 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
       diff = fabs((functional - functional_old) / functional_old);
       criterion = use_theta ? theta : diff;
       iter++;
+      if (iter % reunit_interval == 0) {
+        *reunit_fails_h = 0;
+        unitarizeLinks(*rot, *rot, reunit_fails_d);
+        if (*reunit_fails_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *reunit_fails_h);
+      }
       if (iter % verbose_interval == 0) {
         logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
                 theta);
       }
     }
-    if (iter % verbose_interval != 0 && iter < maxiter) {
-      logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff, theta);
+    if (iter < maxiter) {
+      if (iter % reunit_interval != 0) {
+        *reunit_fails_h = 0;
+        unitarizeLinks(*rot, *rot, reunit_fails_d);
+        if (*reunit_fails_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *reunit_fails_h);
+      }
+      if (iter % verbose_interval != 0) {
+        logQuda(QUDA_SUMMARIZE, "%d iter: functional=%.15f, functional diff=%le, theta=%le\n", iter, functional, diff,
+                theta);
+      }
     }
 
+    host_free(reunit_fails_h);
     gaugeRotate(*tmp, *tmp, *rot);
     delete rot;
     copyExtendedGauge(gauge, *tmp, QUDA_CUDA_FIELD_LOCATION);
@@ -317,7 +336,8 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
   virtual void run_ovr2()
   {
     if (execute) {
-      gaugeFixOVR_v2(*U, gf_gauge_dir, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_verbosity_interval);
+      gaugeFixOVR_v2(*U, gf_gauge_dir, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition,
+                     gf_reunit_interval, gf_verbosity_interval);
       auto plaq_gf = plaquette(*U);
       printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
       printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
@@ -427,7 +447,8 @@ TEST_P(GaugeAlgTest, Landau_Overrelaxation_v2)
 {
   if (execute) {
     printfQuda("Landau gauge fixing with overrelaxation v2\n");
-    gaugeFixOVR_v2(*U, 4, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_verbosity_interval);
+    gaugeFixOVR_v2(*U, 4, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_reunit_interval,
+                   gf_verbosity_interval);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
     printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
@@ -439,7 +460,8 @@ TEST_P(GaugeAlgTest, Coulomb_Overrelaxation_v2)
 {
   if (execute) {
     printfQuda("Coulomb gauge fixing with overrelaxation v2\n");
-    gaugeFixOVR_v2(*U, 3, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_verbosity_interval);
+    gaugeFixOVR_v2(*U, 3, gf_tolerance, gf_maxiter, gf_ovr_relaxation_boost, gf_theta_condition, gf_reunit_interval,
+                   gf_verbosity_interval);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
     printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
