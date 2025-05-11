@@ -80,7 +80,10 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
                       int reunit_interval, int verbose_interval)
   {
     lat_dim_t R = {0, 0, 0, 0};
-    for (int d = 0; d < 4; d++) { if (comm_dim_partitioned(d)) R[d] = 2; }
+    for (int d = 0; d < 4; d++) {
+      if (comm_dim_partitioned(d)) R[d] = 2;
+    }
+    static TimeProfile GaugeFix("GaugeFix");
     int *reunit_fails_h = static_cast<int *>(mapped_malloc(sizeof(int)));
     int *reunit_fails_d = static_cast<int *>(get_mapped_device_pointer(reunit_fails_h));
 
@@ -93,7 +96,6 @@ struct GaugeAlgTest : public ::testing::TestWithParam<test_t> {
     gauge_field_param.geometry = QUDA_SCALAR_GEOMETRY;
     GaugeField *tmp = new GaugeField(gauge_field_param);
     InitGaugeField(*tmp);
-    static TimeProfile GaugeFix("GaugeFix");
     GaugeField *rot = createExtendedGauge(*tmp, R, GaugeFix);
     delete tmp;
     gauge_field_param.geometry = QUDA_VECTOR_GEOMETRY;

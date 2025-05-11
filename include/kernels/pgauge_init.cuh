@@ -39,7 +39,7 @@ namespace quda {
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> U;
       setIdentity(&U);
-      for ( int d = 0; d < Arg::geom; d++ ) arg.U(d, x_cb, parity) = U;
+      for (int d = 0; d < Arg::geom; d++) arg.U(d, x_cb, parity) = U;
     }
   };
 

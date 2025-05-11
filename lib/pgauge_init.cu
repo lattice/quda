@@ -40,8 +40,8 @@ namespace quda {
     long long bytes() const { return U.Bytes(); }
   };
 
-  template<typename Float, int nColor, QudaReconstructType recon>
-  class InitGaugeHot : TunableKernel1D {
+  template <typename Float, int nColor, QudaReconstructType recon> class InitGaugeHot : TunableKernel1D
+  {
     const GaugeField &U;
     RNG &rng;
     unsigned int minThreads() const { return U.LocalVolumeCB(); }
