@@ -23,18 +23,20 @@ bool skip_test(test_t param)
   return false;
 }
 
-std::array<double, 2> covdev_test(test_t param);
+std::array<double, 3> covdev_test(test_t param);
 
 TEST_P(CovDevTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
 
-  std::array<double, 2> test_results = covdev_test(param);
+  std::array<double, 3> test_results = covdev_test(param);
 
   double deviation = test_results[0];
-  double tol = test_results[1];
+  double deviation_shift = test_results[1];
+  double tol = test_results[2];
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  ASSERT_LE(deviation, tol) << "unit and shift implementations do not agree";
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)

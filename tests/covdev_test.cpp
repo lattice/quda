@@ -13,6 +13,7 @@
 #include <util_quda.h>
 #include <blas_quda.h>
 #include <gauge_field.h>
+#include <pgauge_monte.h>
 
 #include "misc.h"
 #include "host_utils.h"
@@ -28,9 +29,10 @@ QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
 GaugeField *cpuLink = nullptr;
+GaugeField *unitLink = nullptr;
 
 std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
-std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
+std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut, cudaSpinorUnitOut, cudaSpinorShiftOut;
 
 std::unique_ptr<ColorSpinorField> tmp;
 
@@ -39,6 +41,7 @@ void *links[4];
 QudaParity parity = QUDA_EVEN_PARITY;
 
 GaugeCovDev *dirac;
+GaugeCovDev *diracUnit;
 
 const int nColor = 3;
 
@@ -115,6 +118,12 @@ void init(int argc, char **argv)
   printfQuda("Creating cudaSpinorOut\n");
   cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
 
+  printfQuda("Creating cudaSpinorUnitOut\n");
+  cudaSpinorUnitOut = std::make_unique<ColorSpinorField>(csParam);
+
+  printfQuda("Creating cudaSpinorShiftOut\n");
+  cudaSpinorShiftOut = std::make_unique<ColorSpinorField>(csParam);
+
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
@@ -129,6 +138,16 @@ void init(int argc, char **argv)
   setDiracParam(diracParam, &inv_param, false);
 
   dirac = new GaugeCovDev(diracParam);
+
+  GaugeFieldParam cudaParam(gauge_param);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.reconstruct = gauge_param.reconstruct;
+  cudaParam.setPrecision(gauge_param.cuda_prec, true);
+  unitLink = new GaugeField(cudaParam);
+  InitGaugeField(*unitLink);
+  diracParam.gauge = unitLink;
+  diracUnit = new GaugeCovDev(diracParam);
 }
 
 void end(void)
@@ -136,8 +155,12 @@ void end(void)
   for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
 
   delete dirac;
+  delete unitLink;
+  delete diracUnit;
   cudaSpinor.reset();
   cudaSpinorOut.reset();
+  cudaSpinorUnitOut.reset();
+  cudaSpinorShiftOut.reset();
   tmp.reset();
   spinor.reset();
   spinorOut.reset();
@@ -148,7 +171,7 @@ void end(void)
   endQuda();
 }
 
-double dslashCUDA(int niter, int mu)
+double covDev(int niter, int mu)
 {
   device_timer_t timer;
   timer.start();
@@ -159,7 +182,7 @@ double dslashCUDA(int niter, int mu)
   return timer.last();
 }
 
-void covdevRef(int mu)
+void covDevRef(int mu)
 {
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
@@ -169,6 +192,28 @@ void covdevRef(int mu)
   mat(*spinorRef, *cpuLink, *spinor, dagger, mu);
 #endif
   printfQuda("done.\n");
+}
+
+double covDevUnit(int niter, int mu)
+{
+  device_timer_t timer;
+  timer.start();
+
+  for (int i = 0; i < niter; i++) diracUnit->MCD(*cudaSpinorUnitOut, *cudaSpinor, mu);
+
+  timer.stop();
+  return timer.last();
+}
+
+double shift(int niter, int mu)
+{
+  device_timer_t timer;
+  timer.start();
+
+  for (int i = 0; i < niter; i++) dirac->MS(*cudaSpinorShiftOut, *cudaSpinor, mu);
+
+  timer.stop();
+  return timer.last();
 }
 
 void display_test_info()
@@ -224,7 +269,7 @@ int main(int argc, char **argv)
   return result;
 }
 
-std::array<double, 2> covdev_test(test_t param)
+std::array<double, 3> covdev_test(test_t param)
 {
 
   // QudaPrecision    test_prec    = ::testing::get<0>(param);
@@ -241,38 +286,46 @@ std::array<double, 2> covdev_test(test_t param)
     if (mu_flags[mu] == 0) continue; // skip direction
     int muCuda = mu + (test_dagger ? 4 : 0);
     int muCpu = mu * 2 + (test_dagger ? 1 : 0);
+    printfQuda("\n\nChecking muQuda = %d\n", muCuda);
 
     // Reference computation
-    covdevRef(muCpu);
-    printfQuda("\n\nChecking muQuda = %d\n", muCuda);
+    covDevRef(muCpu);
 
     { // warm-up run
       printfQuda("Tuning...\n");
-      dslashCUDA(1, muCuda);
+      covDev(1, muCuda);
     }
-    printfQuda("Executing %d kernel loop(s)...", niter);
+    printfQuda("Executing %d kernel loop(s)...\n", niter);
 
-    double secs = dslashCUDA(niter, muCuda);
+    double secs = covDev(niter, muCuda);
 
     *spinorOut = *cudaSpinorOut;
-    printfQuda("\n%fms per loop\n", 1000 * secs);
+    printfQuda("%fms per covDev loop\n", 1000 * secs / niter);
 
     unsigned long long flops = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
     printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 = blas::norm2(*spinorOut);
-
     double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
+
     printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
                spinor_out_norm2);
 
+    // nColor * nColor * 8
+    secs = covDevUnit(niter, muCuda);
+    printfQuda("%fms per covDevUnit loop\n", 1000 * secs / niter);
+    secs = shift(niter, muCuda);
+    printfQuda("%fms per shift loop\n", 1000 * secs / niter);
   } // Directions
 
   double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  *spinorRef = *cudaSpinorUnitOut;
+  *spinorOut = *cudaSpinorShiftOut;
+  double deviation_shift = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol
     = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
                                                       (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
 
-  return std::array<double, 2> {deviation, tol};
+  return std::array<double, 3> {deviation, deviation_shift, tol};
 }
