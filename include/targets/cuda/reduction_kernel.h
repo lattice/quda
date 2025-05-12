@@ -6,6 +6,12 @@
 namespace quda
 {
 
+#if (CUDA_VERSION >= 12040)
+#define MAXNREG(x) __maxnreg__(x)
+#else
+#define MAXNREG(x)
+#endif
+
   /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
      reduction kernel.  Functors that utilize this kernel have two
@@ -49,7 +55,8 @@ namespace quda
   /**
      @brief Reduction2D is the entry point of the generic 2-d
      reduction kernel.  This is the specialization where the kernel
-     argument struct is passed by value directly to the kernel.
+     argument struct is passed by value directly to the kernel that
+     does specify a max register count.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -59,7 +66,8 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Reduction2D(Arg arg)
+  MAXNREG(Arg::max_regs)
+  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Reduction2D(Arg arg)
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -67,7 +75,8 @@ namespace quda
   /**
      @brief Reduction2D is the entry point of the generic 2-d
      reduction kernel.  This is the specialization where the kernel
-     argument struct is copied to the device prior to kernel launch.
+     argument struct is passed by value directly to the kernel that
+     does not specify a max register count.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -77,7 +86,46 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Reduction2D(Arg arg)
+  {
+    Reduction2D_impl<Functor, Arg, grid_stride>(arg);
+  }
+
+  /**
+     @brief Reduction2D is the entry point of the generic 2-d
+     reduction kernel.  This is the specialization where the kernel
+     argument struct is copied to the device prior to kernel launch
+     that does specify a max register count.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  MAXNREG(Arg::max_regs)
+  __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> Reduction2D()
+  {
+    Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  }
+
+  /**
+     @brief Reduction2D is the entry point of the generic 2-d
+     reduction kernel.  This is the specialization where the kernel
+     argument struct is copied to the device prior to kernel launch
+     that does not specify a max register count.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> Reduction2D()
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
@@ -129,7 +177,8 @@ namespace quda
   /**
      @brief MultiReduction is the entry point of the generic
      multi-reduction kernel.  This is the specialization where the
-     kernel argument struct is passed by value directly to the kernel.
+     kernel argument struct is passed by value directly to the kernel
+     that specifies a max register count.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -139,7 +188,8 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> MultiReduction(Arg arg)
+  MAXNREG(Arg::max_regs)
+  __global__ std::enable_if_t<(device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> MultiReduction(Arg arg)
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -147,7 +197,8 @@ namespace quda
   /**
      @brief MultiReduction is the entry point of the generic
      multi-reduction kernel.  This is the specialization where the
-     kernel argument struct is passed by value directly to the kernel.
+     kernel argument struct is passed by value directly to the kernel
+     that does not specify a max register count.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -157,7 +208,46 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && Arg::max_regs == 0, void> MultiReduction(Arg arg)
+  {
+    MultiReduction_impl<Functor, Arg, grid_stride>(arg);
+  }
+
+  /**
+     @brief MultiReduction is the entry point of the generic
+     multi-reduction kernel.  This is the specialization where the
+     kernel argument struct is passed by value directly to the kernel
+     that specifies a max register count.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  MAXNREG(Arg::max_regs)
+  __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs > 0), void> MultiReduction()
+  {
+    MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  }
+
+  /**
+     @brief MultiReduction is the entry point of the generic
+     multi-reduction kernel.  This is the specialization where the
+     kernel argument struct is passed by value directly to the kernel
+     that does not specify a max register count.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>() && Arg::max_regs == 0), void> MultiReduction()
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
