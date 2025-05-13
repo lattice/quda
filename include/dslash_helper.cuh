@@ -653,9 +653,10 @@ namespace quda
     __forceinline__ __device__ void operator()(int, int s, int parity)
     {
       typename Arg::D dslash(arg);
+#if 0
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
-
+#endif
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
         // first few blocks do packing kernel

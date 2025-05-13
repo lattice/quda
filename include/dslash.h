@@ -333,7 +333,7 @@ namespace quda
 
     Dslash(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
            const ColorSpinorField &halo, const std::string &app_base = "") :
-      TunableKernel3D(in[0], (halo.X(4) + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity),
+      TunableKernel3D(in[0], (halo.X(4) + Arg::n_src_tile - 1) / Arg::n_src_tile, arg.nParity * Arg::dim_threads * Arg::dir_threads),
       arg(arg),
       out(out),
       in(in),
@@ -341,6 +341,8 @@ namespace quda
       nDimComms(4),
       dslashParam(arg)
     {
+      resizeStep(step_y, Arg::dim_threads * Arg::dir_threads); // stencil dim/dir must be block local
+
       if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
         errorQuda("CPU Fields not supported in Dslash framework yet");
 

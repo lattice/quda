@@ -8,6 +8,7 @@
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
 #include <kernels/spinor_reweight.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda
 {
@@ -22,6 +23,12 @@ namespace quda
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
+
+    // stencil direction thread parallelization
+    static constexpr int dim_threads = 1;
+    static constexpr int dir_threads = 2;
+    static_assert(dim_threads == 1 || dim_threads == 2 || dim_threads == 4);
+    static_assert(dir_threads == 1 || dir_threads == 2);
 
     using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
@@ -80,7 +87,7 @@ namespace quda
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
-                                              int thread_dim, bool &active, int src_idx)
+                                              int thread_dim, bool &active, int src_idx, int dim_idx, int dir_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -98,14 +105,16 @@ namespace quda
       = Arg::distance_pc ? distanceWeight(arg, t - 1, nt) / distanceWeight(arg, t, nt) : static_cast<real>(1.0);
 
 #pragma unroll
-    for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
-      {                           // Forward gather - compute fwd offset for vector fetch
+    for (int d0 = 0; d0 < 4; d0 += Arg::dim_threads) { // loop over dimension - 4 and not nDim since this is used for DWF as well
+      int d = d0 + dim_idx;
+
+      if (!(dir_idx % Arg::dir_threads)) { // Forward gather - compute fwd offset for vector fetch
         const real fwd_coeff = (d < 3) ? 1.0 : fwd_coeff_3;
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
 
-        const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.inBoundary(d, 1) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
@@ -126,13 +135,13 @@ namespace quda
         }
       }
 
-      { // Backward gather - compute back offset for spinor and gauge fetch
+      if (!((1 - dir_idx) % Arg::dir_threads)) { // Backward gather - compute back offset for spinor and gauge fetch
         const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
 
-        const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.inBoundary(d, 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
@@ -164,31 +173,57 @@ namespace quda
 
     // out(x) = M*in = (-D + m) * in(x-mu)
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_idx, int parity_dim_dir)
     {
-      typedef typename mapper<typename Arg::Float>::type real;
-      typedef ColorSpinor<real, Arg::nColor, 4> Vector;
+      using real = typename mapper<typename Arg::Float>::type;
+      using Vector = ColorSpinor<real, Arg::nColor, 4>;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
       
+      int dir_idx = parity_dim_dir % Arg::dir_threads;
+      int parity_dim = parity_dim_dir / Arg::dir_threads;
+      int dim_idx = Arg::dim_threads == 1 ? 0 : parity_dim % Arg::dim_threads;
+      int parity = parity_dim / Arg::dim_threads;
+      int dim_dir_idx = dim_idx * Arg::dir_threads + dir_idx;
+
+      // for full fields set parity from z thread index else use arg setting
+      if (nParity == 1) parity = arg.parity;
+
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx, dim_idx, dir_idx);
 
-      int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x[src_idx](xs, my_spinor_parity);
-        out = x + arg.a * out;
-      } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out[src_idx](xs, my_spinor_parity);
-        out = x + (xpay ? arg.a * out : out);
+      if constexpr (Arg::dim_threads > 1 || Arg::dir_threads > 1) {
+        SharedMemoryCache<Vector> cache;
+        if (dim_dir_idx > 0) cache.save(out);
+        cache.sync();
+        if (dim_dir_idx == 0) {
+          out += cache.load_z(target::thread_idx().z + 1); // remainder of x dim
+          for (int dim = 1; dim < Arg::dim_threads; dim++) {
+            for (int dir = 0; dir < Arg::dir_threads; dir++) {
+              out += cache.load_z(2 * dim + dir);
+            }
+          }
+        }
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](xs, my_spinor_parity) = out;
+      // only thread 0 in dim/dir handles writing
+      if ((Arg::dim_threads == 1 && Arg::dir_threads == 1) || dim_dir_idx == 0) {
+        int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
+        if (xpay && mykernel_type == INTERIOR_KERNEL) {
+          Vector x = arg.x[src_idx](xs, my_spinor_parity);
+          out = x + arg.a * out;
+        } else if (mykernel_type != INTERIOR_KERNEL && active) {
+          Vector x = arg.out[src_idx](xs, my_spinor_parity);
+          out = x + (xpay ? arg.a * out : out);
+        }
+
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](xs, my_spinor_parity) = out;
+      }
     }
   };
 

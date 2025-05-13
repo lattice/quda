@@ -237,6 +237,17 @@ namespace quda {
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
     array_2d<bool, 2, nDim> in_boundary = {};
+
+    constexpr bool inBoundary(int dim, int dir) {
+      switch (dim) {
+      case 0: return dir ? in_boundary[1][0] : in_boundary[0][0];
+      case 1: return dir ? in_boundary[1][1] : in_boundary[0][1];
+      case 2: return dir ? in_boundary[1][2] : in_boundary[0][2];
+      case 3: return dir ? in_boundary[1][3] : in_boundary[0][3];
+      case 4: return dir ? in_boundary[1][4] : in_boundary[0][4];
+      }
+      return false;
+    }
   };
 
   /**

@@ -32,6 +32,15 @@ namespace quda
       Dslash::setParam(tp);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
+
+    unsigned int sharedBytesPerThread() const
+    {
+      if (Arg::dim_threads * Arg::dir_threads > 1) {
+        return 2 * Dslash::in.Nspin() * Dslash::in.Ncolor() * sizeof(typename Arg::real);
+      } else {
+        return 0;
+      }
+    }
   };
 
   template <bool distance_pc> struct DistanceType {
