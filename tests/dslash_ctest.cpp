@@ -18,7 +18,8 @@ using ::testing::Range;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>>
+class DslashTest
+  : public ::testing::TestWithParam<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>>
 {
 protected:
   ::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor> param;
@@ -170,12 +171,13 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>> param)
+std::string getdslashtestname(
+  testing::TestParamInfo<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>> param)
 {
   const int prec = ::testing::get<0>(param.param);
   const int recon = ::testing::get<1>(param.param);
   const int part = ::testing::get<2>(param.param);
-  const QudaDomainDecompositionType  dd = ::testing::get<3>(param.param);
+  const QudaDomainDecompositionType dd = ::testing::get<3>(param.param);
   const QudaDomainDecompositionColor col = ::testing::get<4>(param.param);
   std::stringstream ss;
   ss << get_prec_str(getPrecision(prec));
@@ -183,7 +185,7 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
   ss << "_partition" << part;
   if (dd != QUDA_NO_DD) {
     switch (dd) {
-    case QUDA_DDBLOCK_HALFLOCALL:  ss << "_dd_local"; break;
+    case QUDA_DDBLOCK_HALFLOCALL: ss << "_dd_local"; break;
     case QUDA_DDBLOCK_HALFGLOBALL: ss << "_dd_global"; break;
     default: break;
     }
@@ -209,7 +211,8 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
 INSTANTIATE_TEST_SUITE_P(Regular, DslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD), ::testing::Values(QUDA_DD_COLOR_RED_RED)),
+                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD),
+                                 ::testing::Values(QUDA_DD_COLOR_RED_RED)),
                          getdslashtestname);
 
 #if QUDA_DOMAIN_DECOMPOSITION > 0
@@ -218,8 +221,10 @@ INSTANTIATE_TEST_SUITE_P(Regular, DslashTest,
 INSTANTIATE_TEST_SUITE_P(DD, DslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_DDBLOCK_HALFLOCALL,QUDA_DDBLOCK_HALFGLOBALL),
-                                 ::testing::Values(QUDA_DD_COLOR_RED_RED, QUDA_DD_COLOR_BLACK_RED, QUDA_DD_COLOR_RED_BLACK, QUDA_DD_COLOR_BLACK_BLACK)),
+                                 Range(0, N_PARTITIONS),
+                                 ::testing::Values(QUDA_DDBLOCK_HALFLOCALL, QUDA_DDBLOCK_HALFGLOBALL),
+                                 ::testing::Values(QUDA_DD_COLOR_RED_RED, QUDA_DD_COLOR_BLACK_RED,
+                                                   QUDA_DD_COLOR_RED_BLACK, QUDA_DD_COLOR_BLACK_BLACK)),
                          getdslashtestname);
 
 #endif

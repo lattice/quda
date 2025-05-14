@@ -105,7 +105,8 @@ struct StaggeredDslashTestWrapper {
     }
   }
 
-  void init_ctest(int precision, QudaReconstructType link_recon_, QudaDomainDecompositionType dd_value, QudaDomainDecompositionColor dd_color)
+  void init_ctest(int precision, QudaReconstructType link_recon_, QudaDomainDecompositionType dd_value,
+                  QudaDomainDecompositionColor dd_color)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();

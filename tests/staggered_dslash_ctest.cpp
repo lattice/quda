@@ -11,7 +11,8 @@ using ::testing::Range;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>>
+class StaggeredDslashTest
+  : public ::testing::TestWithParam<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>>
 {
 protected:
   ::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor> param;
@@ -169,7 +170,8 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>> param)
+std::string getstaggereddslashtestname(
+  testing::TestParamInfo<::testing::tuple<int, int, int, QudaDomainDecompositionType, QudaDomainDecompositionColor>> param)
 {
   const int prec = ::testing::get<0>(param.param);
   const int recon = ::testing::get<1>(param.param);
@@ -209,13 +211,17 @@ std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<i
 INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD, QUDA_DDBLOCK_HALFLOCALL, QUDA_DDBLOCK_HALFGLOBALL), ::testing::Values(QUDA_DD_COLOR_RED_RED, QUDA_DD_COLOR_BLACK_RED, QUDA_DD_COLOR_RED_BLACK, QUDA_DD_COLOR_BLACK_BLACK)),
+                                 Range(0, N_PARTITIONS),
+                                 ::testing::Values(QUDA_NO_DD, QUDA_DDBLOCK_HALFLOCALL, QUDA_DDBLOCK_HALFGLOBALL),
+                                 ::testing::Values(QUDA_DD_COLOR_RED_RED, QUDA_DD_COLOR_BLACK_RED,
+                                                   QUDA_DD_COLOR_RED_BLACK, QUDA_DD_COLOR_BLACK_BLACK)),
                          getstaggereddslashtestname);
 #else
 INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD), ::testing::Values(QUDA_DD_COLOR_RED_RED)),
+                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD),
+                                 ::testing::Values(QUDA_DD_COLOR_RED_RED)),
                          getstaggereddslashtestname);
 #endif
 

@@ -165,8 +165,7 @@ namespace quda
     instantiate<Apply, Recon>(out, in, x, U, y, args...);
   }
 
-  template <bool distance_pc>
-  using DistanceType = std::integral_constant<bool, distance_pc>;
+  template <bool distance_pc> using DistanceType = std::integral_constant<bool, distance_pc>;
 
   template <Dslash5Type...> struct Dslash5TypeList {
   };
