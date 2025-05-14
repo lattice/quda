@@ -1133,7 +1133,7 @@ struct DslashTestWrapper {
 
   void run_test(int niter, bool = false)
   {
-    if (getTuning()) {
+    {
       printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
     }
