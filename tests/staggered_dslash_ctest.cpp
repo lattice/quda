@@ -206,19 +206,17 @@ std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<i
 #endif
 
 #if QUDA_DOMAIN_DECOMPOSITION > 0
-#define N_DD_TESTS 3
-#define N_DD_COLS 4
-#else
-#define N_DD_TESTS 1
-#define N_DD_COLS 1
-#endif
-
 INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
                          Combine(Range(0, 4),
                                  ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
                                  Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD, QUDA_DDBLOCK_HALFLOCALL, QUDA_DDBLOCK_HALFGLOBALL), ::testing::Values(QUDA_DD_COLOR_RED_RED, QUDA_DD_COLOR_BLACK_RED, QUDA_DD_COLOR_RED_BLACK, QUDA_DD_COLOR_BLACK_BLACK)),
                          getstaggereddslashtestname);
+#else
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
+                         Combine(Range(0, 4),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                 Range(0, N_PARTITIONS), ::testing::Values(QUDA_NO_DD), ::testing::Values(QUDA_DD_COLOR_RED_RED)),
+                         getstaggereddslashtestname);
+#endif
 
 #undef N_PARTITIONS
-#undef N_DD_TESTS
-#undef N_DD_COLS
