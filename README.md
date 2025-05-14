@@ -272,6 +272,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Hwancheol Jeong (Indiana University)
 *  Xiangyu Jiang (ITP, Chinese Academy of Sciences)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
+*  Rohith Karur (UC Berkeley, Lawrence Berkeley National Laboratory)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartosz Kostrzewa (HPC/A-Lab, University of Bonn)
 *  Damon McDougall (AMD)

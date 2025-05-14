@@ -101,7 +101,7 @@ set (QUDA_OBJS
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
-  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
+  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
   inv_gmresdr_quda.cpp

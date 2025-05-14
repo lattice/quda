@@ -566,6 +566,8 @@ extern double gauge_smear_alpha1;
 extern double gauge_smear_alpha2;
 extern double gauge_smear_alpha3;
 extern int gauge_smear_steps;
+extern int gauge_n_save;
+extern int hier_threshold;
 extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;

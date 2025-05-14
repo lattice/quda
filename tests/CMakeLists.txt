@@ -199,6 +199,13 @@ target_link_libraries(su3_test ${TEST_LIBS})
 quda_checkbuildtest(su3_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS su3_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+if(QUDA_DIRAC_LAPLACE)
+  add_executable(su3_fermion_test su3_fermion_test.cpp)
+  target_link_libraries(su3_fermion_test ${TEST_LIBS})
+  quda_checkbuildtest(su3_fermion_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS su3_fermion_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 add_executable(pack_test pack_test.cpp)
 target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
@@ -1585,6 +1592,12 @@ if (QUDA_DIRAC_LAPLACE AND QUDA_DIRAC_WILSON)
            --dim 2 4 6 8
            --enable-testing true
            --gtest_output=xml:laph_test.xml)
+
+  add_test(NAME su3_fermion_test
+           COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:su3_fermion_test> ${MPIEXEC_POSTFLAGS}
+           --dim 2 4 6 8
+           --enable-testing true
+           --gtest_output=xml:su3_fermion_test.xml)
 endif()
 
 

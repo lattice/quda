@@ -317,6 +317,8 @@ double gauge_smear_alpha1 = 0.75;
 double gauge_smear_alpha2 = 0.6;
 double gauge_smear_alpha3 = 0.3;
 int gauge_smear_steps = 5;
+int gauge_n_save = 3;
+int hier_threshold = 6;
 int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
 bool su_project = true;
@@ -1172,6 +1174,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
     "Direction to be ignored by the smearing, negative value means decided by --su3-smear-type (default -1)");
 
   opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 10)");
+
+  opgroup->add_option("--su3-adj-gauge-nsave", gauge_n_save,
+                      "The number of gauge steps to save for hierarchical adj grad flow");
+
+  opgroup->add_option("--su3-hier-threshold", hier_threshold, "Minimum threshold for hierarchical adj grad flow");
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and/or topological charge every Nth step (default 5) ");
