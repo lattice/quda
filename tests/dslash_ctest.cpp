@@ -213,7 +213,6 @@ INSTANTIATE_TEST_SUITE_P(Regular, DslashTest,
                          getdslashtestname);
 
 #if QUDA_DOMAIN_DECOMPOSITION > 0
-#define N_DD_TESTS 3
 
 // DD tests
 INSTANTIATE_TEST_SUITE_P(DD, DslashTest,
@@ -226,4 +225,3 @@ INSTANTIATE_TEST_SUITE_P(DD, DslashTest,
 #endif
 
 #undef N_PARTITIONS
-#undef N_DD_TESTS
