@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_domain_wall_5d.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is the gauged domain-wall 5-d preconditioned operator.
@@ -8,6 +6,13 @@
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall5DApply {
+    template <bool distance_pc>
+    DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
+                      bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the 5-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)

@@ -65,17 +65,11 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall5DApply {
     template <bool distance_pc>
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
                       bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
-#ifdef SIGNATURE_ONLY
-      ;
-#else
     {
       constexpr int nDim = 5;
       auto halo = ColorSpinorField::create_comms_batch(in);
@@ -84,7 +78,6 @@ namespace quda
       DomainWall5D<decltype(arg)> dwf(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
     }
-#endif
   };
 
 } // namespace quda

@@ -148,17 +148,11 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct LaplaceApply {
     template <bool distance_pc>
     LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, int dir, double a, double b, int parity,
                  const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
-#ifdef SIGNATURE_ONLY // Used to hide from the compiler the implementation of the function
-      ;
-#else
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
@@ -176,6 +170,6 @@ namespace quda
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }
     }
-#endif
   };
+
 } // namespace quda

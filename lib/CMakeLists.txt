@@ -50,6 +50,27 @@ set (QUDA_OBJS
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
+  dslash_wilson.cpp
+  dslash_staggered.cpp dslash_improved_staggered.cpp
+  dslash_wilson_distance.cpp
+  dslash_wilson_clover.cpp dslash_wilson_clover_distance.cpp
+  dslash_wilson_clover_preconditioned.cpp
+  dslash_wilson_clover_preconditioned_distance.cpp
+  dslash_twisted_mass.cpp dslash_twisted_mass_preconditioned.cpp
+  dslash_ndeg_twisted_mass.cpp dslash_ndeg_twisted_mass_preconditioned.cpp
+  dslash_twisted_clover.cpp dslash_twisted_clover_preconditioned.cpp
+  dslash_ndeg_twisted_clover.cpp dslash_ndeg_twisted_clover_preconditioned.cpp
+  dslash_wilson_clover_hasenbusch_twist.cpp
+  dslash_wilson_clover_hasenbusch_twist_preconditioned.cpp
+  dslash_domain_wall_4d.cpp  dslash_domain_wall_5d.cpp
+  dslash_domain_wall_4d_m5inv.cpp
+  dslash_domain_wall_4d_m5pre.cpp
+  dslash_domain_wall_4d_m5pre_m5inv.cpp
+  dslash_domain_wall_4d_m5inv_m5pre.cpp
+  dslash_domain_wall_4d_m5inv_m5inv.cpp
+  dslash_domain_wall_4d_m5mob.cpp
+  dslash_domain_wall_4d_m5pre_m5mob.cpp
+  laplace.cpp
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
@@ -97,27 +118,8 @@ set (QUDA_OBJS
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
-  dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_distance.cu
-  dslash_wilson_clover.cu dslash_wilson_clover_distance.cu
-  dslash_wilson_clover_preconditioned.cu
-  dslash_wilson_clover_preconditioned_distance.cu
   dslash5_domain_wall.cu
-  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
-  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
-  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
-  dslash_ndeg_twisted_clover.cu dslash_ndeg_twisted_clover_preconditioned.cu
-  dslash_wilson_clover_hasenbusch_twist.cu
-  dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
-  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  dslash_domain_wall_4d_m5inv.cu
-  dslash_domain_wall_4d_m5pre.cu
-  dslash_domain_wall_4d_m5pre_m5inv.cu
-  dslash_domain_wall_4d_m5inv_m5pre.cu
-  dslash_domain_wall_4d_m5inv_m5inv.cu
-  dslash_domain_wall_4d_m5mob.cu
-  dslash_domain_wall_4d_m5pre_m5mob.cu
-  dslash_pack2.cu laplace.cu covariant_derivative.cu staggered_quark_smearing.cu)
+  dslash_pack2.cu covariant_derivative.cu staggered_quark_smearing.cu)
 
 # Function to check if a specific bit is set
 function(check_bit number bit)

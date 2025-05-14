@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_ndeg_twisted_mass_preconditioned.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is the preconditioned twisted-mass operator acting on a non-generate
@@ -10,6 +8,14 @@
 namespace quda
 {
 
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct NdegTwistedMassPreconditionedApply {
+    template <bool distance_pc>
+    NdegTwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
+                                       double c, bool xpay, int parity, bool dagger, bool asymmetric,
+                                       const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the non-degenerate twisted-mass Dslash operator
   // out(x) = M*in = a*(1 + i*b*gamma_5*tau_3 + c*tau_1)*D + x

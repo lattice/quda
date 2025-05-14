@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_domain_wall_4d.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 /**
    This is the gauged domain-wall 4-d preconditioned operator.
 
@@ -11,6 +9,13 @@
 namespace quda
 {
 
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall4DApply {
+    template <bool distance_pc>
+    DomainWall4DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_5,
+                      const Complex *b_5, const Complex *c_5, int parity, bool dagger, const int *comm_override,
+                      DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)

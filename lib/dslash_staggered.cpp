@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_staggered.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is a staggered Dirac operator
@@ -8,6 +6,13 @@
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_u> struct StaggeredApply {
+    template <bool distance_pc>
+    StaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, int parity, bool dagger,
+                   const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   void ApplyStaggered(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const GaugeField &U,
                       double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,

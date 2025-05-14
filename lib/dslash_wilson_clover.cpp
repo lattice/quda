@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_wilson_clover.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is the Wilson-clover linear operator
@@ -8,6 +6,14 @@
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonCloverApply {
+    template <bool distance_pc>
+    WilsonCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A, double a,
+                      double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                      DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x)*in(x) + a * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))

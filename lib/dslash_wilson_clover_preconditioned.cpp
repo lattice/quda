@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_wilson_clover_preconditioned.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is the Wilson-clover preconditioned linear operator
@@ -8,6 +6,15 @@
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverPreconditionedApply {
+    template <bool distance_pc>
+    WilsonCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
+                                    double a, double alpha0, int t0, int parity, bool dagger, const int *comm_override,
+                                    DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the preconditioned Wilson-clover operator
   // out(x) = M*in = a * A(x)^{-1} (\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))

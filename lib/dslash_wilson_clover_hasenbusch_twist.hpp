@@ -72,9 +72,6 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct WilsonCloverHasenbuschTwistApply {
     template <bool distance_pc>
@@ -82,9 +79,6 @@ namespace quda
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
                                      double a, double b, int parity, bool dagger, const int *comm_override,
                                      DistanceType<distance_pc>, TimeProfile &profile)
-#ifdef SIGNATURE_ONLY // Used to hide from the compiler the implementation of the function
-      ;
-#else
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
@@ -93,7 +87,6 @@ namespace quda
       WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }
-#endif
   };
 
 } // namespace quda

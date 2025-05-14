@@ -71,9 +71,6 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct TwistedMassPreconditionedApply {
     template <bool distance_pc>
@@ -81,9 +78,6 @@ namespace quda
                                    cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
                                    bool xpay, int parity, bool dagger, bool asymmetric, const int *comm_override,
                                    DistanceType<distance_pc>, TimeProfile &profile)
-#ifdef SIGNATURE_ONLY
-      ;
-#else
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
@@ -101,7 +95,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
       }
     }
-#endif
   };
 
 } // namespace quda

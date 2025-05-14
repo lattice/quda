@@ -6,6 +6,7 @@
 #include <gauge_field.h>
 #include <instantiate.h>
 #include <domain_decomposition_helper.cuh>
+#include <domain_wall_helper.h>
 
 namespace quda
 {
@@ -146,5 +147,28 @@ namespace quda
       errorQuda("Unsupported precision %d", U.Precision());
     }
   }
+
+  // use custom instantiate to deal with 4 quark fields
+  template <template <typename, int, typename, QudaReconstructType> class Apply, typename Recon = ReconstructWilson,
+            typename... Args>
+  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                   cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U,
+                   Args... args)
+  {
+    if (in.size() > get_max_multi_rhs()) {
+      instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
+                                {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2}, U, args...);
+      instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
+                                {x.begin() + x.size() / 2, x.end()}, {y.begin() + y.size() / 2, y.end()}, U, args...);
+      return;
+    }
+    instantiate<Apply, Recon>(out, in, x, U, y, args...);
+  }
+
+  template <bool distance_pc>
+  using DistanceType = std::integral_constant<bool, distance_pc>;
+
+  template <Dslash5Type...> struct Dslash5TypeList {
+  };
 
 } // namespace quda

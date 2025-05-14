@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_twisted_clover.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is the basic gauged twisted-clover operator
@@ -8,6 +6,14 @@
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedCloverApply {
+    template <bool distance_pc>
+    TwistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C, double a,
+                       double b, int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>,
+                       TimeProfile &profile);
+  };
 
   // Apply the twisted-mass Dslash operator
   // out(x) = M*in = (A + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)

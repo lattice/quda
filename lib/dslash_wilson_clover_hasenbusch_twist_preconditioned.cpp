@@ -1,9 +1,27 @@
-#define SIGNATURE_ONLY
-#include <dslash_wilson_clover_hasenbusch_twist_preconditioned.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
+    template <bool distance_pc>
+    WilsonCloverHasenbuschTwistPCNoClovInvApply(cvector_ref<ColorSpinorField> &out,
+                                                cvector_ref<const ColorSpinorField> &in,
+                                                cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
+                                                const CloverField &A, double a, double b, int parity, bool dagger,
+                                                const int *comm_override, DistanceType<distance_pc>,
+                                                TimeProfile &profile);
+  };
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverHasenbuschTwistPCClovInvApply {
+    template <bool distance_pc>
+    WilsonCloverHasenbuschTwistPCClovInvApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                              cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
+                                              const CloverField &A, double kappa, double mu, int parity, bool dagger,
+                                              const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
@@ -22,7 +40,6 @@ namespace quda
       errorQuda("Clover Hasenbusch Twist operator has not been built");
     }
   }
-
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))

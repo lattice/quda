@@ -1,9 +1,14 @@
-#define SIGNATURE_ONLY
-#include <laplace.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct LaplaceApply {
+    template <bool distance_pc>
+    LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                 cvector_ref<const ColorSpinorField> &x, const GaugeField &U, int dir, double a, double b, int parity,
+                 const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the Laplace operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)

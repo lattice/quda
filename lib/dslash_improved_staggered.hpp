@@ -151,18 +151,12 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
     template <bool distance_pc>
     ImprovedStaggeredApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                            cvector_ref<const ColorSpinorField> &x, const GaugeField &L, const GaugeField &U, double a,
                            int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>,
                            TimeProfile &profile)
-#ifdef SIGNATURE_ONLY
-      ;
-#else
     {
       constexpr int nDim = 4;
       constexpr bool improved = true;
@@ -173,7 +167,6 @@ namespace quda
       Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
       dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
     }
-#endif
   };
 
 } // namespace quda

@@ -1,6 +1,4 @@
-#define SIGNATURE_ONLY
-#include <dslash_twisted_mass_preconditioned.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 /**
    This is the preconditioned gauged twisted-mass operator
@@ -8,6 +6,15 @@
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct TwistedMassPreconditionedApply {
+    template <bool distance_pc>
+    TwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                                   cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
+                                   bool xpay, int parity, bool dagger, bool asymmetric, const int *comm_override,
+                                   DistanceType<distance_pc>, TimeProfile &profile);
+  };
 
   /*
     Apply the preconditioned twisted-mass Dslash operator

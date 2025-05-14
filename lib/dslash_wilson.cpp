@@ -1,9 +1,14 @@
-#define SIGNATURE_ONLY
-#include <dslash_wilson.hpp>
-#undef SIGNATURE_ONLY
+#include <instantiate_dslash.h>
 
 namespace quda
 {
+
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct WilsonApply {
+    template <bool distance_pc>
+    WilsonApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double alpha0, int t0, int parity,
+                bool dagger, const int *comm_override, std::integral_constant<bool, distance_pc>, TimeProfile &profile);
+  };
 
   // Apply the Wilson operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
