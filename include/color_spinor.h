@@ -1133,9 +1133,49 @@ namespace quda {
      @param[in] x Input vector
      @return The vector A * x
   */
-  template<typename Float, int Nc, int Ns> __device__ __host__ inline
-    ColorSpinor<Float,Nc,Ns> operator*(const Matrix<complex<Float>,Nc> &A, const ColorSpinor<Float,Nc,Ns> &x) {
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline std::enable_if_t<std::is_same_v<Float, float> && __COMPUTE_CAPABILITY__ >= 1000,
+                                              ColorSpinor<Float, Nc, Ns>>
+  operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
+  {
+    ColorSpinor<Float, Nc, Ns> y;
 
+    for (int i = 0; i < Nc; i++) {
+      float2 y2[Ns] = {};
+#pragma unroll
+      for (int s = 0; s < Ns; s++) {
+        y2[s]
+          = __ffma2_rn({A(i, 0).real(), A(i, 0).real()}, {x.data[s * Nc + 0].real(), x.data[s * Nc + 0].imag()}, y2[s]);
+        y2[s]
+          = __ffma2_rn({A(i, 0).imag(), A(i, 0).imag()}, {-x.data[s * Nc + 0].imag(), x.data[s * Nc + 0].real()}, y2[s]);
+      }
+#pragma unroll
+      for (int j = 1; j < Nc; j++) {
+#pragma unroll
+        for (int s = 0; s < Ns; s++) {
+          y2[s] = __ffma2_rn({A(i, j).real(), A(i, j).real()}, {x.data[s * Nc + j].real(), x.data[s * Nc + j].imag()},
+                             y2[s]);
+          y2[s] = __ffma2_rn({A(i, j).imag(), A(i, j).imag()}, {-x.data[s * Nc + j].imag(), x.data[s * Nc + j].real()},
+                             y2[s]);
+        }
+      }
+#pragma unroll
+      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = {y2[s].x, y2[s].y}; }
+    }
+    return y;
+  }
+
+  /**
+     @brief Compute the matrix-vector product y = A * x
+     @param[in] A Input matrix
+     @param[in] x Input vector
+     @return The vector A * x
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline std::enable_if_t<!(std::is_same_v<Float, float> && __COMPUTE_CAPABILITY__ >= 1000),
+                                              ColorSpinor<Float, Nc, Ns>>
+  operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
+  {
     ColorSpinor<Float,Nc,Ns> y;
 
 #pragma unroll
@@ -1158,7 +1198,6 @@ namespace quda {
 	}
       }
     }
-
     return y;
   }
 
