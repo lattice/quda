@@ -16,7 +16,7 @@ jobs:
     build:
       strategy:
         matrix:
-          compiler: [clang++-18]
+          compiler: [clang++-19]
       runs-on: ubuntu-24.04
 
       steps:
@@ -25,7 +25,10 @@ jobs:
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
           sudo dpkg -i cuda-keyring_1.0-1_all.deb
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends libopenmpi-dev cuda-compiler-12-3 cuda-libraries-dev-12-3 cuda-nvml-dev-12-3
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev cuda-compiler-12-8 cuda-libraries-dev-12-8 cuda-nvml-dev-12-8
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
       
       # currently deactivated as it cuased build errors - maybe put in again later
       # - uses: awalsh128/cache-apt-pkgs-action@latest
