@@ -380,9 +380,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
+  P(laplace_nspin, 1);
   P(covdev_mu, INVALID_INT);
   P(covdev_shift, false);
-  P(staggered, true);
+  P(covdev_nspin, 4);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH

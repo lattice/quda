@@ -179,11 +179,10 @@ namespace quda
                      QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
       LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
       nColor(3),
-      nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
-             || ((inv_param.dslash_type == QUDA_LAPLACE_DSLASH || inv_param.dslash_type == QUDA_COVDEV_DSLASH)
-                 && inv_param.staggered)) ?
-              1 :
-              4),
+      nSpin((inv_param.dslash_type == QUDA_LAPLACE_DSLASH)  ? inv_param.laplace_nspin :
+              (inv_param.dslash_type == QUDA_COVDEV_DSLASH) ? inv_param.covdev_nspin :
+              (inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH) ? 1 :
+                                                                                                                4),
       twistFlavor(inv_param.twist_flavor),
       gammaBasis(nSpin == 4 ? inv_param.gamma_basis : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
       create(QUDA_REFERENCE_FIELD_CREATE),
