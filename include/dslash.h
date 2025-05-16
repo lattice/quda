@@ -207,9 +207,12 @@ namespace quda
       }
     }
 
+    bool tuneSharedCarveOut() const override { return true; }
+
     virtual bool advanceTuneParam(TuneParam &param) const override
     {
-      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
+      return advanceAux(param) || advanceSharedBytes(param) || advanceSharedCarveOut(param) || advanceBlockDim(param)
+        || advanceGridDim(param);
     }
 
     virtual void initTuneParam(TuneParam &param) const override

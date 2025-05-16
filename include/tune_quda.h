@@ -22,6 +22,7 @@ namespace quda {
     dim3 grid;
     unsigned int shared_bytes = 0;
     bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
+    int shared_carve_out = 0;          // what to set the shared carve out
     int4 aux = {1, 1, 1, 1};           // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
@@ -236,6 +237,23 @@ namespace quda {
       }
     }
 
+    virtual bool tuneSharedCarveOut() const { return false; };
+
+    virtual bool advanceSharedCarveOut(TuneParam &param) const
+    {
+      if (tuneSharedCarveOut()) {
+        if (param.shared_carve_out < 100) {
+          param.shared_carve_out += 25;
+          return true;
+        } else {
+          param.shared_carve_out = 0;
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+
     virtual bool advanceAux(TuneParam &) const { return false; }
 
     char vol[TuneKey::volume_n];
@@ -323,7 +341,8 @@ namespace quda {
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
+      return advanceSharedBytes(param) || advanceSharedCarveOut(param) || advanceBlockDim(param)
+        || advanceGridDim(param) || advanceAux(param);
     }
 
     /**

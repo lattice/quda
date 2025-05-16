@@ -208,7 +208,7 @@ namespace quda
       if (check < 0 || check >= key.name_n) errorQuda("Error writing name string (check=%d)", check);
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
       if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string (check=%d)", check);
-      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y
+      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.shared_carve_out >> param.aux.x >> param.aux.y
         >> param.aux.z >> param.aux.w >> param.time;
       ls.ignore(1);               // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
@@ -231,8 +231,8 @@ namespace quda
       out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t"
-          << param.aux.w << "\t";
+      out << param.shared_bytes << "\t" << param.shared_carve_out << "\t";
+      out << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t" << param.aux.w << "\t";
       out << param.time << "\t" << param.comment; // param.comment ends with a newline
     }
   }
@@ -509,7 +509,7 @@ namespace quda
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << std::setw(16) << "volume"
-                 << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux."
+                 << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tshared_carve_out\taux.x\taux.y\taux."
                     "z\taux.w\ttime\tcomment"
                  << std::endl;
       serializeTuneCache(cache_file);
@@ -695,7 +695,7 @@ namespace quda
   {
     output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
     output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    output << "shared_bytes=" << param.shared_bytes;
+    output << "shared_bytes=" << param.shared_bytes << ", shared_carve_out=" << param.shared_carve_out;
     output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
     return output;
   }
@@ -782,7 +782,7 @@ namespace quda
    *
    */
 
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, aux, comment, time,
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, shared_carve_out, aux, comment, time,
                                      n_calls)
 
   class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
@@ -1016,10 +1016,10 @@ namespace quda
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           logQuda(QUDA_DEBUG_VERBOSE,
-                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
+                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d shared_carve_out=%d aux=(%d,%d,%d,%d)\n",
                   static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
                   static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
-                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
+                  static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
                   static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
@@ -1076,10 +1076,10 @@ namespace quda
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           logQuda(QUDA_DEBUG_VERBOSE,
-                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
+                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d shared_carve_out=%d aux=(%d,%d,%d,%d)\n",
                   static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
                   static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
-                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
+                  static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
                   static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
