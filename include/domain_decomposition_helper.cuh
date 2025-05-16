@@ -60,12 +60,12 @@ namespace quda
     // Whether comms are required along given direction
     template <typename DDArg, typename Arg> constexpr bool commDim(int d, const DDArg &dd, const Arg &arg) const
     {
-      if (not red_active && !black_active) return false;
-      if (not dd.red_active && !dd.black_active) return false;
+      if (!red_active && !black_active) return false;
+      if (!dd.red_active && !dd.black_active) return false;
       if (arg.dim[d] % block_dim[d] == 0) {
-        if (not red_active && !dd.red_active) return false;
-        if (not black_active && !dd.black_active) return false;
-        if (not block_hopping && !dd.block_hopping) return false;
+        if (!red_active && !dd.red_active) return false;
+        if (!black_active && !dd.black_active) return false;
+        if (!block_hopping && !dd.block_hopping) return false;
       }
       return true;
     }
@@ -92,7 +92,7 @@ namespace quda
     template <typename Coord> constexpr bool isZero(const Coord &x) const
     {
       bool is_black = block_parity(x);
-      bool is_red = not is_black;
+      bool is_red = !is_black;
 
       if (is_red && red_active) return false;
       if (is_black && black_active) return false;
