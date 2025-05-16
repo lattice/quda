@@ -6184,24 +6184,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
              adjSafeEvolve(sf_list,gf_list,smear_param,inv_param,hier_list[i],profileAdjGFlowHier,meas_cinf,gauge_param);
-
-    logQuda(QUDA_DEBUG_VERBOSE, "Previous hier list elements: \n");
-    for (int j = 0; j < (int)hier_list.size(); j++) { logQuda(QUDA_DEBUG_VERBOSE, "%d \n", (int)hier_list[j]); }
-    logQuda(QUDA_DEBUG_VERBOSE, "\n");
-
-    hier_list.pop_back();
-    gauge_stages.pop_back();
-    ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
-    if (ret_idx == -1) {
-      logQuda(QUDA_VERBOSE, " now in final serial stage of hierarchial evolution \n");
-      for (int i = gauge_stages.size() - 1; i >= 0; --i) {
-        // first load correct gauge field (for beginning of the loop, it is the final gauge list element)
-
-        gf_list.at(0) = std::ref(gauge_stages[i]);
-
-        adjSafeEvolve(sf_list, gf_list, smear_param, hier_list[i], profileAdjGFlowHier, meas_cinf);
-
-        logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
+             logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
       }
       logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
       break;

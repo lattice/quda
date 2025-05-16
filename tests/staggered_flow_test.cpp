@@ -435,16 +435,22 @@ printfQuda("HIIII\n");
   if (!use_multi_src || multishift > 1) {
 
     for (int n = 0; n < Nsrc; n++) {
+      void *aw_hp_multi[] = {_hp_multi_x[n].data()};
+      void *aw_hp_multi_f[] = {_hp_multi_x_flowed[n].data()};
+        
+      void *aw_out[] = {out[n].data()};
+      void *aw_out_f[] = {out_flowed[n].data()};
+        
       // If deflating, preserve the deflation space between solves
       if (inv_deflate) eig_param.preserve_deflation = n < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
       if (multishift > 1) {
         invertMultiShiftQuda(_hp_multi_x[n].data(), in[n].data(), &invParam);
         //QUESTION: is there _hp_multi_x_flowed[n] or or things to be indexed?
-        performGFlowQuda(_hp_multi_x_flowed[n].data(),_hp_multi_x[n].data(), &invParam, &smear_param, obs_param);
+        performGFlowQuda(aw_hp_multi_f,aw_hp_multi, &invParam, &smear_param, obs_param, 1);
       } else {
         invertQuda(out[n].data(), in[n].data(), &invParam);
-        performGFlowQuda(out_flowed[n].data(),out[n].data(), &invParam, &smear_param, obs_param);
+        performGFlowQuda(aw_out_f,aw_out, &invParam, &smear_param, obs_param, 1);
       }
 
       // move residuals to n^th location for verification after solves have finished
@@ -470,6 +476,9 @@ printfQuda("HIIII\n");
     std::vector<void *> _hp_b(Nsrc_tile);
     std::vector<void *> _hp_x_flowed(Nsrc_tile);
 
+    // void *aw_hp_multi[] = {_hp_multi_x[n].data()};
+    // void *aw_hp_multi_f[] = {_hp_multi_x_flowed[n].data()};
+
     for (int j = 0; j < Nsrc; j += Nsrc_tile) {
       for (int i = 0; i < Nsrc_tile; i++) {
         _hp_x[i] = out[j + i].data();
@@ -478,7 +487,7 @@ printfQuda("HIIII\n");
 
       if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &invParam);
-      performGFlowQuda(_hp_x_flowed.data(),_hp_x.data(),&invParam, &smear_param, obs_param);
+      performGFlowQuda(_hp_x_flowed.data(),_hp_x.data(),&invParam, &smear_param, obs_param,1);
 
       // move residuals to (i+j)^th location for verification after solves have finished
       for (int i = 0; i < Nsrc_tile; i++) {
@@ -514,6 +523,9 @@ printfQuda("HIIII\n");
   check_hier = quda::ColorSpinorField(cs_param);
   check_fwd = quda::ColorSpinorField(cs_param);
 
+  void *check_arr[] = {check.data()};
+  void *check_fwdarr[] = {check_fwd.data()};
+
   printf("Inspecting the very first element of the random fermion we will use:\n");
   check.PrintVector(0,0,0);
   printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
@@ -537,7 +549,7 @@ printfQuda("HIIII\n");
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
-    performGFlowQuda(check_fwd.data(),check.data(), &invParam, &smear_param, obs_param);
+    performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param, 1);
     host_fwd_timer.stop();
       
     printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
