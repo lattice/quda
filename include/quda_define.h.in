@@ -280,6 +280,12 @@ static_assert(QUDA_ORDER_QUARTER == 0 || QUDA_ORDER_QUARTER == 2 || QUDA_ORDER_Q
 #endif
 
 /**
+ * @def QUDA_VECTORIZE_SINGLE
+ * @brief Whether to employ vectorized instruction for single precision (where supported)
+ */
+#cmakedefine QUDA_VECTORIZE_SINGLE
+
+/**
  * @def QUDA_BUILD_NATIVE_FFT
  * @brief This macro is set by CMake if the native FFT library is used
  */

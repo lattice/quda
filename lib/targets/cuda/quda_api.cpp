@@ -131,7 +131,6 @@ namespace quda
 
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
   {
-    // if launch requests the maximum shared memory and the device supports it then opt in
     static std::unordered_set<const void *> cache;
     auto search = cache.find(func);
     if (search == cache.end()) {
@@ -139,6 +138,7 @@ namespace quda
       if (!activeTuning()) cache.insert(func);
       qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, tp.shared_carve_out);
 
+      // if launch requests the maximum shared memory and the device supports it then opt in
       if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
         cudaFuncAttributes attributes;
         qudaFuncGetAttributes(attributes, func);

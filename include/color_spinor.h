@@ -1111,17 +1111,16 @@ namespace quda {
      @param[in] x Input vector
      @return The vector a * x
   */
-  template<typename Float, int Nc, int Ns, typename S> __device__ __host__ inline
-    ColorSpinor<Float,Nc,Ns> operator*(const S &a, const ColorSpinor<Float,Nc,Ns> &x) {
+  template <typename Float, int Nc, int Ns, typename S>
+  __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator*(const S &a, const ColorSpinor<Float, Nc, Ns> &x)
+  {
 
-    ColorSpinor<Float,Nc,Ns> y;
+    ColorSpinor<Float, Nc, Ns> y;
 
 #pragma unroll
-    for (int i=0; i<Nc; i++) {
+    for (int i = 0; i < Nc; i++) {
 #pragma unroll
-      for (int s=0; s<Ns; s++) {
-	y.data[s*Nc + i] = a * x.data[s*Nc + i];
-      }
+      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = a * x.data[s * Nc + i]; }
     }
 
     return y;
@@ -1134,68 +1133,18 @@ namespace quda {
      @return The vector A * x
   */
   template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline std::enable_if_t<std::is_same_v<Float, float> && __COMPUTE_CAPABILITY__ >= 1000,
-                                              ColorSpinor<Float, Nc, Ns>>
-  operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
+  __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator*(const Matrix<complex<Float>, Nc> &A,
+                                                                  const ColorSpinor<Float, Nc, Ns> &x)
   {
     ColorSpinor<Float, Nc, Ns> y;
 
     for (int i = 0; i < Nc; i++) {
-      float2 y2[Ns] = {};
 #pragma unroll
-      for (int s = 0; s < Ns; s++) {
-        y2[s]
-          = __ffma2_rn({A(i, 0).real(), A(i, 0).real()}, {x.data[s * Nc + 0].real(), x.data[s * Nc + 0].imag()}, y2[s]);
-        y2[s]
-          = __ffma2_rn({A(i, 0).imag(), A(i, 0).imag()}, {-x.data[s * Nc + 0].imag(), x.data[s * Nc + 0].real()}, y2[s]);
-      }
+      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = cmul(A(i, 0), x.data[s * Nc + 0]); }
 #pragma unroll
       for (int j = 1; j < Nc; j++) {
 #pragma unroll
-        for (int s = 0; s < Ns; s++) {
-          y2[s] = __ffma2_rn({A(i, j).real(), A(i, j).real()}, {x.data[s * Nc + j].real(), x.data[s * Nc + j].imag()},
-                             y2[s]);
-          y2[s] = __ffma2_rn({A(i, j).imag(), A(i, j).imag()}, {-x.data[s * Nc + j].imag(), x.data[s * Nc + j].real()},
-                             y2[s]);
-        }
-      }
-#pragma unroll
-      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = {y2[s].x, y2[s].y}; }
-    }
-    return y;
-  }
-
-  /**
-     @brief Compute the matrix-vector product y = A * x
-     @param[in] A Input matrix
-     @param[in] x Input vector
-     @return The vector A * x
-  */
-  template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline std::enable_if_t<!(std::is_same_v<Float, float> && __COMPUTE_CAPABILITY__ >= 1000),
-                                              ColorSpinor<Float, Nc, Ns>>
-  operator*(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x)
-  {
-    ColorSpinor<Float,Nc,Ns> y;
-
-#pragma unroll
-    for (int i=0; i<Nc; i++) {
-#pragma unroll
-      for (int s=0; s<Ns; s++) {
-	y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
-	y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
-      }
-#pragma unroll
-      for (int j=1; j<Nc; j++) {
-#pragma unroll
-	for (int s=0; s<Ns; s++) {
-	  y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
-	  y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
-	}
+        for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = cmac(A(i, j), x.data[s * Nc + j], y.data[s * Nc + i]); }
       }
     }
     return y;
@@ -1217,21 +1166,11 @@ namespace quda {
 #pragma unroll
     for (int i = 0; i < Nc; i++) {
 #pragma unroll
-      for (int s = 0; s < Ns; s++) {
-        z.data[s * Nc + i].x = y.data[s * Nc + i].real() + A(i, 0).real() * x.data[s * Nc + 0].real();
-        z.data[s * Nc + i].x -= A(i, 0).imag() * x.data[s * Nc + 0].imag();
-        z.data[s * Nc + i].y = y.data[s * Nc + i].imag() + A(i, 0).real() * x.data[s * Nc + 0].imag();
-        z.data[s * Nc + i].y += A(i, 0).imag() * x.data[s * Nc + 0].real();
-      }
+      for (int s = 0; s < Ns; s++) { z.data[s * Nc + i] = cmac(A(i, 0), x.data[s * Nc + 0], y.data[s * Nc + i]); }
 #pragma unroll
       for (int j = 1; j < Nc; j++) {
 #pragma unroll
-        for (int s = 0; s < Ns; s++) {
-          z.data[s * Nc + i].x += A(i, j).real() * x.data[s * Nc + j].real();
-          z.data[s * Nc + i].x -= A(i, j).imag() * x.data[s * Nc + j].imag();
-          z.data[s * Nc + i].y += A(i, j).real() * x.data[s * Nc + j].imag();
-          z.data[s * Nc + i].y += A(i, j).imag() * x.data[s * Nc + j].real();
-        }
+        for (int s = 0; s < Ns; s++) { z.data[s * Nc + i] = cmac(A(i, j), x.data[s * Nc + j], z.data[s * Nc + i]); }
       }
     }
 
@@ -1251,27 +1190,19 @@ namespace quda {
     constexpr int N = Ns * Nc;
 
 #pragma unroll
-    for (int i=0; i<N; i++) {
-      if (i==0) {
-	y.data[i].x  = A(i,0).real() * x.data[0].real();
-	y.data[i].y  = A(i,0).real() * x.data[0].imag();
+    for (int i = 0; i < N; i++) {
+      if (i == 0) {
+        y.data[i] = mul2({A(i, 0).real(), A(i, 0).real()}, x.data[0]);
       } else {
-	y.data[i].x  = A(i,0).real() * x.data[0].real();
-	y.data[i].x -= A(i,0).imag() * x.data[0].imag();
-	y.data[i].y  = A(i,0).real() * x.data[0].imag();
-	y.data[i].y += A(i,0).imag() * x.data[0].real();
+        y.data[i] = cmul(A(i, 0), x.data[0]);
       }
 #pragma unroll
       for (int j=1; j<N; j++) {
 	if (i==j) {
-	  y.data[i].x += A(i,j).real() * x.data[j].real();
-	  y.data[i].y += A(i,j).real() * x.data[j].imag();
-	} else {
-	  y.data[i].x += A(i,j).real() * x.data[j].real();
-	  y.data[i].x -= A(i,j).imag() * x.data[j].imag();
-	  y.data[i].y += A(i,j).real() * x.data[j].imag();
-	  y.data[i].y += A(i,j).imag() * x.data[j].real();
-	}
+          y.data[i] = fma2({A(i, j).real(), A(i, j).real()}, x.data[j], y.data[i]);
+        } else {
+          y.data[i] = cmac(A(i, j), x.data[j], y.data[i]);
+        }
       }
     }
 

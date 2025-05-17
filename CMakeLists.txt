@@ -200,6 +200,8 @@ set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single preci
 set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
 set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 
+option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" OFF)
+
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
