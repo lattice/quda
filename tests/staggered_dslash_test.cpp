@@ -16,6 +16,12 @@ protected:
     printfQuda("Grid partition info:     X  Y  Z  T\n");
     printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
                dimPartitioned(3));
+
+    if (dslash_test_wrapper.test_domain_decomposition) {
+      if (dd_red_black)
+        printfQuda("Testing DD Red Black with block: %d  %d  %d  %d\n", dd_block_size[0], dd_block_size[1],
+                   dd_block_size[2], dd_block_size[3]);
+    }
   }
 
 public:
@@ -45,7 +51,7 @@ TEST_F(StaggeredDslashTest, verify)
 {
   if (!verify_results) GTEST_SKIP();
 
-  dslash_test_wrapper.staggeredDslashRef();
+  if (!dslash_test_wrapper.test_domain_decomposition) dslash_test_wrapper.staggeredDslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();
@@ -70,6 +76,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  add_dd_option_group(app);
   add_comms_option_group(app);
 
   try {
