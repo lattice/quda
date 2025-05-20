@@ -90,6 +90,7 @@ namespace quda {
     virtual bool tuneAuxDim() const { return false; }
 
     virtual bool tuneSharedBytes() const;
+    virtual bool tuneSharedCarveOut() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -237,8 +238,6 @@ namespace quda {
       }
     }
 
-    virtual bool tuneSharedCarveOut() const { return false; };
-
     virtual bool advanceSharedCarveOut(TuneParam &param) const
     {
       if (tuneSharedCarveOut()) {
@@ -329,6 +328,7 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
+      param.shared_carve_out = 0; // set default carve out to prefer L1 cache
       setSharedBytes(param);
     }
 
@@ -341,7 +341,7 @@ namespace quda {
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceSharedBytes(param) || advanceSharedCarveOut(param) || advanceBlockDim(param)
+      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
         || advanceGridDim(param) || advanceAux(param);
     }
 

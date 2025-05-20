@@ -207,8 +207,6 @@ namespace quda
       }
     }
 
-    bool tuneSharedCarveOut() const override { return true; }
-
     virtual bool advanceTuneParam(TuneParam &param) const override
     {
       return advanceAux(param) || advanceSharedBytes(param) || advanceSharedCarveOut(param) || advanceBlockDim(param)
@@ -227,6 +225,9 @@ namespace quda
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
+
+      // if not autotuning the carve out, set to the historical optimal value (prefer shared memory)
+      param.shared_carve_out = tuneSharedCarveOut() ? 0 : 100;
     }
 
     virtual void defaultTuneParam(TuneParam &param) const override
@@ -241,6 +242,8 @@ namespace quda
       if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
         param.aux.x = 1;                                                        // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
+
+      param.shared_carve_out = 100; // historical optimal value
     }
 
     /**

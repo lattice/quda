@@ -715,6 +715,21 @@ namespace quda
     return tune_shared;
   }
 
+  bool Tunable::tuneSharedCarveOut() const
+  {
+    static bool tune_shared = false; // default is not to do carve out tuning
+    static bool init = false;
+
+    if (!init) {
+      char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT");
+      if (enable_shared_env) {
+        if (strcmp(enable_shared_env, "1") == 0) { tune_shared = true; }
+      }
+      init = true;
+    }
+    return tune_shared;
+  }
+
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }
 
