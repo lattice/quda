@@ -122,6 +122,8 @@ void run(test_t param)
   check_hier = quda::ColorSpinorField(cs_param);
   check_fwd = quda::ColorSpinorField(cs_param);
 
+  void *check_safe_arr[] = {check_safe.data()};
+  void *check_hier_arr[] = {check_hier.data()};
   void *check_arr[] = {check.data()};
   void *check_fwdarr[] = {check_fwd.data()};
 
@@ -155,10 +157,10 @@ void run(test_t param)
 
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
-    performAdjGFlowHier(check_hier.data(), check.data(), &invParam, &smear_param);
+    performAdjGFlowHier(check_hier_arr, check_arr, &invParam, &smear_param,1);
     host_hier_timer.stop();
     host_safe_timer.start();
-    performAdjGFlowSafe(check_safe.data(), check.data(), &invParam, &smear_param);
+    performAdjGFlowSafe(check_safe_arr, check_arr, &invParam, &smear_param,1);
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
