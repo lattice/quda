@@ -1701,33 +1701,38 @@ extern "C" {
    * Performs Gradient Flow (gauge + fermion) on gaugePrecise and stores it in gaugeSmeared
    * @param[out] h_out Output fermion field set
    * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
    * @param[in] smear_param Parameter struct that defines the computation parameters
    * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
    * @param[in] nSpinors Number of spinors in the input and output fields
    */
   void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                        QudaGaugeObservableParam *obs_param, const size_t nSpinors);
+                        QudaGaugeObservableParam *obs_param, size_t nSpinors);
 
   /**
    * Performs Adjoint Gradient Flow (gauge + fermion) the "safe" way on gaugePrecise and stores it in gaugeSmeared
-   * @param[out] h_out Output fermion field
-   * @param[in] h_in Input fermion field
+   * @param[out] h_out Output fermion field set
+   * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
    * @param[in] smear_param Parameter struct that defines the computation parameters
    * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
+   * @param[in] nSpinors Number of spinors in the input and output fields
    */
-  void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, const size_t nSpinors);
+  void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, size_t nSpinors);
 
   /**
    * Performs Adjoint Gradient Flow (gauge + fermion) the Hierarchical way on gaugePrecise and stores it in gaugeSmeared
-   * @param[out] h_out Output fermion field
-   * @param[in] h_in Input fermion field
+   * @param[out] h_out Output fermion field set
+   * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
    * @param[in] smear_param Parameter struct that defines the computation parameters
    * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
+   * @param[in] nSpinors Number of spinors in the input and output fields
    */
-  void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, const size_t nSpinors);
+  void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, size_t nSpinors);
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a

@@ -5627,11 +5627,11 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   GaugeField &gaugeTemp = gf_list[4].get();
   GaugeField &precise = gf_list[5].get();
 
-  std::vector<ColorSpinorField> &f_temp0 = sf_list[0].get();
-  std::vector<ColorSpinorField> &f_temp1 = sf_list[1].get();
-  std::vector<ColorSpinorField> &f_temp2 = sf_list[2].get();
-  std::vector<ColorSpinorField> &f_temp3 = sf_list[3].get();
-  std::vector<ColorSpinorField> &f_temp4 = sf_list[4].get();
+  auto &f_temp0 = sf_list[0].get();
+  auto &f_temp1 = sf_list[1].get();
+  auto &f_temp2 = sf_list[2].get();
+  auto &f_temp3 = sf_list[3].get();
+  auto &f_temp4 = sf_list[4].get();
 
   int &i_glob = meas_cinf[0].get();
   int &measurement_n = meas_cinf[1].get();
