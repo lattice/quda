@@ -157,10 +157,10 @@ void run(test_t param)
 
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
-    performAdjGFlowHier(check_hier_arr, check_arr, &invParam, &smear_param,1);
+    performAdjGFlowHier(check_hier_arr, check_arr, &invParam, &smear_param, 1);
     host_hier_timer.stop();
     host_safe_timer.start();
-    performAdjGFlowSafe(check_safe_arr, check_arr, &invParam, &smear_param,1);
+    performAdjGFlowSafe(check_safe_arr, check_arr, &invParam, &smear_param, 1);
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
