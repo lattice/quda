@@ -1674,8 +1674,8 @@ namespace quda {
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first do vectorized copy from memory into registers
-            auto vecTmp
-              = vector_load<Float, N>(ghost[dir] + parity * faceVolumeCB[dir] * reconLen, i * faceVolumeCB[dir] + x);
+            auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
+
             // second do copy converting into register type
 #pragma unroll
             for (int j = 0; j < N; j++) copy(tmp[i * N + j], vecTmp[j]);
@@ -1683,7 +1683,8 @@ namespace quda {
 
           // now load any remainder
           if constexpr (Nrem > 0) {
-            auto vecTmp = vector_load<Float, Nrem>(ghost[dir] + faceVolumeCB[dir] * (parity * reconLen + M * N), x);
+            auto vecTmp
+              = vector_load<Float, Nrem>(ghost[dir] + 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
 #pragma unroll
             for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], vecTmp[j]);
           }
@@ -1694,7 +1695,7 @@ namespace quda {
             // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
             //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
             // } else {
-            copy(phase, ghost[dir][parity * faceVolumeCB[dir] * reconLen + faceVolumeCB[dir] * (reconLen - 1) + x]);
+            copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
             phase *= static_cast<real>(2.0);
             // }
           }
@@ -1717,7 +1718,7 @@ namespace quda {
 #pragma unroll
             for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
             // second do vectorized copy into memory
-            vector_store(ghost[dir] + parity * faceVolumeCB[dir] * reconLen, i * faceVolumeCB[dir] + x, vecTmp);
+            vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x, vecTmp);
           }
 
           // now save any remainder
@@ -1726,12 +1727,12 @@ namespace quda {
 #pragma unroll
             for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
             // second do vectorized copy into memory
-            vector_store(ghost[dir] + faceVolumeCB[dir] * (parity * reconLen + M * N), x, vecTmp);
+            vector_store(ghost[dir] + 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x, vecTmp);
           }
 
           if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
-            copy(ghost[dir][parity * faceVolumeCB[dir] * reconLen + faceVolumeCB[dir] * (reconLen - 1) + x],
+            copy(ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
                  static_cast<real>(0.5) * phase);
           }
         }
@@ -1777,9 +1778,8 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
-          auto vecTmp = vector_load<Float, N>(
-            ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen,
-            i * R[dim] * faceVolumeCB[dim] + x);
+          auto vecTmp = vector_load<Float, N>(ghost[dim] + dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
+                                              ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type
 #pragma unroll
@@ -1788,10 +1788,10 @@ namespace quda {
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(
-            ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen
-              + (M * N) * R[dim] * faceVolumeCB[dim],
-            x);
+          auto vecTmp
+            = vector_load<Float, Nrem>(ghost[dim] + (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
+                                       (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
+
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], vecTmp[j]);
         }
@@ -1799,8 +1799,8 @@ namespace quda {
         real phase = 0.;
         if constexpr (hasPhase)
           copy(phase,
-               ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
-                          + R[dim] * faceVolumeCB[dim] * M * N + x]);
+               ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
+                          + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x]);
 
         // use the extended_idx to determine the boundary condition
         reconstruct.Unpack(v, tmp, extended_idx, g, 2. * phase, X, R);
@@ -1819,8 +1819,8 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy to memory
-          vector_store(ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen,
-                       i * R[dim] * faceVolumeCB[dim] + x, vecTmp);
+          vector_store(ghost[dim] + dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
+                       ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
         // now save any remainder
@@ -1829,15 +1829,14 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * reconLen
-                         + (M * N) * R[dim] * faceVolumeCB[dim],
-                       x, vecTmp);
+          vector_store(ghost[dim] + (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
+                       (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
         if constexpr (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
-                          + R[dim] * faceVolumeCB[dim] * M * N + x],
+          copy(ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
+                          + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
                static_cast<real>(0.5) * phase);
         }
       }
