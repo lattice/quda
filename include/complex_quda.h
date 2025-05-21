@@ -628,7 +628,7 @@ namespace quda
   }
   template <typename ValueType> __host__ __device__ inline complex<ValueType> operator-(const complex<ValueType> &rhs)
   {
-    return rhs * -ValueType(1);
+    return {-rhs.real(), -rhs.imag()};
   }
 
   // Equality operators
