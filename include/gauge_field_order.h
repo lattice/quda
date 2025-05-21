@@ -747,11 +747,26 @@ namespace quda {
         }
       }
 
+      constexpr auto indexNative(int dim, int parity, int x_cb, int row, int col) const
+      {
+        // complex-value indexing (optimal)
+        constexpr int length = nColor * nColor;
+        constexpr int N = get_vector_order<storeFloat, nColor * nColor * 2>();
+        constexpr int M = length / (N / 2);
+        constexpr int Nrem = length - M * (N / 2);
+        int k = row * nColor + col;
+        int j = k / (N / 2);
+        int i = k % (N / 2);
+        int Nvec = (Nrem == 0 || j < M) ? N / 2 : Nrem;
+
+        return j * (N / 2) * 2 * ghostVolumeCB[dim] + (parity * ghostVolumeCB[dim] + x_cb) * Nvec + i;
+      }
+
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
       {
         if constexpr (native_ghost)
           return accessor(d % 4, parity, x_cb + (d / 4) * ghostVolumeCB[d] + volumeCB, row, col);
-        return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
+        return wrapper(ghost[d], indexNative(d, parity, x_cb, row, col), scale, scale_inv);
       }
     };
 
