@@ -114,15 +114,16 @@ void run(test_t param)
 
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
 
-  std::vector<quda::ColorSpinorField> check_safe(Nsrc, cs_param), check_hier(Nsrc, cs_param), check_fwd(Nsrc, cs_param), check_o(Nsrc, cs_param);
+  std::vector<quda::ColorSpinorField> check_safe(Nsrc, cs_param), check_hier(Nsrc, cs_param), check_fwd(Nsrc, cs_param),
+    check_o(Nsrc, cs_param);
 
-  std::vector<void*> check_safe_arr, check_hier_arr, check_fwd_arr, check_arr;
-  for (int i = 0; i < Nsrc; i++){
-  spinorNoise(check_o[i], i, QUDA_NOISE_GAUSS);
-  check_arr.push_back(check_o[i].data());
-  check_safe_arr.push_back(check_safe[i].data());
-  check_hier_arr.push_back(check_hier[i].data());
-  check_fwd_arr.push_back(check_fwd[i].data());    
+  std::vector<void *> check_safe_arr, check_hier_arr, check_fwd_arr, check_arr;
+  for (int i = 0; i < Nsrc; i++) {
+    spinorNoise(check_o[i], i, QUDA_NOISE_GAUSS);
+    check_arr.push_back(check_o[i].data());
+    check_safe_arr.push_back(check_safe[i].data());
+    check_hier_arr.push_back(check_hier[i].data());
+    check_fwd_arr.push_back(check_fwd[i].data());
   }
 
   printf("Inspecting the very first element of fermion #1 we will use:\n");
@@ -155,10 +156,10 @@ void run(test_t param)
 
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
-    performAdjGFlowHier(check_hier_arr.data(), check_arr.data(), &invParam, &smear_param,Nsrc);
+    performAdjGFlowHier(check_hier_arr.data(), check_arr.data(), &invParam, &smear_param, Nsrc);
     host_hier_timer.stop();
     host_safe_timer.start();
-    performAdjGFlowSafe(check_safe_arr.data(), check_arr.data(), &invParam, &smear_param,Nsrc);
+    performAdjGFlowSafe(check_safe_arr.data(), check_arr.data(), &invParam, &smear_param, Nsrc);
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
@@ -177,52 +178,53 @@ void run(test_t param)
   host_timer.stop(); // stop the timer
   printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
 
-  for (int j =0; j < Nsrc; j++)  {
-  printfQuda("\n\nCorrectness test for fermion #%i out of %i\n",j+1,Nsrc);
-  printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
-  printf("Hierarchical method:\n");
-  check_hier[j].PrintVector(0, 0, 0);
-  printf("Safe method:\n");
-  check_safe[j].PrintVector(0, 0, 0);
-  printf("Forward method:\n");
-  check_fwd[j].PrintVector(0, 0, 0);
+  for (int j = 0; j < Nsrc; j++) {
+    printfQuda("\n\nCorrectness test for fermion #%i out of %i\n", j + 1, Nsrc);
+    printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
+    printf("Hierarchical method:\n");
+    check_hier[j].PrintVector(0, 0, 0);
+    printf("Safe method:\n");
+    check_safe[j].PrintVector(0, 0, 0);
+    printf("Forward method:\n");
+    check_fwd[j].PrintVector(0, 0, 0);
 
-  double method_adj_diff = 0.;
-  /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
-  for (int i = 0; i < V * 24; i++) {
-    method_adj_diff += pow(fabs(check_safe[j].data<double *>()[i] - check_hier[j].data<double *>()[i]), 2);
+    double method_adj_diff = 0.;
+    /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
+    for (int i = 0; i < V * 24; i++) {
+      method_adj_diff += pow(fabs(check_safe[j].data<double *>()[i] - check_hier[j].data<double *>()[i]), 2);
+    }
+    double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
+    printf(
+      "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e\n",
+      method_adj_check);
+
+    std::complex<double> trace_fwd, trace_adj;
+    trace_fwd
+      = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_fwd[j].data<std::complex<double> *>());
+    trace_adj
+      = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_safe[j].data<std::complex<double> *>());
+
+    auto trace_diff_err = 2. * std::fabs(trace_fwd - std::conj(trace_adj)) / std::fabs(trace_fwd + std::conj(trace_adj));
+
+    printf("The two numbers below should be complex conjugates of one another\n");
+    printf("<check,adj_check> is %1.5e, %1.5e \n", trace_adj.real(), trace_adj.imag());
+    printf("<check,fwd_check> is %1.5e, %1.5e \n", trace_fwd.real(), trace_fwd.imag());
+    printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
+
+    auto eps = getTolerance(prec);
+
+    printfQuda("Checking adjoint safe/hier match\n");
+    EXPECT_LE(method_adj_check, gauge_smear_steps * gauge_smear_steps * eps);
+    if (method_adj_check > gauge_smear_steps * gauge_smear_steps * eps)
+      warningQuda("Adjoint safe/hier difference %e greater than tolerance %e\n", method_adj_check,
+                  gauge_smear_steps * gauge_smear_steps * eps);
+
+    printfQuda("Checking fractional error\n");
+    EXPECT_LE(trace_diff_err, gauge_smear_steps * gauge_smear_steps * eps);
+    if (trace_diff_err > gauge_smear_steps * gauge_smear_steps * eps)
+      warningQuda("Fractional error %e greater than tolerance %e\n", trace_diff_err,
+                  gauge_smear_steps * gauge_smear_steps * eps);
   }
-  double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
-  printf(
-    "Mean of mag errors between Safe and Hierarchical Adj methods (should be zero up to machine precision) = %1.5e\n",
-    method_adj_check);
-
-  std::complex<double> trace_fwd, trace_adj;
-  trace_fwd = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_fwd[j].data<std::complex<double> *>());
-  trace_adj = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_safe[j].data<std::complex<double> *>());
-
-  auto trace_diff_err = 2. * std::fabs(trace_fwd - std::conj(trace_adj)) / std::fabs(trace_fwd + std::conj(trace_adj));
-
-  printf("The two numbers below should be complex conjugates of one another\n");
-  printf("<check,adj_check> is %1.5e, %1.5e \n", trace_adj.real(), trace_adj.imag());
-  printf("<check,fwd_check> is %1.5e, %1.5e \n", trace_fwd.real(), trace_fwd.imag());
-  printf("Fractional error of (<check,adj_check> - <check,fwd_check>.conj()) = %1.5e \n", trace_diff_err);
-
-  auto eps = getTolerance(prec);
-
-  printfQuda("Checking adjoint safe/hier match\n");
-  EXPECT_LE(method_adj_check, gauge_smear_steps * gauge_smear_steps * eps);
-  if (method_adj_check > gauge_smear_steps * gauge_smear_steps * eps)
-    warningQuda("Adjoint safe/hier difference %e greater than tolerance %e\n", method_adj_check,
-                gauge_smear_steps * gauge_smear_steps * eps);
-
-  printfQuda("Checking fractional error\n");
-  EXPECT_LE(trace_diff_err, gauge_smear_steps * gauge_smear_steps * eps);
-  if (trace_diff_err > gauge_smear_steps * gauge_smear_steps * eps)
-    warningQuda("Fractional error %e greater than tolerance %e\n", trace_diff_err,
-                gauge_smear_steps * gauge_smear_steps * eps);
-
-}
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
