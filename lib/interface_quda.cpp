@@ -5317,7 +5317,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
 // perform forward gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246 (Appendix D)
 // the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)
 void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                      QudaGaugeObservableParam *obs_param, const size_t nSpinors)
+                      QudaGaugeObservableParam *obs_param, size_t nSpinors)
 {
 
   auto profile = pushProfile(profileGFlow);
@@ -5483,7 +5483,7 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
 // perform adjoint (backwards) gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246
 // (Appendix E) the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)
 void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                         const size_t nSpinors)
+                         size_t nSpinors)
 {
 
   auto profile = pushProfile(profileAdjGFlowSafe);
@@ -5757,7 +5757,7 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
 }
 
 void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                         const size_t nSpinors)
+                         size_t nSpinors)
 {
 
   auto profile = pushProfile(profileAdjGFlowHier);
