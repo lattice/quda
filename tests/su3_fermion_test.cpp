@@ -103,7 +103,6 @@ void run(test_t param)
   smear_param.alpha3 = gauge_smear_alpha3;
   smear_param.dir_ignore = gauge_smear_dir_ignore;
 
-  // quda::ColorSpinorField check, check_safe, check_hier, check_fwd;
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   invParam.cuda_prec = cuda_prec;
@@ -114,38 +113,21 @@ void run(test_t param)
   quda::ColorSpinorParam cs_param;
 
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
-  // check = quda::ColorSpinorField(cs_param);
 
-  std::vector<quda::ColorSpinorField> check_o(Nsrc, cs_param);
-  // Add noise to spinor
-  // spinorNoise(check, 1234, QUDA_NOISE_GAUSS);
+  std::vector<quda::ColorSpinorField> check_safe(Nsrc, cs_param), check_hier(Nsrc, cs_param), check_fwd(Nsrc, cs_param), check_o(Nsrc, cs_param);
 
-  // check_safe = quda::ColorSpinorField(cs_param);
-  // check_hier = quda::ColorSpinorField(cs_param);
-  // check_fwd = quda::ColorSpinorField(cs_param);
-
-  std::vector<quda::ColorSpinorField> check_safe(Nsrc, cs_param), check_hier(Nsrc, cs_param), check_fwd(Nsrc, cs_param);
-  
-  // void *check_safe_arr[] = {check_safe.data()};
-  // void *check_hier_arr[] = {check_hier.data()};
-  // void *check_arr[] = {check.data()};
-  // void *check_fwdarr[] = {check_fwd.data()};
-
-  std::vector<void*> check_safe_arr, check_hier_arr, check_arr, check_fwdarr, check_orig;
+  std::vector<void*> check_safe_arr, check_hier_arr, check_fwd_arr, check_arr;
   for (int i = 0; i < Nsrc; i++){
   spinorNoise(check_o[i], i, QUDA_NOISE_GAUSS);
   check_arr.push_back(check_o[i].data());
   check_safe_arr.push_back(check_safe[i].data());
   check_hier_arr.push_back(check_hier[i].data());
-  check_fwdarr.push_back(check_fwd[i].data());    
-
+  check_fwd_arr.push_back(check_fwd[i].data());    
   }
-  // std::vector<void*> check_safe_arr;
-  // check_safe_arr.push_back(check_safe.data());  
-  std::cout<<Nsrc<<'\n';
-  printf("Inspecting the very first element of the random fermion we will use:\n");
+
+  printf("Inspecting the very first element of fermion #1 we will use:\n");
   check_o[0].PrintVector(0, 0, 0);
-  printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
+  printf("Inspecting the very first element of set #1 the 3 un-evolved fermions (should be zero):\n");
   printf("Hierarchical method:\n");
   check_hier[0].PrintVector(0, 0, 0);
   printf("Safe method:\n");
@@ -180,7 +162,7 @@ void run(test_t param)
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
-    performGFlowQuda(check_fwdarr.data(), check_arr.data(), &invParam, &smear_param, obs_param, Nsrc);
+    performGFlowQuda(check_fwd_arr.data(), check_arr.data(), &invParam, &smear_param, obs_param, Nsrc);
     host_fwd_timer.stop();
 
     printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());
@@ -195,20 +177,20 @@ void run(test_t param)
   host_timer.stop(); // stop the timer
   printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
 
-  for (int i =0; i < Nsrc; i++)  {
-  printfQuda("\n\nCorrectness test for fermion #%i out of %i\n",i,Nsrc);
+  for (int j =0; j < Nsrc; j++)  {
+  printfQuda("\n\nCorrectness test for fermion #%i out of %i\n",j+1,Nsrc);
   printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
   printf("Hierarchical method:\n");
-  check_hier[i].PrintVector(0, 0, 0);
+  check_hier[j].PrintVector(0, 0, 0);
   printf("Safe method:\n");
-  check_safe[i].PrintVector(0, 0, 0);
+  check_safe[j].PrintVector(0, 0, 0);
   printf("Forward method:\n");
-  check_fwd[i].PrintVector(0, 0, 0);
+  check_fwd[j].PrintVector(0, 0, 0);
 
   double method_adj_diff = 0.;
   /* To access the ith complex entry in a raw vector, do, for example: check.data<std::complex<double>*>()[i]*/
   for (int i = 0; i < V * 24; i++) {
-    method_adj_diff += pow(fabs(check_safe[i].data<double *>()[i] - check_hier[i].data<double *>()[i]), 2);
+    method_adj_diff += pow(fabs(check_safe[j].data<double *>()[i] - check_hier[j].data<double *>()[i]), 2);
   }
   double method_adj_check = sqrt(method_adj_diff) / (V * 24.);
   printf(
@@ -216,8 +198,8 @@ void run(test_t param)
     method_adj_check);
 
   std::complex<double> trace_fwd, trace_adj;
-  trace_fwd = twoColorSpinorContract(check_o[i].data<std::complex<double> *>(), check_fwd[i].data<std::complex<double> *>());
-  trace_adj = twoColorSpinorContract(check_o[i].data<std::complex<double> *>(), check_safe[i].data<std::complex<double> *>());
+  trace_fwd = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_fwd[j].data<std::complex<double> *>());
+  trace_adj = twoColorSpinorContract(check_o[j].data<std::complex<double> *>(), check_safe[j].data<std::complex<double> *>());
 
   auto trace_diff_err = 2. * std::fabs(trace_fwd - std::conj(trace_adj)) / std::fabs(trace_fwd + std::conj(trace_adj));
 
