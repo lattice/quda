@@ -115,6 +115,8 @@ void run(test_t param)
 
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   check = quda::ColorSpinorField(cs_param);
+
+  std::vector<quda::ColorSpinorField> check_o(Nsrc, cs_param);
   // Add noise to spinor
   spinorNoise(check, 1234, QUDA_NOISE_GAUSS);
 
@@ -122,11 +124,20 @@ void run(test_t param)
   check_hier = quda::ColorSpinorField(cs_param);
   check_fwd = quda::ColorSpinorField(cs_param);
 
-  void *check_safe_arr[] = {check_safe.data()};
+  // void *check_safe_arr[] = {check_safe.data()};
   void *check_hier_arr[] = {check_hier.data()};
   void *check_arr[] = {check.data()};
   void *check_fwdarr[] = {check_fwd.data()};
 
+  // std::vector<void*> check_safe_arr, check_hier_arr, check_arr, check_fwdarr;
+  // for (i = 0; i < Nsrc; i++){
+  // check_safe_arr.push_back(check_safe.data());
+
+
+  // }
+  std::vector<void*> check_safe_arr;
+  check_safe_arr.push_back(check_safe.data());  
+  std::cout<<Nsrc<<'\n';
   printf("Inspecting the very first element of the random fermion we will use:\n");
   check.PrintVector(0, 0, 0);
   printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
@@ -160,7 +171,7 @@ void run(test_t param)
     performAdjGFlowHier(check_hier_arr, check_arr, &invParam, &smear_param,1);
     host_hier_timer.stop();
     host_safe_timer.start();
-    performAdjGFlowSafe(check_safe_arr, check_arr, &invParam, &smear_param,1);
+    performAdjGFlowSafe(check_safe_arr.data(), check_arr, &invParam, &smear_param,1);
     host_safe_timer.stop();
     // Perform forward flow algorithm
     host_fwd_timer.start();
