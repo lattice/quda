@@ -222,6 +222,11 @@ if(QUDA_MAX_MULTI_RHS_TILE GREATER QUDA_MAX_MULTI_RHS)
   message(SEND_ERROR "QUDA_MAX_MULTI_RHS_TILE is greater than QUDA_MAX_MULTI_RHS")
 endif()
 
+set(QUDA_MAX_KERNEL_ARG_SIZE "4096" CACHE STRING "maximum static size of the kernel arguments in bytes passed to a kernel on the target architecture")
+if(QUDA_MAX_KERNEL_ARG_SIZE GREATER 32768)
+  message(SEND_ERROR "Maximum QUDA_MAX_KERNEL_ARG_SIZE is 32768")
+endif()
+
 set(QUDA_PRECISION
   "14"
   CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
@@ -282,6 +287,7 @@ mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_MAX_MULTI_RHS)
 mark_as_advanced(QUDA_MAX_MULTI_RHS_TILE)
+mark_as_advanced(QUDA_MAX_KERNEL_ARG_SIZE)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)

@@ -26,6 +26,13 @@
 #define MAX_MULTI_RHS @QUDA_MAX_MULTI_RHS@
 
 /**
+ * @def   MAX_KERNEL_ARG_SIZE
+ * @brief This macro sets the maximum static size of the kernel arguments
+ * in bytes passed to a kernel on the target architecture
+ */
+#define MAX_KERNEL_ARG_SIZE @QUDA_MAX_KERNEL_ARG_SIZE@
+
+/**
  * @def   MAX_MULTI_BLAS_N
  * @brief This macro sets the register tile size for MRHS kernels
  */
