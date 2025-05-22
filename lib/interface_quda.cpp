@@ -5482,7 +5482,8 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
 
 // perform adjoint (backwards) gradient flow on gauge and spinor field following the algorithm in arXiv:1302.5246
 // (Appendix E) the gauge flow steps are identical to Wilson Flow algorithm in arXiv:1006.4518 (Vt <-> W3)
-void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, const size_t nSpinors)
+void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                         const size_t nSpinors)
 {
 
   auto profile = pushProfile(profileAdjGFlowSafe);
@@ -5526,7 +5527,7 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<ColorSpinorField> fin_h, fin, fout;
   // auxilliary fermion fields [0], [1], [2] and [3]
   std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
-    for (size_t i = 0; i < nSpinors; i++) {
+  for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
     fin_h.push_back(ColorSpinorField(cpuParam));
     ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
@@ -5755,7 +5756,8 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
   return result;
 }
 
-void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, const size_t nSpinors)
+void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                         const size_t nSpinors)
 {
 
   auto profile = pushProfile(profileAdjGFlowHier);
@@ -5811,7 +5813,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<ColorSpinorField> fin_h, fin, fout;
   // auxilliary fermion fields [0], [1], [2] and [3]
   std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
-    for (size_t i = 0; i < nSpinors; i++) {
+  for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_in[i], *inv_param, gaugePrecise->X(), false, inv_param->input_location);
     fin_h.push_back(ColorSpinorField(cpuParam));
     ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
@@ -5827,9 +5829,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     // set [3] = input spinor
     f_temp3[i] = fin[i];
   }
-  
-
-    
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
   logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
@@ -5927,7 +5926,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     ColorSpinorField fout_h(cpuParam);
     fout_h = sf_list[0].get()[i];
   }
-    
+
   logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");
   popOutputPrefix();
 }
