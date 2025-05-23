@@ -36,7 +36,7 @@ TEST_P(CovDevTest, verify)
   double tol = test_results[2];
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-  ASSERT_LE(deviation, tol) << "unit and shift implementations do not agree";
+  ASSERT_LE(deviation_shift, tol) << "unit and shift implementations do not agree";
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
