@@ -1596,7 +1596,7 @@ if (QUDA_DIRAC_LAPLACE AND QUDA_DIRAC_WILSON)
   add_test(NAME su3_fermion_test
            COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:su3_fermion_test> ${MPIEXEC_POSTFLAGS}
            --dim 2 4 6 8
-           --enable-testing true
+           --enable-testing true --nsrc 2
            --gtest_output=xml:su3_fermion_test.xml)
 endif()
 
