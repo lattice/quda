@@ -14,8 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariant derivative operator
   */
-  template <typename Float, int nSpin_, int nColor_, QudaReconstructType reconstruct_, int nDim, bool shift_>
-  struct CovDevArg : DslashArg<Float, nDim> {
+  template <typename Float, int nSpin_, int nColor_, typename DDArg, QudaReconstructType reconstruct_, int nDim, bool shift_>
+  struct CovDevArg : DslashArg<Float, nDim, DDArg> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
@@ -38,12 +38,12 @@ namespace quda
     F in[MAX_MULTI_RHS];   /** input vector field */
     const Ghost halo_pack; /** accessor for writing the halo field */
     const Ghost halo;      /** accessor for reading the halo field */
-    const G U;  /** the gauge field */
-    int mu;     /** The direction in which to apply the derivative */
+    const G U;             /** the gauge field */
+    int mu;                /** The direction in which to apply the derivative */
 
     CovDevArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, int mu, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, halo, U, in, parity, dagger, false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, halo, U, in, parity, dagger, false, 1, spin_project, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -79,7 +79,8 @@ namespace quda
 
     const int d = mu % 4;
 
-    if (mu < 4) { // Forward gather - compute fwd offset for vector fetch
+    if (mu < 4 && arg.dd_in.doHopping(coord, d, +1)) {
+      // Forward gather - compute fwd offset for vector fetch
 
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -107,7 +108,8 @@ namespace quda
         }
       }
 
-    } else { // Backward gather - compute back offset for spinor and gauge fetch
+    } else if (mu >= 4 && arg.dd_in.doHopping(coord, d, -1)) {
+      // Backward gather - compute back offset for spinor and gauge fetch
 
       const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
 
@@ -162,6 +164,11 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
+
+      if (arg.dd_x.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
       case 0:

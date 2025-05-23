@@ -25,12 +25,22 @@ namespace quda
     Solver::create(x, b);
 
     if (!init || r.size() != b.size()) {
+
       resize(r, b.size(), QUDA_NULL_FIELD_CREATE, b[0]);
 
-      // now allocate sloppy fields
       ColorSpinorParam csParam(b[0]);
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
+
+      // Setting the value of block_dim and checking if blocks are local
+      bool local = true;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        csParam.dd.block_dim[i] = param.schwarz_block[i];
+        local &= (param.do_block_schwarz() && x.full_dim(i) % csParam.dd.block_dim[i] == 0);
+      }
+      // Disabling global_reduction if blocks are local and we do block_schwarz
+      if (param.do_block_schwarz() && param.global_reduction) param.global_reduction = !local;
+
       resize(Ar, b.size(), csParam);
       resize(x_sloppy, b.size(), csParam);
 
@@ -88,15 +98,33 @@ namespace quda
     while (!is_done) {
 
       int k = 0;
+
       vector<double> scale(b.size(), 1.0);
       vector<double> scale_inv(b.size(), 1.0);
       vector<double> delta2(b.size(), param.delta * param.delta);
 
-      if ((node_parity + step) % 2 == 0 && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+      if (!param.do_block_schwarz() && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ
+          && (node_parity + step) % 2 == 0) {
         // for multiplicative Schwarz we alternate updates depending on node parity
       } else {
 
         commGlobalReductionPush(param.global_reduction); // use local reductions for DD solver
+
+        if (param.do_block_schwarz()) {
+          if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
+            for (auto i = 0u; i < b.size(); i++) {
+              // Red or black active
+              (Ar[i]).DD(DD::reset, DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+              (r_sloppy[i]).DD(DD::red_black_type, step % 2 == 0 ? DD::red_active : DD::black_active);
+            }
+          } else {
+            // Both red and black active but no hopping
+            for (auto i = 0u; i < b.size(); i++) {
+              (Ar[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+              (r_sloppy[i]).DD(DD::reset, DD::red_black_type, DD::red_active, DD::black_active, DD::no_block_hopping);
+            }
+          }
+        }
 
         blas::zero(x_sloppy); // can get rid of this for a special first update kernel
         auto c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
@@ -126,6 +154,7 @@ namespace quda
           } else {
             // doing local reductions so can make it asynchronous
             commAsyncReductionSet(true);
+
             blas::cDotProductNormAB(Ar, r_sloppy);
 
             // omega*alpha is done in the kernel
@@ -138,6 +167,14 @@ namespace quda
         }
 
         blas::axpy(scale, x_sloppy, x); // Scale and sum to accumulator
+
+        if (param.do_block_schwarz()) {
+          // Disable domain decomposition
+          for (auto i = 0u; i < Ar.size(); i++) {
+            (Ar[i]).DD(DD::reset);
+            (r_sloppy[i]).DD(DD::reset);
+          }
+        }
 
         commGlobalReductionPop(); // renable global reductions for outer solver
       }

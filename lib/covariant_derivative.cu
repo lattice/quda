@@ -87,8 +87,8 @@ namespace quda
     long long bytes() const override
     {
       int gauge_bytes = Arg::shift ? 0 : arg.reconstruct * in.Precision();
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() +
-        (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int spinor_bytes
+        = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = gauge_bytes + 3 * spinor_bytes; // 3 since we have to load the partial
       int dim = arg.mu % 4;
       long long bytes_ = 0;
@@ -133,7 +133,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct CovDevApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct CovDevApply {
 
     CovDevApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                 cvector_ref<const ColorSpinorField> &, const GaugeField &U, int mu, int parity, bool dagger, bool shift,
@@ -144,21 +144,21 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
       if (in.Nspin() == 4) {
         if (shift) {
-          CovDevArg<Float, 4, nColor, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+          CovDevArg<Float, 4, nColor, DDArg, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
         } else {
-          CovDevArg<Float, 4, nColor, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+          CovDevArg<Float, 4, nColor, DDArg, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
         }
       } else if (in.Nspin() == 1) {
         if (shift) {
-          CovDevArg<Float, 1, nColor, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+          CovDevArg<Float, 1, nColor, DDArg, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
         } else {
-          CovDevArg<Float, 1, nColor, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
+          CovDevArg<Float, 1, nColor, DDArg, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
           dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
         }
