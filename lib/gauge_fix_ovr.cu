@@ -73,13 +73,16 @@ namespace quda {
 
     bool advanceAux(TuneParam &param) const
     {
-      param.aux.x = (param.aux.x + 1) % 6;
-      if (!device::shared_memory_atomic_supported()) { // 1, 4 use shared memory atomics
-	if(param.aux.x == 1 || param.aux.x == 4) param.aux.x++;
+      param.aux.x = (param.aux.x + 1) % 4;
+
+      // mu must be contained in the block, types 0, 1 have mu = 8 and 2, 3 have mu = 4
+      if (param.aux.x == 0 || param.aux.x == 1) {
+        TunableKernel2D::resizeVector(8);
+        TunableKernel2D::resizeStep(8);
+      } else {
+        TunableKernel2D::resizeVector(4);
+        TunableKernel2D::resizeStep(4);
       }
-      // mu must be contained in the block, types 0, 1, 2 have mu = 8 and 3, 4, 5 have mu = 4
-      TunableKernel2D::resizeVector(param.aux.x < 3 ? 8 : 4);
-      TunableKernel2D::resizeStep(param.aux.x < 3 ? 8 : 4);
       TunableKernel2D::initTuneParam(param);
       return param.aux.x == 0 ? false : true;
     }
@@ -89,9 +92,9 @@ namespace quda {
       switch (param.aux.x) {
       case 0: return 8 * param.block.x * 4 * sizeof(Float);
       case 1: return 8 * param.block.x * 4 * sizeof(Float) / 8;
-      case 2: return 8 * param.block.x * 4 * sizeof(Float) / 8;
-      case 3: return 4 * param.block.x * 4 * sizeof(Float);
-      default: return 4 * param.block.x * sizeof(Float);
+      case 2: return 4 * param.block.x * 4 * sizeof(Float);
+      case 3: return 4 * param.block.x * sizeof(Float);
+      default: return 0;
       }
     }
 
@@ -134,8 +137,6 @@ namespace quda {
         case 1: launch<computeFix>(tp, stream, Arg<false, 1>(u, relax_boost, parity, borderpoints, threads)); break;
         case 2: launch<computeFix>(tp, stream, Arg<false, 2>(u, relax_boost, parity, borderpoints, threads)); break;
         case 3: launch<computeFix>(tp, stream, Arg<false, 3>(u, relax_boost, parity, borderpoints, threads)); break;
-        case 4: launch<computeFix>(tp, stream, Arg<false, 4>(u, relax_boost, parity, borderpoints, threads)); break;
-        case 5: launch<computeFix>(tp, stream, Arg<false, 5>(u, relax_boost, parity, borderpoints, threads)); break;
         default: errorQuda("Unexpected type = %u", tp.aux.x);
         }
       } else {
@@ -144,8 +145,6 @@ namespace quda {
         case 1: launch<computeFix>(tp, stream, Arg<true, 1>(u, relax_boost, parity, borderpoints, threads)); break;
         case 2: launch<computeFix>(tp, stream, Arg<true, 2>(u, relax_boost, parity, borderpoints, threads)); break;
         case 3: launch<computeFix>(tp, stream, Arg<true, 3>(u, relax_boost, parity, borderpoints, threads)); break;
-        case 4: launch<computeFix>(tp, stream, Arg<true, 4>(u, relax_boost, parity, borderpoints, threads)); break;
-        case 5: launch<computeFix>(tp, stream, Arg<true, 5>(u, relax_boost, parity, borderpoints, threads)); break;
         default: errorQuda("Unexpected type = %u", tp.aux.x);
         }
       }
@@ -154,8 +153,13 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       param.aux.x = 0;
-      TunableKernel2D::resizeVector(param.aux.x < 3 ? 8 : 4);
-      TunableKernel2D::resizeStep(param.aux.x < 3 ? 8 : 4);
+      if (param.aux.x == 0 || param.aux.x == 1) {
+        TunableKernel2D::resizeVector(8);
+        TunableKernel2D::resizeStep(8);
+      } else {
+        TunableKernel2D::resizeVector(4);
+        TunableKernel2D::resizeStep(4);
+      }
       TunableKernel2D::initTuneParam(param);
     }
 
