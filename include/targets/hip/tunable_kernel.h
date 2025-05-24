@@ -80,7 +80,7 @@ namespace quda
       strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
       if (this->location == QUDA_CUDA_FIELD_LOCATION) {
-        strcat(aux, "max_kernel_arg=");
+        strcat(aux, "kernel_arg_threshold=");
         i32toa(aux + strlen(aux), device::max_kernel_arg_size());
         strcat(aux, ",");
       }
@@ -93,7 +93,7 @@ namespace quda
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
       if (this->location == QUDA_CUDA_FIELD_LOCATION) {
-        strcat(aux, "max_kernel_arg=");
+        strcat(aux, "kernel_arg_threshold=");
         i32toa(aux + strlen(aux), device::max_kernel_arg_size());
         strcat(aux, ",");
       }

@@ -100,7 +100,7 @@ namespace quda
 #ifdef QUDA_LARGE_KERNEL_ARG
         strcat(aux, "large_kernel_arg,");
 #else
-        strcat(aux, "max_kernel_arg=");
+        strcat(aux, "kernel_arg_threshold=");
         i32toa(aux + strlen(aux), device::max_kernel_arg_size());
         strcat(aux, ",");
 #endif
@@ -117,7 +117,7 @@ namespace quda
 #ifdef QUDA_LARGE_KERNEL_ARG
         strcat(aux, "large_kernel_arg,");
 #else
-        strcat(aux, "max_kernel_arg=");
+        strcat(aux, "kernel_arg_threshold=");
         i32toa(aux + strlen(aux), device::max_kernel_arg_size());
         strcat(aux, ",");
 #endif
