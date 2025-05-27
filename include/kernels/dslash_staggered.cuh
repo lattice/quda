@@ -114,7 +114,7 @@ namespace quda
       }
 
       // improved - forward direction
-      if (arg.improved) {
+      if constexpr (arg.improved) {
         const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
@@ -148,7 +148,7 @@ namespace quda
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
-            out[s] = mv_add(conj(U), -in, out[s]);
+            out[s] = mv_sub(conj(U), in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dc.X, d);
@@ -158,13 +158,13 @@ namespace quda
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.in[src_idx + s](back_idx, their_spinor_parity);
-            out[s] = mv_add(conj(U), -in, out[s]);
+            out[s] = mv_sub(conj(U), in, out[s]);
           }
         }
       }
 
       // improved - backward direction
-      if (arg.improved) {
+      if constexpr (arg.improved) {
         const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
@@ -173,7 +173,7 @@ namespace quda
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
               = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
-            out[s] = mv_add(conj(L), -in, out[s]);
+            out[s] = mv_sub(conj(L), in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back3_idx = linkIndexM3(coord, arg.dc.X, d);
@@ -182,7 +182,7 @@ namespace quda
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in = arg.in[src_idx + s](back3_idx, their_spinor_parity);
-            out[s] = mv_add(conj(L), -in, out[s]);
+            out[s] = mv_sub(conj(L), in, out[s]);
           }
         }
       }
@@ -219,13 +219,13 @@ namespace quda
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
           Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
-          out[s] = arg.a * x - out[s];
+          out[s] = axpy(arg.a, x, -out[s]);
         }
       } else if (mykernel_type != INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
           Vector x = arg.out[src_idx + s](coord.x_cb, my_spinor_parity);
-          out[s] = x + (xpay ? -out[s] : out[s]);
+          out[s] = xpay ? x - out[s] : x + out[s];
         }
       }
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) {
