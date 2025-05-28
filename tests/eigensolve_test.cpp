@@ -7,13 +7,14 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <timer.h>
 //#include <color_spinor_field.h> // convenient quark field container
 
-#include <misc.h>
-#include <timer.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
 #include "test.h"
 
 // Place params above "eigensolve_test_gtest.hpp" so they

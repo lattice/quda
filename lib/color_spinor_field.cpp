@@ -99,6 +99,7 @@ namespace quda
     nVec = param.nVec;
     nVec_actual = param.nVec_actual;
     twistFlavor = param.twistFlavor;
+    dd = param.dd;
 
     if (param.pc_type != QUDA_5D_PC && param.pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", param.pc_type);
     pc_type = param.pc_type;
@@ -242,6 +243,7 @@ namespace quda
     ghostFace = std::exchange(src.ghostFace, {});
     ghostFaceCB = std::exchange(src.ghostFaceCB, {});
     ghost_buf = std::exchange(src.ghost_buf, {});
+    dd = std::exchange(src.dd, {});
     dslash_constant = std::exchange(src.dslash_constant, nullptr);
     bytes = std::exchange(src.bytes, 0);
     bytes_raw = std::exchange(src.bytes_raw, 0);
@@ -521,6 +523,7 @@ namespace quda
     param.pc_type = pc_type;
     param.suggested_parity = suggested_parity;
     param.create = QUDA_NULL_FIELD_CREATE;
+    param.dd = dd;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const
@@ -698,6 +701,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    even->dd = dd;
     return *even;
   }
 
@@ -705,6 +709,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    odd->dd = dd;
     return *odd;
   }
 
@@ -712,6 +717,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    even->dd = dd;
     return *even;
   }
 
@@ -719,6 +725,7 @@ namespace quda
   {
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
+    odd->dd = dd;
     return *odd;
   }
 
@@ -1536,6 +1543,8 @@ namespace quda
   {
     genericPrintVector(*this, parity, x_cb, rank);
   }
+
+  void ColorSpinorField::projectDD() { genericProjectDD(*this); }
 
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {

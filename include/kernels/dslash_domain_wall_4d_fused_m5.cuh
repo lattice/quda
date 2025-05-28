@@ -7,15 +7,15 @@
 namespace quda
 {
 
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, Dslash5Type dslash5_type_>
-  struct DomainWall4DFusedM5Arg : DomainWall4DArg<Float, nColor_, nDim, reconstruct_>,
+  template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_, Dslash5Type dslash5_type_>
+  struct DomainWall4DFusedM5Arg : DomainWall4DArg<Float, nColor_, nDim, DDArg, reconstruct_>,
                                   Dslash5Arg<Float, nColor_, false, false, dslash5_type_> {
     // ^^^ Note that for Dslash5Arg we have xpay == dagger == false. This is because the xpay and dagger are determined
     // by fused kernel, not the dslash5, so the `false, false` here are simply dummy instantiations.
 
     static constexpr int nColor = nColor_;
 
-    using DomainWall4DArg = DomainWall4DArg<Float, nColor, nDim, reconstruct_>;
+    using DomainWall4DArg = DomainWall4DArg<Float, nColor, nDim, DDArg, reconstruct_>;
     using DomainWall4DArg::a_5;
     using DomainWall4DArg::dagger;
     using DomainWall4DArg::in;
@@ -57,13 +57,17 @@ namespace quda
     }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct domainWall4DFusedM5 : dslash_default {
+  constexpr bool domainWall4DFusedM5shared = true; // Use shared memory
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg_>
+  struct domainWall4DFusedM5 : dslash_default, d5Params<Arg_, domainWall4DFusedM5shared>::Ops {
+    using Arg = Arg_;
 
     static constexpr Dslash5Type dslash5_type = Arg::type;
+    static constexpr bool shared = domainWall4DFusedM5shared;
 
     const Arg &arg;
-    constexpr domainWall4DFusedM5(const Arg &arg) : arg(arg) { }
+    using typename d5Params<Arg_, shared>::Ops::KernelOpsT;
+    template <typename Ftor> constexpr domainWall4DFusedM5(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -97,8 +101,8 @@ namespace quda
          */
         if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
           constexpr bool sync = false;
-          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s,
-                                                                           src_idx);
+          out = d5<sync, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(*this, stencil_out,
+                                                                                    my_spinor_parity, 0, s, src_idx);
         }
       }
 
@@ -112,8 +116,8 @@ namespace quda
          */
         if (active) {
           constexpr bool sync = false;
-          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity,
-                                                                                    0, s, src_idx);
+          out = variableInv<sync, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(
+            *this, stencil_out, my_spinor_parity, 0, s, src_idx);
         }
 
         Vector aggregate_external;
@@ -139,8 +143,8 @@ namespace quda
           constexpr bool sync = true;
           constexpr bool this_dagger = true;
           // Then we apply the second m5inv-dag
-          out = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0,
-                                                                                         s, src_idx);
+          out = variableInv<sync, this_dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(
+            *this, out, my_spinor_parity, 0, s, src_idx);
         }
 
       } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS
@@ -157,16 +161,16 @@ namespace quda
 
           if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
             constexpr bool sync = false;
-            out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
-              arg, stencil_out, my_spinor_parity, 0, s, src_idx);
+            out = d5<sync, dagger, shared, decltype(*this), typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
+              *this, stencil_out, my_spinor_parity, 0, s, src_idx);
           }
         }
 
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
           Vector x = arg.x[src_idx](xs, my_spinor_parity);
           constexpr bool sync_m5mob = Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS ? false : true;
-          x = d5<sync_m5mob, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(
-            arg, x, my_spinor_parity, 0, s, src_idx);
+          x = d5<sync_m5mob, dagger, shared, decltype(*this), typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(
+            *this, x, my_spinor_parity, 0, s, src_idx);
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
           Vector x = arg.out[src_idx](xs, my_spinor_parity);
@@ -184,8 +188,8 @@ namespace quda
         if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
           // Apply the m5inv.
           constexpr bool sync = false;
-          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity,
-                                                                                    0, s, src_idx);
+          out = variableInv<sync, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(
+            *this, stencil_out, my_spinor_parity, 0, s, src_idx);
         }
 
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
@@ -205,12 +209,12 @@ namespace quda
           if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
             // Apply the m5inv.
             constexpr bool sync_m5inv = false;
-            out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
-                                                                                            0, s, src_idx);
+            out = variableInv<sync_m5inv, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(
+              *this, out, my_spinor_parity, 0, s, src_idx);
             // Apply the m5pre.
             constexpr bool sync_m5pre = true;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s,
-                                                                                   src_idx);
+            out = d5<sync_m5pre, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(*this, out, my_spinor_parity,
+                                                                                            0, s, src_idx);
           }
 
           /******
@@ -219,12 +223,12 @@ namespace quda
           if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
             // Apply the m5pre.
             constexpr bool sync_m5pre = false;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s,
-                                                                                   src_idx);
+            out = d5<sync_m5pre, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(*this, out, my_spinor_parity,
+                                                                                            0, s, src_idx);
             // Apply the m5inv.
             constexpr bool sync_m5inv = true;
-            out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
-                                                                                            0, s, src_idx);
+            out = variableInv<sync_m5inv, dagger, shared, decltype(*this), typename Arg::Dslash5Arg>(
+              *this, out, my_spinor_parity, 0, s, src_idx);
           }
         }
       }

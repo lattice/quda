@@ -117,45 +117,25 @@ namespace quda
     }
   };
 
-  template <Dslash5Type...> struct Dslash5TypeList {
-  };
-
-  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
-
-    template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
+    template <bool distance_pc, Dslash5Type dslash5_type_impl, Dslash5Type... N>
     DomainWall4DApplyFusedM5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                              cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
                              cvector_ref<ColorSpinorField> &y, const Complex *b_5, const Complex *c_5, double a,
                              double m_5, int parity, bool dagger, const int *comm_override, double m_f,
-                             Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
+                             DistanceType<distance_pc>, Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
 #ifdef NVSHMEM_COMMS
       errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
 #else
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
+      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, DDArg, recon, dslash5_type_impl>;
       Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
 #endif
     }
   };
-
-  // use custom instantiate to deal with field splitting if needed
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructWilson, typename... Args>
-  void instantiate(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                   cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y, const GaugeField &U,
-                   Args... args)
-  {
-    if (in.size() > get_max_multi_rhs()) {
-      instantiate<Apply, Recon>({out.begin(), out.begin() + out.size() / 2}, {in.begin(), in.begin() + in.size() / 2},
-                                {x.begin(), x.begin() + x.size() / 2}, {y.begin(), y.begin() + y.size() / 2}, U, args...);
-      instantiate<Apply, Recon>({out.begin() + out.size() / 2, out.end()}, {in.begin() + in.size() / 2, in.end()},
-                                {x.begin() + x.size() / 2, x.end()}, {y.begin() + y.size() / 2, y.end()}, U, args...);
-      return;
-    }
-    instantiate<Apply, Recon>(out, in, x, U, y, args...);
-  }
 
 } // namespace quda

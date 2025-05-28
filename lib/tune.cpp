@@ -372,6 +372,15 @@ namespace quda
     }
   }
 
+  auto getTuneCacheName(bool error = false, bool lock = false)
+  {
+    std::string name("/tunecache");
+    if (!getTuning()) name += "_notune";
+    if (error) name += "_error";
+    name += lock ? ".lock" : ".tsv";
+    return name;
+  }
+
   /*
    * Read tunecache from disk.
    */
@@ -395,7 +404,7 @@ namespace quda
 
     if (comm_rank_global() == 0) {
       cache_path = get_resource_path();
-      cache_path += "/tunecache.tsv";
+      cache_path += getTuneCacheName();
       cache_file.open(cache_path.c_str());
 
       if (cache_file) {
@@ -480,7 +489,7 @@ namespace quda
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
-      lock_path = resource_path + (error ? "/tunecache_error.lock" : "/tunecache.lock");
+      lock_path = resource_path + getTuneCacheName(error, true);
       lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
       if (lock_handle == -1) {
         warningQuda("Unable to lock cache file.  Tuned launch parameters will not be cached to disk.  "
@@ -494,7 +503,7 @@ namespace quda
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-      cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
+      cache_path = resource_path + getTuneCacheName(error);
       cache_file.open(cache_path.c_str());
 
       logQuda(QUDA_SUMMARIZE, "Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()),
@@ -972,6 +981,8 @@ namespace quda
       param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);
       tunable.checkLaunchParam(param_default);
+      param_default.comment = "# default\n";
+      tunecache[key] = param_default;
       logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
               tunable.paramString(param_default).c_str());
 
