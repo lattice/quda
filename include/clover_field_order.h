@@ -654,9 +654,8 @@ namespace quda {
             // first load from memory
             auto vecTmp = vector_load<Float, N>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
 
-            // second do scalar copy converting into register type
-#pragma unroll
-            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], vecTmp[j], nrm); }
+            // second do copy converting into register type
+            copy_and_scale(&tmp[i * N], vecTmp, nrm);
           }
 
 #pragma unroll
@@ -700,25 +699,20 @@ namespace quda {
           // the chiral block size may not be exactly divisible by N,
           // in which case we write the divisble part first and then
           // deal with the remainder afterwards
-          array<real, compressed_block> tmp;
-#pragma unroll
-          for (int i = 0; i < compressed_block; i++) tmp[i] = isFixed<Float>::value ? v[i] * nrm_inv : v[i];
 
 #pragma unroll
           for (int i = 0; i < M_offset; i++) {
             array<Float, N> vecTmp;
-            // first do scalar copy converting into storage type
-#pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], tmp[chirality * Nrem + i * N + j]);
+            // first do copy converting into storage type
+            copy_and_scale<Float, real, N>(vecTmp, v + chirality * Nrem + i * N, nrm_inv);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
           }
 
           if constexpr (Nrem) {
             array<Float, Nrem> vecTmp;
-            // first do scalar copy converting into storage type
-#pragma unroll
-            for (int j = 0; j < Nrem; j++) copy_scaled(vecTmp[j], tmp[(1 - chirality) * M_offset * N + j]);
+            // first do copy converting into storage type
+            copy_and_scale<Float, real, Nrem>(vecTmp, v + (1 - chirality) * M_offset * N, nrm_inv);
 
             auto *ptr = clover + (parity * offset + x) * N + volumeCB * (M_offset * N) + chirality * Nrem;
             vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory

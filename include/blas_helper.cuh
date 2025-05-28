@@ -225,15 +225,13 @@ namespace quda
             // first load from memory
             auto vecTmp = vector_load<store_t, N>(data.spinor + parity * data.cb_offset, data.stride * i + x);
             // now copy into output and scale
-#pragma unroll
-            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], vecTmp[j], nrm);
+            copy_and_scale(&v_[i * N], vecTmp, nrm);
           }
           if constexpr (Nrem > 0) {
             // first load from memory
             auto vecTmp = vector_load<store_t, Nrem>(data.spinor + parity * data.cb_offset + data.stride * M * N, x);
             // now copy into output and scale
-#pragma unroll
-            for (int j = 0; j < Nrem; j++) copy_and_scale(v_[M * N + j], vecTmp[j], nrm);
+            copy_and_scale(&v_[M * N], vecTmp, nrm);
           }
 
 #pragma unroll
@@ -251,8 +249,7 @@ namespace quda
           memcpy(&nrm, &vecTmp[6], sizeof(norm_t));
 
           // now copy into output and scale
-#pragma unroll
-          for (int i = 0; i < len; i++) copy_and_scale(v_[i], vecTmp[i], nrm);
+          copy_and_scale(&v_[0], vecTmp, nrm);
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
@@ -272,23 +269,16 @@ namespace quda
       {
         constexpr int len = 2 * n; // real-valued length
 
-        if constexpr (!(n == 3 && isHalf<store_t>::value)) {
-          array<real, len> v_;
+        array<real, len> v_;
+        for (int i = 0; i < n; i++) {
+          v_[2 * i + 0] = v[i].real();
+          v_[2 * i + 1] = v[i].imag();
+        }
 
-          if constexpr (isFixed<store_t>::value) {
-            real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, data.norm[x + parity * data.cb_norm_offset]);
-#pragma unroll
-            for (int i = 0; i < n; i++) {
-              v_[2 * i + 0] = scale_inv * v[i].real();
-              v_[2 * i + 1] = scale_inv * v[i].imag();
-            }
-          } else {
-#pragma unroll
-            for (int i = 0; i < n; i++) {
-              v_[2 * i + 0] = v[i].real();
-              v_[2 * i + 1] = v[i].imag();
-            }
-          }
+        if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+          real scale_inv = 0.0;
+          if constexpr (isFixed<store_t>::value)
+            scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, data.norm[x + parity * data.cb_norm_offset]);
 
           constexpr int M = len / N;
           constexpr int Nrem = len - M * N;
@@ -296,17 +286,15 @@ namespace quda
           for (int i = 0; i < M; i++) {
             array<store_t, N> vecTmp;
             // first do scalar copy converting into storage type
-#pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], v_[i * N + j]);
+            copy_and_scale<store_t, real, N>(vecTmp, &v_[i * N], scale_inv);
             // second do vectorized copy into memory
             vector_store(data.spinor + parity * data.cb_offset, data.stride * i + x, vecTmp);
           }
 
           if constexpr (Nrem > 0) {
             array<store_t, Nrem> vecTmp;
-            // first do scalar copy converting into storage type
-#pragma unroll
-            for (int j = 0; j < Nrem; j++) copy_scaled(vecTmp[j], v_[M * N + j]);
+            // first do copy converting into storage type
+            copy_and_scale<store_t, real, Nrem>(vecTmp, &v_[M * N], scale_inv);
             // second do vectorized copy into memory
             vector_store(data.spinor + parity * data.cb_offset + data.stride * M * N, x, vecTmp);
           }
@@ -315,17 +303,12 @@ namespace quda
           auto cb_offset = data.cb_norm_offset / 4;
           norm_t norm;
           norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
-          array<real, len> v_;
-#pragma unroll
-          for (int i = 0; i < n; i++) {
-            v_[2 * i + 0] = scale_inv * v[i].real();
-            v_[2 * i + 1] = scale_inv * v[i].imag();
-          }
 
           array<store_t, 8> vecTmp;
           memcpy(&vecTmp[6], &norm, sizeof(norm_t)); // pack the norm
-#pragma unroll
-          for (int i = 0; i < len; i++) copy_scaled(vecTmp[i], v_[i]);
+          array<store_t, 6> vecTmp2;
+          copy_and_scale<store_t, real, 6>(vecTmp2, &v_[0], scale_inv);
+          std::memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }

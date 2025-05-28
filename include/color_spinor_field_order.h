@@ -1032,15 +1032,13 @@ namespace quda
         for (int i = 0; i < M; i++) {
           auto vecTmp = vector_load<Float, N>(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost,
                                               i * faceVolumeCB[dim] + x);
-#pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], vecTmp[j], nrm);
+          copy_and_scale(v + i * N, vecTmp, nrm);
         }
 
         if constexpr (Nrem > 0) { // now load any remainder
           auto vecTmp = vector_load<Float, Nrem>(
             ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost + faceVolumeCB[dim] * M * N, x);
-#pragma unroll
-          for (int j = 0; j < Nrem; j++) copy_and_scale(v[M * N + j], vecTmp[j], nrm);
+          copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
 #pragma unroll
@@ -1057,28 +1055,25 @@ namespace quda
           v[2 * i + 1] = in[i].imag();
         }
 
-        if (isFixed<Float>::value) {
+        norm_type scale = 0.0;
+        norm_type scale_inv = 0.0;
+        if constexpr (isFixed<Float>::value) {
           norm_type max_[length_ghost / 2];
           // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
           for (int i = 0; i < length_ghost / 2; i++)
             max_[i] = fmaxf((norm_type)fabsf((norm_type)v[i]), (norm_type)fabsf((norm_type)v[i + length_ghost / 2]));
-          norm_type scale = 0.0;
 #pragma unroll
           for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
           ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale * fixedInvMaxValue<Float>::value;
-
-          real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-          for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
+          scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
         }
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           array<Float, N> vecTmp;
           // first do scalar copy converting into storage type
-#pragma unroll
-          for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], v[i * N + j]);
+          copy_and_scale<Float, real, N>(vecTmp, v + i * N, scale_inv);
           // second do vectorized copy into memory
           vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost, i * faceVolumeCB[dim] + x,
                        vecTmp);
@@ -1086,8 +1081,7 @@ namespace quda
 
         if constexpr (Nrem > 0) { // now load any remainder
           array<Float, Nrem> vecTmp;
-#pragma unroll
-          for (int j = 0; j < Nrem; j++) copy_scaled(vecTmp[j], v[M * N + j]);
+          copy_and_scale<Float, real, Nrem>(vecTmp, v + M * N, scale_inv);
           vector_store<Float, Nrem>(
             ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost + faceVolumeCB[dim] * M * N, x, vecTmp);
         }
@@ -1177,15 +1171,13 @@ namespace quda
           // first load from memory
           auto vecTmp = vector_load<Float, N>(field + parity * offset, volumeCB * i + x);
           // now copy into output and scale
-#pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], vecTmp[j], nrm);
+          copy_and_scale(v + i * N, vecTmp, nrm);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<Float, Nrem>(field + parity * offset + volumeCB * M * N, x);
-#pragma unroll
-          for (int j = 0; j < Nrem; j++) copy_and_scale(v[M * N + j], vecTmp[j], nrm);
+          copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
 #pragma unroll
@@ -1205,36 +1197,32 @@ namespace quda
           v[2 * i + 1] = in[i].imag();
         }
 
-        if (isFixed<Float>::value) {
+        norm_type scale = 0.0;
+        norm_type scale_inv = 0.0;
+        if constexpr (isFixed<Float>::value) {
           norm_type max_[length / 2];
           // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
           for (int i = 0; i < length / 2; i++)
             max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
-          norm_type scale = 0.0;
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
           norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
-
-          real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-          for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
+          scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
         }
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           array<Float, N> vecTmp;
           // first do scalar copy converting into storage type
-#pragma unroll
-          for (int j = 0; j < N; j++) copy_scaled(vecTmp[j], v[i * N + j]);
+          copy_and_scale<Float, real, N>(vecTmp, v + i * N, scale_inv);
           // second do vectorized copy into memory
           vector_store(field + parity * offset, volumeCB * i + x, vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           array<Float, Nrem> vecTmp;
-#pragma unroll
-          for (int j = 0; j < Nrem; j++) copy_scaled(vecTmp[j], v[M * N + j]);
+          copy_and_scale<Float, real, Nrem>(vecTmp, v + M * N, scale_inv);
           // second do vectorized copy into memory
           vector_store(field + parity * offset + volumeCB * M * N, x, vecTmp);
         }
@@ -1298,9 +1286,9 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp[6], sizeof(norm_type));
-
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], vecTmp[i], nrm);
+        array<Float, 6> vecTmp2;
+        memcpy(&vecTmp2, &vecTmp, sizeof(vecTmp2));
+        copy_and_scale(v, vecTmp2, nrm);
 
 #pragma unroll
         for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
@@ -1328,15 +1316,14 @@ namespace quda
         norm_type nrm = scale * fixedInvMaxValue<Float>::value;
 
         real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
 
         array<Float, 8> vecTmp;
         memcpy(&vecTmp[6], &nrm, sizeof(norm_type)); // pack the norm
 
         // pack the spinor elements
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_scaled(vecTmp[i], v[i]);
+        array<Float, 6> vecTmp2;
+        copy_and_scale<Float, real, 6>(vecTmp2, v, scale_inv);
+        memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
         vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
 
@@ -1405,10 +1392,10 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp[6], sizeof(norm_type));
-
+        array<Float, 6> vecTmp2;
+        memcpy(&vecTmp2, &vecTmp, sizeof(vecTmp2));
         // now copy into output and scale
-#pragma unroll
-        for (int i = 0; i < length; i++) copy_and_scale(v[i], vecTmp[i], nrm);
+        copy_and_scale(v, vecTmp2, nrm);
 
 #pragma unroll
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
@@ -1435,15 +1422,14 @@ namespace quda
         norm_type nrm = scale * fixedInvMaxValue<Float>::value;
 
         real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-        for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
 
         array<Float, 8> vecTmp;
         memcpy(&vecTmp[6], &nrm, sizeof(norm_type)); // pack the norm
 
         // pack the spinor elements
-#pragma unroll
-        for (int i = 0; i < length; i++) copy_scaled(vecTmp[i], v[i]);
+        array<Float, 6> vecTmp2;
+        copy_and_scale<Float, real, 6>(vecTmp2, v, scale_inv);
+        memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
 
         vector_store(field, parity * offset + x, vecTmp);
       }

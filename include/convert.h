@@ -21,71 +21,52 @@ namespace quda
    * value of a (signed) char and short. Relevant for
    * fixed-precision types.
    */
-  template <typename T> struct fixedMaxValue {
+  template <typename T1> struct fixedMaxValue {
     static constexpr float value = 0.0f;
   };
   template <> struct fixedMaxValue<short> {
     static constexpr float value = 32767.0f;
   };
-  template <> struct fixedMaxValue<short2> {
-    static constexpr float value = 32767.0f;
-  };
-  template <> struct fixedMaxValue<short4> {
-    static constexpr float value = 32767.0f;
-  };
-  template <> struct fixedMaxValue<short8> {
-    static constexpr float value = 32767.0f;
-  };
+
   template <> struct fixedMaxValue<int8_t> {
     static constexpr float value = 127.0f;
   };
-  template <> struct fixedMaxValue<char2> {
-    static constexpr float value = 127.0f;
-  };
-  template <> struct fixedMaxValue<char4> {
-    static constexpr float value = 127.0f;
-  };
-  template <> struct fixedMaxValue<char8> {
-    static constexpr float value = 127.0f;
-  };
 
-  template <typename T> struct fixedInvMaxValue {
+  template <typename T1> struct fixedInvMaxValue {
     static constexpr float value = 3.402823e+38f;
   };
+
   template <> struct fixedInvMaxValue<short> {
     static constexpr float value = 3.0518509476e-5f;
   };
-  template <> struct fixedInvMaxValue<short2> {
-    static constexpr float value = 3.0518509476e-5f;
-  };
-  template <> struct fixedInvMaxValue<short4> {
-    static constexpr float value = 3.0518509476e-5f;
-  };
-  template <> struct fixedInvMaxValue<short8> {
-    static constexpr float value = 3.0518509476e-5f;
-  };
+
   template <> struct fixedInvMaxValue<int8_t> {
     static constexpr float value = 7.874015748031e-3f;
   };
-  template <> struct fixedInvMaxValue<char2> {
-    static constexpr float value = 7.874015748031e-3f;
-  };
-  template <> struct fixedInvMaxValue<char4> {
-    static constexpr float value = 7.874015748031e-3f;
-  };
-  template <> struct fixedInvMaxValue<char8> {
-    static constexpr float value = 7.874015748031e-3f;
-  };
 
-  template <typename T> constexpr float i2f(T a)
+  template <typename T> __device__ __host__ float i2f(T a)
   {
 #ifndef QUDA_ALTERNATIVE_I_TO_F
     return static_cast<float>(a);
 #else
     // will work for up to 23-bit int
     int32_t i = a + 0x4B400000;
-    float &f = reinterpret_cast<float &>(i);
+    float f;
+    memcpy(&f, &i, sizeof(int32_t));
     return f - 12582912.0f;
+#endif
+  }
+
+  template <typename T> __device__ __host__ float2 i2f(const T &a, const T &b)
+  {
+#ifndef QUDA_ALTERNATIVE_I_TO_F
+    return {static_cast<float>(a), static_cast<float>(b)};
+#else
+    // will work for up to 23-bit int
+    int2 i = {a + 0x4B400000, b + 0x4B400000};
+    float2 f;
+    memcpy(&f, &i, sizeof(int2));
+    return add2(f, {-12582912.0f, -12582912.0f});
 #endif
   }
 
@@ -94,6 +75,11 @@ namespace quda
   */
   template <bool is_device> struct f2i {
     constexpr int operator()(float f) { return static_cast<int>(rintf(f)); }
+    constexpr int2 operator()(float2 f) { return {static_cast<int>(rintf(f.x)), static_cast<int>(rintf(f.y))}; }
+    constexpr int2 operator()(float2 f, float c)
+    {
+      return {static_cast<int>(rintf(f.x * c)), static_cast<int>(rintf(f.y * c))};
+    }
   };
 
   /**
@@ -103,7 +89,17 @@ namespace quda
     __device__ inline int operator()(float f)
     {
       f += 12582912.0f;
-      return reinterpret_cast<int &>(f);
+      int i;
+      memcpy(&i, &f, sizeof(int));
+      return i;
+    }
+
+    __device__ inline int2 operator()(float2 f, float c)
+    {
+      f = fma2(f, {c, c}, {12582912.0f, 12582912.0f});
+      int2 i;
+      memcpy(&i, &f, sizeof(int2));
+      return i;
     }
   };
 
@@ -150,20 +146,34 @@ namespace quda
     a = target::dispatch<f2i>(b * fixedMaxValue<T1>::value);
   }
 
-  /**
-     @brief Specialized variants of the copy function that assumes the
-     scaling factor has already been done.
-  */
-  template <typename T1, typename T2>
-  constexpr std::enable_if_t<!isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
+  template <typename T1, typename T2, int n>
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
-    copy(a, b);
+    for (int i = 0; i < n; i++) a[i] = b[i];
   }
 
-  template <typename T1, typename T2>
-  constexpr std::enable_if_t<isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
+  template <typename T1, typename T2, int n>
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
-    a = target::dispatch<f2i>(b);
+    static_assert(n % 2 == 0);
+    for (int i = 0; i < n; i += 2) {
+      auto bi = i2f(b[i + 0], b[i + 1]);
+      auto ai = mul2(bi, {fixedInvMaxValue<T2>::value, fixedInvMaxValue<T2>::value});
+      a[i + 0] = ai.x;
+      a[i + 1] = ai.y;
+    }
+  }
+
+  template <typename T1, typename T2, int n>
+  constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
+  {
+    static_assert(n % 2 == 0);
+    for (int i = 0; i < n; i += 2) {
+      auto bi = mul2({b[i], b[i + 1]}, {fixedMaxValue<T1>::value, fixedMaxValue<T1>::value});
+      auto ai = target::dispatch<f2i>(bi);
+      a[i + 0] = ai.x;
+      a[i + 1] = ai.y;
+    }
   }
 
   /**
@@ -172,15 +182,63 @@ namespace quda
      the input type (b) is either a short or char vector.
   */
   template <typename T1, typename T2, typename T3>
-  constexpr std::enable_if_t<!isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &)
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b,
+                                                                                              const T3 &)
   {
     copy(a, b);
   }
 
   template <typename T1, typename T2, typename T3>
-  constexpr std::enable_if_t<isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &c)
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b,
+                                                                                             const T3 &c)
   {
     a = i2f(b) * c;
+  }
+
+  template <typename T1, typename T2, typename T3>
+  constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b,
+                                                                                             const T3 &c)
+  {
+    a = target::dispatch<f2i>(b * c);
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void>
+  copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &)
+  {
+    for (int i = 0; i < n; i++) copy(a[i], b[i]);
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(array<T1, n> &a,
+                                                                                              const T2 *b, const T3 &)
+  {
+    for (int i = 0; i < n; i++) copy(a[i], b[i]);
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void>
+  copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &c)
+  {
+    static_assert(n % 2 == 0);
+    for (int i = 0; i < n; i += 2) {
+      auto bi = i2f(b[i + 0], b[i + 1]);
+      auto ai = mul2(bi, {c, c});
+      a[i + 0] = ai.x;
+      a[i + 1] = ai.y;
+    }
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(array<T1, n> &a,
+                                                                                             const T2 *b, const T3 &c)
+  {
+    static_assert(n % 2 == 0);
+    for (int i = 0; i < n; i += 2) {
+      auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, c);
+      a[i + 0] = ai.x;
+      a[i + 1] = ai.y;
+    }
   }
 
   template <class fixed_t, class float_t> __device__ __host__ fixed_t f2i_round(float_t f)

@@ -1013,8 +1013,9 @@ namespace quda {
         if constexpr (isFixed<Float>::value) {
 #pragma unroll
             for (int i = 0; i < N / 2; i++) {
-              out[2 * i + 0] = scale_inv * in[i].real();
-              out[2 * i + 1] = scale_inv * in[i].imag();
+              auto outi = mul2({scale_inv, scale_inv}, in[i]);
+              out[2 * i + 0] = outi.x;
+              out[2 * i + 1] = outi.y;
             }
           } else {
 #pragma unroll
@@ -1613,15 +1614,13 @@ namespace quda {
           // first load from memory
           auto vecTmp = vector_load<Float, N>(gauge + parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
           // second do copy converting into register type
-#pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], vecTmp[j]);
+          copy(tmp + i * N, vecTmp);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<Float, Nrem>(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
-#pragma unroll
-          for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], vecTmp[j]);
+          copy(tmp + M * N, vecTmp);
         }
 
         constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
@@ -1692,16 +1691,14 @@ namespace quda {
             auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
 
             // second do copy converting into register type
-#pragma unroll
-            for (int j = 0; j < N; j++) copy(tmp[i * N + j], vecTmp[j]);
+            copy(tmp + i * N, vecTmp);
           }
 
           // now load any remainder
           if constexpr (Nrem > 0) {
             auto vecTmp
               = vector_load<Float, Nrem>(ghost[dir] + 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
-#pragma unroll
-            for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], vecTmp[j]);
+            copy(tmp + M * N, vecTmp);
           }
 
           real phase = 0.;
@@ -1797,8 +1794,7 @@ namespace quda {
                                               ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type
-#pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], vecTmp[j]);
+          copy(tmp + i * N, vecTmp);
         }
 
         // now load any remainder
@@ -1807,8 +1803,7 @@ namespace quda {
             = vector_load<Float, Nrem>(ghost[dim] + (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
                                        (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
-#pragma unroll
-          for (int j = 0; j < Nrem; j++) copy(tmp[M * N + j], vecTmp[j]);
+          copy(tmp + M * N, vecTmp);
         }
 
         real phase = 0.;
