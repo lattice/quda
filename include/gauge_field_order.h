@@ -666,8 +666,8 @@ namespace quda {
 
       __device__ __host__ inline wrapper operator()(int dim, int parity, int x_cb, int row, int col) const
       {
-        auto index = indexFloatN<nColor, get_vector_order<storeFloat, nColor * nColor * 2>()>(dim, parity, x_cb, row,
-                                                                                              col, stride, offset_cb);
+        auto index = indexFloatN<nColor, get_vector_order<storeFloat>(nColor * nColor * 2)>(dim, parity, x_cb, row, col,
+                                                                                            stride, offset_cb);
         return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
       }
 
@@ -676,8 +676,8 @@ namespace quda {
                                           const complex<theirFloat> &val) const
       {
         using vec2 = array<storeFloat, 2>;
-        auto index = indexFloatN<nColor, get_vector_order<storeFloat, nColor * nColor * 2>()>(dim, parity, x_cb, row,
-                                                                                              col, stride, offset_cb);
+        auto index = indexFloatN<nColor, get_vector_order<storeFloat>(nColor * nColor * 2)>(dim, parity, x_cb, row, col,
+                                                                                            stride, offset_cb);
         vec2 *u2 = reinterpret_cast<vec2 *>(u + index);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
@@ -707,6 +707,8 @@ namespace quda {
         std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
         ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        std::cout << "offset_cb = " << offset_cb << " stride = " << stride << " start " << start << " count " << count
+                  << " result = " << result[0] << " " << result[1] << std::endl;
         return reducer::apply(result[0], result[1]);
       }
     };
@@ -751,7 +753,7 @@ namespace quda {
       {
         // complex-value indexing (optimal)
         constexpr int length = nColor * nColor;
-        constexpr int N = get_vector_order<storeFloat, nColor * nColor * 2>();
+        constexpr int N = get_vector_order<storeFloat>(nColor * nColor * 2);
         constexpr int M = length / (N / 2);
         constexpr int Nrem = length - M * (N / 2);
         int k = row * nColor + col;
@@ -1563,7 +1565,7 @@ namespace quda {
         Reconstruct<length, Float, recon, ghostExchange_, stag_phase> reconstruct;
         static constexpr int reconLen = recon;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
-        static constexpr int N = gauge::get_vector_order<Float, reconLen - hasPhase>();
+        static constexpr int N = gauge::get_vector_order<Float>(reconLen - hasPhase);
         static constexpr int M = (reconLen - hasPhase) / N;
         static constexpr int Nrem = reconLen - hasPhase - M * N;
         static_assert(Nrem == 0 || (Nrem > 0 && (Nrem & (Nrem - 1)) == 0), "Nrem must be a power of 2");

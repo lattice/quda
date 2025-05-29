@@ -18,7 +18,7 @@ namespace quda {
     template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
     template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
 
-    template <typename T, int length> constexpr int get_vector_order()
+    template <typename T> constexpr int get_vector_order(int length)
     {
       constexpr int N = get_vector_order<T>();
       if constexpr (N == 0) {                    // legacy path
@@ -30,6 +30,17 @@ namespace quda {
         while (Nvec > length) Nvec /= 2;
         return Nvec;
       }
+    }
+
+    constexpr int get_vector_order(size_t word_size, int length)
+    {
+      switch (word_size) {
+      case 1: return get_vector_order<int8_t>(length);
+      case 2: return get_vector_order<short>(length);
+      case 4: return get_vector_order<float>(length);
+      case 8: return get_vector_order<double>(length);
+      }
+      return 0;
     }
 
   } // namespace gauge
