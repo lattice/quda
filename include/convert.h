@@ -44,31 +44,63 @@ namespace quda
     static constexpr float value = 7.874015748031e-3f;
   };
 
-  template <typename T> __device__ __host__ float i2f(T a)
-  {
-#ifndef QUDA_ALTERNATIVE_I_TO_F
-    return static_cast<float>(a);
-#else
-    // will work for up to 23-bit int
-    int32_t i = a + 0x4B400000;
-    float f;
-    memcpy(&f, &i, sizeof(int32_t));
-    return f - 12582912.0f;
-#endif
-  }
+  /**
+     @brief Regular integer to float used on the host
+  */
+  template <bool is_device> struct i2f {
+    template <typename T> constexpr float operator()(int a, T) { return static_cast<float>(a); }
+    template <typename T> constexpr float2 operator()(int a, int b, T)
+    {
+      return {static_cast<float>(a), static_cast<float>(b)};
+    }
+  };
 
-  template <typename T> __device__ __host__ float2 i2f(const T &a, const T &b)
-  {
-#ifndef QUDA_ALTERNATIVE_I_TO_F
-    return {static_cast<float>(a), static_cast<float>(b)};
-#else
-    // will work for up to 23-bit int
-    int2 i = {a + 0x4B400000, b + 0x4B400000};
-    float2 f;
-    memcpy(&f, &i, sizeof(int2));
-    return add2(f, {-12582912.0f, -12582912.0f});
+#if QUDA_ALTERNATIVE_I_TO_F == 100
+  constexpr bool i2f_i[] = {true, true, true, true};
+#elif QUDA_ALTERNATIVE_I_TO_F == 75
+  constexpr bool i2f_i[] = {true, false, true, true};
+#elif QUDA_ALTERNATIVE_I_TO_F == 50
+  constexpr bool i2f_i[] = {true, false, true, false};
+#elif QUDA_ALTERNATIVE_I_TO_F == 25
+  constexpr bool i2f_i[] = {false, true, false, false};
+#elif QUDA_ALTERNATIVE_I_TO_F == 0
+  constexpr bool i2f_i[] = {false, false, false, false};
 #endif
-  }
+
+  /**
+     @brief Fast float to integer round used on the device
+  */
+  template <> struct i2f<true> {
+    template <typename T, typename alternative_t>
+    __device__ std::enable_if_t<std::is_same_v<alternative_t, std::integral_constant<bool, alternative_t::value>>, float>
+    operator()(T a, alternative_t)
+    {
+      if constexpr (!alternative_t::value) {
+        return static_cast<float>(a);
+      } else {
+        // will work for up to 23-bit int
+        int32_t i = a + 0x4B400000;
+        float f;
+        memcpy(&f, &i, sizeof(int32_t));
+        return f - 12582912.0f;
+      }
+    }
+
+    template <typename T, typename alternative_t>
+    __device__ std::enable_if_t<std::is_same_v<alternative_t, std::integral_constant<bool, alternative_t::value>>, float2>
+    operator()(const T &a, const T &b, alternative_t)
+    {
+      if constexpr (!alternative_t::value) {
+        return {static_cast<float>(a), static_cast<float>(b)};
+      } else {
+        // will work for up to 23-bit int
+        int2 i = {a + 0x4B400000, b + 0x4B400000};
+        float2 f;
+        memcpy(&f, &i, sizeof(int2));
+        return add2(f, {-12582912.0f, -12582912.0f});
+      }
+    }
+  };
 
   /**
      @brief Regular float to integer round used on the host
@@ -121,6 +153,14 @@ namespace quda
     }
   };
 
+  template <auto Start, auto End, auto Inc, class F> constexpr void constexpr_for(F &&f)
+  {
+    if constexpr (Start < End) {
+      f(std::integral_constant<decltype(Start), Start>());
+      constexpr_for<Start + Inc, End, Inc>(f);
+    }
+  }
+
   /**
      @brief Copy function which is trival between floating point
      types.  When converting to an integer type, the input float is
@@ -137,7 +177,7 @@ namespace quda
   template <typename T1, typename T2>
   constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
-    a = i2f(b) * fixedInvMaxValue<T2>::value;
+    a = target::dispatch<i2f>(b, std::integral_constant<bool, i2f_i[0]>()) * fixedInvMaxValue<T2>::value;
   }
 
   template <typename T1, typename T2>
@@ -149,6 +189,7 @@ namespace quda
   template <typename T1, typename T2, int n>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
+#pragma unroll
     for (int i = 0; i < n; i++) a[i] = b[i];
   }
 
@@ -156,18 +197,19 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
     static_assert(n % 2 == 0);
-    for (int i = 0; i < n; i += 2) {
-      auto bi = i2f(b[i + 0], b[i + 1]);
+    constexpr_for<0, n, 2>([&](auto i) {
+      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[i / 2]>());
       auto ai = mul2(bi, {fixedInvMaxValue<T2>::value, fixedInvMaxValue<T2>::value});
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
-    }
+    });
   }
 
   template <typename T1, typename T2, int n>
   constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
     static_assert(n % 2 == 0);
+#pragma unroll
     for (int i = 0; i < n; i += 2) {
       auto bi = mul2({b[i], b[i + 1]}, {fixedMaxValue<T1>::value, fixedMaxValue<T1>::value});
       auto ai = target::dispatch<f2i>(bi);
@@ -192,7 +234,7 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b,
                                                                                              const T3 &c)
   {
-    a = i2f(b) * c;
+    a = target::dispatch<i2f>(b, std::integral_constant<bool, i2f_i[0]>()) * c;
   }
 
   template <typename T1, typename T2, typename T3>
@@ -206,6 +248,7 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void>
   copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &)
   {
+#pragma unroll
     for (int i = 0; i < n; i++) copy(a[i], b[i]);
   }
 
@@ -213,6 +256,7 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(array<T1, n> &a,
                                                                                               const T2 *b, const T3 &)
   {
+#pragma unroll
     for (int i = 0; i < n; i++) copy(a[i], b[i]);
   }
 
@@ -221,12 +265,12 @@ namespace quda
   copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &c)
   {
     static_assert(n % 2 == 0);
-    for (int i = 0; i < n; i += 2) {
-      auto bi = i2f(b[i + 0], b[i + 1]);
+    constexpr_for<0, n, 2>([&](auto i) {
+      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[i / 2]>());
       auto ai = mul2(bi, {c, c});
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
-    }
+    });
   }
 
   template <typename T1, typename T2, int n, typename T3>
@@ -234,6 +278,7 @@ namespace quda
                                                                                              const T2 *b, const T3 &c)
   {
     static_assert(n % 2 == 0);
+#pragma unroll
     for (int i = 0; i < n; i += 2) {
       auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, c);
       a[i + 0] = ai.x;

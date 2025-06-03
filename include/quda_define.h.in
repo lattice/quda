@@ -1,3 +1,5 @@
+#pragma once
+
 /**
    @file quda_define.h
    @brief Macros defined set by the cmake build system.  This file
@@ -30,6 +32,16 @@
  * @brief This macro sets the register tile size for MRHS kernels
  */
 #define MAX_MULTI_RHS_TILE @QUDA_MAX_MULTI_RHS_TILE@
+
+/**
+ * @def   QUDA_ALTERNATIVE_I_TO_F
+ * @brief This sets the percentage of I2F conversions using the alternative path
+ */
+#define QUDA_ALTERNATIVE_I_TO_F @QUDA_ALTERNATIVE_I_TO_F@
+#ifdef __cplusplus
+static_assert(QUDA_ALTERNATIVE_I_TO_F == 0 || QUDA_ALTERNATIVE_I_TO_F == 25 || QUDA_ALTERNATIVE_I_TO_F == 50 ||
+              QUDA_ALTERNATIVE_I_TO_F == 75 || QUDA_ALTERNATIVE_I_TO_F == 100, "invalid QUDA_ALTERNATIVE_I_TO_F");
+#endif
 
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC

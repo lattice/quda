@@ -241,7 +241,7 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
-option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conversion" OFF)
+set(QUDA_ALTERNATIVE_I_TO_F 0 CACHE STRING "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100)")
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
