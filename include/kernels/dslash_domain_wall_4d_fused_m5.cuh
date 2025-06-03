@@ -25,6 +25,7 @@ namespace quda
     using DomainWall4DArg::x;
     using DomainWall4DArg::xpay;
     using DomainWall4DArg::max_regs;
+    using DomainWall4DArg::spill_shared;
 
     using F = typename DomainWall4DArg::F;
 
