@@ -209,7 +209,7 @@ namespace quda
 
     virtual bool advanceTuneParam(TuneParam &param) const override
     {
-      return advanceAux(param) || advanceSharedBytes(param) || advanceSharedCarveOut(param) || advanceBlockDim(param)
+      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
         || advanceGridDim(param);
     }
 
