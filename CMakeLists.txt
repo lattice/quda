@@ -222,8 +222,8 @@ if(QUDA_MAX_MULTI_RHS_TILE GREATER QUDA_MAX_MULTI_RHS)
 endif()
 
 set(QUDA_MAX_KERNEL_ARG_SIZE "4096" CACHE STRING "maximum static size of the kernel arguments in bytes passed to a kernel on the target architecture")
-if(QUDA_MAX_KERNEL_ARG_SIZE GREATER 32768)
-  message(SEND_ERROR "Maximum QUDA_MAX_KERNEL_ARG_SIZE is 32768")
+if(QUDA_MAX_KERNEL_ARG_SIZE GREATER 32764)
+  message(SEND_ERROR "Maximum QUDA_MAX_KERNEL_ARG_SIZE is 32764")
 endif()
 
 set(QUDA_PRECISION
