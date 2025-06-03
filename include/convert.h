@@ -56,15 +56,15 @@ namespace quda
   };
 
 #if QUDA_ALTERNATIVE_I_TO_F == 100
-  constexpr bool i2f_i[] = {true, true, true, true};
+  constexpr bool i2f_i[4] = {true, true, true, true};
 #elif QUDA_ALTERNATIVE_I_TO_F == 75
-  constexpr bool i2f_i[] = {true, false, true, true};
+  constexpr bool i2f_i[4] = {true, false, true, true};
 #elif QUDA_ALTERNATIVE_I_TO_F == 50
-  constexpr bool i2f_i[] = {true, false, true, false};
+  constexpr bool i2f_i[4] = {true, false, true, false};
 #elif QUDA_ALTERNATIVE_I_TO_F == 25
-  constexpr bool i2f_i[] = {false, true, false, false};
+  constexpr bool i2f_i[4] = {false, true, false, false};
 #elif QUDA_ALTERNATIVE_I_TO_F == 0
-  constexpr bool i2f_i[] = {false, false, false, false};
+  constexpr bool i2f_i[4] = {false, false, false, false};
 #endif
 
   /**
@@ -198,7 +198,7 @@ namespace quda
   {
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
-      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[i / 2]>());
+      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % 4]>());
       auto ai = mul2(bi, {fixedInvMaxValue<T2>::value, fixedInvMaxValue<T2>::value});
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
@@ -266,7 +266,7 @@ namespace quda
   {
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
-      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[i / 2]>());
+      auto bi = target::dispatch<i2f>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % 4]>());
       auto ai = mul2(bi, {c, c});
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
