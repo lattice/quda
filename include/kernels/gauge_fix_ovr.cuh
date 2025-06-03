@@ -105,6 +105,9 @@ namespace quda {
     static constexpr int gauge_dir = gauge_dir_;
     static constexpr bool halo = halo_;
     static constexpr int type = type_;
+
+    static_assert(type == 0 || type == 1 || type == 2 || type == 3, "Invalid gauge fixing algorithm type");
+
     typename gauge_mapper<store_t, recon>::type u;
     const real relax_boost;
     int parity;
@@ -113,11 +116,11 @@ namespace quda {
     int *borderpoints[2];
 
     GaugeFixArg(const GaugeField &u, const double relax_boost, int parity, int *borderpoints[2], unsigned threads) :
-      kernel_param(dim3(threads, type < 3 ? 8 : 4, 1)),
+      kernel_param(dim3(threads, (type == 0 || type == 1) ? 8 : 4, 1)),
       u(u),
       relax_boost(static_cast<real>(relax_boost)),
       parity(parity),
-      borderpoints{ borderpoints[0], borderpoints[1] }
+      borderpoints {borderpoints[0], borderpoints[1]}
     {
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = halo ? u.R()[dir] : comm_dim_partitioned(dir) ? u.R()[dir] + 1 : 0;
@@ -127,16 +130,12 @@ namespace quda {
   };
 
   template <typename Arg>
-  using computeFixOps2
-    = std::conditional_t<Arg::type == 3, GaugeFixHit_NoAtomicAdd2Ops<typename Arg::real>,
-                         std::conditional_t<Arg::type == 4, GaugeFixHit_AtomicAdd2Ops<typename Arg::real>,
-                                            GaugeFixHit_NoAtomicAdd_LessSM2Ops<typename Arg::real>>>;
+  using computeFixOps2 = std::conditional_t<Arg::type == 2, GaugeFixHit_NoAtomicAdd2Ops<typename Arg::real>,
+                                            GaugeFixHit_NoAtomicAdd_LessSM2Ops<typename Arg::real>>;
   template <typename Arg>
   using computeFixOps = std::conditional_t<
     Arg::type == 0, GaugeFixHit_NoAtomicAddOps<typename Arg::real>,
-    std::conditional_t<
-      Arg::type == 1, GaugeFixHit_AtomicAddOps<typename Arg::real>,
-      std::conditional_t<Arg::type == 2, GaugeFixHit_NoAtomicAdd_LessSMOps<typename Arg::real>, computeFixOps2<Arg>>>>;
+    std::conditional_t<Arg::type == 1, GaugeFixHit_NoAtomicAdd_LessSMOps<typename Arg::real>, computeFixOps2<Arg>>>;
   /**
    * @brief Perform gauge fixing with overrelaxation
    */
@@ -175,7 +174,7 @@ namespace quda {
         X[dr] += 2 * arg.border[dr];
       }
 
-      if constexpr (Arg::type < 3) {
+      if constexpr (Arg::type == 0 || Arg::type == 1) {
         // 8 threads per lattice site
         int dim = mu;
         if (dim >= 4) {
@@ -197,17 +196,13 @@ namespace quda {
           GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
         }
         if constexpr (Arg::type == 1) {
-          // 8 threads per lattice site, the reduction is performed by shared memory using atomicadd
-          GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
-        }
-        if constexpr (Arg::type == 2) {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
           GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
         }
 
         arg.u(dim, idx, parity) = link;
-      } else {
+      } else if constexpr (Arg::type == 2 || Arg::type == 3) {
         // 4 threads per lattice site
         idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         Link link = arg.u(mu, idx, parity);
@@ -221,16 +216,12 @@ namespace quda {
         int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         Link link1 = arg.u(mu, idx1, 1 - parity);
 
-        if constexpr (Arg::type == 3) {
+        if constexpr (Arg::type == 2) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 4x more shared memory than the implementation using atomicadd
           GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);
         }
-        if constexpr (Arg::type == 4) {
-          // 4 threads per lattice site, the reduction is performed by shared memory using atomicadd
-          GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);
-        }
-        if constexpr (Arg::type == 5) {
+        if constexpr (Arg::type == 3) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
           GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);

@@ -137,6 +137,7 @@ void constructPointSpinorSource(void *v, QudaPrecision precision, const int *con
 void constructWallSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int dil);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
                                  const int *const x, int nDim, quda::RNG &rng);
+std::complex<double> twoColorSpinorContract(std::complex<double> *spinor1, std::complex<double> *spinor2);
 //------------------------------------------------------
 
 // Helper functions

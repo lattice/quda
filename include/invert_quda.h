@@ -222,6 +222,10 @@ namespace quda {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type = QUDA_INVALID_SCHWARZ;
 
+    /** The size of a block per direction in the Schwarz procedure
+        (default = 0, i.e. local volume, old implementation) */
+    int schwarz_block[QUDA_MAX_DIM] = {0};
+
     /** The type of accelerator type to use for preconditioner */
     QudaAcceleratorType accelerator_type_precondition = QUDA_INVALID_ACCELERATOR;
 
@@ -364,6 +368,14 @@ namespace quda {
 
     // for incremental eigCG:
     void updateRhsIndex(QudaInvertParam &param) { rhs_idx = param.rhs_idx; }
+
+    inline bool do_block_schwarz() const
+    {
+      if (schwarz_type == QUDA_INVALID_SCHWARZ) return false;
+      for (int i = 0; i < QUDA_MAX_DIM; i++)
+        if (schwarz_block[i] > 0) return true;
+      return false;
+    }
   };
 
   class Solver {

@@ -93,6 +93,7 @@ namespace quda {
 
   void DiracTwistedMass::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -216,6 +217,7 @@ namespace quda {
 
   void DiracTwistedMassPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     double kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(out);
 
@@ -230,6 +232,7 @@ namespace quda {
 
   void DiracTwistedMassPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     // need extra temporary because of symmetric preconditioning dagger
     auto tmp = getFieldTmp(out);
     M(tmp, in);

@@ -7,15 +7,15 @@
 namespace quda
 {
 
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, Dslash5Type dslash5_type_>
-  struct DomainWall4DFusedM5Arg : DomainWall4DArg<Float, nColor_, nDim, reconstruct_>,
+  template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_, Dslash5Type dslash5_type_>
+  struct DomainWall4DFusedM5Arg : DomainWall4DArg<Float, nColor_, nDim, DDArg, reconstruct_>,
                                   Dslash5Arg<Float, nColor_, false, false, dslash5_type_> {
     // ^^^ Note that for Dslash5Arg we have xpay == dagger == false. This is because the xpay and dagger are determined
     // by fused kernel, not the dslash5, so the `false, false` here are simply dummy instantiations.
 
     static constexpr int nColor = nColor_;
 
-    using DomainWall4DArg = DomainWall4DArg<Float, nColor, nDim, reconstruct_>;
+    using DomainWall4DArg = DomainWall4DArg<Float, nColor, nDim, DDArg, reconstruct_>;
     using DomainWall4DArg::a_5;
     using DomainWall4DArg::dagger;
     using DomainWall4DArg::in;

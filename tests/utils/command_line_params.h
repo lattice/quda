@@ -252,6 +252,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
@@ -337,6 +338,10 @@ extern bool gauge_smear;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
 extern QudaAcceleratorType precon_accelerator_type;
+
+extern std::array<int, 4> dd_block_size;
+extern bool dd_red_black;
+extern bool dd_test_projection;
 
 extern double madwf_diagonal_suppressor;
 extern int madwf_ls;
@@ -562,6 +567,8 @@ extern double gauge_smear_alpha1;
 extern double gauge_smear_alpha2;
 extern double gauge_smear_alpha3;
 extern int gauge_smear_steps;
+extern int gauge_n_save;
+extern int hier_threshold;
 extern int gauge_smear_dir_ignore;
 extern int measurement_interval;
 extern QudaGaugeSmearType gauge_smear_type;

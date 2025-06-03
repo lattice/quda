@@ -7,6 +7,7 @@
 #include <enum_quda.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <domain_decomposition.h>
 
 namespace quda
 {
@@ -378,6 +379,15 @@ namespace quda
     }
 
     template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, int> full_dim(int d) const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).full_dim(d) != operator[](i).full_dim(d))
+          errorQuda("Dimension %d does not match %d != %d", d, operator[](i - 1).full_dim(d), operator[](i).full_dim(d));
+      return operator[](0).full_dim(d);
+    }
+
+    template <class U = T>
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> Length() const
     {
       for (auto i = 1u; i < vector::size(); i++)
@@ -463,9 +473,27 @@ namespace quda
     }
 
     template <class U = T>
+
     std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, size_t> size_actual() const
     {
       return operator[](0).Nvec() > 1 ? operator[](0).Nvec_actual() : vector::size();
+
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, const DDParam> DD() const
+    {
+      for (auto i = 1u; i < vector::size(); i++)
+        if (operator[](i - 1).DD() != operator[](i).DD()) errorQuda("DD do not match %d != %d", i - 1, i);
+      return operator[](0).DD();
+    }
+
+    template <class U = T, typename... Args>
+    std::enable_if_t<std::is_same_v<U, ColorSpinorField>, void> DD(const quda::DD &flag, const Args &...args)
+    {
+      for (auto i = 0u; i < vector::size(); i++) operator[](i).DD(flag, args...);
+    }
+
+    template <class U = T, typename... Args> std::enable_if_t<std::is_same_v<U, ColorSpinorField>, void> projectDD()
+    {
+      for (auto i = 0u; i < vector::size(); i++) operator[](i).projectDD();
     }
   };
 
