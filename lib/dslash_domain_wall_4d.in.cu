@@ -17,4 +17,5 @@ namespace quda
     cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, cvector_ref<const ColorSpinorField> &x,
     const GaugeField &U, double a, double m_5, const Complex *b_5, const Complex *c_5, int parity, bool dagger,
     const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+
 } // namespace quda
