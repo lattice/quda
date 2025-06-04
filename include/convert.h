@@ -189,7 +189,7 @@ namespace quda
   template <typename T1, typename T2, int n>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
-#pragma unroll
+#pragma unroll n
     for (int i = 0; i < n; i++) a[i] = b[i];
   }
 
@@ -248,7 +248,7 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void>
   copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &)
   {
-#pragma unroll
+#pragma unroll n
     for (int i = 0; i < n; i++) copy(a[i], b[i]);
   }
 
@@ -256,7 +256,7 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(array<T1, n> &a,
                                                                                               const T2 *b, const T3 &)
   {
-#pragma unroll
+#pragma unroll n
     for (int i = 0; i < n; i++) copy(a[i], b[i]);
   }
 
