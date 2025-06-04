@@ -260,7 +260,7 @@ target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   add_executable(clover_force_test clover_force_test.cpp)
   target_link_libraries(clover_force_test ${TEST_LIBS})
   quda_checkbuildtest(clover_force_test QUDA_BUILD_ALL_TESTS)
