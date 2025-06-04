@@ -189,7 +189,6 @@ namespace quda
   template <typename T1, typename T2, int n>
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
-#pragma unroll n
     for (int i = 0; i < n; i++) a[i] = b[i];
   }
 
@@ -209,13 +208,12 @@ namespace quda
   constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 *a, const array<T2, n> &b)
   {
     static_assert(n % 2 == 0);
-#pragma unroll
-    for (int i = 0; i < n; i += 2) {
+    constexpr_for<0, n, 2>([&](auto i) {
       auto bi = mul2({b[i], b[i + 1]}, {fixedMaxValue<T1>::value, fixedMaxValue<T1>::value});
       auto ai = target::dispatch<f2i>(bi);
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
-    }
+    });
   }
 
   /**
@@ -248,7 +246,6 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void>
   copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &)
   {
-#pragma unroll n
     for (int i = 0; i < n; i++) copy(a[i], b[i]);
   }
 
@@ -256,7 +253,6 @@ namespace quda
   constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(array<T1, n> &a,
                                                                                               const T2 *b, const T3 &)
   {
-#pragma unroll n
     for (int i = 0; i < n; i++) copy(a[i], b[i]);
   }
 
@@ -278,12 +274,11 @@ namespace quda
                                                                                              const T2 *b, const T3 &c)
   {
     static_assert(n % 2 == 0);
-#pragma unroll
-    for (int i = 0; i < n; i += 2) {
+    constexpr_for<0, n, 2>([&](auto i) {
       auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, c);
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
-    }
+    });
   }
 
   template <class fixed_t, class float_t> __device__ __host__ fixed_t f2i_round(float_t f)
