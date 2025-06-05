@@ -9,11 +9,9 @@ namespace quda
 {
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct NdegTwistedMassApply {
-    template <bool distance_pc>
     NdegTwistedMassApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b, double c,
-                         int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>,
-                         TimeProfile &profile);
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile);
   };
 
   void ApplyNdegTwistedMass(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -21,8 +19,7 @@ namespace quda
                             int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      auto dummy = DistanceType<false>();
-      instantiate<NdegTwistedMassApply>(out, in, x, U, a, b, c, parity, dagger, comm_override, dummy, profile);
+      instantiate<NdegTwistedMassApply>(out, in, x, U, a, b, c, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Non-degenerate twisted-mass operator has not been built");
     }

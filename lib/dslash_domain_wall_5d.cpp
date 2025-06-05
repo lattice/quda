@@ -8,10 +8,9 @@ namespace quda
 {
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall5DApply {
-    template <bool distance_pc>
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
-                      bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+                      bool dagger, const int *comm_override, TimeProfile &profile);
   };
 
   // Apply the 5-d preconditioned domain-wall Dslash operator
@@ -21,8 +20,7 @@ namespace quda
                          bool dagger, const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_DOMAIN_WALL_DSLASH>()) {
-      auto dummy = DistanceType<false>();
-      instantiate<DomainWall5DApply>(out, in, x, U, a, m_f, parity, dagger, comm_override, dummy, profile);
+      instantiate<DomainWall5DApply>(out, in, x, U, a, m_f, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Domain-wall operator has not been built");
     }
