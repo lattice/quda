@@ -42,7 +42,7 @@ namespace quda
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     /** parameters for distance preconditioning */
-    const real alpha0;
+    const double alpha0;
     const int t0;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
