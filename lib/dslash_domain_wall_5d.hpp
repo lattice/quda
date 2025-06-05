@@ -66,10 +66,9 @@ namespace quda
   };
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct DomainWall5DApply {
-    template <bool distance_pc>
     DomainWall5DApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                       cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double m_f, int parity,
-                      bool dagger, const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile)
+                      bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 5;
       auto halo = ColorSpinorField::create_comms_batch(in);

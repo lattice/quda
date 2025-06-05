@@ -5,11 +5,10 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct WilsonCloverHasenbuschTwistApply {
-    template <bool distance_pc>
     WilsonCloverHasenbuschTwistApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &A,
                                      double a, double b, int parity, bool dagger, const int *comm_override,
-                                     DistanceType<distance_pc>, TimeProfile &profile);
+                                     TimeProfile &profile);
   };
 
   // Apply the Wilson-clover operator
@@ -21,9 +20,7 @@ namespace quda
                                         const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH>()) {
-      auto dummy = DistanceType<false>();
-      instantiate<WilsonCloverHasenbuschTwistApply>(out, in, x, U, A, a, b, parity, dagger, comm_override, dummy,
-                                                    profile);
+      instantiate<WilsonCloverHasenbuschTwistApply>(out, in, x, U, A, a, b, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Clover Hasensbuch Twist operator has not been built");
     }

@@ -1,4 +1,4 @@
-#include <dslash_twisted_clover.hpp>
+#include <dslash_wilson_clover_hasenbusch_twist_preconditioned.hpp>
 
 namespace quda
 {
@@ -10,6 +10,6 @@ namespace quda
   using DDArg = @QUDA_DSLASH_DDARG@;
   using Float = precision_type_mapper<precision>::type;
 
-  template struct TwistedCloverApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
+  template struct WilsonCloverHasenbuschTwistPCNoClovInvApply<Float, nColor, DDArg, ReconstructWilson::recon[reconI]>;
 
 } // namespace quda
