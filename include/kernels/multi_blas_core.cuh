@@ -3,7 +3,6 @@
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
 #include <array.h>
-#include <constant_kernel_arg.h>
 #include <kernel.h>
 #include <warp_collective.h>
 

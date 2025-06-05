@@ -10,11 +10,10 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct NdegTwistedMassPreconditionedApply {
-    template <bool distance_pc>
     NdegTwistedMassPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                        cvector_ref<const ColorSpinorField> &x, const GaugeField &U, double a, double b,
                                        double c, bool xpay, int parity, bool dagger, bool asymmetric,
-                                       const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+                                       const int *comm_override, TimeProfile &profile);
   };
 
   // Apply the non-degenerate twisted-mass Dslash operator
@@ -26,9 +25,8 @@ namespace quda
                                           bool asymmetric, const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_MASS_DSLASH>()) {
-      auto dummy = DistanceType<false>();
       instantiate<NdegTwistedMassPreconditionedApply>(out, in, x, U, a, b, c, xpay, parity, dagger, asymmetric,
-                                                      comm_override, dummy, profile);
+                                                      comm_override, profile);
     } else {
       errorQuda("Non-degenerate preconditioned twisted-mass dslash has not been built");
     }

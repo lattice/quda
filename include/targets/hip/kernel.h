@@ -2,6 +2,7 @@
 #include <hip/hip_runtime.h>
 #include <kernel_helper.h>
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 
 namespace quda
 {

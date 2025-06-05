@@ -9,11 +9,10 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct TwistedCloverPreconditionedApply {
-    template <bool distance_pc>
     TwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                      cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C,
                                      double a, double b, bool xpay, int parity, bool dagger, const int *comm_override,
-                                     DistanceType<distance_pc>, TimeProfile &profile);
+                                     TimeProfile &profile);
   };
 
   /*
@@ -27,9 +26,7 @@ namespace quda
                                         const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
-      auto dummy = DistanceType<false>();
-      instantiate<TwistedCloverPreconditionedApply>(out, in, x, U, C, a, b, xpay, parity, dagger, comm_override, dummy,
-                                                    profile);
+      instantiate<TwistedCloverPreconditionedApply>(out, in, x, U, C, a, b, xpay, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }

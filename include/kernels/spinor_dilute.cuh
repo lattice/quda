@@ -1,5 +1,4 @@
 #include <color_spinor_field_order.h>
-#include <constant_kernel_arg.h>
 #include <kernel.h>
 
 namespace quda {
