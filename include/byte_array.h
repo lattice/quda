@@ -15,7 +15,8 @@ namespace quda
   */
   template <class T = int8_t, int n = 4> class byte_array
   {
-    static_assert(4 * sizeof(T) == sizeof(uint32_t), "element size must be 8-bits");
+    static_assert(sizeof(T) == 1, "element size must be 1 byte");
+    static_assert(n == 4, "array length of 4 required");
 
   private:
     uint32_t data = 0;
