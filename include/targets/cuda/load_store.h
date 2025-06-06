@@ -37,6 +37,11 @@ namespace quda
     {
       load_cached_double4(value, reinterpret_cast<const double4 *>(ptr) + idx);
     }
+
+    __device__ inline void operator()(float8 &value, const void *ptr, int idx)
+    {
+      load_cached_float8(value, reinterpret_cast<const float8 *>(ptr) + idx);
+    }
 #endif
 
     __device__ inline void operator()(double2 &value, const void *ptr, int idx)
@@ -73,6 +78,11 @@ namespace quda
     __device__ inline void operator()(void *ptr, int idx, const double4 &value)
     {
       store_streaming_double4(reinterpret_cast<double4 *>(ptr) + idx, value.x, value.y, value.z, value.w);
+    }
+
+    __device__ inline void operator()(void *ptr, int idx, const float8 &value)
+    {
+      store_streaming_float8(reinterpret_cast<float8 *>(ptr) + idx, value);
     }
 #endif
 

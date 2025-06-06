@@ -23,6 +23,11 @@ namespace quda {
     short4 y;
   };
 
+  struct alignas(32) float8 {
+    float4 x;
+    float4 y;
+  };
+
   struct alignas(64) double8 {
     double4 x;
     double4 y;
@@ -150,7 +155,7 @@ namespace quda {
   };
   template <> struct VectorType<float, 4>{typedef float4 type; };
   template <> struct VectorType<float, 8> {
-    typedef double4 type;
+    typedef float8 type;
   };
 
   // single precision
@@ -175,7 +180,7 @@ namespace quda {
     typedef short8 type;
   };
   template <> struct VectorType<short, 16> {
-    typedef double4 type;
+    typedef float8 type;
   };
 
   // quarter precision

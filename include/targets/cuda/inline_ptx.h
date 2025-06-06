@@ -32,6 +32,15 @@ namespace quda {
     a.x = x; a.y = y;
   }
 
+  __device__ inline void load_streaming_float8(float8 &v, const float8 *addr)
+  {
+    float x, y, z, w, a, b, c, d;
+    asm("ld.cs.global.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8+0];"
+        : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+        : __PTR(addr));
+    v = {x, y, z, w, a, b, c, d};
+  }
+
   __device__ inline void load_streaming_float4(float4 &a, const float4* addr)
   {
     float x, y, z, w;
@@ -89,6 +98,15 @@ namespace quda {
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
+  __device__ inline void load_cached_float8(float8 &v, const float8 *addr)
+  {
+    float x, y, z, w, a, b, c, d;
+    asm("ld.ca.global.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8+0];"
+        : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+        : __PTR(addr));
+    v = {x, y, z, w, a, b, c, d};
+  }
+
   __device__ inline void load_cached_float2(float2 &a, const float2* addr)
   {
     float x, y;
@@ -108,6 +126,12 @@ namespace quda {
     double x, y;
     asm("ld.ca.global.v2.f64 {%0, %1}, [%2+0];" : "=d"(x), "=d"(y) : __PTR(addr));
     a.x = x; a.y = y;
+  }
+
+  __device__ inline void store_streaming_float8(float8 *addr, const float8 &v)
+  {
+    asm("st.cs.global.v8.f32 [%0+0], {%1, %2, %3, %4, %5, %6, %7, %8};" ::__PTR(addr), "f"(v.x.x), "f"(v.x.y),
+        "f"(v.x.z), "f"(v.x.w), "f"(v.y.x), "f"(v.y.y), "f"(v.y.z), "f"(v.y.w));
   }
 
   __device__ inline void store_streaming_float4(float4* addr, float x, float y, float z, float w)
