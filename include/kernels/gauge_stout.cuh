@@ -11,26 +11,26 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int stoutDim_> struct STOUTArg : kernel_param<> {
-    using Float = Float_;
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int stoutDim_> struct STOUTArg : kernel_param<> {
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int stoutDim = stoutDim_;
-    typedef typename gauge_mapper<Float, recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
 
     int X[4]; // grid dimensions
     int border[4];
-    const Float rho;
-    const Float staple_coeff;
-    const Float rectangle_coeff;
+    const real rho;
+    const real staple_coeff;
+    const real rectangle_coeff;
     const int dir_ignore;
-    const Float anisotropy;
+    const real anisotropy;
 
-    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon, int dir_ignore, Float anisotropy) :
+    STOUTArg(GaugeField &out, const GaugeField &in, real rho, real epsilon, int dir_ignore, real anisotropy) :
       kernel_param(dim3(1, 2, stoutDim)),
       out(out),
       in(in),
@@ -49,19 +49,17 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct STOUT : computeStapleOps {
-    using real = typename Arg::Float;
-    using Complex = complex<real>;
-    using Link = Matrix<complex<real>, Arg::nColor>;
+  template <typename Arg> struct STOUT {
 
     const Arg &arg;
-    template <typename... OpsArgs> constexpr STOUT(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr STOUT(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
+      using real = typename Arg::real;
+      using Link = Matrix<complex<real>, Arg::nColor>;
+
       // Compute spacetime and local coords
       int X[4];
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -76,7 +74,7 @@ namespace quda
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
+      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -118,18 +116,15 @@ namespace quda
   // Over-Improved routines //
   //------------------------//
   template <typename Arg> struct OvrImpSTOUTOps {
-    using real = typename Arg::Float;
+    using real = typename Arg::real;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using StapCacheT = ThreadLocalCache<Link, 0, computeStapleRectangleOps>; // offset by computeStapleRectangleOps
+    using StapCacheT = ThreadLocalCache<Link>;                               // zero offset
     using RectCacheT = ThreadLocalCache<Link, 0, StapCacheT>;                // offset by StapCacheT
-    using Ops = combineOps<computeStapleRectangleOps, KernelOps<StapCacheT, RectCacheT>>;
+    using Ops = KernelOps<StapCacheT, RectCacheT>;
   };
 
   template <typename Arg> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg>::Ops {
-    using real = typename Arg::Float;
-    using Complex = complex<real>;
-    using Link = Matrix<complex<real>, Arg::nColor>;
     using typename OvrImpSTOUTOps<Arg>::Ops::KernelOpsT;
 
     const Arg &arg;
@@ -141,6 +136,10 @@ namespace quda
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
+      using real = typename Arg::real;
+      using Complex = complex<real>;
+      using Link = Matrix<complex<real>, Arg::nColor>;
+
       // Compute spacetime and local coords
       int X[4];
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -159,7 +158,7 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(*this, x, X, parity, dir, Stap, Rect, arg.dir_ignore, arg.anisotropy);
+      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, arg.dir_ignore, arg.anisotropy);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
