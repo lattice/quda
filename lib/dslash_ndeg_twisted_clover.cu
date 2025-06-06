@@ -24,7 +24,7 @@ namespace quda
 
       unsigned int sharedBytesPerThread() const
       {
-        if (arg.kernel_type == INTERIOR_KERNEL) {
+        if (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL) {
           return 2 * in.Ncolor() * 4 * sizeof(typename mapper<typename Arg::Float>::type);
         }
         return 0;
