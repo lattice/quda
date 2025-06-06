@@ -12,6 +12,7 @@
 #include <target_device.h>
 #include <register_traits.h>
 #include <math_helper.cuh>
+#include <constexpr_for.h>
 
 namespace quda
 {
@@ -152,14 +153,6 @@ namespace quda
       return reinterpret_cast<int &>(d);
     }
   };
-
-  template <auto Start, auto End, auto Inc, class F> constexpr void constexpr_for(F &&f)
-  {
-    if constexpr (Start < End) {
-      f(std::integral_constant<decltype(Start), Start>());
-      constexpr_for<Start + Inc, End, Inc>(f);
-    }
-  }
 
   /**
      @brief Copy function which is trival between floating point
