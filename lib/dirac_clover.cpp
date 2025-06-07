@@ -67,6 +67,7 @@ namespace quda {
 
   void DiracClover::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -172,6 +173,7 @@ namespace quda {
   // Apply the even-odd preconditioned clover-improved Dirac operator
   void DiracCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     double kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(out);
 
@@ -209,6 +211,7 @@ namespace quda {
 
   void DiracCloverPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     // need extra temporary because of symmetric preconditioning dagger
     // and for multi-gpu the input and output fields cannot alias
     auto tmp = getFieldTmp(out);

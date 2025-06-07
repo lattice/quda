@@ -113,7 +113,7 @@ namespace quda
         if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
           return mat_norm;
         else
-          return sr_norm;
+          return fabs(sr_norm);
       };
 
       // Locking check

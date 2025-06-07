@@ -17,7 +17,9 @@
 #include <unitarization_links.h>
 
 #include <qio_field.h>
-#include <test.h>
+
+#include "test.h"
+#include "gauge_utils.h"
 
 using namespace quda;
 

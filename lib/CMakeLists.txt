@@ -28,13 +28,13 @@ set (QUDA_OBJS
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_stout.cu gauge_hyp.cu gauge_wilson_flow.cu gauge_plaq.cu gauge_plaqrect.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cgnr.cpp inv_cgne.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu
+  color_spinor_field.cpp color_spinor_util.cu color_spinor_project_domain_decomp.cu
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
@@ -50,6 +50,27 @@ set (QUDA_OBJS
   gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
+  dslash_wilson.cpp
+  dslash_staggered.cpp dslash_improved_staggered.cpp
+  dslash_wilson_distance.cpp
+  dslash_wilson_clover.cpp dslash_wilson_clover_distance.cpp
+  dslash_wilson_clover_preconditioned.cpp
+  dslash_wilson_clover_preconditioned_distance.cpp
+  dslash_twisted_mass.cpp dslash_twisted_mass_preconditioned.cpp
+  dslash_ndeg_twisted_mass.cpp dslash_ndeg_twisted_mass_preconditioned.cpp
+  dslash_twisted_clover.cpp dslash_twisted_clover_preconditioned.cpp
+  dslash_ndeg_twisted_clover.cpp dslash_ndeg_twisted_clover_preconditioned.cpp
+  dslash_wilson_clover_hasenbusch_twist.cpp
+  dslash_wilson_clover_hasenbusch_twist_preconditioned.cpp
+  dslash_domain_wall_4d.cpp  dslash_domain_wall_5d.cpp
+  dslash_domain_wall_4d_m5inv.cpp
+  dslash_domain_wall_4d_m5pre.cpp
+  dslash_domain_wall_4d_m5pre_m5inv.cpp
+  dslash_domain_wall_4d_m5inv_m5pre.cpp
+  dslash_domain_wall_4d_m5inv_m5inv.cpp
+  dslash_domain_wall_4d_m5mob.cpp
+  dslash_domain_wall_4d_m5pre_m5mob.cpp
+  laplace.cpp
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
@@ -80,7 +101,7 @@ set (QUDA_OBJS
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
-  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
+  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
   inv_gmresdr_quda.cpp
@@ -97,27 +118,151 @@ set (QUDA_OBJS
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
-  dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_distance.cu
-  dslash_wilson_clover.cu dslash_wilson_clover_distance.cu
-  dslash_wilson_clover_preconditioned.cu
-  dslash_wilson_clover_preconditioned_distance.cu
   dslash5_domain_wall.cu
-  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
-  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
-  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
-  dslash_ndeg_twisted_clover.cu dslash_ndeg_twisted_clover_preconditioned.cu
-  dslash_wilson_clover_hasenbusch_twist.cu
-  dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
-  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  dslash_domain_wall_4d_m5inv.cu
-  dslash_domain_wall_4d_m5pre.cu
-  dslash_domain_wall_4d_m5pre_m5inv.cu
-  dslash_domain_wall_4d_m5inv_m5pre.cu
-  dslash_domain_wall_4d_m5inv_m5inv.cu
-  dslash_domain_wall_4d_m5mob.cu
-  dslash_domain_wall_4d_m5pre_m5mob.cu
-  dslash_pack2.cu laplace.cu covariant_derivative.cu staggered_quark_smearing.cu)
+  dslash_pack2.cu covariant_derivative.cu staggered_quark_smearing.cu)
+
+# Function to check if a specific bit is set
+function(check_bit number bit)
+  # Perform bitwise AND with (1 << bit) to check if the bit is set
+  math(EXPR result "${number} & (1 << ${bit})")
+  set(BIT_CHECK "${result}" PARENT_SCOPE)
+endfunction()
+
+set(QUDA_DSLASH_FILENAME_LIST "") 
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_hasenbusch_twist")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_hasenbusch_twist_preconditioned_no_clovinv")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_hasenbusch_twist_preconditioned_clovinv")
+endif()
+if(QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_clover")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_clover_preconditioned")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_clover")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_clover_preconditioned")
+endif()
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_CLOVER_HASENBUSCH)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_preconditioned")
+  if(QUDA_DIRAC_DISTANCE_PRECONDITIONING)
+    list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_distance")
+    list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_clover_preconditioned_distance")
+  endif()
+endif()
+if(QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_mass")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_twisted_mass_preconditioned")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_mass")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_ndeg_twisted_mass_preconditioned")
+endif()
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson")
+  if(QUDA_DIRAC_DISTANCE_PRECONDITIONING)
+    list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_wilson_distance")
+  endif()
+endif()
+if(QUDA_DIRAC_STAGGERED)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_staggered")
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_improved_staggered")
+endif()
+if(QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_TWISTED_CLOVER)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_domain_wall_4d")
+endif()
+if(QUDA_DIRAC_DOMAIN_WALL)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_domain_wall_5d")
+endif()
+if(QUDA_DIRAC_LAPLACE)
+  list(APPEND QUDA_DSLASH_FILENAME_LIST "laplace")
+endif()
+
+set(QUDA_DSLASH_PREC_LIST "")
+set(QUDA_DSLASH_NCOLOR_LIST "3")
+set(QUDA_DSLASH_DDARG_LIST "DDNo")
+set(QUDA_DSLASH_RECONI_LIST "")
+set(QUDA_DSLASH_RECON_LIST "")
+set(QUDA_DSLASH5_TYPE_LIST "")
+
+if(QUDA_DIRAC_DOMAIN_WALL)
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "DSLASH5_MOBIUS_PRE")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "DSLASH5_MOBIUS")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_INV_MOBIUS")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_INV_MOBIUS_M5_PRE")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_PRE_MOBIUS_M5_INV")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "M5_INV_MOBIUS_M5_INV_DAG")
+  list(APPEND QUDA_DSLASH5_TYPE_LIST "DSLASH5_MOBIUS_PRE_M5_MOB")
+endif()
+
+check_bit(${QUDA_PRECISION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "QUARTER")
+endif()
+
+check_bit(${QUDA_PRECISION} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "HALF")
+endif()
+
+check_bit(${QUDA_PRECISION} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "SINGLE")
+endif()
+
+check_bit(${QUDA_PRECISION} 3)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_PREC_LIST "DOUBLE")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "2")
+  list(APPEND QUDA_DSLASH_RECON_LIST "9or8")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 1)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "1")
+  list(APPEND QUDA_DSLASH_RECON_LIST "13or12")
+endif()
+
+check_bit(${QUDA_RECONSTRUCT} 2)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_RECONI_LIST "0")
+  list(APPEND QUDA_DSLASH_RECON_LIST "18")
+endif()
+
+check_bit(${QUDA_DOMAIN_DECOMPOSITION} 0)
+if(BIT_CHECK)
+  list(APPEND QUDA_DSLASH_DDARG_LIST "DDRedBlack")
+endif()
+
+message(STATUS "QUDA_DSLASH_FILENAME_LIST=${QUDA_DSLASH_FILENAME_LIST}")
+message(STATUS "QUDA_DSLASH_PREC_LIST=${QUDA_DSLASH_PREC_LIST}")
+message(STATUS "QUDA_DSLASH_NCOLOR_LIST=${QUDA_DSLASH_NCOLOR_LIST}")
+message(STATUS "QUDA_DSLASH_DDARG_LIST=${QUDA_DSLASH_DDARG_LIST}")
+message(STATUS "QUDA_DSLASH_RECONI_LIST=${QUDA_DSLASH_RECONI_LIST}")
+message(STATUS "QUDA_DSLASH5_TYPE_LIST=${QUDA_DSLASH5_TYPE_LIST}")
+
+foreach(QUDA_DSLASH_PREC ${QUDA_DSLASH_PREC_LIST})
+  string(TOLOWER "${QUDA_DSLASH_PREC}" QUDA_DSLASH_PREC_LOWER)
+  foreach(QUDA_DSLASH_NCOLOR ${QUDA_DSLASH_NCOLOR_LIST})
+    foreach(QUDA_DSLASH_DDARG ${QUDA_DSLASH_DDARG_LIST})
+      string(TOLOWER "${QUDA_DSLASH_DDARG}" QUDA_DSLASH_DDARG_LOWER)
+      foreach(QUDA_DSLASH_RECONI QUDA_DSLASH_RECON IN ZIP_LISTS QUDA_DSLASH_RECONI_LIST QUDA_DSLASH_RECON_LIST)
+        set(DSLASH_SPECS "${QUDA_DSLASH_PREC_LOWER}_ncolor${QUDA_DSLASH_NCOLOR}_${QUDA_DSLASH_DDARG_LOWER}_recon${QUDA_DSLASH_RECON}")
+        foreach(QUDA_DSLASH_FILENAME ${QUDA_DSLASH_FILENAME_LIST})
+          set(TMP_FILENAME "${QUDA_DSLASH_FILENAME}_${DSLASH_SPECS}.cu")
+          configure_file(${QUDA_DSLASH_FILENAME}.in.cu ${TMP_FILENAME} @ONLY)
+          list(PREPEND QUDA_DSLASH_OBJS ${TMP_FILENAME})
+        endforeach()
+        foreach(QUDA_DSLASH5_TYPE ${QUDA_DSLASH5_TYPE_LIST})
+          string(TOLOWER "${QUDA_DSLASH5_TYPE}" QUDA_DSLASH5_TYPE_LOWER)
+          set(TMP_FILENAME "dslash_domain_wall_4d_${QUDA_DSLASH5_TYPE_LOWER}_${DSLASH_SPECS}.cu")
+          configure_file(dslash_domain_wall_4d_fused_m5.in.cu ${TMP_FILENAME} @ONLY)
+          list(PREPEND QUDA_DSLASH_OBJS ${TMP_FILENAME})
+        endforeach()
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
 
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
@@ -579,4 +724,4 @@ write_basic_package_version_file(
   COMPATIBILITY AnyNewerVersion)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
-	DESTINATION lib/cmake/QUDA)
+  DESTINATION lib/cmake/QUDA)

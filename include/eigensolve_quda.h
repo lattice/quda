@@ -28,6 +28,7 @@ namespace quda
     int n_conv = 0;       /** Number of converged eigenvalues requested */
     int n_ev_deflate = 0; /** Number of converged eigenvalues to use in deflation */
     double tol = 0.0;     /** Tolerance on eigenvalues */
+    double qr_tol = 0.0;  /** Tolerance on QR (IRAM) */
     bool reverse = false; /** True if using polynomial acceleration */
     std::string spectrum; /** Part of the spectrum to be computed */
     bool compute_svd; /** Compute the SVD if requested **/

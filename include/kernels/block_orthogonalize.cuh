@@ -2,7 +2,6 @@
 
 #include <math_helper.cuh>
 #include <color_spinor_field_order.h>
-#include <constant_kernel_arg.h> // allow for large parameter structs
 #include <block_reduce_helper.h>
 #include <fast_intdiv.h>
 #include <array.h>

@@ -59,3 +59,15 @@ const char *get_TwistFlavor_str(QudaTwistFlavorType type);
 #define OPP_DIR(dir) (7 - (dir))
 #define GOES_FORWARDS(dir) (dir <= 3)
 #define GOES_BACKWARDS(dir) (dir > 3)
+
+typedef enum QudaDomainDecompositionType_s {
+  QUDA_NO_DD,
+  QUDA_DDBLOCK_HALFLOCALL,
+  QUDA_DDBLOCK_HALFGLOBALL
+} QudaDomainDecompositionType;
+typedef enum QudaDomainDecompositionColor_s {
+  QUDA_DD_COLOR_RED_RED,
+  QUDA_DD_COLOR_RED_BLACK,
+  QUDA_DD_COLOR_BLACK_RED,
+  QUDA_DD_COLOR_BLACK_BLACK
+} QudaDomainDecompositionColor;

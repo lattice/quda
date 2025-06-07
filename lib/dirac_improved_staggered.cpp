@@ -74,6 +74,7 @@ namespace quda {
 
   void DiracImprovedStaggered::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out.Even());
 
     //even
@@ -186,7 +187,7 @@ namespace quda {
     // Convention note: Dslash applies D_eo, DslashXpay applies 4m^2 - D_oe!
     // Note the minus sign convention in the Xpay version.
     // This applies equally for the e <-> o permutation.
-
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     Dslash(tmp, in, other_parity);
     DslashXpay(out, tmp, this_parity, in, 4 * mass * mass);
