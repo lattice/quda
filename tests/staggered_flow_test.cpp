@@ -7,6 +7,7 @@
 #include <timer.h>
 #include <util_quda.h>
 #include <host_utils.h>
+#include <gauge_tools.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
@@ -291,6 +292,38 @@ printfQuda("HIIII\n");
   }
 
   freeGaugeQuda();
+
+  void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *milc_sitelink;
+  milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+
+  void *longlink_ptr = longlink;
+    
+  double act_path[6];
+  set_act_path(act_path, 0);
+
+  GaugeFieldParam InParam(gauge_param);
+  InParam.order = QUDA_MILC_GAUGE_ORDER;
+  InParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  InParam.create = QUDA_NULL_FIELD_CREATE;
+  GaugeField cpuInNew = GaugeField(InParam);
+
+  InParam.gauge = longlink;
+  InParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  GaugeField ULink = GaugeField(InParam);
+
+  InParam.gauge = fatlink;
+  InParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  GaugeField VLink = GaugeField(InParam);
+  //   int *num_failures_d = 0;
+  // projectSU3(VLink, 1e-1, num_failures_d);
+  // gaugeGauss(VLink,123,);
+  // gaugeGauss(ULink,123,1e-1);
+    
+  computeKSLinkQuda(fatlink, longlink, nullptr, cpuInNew.data(), act_path, &gauge_param);
+
+  // computeKSLinkQuda(VLink.data(), nullptr, ULink.data(), cpuInNew.data(), act_path, &gauge_param);
 
   loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
 

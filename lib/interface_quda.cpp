@@ -3881,7 +3881,7 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
     quda::unitarizeLinks(unitarizedLink, fatLink, num_failures_d); // unitarize on the gpu
     if (*num_failures_h > 0)
       errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
-
+    printfQuda("We are passed uni point\n");
     // project onto SU(3) if using the Chroma convention
     if (param->staggered_phase_type == QUDA_STAGGERED_PHASE_CHROMA) {
       *num_failures_h = 0;
@@ -5954,25 +5954,25 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
         // GaugeField fatR = *gaugeFatPrecise;
         // (*gaugeFatPrecise).PrintMatrix(0,0,0,0);
 
-        GaugeField inlink = *gaugeSmeared;
-        GaugeField fatlink = *gaugeSmeared;
-        GaugeField longlink = *gaugeSmeared;
-        GaugeField ulink = *gaugeSmeared;
-        computeKSLinkO(fatlink,longlink,ulink,inlink);
+        // GaugeField inlink = *gaugeSmeared;
+        // GaugeField fatlink = *gaugeSmeared;
+        // GaugeField longlink = *gaugeSmeared;
+        // GaugeField ulink = *gaugeSmeared;
+        // computeKSLinkO(fatlink,longlink,ulink,inlink);
 
-        // QudaGaugeParam gauge_param = newQudaGaugeParam();
-        // gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+        // // QudaGaugeParam gauge_param = newQudaGaugeParam();
+        // // gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
 
-        // GaugeFieldParam gParam(gauge_param, fatlink, QUDA_GENERAL_LINKS);
-        GaugeFieldParam gParam(*gaugeSmeared);
-        gParam.location = QUDA_CPU_FIELD_LOCATION;
-        gParam.order = QUDA_MILC_GAUGE_ORDER;
-        GaugeField cpuFatLink(gParam); // create the host fatlink
-        cpuFatLink.copy(fatlink);
-        GaugeField cpuLongLink(gParam); // create the host fatlink
-        cpuLongLink.copy(longlink);
+        // // GaugeFieldParam gParam(gauge_param, fatlink, QUDA_GENERAL_LINKS);
+        // GaugeFieldParam gParam(*gaugeSmeared);
+        // gParam.location = QUDA_CPU_FIELD_LOCATION;
+        // gParam.order = QUDA_MILC_GAUGE_ORDER;
+        // GaugeField cpuFatLink(gParam); // create the host fatlink
+        // cpuFatLink.copy(fatlink);
+        // GaugeField cpuLongLink(gParam); // create the host fatlink
+        // cpuLongLink.copy(longlink);
         
-        loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
+        // loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
         
         invertQuda(f_temp4.data(),f_temp3.data(),inv_param);
         printfQuda("below vv is solved spinor\n");
@@ -5986,12 +5986,12 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
         printfQuda("well soemthing happened %1.5e \n",PsiPsibarR[0]);
 
         // GaugeFieldParam gParam(*gaugeSmeared);
-        gParam.location = QUDA_CPU_FIELD_LOCATION;
-        gParam.order = QUDA_MILC_GAUGE_ORDER;
-        cpuFatLink.copy(*gaugeSmeared);
-        cpuLongLink.copy(*gaugeSmeared);
+        // gParam.location = QUDA_CPU_FIELD_LOCATION;
+        // gParam.order = QUDA_MILC_GAUGE_ORDER;
+        // cpuFatLink.copy(*gaugeSmeared);
+        // cpuLongLink.copy(*gaugeSmeared);
 
-        loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
+        // loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
         
     } 
 
