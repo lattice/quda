@@ -3917,8 +3917,8 @@ void unitarize_fat(GaugeField &FatLink, GaugeField &UnitarizedLink){
       errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
 }
 
-void set_act_path(double (&act_path)[6], int i){
-
+// void set_act_path(double (&act_path)[6], int i){
+void set_act_path(double *act_path, int i){
     double tadpole_factor = 0.5;
     double u1 = 1.0 / tadpole_factor;
     double u2 = u1 * u1;
@@ -3952,8 +3952,6 @@ void set_act_path(double (&act_path)[6], int i){
         act_path[4] = 0.0;
         act_path[5] = 0.0;
     }
-
-
 }
     
 void computeKSLinkNew(void *fatlink, void *longlink, void *ulink, void *inlink)
@@ -5952,6 +5950,10 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
         printfQuda("below vv is flowed adjoint\n");
         f_temp3.PrintVector(0,300,0);
 
+        // GaugeField longR = *gaugeLongPrecise;
+        // GaugeField fatR = *gaugeFatPrecise;
+        // (*gaugeFatPrecise).PrintMatrix(0,0,0,0);
+
         GaugeField inlink = *gaugeSmeared;
         GaugeField fatlink = *gaugeSmeared;
         GaugeField longlink = *gaugeSmeared;
@@ -5988,7 +5990,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
         gParam.order = QUDA_MILC_GAUGE_ORDER;
         cpuFatLink.copy(*gaugeSmeared);
         cpuLongLink.copy(*gaugeSmeared);
-        
+
         loadFatLongGaugeQuda(inv_param,gauge_param,cpuFatLink.data(), cpuLongLink.data());
         
     } 
