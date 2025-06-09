@@ -1370,6 +1370,8 @@ extern "C" {
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
+
+  void set_act_path(double *act_path, int i);
                          
   /**
    * Compute two-link field
