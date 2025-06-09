@@ -17,7 +17,7 @@ namespace quda
   template <int nColor> __host__ __device__ constexpr int2 IndexBlock(int block)
   {
     int2 id;
-    int i1;
+    int i1 = 0;
     int found = 0;
     int del_i = 0;
     int index = -1;
@@ -56,7 +56,7 @@ namespace quda
         q = 2;
       }
     } else if constexpr (nColor > 3) {
-      int i1;
+      int i1 = 0;
       int found = 0;
       int del_i = 0;
       int index = -1;
