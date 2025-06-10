@@ -97,12 +97,10 @@ namespace quda
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
   struct NdegTwistedCloverPreconditionedApply {
-    template <bool distance_pc>
     NdegTwistedCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                          cvector_ref<const ColorSpinorField> &x, const GaugeField &U,
                                          const CloverField &A, double a, double b, double c, bool xpay, int parity,
-                                         bool dagger, const int *comm_override, DistanceType<distance_pc>,
-                                         TimeProfile &profile)
+                                         bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);

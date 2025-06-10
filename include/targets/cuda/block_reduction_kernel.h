@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <constant_kernel_arg.h>
 #include <kernel_helper.h>
 #include <block_reduce_helper.h>
 

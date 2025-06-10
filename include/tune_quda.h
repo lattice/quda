@@ -14,6 +14,7 @@
 #include <quda_internal.h>
 #include <device.h>
 #include <uint_to_char.h>
+#include <kernel_ops_base.h>
 
 namespace quda {
 
@@ -385,10 +386,17 @@ namespace quda {
      * correctly (e.g., check that block size has been correctly
      * factored in when set setting shared_bytes)
      */
-    void checkSharedBytes(const TuneParam &tp) const
+    template <template <typename> class Functor, typename Arg>
+    void checkSharedBytes(const TuneParam &tp, const Arg &) const
     {
       auto tp2 = TuneParam(tp);
       auto expected = setSharedBytes(tp2);
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      if (sizeOps != expected) {
+        printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+        printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+        errorQuda("Shared bytes mismatch KernelOps: %u  cu: %u\n", sizeOps, expected);
+      }
       if (tp.shared_bytes < expected)
         errorQuda("Shared bytes %u insufficient (expected %u)", tp.shared_bytes, expected);
 

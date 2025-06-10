@@ -8,11 +8,9 @@ namespace quda
 {
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct TwistedCloverApply {
-    template <bool distance_pc>
     TwistedCloverApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                        cvector_ref<const ColorSpinorField> &x, const GaugeField &U, const CloverField &C, double a,
-                       double b, int parity, bool dagger, const int *comm_override, DistanceType<distance_pc>,
-                       TimeProfile &profile);
+                       double b, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
   };
 
   // Apply the twisted-mass Dslash operator
@@ -24,8 +22,7 @@ namespace quda
                           TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_TWISTED_CLOVER_DSLASH>()) {
-      auto dummy = DistanceType<false>();
-      instantiate<TwistedCloverApply>(out, in, x, U, C, a, b, parity, dagger, comm_override, dummy, profile);
+      instantiate<TwistedCloverApply>(out, in, x, U, C, a, b, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Twisted-clover operator has not been built");
     }

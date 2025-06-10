@@ -211,7 +211,7 @@ target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS pack_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(QUDA_COVDEV)
+if(QUDA_DIRAC_COVDEV)
   add_executable(covdev_test covdev_test.cpp)
   target_link_libraries(covdev_test ${TEST_LIBS})
   quda_checkbuildtest(covdev_test QUDA_BUILD_ALL_TESTS)
@@ -1121,7 +1121,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
-  if(QUDA_COVDEV)
+  if(QUDA_DIRAC_COVDEV)
     add_test(NAME covdev_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEC_POSTFLAGS}
                      --dim 6 8 10 12

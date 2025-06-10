@@ -4,10 +4,9 @@ namespace quda
 {
 
   template <typename Float, int nColor, typename DDArg, QudaReconstructType recon> struct LaplaceApply {
-    template <bool distance_pc>
     LaplaceApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  cvector_ref<const ColorSpinorField> &x, const GaugeField &U, int dir, double a, double b, int parity,
-                 const int *comm_override, DistanceType<distance_pc>, TimeProfile &profile);
+                 const int *comm_override, TimeProfile &profile);
   };
 
   // Apply the Laplace operator
@@ -18,8 +17,7 @@ namespace quda
                     const int *comm_override, TimeProfile &profile)
   {
     if constexpr (is_enabled<QUDA_LAPLACE_DSLASH>()) {
-      auto dummy = DistanceType<false>();
-      instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, comm_override, dummy, profile);
+      instantiate<LaplaceApply>(out, in, x, U, dir, a, b, parity, comm_override, profile);
     } else {
       errorQuda("Laplace operator has not been enabled");
     }

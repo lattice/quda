@@ -20,19 +20,6 @@ namespace quda
    */
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
 
-  /**
-     @brief This helper function indicates if the present
-     compilation unit has explicit constant memory usage enabled.
-  */
-  static bool use_constant_memory()
-  {
-#ifdef QUDA_USE_CONSTANT_MEMORY
-    return true;
-#else
-    return false;
-#endif
-  }
-
   class TunableKernel : public Tunable
   {
 
@@ -43,7 +30,7 @@ namespace quda
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      checkSharedBytes(tp);
+      checkSharedBytes<Functor>(tp, arg);
       launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
       return launch_error;
     }
@@ -52,7 +39,7 @@ namespace quda
     std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      checkSharedBytes(tp);
+      checkSharedBytes<Functor>(tp, arg);
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
       launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
@@ -69,7 +56,7 @@ namespace quda
     template <template <typename> class Functor, typename Arg>
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
     {
-      checkSharedBytes(tp);
+      checkSharedBytes<Functor>(tp, arg);
       constexpr bool grid_stride = false;
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }
@@ -79,7 +66,11 @@ namespace quda
     {
       strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
-      if (this->location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CUDA_FIELD_LOCATION) {
+        strcat(aux, "kernel_arg_threshold=");
+        i32toa(aux + strlen(aux), device::max_kernel_arg_size());
+        strcat(aux, ",");
+      }
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux, field.AuxString().c_str());
     }
@@ -88,7 +79,11 @@ namespace quda
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
-      if (location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CUDA_FIELD_LOCATION) {
+        strcat(aux, "kernel_arg_threshold=");
+        i32toa(aux + strlen(aux), device::max_kernel_arg_size());
+        strcat(aux, ",");
+      }
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
 
