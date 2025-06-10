@@ -137,7 +137,6 @@ namespace quda
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
       using real = typename Arg::real;
-      using Complex = complex<real>;
       using Link = Matrix<complex<real>, Arg::nColor>;
 
       // Compute spacetime and local coords
