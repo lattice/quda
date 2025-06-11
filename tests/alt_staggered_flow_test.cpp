@@ -194,13 +194,6 @@ int main(int argc, char **argv)
   // All user inputs are now defined
   // display_test_info();
 
-  // void *gauge[4], *new_gauge[4];
-
-  // for (int dir = 0; dir < 4; dir++) {
-  //   gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  //   new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  // }
-
   initQuda(device_ordinal);
 
   setVerbosity(verbosity);
@@ -222,15 +215,15 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
         qdp_longlink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
       }
     }
-printfQuda("HII2\n");
+
     milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);
-    printfQuda("HII3\n");
+
     reorderQDPtoMILC(milc_sitelink, qdp_sitelink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
-printfQuda("HII4\n");
+
     // Paths for step 1:
     vlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
     wlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
-printfQuda("HII5\n");
+
     // Paths for step 2:
     fatlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // final fat ("X") links
     longlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // final long links
@@ -240,10 +233,36 @@ printfQuda("HII5\n");
       fatlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // epsilon fat links
       longlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // epsilon long naiks
     }
-    printfQuda("HII\n");
+
   double act_path[6];
   set_act_path(act_path, 0);
-    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path, &gauge_param);
+  computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path, &gauge_param);
+    
+  if (n_naiks > 1) {
+    // Create Naiks, 3rd path table set
+    set_act_path(act_path, 2);
+    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path, &gauge_param);
+
+    // Rescale+copy Naiks into Naik field
+    cpu_axy(gauge_param.cuda_prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
+    cpu_axy(gauge_param.cuda_prec, eps_naik, longlink, longlink_eps, V * 4 * gauge_site_size);
+  } else {
+        memset(fatlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
+        memset(longlink, 0, V * 4 * gauge_site_size * gauge_param.cuda_prec);
+      }
+
+      // Create X and long links, 2nd path table set
+    set_act_path(act_path, 1);
+      computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path, &gauge_param);
+
+      if (n_naiks > 1) {
+        // Add into Naik field
+        cpu_xpy(gauge_param.cuda_prec, fatlink, fatlink_eps, V * 4 * gauge_site_size);
+        cpu_xpy(gauge_param.cuda_prec, longlink, longlink_eps, V * 4 * gauge_site_size);
+      }
+
+
+    
 //   quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
 // printfQuda("HIIII\n");
 
@@ -256,19 +275,19 @@ printfQuda("HII5\n");
 //   }
 
 //   // We here set all the problem parameters for all possible smearing types.
-//   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
-//   smear_param.smear_type = gauge_smear_type;
-//   smear_param.n_steps = gauge_smear_steps;
-//   smear_param.adj_n_save = gauge_n_save;
-//   smear_param.hier_threshold = hier_threshold;
-//   smear_param.meas_interval = measurement_interval;
-//   smear_param.alpha = gauge_smear_alpha;
-//   smear_param.rho = gauge_smear_rho;
-//   smear_param.epsilon = gauge_smear_epsilon;
-//   smear_param.alpha1 = gauge_smear_alpha1;
-//   smear_param.alpha2 = gauge_smear_alpha2;
-//   smear_param.alpha3 = gauge_smear_alpha3;
-//   smear_param.dir_ignore = gauge_smear_dir_ignore;
+  // QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+  // smear_param.smear_type = gauge_smear_type;
+  // smear_param.n_steps = gauge_smear_steps;
+  // smear_param.adj_n_save = gauge_n_save;
+  // smear_param.hier_threshold = hier_threshold;
+  // smear_param.meas_interval = measurement_interval;
+  // smear_param.alpha = gauge_smear_alpha;
+  // smear_param.rho = gauge_smear_rho;
+  // smear_param.epsilon = gauge_smear_epsilon;
+  // smear_param.alpha1 = gauge_smear_alpha1;
+  // smear_param.alpha2 = gauge_smear_alpha2;
+  // smear_param.alpha3 = gauge_smear_alpha3;
+  // smear_param.dir_ignore = gauge_smear_dir_ignore;
 
 
 //   quda::ColorSpinorField check,check_safe,check_hier,check_fwd;

@@ -3881,7 +3881,6 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
     quda::unitarizeLinks(unitarizedLink, fatLink, num_failures_d); // unitarize on the gpu
     if (*num_failures_h > 0)
       errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
-    printfQuda("We are passed uni point\n");
     // project onto SU(3) if using the Chroma convention
     if (param->staggered_phase_type == QUDA_STAGGERED_PHASE_CHROMA) {
       *num_failures_h = 0;
