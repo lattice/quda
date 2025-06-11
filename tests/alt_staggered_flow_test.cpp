@@ -69,7 +69,10 @@ void *longlink_eps = nullptr;
 void *qdp_sitelink[4] = {nullptr, nullptr, nullptr, nullptr};
 void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
 void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
+void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
+void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
 
+int n_naiks = 1;
 
 void display_test_info()
 {
@@ -187,9 +190,9 @@ int main(int argc, char **argv)
   setStaggeredGaugeParam(gauge_param);
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
-
+  gauge_param.reconstruct = link_recon;
   // All user inputs are now defined
-  display_test_info();
+  // display_test_info();
 
   // void *gauge[4], *new_gauge[4];
 
@@ -204,7 +207,43 @@ int main(int argc, char **argv)
 
   // call srand() with a rank-dependent seed
   initRand();
+printfQuda("HII1\n");
 
+for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
+
+    // Note: this could be replaced with loading a gauge field
+    createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+    
+    for (int i = 0; i < 4; i++) {
+      qdp_fatlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      qdp_longlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      if (n_naiks > 1) {
+        qdp_fatlink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+        qdp_longlink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+printfQuda("HII2\n");
+    milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);
+    printfQuda("HII3\n");
+    reorderQDPtoMILC(milc_sitelink, qdp_sitelink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
+printfQuda("HII4\n");
+    // Paths for step 1:
+    vlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
+    wlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
+printfQuda("HII5\n");
+    // Paths for step 2:
+    fatlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // final fat ("X") links
+    longlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // final long links
+
+    // Place to accumulate Naiks
+    if (n_naiks > 1) {
+      fatlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec);  // epsilon fat links
+      longlink_eps = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // epsilon long naiks
+    }
+    printfQuda("HII\n");
+  double act_path[6];
+  set_act_path(act_path, 0);
+    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path, &gauge_param);
 //   quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
 // printfQuda("HIIII\n");
 
