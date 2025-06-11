@@ -262,404 +262,215 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
       }
 
 
+    loadFatLongGaugeQuda(fatlink, longlink, gauge_param);
     
-//   quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
-// printfQuda("HIIII\n");
+  quda::host_timer_t host_timer, host_safe_timer, host_hier_timer, host_fwd_timer;
 
-//   QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[gauge_smear_steps / measurement_interval + 1];
-//   for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
-//     obs_param[i] = newQudaGaugeObservableParam();
-//     obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
-//     obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-//     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-//   }
+  QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[gauge_smear_steps / measurement_interval + 1];
+  for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+    obs_param[i] = newQudaGaugeObservableParam();
+    obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+    obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+    obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  }
 
-//   // We here set all the problem parameters for all possible smearing types.
-  // QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
-  // smear_param.smear_type = gauge_smear_type;
-  // smear_param.n_steps = gauge_smear_steps;
-  // smear_param.adj_n_save = gauge_n_save;
-  // smear_param.hier_threshold = hier_threshold;
-  // smear_param.meas_interval = measurement_interval;
-  // smear_param.alpha = gauge_smear_alpha;
-  // smear_param.rho = gauge_smear_rho;
-  // smear_param.epsilon = gauge_smear_epsilon;
-  // smear_param.alpha1 = gauge_smear_alpha1;
-  // smear_param.alpha2 = gauge_smear_alpha2;
-  // smear_param.alpha3 = gauge_smear_alpha3;
-  // smear_param.dir_ignore = gauge_smear_dir_ignore;
+  // We here set all the problem parameters for all possible smearing types.
+  QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+  smear_param.smear_type = gauge_smear_type;
+  smear_param.n_steps = gauge_smear_steps;
+  smear_param.adj_n_save = gauge_n_save;
+  smear_param.hier_threshold = hier_threshold;
+  smear_param.meas_interval = measurement_interval;
+  smear_param.alpha = gauge_smear_alpha;
+  smear_param.rho = gauge_smear_rho;
+  smear_param.epsilon = gauge_smear_epsilon;
+  smear_param.alpha1 = gauge_smear_alpha1;
+  smear_param.alpha2 = gauge_smear_alpha2;
+  smear_param.alpha3 = gauge_smear_alpha3;
+  smear_param.dir_ignore = gauge_smear_dir_ignore;
 
 
-//   quda::ColorSpinorField check,check_safe,check_hier,check_fwd;
+  quda::ColorSpinorField check,check_safe,check_hier,check_fwd;
 
-//   QudaInvertParam invParam = newQudaInvertParam();
-//     QudaMultigridParam mg_param;
-//     QudaInvertParam mg_invParam;
-//     QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
-//     QudaEigParam eig_param;
-//     bool use_split_grid = false;
-//     bool use_multi_src = false;
-//   setStaggeredInvertParam(invParam);
-//   //if !inv_deflate
-//   invParam.eig_param = nullptr;
+  QudaInvertParam invParam = newQudaInvertParam();
+    QudaMultigridParam mg_param;
+    QudaInvertParam mg_invParam;
+    QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+    QudaEigParam eig_param;
+    bool use_split_grid = false;
+    bool use_multi_src = false;
+  setStaggeredInvertParam(invParam);
+  if (!inv_deflate)
+  invParam.eig_param = nullptr;
 
-//   setDims(gauge_param.X);
-//   dw_setDims(gauge_param.X, 1);
+  setStaggeredInvertParam(invParam);
 
-//   // Staggered Gauge construct START
-//   //-----------------------------------------------------------------------------------
-//   // Allocate host staggered gauge fields
-//   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-//     QUDA_SU3_LINKS :
-//     QUDA_ASQTAD_FAT_LINKS;
-//   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-//   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
+  // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
+  if (enable_testing) invParam.ca_lambda_max = -1.0;
 
-//   GaugeFieldParam cpuParam(gauge_param);
-//   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
-//   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-//   cpuParam.create = QUDA_NULL_FIELD_CREATE;
-//   GaugeField cpuIn = GaugeField(cpuParam);
-//   cpuFatQDP = GaugeField(cpuParam);
-//   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
-//   cpuFatMILC = GaugeField(cpuParam);
+  logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
+          get_solution_str(invParam.solution_type), get_solve_str(invParam.solve_type),
+          get_solver_str(invParam.inv_type), get_prec_str(invParam.cuda_prec_sloppy));
 
-//   cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-//   cpuParam.nFace = 3;
-//   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
-//   cpuLongQDP = GaugeField(cpuParam);
-//   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
-//   cpuLongMILC = GaugeField(cpuParam);
+  // params related to split grid.
+  for (int i = 0; i < 4; i++) invParam.split_grid[i] = grid_partition[i];
+  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  use_split_grid = num_sub_partition > 1;
+  use_multi_src = use_split_grid || (Nsrc_tile > 1);
 
-//   void *qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
-//   void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
-//   void *qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
-//   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, true);
+  // Setup the multigrid preconditioner
+  void *mg_preconditioner = nullptr;
+  if (inv_multigrid) {
+    if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    invParam.preconditioner = mg_preconditioner;
 
-//   // Reorder gauge fields to MILC order
-//   cpuFatMILC = cpuFatQDP;
-//   cpuLongMILC = cpuLongQDP;
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.invert_param->secs,
+               mg_param.invert_param->gflops / mg_param.invert_param->secs);
+    if (mg_param.invert_param->energy > 0) {
+      printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n", mg_param.invert_param->energy,
+                 mg_param.invert_param->power, mg_param.invert_param->temp, mg_param.invert_param->clock);
+    }
+  }
+    //multishift: same linear system, different masses (charm + strange ie)
+    //SET UP INV PARAM END
+  if (Nsrc > QUDA_MAX_MULTI_SRC)
+    errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
+  std::vector<quda::ColorSpinorField> in_raw(Nsrc);
+  std::vector<quda::ColorSpinorField> in(Nsrc);
+  std::vector<quda::ColorSpinorField> out(Nsrc);
+  std::vector<quda::ColorSpinorField> out_flowed(Nsrc);
 
-//   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
-//   // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
-//   // gauge fields with different parameters.
-//   double plaq[3];
-//   computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
-//   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-//   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-//     // Compute fat link plaquette
-//     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-//     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-//   }
-
-//   freeGaugeQuda();
-
-//   void *fatlink = nullptr;
-//   void *longlink = nullptr;
-//   void *vlink = nullptr;
-//   void *wlink = nullptr;
-//   fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-//   longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-
-//   vlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
-//   wlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
-//   void *milc_sitelink = nullptr;
-//   milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-
-//   reorderQDPtoMILC(milc_sitelink, qdp_inlink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
-//   reorderQDPtoMILC(fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
-//   reorderQDPtoMILC(longlink, qdp_longlink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
-
-//   void *longlink_ptr = longlink;
+    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+    }
     
-//   double act_path[6];
-//   set_act_path(act_path, 0);
+  quda::ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
+    //simulates what user might do from external library
 
-//   auto cpu_param_backup = gauge_param.cpu_prec;
-//   gauge_param.cpu_prec = gauge_param.cuda_prec;
+// Prepare rng, fill host spinors with random numbers
+  //-----------------------------------------------------------------------------------
 
-//   GaugeFieldParam InParam(gauge_param);
-    
-//   InParam.location = QUDA_CPU_FIELD_LOCATION;
-    
-//   InParam.order = QUDA_MILC_GAUGE_ORDER;
-//   InParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-//   InParam.create = QUDA_NULL_FIELD_CREATE;
-//   InParam.gauge = milc_sitelink;
-//   GaugeField cpuInNew = GaugeField(InParam);
+  std::vector<double> time(Nsrc);
+  std::vector<double> gflops(Nsrc);
+  std::vector<int> iter(Nsrc);
 
-//   InParam.gauge = longlink;
-//   InParam.create = QUDA_REFERENCE_FIELD_CREATE;
-//   GaugeField ULink = GaugeField(InParam);
+  // Create a temporary spinor just to seed the rng
+  quda::ColorSpinorField tmp(cs_param);
+  quda::RNG rng(tmp, 1234);
+  tmp = quda::ColorSpinorField();
 
-//   InParam.gauge = fatlink;
-//   InParam.create = QUDA_REFERENCE_FIELD_CREATE;
-//   GaugeField VLink = GaugeField(InParam);
-
-//   // computeKSLinkQuda(fatlink, longlink, nullptr, cpuInNew.data(), act_path, &gauge_param);
-
-//   computeKSLinkQuda(VLink.data(), nullptr, ULink.data(), cpuInNew.data(), act_path, &gauge_param);
-
-//   loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
-
-//   // now copy back to QDP aliases, since these are used for the reference dslash
-//   cpuFatQDP = cpuFatMILC;
-//   cpuLongQDP = cpuLongMILC;
-//   // ensure QDP alias has exchanged ghosts
-//   cpuFatQDP.exchangeGhost();
-//   cpuLongQDP.exchangeGhost();
-
-//   setStaggeredInvertParam(invParam);
-
-//   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
-//   if (enable_testing) invParam.ca_lambda_max = -1.0;
-
-//   logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
-//           get_solution_str(invParam.solution_type), get_solve_str(invParam.solve_type),
-//           get_solver_str(invParam.inv_type), get_prec_str(invParam.cuda_prec_sloppy));
-
-//   // params related to split grid.
-//   for (int i = 0; i < 4; i++) invParam.split_grid[i] = grid_partition[i];
-//   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-//   use_split_grid = num_sub_partition > 1;
-//   use_multi_src = use_split_grid || (Nsrc_tile > 1);
-
-//   // Setup the multigrid preconditioner
-//   void *mg_preconditioner = nullptr;
-//   if (inv_multigrid) {
-//     if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
-//     mg_preconditioner = newMultigridQuda(&mg_param);
-//     invParam.preconditioner = mg_preconditioner;
-
-//     printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.invert_param->secs,
-//                mg_param.invert_param->gflops / mg_param.invert_param->secs);
-//     if (mg_param.invert_param->energy > 0) {
-//       printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n", mg_param.invert_param->energy,
-//                  mg_param.invert_param->power, mg_param.invert_param->temp, mg_param.invert_param->clock);
-//     }
-//   }
-//     //multishift: same linear system, different masses (charm + strange ie)
-//     //SET UP INV PARAM END
-//   if (Nsrc > QUDA_MAX_MULTI_SRC)
-//     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
-//   std::vector<quda::ColorSpinorField> in_raw(Nsrc);
-//   std::vector<quda::ColorSpinorField> in(Nsrc);
-//   std::vector<quda::ColorSpinorField> out(Nsrc);
-//   std::vector<quda::ColorSpinorField> out_flowed(Nsrc);
-//   std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
-//   std::vector<quda::ColorSpinorField> out_multishift_flowed(Nsrc * multishift);
-
-//     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
-//       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
-//     }
-    
-//   quda::ColorSpinorParam cs_param;
-//   constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
-//     //simulates what user might do from external library
-//   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
-//   std::vector<std::vector<void *>> _hp_multi_x_flowed(Nsrc, std::vector<void *>(multishift));
-    
-//   // Set up Masses
-//   std::vector<double> masses(multishift);
-
-//   if (multishift > 1) {
-//     if (use_split_grid)
-//       errorQuda("Multishift currently doesn't support split grid.\n");
-
-//     invParam.num_offset = multishift;
-
-//     // Consistency check for masses, tols, tols_hq size if we're setting custom values
-//     if (multishift_shifts.size() != 0)
-//       errorQuda("Multishift shifts are not supported for Wilson-type fermions");
-//     if (multishift_masses.size() != 0 && multishift_masses.size() != static_cast<unsigned long>(multishift))
-//       errorQuda("Multishift mass count %d does not agree with number of masses passed in %lu\n", multishift, multishift_masses.size());
-//     if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
-//       errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
-//     if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
-//       errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
-
-//     // Copy offsets and tolerances into invParam; allocate and copy data pointers
-//     for (int i = 0; i < multishift; i++) {
-//       masses[i] = (multishift_masses.size() == 0 ? (mass + i * i * 0.01) : multishift_masses[i]);
-//       invParam.offset[i] = 4 * masses[i] * masses[i];
-//       invParam.tol_offset[i] = (multishift_tols.size() == 0 ? invParam.tol : multishift_tols[i]);
-//       invParam.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? invParam.tol_hq : multishift_tols_hq[i]);
-
-//       // Allocate memory and set pointers
-//       for (int n = 0; n < Nsrc; n++) {
-//         out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
-//         _hp_multi_x[n][i] = out_multishift[n * multishift + i].data();
-//       }
-
-//       logQuda(QUDA_VERBOSE, "Multishift mass %d = %e ; tolerance %e ; hq tolerance %e\n", i, masses[i], invParam.tol_offset[i], invParam.tol_hq_offset[i]);
-//     }
-//   }
-
-// // Prepare rng, fill host spinors with random numbers
-//   //-----------------------------------------------------------------------------------
-
-//   std::vector<double> time(Nsrc);
-//   std::vector<double> gflops(Nsrc);
-//   std::vector<int> iter(Nsrc);
-
-//   // Create a temporary spinor just to seed the rng
-//   quda::ColorSpinorField tmp(cs_param);
-//   quda::RNG rng(tmp, 1234);
-//   tmp = quda::ColorSpinorField();
-
-//   for (int n = 0; n < Nsrc; n++) {
-//     // Populate the host spinor with random numbers.
-//     in_raw[n] = quda::ColorSpinorField(cs_param);
-//     in[n] = quda::ColorSpinorField(cs_param);
-//     quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_UNIFORM);
-//     performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param, &gauge_param);
-//     out[n] = quda::ColorSpinorField(cs_param);
-//     out_flowed[n] = quda::ColorSpinorField(cs_param);
-//   }
+  for (int n = 0; n < Nsrc; n++) {
+    // Populate the host spinor with random numbers.
+    in_raw[n] = quda::ColorSpinorField(cs_param);
+    in[n] = quda::ColorSpinorField(cs_param);
+    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_UNIFORM);
+    performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param, &gauge_param);
+    out[n] = quda::ColorSpinorField(cs_param);
+    out_flowed[n] = quda::ColorSpinorField(cs_param);
+  }
 
 //   // Prepare rng, fill host spinors with random numbers END
 //   //-----------------------------------------------------------------------------------
 
 //   // QUDA invert test
 //   //----------------------------------------------------------------------------
+  //   invParam.num_src = Nsrc_tile;
+  //   invParam.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
+  //   // Host arrays for solutions, sources, and check
+  //   std::vector<void *> _hp_x(Nsrc_tile);
+  //   std::vector<void *> _hp_b(Nsrc_tile);
+  //   std::vector<void *> _hp_x_flowed(Nsrc_tile);
 
-//   if (!use_multi_src || multishift > 1) {
+  //   for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+  //     for (int i = 0; i < Nsrc_tile; i++) {
+  //       _hp_x[i] = out[j + i].data();
+  //       _hp_b[i] = in[j + i].data();
+  //     }
 
-//     for (int n = 0; n < Nsrc; n++) {
-//       void *aw_hp_multi[] = {_hp_multi_x[n].data()};
-//       void *aw_hp_multi_f[] = {_hp_multi_x_flowed[n].data()};
-        
-//       void *aw_out[] = {out[n].data()};
-//       void *aw_out_f[] = {out_flowed[n].data()};
-        
-//       // If deflating, preserve the deflation space between solves
-//       if (inv_deflate) eig_param.preserve_deflation = n < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-//       // Perform QUDA inversions
-//       if (multishift > 1) {
-//         invertMultiShiftQuda(_hp_multi_x[n].data(), in[n].data(), &invParam);
-//         //QUESTION: is there _hp_multi_x_flowed[n] or or things to be indexed?
-//         performGFlowQuda(aw_hp_multi_f,aw_hp_multi, &invParam, &smear_param, obs_param, 1);
-//       } else {
-//         invertQuda(out[n].data(), in[n].data(), &invParam);
-//         performGFlowQuda(aw_out_f,aw_out, &invParam, &smear_param, obs_param, 1);
-//       }
+  //     if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  //     invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &invParam);
+  //     performGFlowQuda(_hp_x_flowed.data(),_hp_x.data(),&invParam, &smear_param, obs_param,1);
 
-//       // move residuals to n^th location for verification after solves have finished
-//       invParam.true_res[n] = invParam.true_res[0];
-//       invParam.true_res_hq[n] = invParam.true_res_hq[0];
+  //     // move residuals to (i+j)^th location for verification after solves have finished
+  //     for (int i = 0; i < Nsrc_tile; i++) {
+  //       invParam.true_res[j + i] = invParam.true_res[i];
+  //       invParam.true_res_hq[j + i] = invParam.true_res_hq[i];
+  //     }
 
-//       time[n] = invParam.secs;
-//       gflops[n] = invParam.gflops / invParam.secs;
-//       iter[n] = invParam.iter;
-//       printfQuda("Done: %i iter / %g secs = %g Gflops\n", invParam.iter, invParam.secs,
-//                  invParam.gflops / invParam.secs);
-//       if (invParam.energy > 0) {
-//         printfQuda("Energy = %g J, Mean power = %g W, mean temp = %g C, mean clock = %f\n\n", invParam.energy,
-//                    invParam.power, invParam.temp, invParam.clock);
-//       }
-//     }
-//   } else {
+  //     printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+  //                invParam.iter, invParam.secs, invParam.gflops / invParam.secs, invParam.secs / Nsrc_tile);
+  //     if (invParam.energy > 0) {
+  //       printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+  //                  invParam.energy, invParam.energy / Nsrc_tile, invParam.power, invParam.temp, invParam.clock);
+  //     }
+  //   }
 
-//     invParam.num_src = Nsrc_tile;
-//     invParam.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
-//     // Host arrays for solutions, sources, and check
-//     std::vector<void *> _hp_x(Nsrc_tile);
-//     std::vector<void *> _hp_b(Nsrc_tile);
-//     std::vector<void *> _hp_x_flowed(Nsrc_tile);
+  // // Free the multigrid solver
+  // if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
-//     // void *aw_hp_multi[] = {_hp_multi_x[n].data()};
-//     // void *aw_hp_multi_f[] = {_hp_multi_x_flowed[n].data()};
-
-//     for (int j = 0; j < Nsrc; j += Nsrc_tile) {
-//       for (int i = 0; i < Nsrc_tile; i++) {
-//         _hp_x[i] = out[j + i].data();
-//         _hp_b[i] = in[j + i].data();
-//       }
-
-//       if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-//       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &invParam);
-//       performGFlowQuda(_hp_x_flowed.data(),_hp_x.data(),&invParam, &smear_param, obs_param,1);
-
-//       // move residuals to (i+j)^th location for verification after solves have finished
-//       for (int i = 0; i < Nsrc_tile; i++) {
-//         invParam.true_res[j + i] = invParam.true_res[i];
-//         invParam.true_res_hq[j + i] = invParam.true_res_hq[i];
-//       }
-
-//       printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
-//                  invParam.iter, invParam.secs, invParam.gflops / invParam.secs, invParam.secs / Nsrc_tile);
-//       if (invParam.energy > 0) {
-//         printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
-//                    invParam.energy, invParam.energy / Nsrc_tile, invParam.power, invParam.temp, invParam.clock);
-//       }
-//     }
-//   }
-
-//   // Free the multigrid solver
-//   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
-
-//   // Compute timings
-//   if (!use_multi_src) performanceStats(time, gflops, iter);
+  // // Compute timings
+  // if (!use_multi_src) performanceStats(time, gflops, iter);
 
 
     
     
-//   check = quda::ColorSpinorField(cs_param);
-//   //Add noise to spinor
+  check = quda::ColorSpinorField(cs_param);
+  //Add noise to spinor
 
-//   spinorNoise(check, rng, QUDA_NOISE_GAUSS);
+  spinorNoise(check, rng, QUDA_NOISE_GAUSS);
 
 
-//   check_safe = quda::ColorSpinorField(cs_param);
-//   check_hier = quda::ColorSpinorField(cs_param);
-//   check_fwd = quda::ColorSpinorField(cs_param);
+  check_safe = quda::ColorSpinorField(cs_param);
+  check_hier = quda::ColorSpinorField(cs_param);
+  check_fwd = quda::ColorSpinorField(cs_param);
 
-//   void *check_arr[] = {check.data()};
-//   void *check_fwdarr[] = {check_fwd.data()};
+  void *check_arr[] = {check.data()};
+  void *check_fwdarr[] = {check_fwd.data()};
 
-//   printf("Inspecting the very first element of the random fermion we will use:\n");
-//   check.PrintVector(0,0,0);
-//   printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
-//   printf("Hierarchical method:\n");
-//   check_hier.PrintVector(0,0,0);
-//   printf("Safe method:\n");
-//   check_safe.PrintVector(0,0,0);
-//   printf("Forward method:\n");
-//   check_fwd.PrintVector(0,0,0);
+  printf("Inspecting the very first element of the random fermion we will use:\n");
+  check.PrintVector(0,0,0);
+  printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
+  printf("Hierarchical method:\n");
+  check_hier.PrintVector(0,0,0);
+  printf("Safe method:\n");
+  check_safe.PrintVector(0,0,0);
+  printf("Forward method:\n");
+  check_fwd.PrintVector(0,0,0);
      
-//   host_timer.start(); // start the timer
+  host_timer.start(); // start the timer
 
 
      
-//     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
-//     host_hier_timer.start();
-//     performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, &gauge_param);
-//     host_hier_timer.stop();
-//     host_safe_timer.start();
-//     performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
-//     host_safe_timer.stop();
-//     // Perform forward flow algorithm
-//     host_fwd_timer.start();
-//     performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param, 1);
-//     host_fwd_timer.stop();
+    // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
+    host_hier_timer.start();
+    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, &gauge_param);
+    host_hier_timer.stop();
+    host_safe_timer.start();
+    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
+    host_safe_timer.stop();
+    // Perform forward flow algorithm
+    host_fwd_timer.start();
+    performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param, 1);
+    host_fwd_timer.stop();
       
-//     printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
-//     printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
-//     printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());   
+    printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
+    printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
+    printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());   
 
 
 
-//   host_timer.stop(); // stop the timer
+  host_timer.stop(); // stop the timer
    
-//   printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
-//   printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
-//   printf("Hierarchical method:\n");
-//   check_hier.PrintVector(0,0,0);
-//   printf("Safe method:\n");
-//   check_safe.PrintVector(0,0,0);
-//   printf("Forward method:\n");
-//   check_fwd.PrintVector(0,0,0);
+  printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
+  printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
+  printf("Hierarchical method:\n");
+  check_hier.PrintVector(0,0,0);
+  printf("Safe method:\n");
+  check_safe.PrintVector(0,0,0);
+  printf("Forward method:\n");
+  check_fwd.PrintVector(0,0,0);
 
 
   freeGaugeQuda();
