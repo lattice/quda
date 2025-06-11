@@ -11,6 +11,7 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
+#include <unitarization_links.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
 #include <misc.h>
@@ -36,6 +37,13 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
 bool su_project = true;
+
+static double unitarize_eps = 1e-6;
+static bool reunit_allow_svd = true;
+static bool reunit_svd_only = false;
+static double svd_rel_error = 1e-4;
+static double svd_abs_error = 1e-4;
+static double max_allowed_error = 1e-11;
 
 void display_test_info()
 {
@@ -293,20 +301,36 @@ printfQuda("HIIII\n");
 
   freeGaugeQuda();
 
-  void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  void *milc_sitelink;
+  void *fatlink = nullptr;
+  void *longlink = nullptr;
+  void *vlink = nullptr;
+  void *wlink = nullptr;
+  fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+
+  vlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // V links
+  wlink = pinned_malloc(4 * V * gauge_site_size * gauge_param.cuda_prec); // W links
+  void *milc_sitelink = nullptr;
   milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+
+  reorderQDPtoMILC(milc_sitelink, qdp_inlink, V, gauge_site_size, gauge_param.cuda_prec, gauge_param.cpu_prec);
 
   void *longlink_ptr = longlink;
     
   double act_path[6];
   set_act_path(act_path, 0);
 
+  auto cpu_param_backup = gauge_param.cpu_prec;
+  gauge_param.cpu_prec = gauge_param.cuda_prec;
+
   GaugeFieldParam InParam(gauge_param);
+    
+  InParam.location = QUDA_CPU_FIELD_LOCATION;
+    
   InParam.order = QUDA_MILC_GAUGE_ORDER;
   InParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   InParam.create = QUDA_NULL_FIELD_CREATE;
+  InParam.gauge = milc_sitelink;
   GaugeField cpuInNew = GaugeField(InParam);
 
   InParam.gauge = longlink;
@@ -316,9 +340,15 @@ printfQuda("HIIII\n");
   InParam.gauge = fatlink;
   InParam.create = QUDA_REFERENCE_FIELD_CREATE;
   GaugeField VLink = GaugeField(InParam);
+
+  ULink.PrintMatrix(0,0,0,0);
+
+  // setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
+  //                              svd_abs_error);
+  
   //   int *num_failures_d = 0;
   // projectSU3(VLink, 1e-1, num_failures_d);
-  // gaugeGauss(VLink,123,);
+  // gaugeGauss(VLink,123,1e-1);
   // gaugeGauss(ULink,123,1e-1);
     
   computeKSLinkQuda(fatlink, longlink, nullptr, cpuInNew.data(), act_path, &gauge_param);
