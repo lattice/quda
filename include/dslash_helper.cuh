@@ -11,6 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
+#include <domain_decomposition_helper.cuh>
 #include <kernel_ops.h>
 
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
@@ -100,6 +101,7 @@ namespace quda
   {
     constexpr auto nDim = Arg::nDim;
     Coord<nDim> coord;
+    for (auto i = 0; i < nDim; i++) coord.gDim[i] = arg.gDim[i];
     dim = kernel_type; // keep compiler happy
 
     // only for 5-d checkerboarding where we need to include the fifth dimension
@@ -151,6 +153,7 @@ namespace quda
         coordsFromFaceIndex<nDim, pc_type, 3, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       }
     }
+    for (int i = 0; i < nDim; i++) { coord.gx[i] = arg.commCoord[i] + coord.x[i]; }
     coord.s = s;
     return coord;
   }
@@ -237,7 +240,7 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_, int n_src_tile_ = 1> struct DslashArg {
+  template <typename Float_, int nDim_, typename DDArg, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
@@ -251,8 +254,12 @@ namespace quda
 
     const int_fastdiv X0h;
     const int_fastdiv dim[5]; // full lattice dimensions
+    const int gDim[5];        // global full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
+
+    const int commCoord[5];
+    const int globalDim3;
 
     const bool dagger; // dagger
     const bool xpay;   // whether we are doing xpay or not
@@ -283,6 +290,10 @@ namespace quda
     int pack_blocks; // total number of blocks used for packing in the dslash
     int exterior_dims; // dimension to run in the exterior Dslash
     int exterior_blocks;
+
+    DDArg dd_out;
+    DDArg dd_in;
+    DDArg dd_x;
 
     // for shmem ...
     static constexpr bool packkernel = false;
@@ -317,7 +328,10 @@ namespace quda
       reconstruct(U.Reconstruct()),
       X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
       dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
+      gDim {comm_dim(0) * dim[0], comm_dim(1) * dim[1], comm_dim(2) * dim[2], comm_dim(3) * dim[3], dim[4]},
       volumeCB(in.VolumeCB()),
+      commCoord {comm_coord(0) * dim[0], comm_coord(1) * dim[1], comm_coord(2) * dim[2], comm_coord(3) * dim[3], dim[4]},
+      globalDim3(comm_dim(3) * this->dim[3]),
       dagger(dagger),
       xpay(xpay),
       kernel_type(INTERIOR_KERNEL),
@@ -337,6 +351,9 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
+      dd_out(out.DD()),
+      dd_in(in.DD()),
+      dd_x(x.DD()),
 #ifndef NVSHMEM_COMMS
       counter(0)
 #else
@@ -355,10 +372,11 @@ namespace quda
         if (in[i].data() == out[i].data()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match
       checkLocation(out, in, x, U);  // check all locations match
+      checkDD(out, in, x);           // check all DD match
       checkNative(in, U);
 
       for (int d = 0; d < 4; d++) {
-        commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
+        commDim[d] = (comm_override[d] == 0) ? 0 : (comm_dim_partitioned(d) * dd_out.commDim(d, dd_in, *this));
       }
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -414,7 +432,8 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
+  template <typename Float, int nDim, typename DDArg>
+  std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim, DDArg> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;
@@ -451,6 +470,10 @@ namespace quda
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
     out << "exterior_threads = " << arg.exterior_threads << std::endl;
     out << "exterior_blocks = " << arg.exterior_blocks << std::endl;
+    out << "dd_out: " << arg.dd_out << std::endl;
+    out << "dd_in: " << arg.dd_in << std::endl;
+    out << "dd_x: " << arg.dd_x << std::endl;
+
     return out;
   }
 

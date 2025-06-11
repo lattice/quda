@@ -336,10 +336,16 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
     //SET UP INV PARAM END
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
-  std::vector<quda::ColorSpinorField> in_raw(Nsrc);
-  std::vector<quda::ColorSpinorField> in(Nsrc);
-  std::vector<quda::ColorSpinorField> out(Nsrc);
-  std::vector<quda::ColorSpinorField> out_flowed(Nsrc);
+  std::vector<quda::ColorSpinorField> in_raw(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> in(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> out(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> out_flowed(Nsrc,cs_param);
+
+
+  std::vector<void *> in_raw_ptr(Nsrc);
+  std::vector<void *> in_ptr(Nsrc);
+  std::vector<void *> out_ptr(Nsrc);
+  std::vector<void *> out_flowed_ptr(Nsrc);
 
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
@@ -363,13 +369,13 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
-    in_raw[n] = quda::ColorSpinorField(cs_param);
-    in[n] = quda::ColorSpinorField(cs_param);
-    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_UNIFORM);
-    performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param, &gauge_param);
-    out[n] = quda::ColorSpinorField(cs_param);
-    out_flowed[n] = quda::ColorSpinorField(cs_param);
+    in_raw_ptr[n] = in_raw[n].data();
+    in_ptr[n] = in[n].data();
+    out_ptr[n] = out[n].data();
+    out_flowed_ptr[n] = out_flowed[n].data();
   }
+
+  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, &gauge_param);
 
 //   // Prepare rng, fill host spinors with random numbers END
 //   //-----------------------------------------------------------------------------------

@@ -275,11 +275,39 @@ namespace quda {
       for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
     }
 
+    template <typename Arg> struct FusedMobiusDslashParams {
+      struct SmemSize {
+        static constexpr unsigned int size(dim3 block)
+        {
+          const int a_size = (block.y * 4) * (block.y * 4 + sm_m_pad_size(block.y * 4));
+          const int b_size = (block.y * 4) * (block.x * 6 + sm_n_pad_size(block.x * 6));
+          int size = 0;
+          // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
+          // if (param.aux.x == 1) { // aux.x == 1 --> reload == true
+          if constexpr (Arg::reload) {
+            if constexpr (Arg::type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
+              size = (a_size * 2 + b_size);
+            } else {
+              size = (a_size + b_size);
+            }
+          } else {
+            size = (a_size > b_size ? a_size : b_size);
+          }
+          return size / 2; // number of half2 elements
+        }
+      };
+    };
+    // template <typename Arg> using FusedMobiusDslashSmem = SharedMemory<half2, typename
+    // FusedMobiusDslashParams<Arg>::SmemSize,load_matrix_b_vector_ops>;
+    template <typename Arg>
+    using FusedMobiusDslashSmem = SharedMemory<half2, typename FusedMobiusDslashParams<Arg>::SmemSize>;
+    template <typename Arg>
+    using FusedMobiusDslashOps = combineOps<load_matrix_b_vector_ops, KernelOps<FusedMobiusDslashSmem<Arg>>>;
     /**
       @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha * M5inv operator
       The integer kernel types corresponds to the enum MdwfFusedDslashType.
     */
-    template <typename Arg> struct FusedMobiusDslash : KernelOps<SharedMemoryCache<half2>> {
+    template <typename Arg> struct FusedMobiusDslash : FusedMobiusDslashOps<Arg> {
       const Arg &arg;
       constexpr FusedMobiusDslash(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
@@ -292,7 +320,8 @@ namespace quda {
         constexpr int Ls = Arg::Ls;
         const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-        SharedMemoryCache<half2> cache {*this};
+        // SharedMemoryCache<half2> cache {*this};
+        FusedMobiusDslashSmem<Arg> cache {*this};
 
         static_assert(Arg::block_dim_x * Ls / 32 < 32, "Number of threads in a threadblock should be less than 1024.");
 
@@ -302,7 +331,8 @@ namespace quda {
         constexpr int N_sm = N + sm_n_pad_size(N);
         constexpr int M_sm = M + sm_m_pad_size(M);
 
-        half2 *sm_b = cache.data();
+        // half2 *sm_b = cache.data();
+        half2 *sm_b = &cache[0];
         half *sm_c = reinterpret_cast<half *>(sm_b);
 
         half *sm_a = Arg::reload ? sm_c + M * N_sm : sm_c;
@@ -396,7 +426,7 @@ namespace quda {
             // store result to shared memory
           }
           float scale;
-          load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, scale); // acc(accumulation) = false
+          load_matrix_b_vector<N_sm / 2, false>(*this, in_vec, sm_b, scale); // acc(accumulation) = false
 
           __syncthreads();
           mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a, sm_a, sm_c, sm_c, wrm);
@@ -413,7 +443,7 @@ namespace quda {
                 aux_in_vec = arg.x(sid_back, explicit_parity);
               }
             }
-            load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
+            load_matrix_b_vector<N_sm / 2, true>(*this, aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
             if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, scale); }
             __syncthreads();
             mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c,
@@ -424,7 +454,7 @@ namespace quda {
             Vector aux_in_vec;
             int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
             if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
-            load_matrix_b_vector<N_sm / 2, true, false>(aux_in_vec, sm_b, scale, arg.m_scale);
+            load_matrix_b_vector<N_sm / 2, true, false>(*this, aux_in_vec, sm_b, scale, arg.m_scale);
             if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
           }
 

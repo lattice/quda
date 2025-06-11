@@ -3,7 +3,6 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <constant_kernel_arg.h>
 #include <reduce_helper.h>
 #include <reduction_kernel.h>
 
