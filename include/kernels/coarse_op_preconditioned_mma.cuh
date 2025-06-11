@@ -102,7 +102,7 @@ namespace quda
         int n = (mn % t_n) * Arg::bN;
         int m = (mn / t_n) * Arg::bM;
 
-        if (x_cb >= arg.Y.VolumeCB()) return;
+        if (static_cast<unsigned>(x_cb) >= arg.Y.VolumeCB()) return;
 
         int parity = blockIdx.y;
         int d = blockIdx.z;
