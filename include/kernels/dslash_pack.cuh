@@ -393,7 +393,7 @@ namespace quda
     {
       int src_s_block = MAX_MULTI_RHS == 1 ? 0 : src_s_block_;
       int src_s_idx = src_s_block * Arg::n_src_tile;
-      if (src_s_idx + n_src_tile * arg.Ls <= arg.n_src * arg.Ls) {
+      if (src_s_idx + n_src_tile <= arg.n_src * arg.Ls) {
         switch (twist_pack) {
         case 0: this->operator()<0, n_src_tile>(arg, src_s_idx, parity); break;
         case 1: this->operator()<1, n_src_tile>(arg, src_s_idx, parity); break;

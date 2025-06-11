@@ -114,7 +114,7 @@ void init()
   cpuFatMILC = GaugeField(cpuParam);
 
   cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-  cpuParam.nFace = 3;
+  cpuParam.nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuLongQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
@@ -127,7 +127,7 @@ void init()
 
   // Reorder gauge fields to MILC order
   cpuFatMILC = cpuFatQDP;
-  cpuLongMILC = cpuLongQDP;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) cpuLongMILC = cpuLongQDP;
 
   // Make sure QDP fields have exchanged ghosts because they are used
   // for the reference dslash

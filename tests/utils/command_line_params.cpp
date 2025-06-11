@@ -78,6 +78,10 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
 
+std::array<int, 4> dd_block_size = {4, 4, 4, 4};
+bool dd_red_black = false;
+bool dd_test_projection = false;
+
 double madwf_diagonal_suppressor = 0.0;
 int madwf_ls = 4;
 int madwf_null_miniter = niter;
@@ -313,6 +317,8 @@ double gauge_smear_alpha1 = 0.75;
 double gauge_smear_alpha2 = 0.6;
 double gauge_smear_alpha3 = 0.3;
 int gauge_smear_steps = 5;
+int gauge_n_save = 3;
+int hier_threshold = 6;
 int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
 bool su_project = true;
@@ -1116,7 +1122,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
+  auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameters");
 
   CLI::TransformPairs<int> eofa_pm_map {{"plus", 1}, {"minus", 0}};
   opgroup->add_option("--eofa-pm", eofa_pm, "Set to evalute \"plus\" or \"minus\" EOFA operator (default plus)")
@@ -1125,6 +1131,17 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
   opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
+}
+
+void add_dd_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("DD", "Options controlling Domain Decomposition parameters");
+  opgroup
+    ->add_option("--dd-block-size", dd_block_size,
+                 "Set the domain decomposition block size in all four dimension (default 4 4 4 4)")
+    ->expected(4);
+  opgroup->add_option("--dd-red-black", dd_red_black, "Enable red-black domain decomposition (default false)");
+  opgroup->add_option("--dd-test-projection", dd_red_black, "Compare against the projected result (default false)");
 }
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
@@ -1158,6 +1175,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 10)");
 
+  opgroup->add_option("--su3-adj-gauge-nsave", gauge_n_save,
+                      "The number of gauge steps to save for hierarchical adj grad flow");
+
+  opgroup->add_option("--su3-hier-threshold", hier_threshold, "Minimum threshold for hierarchical adj grad flow");
+
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and/or topological charge every Nth step (default 5) ");
 
@@ -1167,7 +1189,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameteres");
+  auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameters");
 
   opgroup->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor,
                       "Set the digonal suppressor for MADWF (default 0)");
@@ -1303,8 +1325,7 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup
-    = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
+  auto opgroup = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameters");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }
 
