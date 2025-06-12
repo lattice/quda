@@ -652,6 +652,15 @@ typedef enum QudaWFlowStepType_s {
   WFLOW_FOURTH_ORDER_STEP_6,
 } QudaWFlowStepType;
 
+// Used by update_split_gauge
+typedef enum QudaUpdateSplitGauge_s {
+  QUDA_UPDATE_SPLIT_GAUGE_OFF, // will not use split gauge buffers
+  QUDA_UPDATE_SPLIT_GAUGE_TRUE
+  = 1, // the input gauge fields will be split and the buffered (split) gauges will be updated accordingly
+  QUDA_UPDATE_SPLIT_GAUGE_FALSE
+  = 0, // the input gauge fields will not be split and the buffered (split) gauges will be used for split grid solves
+} QudaUpdateSplitGauge;
+
 #ifdef __cplusplus
 }
 #endif
