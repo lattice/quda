@@ -48,13 +48,16 @@ namespace quda
   }
 #endif
 
+#ifdef QUDA_USE_CUDA_PIPELINE
   template <class T> __device__ inline void memcpy_async(T *destination, T *source, size_t size, pipeline_t &pipe)
   {
-#ifdef QUDA_USE_CUDA_PIPELINE
     cuda::memcpy_async(destination, source, size, pipe.pipe);
-#else
-    *destination = *source;
-#endif
   }
+#else
+  template <class T> __device__ inline void memcpy_async(T *destination, T *source, size_t, pipeline_t &)
+  {
+    *destination = *source;
+  }
+#endif
 
 } // namespace quda
