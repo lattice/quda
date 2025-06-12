@@ -111,7 +111,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
   P(overlap, 0);
-  P(use_split_gauge_bkup, true);	
+  P(use_split_gauge_bkup, true);
 #else
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
   P(staggered_phase_applied, INVALID_INT);
