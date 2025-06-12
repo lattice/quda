@@ -162,7 +162,12 @@ namespace quda
           pool_pinned_free(A_h);
 #endif
         } else if (prec == QUDA_DOUBLE_PRECISION) {
+#if hipblasVersionMajor >= 3
+          typedef hipDoubleComplex Z;
+#else
+          // The hipblas v1 interface, deprecated in v2, and removed in v3
           typedef hipblasDoubleComplex Z;
+#endif
           Z **A_array = static_cast<Z **>(pool_device_malloc(2 * batch * sizeof(Z *)));
           Z **Ainv_array = A_array + batch;
           Z **A_array_h = static_cast<Z **>(pool_pinned_malloc(2 * batch * sizeof(Z *)));
@@ -406,7 +411,12 @@ namespace quda
         //-------------------------------------------------------------------------
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
 
+#if hipblasVersionMajor >= 3
+          typedef hipDoubleComplex Z;
+#else
+          // The hipblas v1 interface, deprecated in v2, and removed in v3
           typedef hipblasDoubleComplex Z;
+#endif
           const std::complex<double> al = static_cast<const std::complex<double>>(blas_param.alpha);
           const std::complex<double> be = static_cast<const std::complex<double>>(blas_param.beta);
 
