@@ -336,6 +336,10 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
     //SET UP INV PARAM END
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
+
+  quda::ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
+    
   std::vector<quda::ColorSpinorField> in_raw(Nsrc,cs_param);
   std::vector<quda::ColorSpinorField> in(Nsrc,cs_param);
   std::vector<quda::ColorSpinorField> out(Nsrc,cs_param);
@@ -351,8 +355,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     
-  quda::ColorSpinorParam cs_param;
-  constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
+  
     //simulates what user might do from external library
 
 // Prepare rng, fill host spinors with random numbers
@@ -369,114 +372,15 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
+    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_GAUSS);
     in_raw_ptr[n] = in_raw[n].data();
     in_ptr[n] = in[n].data();
     out_ptr[n] = out[n].data();
     out_flowed_ptr[n] = out_flowed[n].data();
   }
 
-  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, &gauge_param);
+  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, Nsrc);
 
-//   // Prepare rng, fill host spinors with random numbers END
-//   //-----------------------------------------------------------------------------------
-
-//   // QUDA invert test
-//   //----------------------------------------------------------------------------
-  //   invParam.num_src = Nsrc_tile;
-  //   invParam.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
-  //   // Host arrays for solutions, sources, and check
-  //   std::vector<void *> _hp_x(Nsrc_tile);
-  //   std::vector<void *> _hp_b(Nsrc_tile);
-  //   std::vector<void *> _hp_x_flowed(Nsrc_tile);
-
-  //   for (int j = 0; j < Nsrc; j += Nsrc_tile) {
-  //     for (int i = 0; i < Nsrc_tile; i++) {
-  //       _hp_x[i] = out[j + i].data();
-  //       _hp_b[i] = in[j + i].data();
-  //     }
-
-  //     if (inv_deflate) eig_param.preserve_deflation = j < Nsrc - Nsrc_tile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  //     invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &invParam);
-  //     performGFlowQuda(_hp_x_flowed.data(),_hp_x.data(),&invParam, &smear_param, obs_param,1);
-
-  //     // move residuals to (i+j)^th location for verification after solves have finished
-  //     for (int i = 0; i < Nsrc_tile; i++) {
-  //       invParam.true_res[j + i] = invParam.true_res[i];
-  //       invParam.true_res_hq[j + i] = invParam.true_res_hq[i];
-  //     }
-
-  //     printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
-  //                invParam.iter, invParam.secs, invParam.gflops / invParam.secs, invParam.secs / Nsrc_tile);
-  //     if (invParam.energy > 0) {
-  //       printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
-  //                  invParam.energy, invParam.energy / Nsrc_tile, invParam.power, invParam.temp, invParam.clock);
-  //     }
-  //   }
-
-  // // Free the multigrid solver
-  // if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
-
-  // // Compute timings
-  // if (!use_multi_src) performanceStats(time, gflops, iter);
-
-
-    
-    
-  check = quda::ColorSpinorField(cs_param);
-  //Add noise to spinor
-
-  spinorNoise(check, rng, QUDA_NOISE_GAUSS);
-
-
-  check_safe = quda::ColorSpinorField(cs_param);
-  check_hier = quda::ColorSpinorField(cs_param);
-  check_fwd = quda::ColorSpinorField(cs_param);
-
-  void *check_arr[] = {check.data()};
-  void *check_fwdarr[] = {check_fwd.data()};
-
-  printf("Inspecting the very first element of the random fermion we will use:\n");
-  check.PrintVector(0,0,0);
-  printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
-  printf("Hierarchical method:\n");
-  check_hier.PrintVector(0,0,0);
-  printf("Safe method:\n");
-  check_safe.PrintVector(0,0,0);
-  printf("Forward method:\n");
-  check_fwd.PrintVector(0,0,0);
-     
-  host_timer.start(); // start the timer
-
-
-     
-    // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
-    host_hier_timer.start();
-    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, &gauge_param);
-    host_hier_timer.stop();
-    host_safe_timer.start();
-    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
-    host_safe_timer.stop();
-    // Perform forward flow algorithm
-    host_fwd_timer.start();
-    performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param, 1);
-    host_fwd_timer.stop();
-      
-    printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
-    printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
-    printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());   
-
-
-
-  host_timer.stop(); // stop the timer
-   
-  printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
-  printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
-  printf("Hierarchical method:\n");
-  check_hier.PrintVector(0,0,0);
-  printf("Safe method:\n");
-  check_safe.PrintVector(0,0,0);
-  printf("Forward method:\n");
-  check_fwd.PrintVector(0,0,0);
 
 
   freeGaugeQuda();

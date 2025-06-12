@@ -349,23 +349,32 @@ printfQuda("HIIII\n");
                  mg_param.invert_param->power, mg_param.invert_param->temp, mg_param.invert_param->clock);
     }
   }
+  quda::ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
     //multishift: same linear system, different masses (charm + strange ie)
     //SET UP INV PARAM END
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
-  std::vector<quda::ColorSpinorField> in_raw(Nsrc);
-  std::vector<quda::ColorSpinorField> in(Nsrc);
-  std::vector<quda::ColorSpinorField> out(Nsrc);
-  std::vector<quda::ColorSpinorField> out_flowed(Nsrc);
-  std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift);
-  std::vector<quda::ColorSpinorField> out_multishift_flowed(Nsrc * multishift);
+  std::vector<quda::ColorSpinorField> in_raw(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> in(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> out(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> out_flowed(Nsrc,cs_param);
+  std::vector<quda::ColorSpinorField> out_multishift(Nsrc * multishift,cs_param);
+  std::vector<quda::ColorSpinorField> out_multishift_flowed(Nsrc * multishift,cs_param);
+
+
+  std::vector<void *> in_raw_ptr(Nsrc);
+  std::vector<void *> in_ptr(Nsrc);
+  std::vector<void *> out_ptr(Nsrc);
+  std::vector<void *> out_flowed_ptr(Nsrc);
+  std::vector<void *> out_multishift_ptr(Nsrc);
+  std::vector<void *> out_multishift_flowed_ptr(Nsrc);
 
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     
-  quda::ColorSpinorParam cs_param;
-  constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
+
     //simulates what user might do from external library
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
   std::vector<std::vector<void *>> _hp_multi_x_flowed(Nsrc, std::vector<void *>(multishift));
@@ -420,14 +429,13 @@ printfQuda("HIIII\n");
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
-    in_raw[n] = quda::ColorSpinorField(cs_param);
-    in[n] = quda::ColorSpinorField(cs_param);
-    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_UNIFORM);
-    performAdjGFlowHier(in[n].data(),in_raw[n].data(), &invParam, &smear_param, &gauge_param);
-    out[n] = quda::ColorSpinorField(cs_param);
-    out_flowed[n] = quda::ColorSpinorField(cs_param);
+    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_GAUSS);
+    in_raw_ptr[n] = in_raw[n].data();
+    in_ptr[n] = in[n].data();
+    out_ptr[n] = out[n].data();
+    out_flowed_ptr[n] = out_flowed[n].data();
   }
-
+  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, Nsrc);
   // Prepare rng, fill host spinors with random numbers END
   //-----------------------------------------------------------------------------------
 
@@ -512,70 +520,6 @@ printfQuda("HIIII\n");
   // Compute timings
   if (!use_multi_src) performanceStats(time, gflops, iter);
 
-
-    
-    
-  check = quda::ColorSpinorField(cs_param);
-  //Add noise to spinor
-
-  spinorNoise(check, rng, QUDA_NOISE_GAUSS);
-
-
-  check_safe = quda::ColorSpinorField(cs_param);
-  check_hier = quda::ColorSpinorField(cs_param);
-  check_fwd = quda::ColorSpinorField(cs_param);
-
-  void *check_arr[] = {check.data()};
-  void *check_fwdarr[] = {check_fwd.data()};
-
-  printf("Inspecting the very first element of the random fermion we will use:\n");
-  check.PrintVector(0,0,0);
-  printf("Inspecting the very first element of the 3 un-evolved fermions (should be zero):\n");
-  printf("Hierarchical method:\n");
-  check_hier.PrintVector(0,0,0);
-  printf("Safe method:\n");
-  check_safe.PrintVector(0,0,0);
-  printf("Forward method:\n");
-  check_fwd.PrintVector(0,0,0);
-     
-  host_timer.start(); // start the timer
-
-
-     
-    // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
-    host_hier_timer.start();
-    performAdjGFlowHier(check_hier.data(),check.data(), &invParam, &smear_param, &gauge_param);
-    host_hier_timer.stop();
-    host_safe_timer.start();
-    performAdjGFlowSafe(check_safe.data(),check.data() , &invParam, &smear_param);
-    host_safe_timer.stop();
-    // Perform forward flow algorithm
-    host_fwd_timer.start();
-    performGFlowQuda(check_fwdarr,check_arr, &invParam, &smear_param, obs_param, 1);
-    host_fwd_timer.stop();
-      
-    printfQuda("Time elapsed for adjoint hierarchical fermion/gauge smearing = %g secs\n", host_hier_timer.last());  
-    printfQuda("Time elapsed for adjoint safe fermion/gauge smearing = %g secs\n", host_safe_timer.last());  
-    printfQuda("Time elapsed for forward fermion/gauge smearing = %g secs\n", host_fwd_timer.last());   
-
-
-
-  host_timer.stop(); // stop the timer
-   
-  printfQuda("Total time for collective fermion/gauge smearing = %g secs\n", host_timer.last());
-  printf("Now, inspecting the very first element of the 3 evolved fermions:\n");
-  printf("Hierarchical method:\n");
-  check_hier.PrintVector(0,0,0);
-  printf("Safe method:\n");
-  check_safe.PrintVector(0,0,0);
-  printf("Forward method:\n");
-  check_fwd.PrintVector(0,0,0);
-
-  // for (int dir = 0; dir < 4; dir++) {
-  //   host_free(qdp_inlink[dir]);
-  //   host_free(qdp_fatlink[dir]);
-  //   host_free(qdp_longlink[dir]);
-  // }
 
   freeGaugeQuda();
   endQuda();
