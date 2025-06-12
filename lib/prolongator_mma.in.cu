@@ -41,7 +41,7 @@ namespace quda
     using this_t = ProlongateLaunchMma<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, nVec>;
     expand_aux_t<this_t, k, block_atom_size, n, n_atom_size, m, m_atom_size, k, k_atom_size> expand;
 
-    bool checkParam(const TuneParam &param) const { return true; }
+    bool checkParam(const TuneParam &) const { return true; }
 
     unsigned int sharedBytesPerThread() const { return 0; }
 

@@ -218,7 +218,7 @@ namespace quda
 
     static constexpr int get_m(int lane_id, int) { return lane_id % 8; }
 
-    static constexpr int get_n(int lane_id, int phase_id) { return lane_id / 8; }
+    static constexpr int get_n(int lane_id, int) { return lane_id / 8; }
   };
 
   /****** Specializations for short -> float, x == false ******/
@@ -270,7 +270,7 @@ namespace quda
 
     static constexpr int get_m(int lane_id, int) { return lane_id; }
 
-    static constexpr int get_n(int lane_id, int) { return 0; }
+    static constexpr int get_n(int, int) { return 0; }
   };
 
   /****** Specializations for float -> half2, x == false ******/
