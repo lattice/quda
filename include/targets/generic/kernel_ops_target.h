@@ -21,14 +21,11 @@ namespace quda
 
   // op implementations
   struct op_blockSync {
-    template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3, const Arg &...) { return 0; }
+    template <typename... Arg> static constexpr unsigned int shared_mem_size(dim3, const Arg &...) { return 0; }
   };
 
-  template <typename T>
-  struct op_warp_combine {
-    template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3, const Arg &...) { return 0; }
+  template <typename T> struct op_warp_combine {
+    template <typename... Arg> static constexpr unsigned int shared_mem_size(dim3, const Arg &...) { return 0; }
   };
 
 } // namespace quda

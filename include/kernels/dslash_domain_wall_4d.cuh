@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct DomainWall4DArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct DomainWall4DArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
     typedef typename mapper<Float>::type real;
     int_fastdiv Ls;                     /** fifth dimension length */
     complex<real> a_5[QUDA_MAX_DWF_LS]; /** xpay scale factor for each 4-d subvolume */
@@ -15,7 +15,8 @@ namespace quda
                     const ColorSpinorField &halo, const GaugeField &U, double a, double m_5, const Complex *b_5,
                     const Complex *c_5, bool xpay, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                     const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger,
+                                                          comm_override),
       Ls(in.X(4))
     {
       if (b_5 == nullptr || c_5 == nullptr)
@@ -48,10 +49,18 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](xs, my_spinor_parity) = out;
+        return;
+      }
+
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a_5[s] * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](xs, my_spinor_parity);
         out = x + arg.a_5[s] * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {

@@ -78,8 +78,7 @@ namespace quda
     atomic_fetch_add(reinterpret_cast<int *>(addr) + 3, val.w);
   }
 
-  template <typename T>
-  __device__ __host__ inline void atomic_add_shared(T *addr, T val)
+  template <typename T> __device__ __host__ inline void atomic_add_shared(T *addr, T val)
   {
     atomic_fetch_add(addr, val);
   }

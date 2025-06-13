@@ -374,9 +374,9 @@ namespace quda {
       auto expected = setSharedBytes(tp2);
       auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
       if (sizeOps != expected) {
-	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
-	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
-	errorQuda("Shared bytes mismatch KernelOps: %u  cu: %u\n", sizeOps, expected);
+        printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+        printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
+        errorQuda("Shared bytes mismatch KernelOps: %u  cu: %u\n", sizeOps, expected);
       }
       if (tp.shared_bytes < expected)
         errorQuda("Shared bytes %u insufficient (expected %u)", tp.shared_bytes, expected);

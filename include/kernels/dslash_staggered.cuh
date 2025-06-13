@@ -14,9 +14,10 @@ namespace quda
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
-            bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC, int n_src_tile = MAX_MULTI_RHS_TILE>
-  struct StaggeredArg : DslashArg<Float, nDim, n_src_tile> {
+  template <typename Float, int nColor_, int nDim, typename DDArg, QudaReconstructType reconstruct_u_,
+            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC,
+            int n_src_tile = MAX_MULTI_RHS_TILE>
+  struct StaggeredArg : DslashArg<Float, nDim, DDArg, n_src_tile> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -56,8 +57,8 @@ namespace quda
     StaggeredArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                  const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L, double a,
                  cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim, n_src_tile>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true,
-                                         improved_ ? 3 : 1, spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg, n_src_tile>(out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true,
+                                                improved_ ? 3 : 1, spin_project, comm_override),
       halo_pack(halo, improved_ ? 3 : 1),
       halo(halo, improved_ ? 3 : 1),
       U(U),
@@ -98,7 +99,7 @@ namespace quda
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
-      {
+      if (arg.dd_in.doHopping(coord, d, +1)) {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
@@ -121,7 +122,7 @@ namespace quda
       }
 
       // improved - forward direction
-      if (arg.improved) {
+      if (arg.improved && arg.dd_in.doHopping(coord, d, +3)) {
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
@@ -143,7 +144,7 @@ namespace quda
         }
       }
 
-      {
+      if (arg.dd_in.doHopping(coord, d, -1)) {
         // Backward gather - compute back offset for spinor and gauge fetch
         const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
@@ -172,7 +173,7 @@ namespace quda
       }
 
       // improved - backward direction
-      if (arg.improved) {
+      if (arg.improved && arg.dd_in.doHopping(coord, d, -3)) {
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           // when updating replace arg.nFace with 1 here
@@ -221,12 +222,21 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       array<Vector, n_src_tile> out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active)
+#pragma unroll
+          for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity) = out[s]; }
+        return;
+      }
+
       applyStaggered<nParity, mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
 #pragma unroll
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        for (auto s = 0; s < n_src_tile; s++) { out[s] = -out[s]; }
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
           Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);

@@ -69,6 +69,7 @@ namespace quda {
 
   void DiracDomainWall::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -123,6 +124,7 @@ namespace quda {
   // Apply the even-odd preconditioned clover-improved Dirac operator
   void DiracDomainWallPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkDWF(out, in);
     double kappa2 = -kappa5*kappa5;
     auto tmp = getFieldTmp(out);
@@ -140,6 +142,7 @@ namespace quda {
 
   void DiracDomainWallPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

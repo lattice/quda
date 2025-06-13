@@ -6,11 +6,11 @@
 
 namespace quda
 {
-  
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-    struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     typedef typename clover_mapper<Float, length, true>::type C;
     typedef typename mapper<Float>::type real;
@@ -24,7 +24,7 @@ namespace quda
                          const ColorSpinorField &halo, const GaugeField &U, const CloverField &A, double a, double b,
                          double c, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
                          const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),
       // if dagger flip the chiral twist
@@ -34,14 +34,15 @@ namespace quda
     {
       checkPrecision(U, A);
       checkLocation(U, A);
-      }
+    }
   };
 
   template <KernelType kernel_type, typename Arg> struct nDegTwistedCloverParams {
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = std::conditional_t<kernel_type == INTERIOR_KERNEL, KernelOps<Cache>, NoKernelOps>;
+    using Ops
+      = std::conditional_t<kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL, KernelOps<Cache>, NoKernelOps>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -73,6 +74,15 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
+
+      if (!allthreads || active) {
+	if (arg.dd_out.isZero(coord)) {
+	  if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+	  if (!allthreads) return;
+	  active = false;
+	}
+      }
+
       if (!allthreads || active) {
 	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
 	// defined in dslash_wilson.cuh
@@ -80,39 +90,42 @@ namespace quda
       }
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
-	SharedMemoryCache<Vector> cache{*this};
-	Vector tmp;
-	if (!allthreads || active) {
-	  // apply the chiral and flavor twists
-	  // use consistent load order across s to ensure better cache locality
-	  Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
-	  cache.save(x);
+	if ((!allthreads || active) && arg.dd_x.isZero(coord)) {
+	  out = arg.a * out;
+	} else {
+	  SharedMemoryCache<Vector> cache{*this};
+	  Vector tmp;
+	  if (!allthreads || active) {
+	    // apply the chiral and flavor twists
+	    // use consistent load order across s to ensure better cache locality
+	    Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
+	    cache.save(x);
 
-	  x.toRel(); // switch to chiral basis
+	    x.toRel(); // switch to chiral basis
 
 #pragma unroll
-	  for (int chirality = 0; chirality < 2; chirality++) {
-	    constexpr int n = Arg::nColor * Arg::nSpin / 2;
-	    HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
-	    HalfVector x_chi = x.chiral_project(chirality);
-	    HalfVector Ax_chi = A * x_chi;
-	    // i * mu * gamma_5 * tau_3
-	    const complex<real> b(0.0, (chirality^flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
-	    Ax_chi += b * x_chi;
-	    tmp += Ax_chi.chiral_reconstruct(chirality);
+	    for (int chirality = 0; chirality < 2; chirality++) {
+	      constexpr int n = Arg::nColor * Arg::nSpin / 2;
+	      HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
+	      HalfVector x_chi = x.chiral_project(chirality);
+	      HalfVector Ax_chi = A * x_chi;
+	      // i * mu * gamma_5 * tau_3
+	      const complex<real> b(0.0, (chirality ^ flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+	      Ax_chi += b * x_chi;
+	      tmp += Ax_chi.chiral_reconstruct(chirality);
+	    }
+
+	    tmp.toNonRel();
+	    // tmp += (c * tau_1) * x
 	  }
+	  cache.sync();
+	  if (!allthreads || active) {
+	    tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
-	  tmp.toNonRel();
-	  // tmp += (c * tau_1) * x
+	    // add the Wilson part with normalisation
+	    out = tmp + arg.a * out;
+	  }
 	}
-        cache.sync();
-	if (!allthreads || active) {
-	  tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
-
-	  // add the Wilson part with normalisation
-	  out = tmp + arg.a * out;
-	}
-
       } else if (active) {
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out = x + arg.a * out;

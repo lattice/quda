@@ -162,16 +162,17 @@ namespace quda
     }
   };
 
-  template <typename T, int block_dim, int batch_size>
-  struct block_reduce {
+  template <typename T, int block_dim, int batch_size> struct block_reduce {
     template <typename Ops> __device__ __host__ inline block_reduce(Ops &) {};
-    template <typename ...Arg> static constexpr size_t shared_mem_size(dim3 block) {
+    template <typename... Arg> static constexpr size_t shared_mem_size(dim3 block)
+    {
       return SizeBlockDivWarp::size(block) * sizeof(T);
     }
     template <typename reducer_t>
     __device__ __host__ inline T apply(const T &value, bool async, int batch, bool all, const reducer_t &r)
     {
-      return target::dispatch<block_reduce_impl>(value, async, batch, all, r, block_reduce_param<block_dim, batch_size>());
+      return target::dispatch<block_reduce_impl>(value, async, batch, all, r,
+                                                 block_reduce_param<block_dim, batch_size>());
     }
   };
 
