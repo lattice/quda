@@ -17,6 +17,12 @@
 #define GRID_CONSTANT
 #endif
 
+#if defined(__NVCC__) || defined(_NVHPC_CUDA)
+#define MAXNREG(x) __maxnreg__(x)
+#else
+#define MAXNREG(x)
+#endif
+
 namespace quda
 {
 

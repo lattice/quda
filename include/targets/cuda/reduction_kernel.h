@@ -7,12 +7,6 @@
 namespace quda
 {
 
-#if (CUDA_VERSION >= 12040)
-#define MAXNREG(x) __maxnreg__(x)
-#else
-#define MAXNREG(x)
-#endif
-
   /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
      reduction kernel.  Functors that utilize this kernel have two

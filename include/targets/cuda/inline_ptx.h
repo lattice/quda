@@ -38,7 +38,7 @@ namespace quda {
     asm("ld.cs.global.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8+0];"
         : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
         : __PTR(addr));
-    v = {x, y, z, w, a, b, c, d};
+    v = {{x, y, z, w}, {a, b, c, d}};
   }
 
   __device__ inline void load_streaming_float4(float4 &a, const float4* addr)
@@ -104,7 +104,7 @@ namespace quda {
     asm("ld.ca.global.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8+0];"
         : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
         : __PTR(addr));
-    v = {x, y, z, w, a, b, c, d};
+    v = {{x, y, z, w}, {a, b, c, d}};
   }
 
   __device__ inline void load_cached_float2(float2 &a, const float2* addr)

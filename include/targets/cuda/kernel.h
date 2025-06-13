@@ -7,12 +7,6 @@
 namespace quda
 {
 
-#if (CUDA_VERSION >= 12040)
-#define MAXNREG(x) __maxnreg__(x)
-#else
-#define MAXNREG(x)
-#endif
-
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
      kernel.  Functors that utilize this kernel have a
