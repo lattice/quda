@@ -11,6 +11,12 @@
 #define QUDA_CUDA_CC
 #endif
 
+#if defined(__NVCC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && (__clang_major__ >= 20))
+#define GRID_CONSTANT __grid_constant__
+#else
+#define GRID_CONSTANT
+#endif
+
 namespace quda
 {
 
