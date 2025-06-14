@@ -212,7 +212,7 @@ printfQuda("HIIII\n");
     obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
-
+  QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
   smear_param.smear_type = gauge_smear_type;
@@ -435,7 +435,7 @@ printfQuda("HIIII\n");
     out_ptr[n] = out[n].data();
     out_flowed_ptr[n] = out_flowed[n].data();
   }
-  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, Nsrc);
+  performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, &ferm_meas, Nsrc);
   // Prepare rng, fill host spinors with random numbers END
   //-----------------------------------------------------------------------------------
 

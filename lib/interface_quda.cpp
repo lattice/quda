@@ -5772,7 +5772,23 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   popOutputPrefix();
 }
 
-void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
+typedef struct FermMeasObj {
+    std::vector<ColorSpinorField> vec_ref;
+    int i_glob;
+    // std::reference_wrapper<std::vector<int>> i_meas;
+    // std::reference_wrapper<std::vector<Complex>> ppb;
+    
+    
+    // Constructor
+    FermMeasObj(std::vector<ColorSpinorField> vec, int i_g) 
+        : vec_ref(vec), i_glob(i_g) {}
+    
+    // // Optional: getter methods for convenience
+    // std::vector<ColorSpinorField>& get_vector() { return vec_ref.get(); }
+    // const std::vector<ColorSpinorField>& get_vector() const { return vec_ref.get(); }
+} FermMeasObj;
+    
+void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile)
 {
   // const GaugeField gin = gf_list[0].get();
   // GaugeField &g_W0 = gf_list[0].get();
@@ -5796,10 +5812,6 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   std::vector<ColorSpinorField> &f_temp3 = f_temp3_p.get();
   std::vector<ColorSpinorField> f_temp4 = f_temp3_p.get();
 
-  int &i_glob = meas_cinf[0].get();
-  int &measurement_n = meas_cinf[1].get();
-  measurement_n = 0;
-    
   int parity = 0;
 
   // initialize a and b for Laplace operator
@@ -5863,7 +5875,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     
 void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list,
                    std::vector<std::reference_wrapper<GaugeField>> gf_list,  QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                   unsigned int ns_safe, TimeProfile &profile, std::vector<std::reference_wrapper<int>> meas_cinf)
+                   unsigned int ns_safe, TimeProfile &profile, FermMeasObj *ferm_m, std::reference_wrapper<std::vector<ColorSpinorField>> f_init)
 { 
   const GaugeField gin = gf_list[0].get();
   GaugeField &g_W0 = gf_list[0].get();
@@ -5879,9 +5891,9 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   auto &f_temp3 = sf_list[3].get();
   auto &f_temp4 = sf_list[4].get();
 
-  int &i_glob = meas_cinf[0].get();
-  int &measurement_n = meas_cinf[1].get();
-  measurement_n = 0;
+  // int &i_glob = meas_cinf[0].get();
+  // int &measurement_n = meas_cinf[1].get();
+  // measurement_n = 0;
 
   int parity = 0;
 
@@ -5949,23 +5961,24 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     // redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
 
-    i_glob++;
+    ferm_m->i_glob++;
 
-    if (i_glob == 30) {
+    if (ferm_m->i_glob == 30) {
         // ColorSpinorField out;
         printfQuda("below vv is flowed adjoint\n");
         f_temp3[0].PrintVector(0,300,0);
         size_t Nsrc = f_temp4.size();
+        //invertMultiSrcQuda
         for (int n = 0; n < Nsrc; n++){
             invertQuda(f_temp4[n].data(),f_temp3[n].data(),inv_param);
         }
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         t_gf_list = {gaugeTemp,precise};
-        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, i_glob, profile, meas_cinf);
-        // printfQuda("below vv is flowed spinor\n");
-        // f_temp4.PrintVector(0,300,0);
-        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(f_temp4,f_temp3);
-        printfQuda("well soemthing happened %1.5e \n",PsiPsibarR[0]);
+        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
+        printfQuda("below vv is flowed spinor\n");
+        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4 );
+        printfQuda("first component (%1.5e,%1.5e)\n",real(PsiPsibarR[0]),imag(PsiPsibarR[0]));
+        printfQuda("size %lu\n",PsiPsibarR.size());
     } 
 
   }
@@ -6021,7 +6034,7 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 }
 
-void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
                          size_t nSpinors)
 {
 
@@ -6094,6 +6107,9 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     // set [3] = input spinor
     f_temp3[i] = fin[i];
   }
+  std::vector<Complex> ppb;
+  FermMeasObj ferm_m(fin, 0);
+  ferm_meas->ferm_0 = (void **)fin.data();
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
   logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
@@ -6143,7 +6159,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
       logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
-      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, meas_cinf);
+      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, &ferm_m,fin);
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
       for (int j = 0; j < (int) hier_list.size(); j++ ){
@@ -6161,7 +6177,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
               
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,meas_cinf);
+             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,&ferm_m,fin);
              logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
       }
       logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");

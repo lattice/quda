@@ -87,7 +87,7 @@ void run(test_t param)
     obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
-
+  QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
   smear_param.smear_type = gauge_smear_type;
@@ -156,7 +156,7 @@ void run(test_t param)
 
     // Perform two adjoint flow algorithms, these methods dont alter the final value for the gauge so we excecute them first
     host_hier_timer.start();
-    performAdjGFlowHier(check_hier_arr.data(), check_arr.data(), &invParam, &smear_param, Nsrc);
+    performAdjGFlowHier(check_hier_arr.data(), check_arr.data(), &invParam, &smear_param,&ferm_meas, Nsrc);
     host_hier_timer.stop();
     host_safe_timer.start();
     performAdjGFlowSafe(check_safe_arr.data(), check_arr.data(), &invParam, &smear_param, Nsrc);
