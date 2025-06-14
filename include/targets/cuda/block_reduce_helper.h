@@ -302,7 +302,7 @@ namespace quda
 
   template <typename T, int block_dim, int batch_size> struct block_reduce {
     template <typename Ops> __device__ __host__ inline block_reduce(const Ops &) {};
-    template <typename... Arg> static constexpr size_t shared_mem_size(dim3 block, Arg &...)
+    template <typename... Arg> static constexpr size_t shared_mem_size(dim3, Arg &...)
     {
       return 0; // only counts dynamic shared memory (not __shared__)
     }
