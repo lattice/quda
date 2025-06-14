@@ -20,28 +20,31 @@ namespace quda
      @brief Used to declare an object of fixed size.
    */
   template <int N> struct SizeStatic {
-    static constexpr unsigned int size(dim3) { return N; }
+    template <typename... Arg> static constexpr unsigned int size(const dim3, const Arg &...) { return N; }
   };
 
   /**
      @brief Used to declare an object of fixed size per thread, N.
    */
   template <int N> struct SizePerThread {
-    static constexpr unsigned int size(dim3 block) { return N * block.x * block.y * block.z; }
+    template <typename... Arg> static constexpr unsigned int size(const dim3 block, const Arg &...)
+    {
+      return N * block.x * block.y * block.z;
+    }
   };
 
   /**
      @brief Used to declare an object of size equal to the size of the block Z dimension.
    */
   struct SizeZ {
-    static constexpr unsigned int size(dim3 block) { return block.z; }
+    template <typename... Arg> static constexpr unsigned int size(const dim3 block, const Arg &...) { return block.z; }
   };
 
   /**
      @brief Used to declare an object of size equal to the block size divided by the warp size.
    */
   struct SizeBlockDivWarp {
-    static constexpr unsigned int size(dim3 b)
+    template <typename... Arg> static constexpr unsigned int size(const dim3 b, const Arg &...)
     {
       return (b.x * b.y * b.z + device::warp_size() - 1) / device::warp_size();
     }
@@ -51,9 +54,9 @@ namespace quda
      @brief Used to declare an object of fixed size per thread, N, with thread dimensions derermined by D.
    */
   template <typename D, int N = 1> struct SizeDims {
-    static constexpr unsigned int size(dim3 block)
+    template <typename... Arg> static constexpr unsigned int size(const dim3 block, const Arg &...arg)
     {
-      dim3 dims = D::dims(block);
+      dim3 dims = D::dims(block, arg...);
       return dims.x * dims.y * dims.z * N;
     }
   };
@@ -62,14 +65,14 @@ namespace quda
      @brief Used to declare an object with dimensions given by the block size.
    */
   struct DimsBlock {
-    static constexpr dim3 dims(dim3 block) { return block; }
+    template <typename... Arg> static constexpr dim3 dims(const dim3 block, const Arg &...) { return block; }
   };
 
   /**
      @brief Used to declare an object with fixed dimensions.
    */
   template <int x, int y, int z> struct DimsStatic {
-    static constexpr dim3 dims(dim3) { return dim3(x, y, z); }
+    template <typename... Arg> static constexpr dim3 dims(dim3, const Arg &...) { return dim3(x, y, z); }
   };
 
 } // namespace quda
