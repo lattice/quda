@@ -5310,11 +5310,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   if (smear_param->delete_2link != 0) { freeUniqueGaugeQuda(QUDA_SMEARED_LINKS); }
 }
 
-void fermObservables(void* ferm_out, void* ferm_in, GaugeField *u, QudaInvertParam &invParam ){
-
-    
-}
-
 void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
 {
   auto profile = pushProfile(profileGaugeSmear);
@@ -5775,17 +5770,14 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 typedef struct FermMeasObj {
     std::vector<ColorSpinorField> vec_ref;
     int i_glob;
-    // std::reference_wrapper<std::vector<int>> i_meas;
-    // std::reference_wrapper<std::vector<Complex>> ppb;
+    std::vector<int> meas_list;
+    std::vector<std::vector<Complex>> ppb;
     
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> vec, int i_g) 
-        : vec_ref(vec), i_glob(i_g) {}
-    
-    // // Optional: getter methods for convenience
-    // std::vector<ColorSpinorField>& get_vector() { return vec_ref.get(); }
-    // const std::vector<ColorSpinorField>& get_vector() const { return vec_ref.get(); }
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb) {}
+
 } FermMeasObj;
     
 void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile)
@@ -5891,9 +5883,13 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   auto &f_temp3 = sf_list[3].get();
   auto &f_temp4 = sf_list[4].get();
 
-  // int &i_glob = meas_cinf[0].get();
-  // int &measurement_n = meas_cinf[1].get();
-  // measurement_n = 0;
+  size_t Nsrc = f_temp4.size();
+  std::vector<void*> data_f_temp3, data_f_temp4;
+  for (int n = 0; n < Nsrc; n++){
+      data_f_temp3.push_back(f_temp3[n].data());
+      data_f_temp4.push_back(f_temp4[n].data());
+            // invertQuda(f_temp4[n].data(),f_temp3[n].data(),inv_param);
+  }
 
   int parity = 0;
 
@@ -5962,21 +5958,23 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     f_temp3 = f_temp0;
 
     ferm_m->i_glob++;
-
     if (ferm_m->i_glob == 30) {
         // ColorSpinorField out;
         printfQuda("below vv is flowed adjoint\n");
         f_temp3[0].PrintVector(0,300,0);
         size_t Nsrc = f_temp4.size();
         //invertMultiSrcQuda
-        for (int n = 0; n < Nsrc; n++){
-            invertQuda(f_temp4[n].data(),f_temp3[n].data(),inv_param);
-        }
+        // for (int n = 0; n < Nsrc; n++){
+        //     invertQuda(f_temp4[n].data(),f_temp3[n].data(),inv_param);
+        // }
+    invertMultiSrcQuda(data_f_temp4.data(),data_f_temp3.data(),inv_param);
+    
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
         printfQuda("below vv is flowed spinor\n");
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4 );
+        ferm_m->ppb.push_back(PsiPsibarR);
         printfQuda("first component (%1.5e,%1.5e)\n",real(PsiPsibarR[0]),imag(PsiPsibarR[0]));
         printfQuda("size %lu\n",PsiPsibarR.size());
     } 
@@ -6107,8 +6105,10 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     // set [3] = input spinor
     f_temp3[i] = fin[i];
   }
-  std::vector<Complex> ppb;
-  FermMeasObj ferm_m(fin, 0);
+
+  std::vector<int> meas_list = {};
+  std::vector<std::vector<Complex>> ppb;
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb);
   ferm_meas->ferm_0 = (void **)fin.data();
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
