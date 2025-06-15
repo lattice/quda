@@ -5771,12 +5771,12 @@ typedef struct FermMeasObj {
     std::vector<ColorSpinorField> vec_ref;
     int i_glob;
     std::vector<int> meas_list;
+    int meas_interval;
     std::vector<std::vector<Complex>> ppb;
     
-    
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb) {}
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval = 5) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval) {}
 
 } FermMeasObj;
     
@@ -5888,7 +5888,6 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   for (int n = 0; n < Nsrc; n++){
       data_f_temp3.push_back(f_temp3[n].data());
       data_f_temp4.push_back(f_temp4[n].data());
-            // invertQuda(f_temp4[n].data(),f_temp3[n].data(),inv_param);
   }
 
   int parity = 0;
@@ -5958,27 +5957,16 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     f_temp3 = f_temp0;
 
     ferm_m->i_glob++;
-    if (ferm_m->i_glob == 30) {
-        // ColorSpinorField out;
-        printfQuda("below vv is flowed adjoint\n");
-        f_temp3[0].PrintVector(0,300,0);
-        size_t Nsrc = f_temp4.size();
-        //invertMultiSrcQuda
-        // for (int n = 0; n < Nsrc; n++){
-        //     invertQuda(f_temp4[n].data(),f_temp3[n].data(),inv_param);
-        // }
-    invertMultiSrcQuda(data_f_temp4.data(),data_f_temp3.data(),inv_param);
-    
+    if ((ferm_m->i_glob % ferm_m->meas_interval) == 0) {
+        ferm_m->meas_list.push_back(ferm_m->i_glob);
+        invertMultiSrcQuda(data_f_temp4.data(),data_f_temp3.data(),inv_param);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
-        printfQuda("below vv is flowed spinor\n");
-        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4 );
+        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
         ferm_m->ppb.push_back(PsiPsibarR);
-        printfQuda("first component (%1.5e,%1.5e)\n",real(PsiPsibarR[0]),imag(PsiPsibarR[0]));
-        printfQuda("size %lu\n",PsiPsibarR.size());
     } 
-
+    
   }
 
 }
@@ -6109,7 +6097,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
   FermMeasObj ferm_m(fin, 0, meas_list, ppb);
-  ferm_meas->ferm_0 = (void **)fin.data();
+  
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
   logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
@@ -6207,6 +6195,13 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
     ColorSpinorField fout_h(cpuParam);
     fout_h = sf_list[0].get()[i];
+  }
+  // ferm_meas->ppb = (void **)fin.data();
+  auto* ppb_ptr = reinterpret_cast<std::vector<std::vector<Complex>>*>(*ferm_meas->ppb);
+  size_t len_ppb = ferm_m.ppb.size();
+  printfQuda("size of ppb recon %i\n",len_ppb);
+  for (size_t i = 0; i < len_ppb; i++){
+      ppb_ptr->push_back(ferm_m.ppb[i]);
   }
 
   logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");

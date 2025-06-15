@@ -861,10 +861,8 @@ extern "C" {
 
   typedef struct QudaFermMeasurements_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    void **ferm_0; /**< initial (adj) fermion array */
-    unsigned int i_glob; /**<global counter for hierarchical adjoint flow*/
-    unsigned int i_meas;
-    double_complex **ppb;
+    void **ppb;
+    unsigned int meas_n;
   } QudaFermMeasurements;
 
   typedef struct QudaGaugeSmearParam_s {

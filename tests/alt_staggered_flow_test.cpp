@@ -120,14 +120,9 @@ void add_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup
     ->add_option(
       "--has_naik",
-      has_naik, "has naik");
+      has_naik, "has naik (for charm)");
 
 }
-
-GaugeField cpuFatQDP = {};
-GaugeField cpuLongQDP = {};
-GaugeField cpuFatMILC = {};
-GaugeField cpuLongMILC = {};
 
 int main(int argc, char **argv)
 {
@@ -330,7 +325,14 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     
-  
+    
+    ferm_meas.meas_n = 5;
+    std::vector<std::vector<std::complex<double>>> ppb;
+    void* ptr_ppb = &ppb;
+    void** data_ppb = &ptr_ppb;
+    ferm_meas.ppb = data_ppb;
+
+    printfQuda("At start ppb has %i elements\n",ppb.size());
     //simulates what user might do from external library
 
 // Prepare rng, fill host spinors with random numbers
@@ -356,7 +358,12 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
 
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, &ferm_meas, Nsrc);
 
+  printfQuda("At end ppb has %i elements\n",ppb.size());
 
+  in_raw = {};
+  in = {};
+  out = {};
+  out_flowed = {};
 
   freeGaugeQuda();
   endQuda();
