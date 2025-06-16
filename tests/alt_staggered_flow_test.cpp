@@ -39,13 +39,8 @@ int measurement_interval = 5;
 bool su_project = true;
 bool has_naik = false;
 int n_naiks = 1;
+unsigned int meas_int = 5;
 
-static double unitarize_eps = 1e-6;
-static bool reunit_allow_svd = true;
-static bool reunit_svd_only = false;
-static double svd_rel_error = 1e-4;
-static double svd_abs_error = 1e-4;
-static double max_allowed_error = 1e-11;
 void *milc_sitelink = nullptr;
 
 // storage for CPU reference fat and long links w/zero Naik
@@ -113,7 +108,7 @@ void display_test_info()
   return;
 }
 
-void add_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
+void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
     //   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("HISQ", "Options controlling HISQ parameters");
@@ -121,6 +116,10 @@ void add_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option(
       "--has_naik",
       has_naik, "has naik (for charm)");
+  opgroup
+    ->add_option(
+      "--meas_int",
+      meas_int, "measurement interval for psipsibar");
 
 }
 
@@ -130,7 +129,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   add_su3_option_group(app);
   add_eigen_option_group(app);
-  add_hisq_option_group(app);
+  add_adj_hisq_option_group(app);
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
   add_comms_option_group(app);
@@ -242,7 +241,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
     obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
 
-  QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
+  
 
   // We here set all the problem parameters for all possible smearing types.
   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
@@ -325,14 +324,16 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     
-    
-    ferm_meas.meas_n = 5;
+    QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
+    ferm_meas.meas_int = meas_int;
     std::vector<std::vector<std::complex<double>>> ppb;
     void* ptr_ppb = &ppb;
     void** data_ppb = &ptr_ppb;
     ferm_meas.ppb = data_ppb;
+    std::vector<int> meas_list;
+    ferm_meas.meas_list = (void *) &meas_list;
 
-    printfQuda("At start ppb has %i elements\n",ppb.size());
+    printfQuda("At start ppb has %li elements\n",ppb.size());
     //simulates what user might do from external library
 
 // Prepare rng, fill host spinors with random numbers
@@ -358,7 +359,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
 
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, &ferm_meas, Nsrc);
 
-  printfQuda("At end ppb has %i elements\n",ppb.size());
+  printfQuda("At end ppb has %li elements\n",ppb.size());
 
   in_raw = {};
   in = {};

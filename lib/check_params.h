@@ -1229,10 +1229,11 @@ void printQudaFermMeasurements(QudaFermMeasurements *param)
 #endif
 
 #ifdef INIT_PARAM
-  P(meas_n, 5);
+  P(meas_int, 5);
   P(ppb, nullptr);
+  P(meas_list, nullptr);  
 #else
-  P(meas_n, (unsigned int)INVALID_INT);
+  P(meas_int, (unsigned int)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

@@ -5771,11 +5771,11 @@ typedef struct FermMeasObj {
     std::vector<ColorSpinorField> vec_ref;
     int i_glob;
     std::vector<int> meas_list;
-    int meas_interval;
     std::vector<std::vector<Complex>> ppb;
+    int meas_interval;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval = 5) 
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval) 
         : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval) {}
 
 } FermMeasObj;
@@ -6096,7 +6096,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb);
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int);
   
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
@@ -6137,10 +6137,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> gf_list;
   gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
-
-  // first one is global counter, second is meas counter
-  int i_glob = 0, measurement_n = 0;
-  std::vector<std::reference_wrapper<int>> meas_cinf {i_glob, measurement_n};
 
   int hier_loop_counter = 0;
   while (ret_idx != -1){
@@ -6196,12 +6192,17 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     ColorSpinorField fout_h(cpuParam);
     fout_h = sf_list[0].get()[i];
   }
-  // ferm_meas->ppb = (void **)fin.data();
+
   auto* ppb_ptr = reinterpret_cast<std::vector<std::vector<Complex>>*>(*ferm_meas->ppb);
+  auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
   size_t len_ppb = ferm_m.ppb.size();
-  printfQuda("size of ppb recon %i\n",len_ppb);
+  size_t len_meas_list = ferm_m.meas_list.size();
+  printfQuda("size of ppb recon %li\n",len_ppb);
   for (size_t i = 0; i < len_ppb; i++){
       ppb_ptr->push_back(ferm_m.ppb[i]);
+  }
+  for (size_t i = 0; i < len_meas_list; i++){
+      meas_list_ptr->push_back(ferm_m.meas_list[i]);
   }
 
   logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");
