@@ -99,7 +99,7 @@ namespace quda
                     const lat_dim_t &local_block)
   {
     checkNative(src);
-    if (!is_enabled_spin(src.Nspin())) errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+    if (!is_enabled_spin(src.Nspin())) errorQuda("spinorDilute has not been built for nSpin=%d fields", src.Nspin());
 
     if (src.Nspin() == 4) {
       if constexpr (is_enabled_spin(4)) spinorDilute<real, 4>(src, v, type, local_block, IntList<3>());

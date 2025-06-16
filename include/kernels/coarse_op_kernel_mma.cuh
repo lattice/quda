@@ -11,6 +11,7 @@
 #include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
+#include <kernel_ops_target.h>
 
 namespace quda
 {
@@ -76,7 +77,7 @@ namespace quda
         constexpr int ldb = N;
         constexpr int ldc = N;
 
-        using mma_t = typename mma::mg_mma_setup_t<typename Arg::Float>::type;
+        using mma_t = typename mma::mg_mma_setup_t<typename Arg::store_t>::type;
         using Config = MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
         if (Arg::dir == QUDA_IN_PLACE) {
@@ -161,7 +162,8 @@ namespace quda
 
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
-          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
+          KernelOps<BlockReduce<unsigned, block_dim>> ops {};
+          unsigned aggregate = BlockReduce<unsigned, block_dim> {ops}.Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }
@@ -214,9 +216,10 @@ namespace quda
         constexpr int ldb = N;
         constexpr int ldc = N * coarseSpin;
 
-        using mma_t = typename mma::mg_mma_setup_t<typename Arg::Float>::type;
+        using mma_t = typename mma::mg_mma_setup_t<typename Arg::store_t>::type;
 
-        extern __shared__ typename mma_t::compute_t smem_ptr[];
+        extern __shared__ int smem[];
+        auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
 
         using Config = MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 

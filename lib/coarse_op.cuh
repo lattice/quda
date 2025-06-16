@@ -787,7 +787,7 @@ namespace quda {
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(Aux, mma::mg_mma_setup_t<Float>::type::get_type_name().c_str());
+          strcat(Aux, mma::mg_mma_setup_t<typename Arg::store_t>::type::get_type_name().c_str());
 #endif
         }
       }
@@ -802,7 +802,7 @@ namespace quda {
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
 #ifdef QUDA_MMA_AVAILABLE
-          strcat(Aux, mma::mg_mma_setup_t<Float>::type::get_type_name().c_str());
+          strcat(Aux, mma::mg_mma_setup_t<typename Arg::store_t>::type::get_type_name().c_str());
 #endif
         }
       }
@@ -966,7 +966,7 @@ namespace quda {
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
      if some previous level was preconditioned, even if this one isn't
    */
-  template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin,
+  template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, typename store_t, int fineSpin, int fineColor, int coarseSpin,
             int coarseColor, typename avSpinor, typename uvSpinor, typename vSpinor, typename coarseGauge, typename coarseGaugeAtomic,
             typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, uvSpinor &UV,
@@ -1037,7 +1037,7 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
+    using Arg = CalculateYArg<from_coarse, Float, store_t, fineSpin, coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, v, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));

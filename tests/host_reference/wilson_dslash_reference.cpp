@@ -6,6 +6,10 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 
+// to detect which Dirac types are enabled
+#include <instantiate.h>
+
+#include "instantiate_host.hpp"
 #include "host_utils.h"
 #include "index_utils.hpp"
 #include "util_quda.h"
@@ -38,49 +42,56 @@ using namespace quda;
  * @param[in] parity The parity of the dslash (0 for even, 1 for odd).
  * @param[in] dagger Whether to apply the original or the Hermitian conjugate operator
  */
-template <typename real_t>
-void dslashReference(real_t *res, const real_t *const *gaugeFull, const real_t *const *ghostGauge,
-                     const real_t *spinorField, const real_t *const *fwdSpinor, const real_t *const *backSpinor,
-                     int parity, int dagger)
-{
-#pragma omp parallel for
-  for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
-
-  const real_t *gaugeEven[4], *gaugeOdd[4];
-  const real_t *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
-  const real_t *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
-  for (int dir = 0; dir < 4; dir++) {
-    gaugeEven[dir] = gaugeFull[dir];
-    gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
-
-    if (is_multi_gpu()) {
-      ghostGaugeEven[dir] = ghostGauge[dir];
-      ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-    }
-  }
+template <typename real_t> struct DslashReference {
+  void operator()(void *res_, const void *const *gaugeFull_, const void *const *ghostGauge_, const void *spinorField_,
+                  const void *const *fwdSpinor_, const void *const *backSpinor_, int parity, int dagger)
+  {
+    auto res = reinterpret_cast<real_t *>(res_);
+    auto gaugeFull = reinterpret_cast<const real_t *const *>(gaugeFull_);
+    auto ghostGauge = reinterpret_cast<const real_t *const *>(ghostGauge_);
+    auto spinorField = reinterpret_cast<const real_t *>(spinorField_);
+    auto fwdSpinor = reinterpret_cast<const real_t *const *>(fwdSpinor_);
+    auto backSpinor = reinterpret_cast<const real_t *const *>(backSpinor_);
 
 #pragma omp parallel for
-  for (int i = 0; i < Vh; i++) {
+    for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
-    for (int dir = 0; dir < 8; dir++) {
-      const real_t *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      const real_t *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+    const real_t *gaugeEven[4], *gaugeOdd[4];
+    const real_t *ghostGaugeEven[4] = {nullptr, nullptr, nullptr, nullptr};
+    const real_t *ghostGaugeOdd[4] = {nullptr, nullptr, nullptr, nullptr};
+    for (int dir = 0; dir < 4; dir++) {
+      gaugeEven[dir] = gaugeFull[dir];
+      gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
 
-      real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
-      int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
-      multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
-
-      for (int s = 0; s < 4; s++) {
-        if (dir % 2 == 0)
-          su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
-        else
-          su3Tmul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+      if (is_multi_gpu()) {
+        ghostGaugeEven[dir] = ghostGauge[dir];
+        ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
       }
+    }
 
-      sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
+#pragma omp parallel for
+    for (int i = 0; i < Vh; i++) {
+
+      for (int dir = 0; dir < 8; dir++) {
+        const real_t *gauge = gaugeLink(i, dir, parity, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
+        const real_t *spinor = spinorNeighbor(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+
+        real_t projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+        int projIdx = 2 * (dir / 2) + (dir + dagger) % 2;
+        multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
+
+        for (int s = 0; s < 4; s++) {
+          if (dir % 2 == 0)
+            su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+          else
+            su3Tmul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+        }
+
+        sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
+      }
     }
   }
-}
+};
 
 void wil_dslash(void *out, const void *const *gauge, const void *in, int parity, int dagger, QudaPrecision precision,
                 const QudaGaugeParam &gauge_param)
@@ -127,13 +138,8 @@ void wil_dslash(void *out, const void *const *gauge, const void *in, int parity,
   void **fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
   void **back_nbr_spinor = inField.backGhostFaceBuffer;
 
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    dslashReference((double *)out, (double **)gauge, (double **)ghostGauge, (double *)in, (double **)fwd_nbr_spinor,
-                    (double **)back_nbr_spinor, parity, dagger);
-  } else {
-    dslashReference((float *)out, (float **)gauge, (float **)ghostGauge, (float *)in, (float **)fwd_nbr_spinor,
-                    (float **)back_nbr_spinor, parity, dagger);
-  }
+  instantiate_host<DslashReference>(precision, out, gauge, ghostGauge, in, fwd_nbr_spinor, back_nbr_spinor, parity,
+                                    dagger);
 }
 
 // applies b*(1 + i*a*gamma_5)

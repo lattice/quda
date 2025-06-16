@@ -644,11 +644,28 @@ typedef enum QudaExtLibType_s {
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 
+typedef enum QudaDDType_s { QUDA_DD_NO, QUDA_DD_RED_BLACK, QUDA_DD_INVALID = QUDA_INVALID_ENUM } QudaDDType;
+
 typedef enum QudaWFlowStepType_s {
   WFLOW_STEP_W1,
   WFLOW_STEP_W2,
   WFLOW_STEP_VT,
+  WFLOW_FOURTH_ORDER_STEP_1,
+  WFLOW_FOURTH_ORDER_STEP_2,
+  WFLOW_FOURTH_ORDER_STEP_3,
+  WFLOW_FOURTH_ORDER_STEP_4,
+  WFLOW_FOURTH_ORDER_STEP_5,
+  WFLOW_FOURTH_ORDER_STEP_6,
 } QudaWFlowStepType;
+
+// Used by update_split_gauge
+typedef enum QudaUpdateSplitGauge_s {
+  QUDA_UPDATE_SPLIT_GAUGE_OFF, // will not use split gauge buffers
+  QUDA_UPDATE_SPLIT_GAUGE_TRUE
+  = 1, // the input gauge fields will be split and the buffered (split) gauges will be updated accordingly
+  QUDA_UPDATE_SPLIT_GAUGE_FALSE
+  = 0, // the input gauge fields will not be split and the buffered (split) gauges will be used for split grid solves
+} QudaUpdateSplitGauge;
 
 #ifdef __cplusplus
 }

@@ -31,8 +31,13 @@ namespace quda
       Rmat[i].resize(n_kr, 0.0);
     }
 
-    if (eig_param->qr_tol == 0) { eig_param->qr_tol = eig_param->tol * 1e-2; }
-
+    // Set reasonable default for QR tol, supply warning if outside of this bound
+    if (qr_tol == 0) { qr_tol = tol * 1e-3; }
+    if (qr_tol > tol * 1e-3) {
+      warningQuda("QR tolerances greater than eig_tol * 1e-3 can cause instability in IRAM, please revise this option "
+                  "if instability is observed (eig_tol = %e, qr_tol = %e)",
+                  tol, qr_tol);
+    }
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -217,7 +222,7 @@ namespace quda
     Complex T11, T12, T21, T22, U1, U2;
     double dV;
 
-    double tol = eig_param->qr_tol;
+    double tol = qr_tol;
 
     // Allocate the rotation matrices.
     std::vector<Complex> R11(n_kr - 1, 0.0);
@@ -342,16 +347,13 @@ namespace quda
         }
       }
 
-      // This is about as high as one cat get in double without causing
-      // the Arnoldi to compute more restarts.
-      double tol = eig_param->qr_tol;
       int max_iter = 100000;
       int iter = 0;
 
       Complex temp, discriminant, sol1, sol2, eval;
       for (int i = n_kr - 2; i >= 0; i--) {
         while (iter < max_iter) {
-          if (abs(Rmat[i + 1][i]) < tol) {
+          if (abs(Rmat[i + 1][i]) < qr_tol) {
             Rmat[i + 1][i] = 0.0;
             break;
           } else {

@@ -19,11 +19,11 @@ namespace quda {
     //structure to V but double the number of spins so we can store
     //the four distinct block chiral multiplications in a single UV
     //computation.
-    ColorSpinorParam UVparam(T.Vectors(location));
+    ColorSpinorParam UVparam(T.Vectors());
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.nSpin *= 2; // so nSpin == 4
-    UVparam.setPrecision(T.Vectors(location).Precision());
+    UVparam.setPrecision(T.Vectors().Precision());
     UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);

@@ -34,6 +34,7 @@ namespace quda
     n_conv = eig_param->n_conv;
     n_ev_deflate = (eig_param->n_ev_deflate == -1 ? n_conv : eig_param->n_ev_deflate);
     tol = eig_param->tol;
+    qr_tol = eig_param->qr_tol;
     reverse = false;
 
     // Algorithm variables
@@ -196,6 +197,7 @@ namespace quda
 
     logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum.c_str());
     logQuda(QUDA_VERBOSE, "tol %.4e\n", tol);
+    if (qr_tol != 0) logQuda(QUDA_VERBOSE, "qr_tol %.4e\n", qr_tol);
     logQuda(QUDA_VERBOSE, "n_conv %d\n", n_conv);
     logQuda(QUDA_VERBOSE, "n_ev %d\n", n_ev);
     logQuda(QUDA_VERBOSE, "n_kr %d\n", n_kr);

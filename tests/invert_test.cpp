@@ -9,10 +9,11 @@
 #include <color_spinor_field.h> // convenient quark field container
 
 // External headers
-#include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
+#include "misc.h"
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
 #include "test.h"
 
 QudaGaugeParam gauge_param;
@@ -120,6 +121,11 @@ void init(int argc, char **argv)
 {
   // Set QUDA's internal parameters
   gauge_param = newQudaGaugeParam();
+  if (use_split_gauge_bkup == 1) {
+    gauge_param.use_split_gauge_bkup = true;
+  } else {
+    gauge_param.use_split_gauge_bkup = false;
+  }
   setWilsonGaugeParam(gauge_param);
 
   inv_param = newQudaInvertParam();

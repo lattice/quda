@@ -89,7 +89,7 @@ namespace quda
   };
 
   template <int contiguous_dim, int contiguous_limit, int elements_per_thread, class gmem_obj_t, class Arg, class Op>
-  __device__ inline void loop_over(const gmem_obj_t &gmem, int x_coarse, int coarse_spin, int contiguous_dim_offset,
+  __device__ inline void loop_over(const gmem_obj_t &gmem, int, int coarse_spin, int contiguous_dim_offset,
                                    int aggregate_k_offset, int *coarse_to_fine, const Arg &arg, Op op)
   {
     int thread = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
@@ -258,7 +258,8 @@ namespace quda
 
     static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
-    extern __shared__ typename mma_t::compute_t smem_ptr[];
+    extern __shared__ int smem[];
+    auto smem_ptr = reinterpret_cast<typename mma_t::compute_t*>(smem);
 
     typename Config::SmemObjA smem_obj_a_real(smem_ptr);
     typename Config::SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + Config::smem_lda * Arg::bK);

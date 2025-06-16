@@ -1,5 +1,6 @@
 #pragma once
 
+#include <quda_api.h>
 #include <type_traits>
 #include <algorithm>
 #ifdef _NVHPC_CUDA
@@ -8,6 +9,12 @@
 
 #if defined(__CUDACC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
 #define QUDA_CUDA_CC
+#endif
+
+#if defined(__NVCC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && (__clang_major__ >= 20))
+#define GRID_CONSTANT __grid_constant__
+#else
+#define GRID_CONSTANT
 #endif
 
 namespace quda
@@ -194,7 +201,7 @@ namespace quda
        @brief Helper function that returns the default max kernel arg
        size when QUDA_LARGE_KERNEL_ARG is not enabled.
      */
-    constexpr size_t max_kernel_arg_legacy_size() { return 4096; }
+    constexpr size_t max_kernel_arg_legacy_size() { return MAX_KERNEL_ARG_SIZE; }
 
     /**
        @brief Helper function that returns the maximum static size of

@@ -108,7 +108,12 @@ TEST_P(StaggeredInvertTest, verify)
   if (solve_type == QUDA_DIRECT_SOLVE && inverter_type == QUDA_CA_GCR_INVERTER) inv_param.ca_basis = QUDA_POWER_BASIS;
 
   // Single precision needs a tiny bump due to small host/device precision deviations
-  if (prec == QUDA_SINGLE_PRECISION) verify_tol *= 1.01;
+  if (prec == QUDA_SINGLE_PRECISION) verify_tol *= 1.03;
+
+  // account for summation error scaling with number of processors
+  auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
+  verify_tol *= (1 + log(quda::comm_size()) / log(dof));
+  tol_hq *= (1 + log(quda::comm_size()) / log(dof));
 
   for (auto rsd : solve(GetParam())) {
     if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], verify_tol); }

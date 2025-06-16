@@ -70,6 +70,10 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
+    union {
+      bool use_split_gauge_bkup; /**< Used by gauge split buffers (default=true keep split gauge after usage)*/
+      int pad;                   /**< Forces 4-byte alignment */
+    };
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
@@ -839,6 +843,8 @@ extern "C" {
     QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
     double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_rectangle;        /**< Whether to compute the rectangle */
+    double rectangle[3];                  /**< Total, spatial and temporal rectangle, respectively */
     QudaBoolean compute_polyakov_loop;    /**< Whether to compute the temporal Polyakov loop */
     double ploop[2];                      /**< Real and imaginary part of temporal Polyakov loop */
     QudaBoolean compute_gauge_loop_trace; /**< Whether to compute gauge loop traces */
@@ -865,6 +871,8 @@ extern "C" {
     unsigned int n_steps; /**< The total number of smearing steps to perform. */
     double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
                              Wilson/Symanzik flow */
+    double smear_anisotropy; /** Used in anisotropic Wilson/Symanzik flow and APE, STOUT, and OvrimpSTOUT **/
+    unsigned int rk_order;   /** Order of the Runga-Kutta integrator: 3 or 4 **/
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     double alpha1;                 /**< The coefficient used in HYP smearing step 3 (will not be used in 3D smearing)*/
@@ -872,6 +880,8 @@ extern "C" {
     double alpha3;                 /**< The coefficient used in HYP smearing step 1*/
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+    unsigned int adj_n_save; /**< How many intermediate gauge fields to save at each large nblock to perform adj flow*/
+    unsigned int hier_threshold;   /**< Minimum *hierarchical* threshold for adj gradient flow*/
     QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
     double t0;                     /**< Starting flow time for Wilson flow */
     int dir_ignore;                /**< The direction to be ignored by the smearing algorithm
@@ -1696,14 +1706,42 @@ extern "C" {
 
   /**
    * Performs Gradient Flow (gauge + fermion) on gaugePrecise and stores it in gaugeSmeared
-   * @param[out] h_out Output fermion field
-   * @param[in] h_in Input fermion field
+   * @param[out] h_out Output fermion field set
+   * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
    * @param[in] smear_param Parameter struct that defines the computation parameters
    * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
+   * @param[in] nSpinors Number of spinors in the input and output fields
    */
-  void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                        QudaGaugeObservableParam *obs_param);
+  void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                        QudaGaugeObservableParam *obs_param, size_t nSpinors);
+
+  /**
+   * Performs Adjoint Gradient Flow (gauge + fermion) the "safe" way on gaugePrecise and stores it in gaugeSmeared
+   * @param[out] h_out Output fermion field set
+   * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   * @param[in] nSpinors Number of spinors in the input and output fields
+   */
+  void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                           size_t nSpinors);
+
+  /**
+   * Performs Adjoint Gradient Flow (gauge + fermion) the Hierarchical way on gaugePrecise and stores it in gaugeSmeared
+   * @param[out] h_out Output fermion field set
+   * @param[in] h_in Input fermion field set
+   * @param[in] inv_param Dirac/Laplacian and solver meta data
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   * @param[in] nSpinors Number of spinors in the input and output fields
+   */
+  void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                           size_t nSpinors);
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a

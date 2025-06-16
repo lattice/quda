@@ -38,8 +38,7 @@ namespace quda {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
       constexpr QudaCloverFieldOrder clOrder = QUDA_PACKED_CLOVER_ORDER;
 
-      if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d", T.Vectors(Y.Location()).FieldOrder());
+      if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
       if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d", c.Order());
 
@@ -50,7 +49,7 @@ namespace quda {
       using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
       using cFine = typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder>;
 
-      const ColorSpinorField &v = T.Vectors(g.Location());
+      const ColorSpinorField &v = T.Vectors();
 
       V vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -63,7 +62,7 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, vFloat, fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
 	 avAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
          kappa, mass, mu, mu_factor, staggered_allow_truncation, dirac, matpc, need_bidirectional,
@@ -75,8 +74,7 @@ namespace quda {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
       constexpr QudaCloverFieldOrder clOrder = QUDA_FLOAT4_CLOVER_ORDER;
 
-      if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d", T.Vectors(Y.Location()).FieldOrder());
+      if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
       if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d", c.Order());
 
@@ -86,7 +84,7 @@ namespace quda {
       using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
       using cFine = typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder>;
 
-      const ColorSpinorField &v = T.Vectors(g.Location());
+      const ColorSpinorField &v = T.Vectors();
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -99,7 +97,7 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField &>(c), c.Inverse());
 
-      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, vFloat, fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
          avAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
          kappa, mass, mu, mu_factor, staggered_allow_truncation, dirac, matpc, need_bidirectional,
@@ -115,7 +113,7 @@ namespace quda {
   {
     if constexpr (is_enabled_multigrid()) {
       checkPrecision(Xatomic, Yatomic, g);
-      checkPrecision(uv, av, T.Vectors(X.Location()), X, Y);
+      checkPrecision(uv, av, T.Vectors(), X, Y);
       logQuda(QUDA_SUMMARIZE, "Computing Y field......\n");
 
       if (!is_enabled(Y.Precision())) errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, Y.Precision());
@@ -217,10 +215,10 @@ namespace quda {
     }
 
     //Create a field UV which holds U*V.  Has the same structure as V.
-    ColorSpinorParam UVparam(T.Vectors(location));
+    ColorSpinorParam UVparam(T.Vectors());
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
-    UVparam.setPrecision(T.Vectors(location).Precision());
+    UVparam.setPrecision(T.Vectors().Precision());
     UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
@@ -228,7 +226,8 @@ namespace quda {
     // if we are coarsening a preconditioned clover or twisted-mass operator we need
     // an additional vector to store the cloverInv * V field, else just alias v
     ColorSpinorField *av = ((matpc != QUDA_MATPC_INVALID && clover) || (dirac == QUDA_TWISTED_MASSPC_DIRAC)) ?
-      ColorSpinorField::Create(UVparam) : &const_cast<ColorSpinorField&>(T.Vectors(location));
+      ColorSpinorField::Create(UVparam) :
+      &const_cast<ColorSpinorField &>(T.Vectors());
 
     GaugeField *Yatomic = &Y;
     GaugeField *Xatomic = &X;
@@ -248,7 +247,7 @@ namespace quda {
     if (Yatomic != &Y) delete Yatomic;
     if (Xatomic != &X) delete Xatomic;
 
-    if (&T.Vectors(location) != av) delete av;
+    if (&T.Vectors() != av) delete av;
     delete uv;
 
     if (C != clover) delete C;

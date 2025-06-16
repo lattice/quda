@@ -81,7 +81,7 @@ namespace quda
     /**
        @param Helper function to check that the present launch parameters are valid
     */
-    bool checkParam(const TuneParam &param) const { return true; }
+    bool checkParam(const TuneParam &) const { return true; }
 
     bool advanceTuneParam(TuneParam &param) const { return expand.advance_aux(param); }
 
