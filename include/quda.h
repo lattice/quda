@@ -70,6 +70,10 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
+    union {
+      bool use_split_gauge_bkup; /**< Used by gauge split buffers (default=true keep split gauge after usage)*/
+      int pad;                   /**< Forces 4-byte alignment */
+    };
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */

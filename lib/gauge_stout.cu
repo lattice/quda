@@ -22,8 +22,7 @@ namespace quda
     unsigned int sharedBytesPerThread() const
     {
       // use ThreadLocalCache if using over improvement for two link fields
-      return (improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0)
-        + 4 * sizeof(int); // for thread_array
+      return improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
     }
 
   public:

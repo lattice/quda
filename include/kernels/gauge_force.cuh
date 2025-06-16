@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <thread_array.h>
+#include <byte_array.h>
 #include <kernel.h>
 #include <gauge_path_helper.cuh>
 
@@ -44,10 +44,9 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct GaugeForce : KernelOps<thread_array<int, 4>> {
+  template <typename Arg> struct GaugeForce {
     const Arg &arg;
-    template <typename... OpsArgs>
-    constexpr GaugeForce(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
+    constexpr GaugeForce(const Arg &arg) : arg(arg)
     {
     }
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -64,7 +63,7 @@ namespace quda {
       // prod: current matrix product
       // accum: accumulator matrix
       Link link_prod, accum;
-      thread_array<int, 4> dx {*this};
+      byte_array<int8_t, 4> dx = {};
 
       for (int i=0; i<arg.p.num_paths; i++) {
         real coeff = arg.p.path_coeff[i];

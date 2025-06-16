@@ -89,7 +89,7 @@ namespace quda
   };
 
   template <int contiguous_dim, int contiguous_limit, int elements_per_thread, class gmem_obj_t, class Arg, class Op>
-  __device__ inline void loop_over(const gmem_obj_t &gmem, int x_coarse, int coarse_spin, int contiguous_dim_offset,
+  __device__ inline void loop_over(const gmem_obj_t &gmem, int, int coarse_spin, int contiguous_dim_offset,
                                    int aggregate_k_offset, int *coarse_to_fine, const Arg &arg, Op op)
   {
     int thread = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
