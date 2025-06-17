@@ -40,6 +40,7 @@ int measurement_interval = 5;
 bool su_project = true;
 bool has_naik = false;
 int n_naiks = 1;
+double eps_naik = 0.0;
 unsigned int meas_int = 5;
 
 void *milc_sitelink = nullptr;
@@ -115,12 +116,16 @@ void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup = quda_app->add_option_group("HISQ", "Options controlling HISQ parameters");
   opgroup
     ->add_option(
-      "--has_naik",
+      "--has-naik",
       has_naik, "has naik (for charm)");
   opgroup
     ->add_option(
-      "--meas_int",
+      "--meas-int",
       meas_int, "measurement interval for psipsibar");
+  opgroup
+    ->add_option(
+      "--eps-naik",
+      eps_naik, "epsilon naik term");
 
 }
 
@@ -156,12 +161,15 @@ int main(int argc, char **argv)
   // All user inputs are now defined
   display_test_info();
     if (has_naik) {
-    eps_naik = -0.03; // semi-arbitrary
-    n_naiks = 2;
+        if (eps_naik == 0.0) errorQuda("Naik term switched on: Must supply nonzero eps naik number to get meaningful result\n");
+        n_naiks = 2;
     } else {
-    eps_naik = 0.0;
-    n_naiks = 1;
+        printfQuda("Naik term switched off: Making sure to set eps_naik = 0\n");
+        eps_naik = 0.0;
+        n_naiks = 1;
     }
+  printfQuda("eps_naik set to %1.5e, n_naiks set to %i\n",eps_naik,n_naiks);
+    
   initQuda(device_ordinal);
 
   setVerbosity(verbosity);

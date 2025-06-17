@@ -5782,14 +5782,6 @@ typedef struct FermMeasObj {
     
 void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,std::vector<std::reference_wrapper<GaugeField>> tgl,  QudaGaugeSmearParam *smear_param, QudaInvertParam *inv_param, unsigned int ns_safe, TimeProfile &profile)
 {
-  // const GaugeField gin = gf_list[0].get();
-  // GaugeField &g_W0 = gf_list[0].get();
-  // GaugeField &g_W1 = gf_list[1].get();
-  // GaugeField &g_W2 = gf_list[2].get();
-  // GaugeField &g_VT = gf_list[3].get();
-  // GaugeField &gaugeTemp = gf_list[4].get();
-  // GaugeField &precise =   gf_list[5].get();
-
   const GaugeField gin = *gaugeSmeared;
   GaugeField g_W0 = gin;
   GaugeField g_W1 = gin;
@@ -5867,7 +5859,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     
 void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list,
                    std::vector<std::reference_wrapper<GaugeField>> gf_list,  QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
-                   unsigned int ns_safe, TimeProfile &profile, FermMeasObj *ferm_m, std::reference_wrapper<std::vector<ColorSpinorField>> f_init)
+                   unsigned int ns_safe, TimeProfile &profile, FermMeasObj *ferm_m)
 { 
   const GaugeField gin = gf_list[0].get();
   GaugeField &g_W0 = gf_list[0].get();
@@ -5885,7 +5877,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
   size_t Nsrc = f_temp4.size();
   std::vector<void*> data_f_temp3, data_f_temp4;
-  for (int n = 0; n < Nsrc; n++){
+  for (size_t n = 0; n < Nsrc; n++){
       data_f_temp3.push_back(f_temp3[n].data());
       data_f_temp4.push_back(f_temp4[n].data());
   }
@@ -6143,7 +6135,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
       logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
-      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, &ferm_m,fin);
+      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, &ferm_m);
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
       for (int j = 0; j < (int) hier_list.size(); j++ ){
@@ -6161,7 +6153,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
               
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,&ferm_m,fin);
+             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,&ferm_m);
              logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
       }
       logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
