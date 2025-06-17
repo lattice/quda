@@ -80,7 +80,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_CLOVER
-#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_CLOVER_DIRAC
  * @brief This macro is set when we have clover fermions enabled
