@@ -102,8 +102,10 @@ void display_test_info()
   printfQuda(" - smearing steps %d\n", gauge_smear_steps);
   printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
   printfQuda(" - Measurement interval %d\n", measurement_interval);
-  
-  printfQuda(" - has_naik %s\n", has_naik ? "true" : "false");
+  printfQuda(" - Fermion measurement interval %d\n", meas_int);
+  printfQuda(" - has-naik %s\n", has_naik ? "true" : "false");
+  printfQuda(" - n-naiks %d\n", n_naiks);
+  printfQuda(" - eps-naiks %f\n", eps_naik);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -127,6 +129,18 @@ void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
       "--eps-naik",
       eps_naik, "epsilon naik term");
 
+}
+
+void reconfigure_naik(bool &has_naik, double &eps_naik, int &n_naiks)
+{
+    if (has_naik) {
+        if (eps_naik == 0.0) errorQuda("Naik term switched on: Must supply nonzero eps naik number to get meaningful result\n");
+        n_naiks = 2;
+    } else {
+        printfQuda("Naik term switched off: Making sure to set eps_naik = 0\n");
+        eps_naik = 0.0;
+        n_naiks = 1;
+    }
 }
 
 int main(int argc, char **argv)
@@ -158,17 +172,10 @@ int main(int argc, char **argv)
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
   gauge_param.reconstruct = link_recon;
+
+  reconfigure_naik(has_naik, eps_naik,n_naiks);  
   // All user inputs are now defined
   display_test_info();
-    if (has_naik) {
-        if (eps_naik == 0.0) errorQuda("Naik term switched on: Must supply nonzero eps naik number to get meaningful result\n");
-        n_naiks = 2;
-    } else {
-        printfQuda("Naik term switched off: Making sure to set eps_naik = 0\n");
-        eps_naik = 0.0;
-        n_naiks = 1;
-    }
-  printfQuda("eps_naik set to %1.5e, n_naiks set to %i\n",eps_naik,n_naiks);
     
   initQuda(device_ordinal);
 
