@@ -6194,13 +6194,16 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   }
 
   auto* ppb_ptr = reinterpret_cast<std::vector<std::vector<Complex>>*>(*ferm_meas->ppb);
-  auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
   size_t len_ppb = ferm_m.ppb.size();
-  size_t len_meas_list = ferm_m.meas_list.size();
   printfQuda("size of ppb recon %li\n",len_ppb);
   for (size_t i = 0; i < len_ppb; i++){
       ppb_ptr->push_back(ferm_m.ppb[i]);
   }
+
+    
+  auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
+  size_t len_meas_list = ferm_m.meas_list.size();  
+  printfQuda("size of meas list recon %li\n",len_ppb);
   for (size_t i = 0; i < len_meas_list; i++){
       meas_list_ptr->push_back(ferm_m.meas_list[i]);
   }

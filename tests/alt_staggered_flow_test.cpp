@@ -10,6 +10,7 @@
 #include <gauge_tools.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
+#include <qio_field.h> // for QIO routines
 #include <staggered_dslash_reference.h>
 #include <unitarization_links.h>
 #include <staggered_gauge_utils.h>
@@ -167,12 +168,20 @@ int main(int argc, char **argv)
 
   // call srand() with a rank-dependent seed
   initRand();
-printfQuda("HII1\n");
 
 for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
     // Note: this could be replaced with loading a gauge field
-    createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+    // 
+    if (latfile.size() > 0){
+    printfQuda("Loaded gauge file detected, preparing to load\n");
+    // example directory to look at is  "/global/cfs/cdirs/callat/c51/mdwf_hisq/cfgs/a12m130_a/cfgs_flow";
+    read_gauge_field(latfile.c_str(), qdp_sitelink, gauge_param.cpu_prec, gauge_param.X, 0, nullptr);
+    }
+    else{
+        warningQuda("NO loaded gauge file detected, defaulting to random SU(3) gauge field\n");
+        createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, SiteLinkType::SITELINK_PHASE_NO);
+    }
     
     for (int i = 0; i < 4; i++) {
       qdp_fatlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
