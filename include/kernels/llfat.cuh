@@ -4,6 +4,7 @@
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
 #include <kernel.h>
+#include <byte_array.h>
 
 namespace quda {
 
@@ -160,11 +161,12 @@ namespace quda {
     }
   };
 
-  template <int mu, int nu, typename Arg>
-  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg, int x[], int parity)
+  template <typename Arg>
+  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg,
+                                       int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
-    int dx[4] = {0, 0, 0, 0};
+    byte_array<int8_t, 4> dx = {};
 
     /* Computes the upper staple :
      *                 mu (B)
@@ -236,32 +238,7 @@ namespace quda {
 
       using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
       Link staple;
-      switch (mu) {
-      case 0:
-        switch (arg.nu) {
-        case 1: computeStaple<0,1>(staple, arg, x, parity); break;
-        case 2: computeStaple<0,2>(staple, arg, x, parity); break;
-        case 3: computeStaple<0,3>(staple, arg, x, parity); break;
-        } break;
-      case 1:
-        switch (arg.nu) {
-        case 0: computeStaple<1,0>(staple, arg, x, parity); break;
-        case 2: computeStaple<1,2>(staple, arg, x, parity); break;
-        case 3: computeStaple<1,3>(staple, arg, x, parity); break;
-        } break;
-      case 2:
-        switch (arg.nu) {
-        case 0: computeStaple<2,0>(staple, arg, x, parity); break;
-        case 1: computeStaple<2,1>(staple, arg, x, parity); break;
-        case 3: computeStaple<2,3>(staple, arg, x, parity); break;
-      } break;
-      case 3:
-        switch (arg.nu) {
-        case 0: computeStaple<3,0>(staple, arg, x, parity); break;
-        case 1: computeStaple<3,1>(staple, arg, x, parity); break;
-        case 2: computeStaple<3,2>(staple, arg, x, parity); break;
-        } break;
-      }
+      computeStaple(staple, arg, x, parity, mu, arg.nu);
 
       // exclude inner halo
       if ( !(x[0] < arg.inner_border[0] || x[0] >= arg.inner_X[0] + arg.inner_border[0] ||
