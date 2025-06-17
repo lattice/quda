@@ -79,9 +79,12 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
-      if (arg.dd_out.isZero(coord)) {
-        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-        return;
+      if (!allthreads || active) {
+	if (arg.dd_out.isZero(coord)) {
+	  if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+	  if (!allthreads) return;
+	  active = false;
+	}
       }
 
       if (!allthreads || active) {
@@ -92,10 +95,8 @@ namespace quda
 	  applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       }
 
-      //if constexpr (xpay && mykernel_type == INTERIOR_KERNEL) {
-      if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
-
-	if (!allthreads || active) {
+      if (active) {
+	if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
 	  if constexpr (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
 	    // use consistent load order across s to ensure better cache locality
 	    Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
@@ -108,12 +109,11 @@ namespace quda
 	    Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
 	    out += x; // just directly add since twist already applied in the dslash
 	  }
+	} else if (mykernel_type != INTERIOR_KERNEL) {
+	  // if we're not the interior kernel, then we must sum the partial
+	  Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
+	  out += x;
 	}
-
-      } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        // if we're not the interior kernel, then we must sum the partial
-        Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
-        out += x;
       }
 
       if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
@@ -122,7 +122,6 @@ namespace quda
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
         }
-
         cache.sync(); // safe to sync here since other threads will exit if allowed, or all be here
         if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
