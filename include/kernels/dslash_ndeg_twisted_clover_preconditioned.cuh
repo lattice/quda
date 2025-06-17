@@ -85,6 +85,7 @@ namespace quda
       if (!allthreads || active) {
 	if (arg.dd_out.isZero(coord)) {
 	  if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+	  if (!allthreads) return;
 	  active = false;
 	}
       }
@@ -103,30 +104,31 @@ namespace quda
 
       if (isComplete<mykernel_type>(arg, coord) && active) {
         out.toRel();
+      }
 
-        constexpr int n_flavor = 2;
-        HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
+      constexpr int n_flavor = 2;
+      HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
-        for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
+      for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
 
-        int chirality = flavor; // relabel flavor as chirality
+      int chirality = flavor; // relabel flavor as chirality
+      SharedMemoryCache<HalfVector> cache {*this};
 
-        SharedMemoryCache<HalfVector> cache {*this};
+      auto swizzle = [&](HalfVector x[2], int chirality) {
+	if (chirality == 0)
+	  cache.save_y(x[1], target::thread_idx().y);
+	else
+	  cache.save_y(x[0], target::thread_idx().y);
+	cache.sync();
+	if (chirality == 0)
+	  x[1] = cache.load_y(target::thread_idx().y + 1);
+	else
+	  x[0] = cache.load_y(target::thread_idx().y - 1);
+      };
 
-        auto swizzle = [&](HalfVector x[2], int chirality) {
-          if (chirality == 0)
-            cache.save_y(x[1], target::thread_idx().y);
-          else
-            cache.save_y(x[0], target::thread_idx().y);
-          cache.sync();
-          if (chirality == 0)
-            x[1] = cache.load_y(target::thread_idx().y + 1);
-          else
-            x[0] = cache.load_y(target::thread_idx().y - 1);
-        };
+      swizzle(out_chi, chirality); // apply the flavor-chirality swizzle between threads
 
-        swizzle(out_chi, chirality); // apply the flavor-chirality swizzle between threads
-
+      if (isComplete<mykernel_type>(arg, coord) && active) {
         // load in the clover matrix
         HMat A = arg.A(coord.x_cb, parity, chirality);
 
@@ -155,8 +157,11 @@ namespace quda
             out_chi[flavor_] = static_cast<real>(2.0) * (A2inv * A_chi[flavor_]);
           }
         }
+      }
 
-        swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
+      swizzle(out_chi, chirality); // undo the flavor-chirality swizzle
+
+      if (isComplete<mykernel_type>(arg, coord) && active) {
         Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         tmp.toNonRel(); // switch back to non-chiral basis
 
