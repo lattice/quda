@@ -44,6 +44,9 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
+namespace quda {
+    void setDiracEigParam(DiracParam&, QudaInvertParam*, bool, bool);
+}
 
 static bool initialized = false;
 #ifdef MULTI_GPU
@@ -63,6 +66,8 @@ static bool invalidate_quda_mg = true;
 static void *df_preconditioner = nullptr;
 
 static void *preserved_deflation_space = nullptr;
+static QudaParity deflation_space_parity;
+static void *preserved_other_parity_deflation_space = nullptr;
 
 static bool deflation_init = false;
 
@@ -113,8 +118,14 @@ void qudaCleanUpDeflationSpace()
 {
   qudamilc_called<true>(__func__);
   if (preserved_deflation_space) {
-
     deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+    logQuda(QUDA_VERBOSE, "Cleaning up deflation space of size %lu\n", space->evecs.size());
+    space->evecs.clear();
+    space->evals.clear();
+    delete space;
+  }
+  if (preserved_other_parity_deflation_space) {
+    deflation_space *space = reinterpret_cast<deflation_space *>(preserved_other_parity_deflation_space);
     logQuda(QUDA_VERBOSE, "Cleaning up deflation space of size %lu\n", space->evecs.size());
     space->evecs.clear();
     space->evals.clear();
@@ -1242,12 +1253,10 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy = device_precision;
-
   QudaGaugeParam fat_param = newQudaGaugeParam();
   QudaGaugeParam long_param = newQudaGaugeParam();
   setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
                  inv_args.tadpole, inv_args.naik_epsilon);
-
   QudaInvertParam invertParam = newQudaInvertParam();
 
   QudaParity local_parity = inv_args.evenodd;
@@ -1255,10 +1264,8 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
 
   setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
-
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
-
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
@@ -1269,13 +1276,10 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   }
 
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
-
   int src_offset = getColorVectorOffset(other_parity, false, localDim);
   int dst_offset = getColorVectorOffset(local_parity, false, localDim);
-
   dslashQuda(static_cast<char *>(dst) + dst_offset * host_precision,
              static_cast<char *>(src) + src_offset * host_precision, &invertParam, local_parity);
-
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
@@ -1459,24 +1463,78 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
                   QUDA_CG_INVERTER, &invertParam);
   invertParam.num_src = num_src;
 
-  // Deflation for even parity solves
+  // Deflation parameters
   invertParam.eig_param = (qep.n_ev_deflate > 0) ? &qep : nullptr;
-  if (qep.n_ev_deflate > 0 && local_parity != QUDA_EVEN_PARITY)
-    errorQuda("MILC interface deflation currently only supports even parity solves.");
-
-  if (eig_args.vec_in_parity != QUDA_EVEN_PARITY)
-    errorQuda("MILC interface deflation currently only supports even parity eigenvectors.");
-
   invertParam.tol_restart = eig_args.tol_restart;
-
-  // Eigensolver precision
   invertParam.cuda_prec_eigensolver = eig_args.prec_eigensolver;
 
   // Preserve deflation space
   if (invertParam.eig_param && qep.preserve_deflation) {
     if (deflation_init) {
-      if (!preserved_deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
-      qep.preserve_deflation_space = preserved_deflation_space;
+      if(local_parity==deflation_space_parity) {
+        if (!preserved_deflation_space) errorQuda("Unexpected nullptr for preserved deflation space");
+        qep.preserve_deflation_space = preserved_deflation_space;
+      } else { // other parity deflation
+        if(!preserved_other_parity_deflation_space) { // construct other parity deflation space
+          
+          logQuda(QUDA_SUMMARIZE, "Computing other parity deflation space\n");
+
+	  QudaParity other_parity = local_parity==QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+
+          // Create other_parity Dirac operator
+          DiracParam diracEigParam;
+          setDiracEigParam(diracEigParam, &invertParam, true, false);
+          if(local_parity==QUDA_ODD_PARITY) diracEigParam.matpcType = QUDA_MATPC_ODD_ODD;
+          Dirac *dEig = nullptr;
+          dEig = Dirac::create(diracEigParam);
+
+          // Get previous eigenvectors
+	  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+          if(!space) logQuda(QUDA_SUMMARIZE, "ERROR: unexpected nullptr from qep.preserve_deflation_space\n");
+
+	  ColorSpinorParam gpuParam(space->evecs[0]);
+
+	  // Create new deflation space for local_parity eigenvectors
+	  deflation_space *space_other_parity = new deflation_space;
+          space_other_parity->svd = false;
+	  resize(space_other_parity->evecs, qep.n_conv, gpuParam);
+          space_other_parity->evals.resize(qep.n_conv, 0.0);
+	  
+	  // Temp vector on GPU
+          gpuParam.create = QUDA_ZERO_FIELD_CREATE;
+          ColorSpinorField temp(gpuParam);
+          
+          Complex n_unit(-1.0, 0.0);
+          Complex imag_unit(0.0, 1.0);
+
+          for (int i = 0; i < qep.n_conv; i++) {
+
+            // Compute other parity eigenvector v_o = i*D_oe*v_e/\lambda_e
+	    dEig->Dslash(temp, space->evecs[i], local_parity);
+	    auto norm2 = blas::norm2(temp);
+	    blas::ax(imag_unit/sqrt(norm2), temp);
+	    space_other_parity->evecs[i] = temp;
+
+            // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+            dEig->M(temp, space_other_parity->evecs[i]);
+            auto vtAv = blas::cDotProduct(space_other_parity->evecs[i], temp);
+            auto v2 = blas::norm2(space_other_parity->evecs[i]);
+            auto eval = vtAv / sqrt(v2);
+	    space_other_parity->evals[i] = eval;
+	    
+	    // res^2 = |\lambda*v - A*v|
+            auto res = blas::caxpbyNorm(eval, space_other_parity->evecs[i], n_unit, temp);
+            logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(), sqrt(res[0]));
+          }
+
+	  // Use the new deflation space
+	  qep.preserve_deflation_space = space_other_parity;
+
+	} else { // other parity deflation space already constructed
+          qep.preserve_deflation_space = preserved_other_parity_deflation_space;
+          logQuda(QUDA_SUMMARIZE, "Setting preserved_other_parity_deflation_space at place 1\n");
+	}
+      }
     }
   }
 
@@ -1505,10 +1563,15 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
 
   host_free(sln_pointer);
   host_free(src_pointer);
-
+  
   if (invertParam.eig_param && qep.preserve_deflation) {
-    preserved_deflation_space = qep.preserve_deflation_space;
-    deflation_init = true; // signal that we have deflation space preserved
+    if (!deflation_init) { // Set on first deflate
+      preserved_deflation_space = qep.preserve_deflation_space;
+      deflation_space_parity = local_parity;
+      deflation_init = true; // signal that we have deflation space preserved
+    } else if (deflation_space_parity != local_parity) {
+      preserved_other_parity_deflation_space = qep.preserve_deflation_space;
+    }
   }
 
   // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
