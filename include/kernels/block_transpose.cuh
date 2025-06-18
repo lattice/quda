@@ -46,7 +46,8 @@ namespace quda
 
   template <typename Arg> struct BlockTransposeKernelOps {
     struct CacheDims {
-      static constexpr dim3 dims(dim3 block) {
+      template <typename... Args> static constexpr dim3 dims(dim3 block, const Args &...)
+      {
         block.x += 1;
         block.z = 1;
         return block;

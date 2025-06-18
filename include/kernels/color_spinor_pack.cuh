@@ -180,7 +180,7 @@ namespace quda {
       static constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
       static constexpr int Mc = colors_per_thread<true>(Arg::nColor);
       static constexpr int color_spin_threads = (Arg::nSpin / Ms) * (Arg::nColor / Mc);
-      static constexpr dim3 dims(dim3 block)
+      template <typename... Args> static constexpr dim3 dims(dim3 block, const Args &...)
       {
         // pad the shared block size to avoid bank conflicts for native ordering
         if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
