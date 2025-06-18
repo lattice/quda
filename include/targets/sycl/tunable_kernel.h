@@ -104,8 +104,8 @@ namespace quda {
       if constexpr (needsSharedMem<typename F::KernelOpsT>) {
 	//auto localsize = ndRange.get_local_range().size();
 	auto block = makeDim3(ndRange.get_local_range());
-	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
-	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
+	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
+	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
 	}
@@ -160,8 +160,8 @@ namespace quda {
       if constexpr (needsSharedMem<typename F::KernelOpsT>) {
 	//auto localsize = ndRange.get_local_range().size();
 	auto block = makeDim3(ndRange.get_local_range());
-	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
-	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
+	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
+	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("  Allocating local mem size: %u\n", smemsize);
 	}
@@ -217,8 +217,8 @@ namespace quda {
       if constexpr (needsSharedMem<typename F::KernelOpsT>) {
 	//auto localsize = ndRange.get_local_range().size();
 	auto block = makeDim3(ndRange.get_local_range());
-	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
-	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
+	auto smemsize = sharedMemSize<typename F::KernelOpsT>(block, arg);
+	//auto smemsize = sharedMemSize<typename F::KernelOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("  Allocating local mem size: %u\n", smemsize);
 	}

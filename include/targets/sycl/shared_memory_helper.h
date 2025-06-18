@@ -27,16 +27,22 @@ namespace quda
   public:
     using value_type = T;
 
-    static constexpr unsigned int get_offset(dim3 block)
+    /**
+       @brief Byte offset for this shared memory object.
+    */
+    template <typename... Arg> static constexpr unsigned int get_offset(const dim3 block, const Arg &...arg)
     {
       unsigned int o = 0;
-      if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block); }
+      if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block, arg...); }
       return o;
     }
 
-    static constexpr unsigned int shared_mem_size(dim3 block)
+    /**
+       @brief Shared memory size in bytes.
+    */
+    template <typename... Arg> static constexpr unsigned int shared_mem_size(const dim3 block, const Arg &...arg)
     {
-      return get_offset(block) + S::size(block)*sizeof(T);
+      return get_offset(block, arg...) + S::size(block, arg...) * sizeof(T);
     }
 
     /**
@@ -53,12 +59,12 @@ namespace quda
     }
 #endif
 
-    template <typename ...U>
-    SharedMemory(const KernelOps<U...> &ops) : size(S::size(target::block_dim()))
+    template <typename... U, typename... Arg>
+    SharedMemory(const KernelOps<U...> &ops, const Arg &...arg) : size(S::size(target::block_dim(), arg...))
     {
       //auto op = getDependentOps<op_SharedMemory<T,SizeSmem<SharedMemory<T,S,O>>>>(ops);
       auto op = ops;
-      auto offset = get_offset(target::block_dim());
+      auto offset = get_offset(target::block_dim(), arg...);
       sycl::local_ptr<void> v(op.smem + offset);
       sycl::local_ptr<T> p(v);
       data = p;
@@ -73,5 +79,7 @@ namespace quda
      */
     __device__ __host__ T &operator[](const int i) { return data[i]; }
   };
+
+  template <typename T, typename S, typename O> static constexpr bool needsSharedMemImpl<SharedMemory<T,S,O>> = true;
 
 } // namespace quda

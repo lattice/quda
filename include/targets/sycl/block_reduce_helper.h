@@ -219,6 +219,7 @@ namespace quda
 namespace quda
 {
   template <typename T, int block_dim, int batch_size> static constexpr bool needsFullBlockImpl<BlockReduce<T,block_dim,batch_size>> = true;
+  template <typename T, int block_dim, int batch_size> static constexpr bool needsSharedMemImpl<BlockReduce<T,block_dim,batch_size>> = true;
 } // namespace quda
 
 static_assert(needsFullBlock<KernelOps<BlockReduce<double,1>>> == true);

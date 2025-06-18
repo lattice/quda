@@ -29,7 +29,8 @@ namespace quda {
   template <typename T> static constexpr bool needsSharedMemImpl<T> = needsSharedMemF<T>();
   template <> static constexpr bool needsSharedMem<NoKernelOps> = false;
   template <typename ...T> static constexpr bool needsSharedMem<KernelOps<T...>> = needsSharedMemImpl<T...>;
-#else
+#endif
+#if 0
   //template <typename ...T> static constexpr bool needsSharedMemImpl = (needsSharedMemImpl<T> || ...);
   template <typename T> static constexpr bool needsSharedMemImpl = (T::shared_mem_size(dim3{8,8,8}) > 0);
   template <typename... T> static constexpr bool needsSharedMemImpl<KernelOps<T...>> = (needsSharedMemImpl<T> || ...);
@@ -37,6 +38,11 @@ namespace quda {
   template <typename... T> static constexpr bool needsSharedMem<KernelOps<T...>> = (needsSharedMemImpl<T> || ...);
   //template <> static constexpr bool needsSharedMem<NoKernelOps> = false;
 #endif
+
+  template <typename T> static constexpr bool needsSharedMemImpl = (T)false;
+  template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getKernelOps<T>>;
+  template <typename... T> static constexpr bool needsSharedMem<KernelOps<T...>> = (needsSharedMemImpl<T> || ...);
+
 
   // KernelOps
   template <typename ...T>
@@ -272,6 +278,7 @@ namespace quda {
     template <typename ...Arg>
     static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
+  template <> static constexpr bool needsSharedMemImpl<op_blockSync> = false;
 
   template <typename T>
   //struct op_warp_combine : op_BaseT<T> {
@@ -282,6 +289,7 @@ namespace quda {
     static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
   template <typename T> static constexpr bool needsFullBlockImpl<op_warp_combine<T>> = false;
+  template <typename T> static constexpr bool needsSharedMemImpl<op_warp_combine<T>> = false;
 
 #if 0
   template <typename T, int N>
