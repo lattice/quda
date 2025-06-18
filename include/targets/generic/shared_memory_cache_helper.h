@@ -97,8 +97,8 @@ namespace quda
     {
       checkKernelOps<SharedMemoryCache<T, D, O>>(ops);
       // sanity check
-      // static_assert(shared_mem_size(dim3 {32, 16, 8}, arg...)
-      //              == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}, arg...) * sizeof(T));
+      assert(shared_mem_size(dim3 {32, 16, 8}, arg...)
+             == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}, arg...) * sizeof(T));
     }
 
     constexpr SharedMemoryCache(const SharedMemoryCache<T, D, O> &) = delete;
