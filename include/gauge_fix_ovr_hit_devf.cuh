@@ -41,7 +41,7 @@ namespace quda {
   }
 
   template <int N> struct GaugeFixHitDims {
-    static constexpr dim3 dims(dim3 block)
+    template <typename... Arg> static constexpr dim3 dims(dim3 block, const Arg &...)
     {
       block.y = N;
       return block;
