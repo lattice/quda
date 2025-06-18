@@ -1389,11 +1389,18 @@ namespace quda {
     }
   };
 
+  template <int x, int y, int z> struct DimsStaticConditional {
+    template <typename Arg> static constexpr dim3 dims(dim3, Arg &arg)
+    {
+      return arg.shared_atomic ? dim3(x, y, z) : dim3(0, 0, 0);
+    }
+  };
+
   template <> struct storeCoarseSharedAtomic_impl<true> {
     template <typename Arg>
     using CacheT = complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4]
                                      [Arg::coarseSpin][Arg::coarseSpin];
-    template <typename Arg> using Cache = SharedMemoryCache<CacheT<Arg>, DimsStatic<2, 1, 1>>;
+    template <typename Arg> using Cache = SharedMemoryCache<CacheT<Arg>, DimsStaticConditional<2, 1, 1>>;
     template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
 
     template <typename VUV, typename Pack, typename Ftor>
@@ -1405,7 +1412,7 @@ namespace quda {
       using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-      Cache<Arg> cache {ftor};
+      Cache<Arg> cache {ftor, arg};
       auto &X = cache.data()[0];
       auto &Y = cache.data()[1];
 
