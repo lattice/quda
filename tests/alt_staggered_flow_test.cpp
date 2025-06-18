@@ -286,12 +286,12 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
   quda::ColorSpinorField check,check_safe,check_hier,check_fwd;
 
   QudaInvertParam invParam = newQudaInvertParam();
-    QudaMultigridParam mg_param;
-    QudaInvertParam mg_invParam;
-    QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
-    QudaEigParam eig_param;
-    bool use_split_grid = false;
-    bool use_multi_src = false;
+  QudaMultigridParam mg_param;
+  QudaInvertParam mg_invParam;
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+  QudaEigParam eig_param;
+  bool use_split_grid = false;
+  bool use_multi_src = false;
   setStaggeredInvertParam(invParam);
   if (!inv_deflate)
   invParam.eig_param = nullptr;
@@ -330,6 +330,9 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
 
+  invParam.num_src = Nsrc_tile;
+  invParam.num_src_per_sub_partition = Nsrc_tile / num_sub_partition;
+
   quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &invParam, &gauge_param);
     
@@ -349,6 +352,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
     }
     
     QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
+    ferm_meas.take_meas = QUDA_BOOLEAN_TRUE;
     ferm_meas.meas_int = meas_int;
     std::vector<std::vector<std::complex<double>>> ppb;
     void* ptr_ppb = &ppb;

@@ -1230,10 +1230,12 @@ void printQudaFermMeasurements(QudaFermMeasurements *param)
 
 #ifdef INIT_PARAM
   P(meas_int, 5);
+  P(take_meas, QUDA_BOOLEAN_FALSE);
   P(ppb, nullptr);
   P(meas_list, nullptr);  
 #else
   P(meas_int, (unsigned int)INVALID_INT);
+  P(take_meas, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

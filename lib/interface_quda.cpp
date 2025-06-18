@@ -5773,10 +5773,11 @@ typedef struct FermMeasObj {
     std::vector<int> meas_list;
     std::vector<std::vector<Complex>> ppb;
     int meas_interval;
+    QudaBoolean take_meas;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval) {}
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas) {}
 
 } FermMeasObj;
     
@@ -5876,10 +5877,17 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   auto &f_temp4 = sf_list[4].get();
 
   size_t Nsrc = f_temp4.size();
-  std::vector<void*> data_f_temp3, data_f_temp4;
+  auto Nsrc_tile = inv_param->num_src;
+  std::vector<void*> data_f_temp3, data_f_temp4, data_f_temp3_tiled, data_f_temp4_tiled;
   for (size_t n = 0; n < Nsrc; n++){
       data_f_temp3.push_back(f_temp3[n].data());
       data_f_temp4.push_back(f_temp4[n].data());
+  }
+  for (size_t j = 0; j < Nsrc; j += Nsrc_tile) {
+    for (size_t i = 0; i < Nsrc_tile; i++) {
+      data_f_temp4_tiled.push_back(f_temp4[j + i].data());
+      data_f_temp3_tiled.push_back(f_temp3[j + i].data());
+    }
   }
 
   int parity = 0;
@@ -5949,9 +5957,9 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     f_temp3 = f_temp0;
 
     ferm_m->i_glob++;
-    if ((ferm_m->i_glob % ferm_m->meas_interval) == 0) {
+    if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
         ferm_m->meas_list.push_back(ferm_m->i_glob);
-        invertMultiSrcQuda(data_f_temp4.data(),data_f_temp3.data(),inv_param);
+        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
@@ -6088,7 +6096,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int);
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas);
   
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
@@ -6185,21 +6193,21 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     fout_h = sf_list[0].get()[i];
   }
 
-  auto* ppb_ptr = reinterpret_cast<std::vector<std::vector<Complex>>*>(*ferm_meas->ppb);
-  size_t len_ppb = ferm_m.ppb.size();
-  printfQuda("size of ppb recon %li\n",len_ppb);
-  for (size_t i = 0; i < len_ppb; i++){
-      ppb_ptr->push_back(ferm_m.ppb[i]);
+  if ( ferm_meas->take_meas){
+      auto* ppb_ptr = reinterpret_cast<std::vector<std::vector<Complex>>*>(*ferm_meas->ppb);
+      size_t len_ppb = ferm_m.ppb.size();
+      printfQuda("size of ppb recon %li\n",len_ppb);
+      for (size_t i = 0; i < len_ppb; i++){
+          ppb_ptr->push_back(ferm_m.ppb[i]);
+      }
+        
+      auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
+      size_t len_meas_list = ferm_m.meas_list.size();  
+      printfQuda("size of meas list recon %li\n",len_ppb);
+      for (size_t i = 0; i < len_meas_list; i++){
+          meas_list_ptr->push_back(ferm_m.meas_list[i]);
+      }
   }
-
-    
-  auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
-  size_t len_meas_list = ferm_m.meas_list.size();  
-  printfQuda("size of meas list recon %li\n",len_ppb);
-  for (size_t i = 0; i < len_meas_list; i++){
-      meas_list_ptr->push_back(ferm_m.meas_list[i]);
-  }
-
   logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");
   popOutputPrefix();
 }
