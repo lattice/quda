@@ -4,6 +4,7 @@
 #include <kernel_ops.h>
 #include <target_device.h>
 #include <shared_memory_helper.h>
+#include <cassert>
 
 /**
    @file shared_memory_cache_helper.h
