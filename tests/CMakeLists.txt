@@ -68,8 +68,6 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
-   OR QUDA_DIRAC_NDEG_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_executable(dslash_test dslash_test.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS})
@@ -140,8 +138,6 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
-   OR QUDA_DIRAC_NDEG_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cpp)
@@ -306,8 +302,6 @@ endif()
 if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_MASS
-   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
@@ -640,7 +634,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
-  if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+  if(QUDA_DIRAC_TWISTED_MASS)
     # the ndeg-twisted-mas operator does not fit the pattern used for most other operators
     # since it is defined via 'dslash-type = twisted-mass` and 'flavor = nondeg-doublet'
     set(DIRAC_NAME twisted-mass)
@@ -753,7 +747,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
-  if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  if(QUDA_DIRAC_TWISTED_CLOVER)
     # the ndeg-twisted-clover operator does not fit the pattern used for most other operators
     # since it is defined via 'dslash-type = twisted-clover` and 'flavor = nondeg-doublet'
     set(DIRAC_NAME twisted-clover)
@@ -1180,7 +1174,7 @@ if(QUDA_DIRAC_TWISTED_MASS)
     --gtest_output=xml:invert_test_twisted_mass_asym.xml)
 endif()
 
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+if(QUDA_DIRAC_TWISTED_MASS)
   add_test(NAME invert_test_ndeg_twisted_mass_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-mass
@@ -1230,7 +1224,7 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
     --gtest_output=xml:invert_test_twisted_clover_asym.xml)
 endif()
 
-if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME invert_test_ndeg_twisted_clover_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
@@ -1420,7 +1414,7 @@ if(QUDA_DIRAC_TWISTED_MASS)
     --gtest_output=xml:eigensolve_test_twisted_mass_asym.xml)
 endif()
   
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+if(QUDA_DIRAC_TWISTED_MASS)
   add_test(NAME eigensolve_test_ndeg_twisted_mass_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
@@ -1474,7 +1468,7 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
     --gtest_output=xml:eigensolve_test_twisted_clover_asym.xml)
 endif()
   
-if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME eigensolve_test_ndeg_twisted_clover_sym
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
     --dslash-type twisted-clover --compute-clover true
@@ -1608,7 +1602,7 @@ if(QUDA_DIRAC_STAGGERED)
                    --gtest_output=xml:hisq_stencil_test.xml)
 endif()
 
-if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+if(QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME clover_force_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:clover_force_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
