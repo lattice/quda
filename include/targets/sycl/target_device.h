@@ -6,9 +6,9 @@
 #ifndef QUDA_MAX_BLOCK_SIZE
 #define QUDA_MAX_BLOCK_SIZE 512
 #endif
-#ifndef QUDA_MAX_ARGUMENT_SIZE
-#define QUDA_MAX_ARGUMENT_SIZE 2048
-#endif
+//#ifndef QUDA_MAX_ARGUMENT_SIZE
+//#define QUDA_MAX_ARGUMENT_SIZE 2048
+//#endif
 
 //#define HOSTDEVICE __host__ __device__
 //#define HostDevice __host__ __device__
@@ -206,8 +206,8 @@ namespace quda {
        architecture.
     */
     constexpr size_t max_kernel_arg_size() {
-      return std::max(QUDA_MAX_ARGUMENT_SIZE-8, 0);  // reserve 8 bytes for local accessor
-      //return std::max(MAX_KERNEL_ARG_SIZE, 0);  // reserve 8 bytes for local accessor
+      //return std::max(QUDA_MAX_ARGUMENT_SIZE-8, 0);  // reserve 8 bytes for local accessor
+      return std::max(MAX_KERNEL_ARG_SIZE-8, 0);  // reserve 8 bytes for local accessor
     }
 
     /**

@@ -12,19 +12,6 @@
 
 namespace quda {
 
-  /**
-     @brief This helper function indicates if the present
-     compilation unit has explicit constant memory usage enabled.
-  */
-  static bool use_constant_memory()
-  {
-#ifdef QUDA_USE_CONSTANT_MEMORY
-    return true;
-#else
-    return false;
-#endif
-  }
-
   class TunableKernel : public Tunable
   {
 
@@ -51,7 +38,11 @@ namespace quda {
     {
       strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
-      if (this->location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CUDA_FIELD_LOCATION) {
+        strcat(aux, "kernel_arg_threshold=");
+        i32toa(aux + strlen(aux), device::max_kernel_arg_size());
+        strcat(aux, ",");
+      }
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux, field.AuxString().c_str());
     }
@@ -60,7 +51,11 @@ namespace quda {
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
-      if (location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        strcat(aux, "kernel_arg_threshold=");
+        i32toa(aux + strlen(aux), device::max_kernel_arg_size());
+        strcat(aux, ",");
+      }
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
 
