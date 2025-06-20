@@ -483,8 +483,8 @@ namespace quda
      classed.
    */
   struct dslash_default {
-    constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
-    constexpr int twist_pack() const { return 0; }
+    constexpr QudaPCType pc_type() { return QUDA_4D_PC; }
+    constexpr int twist_pack() { return 0; }
   };
 
   /**
@@ -696,7 +696,8 @@ namespace quda
     {
     }
 
-    __forceinline__ __device__ void operator()(int, int s, int parity)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool active = true)
     {
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
@@ -704,10 +705,11 @@ namespace quda
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        // first few blocks do packing kernel
-        typename Arg::template P<dslash.pc_type()> packer;
-        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
+        if (!allthreads || active) {
+          // first few blocks do packing kernel
+          typename Arg::template P<dslash.pc_type()> packer;
+          packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+        }
         // we use that when running the exterior -- this is either
         // * an explicit call to the exterior when not merged with the interior or
         // * the interior with exterior_blocks > 0
@@ -722,14 +724,41 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
+        if (x_cb >= arg.threads) {
+          if constexpr (allthreads)
+            active = false;
+          else
+            return;
+        }
 
 #ifdef QUDA_FAST_COMPILE_DSLASH
-        dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
+        if constexpr (allthreads) {
+          dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, parity,
+                                                                                                       active);
+        } else {
+          dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
+        }
 #else
-        switch (parity) {
-        case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
-        case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
+        if constexpr (allthreads) {
+          switch (parity) {
+          case 0:
+            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 0,
+                                                                                                         active);
+            break;
+          case 1:
+            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 1,
+                                                                                                         active);
+            break;
+          }
+        } else {
+          switch (parity) {
+          case 0:
+            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0);
+            break;
+          case 1:
+            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1);
+            break;
+          }
         }
 #endif
 #ifdef NVSHMEM_COMMS

@@ -111,7 +111,8 @@ namespace quda
         @param[in] x_b Checkerboarded 4-d space-time index
         @param[in] s The output Ls dimension coordinate
        */
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+      template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
       {
         constexpr bool dagger = Arg::dagger;
 
@@ -132,14 +133,16 @@ namespace quda
         }
         cache.sync();
 
-        Vector out;
-        // t -> s_in, s-> s_out
-        for (int t = 0; t < Ls_in; t++) {
-          Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
-          int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
-          matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
+        if (!allthreads || active) {
+          Vector out;
+          // t -> s_in, s-> s_out
+          for (int t = 0; t < Ls_in; t++) {
+            Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
+            int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
+            matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
+          }
+          arg.out(s * volume_4d_cb + x_cb, parity) = out;
         }
-        arg.out(s * volume_4d_cb + x_cb, parity) = out;
       }
     };
   } // namespace madwf_ml

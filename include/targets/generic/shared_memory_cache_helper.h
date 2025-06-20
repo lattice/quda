@@ -94,7 +94,7 @@ namespace quda
     */
     template <typename... U, typename... Arg>
     constexpr SharedMemoryCache(const KernelOps<U...> &ops, const Arg &...arg) :
-      Smem(ops), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
+      Smem(ops, arg...), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
     {
       checkKernelOps<SharedMemoryCache<T, D, O>>(ops);
       // sanity check
