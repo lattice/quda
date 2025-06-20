@@ -483,8 +483,8 @@ namespace quda
      classed.
    */
   struct dslash_default {
-    constexpr QudaPCType pc_type() { return QUDA_4D_PC; }
-    constexpr int twist_pack() { return 0; }
+    constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
+    constexpr int twist_pack() const { return 0; }
   };
 
   /**
