@@ -3,7 +3,7 @@
 
 #ifdef NATIVE_LAPACK_LIB
 #include <quda_sycl_api.h>
-//#include <complex>
+// #include <complex>
 #include <oneapi/mkl.hpp>
 #include <malloc_quda.h>
 using namespace oneapi::mkl;
@@ -32,7 +32,7 @@ namespace quda
         if (!native_init) {
           native_init = true;
 #ifndef NATIVE_LAPACK_LIB
-	  quda::blas_lapack::generic::init();
+          quda::blas_lapack::generic::init();
 #endif
         }
       }
@@ -42,15 +42,14 @@ namespace quda
         if (native_init) {
           native_init = false;
 #ifndef NATIVE_LAPACK_LIB
-	  quda::blas_lapack::generic::destroy();
+          quda::blas_lapack::generic::destroy();
 #endif
         }
       }
 
 #ifdef _DEBUG
       template <typename EigenMatrix, typename Float>
-      __host__ void checkEigen(std::complex<Float> *A_h, std::complex<Float> *Ainv_h,
-			       int n, uint64_t batch)
+      __host__ void checkEigen(std::complex<Float> *A_h, std::complex<Float> *Ainv_h, int n, uint64_t batch)
       {
         EigenMatrix A = EigenMatrix::Zero(n, n);
         EigenMatrix Ainv = EigenMatrix::Zero(n, n);
@@ -71,8 +70,8 @@ namespace quda
 
 #ifdef NATIVE_LAPACK_LIB
       // FIXME do this in pipelined fashion to reduce memory overhead.
-      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch,
-				  QudaPrecision prec, QudaFieldLocation location)
+      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
+                                  QudaFieldLocation location)
       {
         init();
         if (getVerbosity() >= QUDA_VERBOSE)
@@ -82,124 +81,126 @@ namespace quda
         timeval start, stop;
         gettimeofday(&start, NULL);
 
-	std::int64_t stride_a = n * n;
+        std::int64_t stride_a = n * n;
         size_t size = 2 * n * n * prec * batch;
-	std::int64_t *dipiv = static_cast<std::int64_t *>(pool_device_malloc(batch * n * sizeof(std::int64_t)));
-	auto q = device::defaultQueue();
+        std::int64_t *dipiv = static_cast<std::int64_t *>(pool_device_malloc(batch * n * sizeof(std::int64_t)));
+        auto q = device::defaultQueue();
 
         if (prec == QUDA_SINGLE_PRECISION) {
           typedef std::complex<float> C;
 
-	  C *A_d = static_cast<C *>(A);
-	  C *Ainv_d = static_cast<C *>(Ainv);
-	  if(location == QUDA_CPU_FIELD_LOCATION) {
-	    A_d = static_cast<C *>(pool_device_malloc(size));
-	    Ainv_d = static_cast<C *>(pool_device_malloc(size));
-	    qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
-	  }
+          C *A_d = static_cast<C *>(A);
+          C *Ainv_d = static_cast<C *>(Ainv);
+          if (location == QUDA_CPU_FIELD_LOCATION) {
+            A_d = static_cast<C *>(pool_device_malloc(size));
+            Ainv_d = static_cast<C *>(pool_device_malloc(size));
+            qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
+          }
 
 #ifdef _DEBUG
-	  // Debug code: Copy original A matrix to host
-	  C *A_h = static_cast<C *>(pool_pinned_malloc(size));
-	  qudaMemcpy(A_h, A_d, size, qudaMemcpyDeviceToHost);
+          // Debug code: Copy original A matrix to host
+          C *A_h = static_cast<C *>(pool_pinned_malloc(size));
+          qudaMemcpy(A_h, A_d, size, qudaMemcpyDeviceToHost);
 #endif
 
-	  try {
-	    std::int64_t getrf_scratchpad_size = getrf_batch_scratchpad_size<C>(q, n, n, n, stride_a, n, batch);
-	    C *getrf_scratchpad = static_cast<C *>(pool_device_malloc(getrf_scratchpad_size*sizeof(C)));
-	    auto getrf_event = getrf_batch(q, n, n, A_d, n, stride_a, dipiv, n, batch, getrf_scratchpad, getrf_scratchpad_size);
-	    flops += batch * FLOPS_CGETRF(n, n);
+          try {
+            std::int64_t getrf_scratchpad_size = getrf_batch_scratchpad_size<C>(q, n, n, n, stride_a, n, batch);
+            C *getrf_scratchpad = static_cast<C *>(pool_device_malloc(getrf_scratchpad_size * sizeof(C)));
+            auto getrf_event
+              = getrf_batch(q, n, n, A_d, n, stride_a, dipiv, n, batch, getrf_scratchpad, getrf_scratchpad_size);
+            flops += batch * FLOPS_CGETRF(n, n);
 
-	    std::int64_t getri_scratchpad_size = getri_batch_scratchpad_size<C>(q, n, n, n, n, batch);
-	    C *getri_scratchpad = static_cast<C *>(pool_device_malloc(getri_scratchpad_size*sizeof(C)));
-	    auto getri_event = getri_batch(q, n, A_d, n, stride_a, dipiv, n, Ainv_d, n, stride_a, batch, getri_scratchpad, getri_scratchpad_size, {getrf_event});
-	    flops += batch * FLOPS_CGETRI(n);
-	    getri_event.wait_and_throw();
-	    pool_device_free(getrf_scratchpad);
-	    pool_device_free(getri_scratchpad);
-	  } catch(oneapi::mkl::lapack::exception const& e) {
-	    // Handle LAPACK related exceptions happened during synchronous call
-	    errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld", e.what(), e.info());
-	  } catch(sycl::exception const& e) {
-	    // Handle not LAPACK related exceptions happened during synchronous call
-	    errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
-	  }
+            std::int64_t getri_scratchpad_size = getri_batch_scratchpad_size<C>(q, n, n, n, n, batch);
+            C *getri_scratchpad = static_cast<C *>(pool_device_malloc(getri_scratchpad_size * sizeof(C)));
+            auto getri_event = getri_batch(q, n, A_d, n, stride_a, dipiv, n, Ainv_d, n, stride_a, batch,
+                                           getri_scratchpad, getri_scratchpad_size, {getrf_event});
+            flops += batch * FLOPS_CGETRI(n);
+            getri_event.wait_and_throw();
+            pool_device_free(getrf_scratchpad);
+            pool_device_free(getri_scratchpad);
+          } catch (oneapi::mkl::lapack::exception const &e) {
+            // Handle LAPACK related exceptions happened during synchronous call
+            errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld",
+                      e.what(), e.info());
+          } catch (sycl::exception const &e) {
+            // Handle not LAPACK related exceptions happened during synchronous call
+            errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
+          }
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
           C *Ainv_h = static_cast<C *>(pool_pinned_malloc(size));
           qudaMemcpy(Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
-          for (uint64_t i = 0; i < batch; i++) {
-	    checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i);
-	  }
+          for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
 #endif
-	  if (location == QUDA_CPU_FIELD_LOCATION) {
-	    qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
-	    pool_device_free(Ainv_d);
-	    pool_device_free(A_d);
-	  }
+          if (location == QUDA_CPU_FIELD_LOCATION) {
+            qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
+            pool_device_free(Ainv_d);
+            pool_device_free(A_d);
+          }
         } else if (prec == QUDA_DOUBLE_PRECISION) {
           typedef std::complex<double> C;
 
-	  C *A_d = static_cast<C *>(A);
-	  C *Ainv_d = static_cast<C *>(Ainv);
-	  if(location == QUDA_CPU_FIELD_LOCATION) {
-	    A_d = static_cast<C *>(pool_device_malloc(size));
-	    Ainv_d = static_cast<C *>(pool_device_malloc(size));
-	    qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
-	  }
+          C *A_d = static_cast<C *>(A);
+          C *Ainv_d = static_cast<C *>(Ainv);
+          if (location == QUDA_CPU_FIELD_LOCATION) {
+            A_d = static_cast<C *>(pool_device_malloc(size));
+            Ainv_d = static_cast<C *>(pool_device_malloc(size));
+            qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
+          }
 
 #ifdef _DEBUG
-	  // Debug code: Copy original A matrix to host
-	  C *A_h = static_cast<C *>(pool_pinned_malloc(size));
-	  qudaMemcpy(A_h, A_d, size, qudaMemcpyDeviceToHost);
+          // Debug code: Copy original A matrix to host
+          C *A_h = static_cast<C *>(pool_pinned_malloc(size));
+          qudaMemcpy(A_h, A_d, size, qudaMemcpyDeviceToHost);
 #endif
 
-	  try {
-	    std::int64_t getrf_scratchpad_size = getrf_batch_scratchpad_size<C>(q, n, n, n, stride_a, n, batch);
-	    C *getrf_scratchpad = static_cast<C *>(pool_device_malloc(getrf_scratchpad_size*sizeof(C)));
-	    auto getrf_event = getrf_batch(q, n, n, A_d, n, stride_a, dipiv, n, batch, getrf_scratchpad, getrf_scratchpad_size);
-	    flops += batch * FLOPS_CGETRF(n, n);
+          try {
+            std::int64_t getrf_scratchpad_size = getrf_batch_scratchpad_size<C>(q, n, n, n, stride_a, n, batch);
+            C *getrf_scratchpad = static_cast<C *>(pool_device_malloc(getrf_scratchpad_size * sizeof(C)));
+            auto getrf_event
+              = getrf_batch(q, n, n, A_d, n, stride_a, dipiv, n, batch, getrf_scratchpad, getrf_scratchpad_size);
+            flops += batch * FLOPS_CGETRF(n, n);
 
-	    std::int64_t getri_scratchpad_size = getri_batch_scratchpad_size<C>(q, n, n, n, n, batch);
-	    C *getri_scratchpad = static_cast<C *>(pool_device_malloc(getri_scratchpad_size*sizeof(C)));
-	    auto getri_event = getri_batch(q, n, A_d, n, stride_a, dipiv, n, Ainv_d, n, stride_a, batch, getri_scratchpad, getri_scratchpad_size, {getrf_event});
-	    flops += batch * FLOPS_CGETRI(n);
-	    getri_event.wait_and_throw();
-	    pool_device_free(getrf_scratchpad);
-	    pool_device_free(getri_scratchpad);
-	  } catch(oneapi::mkl::lapack::exception const& e) {
-	    // Handle LAPACK related exceptions happened during synchronous call
-	    errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld", e.what(), e.info());
-	  } catch(sycl::exception const& e) {
-	    // Handle not LAPACK related exceptions happened during synchronous call
-	    errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
-	  }
+            std::int64_t getri_scratchpad_size = getri_batch_scratchpad_size<C>(q, n, n, n, n, batch);
+            C *getri_scratchpad = static_cast<C *>(pool_device_malloc(getri_scratchpad_size * sizeof(C)));
+            auto getri_event = getri_batch(q, n, A_d, n, stride_a, dipiv, n, Ainv_d, n, stride_a, batch,
+                                           getri_scratchpad, getri_scratchpad_size, {getrf_event});
+            flops += batch * FLOPS_CGETRI(n);
+            getri_event.wait_and_throw();
+            pool_device_free(getrf_scratchpad);
+            pool_device_free(getri_scratchpad);
+          } catch (oneapi::mkl::lapack::exception const &e) {
+            // Handle LAPACK related exceptions happened during synchronous call
+            errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld",
+                      e.what(), e.info());
+          } catch (sycl::exception const &e) {
+            // Handle not LAPACK related exceptions happened during synchronous call
+            errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
+          }
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
           C *Ainv_h = static_cast<C *>(pool_pinned_malloc(size));
           qudaMemcpy(Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
-          for (uint64_t i = 0; i < batch; i++) {
-	    checkEigen<MatrixXcf, double>(A_h, Ainv_h, n, i);
-	  }
+          for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, double>(A_h, Ainv_h, n, i); }
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
 #endif
-	  if (location == QUDA_CPU_FIELD_LOCATION) {
-	    qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
-	    pool_device_free(Ainv_d);
-	    pool_device_free(A_d);
-	  }
+          if (location == QUDA_CPU_FIELD_LOCATION) {
+            qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
+            pool_device_free(Ainv_d);
+            pool_device_free(A_d);
+          }
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
         }
 
         pool_device_free(dipiv);
 
-        //qudaDeviceSynchronize();
+        // qudaDeviceSynchronize();
         gettimeofday(&stop, NULL);
         long ds = stop.tv_sec - start.tv_sec;
         long dus = stop.tv_usec - start.tv_usec;
@@ -211,19 +212,18 @@ namespace quda
         return flops;
       }
 #else
-      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch,
-				  QudaPrecision prec, QudaFieldLocation location)
+      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
+                                  QudaFieldLocation location)
       {
-	return quda::blas_lapack::generic::BatchInvertMatrix(Ainv, A, n, batch,
-							     prec, location);
+        return quda::blas_lapack::generic::BatchInvertMatrix(Ainv, A, n, batch, prec, location);
       }
 #endif
 
 #ifdef NATIVE_LAPACK_LIB
-      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data,
-				 QudaBLASParam blas_param, QudaFieldLocation location)
+      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
+                                 QudaFieldLocation location)
       {
-	warningQuda("using mkl stridedBatchGEMM");
+        warningQuda("using mkl stridedBatchGEMM");
         long long flops = 0;
         timeval start, stop;
         gettimeofday(&start, NULL);
@@ -377,98 +377,90 @@ namespace quda
           typedef std::complex<double> Z;
 
           const Z alpha(static_cast<std::complex<double>>(blas_param.alpha));
-	  const Z beta(static_cast<std::complex<double>>(blas_param.beta));
+          const Z beta(static_cast<std::complex<double>>(blas_param.beta));
 
-	  auto q = device::defaultQueue();
-	  sycl::event evnt;
+          auto q = device::defaultQueue();
+          sycl::event evnt;
           if (batch > 1) {
-	    evnt = blas::column_major::gemm_batch
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-	       (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
-	       (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-	    evnt.wait();
+            evnt = blas::column_major::gemm_batch(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                                  (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                                  (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+                                                  (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+            evnt.wait();
           } else {
-	    evnt = blas::column_major::gemm
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (Z *)A_d + blas_param.a_offset, blas_param.lda,
-	       (Z *)B_d + blas_param.b_offset, blas_param.ldb, beta,
-	       (Z *)C_d + blas_param.c_offset, blas_param.ldc);
-	    evnt.wait();
-	  }
-	  flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
-	} else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
+            evnt
+              = blas::column_major::gemm(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                         (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
+                                         blas_param.ldb, beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
+            evnt.wait();
+          }
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
+        } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
           typedef std::complex<float> C;
 
           const C alpha(static_cast<std::complex<double>>(blas_param.alpha));
-	  const C beta(static_cast<std::complex<double>>(blas_param.beta));
+          const C beta(static_cast<std::complex<double>>(blas_param.beta));
 
-	  auto q = device::defaultQueue();
-	  sycl::event evnt;
+          auto q = device::defaultQueue();
+          sycl::event evnt;
           if (batch > 1) {
-	    evnt = blas::column_major::gemm_batch
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-	       (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
-	       (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-	    evnt.wait();
+            evnt = blas::column_major::gemm_batch(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                                  (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                                  (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+                                                  (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+            evnt.wait();
           } else {
-	    evnt = blas::column_major::gemm
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (C *)A_d + blas_param.a_offset, blas_param.lda,
-	       (C *)B_d + blas_param.b_offset, blas_param.ldb, beta,
-	       (C *)C_d + blas_param.c_offset, blas_param.ldc);
-	    evnt.wait();
+            evnt
+              = blas::column_major::gemm(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                         (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
+                                         blas_param.ldb, beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
+            evnt.wait();
           }
-	  flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
           typedef double D;
 
           const D alpha = (D) static_cast<std::complex<double>>(blas_param.alpha).real();
           const D beta = (D) static_cast<std::complex<double>>(blas_param.beta).real();
 
-	  auto q = device::defaultQueue();
-	  sycl::event evnt;
+          auto q = device::defaultQueue();
+          sycl::event evnt;
           if (batch > 1) {
-	    evnt = blas::column_major::gemm_batch
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-	       (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
-	       (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-	    evnt.wait();
+            evnt = blas::column_major::gemm_batch(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                                  (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                                  (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+                                                  (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+            evnt.wait();
           } else {
-	    evnt = blas::column_major::gemm
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (D *)A_d + blas_param.a_offset, blas_param.lda,
-	       (D *)B_d + blas_param.b_offset, blas_param.ldb, beta,
-	       (D *)C_d + blas_param.c_offset, blas_param.ldc);
-	    evnt.wait();
+            evnt
+              = blas::column_major::gemm(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                         (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
+                                         blas_param.ldb, beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
+            evnt.wait();
           }
-	  flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
           typedef float S;
 
           const S alpha = (S) static_cast<std::complex<float>>(blas_param.alpha).real();
           const S beta = (S) static_cast<std::complex<float>>(blas_param.beta).real();
 
-	  auto q = device::defaultQueue();
-	  sycl::event evnt;
+          auto q = device::defaultQueue();
+          sycl::event evnt;
           if (batch > 1) {
-	    evnt = blas::column_major::gemm_batch
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-	       (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
-	       (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-	    evnt.wait();
+            evnt = blas::column_major::gemm_batch(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                                  (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                                  (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+                                                  (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+            evnt.wait();
           } else {
-	    evnt = blas::column_major::gemm
-	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-	       (S *)A_d + blas_param.a_offset, blas_param.lda,
-	       (S *)B_d + blas_param.b_offset, blas_param.ldb, beta,
-	       (S *)C_d + blas_param.c_offset, blas_param.ldc);
-	    evnt.wait();
+            evnt
+              = blas::column_major::gemm(q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                                         (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
+                                         blas_param.ldb, beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
+            evnt.wait();
           }
-	  flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
           errorQuda("MKL GEMM type %d not implemented\n", blas_param.data_type);
         }
@@ -497,22 +489,21 @@ namespace quda
         long ds = stop.tv_sec - start.tv_sec;
         long dus = stop.tv_usec - start.tv_usec;
         double time = ds + 0.000001 * dus;
-        //if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
+        // if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+        printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
         //-------------------------------------------------------------------------
 
         return flops;
       }
 #else
-      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data,
-				 QudaBLASParam blas_param, QudaFieldLocation location)
+      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
+                                 QudaFieldLocation location)
       {
-	warningQuda("using generic stridedBatchGEMM");
-	return quda::blas_lapack::generic::stridedBatchGEMM(A_data, B_data, C_data,
-							    blas_param, location);
+        warningQuda("using generic stridedBatchGEMM");
+        return quda::blas_lapack::generic::stridedBatchGEMM(A_data, B_data, C_data, blas_param, location);
       }
 #endif
 
     } // namespace native
-  }   // namespace blas_lapack
+  } // namespace blas_lapack
 } // namespace quda

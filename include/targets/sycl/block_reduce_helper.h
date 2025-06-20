@@ -13,7 +13,7 @@
    warp- and block-level reductions, using the CUB library
  */
 
-//using namespace quda;
+// using namespace quda;
 
 namespace quda
 {
@@ -70,32 +70,29 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     T inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
-      //auto sg = sycl::ext::oneapi::experimental::this_sub_group();
+      // auto sg = sycl::ext::oneapi::experimental::this_sub_group();
       auto sg = sycl::ext::oneapi::this_work_item::get_sub_group();
       T value = value_;
 #pragma unroll
-      for (int offset = param_t::width/2; offset >= 1; offset /= 2) {
-	value = r(value, sycl::shift_group_left(sg, value, offset));
+      for (int offset = param_t::width / 2; offset >= 1; offset /= 2) {
+        value = r(value, sycl::shift_group_left(sg, value, offset));
       }
-      //if (all) value = sycl::select_from_group(sg, value, 0);
+      // if (all) value = sycl::select_from_group(sg, value, 0);
       if (all) value = sycl::group_broadcast(sg, value);
       return value;
     }
-
   };
 
-
   // pre-declaration of block_reduce that we wish to specialize
-  //template <bool> struct block_reduce;
+  // template <bool> struct block_reduce;
   template <typename T, int block_dim, int batch_size> class BlockReduce;
 
   /**
      @brief SYCL specialization of block_reduce, using SYCL group reductions
   */
-  template <typename T, int block_dim, int batch_size>
-  struct block_reduceG {
-    //using dependencies = op_Sequential<op_blockSync>;
-    //using dependentOps = KernelOps<op_blockSync>;
+  template <typename T, int block_dim, int batch_size> struct block_reduceG {
+    // using dependencies = op_Sequential<op_blockSync>;
+    // using dependentOps = KernelOps<op_blockSync>;
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
     template <typename S> inline block_reduceG(S &) {};
     /**
@@ -110,20 +107,19 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
-    template <typename reducer_t>
-    inline T apply(const T &value_, bool async, int batch, bool, const reducer_t &r)
+    template <typename reducer_t> inline T apply(const T &value_, bool async, int batch, bool, const reducer_t &r)
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       const int nbatch = batch_size;
-      //const int nbatch = std::min(param_t::batch_size, localRangeZ);
+      // const int nbatch = std::min(param_t::batch_size, localRangeZ);
       auto grp = getGroup();
       T result;
-      //T result = reducer_t::init();
-      for(int i=0; i<nbatch; i++) {
-	T in = (i==batch) ? value_ : reducer_t::init();
-	T out;
-	blockReduce(grp, out, in, r);
-	if(i==batch) result = out;
+      // T result = reducer_t::init();
+      for (int i = 0; i < nbatch; i++) {
+        T in = (i == batch) ? value_ : reducer_t::init();
+        T out;
+        blockReduce(grp, out, in, r);
+        if (i == batch) result = out;
       }
       return result;
     }
@@ -132,9 +128,8 @@ namespace quda
   /**
      @brief SYCL specialization of block_reduce, building on the warp_reduce
   */
-  template <typename T, int block_dim, int batch_size>
-  struct block_reduceW : SharedMemory<T,SizeBlockDivWarp> {
-    using Smem = SharedMemory<T,SizeBlockDivWarp>;
+  template <typename T, int block_dim, int batch_size> struct block_reduceW : SharedMemory<T, SizeBlockDivWarp> {
+    using Smem = SharedMemory<T, SizeBlockDivWarp>;
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
     template <typename S> inline block_reduceW(S &ops) : Smem(ops) {};
 
@@ -154,8 +149,7 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
-    template <typename reducer_t>
-    inline T apply(const T &value_, bool async, int batch, bool all, const reducer_t &r)
+    template <typename reducer_t> inline T apply(const T &value_, bool async, int batch, bool all, const reducer_t &r)
     {
       constexpr auto max_items = device::max_block_size() / device::warp_size();
       const auto thread_idx = target::thread_idx_linear<block_dim>();
@@ -175,7 +169,7 @@ namespace quda
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
-      //blockSync(ops);
+      // blockSync(ops);
       __syncthreads();
 
       // whether to use the first warp or first thread for the final reduction
@@ -200,8 +194,8 @@ namespace quda
 
       if (all) {
         if (thread_idx == 0) storage[batch * warp_items + 0] = value;
-	//blockSync(ops);
-	__syncthreads();
+        // blockSync(ops);
+        __syncthreads();
         value = storage[batch * warp_items + 0];
       }
 
@@ -209,8 +203,8 @@ namespace quda
     }
   };
 
-  //template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceG<T,block_dim,batch_size>;
-  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T,block_dim,batch_size>;
+  // template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceG<T,block_dim,batch_size>;
+  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T, block_dim, batch_size>;
 
 } // namespace quda
 
@@ -218,10 +212,12 @@ namespace quda
 
 namespace quda
 {
-  template <typename T, int block_dim, int batch_size> static constexpr bool needsFullBlockImpl<BlockReduce<T,block_dim,batch_size>> = true;
-  template <typename T, int block_dim, int batch_size> static constexpr bool needsSharedMemImpl<BlockReduce<T,block_dim,batch_size>> = true;
+  template <typename T, int block_dim, int batch_size>
+  static constexpr bool needsFullBlockImpl<BlockReduce<T, block_dim, batch_size>> = true;
+  template <typename T, int block_dim, int batch_size>
+  static constexpr bool needsSharedMemImpl<BlockReduce<T, block_dim, batch_size>> = true;
 } // namespace quda
 
-static_assert(needsFullBlock<KernelOps<BlockReduce<double,1>>> == true);
-static_assert(BlockReduce<double,1>::shared_mem_size(dim3{8,8,8}) > 0);
-static_assert(needsSharedMem<KernelOps<BlockReduce<double,1>>> == true);
+static_assert(needsFullBlock<KernelOps<BlockReduce<double, 1>>> == true);
+static_assert(BlockReduce<double, 1>::shared_mem_size(dim3 {8, 8, 8}) > 0);
+static_assert(needsSharedMem<KernelOps<BlockReduce<double, 1>>> == true);

@@ -153,55 +153,56 @@ namespace quda {
 
       vector reduced{0};
       if (!allthreads || active) {
-	while (x_fine_offset < arg.aggregate_size) {
-	  // all threads with x_fine_offset greater than aggregate_size_cb are second parity
-	  const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
-	  const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
-	  const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
+        while (x_fine_offset < arg.aggregate_size) {
+          // all threads with x_fine_offset greater than aggregate_size_cb are second parity
+          const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
+          const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
+          const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
 
-	  // look-up map is ordered as (coarse-block-id + fine-point-id),
-	  // with fine-point-id parity ordered
-	  const int x_fine_site_id = (x_coarse * 2 + parity) * arg.aggregate_size_cb + x_fine_cb_offset;
-	  const int x_fine = arg.coarse_to_fine[x_fine_site_id];
-	  const int x_fine_cb = x_fine - parity * arg.in[src_idx].VolumeCB();
+          // look-up map is ordered as (coarse-block-id + fine-point-id),
+          // with fine-point-id parity ordered
+          const int x_fine_site_id = (x_coarse * 2 + parity) * arg.aggregate_size_cb + x_fine_cb_offset;
+          const int x_fine = arg.coarse_to_fine[x_fine_site_id];
+          const int x_fine_cb = x_fine - parity * arg.in[src_idx].VolumeCB();
 
-	  array<complex<typename Arg::real>, Arg::fineSpin * coarse_color_per_thread> tmp{0};
+          array<complex<typename Arg::real>, Arg::fineSpin * coarse_color_per_thread> tmp {0};
 
-	  rotateCoarseColor(tmp, arg, src_idx, parity, x_fine_cb, coarse_color_block);
+          rotateCoarseColor(tmp, arg, src_idx, parity, x_fine_cb, coarse_color_block);
 
-	  // perform any local spin coarsening
+          // perform any local spin coarsening
 #pragma unroll
-	  for (int s = 0; s<Arg::fineSpin; s++) {
+          for (int s = 0; s < Arg::fineSpin; s++) {
 #pragma unroll
-	    for (int v = 0; v<coarse_color_per_thread; v++) {
-	      if (arg.spin_map(s, parity) == 0) {
-		reduced[0 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
-	      } else {
-		reduced[1 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
-	      }
-	    }
-	  }
+            for (int v = 0; v < coarse_color_per_thread; v++) {
+              if (arg.spin_map(s, parity) == 0) {
+                reduced[0 * coarse_color_per_thread + v] += tmp[s * coarse_color_per_thread + v];
+              } else {
+                reduced[1 * coarse_color_per_thread + v] += tmp[s * coarse_color_per_thread + v];
+              }
+            }
+          }
 
-	  x_fine_offset += target::block_dim().x;
-	}
+          x_fine_offset += target::block_dim().x;
+        }
       }
 
       reduced = BlockReduce_t(*this, thread.z).Sum(reduced);
 
       if (!allthreads || active) {
-	if (target::thread_idx().x == 0) {
-	  const int parity_coarse = x_coarse >= arg.out[src_idx].VolumeCB() ? 1 : 0;
-	  const int x_coarse_cb = x_coarse - parity_coarse*arg.out[src_idx].VolumeCB();
+        if (target::thread_idx().x == 0) {
+          const int parity_coarse = x_coarse >= arg.out[src_idx].VolumeCB() ? 1 : 0;
+          const int x_coarse_cb = x_coarse - parity_coarse * arg.out[src_idx].VolumeCB();
 
 #pragma unroll
-	  for (int s = 0; s < Arg::coarseSpin; s++) {
+          for (int s = 0; s < Arg::coarseSpin; s++) {
 #pragma unroll
-	    for (int coarse_color_local=0; coarse_color_local<coarse_color_per_thread; coarse_color_local++) {
-	      int v = coarse_color_thread * coarse_color_per_thread + coarse_color_local;
-	      arg.out[src_idx](parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_color_per_thread+coarse_color_local];
-	    }
-	  }
-	}
+            for (int coarse_color_local = 0; coarse_color_local < coarse_color_per_thread; coarse_color_local++) {
+              int v = coarse_color_thread * coarse_color_per_thread + coarse_color_local;
+              arg.out[src_idx](parity_coarse, x_coarse_cb, s, v)
+                = reduced[s * coarse_color_per_thread + coarse_color_local];
+            }
+          }
+        }
       }
     }
   };

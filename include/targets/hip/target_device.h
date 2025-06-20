@@ -10,19 +10,20 @@ namespace quda
   {
 
     // hip-clang: compile-time dispatch
-    template <template <bool, typename...> class f, auto ...Params, typename ...Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __HIP_DEVICE_COMPILE__
       if constexpr (sizeof...(Params) == 0) {
-	return f<true>()(args...);
+        return f<true>()(args...);
       } else {
-	return f<true>().template operator()<Params...>(args...);
+        return f<true>().template operator()<Params...>(args...);
       }
 #else
       if constexpr (sizeof...(Params) == 0) {
-	return f<false>()(args...);
+        return f<false>()(args...);
       } else {
-	return f<false>().template operator()<Params...>(args...);
+        return f<false>().template operator()<Params...>(args...);
       }
 #endif
     }

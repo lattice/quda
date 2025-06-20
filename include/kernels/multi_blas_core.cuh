@@ -15,7 +15,7 @@ namespace quda
 #ifndef QUDA_FAST_COMPILE_REDUCE
     constexpr bool enable_warp_split() { return false; }
 #else
-    //constexpr bool enable_warp_split() { return true; }
+    // constexpr bool enable_warp_split() { return true; }
     constexpr bool enable_warp_split() { return false; }
 #endif
 
@@ -65,9 +65,9 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    //template <typename Arg> struct MultiBlas_ {
-    template <typename Arg> struct MultiBlas_ : only_warp_combine<array<complex<typename Arg::real>, Arg::n/2>> {
-    //  std::conditional_t<Arg::Functor::write.Y||Arg::Functor::write.W,BlockSync,void> {
+    // template <typename Arg> struct MultiBlas_ {
+    template <typename Arg> struct MultiBlas_ : only_warp_combine<array<complex<typename Arg::real>, Arg::n / 2>> {
+      //  std::conditional_t<Arg::Functor::write.Y||Arg::Functor::write.W,BlockSync,void> {
       const Arg &arg;
       constexpr MultiBlas_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
@@ -87,37 +87,37 @@ namespace quda
         const int l_idx = lane_id / vector_site_width;
 
         vec x, y, z, w;
-	if (!allthreads || active) {
-	  if (l_idx == 0 || warp_split == 1) {
-	    if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
-	    if (arg.f.read.W) arg.W[k].load(w, idx, parity);
-	  } else {
-	    y = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
-	    w = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
-	  }
+        if (!allthreads || active) {
+          if (l_idx == 0 || warp_split == 1) {
+            if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
+            if (arg.f.read.W) arg.W[k].load(w, idx, parity);
+          } else {
+            y = ::quda::zero<complex<typename Arg::real>, Arg::n / 2>();
+            w = ::quda::zero<complex<typename Arg::real>, Arg::n / 2>();
+          }
 
 #pragma unroll
-	  for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
-	    const int l = l_ + l_idx;
-	    if (l < Arg::NXZ || warp_split == 1) {
-	      if (arg.f.read.X) arg.X[l].load(x, idx, parity);
-	      if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
+          for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
+            const int l = l_ + l_idx;
+            if (l < Arg::NXZ || warp_split == 1) {
+              if (arg.f.read.X) arg.X[l].load(x, idx, parity);
+              if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
-	      arg.f(x, y, z, w, k, l);
-	    }
-	  }
-	}
+              arg.f(x, y, z, w, k, l);
+            }
+          }
+        }
 
         // now combine the results across the warp if needed
         if (arg.f.write.Y) y = warp_combine<warp_split>(y);
         if (arg.f.write.W) w = warp_combine<warp_split>(w);
 
-	if (!allthreads || active) {
-	  if (l_idx == 0 || warp_split == 1) {
-	    if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
-	    if (arg.f.write.W) arg.W[k].save(w, idx, parity);
-	  }
-	}
+        if (!allthreads || active) {
+          if (l_idx == 0 || warp_split == 1) {
+            if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
+            if (arg.f.write.W) arg.W[k].save(w, idx, parity);
+          }
+        }
       }
     };
 

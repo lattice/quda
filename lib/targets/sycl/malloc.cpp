@@ -33,7 +33,7 @@ namespace quda
     backward::StackTrace st;
 #endif
 
-    MemAlloc() : line(-1), size(0), base_size(0) {}
+    MemAlloc() : line(-1), size(0), base_size(0) { }
 
     MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
     {
@@ -177,8 +177,7 @@ namespace quda
         warningQuda("Using managed memory for SYCL allocations");
         managed = true;
 
-        if (!device::managed_memory_supported())
-          warningQuda("Target device does not report supporting managed memory");
+        if (!device::managed_memory_supported()) warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;
@@ -221,9 +220,7 @@ namespace quda
     auto q = device::defaultQueue();
     void *ptr = sycl::malloc_device(size, q);
 #ifndef USE_QDPJIT
-    if (!ptr) {
-      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
+    if (!ptr) { errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
 #else
     // QDPJIT version -- barfs internally if it fails
     QDP::QDP_get_global_cache().addDeviceStatic(&ptr, size, true);
@@ -294,9 +291,7 @@ namespace quda
     a.size = a.base_size = size;
     auto q = device::defaultQueue();
     void *ptr = sycl::malloc_host(size, q);
-    if (!ptr) {
-      errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
+    if (!ptr) { errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
     track_malloc(PINNED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
@@ -336,9 +331,7 @@ namespace quda
     a.size = a.base_size = size;
     auto q = device::defaultQueue();
     void *ptr = sycl::malloc_shared(size, q);
-    if (!ptr) {
-      errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
+    if (!ptr) { errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
     q.memset(ptr, 0xff, a.base_size);
@@ -533,8 +526,7 @@ namespace quda
   {
     auto ctx = device::defaultQueue().get_context();
     auto mem_type = sycl::get_pointer_type(ptr, ctx);
-    if(mem_type==sycl::usm::alloc::host || mem_type==sycl::usm::alloc::unknown)
-      return QUDA_CPU_FIELD_LOCATION;
+    if (mem_type == sycl::usm::alloc::host || mem_type == sycl::usm::alloc::unknown) return QUDA_CPU_FIELD_LOCATION;
     return QUDA_CUDA_FIELD_LOCATION;
   }
 

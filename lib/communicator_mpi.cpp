@@ -1,7 +1,7 @@
 #include <communicator_quda.h>
 
-//#define QUDA_COMM_CHECKHANG
-//#define QUDA_COMM_CHECKSUM
+// #define QUDA_COMM_CHECKHANG
+// #define QUDA_COMM_CHECKSUM
 
 #define MPI_CHECK(mpi_call)                                                                                            \
   do {                                                                                                                 \
@@ -58,16 +58,12 @@ namespace quda
     uint64_t sum = 0xf0f0f0f0;
     // assume buffer is aligned
     auto bufl = static_cast<uint64_t *>(buf);
-    size_t nl = n/8;
-    for (size_t i=0; i<nl; i++) {
-      sum ^= bufl[i];
-    }
+    size_t nl = n / 8;
+    for (size_t i = 0; i < nl; i++) { sum ^= bufl[i]; }
     size_t nc = 8 * nl;
     char *bufc = static_cast<char *>(buf) + nc;
     size_t rem = n - nc;
-    for (size_t i=0; i<rem; i++) {
-      sum ^= ((uint64_t)bufc[i]) << i;
-    }
+    for (size_t i = 0; i < rem; i++) { sum ^= ((uint64_t)bufc[i]) << i; }
     return sum;
   }
   uint64_t chksum_gpu(void *buf, size_t n)
@@ -81,7 +77,7 @@ namespace quda
   uint64_t chksum(void *buf, size_t n)
   {
     auto loc = get_pointer_location(buf);
-    if (loc==QUDA_CPU_FIELD_LOCATION) {
+    if (loc == QUDA_CPU_FIELD_LOCATION) {
       return chksum_cpu(buf, n);
     } else {
       return chksum_gpu(buf, n);
@@ -317,8 +313,8 @@ namespace quda
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
-    mh->nbytes = 0;  // strides not supported yet
-    //MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+    mh->nbytes = 0; // strides not supported yet
+    // MPI_CHECK(MPI_Send_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
 #endif
 
     return mh;
@@ -354,8 +350,8 @@ namespace quda
 #endif
 #ifdef QUDA_COMM_CHECKSUM
     mh->buffer = buffer;
-    mh->nbytes = 0;  // strides not supported yet
-    //MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
+    mh->nbytes = 0; // strides not supported yet
+    // MPI_CHECK(MPI_Recv_init(&(mh->chksum), 1, MPI_UINT64_T, rank, tag, MPI_COMM_HANDLE, &(mh->chkreq)));
 #endif
 
     return mh;
@@ -366,7 +362,7 @@ namespace quda
     MPI_CHECK(MPI_Request_free(&(mh->request)));
     if (mh->custom) MPI_CHECK(MPI_Type_free(&(mh->datatype)));
 #ifdef QUDA_COMM_CHECKSUM
-    if (mh->nbytes>0) MPI_CHECK(MPI_Request_free(&(mh->chkreq)));
+    if (mh->nbytes > 0) MPI_CHECK(MPI_Request_free(&(mh->chkreq)));
 #endif
     host_free(mh);
     mh = nullptr;
@@ -376,10 +372,8 @@ namespace quda
   {
     MPI_CHECK(MPI_Start(&(mh->request)));
 #ifdef QUDA_COMM_CHECKSUM
-    if (mh->nbytes>0) {
-      if (mh->isSend) {
-	mh->chksum = chksum(mh->buffer, mh->nbytes);
-      }
+    if (mh->nbytes > 0) {
+      if (mh->isSend) { mh->chksum = chksum(mh->buffer, mh->nbytes); }
       MPI_CHECK(MPI_Start(&(mh->chkreq)));
     }
 #endif
@@ -388,23 +382,23 @@ namespace quda
 #endif
   }
 
-  void Communicator::comm_wait(MsgHandle *mh) {
+  void Communicator::comm_wait(MsgHandle *mh)
+  {
     MPI_CHECK(MPI_Wait(&(mh->request), MPI_STATUS_IGNORE));
 #ifdef QUDA_COMM_CHECKSUM
-    if (mh->nbytes>0) {
+    if (mh->nbytes > 0) {
       MPI_CHECK(MPI_Wait(&(mh->chkreq), MPI_STATUS_IGNORE));
       if (!mh->isSend) {
-	auto cs = chksum(mh->buffer, mh->nbytes);
-	if (cs != mh->chksum) {
-	  errorQuda("comm_wait checksum failure got %lu expeted %lu\n", cs, mh->chksum);
-	}
+        auto cs = chksum(mh->buffer, mh->nbytes);
+        if (cs != mh->chksum) { errorQuda("comm_wait checksum failure got %lu expeted %lu\n", cs, mh->chksum); }
       }
     }
 #endif
   }
 
 #ifdef QUDA_COMM_CHECKHANG
-  void hangwarn(bool isSend) {
+  void hangwarn(bool isSend)
+  {
     char name[MPI_MAX_PROCESSOR_NAME];
     int resultlen;
     MPI_Get_processor_name(name, &resultlen);
@@ -417,7 +411,8 @@ namespace quda
   MPI_Comm MPI_COMM;
   bool isSend;
   int otherRank;
-  void hang(int, siginfo_t *, void *) {
+  void hang(int, siginfo_t *, void *)
+  {
     char name[MPI_MAX_PROCESSOR_NAME];
     int resultlen;
     MPI_Get_processor_name(name, &resultlen);
@@ -435,7 +430,7 @@ namespace quda
   {
 #ifdef QUDA_COMM_CHECKHANG
     static bool firstCall = true;
-    if(firstCall) {
+    if (firstCall) {
       firstCall = false;
       struct sigaction sig_action;
       memset(&sig_action, 0, sizeof(sig_action));
@@ -447,19 +442,17 @@ namespace quda
     MPI_COMM = MPI_COMM_HANDLE;
     isSend = mh->isSend;
     otherRank = mh->otherRank;
-    alarm(120);  // 120 seconds
+    alarm(120); // 120 seconds
 #endif
     int query;
     MPI_CHECK(MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE));
 #ifdef QUDA_COMM_CHECKHANG
     alarm(0);
     double endTime = MPI_Wtime();
-    if (endTime-mh->startTime>120.0) {
-      hang(0, nullptr, nullptr);
-    }
-    //if (endTime-mh->startTime>60.0) {
-    //  hangwarn(mh->isSend);
-    //}
+    if (endTime - mh->startTime > 120.0) { hang(0, nullptr, nullptr); }
+    // if (endTime-mh->startTime>60.0) {
+    //   hangwarn(mh->isSend);
+    // }
 #endif
     return query;
   }

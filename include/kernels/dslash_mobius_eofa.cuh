@@ -122,9 +122,7 @@ namespace quda
         SharedMemoryCache<Vector> cache {*this};
 
         Vector out;
-	if (!allthreads || active) {
-	  cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
-	}
+        if (!allthreads || active) { cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity)); }
         cache.sync();
 
         auto Ls = arg.Ls;
@@ -168,15 +166,13 @@ namespace quda
           }
 
           if (Arg::xpay) { // really axpy
-	    if (!allthreads || active) {
-	      Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
-	      out = arg.a * x + out;
-	    }
+            if (!allthreads || active) {
+              Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+              out = arg.a * x + out;
+            }
           }
         }
-	if (!allthreads || active) {
-	  arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
-	}
+        if (!allthreads || active) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 
@@ -214,9 +210,7 @@ namespace quda
 
         const auto sherman_morrison = arg.sherman_morrison;
         SharedMemoryCache<Vector> cache {*this};
-	if (!allthreads || active) {
-	  cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity));
-	}
+        if (!allthreads || active) { cache.save(arg.in[src_idx](s * arg.volume_4d_cb + x_cb, parity)); }
         cache.sync();
 
         Vector out;
@@ -243,14 +237,12 @@ namespace quda
           }
         }
         if (Arg::xpay) { // really axpy
-	  if (!allthreads || active) {
-	    Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
-	    out = x + arg.a * out;
-	  }
+          if (!allthreads || active) {
+            Vector x = arg.x[src_idx](s * arg.volume_4d_cb + x_cb, parity);
+            out = x + arg.a * out;
+          }
         }
-	if (!allthreads || active) {
-	  arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out;
-	}
+        if (!allthreads || active) { arg.out[src_idx](s * arg.volume_4d_cb + x_cb, parity) = out; }
       }
     };
 

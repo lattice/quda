@@ -34,7 +34,7 @@ namespace quda
     return output;
   }
 
-  template <typename T, int n> constexpr T& elem(array<T, n> &a, int i) { return a[i]; }
+  template <typename T, int n> constexpr T &elem(array<T, n> &a, int i) { return a[i]; }
 
   /**
    * @brief Element-wise maximum of two arrays

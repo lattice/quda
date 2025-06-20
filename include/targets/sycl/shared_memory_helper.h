@@ -22,7 +22,7 @@ namespace quda
   template <typename T, typename S, typename O = void> class SharedMemory
   {
     sycl::local_ptr<T> data;
-    const unsigned int size;  // number of elements of type T
+    const unsigned int size; // number of elements of type T
 
   public:
     using value_type = T;
@@ -62,7 +62,7 @@ namespace quda
     template <typename... U, typename... Arg>
     SharedMemory(const KernelOps<U...> &ops, const Arg &...arg) : size(S::size(target::block_dim(), arg...))
     {
-      //auto op = getDependentOps<op_SharedMemory<T,SizeSmem<SharedMemory<T,S,O>>>>(ops);
+      // auto op = getDependentOps<op_SharedMemory<T,SizeSmem<SharedMemory<T,S,O>>>>(ops);
       auto op = ops;
       auto offset = get_offset(target::block_dim(), arg...);
       sycl::local_ptr<void> v(op.smem + offset);
@@ -80,6 +80,6 @@ namespace quda
     __device__ __host__ T &operator[](const int i) { return data[i]; }
   };
 
-  template <typename T, typename S, typename O> static constexpr bool needsSharedMemImpl<SharedMemory<T,S,O>> = true;
+  template <typename T, typename S, typename O> static constexpr bool needsSharedMemImpl<SharedMemory<T, S, O>> = true;
 
 } // namespace quda

@@ -221,7 +221,8 @@ namespace quda {
   */
   template <bool allthreads, typename Ftor>
   __device__ __host__ inline std::enable_if_t<Ftor::Arg::block_float, typename Ftor::Arg::real>
-  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block,
+                   bool active)
   {
     using real = typename Ftor::Arg::real;
     const int Ms = spins_per_thread(Ftor::Arg::nSpin);
@@ -230,15 +231,15 @@ namespace quda {
 
     if (!allthreads || active) {
 #pragma unroll
-      for (int spin_local=0; spin_local<Ms; spin_local++) {
-	int s = spin_block + spin_local;
+      for (int spin_local = 0; spin_local < Ms; spin_local++) {
+        int s = spin_block + spin_local;
 #pragma unroll
-	for (int color_local=0; color_local<Mc; color_local++) {
-	  int c = color_block + color_local;
-	  complex<real> z = ftor.arg.in[src_idx](spinor_parity, x_cb, s, c);
-	  thread_max.real(max(thread_max.real(), abs(z.real())));
-	  thread_max.imag(max(thread_max.imag(), abs(z.imag())));
-	}
+        for (int color_local = 0; color_local < Mc; color_local++) {
+          int c = color_block + color_local;
+          complex<real> z = ftor.arg.in[src_idx](spinor_parity, x_cb, s, c);
+          thread_max.real(max(thread_max.real(), abs(z.real())));
+          thread_max.imag(max(thread_max.imag(), abs(z.imag())));
+        }
       }
     }
 
@@ -329,16 +330,16 @@ namespace quda {
 
       if (!allthreads || active) {
 #pragma unroll
-	for (int spin_local=0; spin_local<Ms; spin_local++) {
-	  int s = spin_block + spin_local;
+        for (int spin_local = 0; spin_local < Ms; spin_local++) {
+          int s = spin_block + spin_local;
 #pragma unroll
-	  for (int color_local=0; color_local<Mc; color_local++) {
-	    int c = color_block + color_local;
-	    arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
-	  }
-	}
+          for (int color_local = 0; color_local < Mc; color_local++) {
+            int c = color_block + color_local;
+            arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
+          }
+        }
 #ifdef NVSHMEM_COMMS
-	if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
+        if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
 #endif
       }
     }

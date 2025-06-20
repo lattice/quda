@@ -1,8 +1,9 @@
 #pragma once
 
-//#include <quda_sycl.h>
+// #include <quda_sycl.h>
 
-namespace quda {
+namespace quda
+{
 
 #if 0
   template <typename T> struct subgroup_load_store {
@@ -17,38 +18,38 @@ namespace quda {
 
   template <typename T, int n> __host__ __device__ void block_load(T out[n], const T *in)
   {
-    //#pragma unroll
-    //for (int i = 0; i < n; i++) out[i] = in[i];
-    memcpy(out, in, n*sizeof(T));
-    //using U = T[n];
-    //using LS = subgroup_load_store<U>;
-    //using V = typename LS::vec;
-    //using A = typename LS::atom_t;
-    //constexpr int nv = LS::n_element;
-    //auto sg = sycl::ext::oneapi::experimental::this_sub_group();
-    //auto vin = reinterpret_cast<const V*>(in) - sg.get_local_id();
-    //auto vin = reinterpret_cast<const A*>(in) - nv*sg.get_local_id();
-    //auto t = sg.load<nv>(sycl::multi_ptr<const A,sycl::access::address_space::global_space>{vin});
-    //#pragma unroll
-    //for (int i = 0; i < nv; i++) t[i] = sg.load(vin + sg);
-    //auto vout = sg.load(vin);
-    //#pragma unroll
-    //for (int i = 0; i < n; i++) out[i] = vout[i];
+    // #pragma unroll
+    // for (int i = 0; i < n; i++) out[i] = in[i];
+    memcpy(out, in, n * sizeof(T));
+    // using U = T[n];
+    // using LS = subgroup_load_store<U>;
+    // using V = typename LS::vec;
+    // using A = typename LS::atom_t;
+    // constexpr int nv = LS::n_element;
+    // auto sg = sycl::ext::oneapi::experimental::this_sub_group();
+    // auto vin = reinterpret_cast<const V*>(in) - sg.get_local_id();
+    // auto vin = reinterpret_cast<const A*>(in) - nv*sg.get_local_id();
+    // auto t = sg.load<nv>(sycl::multi_ptr<const A,sycl::access::address_space::global_space>{vin});
+    // #pragma unroll
+    // for (int i = 0; i < nv; i++) t[i] = sg.load(vin + sg);
+    // auto vout = sg.load(vin);
+    // #pragma unroll
+    // for (int i = 0; i < n; i++) out[i] = vout[i];
   }
 
   template <typename T, int n> __host__ __device__ void block_store(T *out, const T in[n])
   {
-    //#pragma unroll
-    //for (int i = 0; i < n; i++) out[i] = in[i];
-    memcpy(out, in, n*sizeof(T));
+    // #pragma unroll
+    // for (int i = 0; i < n; i++) out[i] = in[i];
+    memcpy(out, in, n * sizeof(T));
   }
 
   template <typename T> __host__ __device__ void block_load(T &out, const T *in)
   {
-    //out = *in;
+    // out = *in;
     memcpy(&out, in, sizeof(T));
-    //auto sg = sycl::ext::oneapi::experimental::this_sub_group();
-    //out = sg.load(in - sg.get_local_id());
+    // auto sg = sycl::ext::oneapi::experimental::this_sub_group();
+    // out = sg.load(in - sg.get_local_id());
   }
 
   template <typename T> __host__ __device__ void block_store(T *out, const T &in)
@@ -57,4 +58,4 @@ namespace quda {
     memcpy(out, &in, sizeof(T));
   }
 
-}
+} // namespace quda

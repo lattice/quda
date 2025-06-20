@@ -18,8 +18,8 @@ namespace quda
   typedef struct {
     bool isDouble;
     union {
-      descriptor<precision::SINGLE,domain::COMPLEX> *s;
-      descriptor<precision::DOUBLE,domain::COMPLEX> *d;
+      descriptor<precision::SINGLE, domain::COMPLEX> *s;
+      descriptor<precision::DOUBLE, domain::COMPLEX> *d;
     };
   } FFTPlanHandle;
 
@@ -36,19 +36,17 @@ namespace quda
    */
   inline void ApplyFFT(FFTPlanHandle &plan, float2 *data_in, float2 *data_out, int direction)
   {
-    if(plan.isDouble) {
-      errorQuda("Called single precision FFT with double precision plan\n");
-    }
+    if (plan.isDouble) { errorQuda("Called single precision FFT with double precision plan\n"); }
     sycl::event e;
-    if(direction == FFT_FORWARD) {
-      //warningQuda("Forward FFT");
+    if (direction == FFT_FORWARD) {
+      // warningQuda("Forward FFT");
       e = compute_forward(*plan.s, (float *)data_in, (float *)data_out);
     } else {
-      //warningQuda("Backward FFT");
+      // warningQuda("Backward FFT");
       e = compute_backward(*plan.s, (float *)data_in, (float *)data_out);
     }
     e.wait();
-    //warningQuda("Done FFT");
+    // warningQuda("Done FFT");
   }
 
   /**
@@ -61,11 +59,9 @@ namespace quda
    */
   inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, int direction)
   {
-    if(!plan.isDouble) {
-      errorQuda("Called double precision FFT with single precision plan\n");
-    }
+    if (!plan.isDouble) { errorQuda("Called double precision FFT with single precision plan\n"); }
     sycl::event e;
-    if(direction == FFT_FORWARD) {
+    if (direction == FFT_FORWARD) {
       e = compute_forward(*plan.d, (double *)data_in, (double *)data_out);
     } else {
       e = compute_backward(*plan.d, (double *)data_in, (double *)data_out);
@@ -82,8 +78,8 @@ namespace quda
    * @param[in] precision The precision of the computation
    */
 
-  //inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
-  inline void SetPlanFFTMany(FFTPlanHandle &, int4 , int dim, QudaPrecision precision)
+  // inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
+  inline void SetPlanFFTMany(FFTPlanHandle &, int4, int dim, QudaPrecision precision)
   {
     warningQuda("SetPlanFFTMany %i %i : unimplemented", dim, precision);
 #if 0
@@ -111,52 +107,52 @@ namespace quda
    */
   inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
   {
-    //warningQuda("SetPlanFFT2DMany %i %i", dim, precision);
-    if(precision == QUDA_SINGLE_PRECISION) {
+    // warningQuda("SetPlanFFT2DMany %i %i", dim, precision);
+    if (precision == QUDA_SINGLE_PRECISION) {
       plan.isDouble = false;
-      if(dim == 0) {
-	auto q = quda::device::defaultQueue();
-	MKL_LONG distance = size.w * size.z;
-	plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.w, size.z});
-	//plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.z, size.w});
-	plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
-	plan.s->set_value(config_param::FWD_DISTANCE, distance);
-	plan.s->set_value(config_param::BWD_DISTANCE, distance);
-	plan.s->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
-	plan.s->commit(q);
+      if (dim == 0) {
+        auto q = quda::device::defaultQueue();
+        MKL_LONG distance = size.w * size.z;
+        plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.w, size.z});
+        // plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.z, size.w});
+        plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
+        plan.s->set_value(config_param::FWD_DISTANCE, distance);
+        plan.s->set_value(config_param::BWD_DISTANCE, distance);
+        plan.s->set_value(config_param::BACKWARD_SCALE, (1.0 / distance));
+        plan.s->commit(q);
       } else {
-	auto q = quda::device::defaultQueue();
-	MKL_LONG distance = size.x * size.y;
-	//plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.x, size.y});
-	plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.y, size.x});
-	plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
-	plan.s->set_value(config_param::FWD_DISTANCE, distance);
-	plan.s->set_value(config_param::BWD_DISTANCE, distance);
-	plan.s->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
-	plan.s->commit(q);
+        auto q = quda::device::defaultQueue();
+        MKL_LONG distance = size.x * size.y;
+        // plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.x, size.y});
+        plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.y, size.x});
+        plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
+        plan.s->set_value(config_param::FWD_DISTANCE, distance);
+        plan.s->set_value(config_param::BWD_DISTANCE, distance);
+        plan.s->set_value(config_param::BACKWARD_SCALE, (1.0 / distance));
+        plan.s->commit(q);
       }
     } else {
       plan.isDouble = true;
-      if(dim == 0) {
-	auto q = quda::device::defaultQueue();
-	MKL_LONG distance = size.w * size.z;
-	plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.w, size.z});
-	//plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.z, size.w});
-	plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
-	plan.d->set_value(config_param::FWD_DISTANCE, distance);
-	plan.d->set_value(config_param::BWD_DISTANCE, distance);
-	plan.d->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
-	plan.d->commit(q);
+      if (dim == 0) {
+        auto q = quda::device::defaultQueue();
+        MKL_LONG distance = size.w * size.z;
+        plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.w, size.z});
+        // plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.z, size.w});
+        plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
+        plan.d->set_value(config_param::FWD_DISTANCE, distance);
+        plan.d->set_value(config_param::BWD_DISTANCE, distance);
+        plan.d->set_value(config_param::BACKWARD_SCALE, (1.0 / distance));
+        plan.d->commit(q);
       } else {
-	auto q = quda::device::defaultQueue();
-	MKL_LONG distance = size.x * size.y;
-	//plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.x, size.y});
-	plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.y, size.x});
-	plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
-	plan.d->set_value(config_param::FWD_DISTANCE, distance);
-	plan.d->set_value(config_param::BWD_DISTANCE, distance);
-	plan.d->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
-	plan.d->commit(q);
+        auto q = quda::device::defaultQueue();
+        MKL_LONG distance = size.x * size.y;
+        // plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.x, size.y});
+        plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.y, size.x});
+        plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
+        plan.d->set_value(config_param::FWD_DISTANCE, distance);
+        plan.d->set_value(config_param::BWD_DISTANCE, distance);
+        plan.d->set_value(config_param::BACKWARD_SCALE, (1.0 / distance));
+        plan.d->commit(q);
       }
     }
 #if 0
@@ -175,16 +171,17 @@ namespace quda
 #endif
   }
 
-  inline void FFTDestroyPlan(FFTPlanHandle &plan) {
-    if(plan.isDouble) {
-      //plan.d->~descriptor();
+  inline void FFTDestroyPlan(FFTPlanHandle &plan)
+  {
+    if (plan.isDouble) {
+      // plan.d->~descriptor();
       delete plan.d;
     } else {
-      //plan.s->~descriptor();
+      // plan.s->~descriptor();
       delete plan.s;
     }
   }
 
-}
+} // namespace quda
 
 #endif // ifndef NATIVE_FFT_LIB

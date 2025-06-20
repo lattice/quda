@@ -80,40 +80,41 @@ namespace quda
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
       if (!allthreads || active) {
-	if (arg.dd_out.isZero(coord)) {
-	  if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-	  if (!allthreads) return;
-	  active = false;
-	}
+        if (arg.dd_out.isZero(coord)) {
+          if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if (!allthreads) return;
+          active = false;
+        }
       }
 
       if (!allthreads || active) {
-	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-	if constexpr (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-	  applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-	else // defined in dslash_twisted_mass_preconditioned
-	  applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        active
+          &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        if constexpr (!dagger || Arg::asymmetric)                 // defined in dslash_wilson.cuh
+          applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        else // defined in dslash_twisted_mass_preconditioned
+          applyWilsonTM<nParity, dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       }
 
       if (active) {
-	if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
-	  if constexpr (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
-	    // use consistent load order across s to ensure better cache locality
-	    Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-	    Vector x1 = arg.x[src_idx](coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
-	    if (flavor == 0)
-	      out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
-	    else
-	      out += arg.a_inv * (x1 - arg.b_inv * x1.igamma(4) + arg.c_inv * x0);
-	  } else {
-	    Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
-	    out += x; // just directly add since twist already applied in the dslash
-	  }
-	} else if (mykernel_type != INTERIOR_KERNEL) {
-	  // if we're not the interior kernel, then we must sum the partial
-	  Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
-	  out += x;
-	}
+        if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
+          if constexpr (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
+            // use consistent load order across s to ensure better cache locality
+            Vector x0 = arg.x[src_idx](coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
+            Vector x1 = arg.x[src_idx](coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+            if (flavor == 0)
+              out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
+            else
+              out += arg.a_inv * (x1 - arg.b_inv * x1.igamma(4) + arg.c_inv * x0);
+          } else {
+            Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
+            out += x; // just directly add since twist already applied in the dslash
+          }
+        } else if (mykernel_type != INTERIOR_KERNEL) {
+          // if we're not the interior kernel, then we must sum the partial
+          Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
+          out += x;
+        }
       }
 
       if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in

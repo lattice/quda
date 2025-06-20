@@ -680,7 +680,7 @@ namespace quda {
 
             // second do scalar copy converting into register type
 #pragma unroll
-            //for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            // for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
             for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], elem(vecTmp, j), nrm); }
           }
 
@@ -735,7 +735,7 @@ namespace quda {
             // first do scalar copy converting into storage type
 #pragma unroll
             for (int j = 0; j < N; j++)
-              //copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
+              // copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
               copy_scaled(elem(vecTmp, j), tmp[chirality * M_rem + i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
@@ -746,7 +746,7 @@ namespace quda {
             // first do scalar copy converting into storage type
 #pragma unroll
             for (int j = 0; j < M_rem; j++)
-              //copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
+              // copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
               copy_scaled(elem(vecTmp, j), tmp[(1 - chirality) * M_offset * N + j]);
 
             char *ptr = reinterpret_cast<char *>(reinterpret_cast<Vector *>(clover) + parity * offset + x);

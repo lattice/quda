@@ -26,39 +26,41 @@ namespace quda
 #ifdef _NVHPC_CUDA
 
     // nvc++: run-time dispatch using if target
-    template <template <bool, typename ...> class f, auto ...Params, typename ...Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
       if target (nv::target::is_device) {
-	  if constexpr (sizeof...(Params) == 0) {
-	    return f<true>()(args...);
-	  } else {
-	    return f<true>().template operator()<Params...>(args...);
-	  }
-	} else {
-	if constexpr (sizeof...(Params) == 0) {
-	  return f<false>()(args...);
-	} else {
-	  return f<false>().template operator()<Params...>(args...);
-	}
+        if constexpr (sizeof...(Params) == 0) {
+          return f<true>()(args...);
+        } else {
+          return f<true>().template operator()<Params...>(args...);
+        }
+      } else {
+        if constexpr (sizeof...(Params) == 0) {
+          return f<false>()(args...);
+        } else {
+          return f<false>().template operator()<Params...>(args...);
+        }
       }
     }
 
 #else
 
     // nvcc or clang: compile-time dispatch
-    template <template <bool, typename ...> class f, auto ...Params, typename ...Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __CUDA_ARCH__
       if constexpr (sizeof...(Params) == 0) {
-	return f<true>()(args...);
+        return f<true>()(args...);
       } else {
-	return f<true>().template operator()<Params...>(args...);
+        return f<true>().template operator()<Params...>(args...);
       }
 #else
       if constexpr (sizeof...(Params) == 0) {
-	return f<false>()(args...);
+        return f<false>()(args...);
       } else {
-	return f<false>().template operator()<Params...>(args...);
+        return f<false>().template operator()<Params...>(args...);
       }
 #endif
     }

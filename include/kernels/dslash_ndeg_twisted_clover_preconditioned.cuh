@@ -83,17 +83,18 @@ namespace quda
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
       if (!allthreads || active) {
-	if (arg.dd_out.isZero(coord)) {
-	  if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-	  if (!allthreads) return;
-	  active = false;
-	}
+        if (arg.dd_out.isZero(coord)) {
+          if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if (!allthreads) return;
+          active = false;
+        }
       }
 
       if (!allthreads || active) {
-	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-	// defined in dslash_wilson.cuh
-	applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        active
+          &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        // defined in dslash_wilson.cuh
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       }
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
@@ -102,9 +103,7 @@ namespace quda
         out += x;
       }
 
-      if (isComplete<mykernel_type>(arg, coord) && active) {
-        out.toRel();
-      }
+      if (isComplete<mykernel_type>(arg, coord) && active) { out.toRel(); }
 
       constexpr int n_flavor = 2;
       HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
@@ -115,15 +114,15 @@ namespace quda
       SharedMemoryCache<HalfVector> cache {*this};
 
       auto swizzle = [&](HalfVector x[2], int chirality) {
-	if (chirality == 0)
-	  cache.save_y(x[1], target::thread_idx().y);
-	else
-	  cache.save_y(x[0], target::thread_idx().y);
-	cache.sync();
-	if (chirality == 0)
-	  x[1] = cache.load_y(target::thread_idx().y + 1);
-	else
-	  x[0] = cache.load_y(target::thread_idx().y - 1);
+        if (chirality == 0)
+          cache.save_y(x[1], target::thread_idx().y);
+        else
+          cache.save_y(x[0], target::thread_idx().y);
+        cache.sync();
+        if (chirality == 0)
+          x[1] = cache.load_y(target::thread_idx().y + 1);
+        else
+          x[0] = cache.load_y(target::thread_idx().y - 1);
       };
 
       swizzle(out_chi, chirality); // apply the flavor-chirality swizzle between threads

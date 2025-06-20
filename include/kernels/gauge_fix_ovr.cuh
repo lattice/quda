@@ -146,8 +146,7 @@ namespace quda {
     constexpr computeFix(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    template <bool allthreads = false>
-    __device__ inline void operator()(int idx, int mu, bool active = true)
+    template <bool allthreads = false> __device__ inline void operator()(int idx, int mu, bool active = true)
     {
       using real = typename Arg::real;
       using Link = Matrix<complex<real>, 3>;
@@ -162,7 +161,7 @@ namespace quda {
         for (int dr = 0; dr < 4; dr++) p += arg.border[dr];
         getCoords(x, idx, arg.X, p + parity);
       } else {
-	if (!allthreads || active) idx = arg.borderpoints[parity][idx];  // load the lattice site assigment
+        if (!allthreads || active) idx = arg.borderpoints[parity][idx]; // load the lattice site assigment
         x[3] = idx / (X[0] * X[1]  * X[2]);
         x[2] = (idx / (X[0] * X[1])) % X[2];
         x[1] = (idx / X[0]) % X[1];
@@ -189,8 +188,8 @@ namespace quda {
           parity = 1 - parity;
         }
         idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-	Link link;
-	if (!allthreads || active) link = arg.u(dim, idx, parity);
+        Link link;
+        if (!allthreads || active) link = arg.u(dim, idx, parity);
 
         if constexpr (Arg::type == 0) {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
@@ -203,13 +202,13 @@ namespace quda {
           GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
         }
 
-	if (!allthreads || active) arg.u(dim, idx, parity) = link;
+        if (!allthreads || active) arg.u(dim, idx, parity) = link;
         arg.u(dim, idx, parity) = link;
       } else if constexpr (Arg::type == 2 || Arg::type == 3) {
         // 4 threads per lattice site
         idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         Link link;
-	if (!allthreads || active) link = arg.u(mu, idx, parity);
+        if (!allthreads || active) link = arg.u(mu, idx, parity);
 
         switch (mu) {
         case 0: x[0] = (x[0] - 1 + X[0]) % X[0]; break;
@@ -219,7 +218,7 @@ namespace quda {
         }
         int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
         Link link1;
-	if (!allthreads || active) link1 = arg.u(mu, idx1, 1 - parity);
+        if (!allthreads || active) link1 = arg.u(mu, idx1, 1 - parity);
 
         if constexpr (Arg::type == 2) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
@@ -232,10 +231,10 @@ namespace quda {
           GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);
         }
 
-	if (!allthreads || active) {
-	  arg.u(mu, idx, parity) = link;
-	  arg.u(mu, idx1, 1 - parity) = link1;
-	}
+        if (!allthreads || active) {
+          arg.u(mu, idx, parity) = link;
+          arg.u(mu, idx1, 1 - parity) = link1;
+        }
       }
     }
   };

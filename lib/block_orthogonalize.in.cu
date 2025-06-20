@@ -20,7 +20,7 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_REDUCE
     using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
-    using array_type = PowerOfTwoArray<device::max_block_size()/2, device::max_block_size()>;
+    using array_type = PowerOfTwoArray<device::max_block_size() / 2, device::max_block_size()>;
 #endif
     static constexpr array_type block = array_type();
 
@@ -156,7 +156,8 @@ namespace quda {
     }
 
 #if defined(QUDA_TARGET_SYCL)
-    unsigned int sharedBytesPerBlock(const TuneParam &tp) const {
+    unsigned int sharedBytesPerBlock(const TuneParam &tp) const
+    {
       using sum_t = double;
       int mVec = quda::tile_size<nColor, nVec>(tp.block.x);
       int vsize = 2 * sizeof(sum_t) * mVec;

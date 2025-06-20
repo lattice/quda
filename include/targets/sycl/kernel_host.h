@@ -20,20 +20,20 @@ namespace quda
   template <template <typename> class Functor, typename Arg> void Kernel3D_host(const Arg &arg)
   {
     if constexpr (needsSharedMem<getKernelOps<Functor<Arg>>>) {
-      auto smemsize = sharedMemSize<getKernelOps<Functor<Arg>>>(dim3(1,1,1), arg);
+      auto smemsize = sharedMemSize<getKernelOps<Functor<Arg>>>(dim3(1, 1, 1), arg);
       char smem[smemsize];
-      Functor<Arg> f{arg, &smem[0]};
+      Functor<Arg> f {arg, &smem[0]};
       for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {
-	for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
-	  for (int k = 0; k < static_cast<int>(arg.threads.z); k++) { f(i, j, k); }
-	}
+        for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
+          for (int k = 0; k < static_cast<int>(arg.threads.z); k++) { f(i, j, k); }
+        }
       }
     } else {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {
-	for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
-	  for (int k = 0; k < static_cast<int>(arg.threads.z); k++) { f(i, j, k); }
-	}
+        for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
+          for (int k = 0; k < static_cast<int>(arg.threads.z); k++) { f(i, j, k); }
+        }
       }
     }
   }

@@ -2,7 +2,8 @@
 #include <kernel_ops.h>
 #include <block_reduce_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   // needsSharedMem
 #if 0
@@ -39,41 +40,36 @@ namespace quda {
   //template <> static constexpr bool needsSharedMem<NoKernelOps> = false;
 #endif
 
-  template <typename T> static constexpr bool needsSharedMemImpl = (T)false;
+  template <typename T> static constexpr bool needsSharedMemImpl = (T) false;
   template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getKernelOps<T>>;
   template <typename... T> static constexpr bool needsSharedMem<KernelOps<T...>> = (needsSharedMemImpl<T> || ...);
 
-
   // KernelOps
-  template <typename ...T>
-  struct KernelOps : KernelOpsBase<T...> {
-  //struct KernelOpsTarget<T...> {
-    //using KernelOpsT = op_Sequential<T...>;
-    //using KernelOpsT = KernelOps<T...>;
-    //using KernelOpsElemType = typename KernelOpsElemTypeS<T...>::type;
-    //const sycl::nd_item<3> *ndi = nullptr;
-    //char *smem;
+  template <typename... T> struct KernelOps : KernelOpsBase<T...> {
+    // struct KernelOpsTarget<T...> {
+    // using KernelOpsT = op_Sequential<T...>;
+    // using KernelOpsT = KernelOps<T...>;
+    // using KernelOpsElemType = typename KernelOpsElemTypeS<T...>::type;
+    // const sycl::nd_item<3> *ndi = nullptr;
+    // char *smem;
     sycl::local_ptr<char> smem = nullptr;
 
-    //KernelOps() = delete;
-    inline KernelOps() {
-      static_assert(!needsSharedMem<KernelOps<T...>>);
-    }
-    inline KernelOps(char *s) {  // for host
+    // KernelOps() = delete;
+    inline KernelOps() { static_assert(!needsSharedMem<KernelOps<T...>>); }
+    inline KernelOps(char *s)
+    { // for host
       static_assert(needsSharedMem<KernelOps<T...>>);
       smem = s;
     }
-    //template <typename S>
-    //inline KernelOps(S s) {
-    //  static_assert(needsSharedMem<KernelOps<T...>>);
-    //  smem = s.get();
-    //}
-    template <typename ...U>
-    inline KernelOps(const KernelOps<U...> &ops) {
+    // template <typename S>
+    // inline KernelOps(S s) {
+    //   static_assert(needsSharedMem<KernelOps<T...>>);
+    //   smem = s.get();
+    // }
+    template <typename... U> inline KernelOps(const KernelOps<U...> &ops)
+    {
       checkKernelOps<T...>(ops);
-      if constexpr (needsSharedMem<KernelOps<T...>>) {
-	smem = ops.smem;
-      }
+      if constexpr (needsSharedMem<KernelOps<T...>>) { smem = ops.smem; }
     }
 
 #if 0
@@ -95,28 +91,28 @@ namespace quda {
   };
 
   // blockSync
-  template <typename ...T>
-  inline void blockSync(const KernelOps<T...> &ops) {
-    //static_assert(hasBlockSync<T...>);
-    //checkKernelOp<op_blockSync,T...>();
+  template <typename... T> inline void blockSync(const KernelOps<T...> &ops)
+  {
+    // static_assert(hasBlockSync<T...>);
+    // checkKernelOp<op_blockSync,T...>();
     checkKernelOps<op_blockSync>(ops);
-    //if (ops->ndi == nullptr) {
-    //  errorQuda("KernelOps not set");
-    //}
+    // if (ops->ndi == nullptr) {
+    //   errorQuda("KernelOps not set");
+    // }
 #ifdef __SYCL_DEVICE_ONLY__
-    //sycl::group_barrier(ops->ndi->get_group());
+    // sycl::group_barrier(ops->ndi->get_group());
     sycl::group_barrier(getGroup());
 #endif
   }
-  //template <typename ...T> inline void blockSync(KernelOps<T...> ops) { blockSync(&ops); }
+  // template <typename ...T> inline void blockSync(KernelOps<T...> ops) { blockSync(&ops); }
 
-  //template <typename ...T> static constexpr bool isOpConcurrent = false;
-  //template <typename ...T> static constexpr bool isOpConcurrent<op_Concurrent<T...>> = true;
+  // template <typename ...T> static constexpr bool isOpConcurrent = false;
+  // template <typename ...T> static constexpr bool isOpConcurrent<op_Concurrent<T...>> = true;
 
-  //template <typename T, typename ...U> static constexpr int getOpIndex = 0;
-  //template <typename T, typename ...U> static constexpr int getOpIndex<T,op_Concurrent<U...>> = getOpIndex<T,U...>;
-  //template <typename T, typename U, typename ...V> static constexpr int getOpIndex<T, U, V...> =
-  //  std::is_same_v<T,U> ? 0 : (1 + getOpIndex<T,V...>);
+  // template <typename T, typename ...U> static constexpr int getOpIndex = 0;
+  // template <typename T, typename ...U> static constexpr int getOpIndex<T,op_Concurrent<U...>> = getOpIndex<T,U...>;
+  // template <typename T, typename U, typename ...V> static constexpr int getOpIndex<T, U, V...> =
+  //   std::is_same_v<T,U> ? 0 : (1 + getOpIndex<T,V...>);
 
 #if 0
   // getKernelOp
@@ -245,48 +241,48 @@ namespace quda {
   template <> static constexpr bool needsFullBlock<NoKernelOps> = false;
   template <typename ...T> static constexpr bool needsFullBlock<KernelOps<T...>> = needsFullBlockImpl<T...>;
 #else
-  template <typename T> static constexpr bool needsFullBlockImpl = (T)false;
-  template <typename ...T> static constexpr bool needsFullBlockImpl<KernelOps<T...>> = (needsFullBlockImpl<T> || ...);
-  //template <> constexpr bool needsFullBlockImpl<NoKernelOps> = false;
+  template <typename T> static constexpr bool needsFullBlockImpl = (T) false;
+  template <typename... T> static constexpr bool needsFullBlockImpl<KernelOps<T...>> = (needsFullBlockImpl<T> || ...);
+  // template <> constexpr bool needsFullBlockImpl<NoKernelOps> = false;
   template <typename T> static constexpr bool needsFullBlock = needsFullBlockImpl<getKernelOps<T>>;
 #endif
 
   // base operation dependencies
-  struct depNone {};
+  struct depNone {
+  };
   template <> struct sharedMemSizeS<depNone> {
-    template <typename ...Arg>
-    static constexpr unsigned int size(dim3, Arg &...) { return 0; }
+    template <typename... Arg> static constexpr unsigned int size(dim3, Arg &...) { return 0; }
   };
 
-  struct depFullBlock {};
+  struct depFullBlock {
+  };
   template <> struct sharedMemSizeS<depFullBlock> {
-    template <typename ...Arg>
-    static constexpr unsigned int size(dim3, Arg &...) { return 0; }
+    template <typename... Arg> static constexpr unsigned int size(dim3, Arg &...) { return 0; }
   };
 
-  template <typename T, typename S>
-  struct depSharedMem {};
-  template <typename T, typename S> struct sharedMemSizeS<depSharedMem<T,S>> {
-    template <typename ...Arg>
-    static constexpr unsigned int size(dim3 block, Arg &...arg) { return S().template size<T>(block, arg...); }
+  template <typename T, typename S> struct depSharedMem {
+  };
+  template <typename T, typename S> struct sharedMemSizeS<depSharedMem<T, S>> {
+    template <typename... Arg> static constexpr unsigned int size(dim3 block, Arg &...arg)
+    {
+      return S().template size<T>(block, arg...);
+    }
   };
 
   // op implementations
-  //struct op_blockSync : op_BaseT<void> {
+  // struct op_blockSync : op_BaseT<void> {
   struct op_blockSync {
-    //using dependencies = depFullBlock;
-    template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
+    // using dependencies = depFullBlock;
+    template <typename... Arg> static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
   template <> static constexpr bool needsSharedMemImpl<op_blockSync> = false;
 
   template <typename T>
-  //struct op_warp_combine : op_BaseT<T> {
+  // struct op_warp_combine : op_BaseT<T> {
   struct op_warp_combine {
-    //using dependencies = depNone;
-    //using dependencies = depFullBlock;
-    template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
+    // using dependencies = depNone;
+    // using dependencies = depFullBlock;
+    template <typename... Arg> static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
   template <typename T> static constexpr bool needsFullBlockImpl<op_warp_combine<T>> = false;
   template <typename T> static constexpr bool needsSharedMemImpl<op_warp_combine<T>> = false;
@@ -362,4 +358,4 @@ namespace quda {
     opTestKernelOpsType<std::tuple_element_t<n,std::tuple<T...>>,KernelOps<T...>> &&
     opTestAllKernelOpsType<KernelOps<T...>,n+1>;
 #endif
-}
+} // namespace quda

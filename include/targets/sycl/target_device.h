@@ -6,16 +6,18 @@
 #ifndef QUDA_MAX_BLOCK_SIZE
 #define QUDA_MAX_BLOCK_SIZE 512
 #endif
-//#ifndef QUDA_MAX_ARGUMENT_SIZE
-//#define QUDA_MAX_ARGUMENT_SIZE 2048
-//#endif
+// #ifndef QUDA_MAX_ARGUMENT_SIZE
+// #define QUDA_MAX_ARGUMENT_SIZE 2048
+// #endif
 
-//#define HOSTDEVICE __host__ __device__
-//#define HostDevice __host__ __device__
+// #define HOSTDEVICE __host__ __device__
+// #define HostDevice __host__ __device__
 
-namespace quda {
+namespace quda
+{
 
-  namespace target {
+  namespace target
+  {
 
 #if 0
     // compile-time dispatch
@@ -31,26 +33,29 @@ namespace quda {
 #endif
 
     // compile-time dispatch
-    template <template <bool, typename ...> class f, auto ...Params, typename ...Args>
-    auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args> auto dispatch(Args &&...args)
     {
 #ifdef __SYCL_DEVICE_ONLY__
       if constexpr (sizeof...(Params) == 0) {
-	return f<true>()(args...);
+        return f<true>()(args...);
       } else {
-	return f<true>().template operator()<Params...>(args...);
+        return f<true>().template operator()<Params...>(args...);
       }
 #else
       if constexpr (sizeof...(Params) == 0) {
-	return f<false>()(args...);
+        return f<false>()(args...);
       } else {
-	return f<false>().template operator()<Params...>(args...);
+        return f<false>().template operator()<Params...>(args...);
       }
 #endif
     }
 
-    template <bool is_device> struct is_device_impl { constexpr bool operator()() { return false; } };
-    template <> struct is_device_impl<true> { constexpr bool operator()() { return true; } };
+    template <bool is_device> struct is_device_impl {
+      constexpr bool operator()() { return false; }
+    };
+    template <> struct is_device_impl<true> {
+      constexpr bool operator()() { return true; }
+    };
 
     /**
        @brief Helper function that returns if the current execution
@@ -58,9 +63,12 @@ namespace quda {
     */
     __device__ __host__ inline bool is_device() { return dispatch<is_device_impl>(); }
 
-
-    template <bool is_device> struct is_host_impl { constexpr bool operator()() { return true; } };
-    template <> struct is_host_impl<true> { constexpr bool operator()() { return false; } };
+    template <bool is_device> struct is_host_impl {
+      constexpr bool operator()() { return true; }
+    };
+    template <> struct is_host_impl<true> {
+      constexpr bool operator()() { return false; }
+    };
 
     /**
        @brief Helper function that returns if the current execution
@@ -68,9 +76,12 @@ namespace quda {
     */
     __device__ __host__ inline bool is_host() { return dispatch<is_host_impl>(); }
 
-
-    template <bool is_device> struct block_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
-    template <> struct block_dim_impl<true> { dim3 operator()() { return getBlockDim(); } };
+    template <bool is_device> struct block_dim_impl {
+      dim3 operator()() { return dim3(1, 1, 1); }
+    };
+    template <> struct block_dim_impl<true> {
+      dim3 operator()() { return getBlockDim(); }
+    };
 
     /**
        @brief Helper function that returns the block dimensions.  On
@@ -100,7 +111,7 @@ namespace quda {
     */
     inline dim3 thread_idx() { return getThreadIdx(); }
 
-    //inline uint local_linear_id() { return getLocalLinearId(); }
+    // inline uint local_linear_id() { return getLocalLinearId(); }
 
     /**
        @brief Helper function that returns a linear thread index within a thread block.
@@ -130,7 +141,8 @@ namespace quda {
 
   } // namespace target
 
-  namespace device {
+  namespace device
+  {
 
     /**
        @brief Helper function that returns the warp-size of the
@@ -147,35 +159,32 @@ namespace quda {
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension.
     */
-    template <int block_size_y = 1, int block_size_z = 1>
-      constexpr unsigned int max_block_size()
-      {
-        //return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
-        //return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
-        return std::max(warp_size(), QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z));
-      }
+    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_block_size()
+    {
+      // return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
+      // return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
+      return std::max(warp_size(), QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z));
+    }
 
     /**
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension for reduction kernels.
     */
-    template <int block_size_y = 1, int block_size_z = 1>
-      constexpr unsigned int max_reduce_block_size()
-      {
+    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_reduce_block_size()
+    {
 #ifdef QUDA_FAST_COMPILE_REDUCE
-        // This is the specialized variant used when we have fast-compilation mode enabled
-        return warp_size();
+      // This is the specialized variant used when we have fast-compilation mode enabled
+      return warp_size();
 #else
-        return max_block_size<block_size_y, block_size_z>();
+      return max_block_size<block_size_y, block_size_z>();
 #endif
-      }
+    }
 
     /**
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension for reduction kernels.
     */
-    template <int block_size_y = 1, int block_size_z = 1>
-    constexpr unsigned int max_multi_reduce_block_size()
+    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_multi_reduce_block_size()
     {
 #ifdef QUDA_FAST_COMPILE_REDUCE
       // This is the specialized variant used when we have fast-compilation mode enabled
@@ -197,7 +206,7 @@ namespace quda {
        constant_param_t buffer on the target architecture.  For CUDA,
        this corresponds to the maximum __constant__ buffer size.
     */
-    //constexpr size_t max_constant_param_size() { return 8192; }
+    // constexpr size_t max_constant_param_size() { return 8192; }
     constexpr size_t max_constant_param_size() { return 32768; }
 
     /**
@@ -205,9 +214,10 @@ namespace quda {
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() {
-      //return std::max(QUDA_MAX_ARGUMENT_SIZE-8, 0);  // reserve 8 bytes for local accessor
-      return std::max(MAX_KERNEL_ARG_SIZE-8, 0);  // reserve 8 bytes for local accessor
+    constexpr size_t max_kernel_arg_size()
+    {
+      // return std::max(QUDA_MAX_ARGUMENT_SIZE-8, 0);  // reserve 8 bytes for local accessor
+      return std::max(MAX_KERNEL_ARG_SIZE - 8, 0); // reserve 8 bytes for local accessor
     }
 
     /**
@@ -230,9 +240,9 @@ namespace quda {
     */
     template <typename Arg> constexpr bool use_kernel_arg()
     {
-      //return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
-      return Arg::always_use_kernel_arg() ||
-        (Arg::default_use_kernel_arg() && sizeof(Arg) <= device::max_kernel_arg_size());
+      // return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+      return Arg::always_use_kernel_arg()
+        || (Arg::default_use_kernel_arg() && sizeof(Arg) <= device::max_kernel_arg_size());
     }
 
   } // namespace device

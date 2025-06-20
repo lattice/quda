@@ -133,16 +133,16 @@ namespace quda
         }
         cache.sync();
 
-	if (!allthreads || active) {
-	  Vector out;
-	  // t -> s_in, s-> s_out
-	  for (int t = 0; t < Ls_in; t++) {
-	    Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
-	    int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
-	    matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
-	  }
-	  arg.out(s * volume_4d_cb + x_cb, parity) = out;
-	}
+        if (!allthreads || active) {
+          Vector out;
+          // t -> s_in, s-> s_out
+          for (int t = 0; t < Ls_in; t++) {
+            Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
+            int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
+            matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
+          }
+          arg.out(s * volume_4d_cb + x_cb, parity) = out;
+        }
       }
     };
   } // namespace madwf_ml

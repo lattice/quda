@@ -76,10 +76,9 @@ namespace quda
   */
   template <typename T, int width> class WarpReduce
   {
-    static_assert(width <= device::warp_size(),
-		  "WarpReduce logical width must not be greater than the warp size");
-    //using param_t = warp_reduce_param<width>;
-    //const nreduce = device::warp_size() / width;
+    static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
+    // using param_t = warp_reduce_param<width>;
+    // const nreduce = device::warp_size() / width;
 
   public:
     constexpr WarpReduce() { }
@@ -91,10 +90,10 @@ namespace quda
      */
     inline T Sum(const T &value)
     {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Sum unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
+      // static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Sum unimplemented\n";
+      // sycl::ext::oneapi::experimental::printf(format);
       return value;
-      //return target::dispatch<warp_reduce>(value, false, quda::plus<T>(), param_t());
+      // return target::dispatch<warp_reduce>(value, false, quda::plus<T>(), param_t());
     }
 
     /**
@@ -104,10 +103,10 @@ namespace quda
      */
     inline T AllSum(const T &value)
     {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllSum unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
+      // static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllSum unimplemented\n";
+      // sycl::ext::oneapi::experimental::printf(format);
       return value;
-      //return target::dispatch<warp_reduce>(value, true, quda::plus<T>(), param_t());
+      // return target::dispatch<warp_reduce>(value, true, quda::plus<T>(), param_t());
     }
 
     /**
@@ -117,10 +116,10 @@ namespace quda
      */
     inline T Max(const T &value)
     {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Max unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
+      // static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Max unimplemented\n";
+      // sycl::ext::oneapi::experimental::printf(format);
       return value;
-      //return target::dispatch<warp_reduce>(value, false, quda::maximum<T>(), param_t());
+      // return target::dispatch<warp_reduce>(value, false, quda::maximum<T>(), param_t());
     }
 
     /**
@@ -130,10 +129,10 @@ namespace quda
      */
     inline T AllMax(const T &value)
     {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllMax unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
+      // static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllMax unimplemented\n";
+      // sycl::ext::oneapi::experimental::printf(format);
       return value;
-      //return target::dispatch<warp_reduce>(value, true, quda::maximum<T>(), param_t());
+      // return target::dispatch<warp_reduce>(value, true, quda::maximum<T>(), param_t());
     }
 
     /**
@@ -143,10 +142,10 @@ namespace quda
      */
     inline T Min(const T &value)
     {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Min unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
+      // static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Min unimplemented\n";
+      // sycl::ext::oneapi::experimental::printf(format);
       return value;
-      //return target::dispatch<warp_reduce>(value, false, quda::minimum<T>(), param_t());
+      // return target::dispatch<warp_reduce>(value, false, quda::minimum<T>(), param_t());
     }
 
     /**
@@ -156,10 +155,10 @@ namespace quda
      */
     inline T AllMin(const T &value)
     {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllMin unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
+      // static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllMin unimplemented\n";
+      // sycl::ext::oneapi::experimental::printf(format);
       return value;
-      //return target::dispatch<warp_reduce>(value, true, quda::minimum<T>(), param_t());
+      // return target::dispatch<warp_reduce>(value, true, quda::minimum<T>(), param_t());
     }
   };
 
@@ -171,8 +170,7 @@ namespace quda
      @tparam batch_size Batch size of the reduction.  Threads will be
      ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_dim, int batch_size_ = 1>
-  class BlockReduce
+  template <typename T, int block_dim, int batch_size_ = 1> class BlockReduce
   {
     static constexpr int batch_size = std::max(batch_size_, 1);
     const int nbatch = batch_size_ != 0 ? batch_size_ : localRangeZ;
@@ -192,12 +190,12 @@ namespace quda
       auto grp = getGroup();
 #if 1
       T result;
-      //for(int i=0; i<batch_size; i++) {
-      for(int i=0; i<nbatch; i++) {
-	T in = (i==batch) ? value : quda::zero<T>();
-	T out;
-	blockReduceSum(grp, out, in);
-	if(i==batch) result = out;
+      // for(int i=0; i<batch_size; i++) {
+      for (int i = 0; i < nbatch; i++) {
+        T in = (i == batch) ? value : quda::zero<T>();
+        T out;
+        blockReduceSum(grp, out, in);
+        if (i == batch) result = out;
       }
       return result;
 #else
@@ -210,21 +208,17 @@ namespace quda
       auto i0 = localIdX;
       auto i1 = localIdY;
       auto i2 = localIdZ;
-      auto r = r0*r1;
-      auto i = i1*r0+i0;
-      if(i2*r+i < 512) {
-	mem[i2*r+i] = value;
-      }
+      auto r = r0 * r1;
+      auto i = i1 * r0 + i0;
+      if (i2 * r + i < 512) { mem[i2 * r + i] = value; }
       group_barrier(grp);
-      for(int s=1; s<r; s*=2) {
-	int a = 2*s*i;
-	int as = a + s;
-	if(as<r) {
-	  if(i2*r+as < 512) {
-	    mem[i2*r+a] = mem[i2*r+a] + mem[i2*r+as];
-	  }
-	}
-	group_barrier(grp);
+      for (int s = 1; s < r; s *= 2) {
+        int a = 2 * s * i;
+        int as = a + s;
+        if (as < r) {
+          if (i2 * r + as < 512) { mem[i2 * r + a] = mem[i2 * r + a] + mem[i2 * r + as]; }
+        }
+        group_barrier(grp);
       }
       return mem[0];
 #endif
@@ -342,21 +336,21 @@ namespace quda
 #endif
 
     template <bool async = true, typename R>
-    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,plus<typename R::reduce_t>>,T>
-    Reduce(const T &value, const R &)
+    inline std::enable_if_t<std::is_same_v<typename R::reducer_t, plus<typename R::reduce_t>>, T> Reduce(const T &value,
+                                                                                                         const R &)
     {
       return Sum<async>(value);
     }
 
     template <bool async = true, typename R>
-    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,maximum<typename R::reduce_t>>,T>
+    inline std::enable_if_t<std::is_same_v<typename R::reducer_t, maximum<typename R::reduce_t>>, T>
     Reduce(const T &value, const R &)
     {
       return Max<async>(value);
     }
 
     template <bool async = true, typename R>
-    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,minimum<typename R::reduce_t>>,T>
+    inline std::enable_if_t<std::is_same_v<typename R::reducer_t, minimum<typename R::reduce_t>>, T>
     Reduce(const T &value, const R &)
     {
       return Min<async>(value);

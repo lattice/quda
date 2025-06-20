@@ -72,9 +72,9 @@ namespace quda
             previousDir[2 * i + 1] = prev;
             previousDir[2 * i + 0] = 2 * i + 1; // always valid
           } else {
-	    commsCompleted[2*i] = -1;  // mark them invalid for convenience
-	    commsCompleted[2*i+1] = -1;
-	  }
+            commsCompleted[2 * i] = -1; // mark them invalid for convenience
+            commsCompleted[2 * i + 1] = -1;
+          }
         }
 
         // this tells us how many events / comms occurances there are in
@@ -712,7 +712,7 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
-	//commsComplete(pattern, in, true, true, false);
+        // commsComplete(pattern, in, true, true, false);
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;
 #if 1
@@ -795,7 +795,7 @@ namespace quda
 
       DslashCommsPattern pattern(dslashParam.commDim, true);
       while (pattern.completeSum < pattern.commDimTotal) {
-	//commsComplete(pattern, in, true, true, false);
+        // commsComplete(pattern, in, true, true, false);
 #if 1
         for (int i = 3; i >= 0; i--) {
           if (!dslashParam.commDim[i]) continue;

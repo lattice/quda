@@ -76,56 +76,58 @@ namespace quda
       Vector out;
 
       if (!allthreads || active) {
-	if (arg.dd_out.isZero(coord)) {
-	  if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-	  if (!allthreads) return;
-	  active = false;
-	}
+        if (arg.dd_out.isZero(coord)) {
+          if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if (!allthreads) return;
+          active = false;
+        }
       }
 
       if (!allthreads || active) {
-	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-	// defined in dslash_wilson.cuh
-	applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+        active
+          &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        // defined in dslash_wilson.cuh
+        applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
       }
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
-	if (active && arg.dd_x.isZero(coord)) {
-	  out = arg.a * out;
-	} else {
-	  SharedMemoryCache<Vector> cache{*this};
-	  Vector tmp;
-	  if (active) {
-	    // apply the chiral and flavor twists
-	    // use consistent load order across s to ensure better cache locality
-	    Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
-	    cache.save(x);
+        if (active && arg.dd_x.isZero(coord)) {
+          out = arg.a * out;
+        } else {
+          SharedMemoryCache<Vector> cache {*this};
+          Vector tmp;
+          if (active) {
+            // apply the chiral and flavor twists
+            // use consistent load order across s to ensure better cache locality
+            Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
+            cache.save(x);
 
-	    x.toRel(); // switch to chiral basis
+            x.toRel(); // switch to chiral basis
 
 #pragma unroll
-	    for (int chirality = 0; chirality < 2; chirality++) {
-	      constexpr int n = Arg::nColor * Arg::nSpin / 2;
-	      HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
-	      HalfVector x_chi = x.chiral_project(chirality);
-	      HalfVector Ax_chi = A * x_chi;
-	      // i * mu * gamma_5 * tau_3
-	      const complex<real> b(0.0, (chirality ^ flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
-	      Ax_chi += b * x_chi;
-	      tmp += Ax_chi.chiral_reconstruct(chirality);
-	    }
+            for (int chirality = 0; chirality < 2; chirality++) {
+              constexpr int n = Arg::nColor * Arg::nSpin / 2;
+              HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
+              HalfVector x_chi = x.chiral_project(chirality);
+              HalfVector Ax_chi = A * x_chi;
+              // i * mu * gamma_5 * tau_3
+              const complex<real> b(0.0,
+                                    (chirality ^ flavor) == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+              Ax_chi += b * x_chi;
+              tmp += Ax_chi.chiral_reconstruct(chirality);
+            }
 
-	    tmp.toNonRel();
-	    // tmp += (c * tau_1) * x
-	  }
-	  cache.sync();
-	  if (active) {
-	    tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
+            tmp.toNonRel();
+            // tmp += (c * tau_1) * x
+          }
+          cache.sync();
+          if (active) {
+            tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
-	    // add the Wilson part with normalisation
-	    out = tmp + arg.a * out;
-	  }
-	}
+            // add the Wilson part with normalisation
+            out = tmp + arg.a * out;
+          }
+        }
       } else if (active) {
         Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
         out = x + arg.a * out;
