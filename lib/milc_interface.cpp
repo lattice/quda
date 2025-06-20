@@ -126,7 +126,7 @@ void qudaCleanUpDeflationSpace()
   }
   if (preserved_other_parity_deflation_space) {
     deflation_space *space = reinterpret_cast<deflation_space *>(preserved_other_parity_deflation_space);
-    logQuda(QUDA_VERBOSE, "Cleaning up deflation space of size %lu\n", space->evecs.size());
+    logQuda(QUDA_VERBOSE, "Cleaning up other parity deflation space of size %lu\n", space->evecs.size());
     space->evecs.clear();
     space->evals.clear();
     delete space;
@@ -1485,8 +1485,7 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
           DiracParam diracEigParam;
           setDiracEigParam(diracEigParam, &invertParam, true, false);
           if(local_parity==QUDA_ODD_PARITY) diracEigParam.matpcType = QUDA_MATPC_ODD_ODD;
-          Dirac *dEig = nullptr;
-          dEig = Dirac::create(diracEigParam);
+          Dirac *dEig = Dirac::create(diracEigParam);
 
           // Get previous eigenvectors
 	  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
@@ -1505,14 +1504,13 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
           ColorSpinorField temp(gpuParam);
           
           Complex n_unit(-1.0, 0.0);
-          Complex imag_unit(0.0, 1.0);
 
           for (int i = 0; i < qep.n_conv; i++) {
 
             // Compute other parity eigenvector v_o = i*D_oe*v_e/\lambda_e
 	    dEig->Dslash(temp, space->evecs[i], local_parity);
 	    auto norm2 = blas::norm2(temp);
-	    blas::ax(imag_unit/sqrt(norm2), temp);
+	    blas::ax(1.0/sqrt(norm2), temp);
 	    space_other_parity->evecs[i] = temp;
 
             // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
@@ -1526,13 +1524,13 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
             auto res = blas::caxpbyNorm(eval, space_other_parity->evecs[i], n_unit, temp);
             logQuda(QUDA_SUMMARIZE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(), sqrt(res[0]));
           }
+          delete dEig;
 
 	  // Use the new deflation space
 	  qep.preserve_deflation_space = space_other_parity;
 
 	} else { // other parity deflation space already constructed
           qep.preserve_deflation_space = preserved_other_parity_deflation_space;
-          logQuda(QUDA_SUMMARIZE, "Setting preserved_other_parity_deflation_space at place 1\n");
 	}
       }
     }
@@ -1566,12 +1564,11 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
   
   if (invertParam.eig_param && qep.preserve_deflation) {
     if (!deflation_init) { // Set on first deflate
-      preserved_deflation_space = qep.preserve_deflation_space;
       deflation_space_parity = local_parity;
       deflation_init = true; // signal that we have deflation space preserved
-    } else if (deflation_space_parity != local_parity) {
-      preserved_other_parity_deflation_space = qep.preserve_deflation_space;
-    }
+    } 
+    if (deflation_space_parity == local_parity) preserved_deflation_space = qep.preserve_deflation_space;
+    else preserved_other_parity_deflation_space = qep.preserve_deflation_space;
   }
 
   // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
