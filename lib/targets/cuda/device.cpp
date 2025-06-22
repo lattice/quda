@@ -117,7 +117,9 @@ namespace quda
 
       device_id = dev;
 
-      NVML_CHECK(nvmlDeviceGetHandleByIndex(device_id, &monitor_device_id));
+      char pciBusId[13];
+      CHECK_CUDA_ERROR(cudaDeviceGetPCIBusId(pciBusId, 13, device_id));
+      NVML_CHECK(nvmlDeviceGetHandleByPciBusId(pciBusId, &monitor_device_id));
       char name[NVML_DEVICE_NAME_BUFFER_SIZE];
       NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
 
