@@ -49,6 +49,11 @@ void run(test_t param)
 
   constructHostGaugeField(gauge, gauge_param, argc_copy, argv_copy);
   // Load the gauge field to the device
+  gauge_param.cuda_prec = prec;
+  gauge_param.cuda_prec_sloppy = prec;
+  gauge_param.cuda_prec_precondition = prec;
+  gauge_param.cuda_prec_refinement_sloppy = prec;
+  gauge_param.cuda_prec_eigensolver = prec;
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
   // start the timer

@@ -94,7 +94,7 @@ static_assert(QUDA_ALTERNATIVE_I_TO_F == 0 || QUDA_ALTERNATIVE_I_TO_F == 25 || Q
 #endif
 
 #cmakedefine QUDA_DIRAC_CLOVER
-#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_CLOVER_DIRAC
  * @brief This macro is set when we have clover fermions enabled

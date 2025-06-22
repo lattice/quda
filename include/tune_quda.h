@@ -387,11 +387,11 @@ namespace quda {
      * factored in when set setting shared_bytes)
      */
     template <template <typename> class Functor, typename Arg>
-    void checkSharedBytes(const TuneParam &tp, const Arg &) const
+    void checkSharedBytes(const TuneParam &tp, const Arg &arg) const
     {
       auto tp2 = TuneParam(tp);
       auto expected = setSharedBytes(tp2);
-      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block);
+      auto sizeOps = sharedMemSize<getKernelOps<Functor<Arg>>>(tp.block, arg);
       if (sizeOps != expected) {
         printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
         printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
