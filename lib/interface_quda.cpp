@@ -5771,13 +5771,15 @@ typedef struct FermMeasObj {
     std::vector<ColorSpinorField> vec_ref;
     int i_glob;
     std::vector<int> meas_list;
+    // outer vector: flow_time, inner vector: stochastic noise source
     std::vector<std::vector<Complex>> ppb;
+    std::vector<std::vector<std::vector<Complex>>> ppb_t;
     int meas_interval;
     QudaBoolean take_meas;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas) {}
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, std::vector<std::vector<std::vector<Complex>>>  _ppb_t, int _meas_interval,  QudaBoolean _take_meas) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb),ppb_t(_ppb_t), meas_interval(_meas_interval), take_meas(_take_meas) {}
 
 } FermMeasObj;
     
@@ -5959,12 +5961,25 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     ferm_m->i_glob++;
     if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
         ferm_m->meas_list.push_back(ferm_m->i_glob);
-        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+      invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
         ferm_m->ppb.push_back(PsiPsibarR);
+      
+        const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+        const std::array<int, 4> mom_modes = {0,0,0,0};
+        const std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
+        const int source_position = 0;
+        QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+        std::vector<Complex> result_global(f_temp4[0].full_dim(3));
+        std::fill(result_global.begin(), result_global.end(), 0.0);
+        
+        contractSummedQuda(ferm_m->vec_ref[0], f_temp4[0], result_global, cType,&source_position, (int *)&mom_modes, (QudaFFTSymmType_t *)&fft_modes,  0, 0);
+      comm_allreduce_sum(result_global);
+
+      
     } 
     
   }
@@ -6096,7 +6111,8 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas);
+  std::vector<std::vector<std::vector<Complex>>> ppb_t;
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ppb_t, ferm_meas->meas_int, ferm_meas->take_meas);
   
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
