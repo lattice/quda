@@ -606,4 +606,4 @@ extern bool enable_testing;
 
 extern bool detratio;
 
-extern std::array<int, 4> covdev_mu;
+extern int covdev_mu;
