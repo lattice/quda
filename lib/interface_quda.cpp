@@ -5778,8 +5778,8 @@ typedef struct FermMeasObj {
     QudaBoolean take_meas;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, std::vector<std::vector<std::vector<Complex>>>  _ppb_t, int _meas_interval,  QudaBoolean _take_meas) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb),ppb_t(_ppb_t), meas_interval(_meas_interval), take_meas(_take_meas) {}
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas) {}
 
 } FermMeasObj;
     
@@ -5888,8 +5888,8 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   }
   for (size_t j = 0; j < Nsrc; j += Nsrc_tile) {
     for (size_t i = 0; i < Nsrc_tile; i++) {
-      data_f_temp4_tiled.push_back(f_temp4[j + i].data());
       data_f_temp3_tiled.push_back(f_temp3[j + i].data());
+      data_f_temp4_tiled.push_back(f_temp4[j + i].data());
     }
   }
 
@@ -5902,8 +5902,12 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   int comm_dim[4] = {};
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
-  std::vector<std::vector<Complex>> ppb_t_element;
   
+  // std::vector<std::vector<Complex>> ppb_t_element;
+  // The number of slices in the decay dimension on this MPI rank.
+  auto local_decay_dim_slices = comm_dim_partitioned(3);
+  // The number of slices in the decay dimension globally.
+  size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim[3];  
 
   for (unsigned int j = 0; j < ns_safe; j++) {
     for (unsigned int i = 0; i < ns_safe - j; i++) {
@@ -5967,32 +5971,13 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
         ferm_m->meas_list.push_back(ferm_m->i_glob);
       invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
+        cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp4,f_temp3);
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
         ferm_m->ppb.push_back(PsiPsibarR);
         printfQuda("size of original contract %ld\n",PsiPsibarR.size());
-      
-        const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
-        const std::array<int, 4> mom_modes = {0,0,0,0};
-        const std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
-        // const int source_position = 0;
-        const std::array<int, 4> source_position = {0,0,0,0};
-        QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
-
-        ppb_t_element = {};
-        for (size_t n = 0; n < Nsrc; n++){
-          std::vector<Complex> result_global(f_temp4[n].full_dim(3));
-          std::fill(result_global.begin(), result_global.end(), 0.0);
-          
-          contractSummedQuda(ferm_m->vec_ref[n], f_temp4[n], result_global, cType, (int *)&source_position, (int *)&mom_modes, (QudaFFTSymmType_t *)&fft_modes,  0, 0);
-          comm_allreduce_sum(result_global);
-          // ppb_t_element.push_back(result_global);
-          // delete &result_global;
-            
-        }
-        // ferm_m->ppb_t.push_back(ppb_t_element);
-        // printfQuda("size of ppb_t %ld\n",ferm_m->ppb_t.size());
+        printfQuda("first element in ppb %1.5e\n",PsiPsibarR[0]- PsiPsibarTest[0]);
       
     } 
     
@@ -6126,7 +6111,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
   std::vector<std::vector<std::vector<Complex>>> ppb_t;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ppb_t, ferm_meas->meas_int, ferm_meas->take_meas);
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas);
   
 
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
