@@ -5880,6 +5880,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
   size_t Nsrc = f_temp4.size();
   auto Nsrc_tile = inv_param->num_src;
+  printfQuda("nrsc-tile is %i\n",Nsrc_tile);
   std::vector<void*> data_f_temp3, data_f_temp4, data_f_temp3_tiled, data_f_temp4_tiled;
   for (size_t n = 0; n < Nsrc; n++){
       data_f_temp3.push_back(f_temp3[n].data());
@@ -5901,6 +5902,8 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   int comm_dim[4] = {};
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+  std::vector<std::vector<Complex>> ppb_t_element;
+  
 
   for (unsigned int j = 0; j < ns_safe; j++) {
     for (unsigned int i = 0; i < ns_safe - j; i++) {
@@ -5960,6 +5963,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
     ferm_m->i_glob++;
     if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
+        printfQuda("startning another meas\n");
         ferm_m->meas_list.push_back(ferm_m->i_glob);
       invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
@@ -5967,18 +5971,28 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
         ferm_m->ppb.push_back(PsiPsibarR);
+        printfQuda("size of original contract %ld\n",PsiPsibarR.size());
       
         const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
         const std::array<int, 4> mom_modes = {0,0,0,0};
         const std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
-        const int source_position = 0;
+        // const int source_position = 0;
+        const std::array<int, 4> source_position = {0,0,0,0};
         QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
-        std::vector<Complex> result_global(f_temp4[0].full_dim(3));
-        std::fill(result_global.begin(), result_global.end(), 0.0);
-        
-        contractSummedQuda(ferm_m->vec_ref[0], f_temp4[0], result_global, cType,&source_position, (int *)&mom_modes, (QudaFFTSymmType_t *)&fft_modes,  0, 0);
-      comm_allreduce_sum(result_global);
 
+        ppb_t_element = {};
+        for (size_t n = 0; n < Nsrc; n++){
+          std::vector<Complex> result_global(f_temp4[n].full_dim(3));
+          std::fill(result_global.begin(), result_global.end(), 0.0);
+          
+          contractSummedQuda(ferm_m->vec_ref[n], f_temp4[n], result_global, cType, (int *)&source_position, (int *)&mom_modes, (QudaFFTSymmType_t *)&fft_modes,  0, 0);
+          comm_allreduce_sum(result_global);
+          // ppb_t_element.push_back(result_global);
+          // delete &result_global;
+            
+        }
+        // ferm_m->ppb_t.push_back(ppb_t_element);
+        // printfQuda("size of ppb_t %ld\n",ferm_m->ppb_t.size());
       
     } 
     
