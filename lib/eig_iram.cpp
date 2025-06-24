@@ -38,6 +38,7 @@ namespace quda
                   "if instability is observed (eig_tol = %e, qr_tol = %e)",
                   tol, qr_tol);
     }
+    if (qr_tol < 5e-15) qr_tol = 5e-15;
     getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
