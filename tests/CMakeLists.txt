@@ -1573,7 +1573,7 @@ if(QUDA_DIRAC_STAGGERED)
     add_test(NAME eigensolve_test_laplace
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_eigensolve_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type laplace --compute-fat-long true
-      --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 96
+      --dim 2 4 6 8 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 72
       --eig-max-restarts 1000
       --enable-testing true
       --gtest_output=xml:staggered_eigensolve_test_laplace.xml)

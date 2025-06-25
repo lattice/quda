@@ -77,6 +77,7 @@ TEST_P(EigensolveTest, verify)
   if (::testing::get<1>(GetParam()) == QUDA_EIG_IR_ARNOLDI || ::testing::get<1>(GetParam()) == QUDA_EIG_BLK_IR_ARNOLDI)
     tol *= 15;
 
+  // for Arnoldi we double the Krylov space size
   if (::testing::get<1>(GetParam()) == QUDA_EIG_IR_ARNOLDI) {
     eig_param.n_kr = 2 * eig_n_kr;
   } else {
