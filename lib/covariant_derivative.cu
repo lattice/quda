@@ -40,9 +40,10 @@ namespace quda
       if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
       if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
 
+      constexpr bool dagger = false;
       constexpr bool xpay = false;
       constexpr int nParity = 2;
-      Dslash::template instantiate<packStaggeredShmem, nParity, xpay>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem, nParity, xpay, dagger>(tp, stream);
     }
 
     long long flops() const override

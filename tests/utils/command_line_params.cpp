@@ -346,7 +346,7 @@ bool prop_read_sources = false;
 int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
-std::array<int, 4> covdev_mu = {1, 1, 1, 1};
+int covdev_mu = 3;
 
 // Parameters for the (gaussian) quark smearing operator
 int    smear_n_steps = 50;
@@ -1356,5 +1356,5 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Covdev", "Options controlling  cov derivative parameteres");
-  opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction(s) (default 1 1 1 1 - all directions)")->expected(4);
+  opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction for the covariant derivative");
 }
