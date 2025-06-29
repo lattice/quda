@@ -5901,14 +5901,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
   int comm_dim_f[4] = {};
   // only switch on comms needed for directions with a derivative
-  for (int i = 0; i < 4; i++) { comm_dim_f[i] = comm_dim_partitioned(i); }
-  
-  // std::vector<std::vector<Complex>> ppb_t_element;
-  // The number of slices in the decay dimension on this MPI rank.
-  auto local_decay_dim_slices = comm_dim_partitioned(3);
-  printfQuda("comm dim partritioned %d is\n",local_decay_dim_slices);
-  // The number of slices in the decay dimension globally.
-  size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim_f[3];  
+  for (int i = 0; i < 4; i++) { comm_dim_f[i] = comm_dim_partitioned(i); }  
 
   for (unsigned int j = 0; j < ns_safe; j++) {
     for (unsigned int i = 0; i < ns_safe - j; i++) {
@@ -5968,19 +5961,18 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
     ferm_m->i_glob++;
     if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
-        printfQuda("startning another meas\n");
+        printfQuda("starting another meas\n");
         ferm_m->meas_list.push_back(ferm_m->i_glob);
       invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
-        cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp4,f_temp3);
+        cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
         ferm_m->ppb.push_back(PsiPsibarR);
-        printfQuda("size of original contract %ld\n",PsiPsibarR.size());
-        printfQuda("first element in delta ppb %1.5e\n",PsiPsibarR[0]- PsiPsibarTest[0]);
+        printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[0]- PsiPsibarTest[0]),imag(PsiPsibarR[0] - PsiPsibarTest[0]));
 
-      std::vector<std::vector<Complex>> ppb_t = {};
+        std::vector<std::vector<Complex>> ppb_t_el = {};
       
         QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
         std::array<int, 4> mom_modes = {0,0,0,0};
@@ -5991,23 +5983,17 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
         std::vector<Complex> result_global(f_temp0[0].full_dim(3)*comm_dim(3));
 
       
-      for (size_t n = 0; n < 1;n++){
+      for (size_t n = 0; n < f_temp4.size(); n++){
         
         std::fill(result_global.begin(), result_global.end(), 0.0);
-        printfQuda("sixe of result global befor %d\n",result_global.size());
         contractSummedQuda(ferm_m->vec_ref[n], f_temp4[n], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
-        // comm_allreduce_sum(result_global);
-        printfQuda("sixe of result global after %d\n",result_global.size());
+        //necessary?
+        comm_allreduce_sum(result_global);
         
-        ppb_t.push_back(result_global);
+        ppb_t_el.push_back(result_global);
       }
 
-    for (size_t n = 0; n < result_global.size();n++){
-
-      printfQuda("rg element %d is %1.5e \n",n,result_global[n]);
-      
-    }
-    printfQuda("first element in ppb %1.5e\n",PsiPsibarR[0]);
+      ferm_m->ppb_t.push_back(ppb_t_el);
 
     } 
     
