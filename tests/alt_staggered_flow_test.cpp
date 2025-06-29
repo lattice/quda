@@ -394,6 +394,8 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
   out = {};
   out_flowed = {};
 
+  printfQuda("Successfully delted memory of 4 spunor lists\n");
+  
   freeGaugeQuda();
   endQuda();
 

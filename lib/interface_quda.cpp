@@ -5899,15 +5899,16 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   double a = 1.;
   double b = -8.;
 
-  int comm_dim[4] = {};
+  int comm_dim_f[4] = {};
   // only switch on comms needed for directions with a derivative
-  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+  for (int i = 0; i < 4; i++) { comm_dim_f[i] = comm_dim_partitioned(i); }
   
   // std::vector<std::vector<Complex>> ppb_t_element;
   // The number of slices in the decay dimension on this MPI rank.
   auto local_decay_dim_slices = comm_dim_partitioned(3);
+  printfQuda("comm dim partritioned %d is\n",local_decay_dim_slices);
   // The number of slices in the decay dimension globally.
-  size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim[3];  
+  size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim_f[3];  
 
   for (unsigned int j = 0; j < ns_safe; j++) {
     for (unsigned int i = 0; i < ns_safe - j; i++) {
@@ -5929,7 +5930,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     // [4] = Lap2 [0]
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim, profile);
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, comm_dim_f, profile);
 
     // [4] -> 3/4 eps [4]
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
@@ -5940,7 +5941,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     // [4] = Lap1 [2]
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim, profile);
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, comm_dim_f, profile);
 
     // [3] -> [3] + 8/9 eps [4]
     blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
@@ -5955,7 +5956,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     // [0] <- Lap0 [4]
     copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, comm_dim, profile);
+    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, comm_dim_f, profile);
 
     // [0] <- 1/4 eps [0]; [0] <- [2] + [0]; [0] <- [1] + [0]
     blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
@@ -5977,8 +5978,37 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
         ferm_m->ppb.push_back(PsiPsibarR);
         printfQuda("size of original contract %ld\n",PsiPsibarR.size());
-        printfQuda("first element in ppb %1.5e\n",PsiPsibarR[0]- PsiPsibarTest[0]);
+        printfQuda("first element in delta ppb %1.5e\n",PsiPsibarR[0]- PsiPsibarTest[0]);
+
+      std::vector<std::vector<Complex>> ppb_t = {};
       
+        QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+        std::array<int, 4> mom_modes = {0,0,0,0};
+        std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
+        // int source_position = 0;
+        std::array<int, 4> source_position = {0,0,0,0};
+        QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+        std::vector<Complex> result_global(f_temp0[0].full_dim(3)*comm_dim(3));
+
+      
+      for (size_t n = 0; n < 1;n++){
+        
+        std::fill(result_global.begin(), result_global.end(), 0.0);
+        printfQuda("sixe of result global befor %d\n",result_global.size());
+        contractSummedQuda(ferm_m->vec_ref[n], f_temp4[n], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
+        // comm_allreduce_sum(result_global);
+        printfQuda("sixe of result global after %d\n",result_global.size());
+        
+        ppb_t.push_back(result_global);
+      }
+
+    for (size_t n = 0; n < result_global.size();n++){
+
+      printfQuda("rg element %d is %1.5e \n",n,result_global[n]);
+      
+    }
+    printfQuda("first element in ppb %1.5e\n",PsiPsibarR[0]);
+
     } 
     
   }
