@@ -1232,6 +1232,7 @@ void printQudaFermMeasurements(QudaFermMeasurements *param)
   P(meas_int, 5);
   P(take_meas, QUDA_BOOLEAN_FALSE);
   P(ppb, nullptr);
+  P(ppb_t, nullptr);
   P(meas_list, nullptr);  
 #else
   P(meas_int, (unsigned int)INVALID_INT);

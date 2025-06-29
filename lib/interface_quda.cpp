@@ -5881,16 +5881,10 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   size_t Nsrc = f_temp4.size();
   auto Nsrc_tile = inv_param->num_src;
   printfQuda("nrsc-tile is %i\n",Nsrc_tile);
-  std::vector<void*> data_f_temp3, data_f_temp4, data_f_temp3_tiled, data_f_temp4_tiled;
+  std::vector<void*> data_f_temp3, data_f_temp4, data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
   for (size_t n = 0; n < Nsrc; n++){
       data_f_temp3.push_back(f_temp3[n].data());
       data_f_temp4.push_back(f_temp4[n].data());
-  }
-  for (size_t j = 0; j < Nsrc; j += Nsrc_tile) {
-    for (size_t i = 0; i < Nsrc_tile; i++) {
-      data_f_temp3_tiled.push_back(f_temp3[j + i].data());
-      data_f_temp4_tiled.push_back(f_temp4[j + i].data());
-    }
   }
 
   int parity = 0;
@@ -5961,15 +5955,23 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
     ferm_m->i_glob++;
     if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
+
+      
         printfQuda("starting another meas\n");
         ferm_m->meas_list.push_back(ferm_m->i_glob);
+      for (size_t j = 0; j < Nsrc; j += Nsrc_tile) {
+        for (size_t i = 0; i < Nsrc_tile; i++) {
+          data_f_temp3_tiled[i] = f_temp3[j + i].data();
+          data_f_temp4_tiled[i] = f_temp4[j + i].data();
+        }
       invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+      }
         std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
         cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
-        ferm_m->ppb.push_back(PsiPsibarR);
+        ferm_m->ppb.push_back(PsiPsibarTest);
         printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[0]- PsiPsibarTest[0]),imag(PsiPsibarR[0] - PsiPsibarTest[0]));
 
         std::vector<std::vector<Complex>> ppb_t_el = {};
@@ -6231,6 +6233,25 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       for (size_t i = 0; i < len_ppb; i++){
           ppb_ptr->push_back(ferm_m.ppb[i]);
       }
+
+
+      auto* ppb_t_ptr = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas->ppb_t);
+      size_t nft_ppb = ferm_m.ppb_t.size();
+      size_t nsrc_ppb =  ferm_m.ppb_t[0].size();
+      size_t nT_ppb =  ferm_m.ppb_t[0][0].size();
+      for (size_t i = 0; i < nft_ppb; i++){
+          ppb_t_ptr->push_back(ferm_m.ppb_t[i]);
+      }
+      
+        // for (size_t i = 0; i < nft_ppb; i++){
+        //   for (size_t j = 0; j < nsrc_ppb; j++){
+        //     for (size_t k = 0; k < nT_ppb; k++){
+
+
+        //     }
+        //   }
+        // }
+      
         
       auto* meas_list_ptr = reinterpret_cast<std::vector<int>*>(ferm_meas->meas_list);
       size_t len_meas_list = ferm_m.meas_list.size();  

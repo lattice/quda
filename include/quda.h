@@ -862,7 +862,7 @@ extern "C" {
   typedef struct QudaFermMeasurements_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     void **ppb;
-    // void
+    void *ppb_t;
     unsigned int meas_int;
     void *meas_list;
     QudaBoolean take_meas;

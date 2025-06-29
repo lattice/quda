@@ -325,7 +325,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
                  mg_param.invert_param->power, mg_param.invert_param->temp, mg_param.invert_param->clock);
     }
   }
-    //multishift: same linear system, different masses (charm + strange ie)
+
     //SET UP INV PARAM END
   if (Nsrc > QUDA_MAX_MULTI_SRC)
     errorQuda("Nsrc = %d which is great than QUDA_MAX_MULTI_SRC = %d\n", Nsrc, QUDA_MAX_MULTI_SRC);
@@ -355,13 +355,17 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
     ferm_meas.take_meas = QUDA_BOOLEAN_TRUE;
     ferm_meas.meas_int = meas_int;
     std::vector<std::vector<std::complex<double>>> ppb;
+    std::vector<std::vector<std::vector<std::complex<double>>>> ppb_t;
     void* ptr_ppb = &ppb;
     void** data_ppb = &ptr_ppb;
     ferm_meas.ppb = data_ppb;
+    void* data_ppb_t = &ppb_t;
+    ferm_meas.ppb_t = data_ppb_t;
     std::vector<int> meas_list;
     ferm_meas.meas_list = (void *) &meas_list;
 
     printfQuda("At start ppb has %li elements\n",ppb.size());
+    printfQuda("At start ppb_t has %li elements\n",ppb_t.size());
     //simulates what user might do from external library
 
 // Prepare rng, fill host spinors with random numbers
@@ -388,13 +392,33 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &invParam, &smear_param, &ferm_meas, Nsrc);
 
   printfQuda("At end ppb has %li elements\n",ppb.size());
+  printfQuda("At end ppb_t has %li elements\n",ppb_t.size());
 
   in_raw = {};
   in = {};
   out = {};
   out_flowed = {};
+  
+  
+  std::string filename = "testppb.txt";
+  std::ofstream outFile("./testppb.txt");
+  
+  if (!outFile.is_open()) {
+      std::cerr << "Failed to open file: " << filename << std::endl;
+  }
+  
+  for (const auto& row : ppb) {
+      for (const auto& elem : row) {
+          outFile << elem.real() << " ";
+      }
+      outFile << "\n"; // Newline after each row
+  }
+  
+  outFile.close();
+  
+  
 
-  printfQuda("Successfully delted memory of 4 spunor lists\n");
+  printfQuda("Successfully deleted memory of 4 spinor lists\n");
   
   freeGaugeQuda();
   endQuda();
