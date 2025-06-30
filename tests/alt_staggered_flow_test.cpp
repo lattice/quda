@@ -143,6 +143,46 @@ void reconfigure_naik(bool &has_naik, double &eps_naik, int &n_naiks)
     }
 }
 
+void write_files(const QudaFermMeasurements &ferm_meas)
+{
+  std::string filename = "./testppb.txt";
+  std::ofstream out_ppb(filename);
+  
+  if (!out_ppb.is_open()) {
+      std::cerr << "Failed to open file: " << filename << std::endl;
+  }
+  auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
+  for (const auto& row : *ppb_data) {
+      for (const auto& elem : row) {
+          out_ppb << elem.real() << " ";
+      }
+      out_ppb << "\n"; // Newline after each row
+  }
+  out_ppb.close();
+  
+  filename ="./testppb_t.txt";
+  std::ofstream out_ppb_t(filename);
+  if (!out_ppb_t.is_open()) {
+      std::cerr << "Failed to open file: " << filename << std::endl;
+  }
+  auto* ppb_t_data = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas.ppb_t);
+  
+  for (const auto& flow_t: *ppb_t_data) {
+      out_ppb_t << " begin new flow time\n\n";
+      for (const auto& s_src : flow_t) {
+        out_ppb_t << " next source\n";
+        for (const auto& elem : s_src) {
+          out_ppb_t << elem.real() << " ";
+        }
+        out_ppb_t << "\n";
+      }
+    out_ppb_t << "\n";
+  }
+  out_ppb_t.close();
+ 
+  
+}
+
 int main(int argc, char **argv)
 {
     
@@ -400,21 +440,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
   out_flowed = {};
   
   
-  std::string filename = "testppb.txt";
-  std::ofstream outFile("./testppb.txt");
-  
-  if (!outFile.is_open()) {
-      std::cerr << "Failed to open file: " << filename << std::endl;
-  }
-  
-  for (const auto& row : ppb) {
-      for (const auto& elem : row) {
-          outFile << elem.real() << " ";
-      }
-      outFile << "\n"; // Newline after each row
-  }
-  
-  outFile.close();
+    write_files(ferm_meas);
   
   
 
