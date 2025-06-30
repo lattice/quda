@@ -5974,13 +5974,13 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     
       QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
       
-      // std::array<int, 4> mom_modes = {0,0,0,0};
-      // std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
-      // std::array<int, 4> source_position = {0,0,0,0};
+      std::array<int, 4> mom_modes = {0,0,0,0};
+      std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
+      std::array<int, 4> source_position = {0,0,0,0};
       //Why not this?
-      int source_position = 0;
-      QudaFFTSymmType fft_modes = eo;
-      int mom_modes = 0;
+      // int source_position = 0;
+      // QudaFFTSymmType fft_modes = eo;
+      // int mom_modes = 0;
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
       std::vector<Complex> result_global(f_temp0[0].full_dim(3)*comm_dim(3));
 
