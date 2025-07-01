@@ -423,15 +423,29 @@ namespace quda
   void qudaMemPrefetchAsync_(void *ptr, size_t count, QudaFieldLocation mem_space, const qudaStream_t &stream,
                              const char *func, const char *file, const char *line)
   {
+#if CUDA_VERSION >= 13000
+    cudaMemLocation location;
+    if (mem_space == QUDA_CPU_FIELD_LOCATION) {
+      // Location is the host NUMA node closest to the current thread's CPU, id is ignored
+      location.type = cudaMemLocationTypeHostNumaCurrent;
+      location.id = -1; // ignored
+    } else if (mem_space == QUDA_CUDA_FIELD_LOCATION) {
+      location.type = cudaMemLocationTypeDevice;
+      location.id = comm_gpuid();
+    } else
+      errorQuda("Invalid QudaFieldLocation.");
+    // "0" corresponds to a reserved argument for flags in the future
+    cudaError_t error = cudaMemPrefetchAsync_v2(ptr, count, location, 0, get_stream(stream));
+#else
     int dev_id = 0;
     if (mem_space == QUDA_CUDA_FIELD_LOCATION)
       dev_id = comm_gpuid();
-    else if (mem_space == QUDA_CPU_FIELD_LOCATION)
       dev_id = cudaCpuDeviceId;
     else
       errorQuda("Invalid QudaFieldLocation.");
 
     cudaError_t error = cudaMemPrefetchAsync(ptr, count, dev_id, get_stream(stream));
+#endif
     set_runtime_error(error, __func__, func, file, line);
   }
 
