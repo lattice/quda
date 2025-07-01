@@ -435,7 +435,7 @@ namespace quda
     } else
       errorQuda("Invalid QudaFieldLocation.");
     // "0" corresponds to a reserved argument for flags in the future
-    cudaError_t error = cudaMemPrefetchAsync_v2(ptr, count, location, 0, get_stream(stream));
+    cudaError_t error = cudaMemPrefetchAsync(ptr, count, location, 0, get_stream(stream));
 #else
     int dev_id = 0;
     if (mem_space == QUDA_CUDA_FIELD_LOCATION)
