@@ -5955,13 +5955,15 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
       std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
       printfQuda("starting another meas\n");
       ferm_m->meas_list.push_back(ferm_m->i_glob);
+      f_temp3[0].PrintVector(0,0,0);
       for (int j = 0; j < Nsrc; j += Nsrc_tile) {
         for (int i = 0; i < Nsrc_tile; i++) {
           data_f_temp3_tiled[i] = f_temp3[j + i].data();
           data_f_temp4_tiled[i] = f_temp4[j + i].data();
         }
-        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+        invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
       }
+      f_temp4[0].PrintVector(0,0,0);
       std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
       cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
       t_gf_list = {gaugeTemp,precise};
@@ -6101,8 +6103,8 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
   precise = GaugeField(gParam_helper);
 
-  // spinor fields
-  std::vector<ColorSpinorField> fin_h, fin, fout;
+  // spinor fields, fout_h not needed
+  std::vector<ColorSpinorField> fin_h, fin, fout, fout_h;
   // auxilliary fermion fields [0], [1], [2] and [3]
   std::vector<ColorSpinorField> f_temp0, f_temp1, f_temp2, f_temp3, f_temp4;
   for (size_t i = 0; i < nSpinors; i++) {
@@ -6121,6 +6123,17 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     // set [3] = input spinor
     f_temp3[i] = fin[i];
   }
+  fout_h = fin_h;
+  printfQuda("hin vheck\n");
+  invertQuda(fout_h[0].data(), fin_h[0].data(), inv_param);
+  fin_h[0].PrintVector(0,0,0);
+  fout_h[0].PrintVector(0,0,0);
+
+  
+  printfQuda("fin vheck\n");
+  invertQuda(fout[0].data(), fin[0].data(), inv_param);
+  fin[0].PrintVector(0,0,0);
+  fout[0].PrintVector(0,0,0);
 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;

@@ -216,6 +216,11 @@ target_link_libraries(alt_staggered_flow_test ${TEST_LIBS})
 quda_checkbuildtest(alt_staggered_flow_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS alt_staggered_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(final_flow_test final_flow_test.cpp)
+target_link_libraries(final_flow_test ${TEST_LIBS})
+quda_checkbuildtest(final_flow_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS final_flow_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(pack_test pack_test.cpp)
 target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
