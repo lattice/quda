@@ -22,7 +22,7 @@ namespace quda
                                  const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
                                  int halo_shift[4], MdwfFusedDslashType type);
 
-    inline void apply_fused_dslash_list(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+    void inline apply_fused_dslash_list(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
                                         ColorSpinorField &, const ColorSpinorField &, double, double, const Complex *,
                                         const Complex *, bool, int, int[4], int[4], MdwfFusedDslashType, IntList<>)
     {
