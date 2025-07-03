@@ -17,6 +17,10 @@
 namespace quda
 {
 
+#ifdef _NVHPC_CUDA
+#pragma diag_suppress no_device_stack
+#endif
+
   /**
    * Traits for determining the maximum and inverse maximum
    * value of a (signed) char and short. Relevant for
@@ -288,4 +292,9 @@ namespace quda
     return static_cast<fixed_t>(rint(f));
 #endif
   }
+
+#ifdef _NVHPC_CUDA
+#pragma diag_default no_device_stack
+#endif
+
 } // namespace quda
