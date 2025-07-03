@@ -522,7 +522,9 @@ namespace quda
   template <typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
     int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
-    if (amlast == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z - 1) {
+    if (amlast
+        == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z
+          - 1) {
       arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
       arg.interior_done.notify_all();
       arg.interior_count.store(0, cuda::std::memory_order_relaxed);
@@ -530,7 +532,8 @@ namespace quda
   }
 
   template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity) {
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
+  {
 #ifdef QUDA_FAST_COMPILE_DSLASH
     dslash.template operator()<kernel_type>(x_cb, s, parity);
 #else
