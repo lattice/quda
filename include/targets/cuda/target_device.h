@@ -17,7 +17,7 @@
 #define GRID_CONSTANT
 #endif
 
-#if (defined(__NVCC__) || defined(_NVHPC_CUDA)) && (CUDA_VERSION >= 12040)
+#if defined(__NVCC__) && (CUDA_VERSION >= 12040)
 #define MAXNREG(x) __maxnreg__(x)
 #else
 #define MAXNREG(x)
