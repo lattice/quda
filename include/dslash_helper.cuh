@@ -737,7 +737,7 @@ namespace quda
         constexpr bool use_nvshmem_comms = false;
 #endif
         if constexpr (use_nvshmem_comms && Arg::D::use_syncthreads) {
-          // Initialize a shared memory counter for the threads int the block
+          // Initialize a shared memory counter for the threads in the block
           __shared__ cuda::atomic<int, cuda::thread_scope_block> block_counter;
           if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
             block_counter.store(0, cuda::std::memory_order_relaxed);
