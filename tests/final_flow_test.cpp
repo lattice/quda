@@ -45,8 +45,8 @@ int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
 bool su_project = true;
 bool has_naik = false;
-int n_naiks = 1;
-double eps_naik = 0.0;
+// int n_naiks = 1;
+// double eps_naik = 0.0;
 unsigned int meas_int = 5;
 
 GaugeField cpuFatQDP = {};
@@ -88,6 +88,7 @@ void display_test_info()
   printfQuda(" - has-naik %s\n", has_naik ? "true" : "false");
   printfQuda(" - n-naiks %d\n", n_naiks);
   printfQuda(" - eps-naiks %f\n", eps_naik);
+  // printfQuda(" - eps-naiks %f\n", eps_naik);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -108,20 +109,15 @@ void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
       meas_int, "measurement interval for psipsibar");
   opgroup
     ->add_option(
-      "--eps-naik",
-      eps_naik, "epsilon naik term");
+      "--n-naiks",
+      n_naiks, "number of naiks term");
 
 }
 
-void reconfigure_naik(bool &has_naik, double &eps_naik, int &n_naiks)
+void check_naik(double &eps_naik, int &n_naiks)
 {
-    if (has_naik) {
-        if (eps_naik == 0.0) errorQuda("Naik term switched on: Must supply nonzero eps naik number to get meaningful result\n");
-        n_naiks = 2;
-    } else {
-        printfQuda("Naik term switched off: Making sure to set eps_naik = 0\n");
-        eps_naik = 0.0;
-        n_naiks = 1;
+    if (eps_naik != 0 && n_naiks != 2) {
+     errorQuda("if eps naik is onzero, nnaiks must be 2\n");
     }
 }
 
@@ -265,14 +261,14 @@ void init()
   loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
 
   // now copy back to QDP aliases, since these are used for the reference dslash
-  cpuFatQDP = cpuFatMILC;
-  cpuFatQDP.exchangeGhost();
-  cpuFatMILC.exchangeGhost();
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    cpuLongQDP = cpuLongMILC;
-    cpuLongQDP.exchangeGhost();
-    cpuLongMILC.exchangeGhost();
-  }
+  // cpuFatQDP = cpuFatMILC;
+  // cpuFatQDP.exchangeGhost();
+  // cpuFatMILC.exchangeGhost();
+  // if (dslash_type == QUDA_ASQTAD_DSLASH) {
+  //   cpuLongQDP = cpuLongMILC;
+  //   cpuLongQDP.exchangeGhost();
+  //   cpuLongMILC.exchangeGhost();
+  // }
 
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
@@ -305,6 +301,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
   setVerbosity(verbosity);
+  check_naik(eps_naik, n_naiks);
 
   // Set values for precisions via the command line.
   setQudaPrecisions();

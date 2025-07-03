@@ -6114,6 +6114,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     fin.push_back(ColorSpinorField(deviceParam));
     fin[i] = fin_h[i];
     deviceParam.create = QUDA_NULL_FIELD_CREATE;
+    
     fout.push_back(ColorSpinorField(deviceParam));
     f_temp0.push_back(ColorSpinorField(deviceParam));
     f_temp1.push_back(ColorSpinorField(deviceParam));
@@ -6124,13 +6125,18 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     f_temp3[i] = fin[i];
   }
   fout_h = fin_h;
-  printfQuda("hin vheck\n");
+  printfQuda("fin_h check, host dirac order is %d\n",inv_param->dirac_order);
+  inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
   invertQuda(fout_h[0].data(), fin_h[0].data(), inv_param);
   fin_h[0].PrintVector(0,0,0);
   fout_h[0].PrintVector(0,0,0);
 
-  
-  printfQuda("fin vheck\n");
+  fout = fin;
+  printfQuda("fin check\n");
+  inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
+  inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
   invertQuda(fout[0].data(), fin[0].data(), inv_param);
   fin[0].PrintVector(0,0,0);
   fout[0].PrintVector(0,0,0);

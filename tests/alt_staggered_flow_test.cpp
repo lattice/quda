@@ -440,7 +440,7 @@ for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size 
   out_flowed = {};
   
   
-    write_files(ferm_meas);
+  write_files(ferm_meas);
   
   
 

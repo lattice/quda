@@ -143,7 +143,7 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
                                  compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
-
+  
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
@@ -154,6 +154,7 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   } else {
     // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
+      printfQuda("this is actually excecuted, nnaik is %d, eps is %1.5e\n",n_naiks,eps_naik);
       if (compute_on_gpu)
         computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
                           eps_naik);
