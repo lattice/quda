@@ -514,6 +514,19 @@ namespace quda
     }   // parity
   }
 
+  template <KernelType kernel_type, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
+  {
+#ifdef QUDA_FAST_COMPILE_DSLASH
+    dslash.template operator()<kernel_type>(x_cb, s, parity);
+#else
+    switch (parity) {
+    case 0: dslash.template operator()<kernel_type>(x_cb, s, 0); break;
+    case 1: dslash.template operator()<kernel_type>(x_cb, s, 1); break;
+    }
+#endif
+  }
+
 #ifdef NVSHMEM_COMMS
   /**
    * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed.
@@ -529,19 +542,6 @@ namespace quda
       arg.interior_done.notify_all();
       arg.interior_count.store(0, cuda::std::memory_order_relaxed);
     }
-  }
-
-  template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
-  {
-#ifdef QUDA_FAST_COMPILE_DSLASH
-    dslash.template operator()<kernel_type>(x_cb, s, parity);
-#else
-    switch (parity) {
-    case 0: dslash.template operator()<kernel_type>(x_cb, s, 0); break;
-    case 1: dslash.template operator()<kernel_type>(x_cb, s, 1); break;
-    }
-#endif
   }
 
   template <KernelType kernel_type, int nParity, class D, typename Arg>
