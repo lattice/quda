@@ -31,23 +31,23 @@ bool use_multi_src = false;
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
 
-double gauge_smear_rho = 0.1;
-double gauge_smear_epsilon = 0.1;
-double gauge_smear_alpha = 0.6;
-double gauge_smear_alpha1 = 0.75;
-double gauge_smear_alpha2 = 0.6;
-double gauge_smear_alpha3 = 0.3;
-int gauge_smear_steps = 50;
-int gauge_n_save = 3;
-int hier_threshold = 6;
-QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-int gauge_smear_dir_ignore = -1;
-int measurement_interval = 5;
-bool su_project = true;
-bool has_naik = false;
-// int n_naiks = 1;
-// double eps_naik = 0.0;
-unsigned int meas_int = 5;
+// double gauge_smear_rho = 0.1;
+// double gauge_smear_epsilon = 0.1;
+// double gauge_smear_alpha = 0.6;
+// double gauge_smear_alpha1 = 0.75;
+// double gauge_smear_alpha2 = 0.6;
+// double gauge_smear_alpha3 = 0.3;
+// int gauge_smear_steps = 50;
+// int gauge_n_save = 3;
+// int hier_threshold = 6;
+// QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
+// int gauge_smear_dir_ignore = -1;
+// int measurement_interval = 5;
+// bool su_project = true;
+// bool has_naik = false;
+// // int n_naiks = 1;
+// // double eps_naik = 0.0;
+// unsigned int meas_int = 5;
 
 GaugeField cpuFatQDP = {};
 GaugeField cpuLongQDP = {};
@@ -84,8 +84,6 @@ void display_test_info()
   printfQuda(" - smearing steps %d\n", gauge_smear_steps);
   printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
   printfQuda(" - Measurement interval %d\n", measurement_interval);
-  printfQuda(" - Fermion measurement interval %d\n", meas_int);
-  printfQuda(" - has-naik %s\n", has_naik ? "true" : "false");
   printfQuda(" - n-naiks %d\n", n_naiks);
   printfQuda(" - eps-naiks %f\n", eps_naik);
   // printfQuda(" - eps-naiks %f\n", eps_naik);
@@ -101,17 +99,8 @@ void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup = quda_app->add_option_group("HISQ", "Options controlling HISQ parameters");
   opgroup
     ->add_option(
-      "--has-naik",
-      has_naik, "has naik (for charm)");
-  opgroup
-    ->add_option(
-      "--meas-int",
-      meas_int, "measurement interval for psipsibar");
-  opgroup
-    ->add_option(
       "--n-naiks",
       n_naiks, "number of naiks term");
-
 }
 
 void check_naik(double &eps_naik, int &n_naiks)
@@ -132,7 +121,7 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
   for (const auto& row : *ppb_data) {
       for (const auto& elem : row) {
-          out_ppb << elem.real() << " ";
+          out_ppb << elem.real() << " " << elem.imag() << " ";
       }
       out_ppb << "\n"; // Newline after each row
   }
@@ -171,7 +160,7 @@ void init()
     smear_param = newQudaGaugeSmearParam();
     setGaugeSmearParam(smear_param);
   }
-
+  printfQuda("quda prec is %d\n",gauge_param.cuda_prec);
   inv_param = newQudaInvertParam();
   mg_inv_param = newQudaInvertParam();
   mg_param = newQudaMultigridParam();
@@ -384,7 +373,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     
     QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
     ferm_meas.take_meas = QUDA_BOOLEAN_TRUE;
-    ferm_meas.meas_int = meas_int;
+    ferm_meas.meas_int = measurement_interval;
     std::vector<std::vector<std::complex<double>>> ppb;
     std::vector<std::vector<std::vector<std::complex<double>>>> ppb_t;
     void* ptr_ppb = &ppb;
@@ -419,6 +408,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     out_ptr[n] = out[n].data();
     out_flowed_ptr[n] = out_flowed[n].data();
   }
+  
   invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
   in_raw[0].PrintVector(0,0,0);
   out[0].PrintVector(0,0,0);
@@ -431,7 +421,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   in = {};
   out = {};
   out_flowed = {};
-  
+  tmp = {};
   
   write_files(ferm_meas);
   

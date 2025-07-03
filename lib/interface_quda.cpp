@@ -5809,6 +5809,8 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
+  printfQuda("nsafe is %i\n",ns_safe);
+
   for (unsigned int i = 0; i < ns_safe; i++) {
       
     if (i == 0) g_W0 = gin;
@@ -5948,7 +5950,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 
     ferm_m->i_glob++;
     if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
-
+      printfQuda("i_glob is %i\n",ferm_m->i_glob);
       int Nsrc = (int) f_temp4.size();
       int Nsrc_tile = inv_param->num_src;
       printfQuda("nrsc-tile is %i\n",Nsrc_tile);
@@ -5961,16 +5963,18 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
           data_f_temp3_tiled[i] = f_temp3[j + i].data();
           data_f_temp4_tiled[i] = f_temp4[j + i].data();
         }
-        invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
+        // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
+        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
       }
       f_temp4[0].PrintVector(0,0,0);
       std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
+      
       cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
       t_gf_list = {gaugeTemp,precise};
       gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
       cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
-      ferm_m->ppb.push_back(PsiPsibarTest);
-      printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[0]- PsiPsibarTest[0]),imag(PsiPsibarR[0] - PsiPsibarTest[0]));
+      ferm_m->ppb.push_back(PsiPsibarR);
+      printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[2] - PsiPsibarTest[2]),imag(PsiPsibarR[2] - PsiPsibarTest[2]));
 
       std::vector<std::vector<Complex>> ppb_t_el = {};
     
@@ -6114,7 +6118,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     fin.push_back(ColorSpinorField(deviceParam));
     fin[i] = fin_h[i];
     deviceParam.create = QUDA_NULL_FIELD_CREATE;
-    
     fout.push_back(ColorSpinorField(deviceParam));
     f_temp0.push_back(ColorSpinorField(deviceParam));
     f_temp1.push_back(ColorSpinorField(deviceParam));
