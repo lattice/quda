@@ -30,13 +30,13 @@ template <typename real_t_> struct anti_hermitmat {
 
 template <typename real_t> su3_matrix<real_t> *get_su3_matrix(quda::GaugeField &p, int idx, int dir)
 {
-  auto data = static_cast<su3_matrix<real_t> *const>(p.data(dir));
+  auto data = static_cast<su3_matrix<real_t> *>(p.data(dir));
   return data + idx;
 }
 
 template <typename real_t> const su3_matrix<real_t> *get_su3_matrix(const quda::GaugeField &p, int idx, int dir)
 {
-  auto data = static_cast<const su3_matrix<real_t> *const>(p.data(dir));
+  auto data = static_cast<const su3_matrix<real_t> *>(p.data(dir));
   return data + idx;
 }
 
