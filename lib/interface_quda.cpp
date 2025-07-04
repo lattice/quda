@@ -5808,12 +5808,7 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   int comm_dim[4] = {};
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
-
-  printfQuda("beginning gflow of %i steps\n",ns_safe);
-  printfQuda("monitoring ftemp3at the beginning\n");
-    f_temp3[0].PrintVector(0,0,0);
   
-
   for (unsigned int i = 0; i < ns_safe; i++) {
       
     if (i == 0) g_W0 = gin;
@@ -5823,9 +5818,6 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
-
-    printfQuda("monitoring gauge\n");
-    g_W0.PrintMatrix(0,0,0,0);
     
     // STEP 1
     // [4] = Laplace [0]
@@ -5864,8 +5856,6 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     blas::axpy(smear_param->epsilon * 3. / 4., f_temp2, f_temp3);
     // apply step W3 (Vt) of gauge field flow part
     GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
-    printfQuda("monitoring ftemp3\n");
-    f_temp3[0].PrintVector(0,0,0);
   }
     
 }
@@ -6156,7 +6146,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   // Can also do below
   // creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
 
-  GaugeField &gin = *gaugeSmeared;
+  GaugeField gin = *gaugeSmeared;
   GaugeField &gout = gauge_out;
 
   // helper gauge field for Laplace operator
@@ -6208,12 +6198,12 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
       smear_param->n_steps = m;
       
-      // if (m < adj_n_save_init)
-      //   smear_param->adj_n_save = m;
-      // else if (smear_param->n_steps == adj_n_save_init)
-      //   ;
-      // else
-      //   smear_param->adj_n_save = adj_n_save_init; 
+      if (m < adj_n_save_init)
+        smear_param->adj_n_save = m;
+      else if (smear_param->n_steps == adj_n_save_init)
+        ;
+      else
+        smear_param->adj_n_save = adj_n_save_init; 
       
       gauge_stages = {};
       gauge_stages.assign(smear_param->adj_n_save,gParamDummy);
@@ -6275,7 +6265,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   }
   
  
-
+  //get back on cpu
   inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->dirac_order=QUDA_DIRAC_ORDER;
