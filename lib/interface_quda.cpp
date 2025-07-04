@@ -6054,6 +6054,106 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 }
 
+void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list, std::vector<GaugeField> &gauge_stages,
+                   std::vector<std::reference_wrapper<GaugeField>> sub_gf_list, GaugeField &gin, GaugeField &gout, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
+                   TimeProfile &profile, FermMeasObj *ferm_m)
+{
+  GaugeFieldParam gParamDummy(*gaugeSmeared);
+  GaugeField &gaugeW1 = sub_gf_list[0].get();
+  GaugeField &gaugeW2 = sub_gf_list[1].get();
+  GaugeField &gaugeVT = sub_gf_list[2].get();
+  GaugeField &gaugeTemp = sub_gf_list[3].get();
+  GaugeField &precise = sub_gf_list[4].get();
+  
+  int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
+  logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
+  int ret_idx = 0;
+  int threshold = smear_param->hier_threshold;
+  std::vector<int> hier_list;
+  // The first stage is saved at the very beginning, so its presence is implicit
+  hier_list = get_hier_list(smear_param->n_steps, n_b, smear_param->adj_n_save);
+  logQuda(QUDA_SUMMARIZE, "hier list size (number of gauge fields to save) is %d\n", (int)hier_list.size());
+  if (threshold < hier_list.back()) {
+    threshold = hier_list.back();
+    logQuda(QUDA_SUMMARIZE, "threshold changed to %d", threshold);
+  } else
+    logQuda(QUDA_SUMMARIZE, "threshold is %d\n", threshold);
+
+  if (hier_list.empty()) errorQuda("hier_list is not populated\n");
+  if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages\n");
+
+  for (unsigned int i = 0; i < hier_list.size() - 1; i++) {
+
+    if (i == 0) {
+      logQuda(QUDA_VERBOSE, "we first set gin to the first index of the gauge_steps vector\n");
+      gauge_stages[0] = gin;
+    }
+    if (i > 0) std::swap(gout, gin);
+
+    for (unsigned int j = 0; j < (unsigned int)hier_list[i]; j++) {
+      if (j > 0) std::swap(gout, gin);
+
+      WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
+                smear_param->rk_order);
+    }
+    gauge_stages[i + 1] = gout;
+  }
+
+  std::vector<std::reference_wrapper<GaugeField>> gf_list;
+  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+
+  int hier_loop_counter = 0;
+  while (ret_idx != -1){
+      logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
+      logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
+      
+      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, ferm_m);
+      
+      logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
+      for (int j = 0; j < (int) hier_list.size(); j++ ){
+          logQuda(QUDA_DEBUG_VERBOSE,"%d \n", (int) hier_list[j]);
+      }
+      logQuda(QUDA_DEBUG_VERBOSE,"\n");
+      
+      hier_list.pop_back();
+      gauge_stages.pop_back();
+      ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
+      if (ret_idx == -1) {
+          logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
+          for (int i = gauge_stages.size() - 1; i >= 0; --i) {
+             //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
+              
+             gf_list.at(0) = std::ref(gauge_stages[i]); 
+
+             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,ferm_m);
+             logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
+      }
+      logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
+      break;
+    }
+
+    GaugeField g_2(gParamDummy);
+    GaugeField g_1 = gauge_stages[ret_idx];
+
+    logQuda(QUDA_DEBUG_VERBOSE, "Modified hier list elements: \n");
+    for (int j = 0; j < (int)hier_list.size(); j++) { logQuda(QUDA_DEBUG_VERBOSE, "%d \n", (int)hier_list[j]); }
+    logQuda(QUDA_DEBUG_VERBOSE, "\n");
+
+    for (unsigned int j = 0; j < (unsigned int)hier_list[ret_idx]; j++) {
+      if (j > 0) std::swap(g_2, g_1);
+      WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
+                smear_param->rk_order);
+    }
+
+    gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
+    logQuda(QUDA_DEBUG_VERBOSE, "recycled gauge field placed *before* index %d\n\n", ret_idx + 1);
+    gf_list.at(0) = std::ref(gauge_stages.back());
+    hier_loop_counter += 1;
+  }
+  
+    
+}
+
 void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
                          size_t nSpinors)
 {
@@ -6127,116 +6227,131 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     // set [3] = input spinor
     f_temp3[i] = fin[i];
   }
-  fout_h = fin_h;
-  printfQuda("fin_h check, host dirac order is %d\n",inv_param->dirac_order);
-  inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
-  inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
-  invertQuda(fout_h[0].data(), fin_h[0].data(), inv_param);
-  fin_h[0].PrintVector(0,0,0);
-  fout_h[0].PrintVector(0,0,0);
-
-  fout = fin;
-  printfQuda("fin check\n");
+  // The following is crucial when invert matrices on the GPU
+  
   inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
   inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
   inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
-  invertQuda(fout[0].data(), fin[0].data(), inv_param);
-  fin[0].PrintVector(0,0,0);
-  fout[0].PrintVector(0,0,0);
+  
+  // fout_h = fin_h;
+  // printfQuda("fin_h check, host dirac order is %d\n",inv_param->dirac_order);
+  // inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
+  // inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
+  // invertQuda(fout_h[0].data(), fin_h[0].data(), inv_param);
+  // fin_h[0].PrintVector(0,0,0);
+  // fout_h[0].PrintVector(0,0,0);
+
+  // fout = fin;
+  // printfQuda("fin check\n");
+  // inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
+  // inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
+  // inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
+  // invertQuda(fout[0].data(), fin[0].data(), inv_param);
+  // fin[0].PrintVector(0,0,0);
+  // fout[0].PrintVector(0,0,0);
 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
   std::vector<std::vector<std::vector<Complex>>> ppb_t;
   FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas);
-  
-
-  int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
-  logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
-  int ret_idx = 0;
-  int threshold = smear_param->hier_threshold;
-  std::vector<int> hier_list;
-  // The first stage is saved at the very beginning, so its presence is implicit
-  hier_list = get_hier_list(smear_param->n_steps, n_b, smear_param->adj_n_save);
-  logQuda(QUDA_SUMMARIZE, "hier list size (number of gauge fields to save) is %d\n", (int)hier_list.size());
-  if (threshold < hier_list.back()) {
-    threshold = hier_list.back();
-    logQuda(QUDA_SUMMARIZE, "threshold changed to %d", threshold);
-  } else
-    logQuda(QUDA_SUMMARIZE, "threshold is %d\n", threshold);
-
-  if (hier_list.empty()) errorQuda("hier_list is not populated\n");
-  if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages\n");
-
-  for (unsigned int i = 0; i < hier_list.size() - 1; i++) {
-
-    if (i == 0) {
-      logQuda(QUDA_VERBOSE, "we first set gin to the first index of the gauge_steps vector\n");
-      gauge_stages[0] = gin;
-    }
-    if (i > 0) std::swap(gout, gin);
-
-    for (unsigned int j = 0; j < (unsigned int)hier_list[i]; j++) {
-      if (j > 0) std::swap(gout, gin);
-
-      WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
-                smear_param->rk_order);
-    }
-    gauge_stages[i + 1] = gout;
-  }
 
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
-  std::vector<std::reference_wrapper<GaugeField>> gf_list;
-  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+  std::vector<std::reference_wrapper<GaugeField>> sub_gf_list;
+  sub_gf_list = {gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+  algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
 
-  int hier_loop_counter = 0;
-  while (ret_idx != -1){
-      logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
-      logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
+  // int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
+  // logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
+  // int ret_idx = 0;
+  // int threshold = smear_param->hier_threshold;
+  // std::vector<int> hier_list;
+  // // The first stage is saved at the very beginning, so its presence is implicit
+  // hier_list = get_hier_list(smear_param->n_steps, n_b, smear_param->adj_n_save);
+  // logQuda(QUDA_SUMMARIZE, "hier list size (number of gauge fields to save) is %d\n", (int)hier_list.size());
+  // if (threshold < hier_list.back()) {
+  //   threshold = hier_list.back();
+  //   logQuda(QUDA_SUMMARIZE, "threshold changed to %d", threshold);
+  // } else
+  //   logQuda(QUDA_SUMMARIZE, "threshold is %d\n", threshold);
+
+  // if (hier_list.empty()) errorQuda("hier_list is not populated\n");
+  // if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages\n");
+
+  // for (unsigned int i = 0; i < hier_list.size() - 1; i++) {
+
+  //   if (i == 0) {
+  //     logQuda(QUDA_VERBOSE, "we first set gin to the first index of the gauge_steps vector\n");
+  //     gauge_stages[0] = gin;
+  //   }
+  //   if (i > 0) std::swap(gout, gin);
+
+  //   for (unsigned int j = 0; j < (unsigned int)hier_list[i]; j++) {
+  //     if (j > 0) std::swap(gout, gin);
+
+  //     WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
+  //               smear_param->rk_order);
+  //   }
+  //   gauge_stages[i + 1] = gout;
+  // }
+
+  // std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
+  // sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
+  // std::vector<std::reference_wrapper<GaugeField>> gf_list;
+  // gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+
+  // int hier_loop_counter = 0;
+  // while (ret_idx != -1){
+  //     logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
+  //     logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
-      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, &ferm_m);
+  //     adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, &ferm_m);
       
-      logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
-      for (int j = 0; j < (int) hier_list.size(); j++ ){
-          logQuda(QUDA_DEBUG_VERBOSE,"%d \n", (int) hier_list[j]);
-      }
-      logQuda(QUDA_DEBUG_VERBOSE,"\n");
+  //     logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
+  //     for (int j = 0; j < (int) hier_list.size(); j++ ){
+  //         logQuda(QUDA_DEBUG_VERBOSE,"%d \n", (int) hier_list[j]);
+  //     }
+  //     logQuda(QUDA_DEBUG_VERBOSE,"\n");
       
-      hier_list.pop_back();
-      gauge_stages.pop_back();
-      ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
-      if (ret_idx == -1) {
-          logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
-          for (int i = gauge_stages.size() - 1; i >= 0; --i) {
-             //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
+  //     hier_list.pop_back();
+  //     gauge_stages.pop_back();
+  //     ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
+  //     if (ret_idx == -1) {
+  //         logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
+  //         for (int i = gauge_stages.size() - 1; i >= 0; --i) {
+  //            //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
               
-             gf_list.at(0) = std::ref(gauge_stages[i]); 
+  //            gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,&ferm_m);
-             logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
-      }
-      logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
-      break;
-    }
+  //            adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,&ferm_m);
+  //            logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
+  //     }
+  //     logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
+  //     break;
+  //   }
 
-    GaugeField g_2(gParamDummy);
-    GaugeField g_1 = gauge_stages[ret_idx];
+  //   GaugeField g_2(gParamDummy);
+  //   GaugeField g_1 = gauge_stages[ret_idx];
 
-    logQuda(QUDA_DEBUG_VERBOSE, "Modified hier list elements: \n");
-    for (int j = 0; j < (int)hier_list.size(); j++) { logQuda(QUDA_DEBUG_VERBOSE, "%d \n", (int)hier_list[j]); }
-    logQuda(QUDA_DEBUG_VERBOSE, "\n");
+  //   logQuda(QUDA_DEBUG_VERBOSE, "Modified hier list elements: \n");
+  //   for (int j = 0; j < (int)hier_list.size(); j++) { logQuda(QUDA_DEBUG_VERBOSE, "%d \n", (int)hier_list[j]); }
+  //   logQuda(QUDA_DEBUG_VERBOSE, "\n");
 
-    for (unsigned int j = 0; j < (unsigned int)hier_list[ret_idx]; j++) {
-      if (j > 0) std::swap(g_2, g_1);
-      WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
-                smear_param->rk_order);
-    }
+  //   for (unsigned int j = 0; j < (unsigned int)hier_list[ret_idx]; j++) {
+  //     if (j > 0) std::swap(g_2, g_1);
+  //     WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
+  //               smear_param->rk_order);
+  //   }
 
-    gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
-    logQuda(QUDA_DEBUG_VERBOSE, "recycled gauge field placed *before* index %d\n\n", ret_idx + 1);
-    gf_list.at(0) = std::ref(gauge_stages.back());
-    hier_loop_counter += 1;
-  }
+  //   gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
+  //   logQuda(QUDA_DEBUG_VERBOSE, "recycled gauge field placed *before* index %d\n\n", ret_idx + 1);
+  //   gf_list.at(0) = std::ref(gauge_stages.back());
+  //   hier_loop_counter += 1;
+  // }
+
+  inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
+  inv_param->dirac_order=QUDA_DIRAC_ORDER;
 
   for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
