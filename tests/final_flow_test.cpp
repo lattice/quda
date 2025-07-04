@@ -83,6 +83,7 @@ void display_test_info()
   }
   printfQuda(" - smearing steps %d\n", gauge_smear_steps);
   printfQuda(" - smearing ignore direction %d\n", gauge_smear_dir_ignore);
+  printfQuda(" - hierarchical nsave %d\n", gauge_n_save);
   printfQuda(" - Measurement interval %d\n", measurement_interval);
   printfQuda(" - n-naiks %d\n", n_naiks);
   printfQuda(" - eps-naiks %f\n", eps_naik);

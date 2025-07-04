@@ -5809,7 +5809,10 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
 
-  printfQuda("nsafe is %i\n",ns_safe);
+  printfQuda("beginning gflow of %i steps\n",ns_safe);
+  printfQuda("monitoring ftemp3at the beginning\n");
+    f_temp3[0].PrintVector(0,0,0);
+  
 
   for (unsigned int i = 0; i < ns_safe; i++) {
       
@@ -5820,6 +5823,9 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
+
+    printfQuda("monitoring gauge\n");
+    g_W0.PrintMatrix(0,0,0,0);
     
     // STEP 1
     // [4] = Laplace [0]
@@ -5858,6 +5864,8 @@ void gfEvolve(std::reference_wrapper<std::vector<ColorSpinorField>> f_temp3_p,st
     blas::axpy(smear_param->epsilon * 3. / 4., f_temp2, f_temp3);
     // apply step W3 (Vt) of gauge field flow part
     GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
+    printfQuda("monitoring ftemp3\n");
+    f_temp3[0].PrintVector(0,0,0);
   }
     
 }
@@ -5949,57 +5957,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
     f_temp3 = f_temp0;
 
     ferm_m->i_glob++;
-    if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) {
-      printfQuda("i_glob is %i\n",ferm_m->i_glob);
-      int Nsrc = (int) f_temp4.size();
-      int Nsrc_tile = inv_param->num_src;
-      printfQuda("nrsc-tile is %i\n",Nsrc_tile);
-      std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
-      printfQuda("starting another meas\n");
-      ferm_m->meas_list.push_back(ferm_m->i_glob);
-      f_temp3[0].PrintVector(0,0,0);
-      for (int j = 0; j < Nsrc; j += Nsrc_tile) {
-        for (int i = 0; i < Nsrc_tile; i++) {
-          data_f_temp3_tiled[i] = f_temp3[j + i].data();
-          data_f_temp4_tiled[i] = f_temp4[j + i].data();
-        }
-        // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
-        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
-      }
-      f_temp4[0].PrintVector(0,0,0);
-      std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
-      
-      cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
-      t_gf_list = {gaugeTemp,precise};
-      gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, ferm_m->i_glob, profile);
-      cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m->vec_ref,f_temp4);
-      ferm_m->ppb.push_back(PsiPsibarR);
-      printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[2] - PsiPsibarTest[2]),imag(PsiPsibarR[2] - PsiPsibarTest[2]));
-
-      std::vector<std::vector<Complex>> ppb_t_el = {};
-    
-      QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
-      
-      std::array<int, 4> mom_modes = {0,0,0,0};
-      std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
-      std::array<int, 4> source_position = {0,0,0,0};
-      //Why not this?
-      // int source_position = 0;
-      // QudaFFTSymmType fft_modes = eo;
-      // int mom_modes = 0;
-      QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
-      std::vector<Complex> result_global(f_temp0[0].full_dim(3)*comm_dim(3));
-
-      for (size_t n = 0; n < f_temp4.size(); n++){
-        std::fill(result_global.begin(), result_global.end(), 0.0);
-        contractSummedQuda(ferm_m->vec_ref[n], f_temp4[n], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
-        //necessary?
-        comm_allreduce_sum(result_global);
-        ppb_t_el.push_back(result_global);
-      }
-      ferm_m->ppb_t.push_back(ppb_t_el);
-      
-    } 
+    // if (((ferm_m->i_glob % ferm_m->meas_interval) == 0) && ferm_m->take_meas == QUDA_BOOLEAN_TRUE) DO MEASUREMENTS;
     
   }
 
@@ -6064,7 +6022,7 @@ void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   GaugeField &gaugeVT = sub_gf_list[2].get();
   GaugeField &gaugeTemp = sub_gf_list[3].get();
   GaugeField &precise = sub_gf_list[4].get();
-  
+  printfQuda("We are smearing for %d steps now\n",smear_param->n_steps);
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
   logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
   int ret_idx = 0;
@@ -6228,27 +6186,9 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     f_temp3[i] = fin[i];
   }
   // The following is crucial when invert matrices on the GPU
-  
   inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
   inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
   inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
-  
-  // fout_h = fin_h;
-  // printfQuda("fin_h check, host dirac order is %d\n",inv_param->dirac_order);
-  // inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
-  // inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
-  // invertQuda(fout_h[0].data(), fin_h[0].data(), inv_param);
-  // fin_h[0].PrintVector(0,0,0);
-  // fout_h[0].PrintVector(0,0,0);
-
-  // fout = fin;
-  // printfQuda("fin check\n");
-  // inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
-  // inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
-  // inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
-  // invertQuda(fout[0].data(), fin[0].data(), inv_param);
-  // fin[0].PrintVector(0,0,0);
-  // fout[0].PrintVector(0,0,0);
 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
@@ -6259,95 +6199,82 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> sub_gf_list;
   sub_gf_list = {gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
-  algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
 
-  // int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1)));
-  // logQuda(QUDA_SUMMARIZE, "Hierarchical block n_b: %d\n\n", n_b);
-  // int ret_idx = 0;
-  // int threshold = smear_param->hier_threshold;
-  // std::vector<int> hier_list;
-  // // The first stage is saved at the very beginning, so its presence is implicit
-  // hier_list = get_hier_list(smear_param->n_steps, n_b, smear_param->adj_n_save);
-  // logQuda(QUDA_SUMMARIZE, "hier list size (number of gauge fields to save) is %d\n", (int)hier_list.size());
-  // if (threshold < hier_list.back()) {
-  //   threshold = hier_list.back();
-  //   logQuda(QUDA_SUMMARIZE, "threshold changed to %d", threshold);
-  // } else
-  //   logQuda(QUDA_SUMMARIZE, "threshold is %d\n", threshold);
-
-  // if (hier_list.empty()) errorQuda("hier_list is not populated\n");
-  // if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages\n");
-
-  // for (unsigned int i = 0; i < hier_list.size() - 1; i++) {
-
-  //   if (i == 0) {
-  //     logQuda(QUDA_VERBOSE, "we first set gin to the first index of the gauge_steps vector\n");
-  //     gauge_stages[0] = gin;
-  //   }
-  //   if (i > 0) std::swap(gout, gin);
-
-  //   for (unsigned int j = 0; j < (unsigned int)hier_list[i]; j++) {
-  //     if (j > 0) std::swap(gout, gin);
-
-  //     WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
-  //               smear_param->rk_order);
-  //   }
-  //   gauge_stages[i + 1] = gout;
-  // }
-
-  // std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
-  // sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
-  // std::vector<std::reference_wrapper<GaugeField>> gf_list;
-  // gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
-
-  // int hier_loop_counter = 0;
-  // while (ret_idx != -1){
-  //     logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
-  //     logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
+  auto n_steps_total = smear_param->n_steps;
+  auto adj_n_save_init = smear_param->adj_n_save;
+  if (!ferm_meas->take_meas)
+    algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
+  else {
+    for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
+      smear_param->n_steps = m;
       
-  //     adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, &ferm_m);
+      // if (m < adj_n_save_init)
+      //   smear_param->adj_n_save = m;
+      // else if (smear_param->n_steps == adj_n_save_init)
+      //   ;
+      // else
+      //   smear_param->adj_n_save = adj_n_save_init; 
       
-  //     logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
-  //     for (int j = 0; j < (int) hier_list.size(); j++ ){
-  //         logQuda(QUDA_DEBUG_VERBOSE,"%d \n", (int) hier_list[j]);
-  //     }
-  //     logQuda(QUDA_DEBUG_VERBOSE,"\n");
-      
-  //     hier_list.pop_back();
-  //     gauge_stages.pop_back();
-  //     ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
-  //     if (ret_idx == -1) {
-  //         logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
-  //         for (int i = gauge_stages.size() - 1; i >= 0; --i) {
-  //            //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
-              
-  //            gf_list.at(0) = std::ref(gauge_stages[i]); 
+      gauge_stages = {};
+      gauge_stages.assign(smear_param->adj_n_save,gParamDummy);
+      gauge_stages[0] = *gaugeSmeared;
+      f_temp3 = ferm_m.vec_ref;
+      gin = *gaugeSmeared;
+      algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
+  
+      int Nsrc = (int) f_temp4.size();
+      int Nsrc_tile = inv_param->num_src;
+      printfQuda("We are here now\n");
+      std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
+      printfQuda("starting another meas\n");
+      ferm_m.meas_list.push_back(ferm_m.i_glob);
+      f_temp3[0].PrintVector(0,0,0);
+      for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+        for (int i = 0; i < Nsrc_tile; i++) {
+          data_f_temp3_tiled[i] = f_temp3[j + i].data();
+          data_f_temp4_tiled[i] = f_temp4[j + i].data();
+        }
+        // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
+        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+      }
+      f_temp4[0].PrintVector(0,0,0);
+      std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
+      smear_param->n_steps = m;
+      cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
+      t_gf_list = {gaugeTemp,precise};
+      gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier);
+      printfQuda("checiung again\n");
+      f_temp4[0].PrintVector(0,0,0);
+      cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m.vec_ref,f_temp4);
+      ferm_m.ppb.push_back(PsiPsibarR);
+      printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[2] - PsiPsibarTest[2]),imag(PsiPsibarR[2] - PsiPsibarTest[2]));
 
-  //            adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,&ferm_m);
-  //            logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
-  //     }
-  //     logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
-  //     break;
-  //   }
+      std::vector<std::vector<Complex>> ppb_t_el = {};
+    
+      QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+      printfQuda("here?\n");
+      std::array<int, 4> mom_modes = {0,0,0,0};
+      std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
+      std::array<int, 4> source_position = {0,0,0,0};
+      //Why not this?
+      // int source_position = 0;
+      // QudaFFTSymmType fft_modes = eo;
+      // int mom_modes = 0;
+      QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+      std::vector<Complex> result_global(f_temp0[0].full_dim(3)*comm_dim(3));
 
-  //   GaugeField g_2(gParamDummy);
-  //   GaugeField g_1 = gauge_stages[ret_idx];
-
-  //   logQuda(QUDA_DEBUG_VERBOSE, "Modified hier list elements: \n");
-  //   for (int j = 0; j < (int)hier_list.size(); j++) { logQuda(QUDA_DEBUG_VERBOSE, "%d \n", (int)hier_list[j]); }
-  //   logQuda(QUDA_DEBUG_VERBOSE, "\n");
-
-  //   for (unsigned int j = 0; j < (unsigned int)hier_list[ret_idx]; j++) {
-  //     if (j > 0) std::swap(g_2, g_1);
-  //     WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type, smear_param->smear_anisotropy,
-  //               smear_param->rk_order);
-  //   }
-
-  //   gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
-  //   logQuda(QUDA_DEBUG_VERBOSE, "recycled gauge field placed *before* index %d\n\n", ret_idx + 1);
-  //   gf_list.at(0) = std::ref(gauge_stages.back());
-  //   hier_loop_counter += 1;
-  // }
+      for (size_t nn = 0; nn < f_temp4.size(); nn++){
+        std::fill(result_global.begin(), result_global.end(), 0.0);
+        contractSummedQuda(ferm_m.vec_ref[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
+        //necessary?
+        comm_allreduce_sum(result_global);
+        ppb_t_el.push_back(result_global);
+        }
+        ferm_m.ppb_t.push_back(ppb_t_el);
+      }
+  }
+  
+ 
 
   inv_param->input_location =QUDA_CPU_FIELD_LOCATION;
   inv_param->output_location =QUDA_CPU_FIELD_LOCATION;
