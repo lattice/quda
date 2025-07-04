@@ -6133,7 +6133,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   GaugeField gaugeW1(gParamDummy);
   GaugeField gaugeW2(gParamDummy);
   GaugeField gaugeVT(gParamDummy);
-  GaugeField gauge_out(gParamDummy);
+  GaugeField gout(gParamDummy);
 
   GaugeFieldParam gParam(*gaugePrecise);
   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
@@ -6147,7 +6147,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   // creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
 
   GaugeField gin = *gaugeSmeared;
-  GaugeField &gout = gauge_out;
 
   // helper gauge field for Laplace operator
   GaugeField precise;
