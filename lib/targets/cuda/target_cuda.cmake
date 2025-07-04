@@ -17,8 +17,8 @@ endif()
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90)
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90 sm_100)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90 sm_100)
 set(QUDA_GPU_ARCH_SUFFIX
     ""
     CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
