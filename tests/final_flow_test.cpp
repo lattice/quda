@@ -397,13 +397,13 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   std::vector<int> iter(Nsrc);
 
   // Create a temporary spinor just to seed the rng
-  quda::ColorSpinorField tmp(cs_param);
-  quda::RNG rng(tmp, 1234);
-  tmp = quda::ColorSpinorField();
+  // quda::ColorSpinorField tmp(cs_param);
+  // quda::RNG rng(tmp, 1234);
+  // tmp = quda::ColorSpinorField();
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
-    quda::spinorNoise(in_raw[n], rng, QUDA_NOISE_GAUSS);
+    quda::spinorNoise(in_raw[n], n, QUDA_NOISE_GAUSS);
     in_raw_ptr[n] = in_raw[n].data();
     in_ptr[n] = in[n].data();
     out_ptr[n] = out[n].data();
@@ -422,8 +422,8 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   in = {};
   out = {};
   out_flowed = {};
-  tmp = {};
-  
+  // tmp = {};
+  // delete *rng;
   write_files(ferm_meas);
   
   
