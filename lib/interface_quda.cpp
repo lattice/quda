@@ -199,9 +199,10 @@ static TimeProfile profileWFlow("wFlowQuda");
 //!< Profiler for gFlowQuda
 static TimeProfile profileGFlow("gFlowQuda");
 
-//!< Profiler for gFlowQuda
+//!< Profiler for AdjgFlowSafeQuda
 static TimeProfile profileAdjGFlowSafe("AdjgFlowSafeQuda");
 
+//!< Profiler for AdjgFlowHierQuda
 static TimeProfile profileAdjGFlowHier("AdjgFlowHierQuda");
 
 //!< Profiler for projectSU3Quda
@@ -1470,6 +1471,8 @@ void endQuda(void)
     profileGaugeSmear.Print();
     profileWFlow.Print();
     profileGFlow.Print();
+    profileAdjGFlowSafe.Print();
+    profileAdjGFlowHier.Print();
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
@@ -5608,10 +5611,10 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++; // increment measurements.
       gaugeObservables(gout, obs_param[measurement_n]);
-      logQuda(QUDA_SUMMARIZE, "flow_t = %le \n", smear_param->t0 + smear_param->epsilon * (i + 1));
-      logQuda(QUDA_SUMMARIZE, "plaquette = %.16e \n", obs_param[measurement_n].plaquette[0]);
+      logQuda(QUDA_VERBOSE, "flow_t = %le \n", smear_param->t0 + smear_param->epsilon * (i + 1));
+      logQuda(QUDA_VERBOSE, "plaquette = %.16e \n", obs_param[measurement_n].plaquette[0]);
       for (size_t j = 0; j < nSpinors; j++) {
-        logQuda(QUDA_SUMMARIZE, "spinor[%lu] norm = %.16e \n", j, blas::norm2(fout[j]));
+        logQuda(QUDA_VERBOSE, "spinor[%lu] norm = %.16e \n", j, blas::norm2(fout[j]));
       }
     }
   } /* end of one iteration of GF application */
@@ -6020,7 +6023,7 @@ void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
   std::vector<int> hier_list;
   // The first stage is saved at the very beginning, so its presence is implicit
   hier_list = get_hier_list(smear_param->n_steps, n_b, smear_param->adj_n_save);
-  logQuda(QUDA_SUMMARIZE, "hier list size (number of gauge fields to save) is %d\n", (int)hier_list.size());
+  logQuda(QUDA_SILENT, "hier list size (number of gauge fields to save) is %d\n", (int)hier_list.size());
   if (threshold < hier_list.back()) {
     threshold = hier_list.back();
     logQuda(QUDA_SUMMARIZE, "threshold changed to %d", threshold);
@@ -6055,7 +6058,7 @@ void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
       logQuda(QUDA_DEBUG_VERBOSE,"Hier loop count %d has begun \n",hier_loop_counter);
       logQuda(QUDA_DEBUG_VERBOSE,"Starting a hierarchical loop log: \n");
       
-      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profileAdjGFlowHier, ferm_m);
+      adjSafeEvolve(sf_list, gf_list,inv_param, smear_param, hier_list.back(), profile, ferm_m);
       
       logQuda(QUDA_DEBUG_VERBOSE,"Previous hier list elements: \n");
       for (int j = 0; j < (int) hier_list.size(); j++ ){
@@ -6073,7 +6076,7 @@ void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
               
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profileAdjGFlowHier,ferm_m);
+             adjSafeEvolve(sf_list,gf_list,inv_param,smear_param,hier_list[i],profile,ferm_m);
              logQuda(QUDA_DEBUG_VERBOSE, " block number %d successfully deployed \n", i);
       }
       logQuda(QUDA_VERBOSE, "Hierarchial evolution completed \n");
@@ -6197,8 +6200,8 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
       smear_param->n_steps = m;
       
-      if (m < adj_n_save_init)
-        smear_param->adj_n_save = m;
+      if (m <= adj_n_save_init)
+        smear_param->adj_n_save = m - 1;
       else if (smear_param->n_steps == adj_n_save_init)
         ;
       else

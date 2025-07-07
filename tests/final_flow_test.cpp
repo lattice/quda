@@ -418,6 +418,13 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   printfQuda("At end ppb has %li elements\n",ppb.size());
   printfQuda("At end ppb_t has %li elements\n",ppb_t.size());
 
+  printfQuda("Done: %d sub-partitions - %i total iter / %g secs = %g Gflops, %g secs per source\n", num_sub_partition,
+                 inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs, inv_param.secs / Nsrc_tile);
+      if (inv_param.energy > 0) {
+        printfQuda("Energy = %g J (%g J per source), Mean power = %g W, mean temp = %g C, mean clock = %f\n\n",
+                   inv_param.energy, inv_param.energy / Nsrc_tile, inv_param.power, inv_param.temp, inv_param.clock);
+      }
+
   in_raw = {};
   in = {};
   out = {};
