@@ -483,6 +483,10 @@ namespace quda
      classed.
    */
   struct dslash_default {
+
+    // By default the dslash types do not have __syncthreads() in their operator();
+    constexpr static bool use_syncthreads = false;
+
     constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
     constexpr int twist_pack() const { return 0; }
   };
@@ -510,22 +514,46 @@ namespace quda
     }   // parity
   }
 
+  template <KernelType kernel_type, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
+  {
+#ifdef QUDA_FAST_COMPILE_DSLASH
+    dslash.template operator()<kernel_type>(x_cb, s, parity);
+#else
+    switch (parity) {
+    case 0: dslash.template operator()<kernel_type>(x_cb, s, 0); break;
+    case 1: dslash.template operator()<kernel_type>(x_cb, s, 1); break;
+    }
+#endif
+  }
+
+  template <KernelType kernel_type, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool active)
+  {
+#ifdef QUDA_FAST_COMPILE_DSLASH
+    dslash.template operator()<kernel_type, true>(x_cb, s, parity, active);
+#else
+    switch (parity) {
+    case 0: dslash.template operator()<kernel_type, true>(x_cb, s, 0, active); break;
+    case 1: dslash.template operator()<kernel_type, true>(x_cb, s, 1, active); break;
+    }
+#endif
+  }
+
 #ifdef NVSHMEM_COMMS
   /**
-   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed
+   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed.
+      This function is supposed to be called only by the last thread of the block.
    */
-  template <KernelType kernel_type, typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
+  template <typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
-    if (kernel_type == UBER_KERNEL) {
-      __syncthreads();
-      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
-        int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
-        if (amlast == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z - 1) {
-          arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
-          arg.interior_done.notify_all();
-          arg.interior_count.store(0, cuda::std::memory_order_relaxed);
-        }
-      }
+    int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
+    if (amlast
+        == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z
+          - 1) {
+      arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
+      arg.interior_done.notify_all();
+      arg.interior_count.store(0, cuda::std::memory_order_relaxed);
     }
   }
 
@@ -636,14 +664,7 @@ namespace quda
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
         int parity = nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
-#ifdef QUDA_FAST_COMPILE_DSLASH
-        dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
-#else
-        switch (parity) {
-        case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
-        case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
-        }
-#endif
+        apply_dslash<EXTERIOR_KERNEL_ALL>(dslash, tid, s, parity);
         local_tid += target::block_dim().x * blocks_per_dir;
         tid += target::block_dim().x * blocks_per_dir;
       }
@@ -724,46 +745,50 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) {
-          if constexpr (allthreads)
-            active = false;
-          else
-            return;
-        }
 
-#ifdef QUDA_FAST_COMPILE_DSLASH
-        if constexpr (allthreads) {
-          dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, parity,
-                                                                                                       active);
-        } else {
-          dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
-        }
-#else
-        if constexpr (allthreads) {
-          switch (parity) {
-          case 0:
-            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 0,
-                                                                                                         active);
-            break;
-          case 1:
-            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 1,
-                                                                                                         active);
-            break;
-          }
-        } else {
-          switch (parity) {
-          case 0:
-            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0);
-            break;
-          case 1:
-            dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1);
-            break;
-          }
-        }
-#endif
 #ifdef NVSHMEM_COMMS
-        if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type>(arg);
+        constexpr bool use_nvshmem_comms = true;
+#else
+        constexpr bool use_nvshmem_comms = false;
 #endif
+        if constexpr (use_nvshmem_comms && Arg::D::use_syncthreads) {
+#ifdef NVSHMEM_COMMS
+          // Initialize a shared memory counter for the threads in the block
+          __shared__ cuda::atomic<int, cuda::thread_scope_block> block_counter;
+          if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
+            block_counter.store(0, cuda::std::memory_order_relaxed);
+          }
+          __syncthreads();
+
+          if (x_cb < arg.threads) {
+            apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
+          }
+          // Use the shared memory counter to see if is the last thread in the block.
+          // If yes, signal that interior is done for this block.
+          int am_last_thread = block_counter.fetch_add(1, cuda::std::memory_order_acq_rel);
+          if constexpr (kernel_type == UBER_KERNEL) {
+            if (am_last_thread == (target::block_dim().x * target::block_dim().y * target::block_dim().z - 1))
+              shmem_signalinterior(arg);
+          }
+#endif
+        } else {
+          if (x_cb >= arg.threads) {
+            if constexpr (allthreads)
+              active = false;
+            else
+              return;
+          }
+          if constexpr (allthreads) {
+            apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity, active);
+          } else {
+            apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
+          }
+          if constexpr (use_nvshmem_comms && kernel_type == UBER_KERNEL) {
+            __syncthreads();
+            if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0)
+              shmem_signalinterior(arg);
+          }
+        }
       }
     }
   };

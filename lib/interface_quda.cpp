@@ -1916,7 +1916,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param)
 {
   auto profile = pushProfile(profileCovDev, param);
-  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = *gaugePrecise;
 
   QudaInvertParam &inv_param = *param;
 
@@ -1945,12 +1945,7 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
   tmp = in;
 
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
   DiracParam diracParam;
@@ -1973,19 +1968,14 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
 
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
 void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam *param)
 {
   auto profile = pushProfile(profileCovDev, param);
-  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = *gaugePrecise;
 
   QudaInvertParam &inv_param = *param;
 
@@ -2014,11 +2004,7 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
   profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
+  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
   DiracParam diracParam;
@@ -2283,12 +2269,7 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
+  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }
 
