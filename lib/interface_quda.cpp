@@ -5779,10 +5779,11 @@ typedef struct FermMeasObj {
     std::vector<std::vector<std::vector<Complex>>> ppb_t;
     int meas_interval;
     QudaBoolean take_meas;
+    QudaBoolean take_fwd_gflow;
     
     // Constructor
-    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas) 
-        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas) {}
+    FermMeasObj(std::vector<ColorSpinorField> _vec_ref, int _i_glob, std::vector<int> _meas_list, std::vector<std::vector<Complex>>  _ppb, int _meas_interval,  QudaBoolean _take_meas, QudaBoolean _take_fwd_gflow) 
+        : vec_ref(_vec_ref), i_glob(_i_glob), meas_list(_meas_list), ppb(_ppb), meas_interval(_meas_interval), take_meas(_take_meas), take_fwd_gflow(_take_fwd_gflow) {}
 
 } FermMeasObj;
     
@@ -6185,7 +6186,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   std::vector<int> meas_list = {};
   std::vector<std::vector<Complex>> ppb;
   std::vector<std::vector<std::vector<Complex>>> ppb_t;
-  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas);
+  FermMeasObj ferm_m(fin, 0, meas_list, ppb, ferm_meas->meas_int, ferm_meas->take_meas, ferm_meas->take_fwd_gflow);
 
   std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list;
   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
@@ -6233,13 +6234,15 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
       smear_param->n_steps = m;
       cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
-      t_gf_list = {gaugeTemp,precise};
-      gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier);
-      printfQuda("checiung again\n");
-      f_temp4[0].PrintVector(0,0,0);
-      cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m.vec_ref,f_temp4);
-      ferm_m.ppb.push_back(PsiPsibarR);
-      printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[2] - PsiPsibarTest[2]),imag(PsiPsibarR[2] - PsiPsibarTest[2]));
+      if (ferm_m.take_fwd_gflow){
+        t_gf_list = {gaugeTemp,precise};
+        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier);
+        printfQuda("checking again\n");
+        f_temp4[0].PrintVector(0,0,0);
+        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m.vec_ref,f_temp4);
+        ferm_m.ppb.push_back(PsiPsibarR);
+        printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[2] - PsiPsibarTest[2]),imag(PsiPsibarR[2] - PsiPsibarTest[2]));
+      }
 
       std::vector<std::vector<Complex>> ppb_t_el = {};
     

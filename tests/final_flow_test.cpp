@@ -31,23 +31,7 @@ bool use_multi_src = false;
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
 
-// double gauge_smear_rho = 0.1;
-// double gauge_smear_epsilon = 0.1;
-// double gauge_smear_alpha = 0.6;
-// double gauge_smear_alpha1 = 0.75;
-// double gauge_smear_alpha2 = 0.6;
-// double gauge_smear_alpha3 = 0.3;
-// int gauge_smear_steps = 50;
-// int gauge_n_save = 3;
-// int hier_threshold = 6;
-// QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-// int gauge_smear_dir_ignore = -1;
-// int measurement_interval = 5;
-// bool su_project = true;
-// bool has_naik = false;
-// // int n_naiks = 1;
-// // double eps_naik = 0.0;
-// unsigned int meas_int = 5;
+bool take_fwd_gflow = false;
 
 GaugeField cpuFatQDP = {};
 GaugeField cpuLongQDP = {};
@@ -97,11 +81,15 @@ void display_test_info()
 void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
     //   // Option group for SU(3) related options
-  auto opgroup = quda_app->add_option_group("HISQ", "Options controlling HISQ parameters");
+  auto opgroup = quda_app->add_option_group("HISQ", "Options controlling adjoint + HISQ measurement parameters");
   opgroup
     ->add_option(
       "--n-naiks",
       n_naiks, "number of naiks term");
+  opgroup
+    ->add_option(
+      "--take-fwd-gflow",
+      take_fwd_gflow, "take forward gflow for testing purposes");
 }
 
 void check_naik(double &eps_naik, int &n_naiks)
@@ -136,9 +124,9 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   auto* ppb_t_data = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas.ppb_t);
   
   for (const auto& flow_t: *ppb_t_data) {
-      out_ppb_t << " begin new flow time\n\n";
+      out_ppb_t << "begin new flow time\n\n";
       for (const auto& s_src : flow_t) {
-        out_ppb_t << " next source\n";
+        out_ppb_t << "next source\n";
         for (const auto& elem : s_src) {
           out_ppb_t << elem.real() << " ";
         }
@@ -374,6 +362,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     
     QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
     ferm_meas.take_meas = QUDA_BOOLEAN_TRUE;
+    ferm_meas.take_fwd_gflow = (QudaBoolean) take_fwd_gflow;
     ferm_meas.meas_int = measurement_interval;
     std::vector<std::vector<std::complex<double>>> ppb;
     std::vector<std::vector<std::vector<std::complex<double>>>> ppb_t;

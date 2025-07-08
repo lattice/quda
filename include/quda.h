@@ -866,6 +866,7 @@ extern "C" {
     unsigned int meas_int;
     void *meas_list;
     QudaBoolean take_meas;
+    QudaBoolean take_fwd_gflow;
   } QudaFermMeasurements;
 
   typedef struct QudaGaugeSmearParam_s {
