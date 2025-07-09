@@ -1698,9 +1698,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
     
   }
 
-  ColorSpinorParam csParam;
-  setColorSpinorParams(localDim, host_precision, &csParam);
-
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
