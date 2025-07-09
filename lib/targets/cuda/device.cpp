@@ -117,11 +117,13 @@ namespace quda
 
       device_id = dev;
 
-      NVML_CHECK(nvmlDeviceGetHandleByIndex(device_id, &monitor_device_id));
+      char pciBusId[13];
+      CHECK_CUDA_ERROR(cudaDeviceGetPCIBusId(pciBusId, 13, device_id));
+      NVML_CHECK(nvmlDeviceGetHandleByPciBusId(pciBusId, &monitor_device_id));
       char name[NVML_DEVICE_NAME_BUFFER_SIZE];
       NVML_CHECK(nvmlDeviceGetName(monitor_device_id, name, NVML_DEVICE_NAME_BUFFER_SIZE));
 
-      printfQuda("Initializing monitoring on device %d: %s\n", device_id, name);
+      printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
       monitor::init();
     }
 
@@ -217,13 +219,16 @@ namespace quda
         printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
                    deviceProp.totalConstMem / (float)1024);
         printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
-        printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
         printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
+#if CUDA_VERSION <= 12090
         printfQuda("%d - kernelExecTimeoutEnabled %s\n", device,
                    (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
+#endif
         printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
         printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
-        switch (deviceProp.computeMode) {
+        int deviceComputeMode;
+        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&deviceComputeMode, cudaDevAttrComputeMode, device));
+        switch (deviceComputeMode) {
         case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
         case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
         case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
@@ -245,7 +250,9 @@ namespace quda
         default: errorQuda("Unknown deviceProp.asyncEngineCount.");
         }
         printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
+#if CUDA_VERSION <= 12090
         printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
+#endif
         printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
         printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
         printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);

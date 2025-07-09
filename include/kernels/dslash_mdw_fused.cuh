@@ -277,7 +277,7 @@ namespace quda {
 
     template <typename Arg> struct FusedMobiusDslashParams {
       struct SmemSize {
-        static constexpr unsigned int size(dim3 block)
+        template <typename... Args> static constexpr unsigned int size(const dim3 block, const Args &...)
         {
           const int a_size = (block.y * 4) * (block.y * 4 + sm_m_pad_size(block.y * 4));
           const int b_size = (block.y * 4) * (block.x * 6 + sm_n_pad_size(block.x * 6));
