@@ -1065,6 +1065,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
   param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.
+  param->pc_type = QUDA_4D_PC;
   param->create = QUDA_ZERO_FIELD_CREATE;
 }
 
@@ -1238,7 +1239,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   // Load deflation space
   if ( load_type==QUDA_MILC_EIG_COMPUTE ) {
     // Main deflation space is obtained by calling the deflatable inverter with dummy source
-    // Incoming inv_args should have inv_args.max_iter=1
+    // Incoming inv_args can have inv_args.max_iter=1
     logQuda(QUDA_VERBOSE, "Computing deflation space (or loading from file) for parity %d and mass %e\n", parity, mass);
   
     double final_residual, final_fermilab_residual;
@@ -1247,8 +1248,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     ColorSpinorParam csParam;
     setColorSpinorParams(localDim, host_precision, &csParam);
     csParam.location = QUDA_CPU_FIELD_LOCATION;
-    csParam.pc_type = QUDA_4D_PC;
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // invertQuda expects full-parity vectors
+    csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // qudaInvertDeflatable expects full-parity vectors
     csParam.x[0] *= 2;
     ColorSpinorField source(csParam);
     ColorSpinorField solution(csParam);
@@ -1257,9 +1257,6 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     qudaInvertDeflatable(external_precision, quda_precision, mass, inv_args, eigargs, 1.0, 0.0, fatlink,
                      longlink, static_cast<void*>(source.data()), static_cast<void*>(solution.data()),
                      &final_residual, &final_fermilab_residual, &num_iters);
-
-    // Leon FIXME: Make sure preserved_{even/odd}_deflation_space pointer is updated within qudaInvertDeflatable
-    // LEON FIXME: Maybe manually set eigargs.preserve* to true before the call to the inverter?
 
   } else if (load_type==QUDA_MILC_EIG_FROM_OTHER_PARITY) {
     logQuda(QUDA_VERBOSE, "Computing deflation space for parity %d from parity %d\n", parity, other_parity);
@@ -1344,8 +1341,6 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     invertParam.cuda_prec_eigensolver = eigargs.prec_eigensolver;
     ColorSpinorParam csParam;
     setColorSpinorParams(localDim, host_precision, &csParam);
-    //csParam.location = QUDA_CPU_FIELD_LOCATION;
-    csParam.pc_type = QUDA_4D_PC;
     ColorSpinorParam gpuParam(csParam, invertParam, QUDA_CUDA_FIELD_LOCATION);
   
     // Setup deflation space
@@ -1357,7 +1352,6 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     // Create Dirac operator
     DiracParam diracEigParam;
     setDiracEigParam(diracEigParam, &invertParam, true, false);
-    //if(parity==QUDA_ODD_PARITY) diracEigParam.matpcType = QUDA_MATPC_ODD_ODD;
     Dirac *dEig = Dirac::create(diracEigParam);
     
     // Temp vector on GPU
@@ -1688,7 +1682,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
         if ( !qep.preserve_deflation_space ) errorQuda("Failed to load deflation space!");
       }
     }
-    
     // Check that preserved eigenvalues are for this mass
     double epsilon = device_precision==QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
     if (local_parity==QUDA_EVEN_PARITY) {
@@ -1702,7 +1695,6 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
         qep.preserve_evals=QUDA_BOOLEAN_FALSE;
       }
     }
-    
   }
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
