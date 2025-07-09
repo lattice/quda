@@ -1221,6 +1221,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   }
   QudaParity parity = inv_args.evenodd;
   QudaParity other_parity = parity==QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+  double epsilon = device_precision==QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
   int n_evecs = eigargs.n_conv;
   
   // Load gauge fields if not done yet
@@ -1262,6 +1263,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
   } else if (load_type==QUDA_MILC_EIG_FROM_OTHER_PARITY) {
     logQuda(QUDA_VERBOSE, "Computing deflation space for parity %d from parity %d\n", parity, other_parity);
+    double other_parity_mass = parity==QUDA_EVEN_PARITY ? preserved_odd_evals_mass : preserved_even_evals_mass;
       
     // Get other parity deflation space
     deflation_space *other_parity_space;
@@ -1306,11 +1308,18 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       auto norm2 = blas::norm2(temp);
       blas::ax(1.0/sqrt(norm2), temp);
       space->evecs[i] = temp;
-      auto eval = other_parity_space->evals[i]; // re-use eigenvalues
+      
+      // Compute eigenvalues, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+      dEig->M(temp, space->evecs[i]);
+      auto eval = other_parity_space->evals[i]; // re-use eigenvalues by default
+      if (fabs(mass - other_parity_mass) > epsilon) { // recompute eigenvalues if mass doesn't match
+        auto vtAv = blas::cDotProduct(space->evecs[i], temp);
+        auto v2 = blas::norm2(space->evecs[i]);
+        eval = vtAv / sqrt(v2);
+      }
       space->evals[i] = eval;
       
       // res^2 = |\lambda*v - A*v|
-      dEig->M(temp, space->evecs[i]);
       auto res = blas::caxpbyNorm(eval, space->evecs[i], n_unit, temp);
       logQuda(QUDA_VERBOSE, "Eval[%04d] = (%+.16e,%+.16e), Residual = %+.16e\n", i, eval.real(), eval.imag(), sqrt(res[0]));
     }
@@ -1368,8 +1377,6 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
       ColorSpinorParam cpuParam(evecs[i] + evec_offset, invertParam, dims, true, QUDA_CPU_FIELD_LOCATION);
       ColorSpinorField in_evec(cpuParam);
       space->evecs[i] = in_evec;
-      
-      if ( i==0 ) for(int j=0; j<10; j++) space->evecs[i].PrintVector(QUDA_EVEN_PARITY, j);
       
       // Compute eigenvalue, lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       dEig->M(temp, space->evecs[i]);
