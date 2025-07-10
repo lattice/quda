@@ -390,6 +390,19 @@ extern "C" {
 		    int* num_iters);
 
   /**
+   * Get pointers to QUDA's deflation space objects.
+   *
+   * @param[out] evecs Pointer to eigenvectors
+   * @param[out] evals Pointer to eigenvalues
+   * @param[in] parity Parity of the deflation space to return
+   * @param[in] nvecs The number of eigenvectors
+   */
+void qudaGetDeflationSpace(void **evecs,
+                            double *evals,
+                            QudaParity parity,
+                            int nvecs);
+                           
+  /**
    * Load the deflation space (eigenvalues and eigenvectors) for a particular parity
    * which is set in invargs.
    *

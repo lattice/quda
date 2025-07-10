@@ -1205,6 +1205,41 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   qudamilc_called<false>(__func__, verbosity);
 } // qudaMultiShiftInvert
 
+// Get pointers to QUDA's deflation space objects
+// Useful for passing eigenvectors and eigenvalues back to MILC
+void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int Nvecs)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+  
+  // Device-side deflation space
+  void *preserved_deflation_space = nullptr;
+  preserved_deflation_space = parity==QUDA_EVEN_PARITY ? preserved_even_deflation_space : preserved_odd_deflation_space;
+  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+  if(!space) errorQuda("Failed to get deflation space!");
+  
+  // Set up host fields
+  ColorSpinorParam csParam(space->evecs[0]);
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
+  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  std::vector<ColorSpinorField> host_evecs(Nvecs);
+  if( evecs ) {
+    for( int i=0; i<Nvecs; i++) {
+      csParam.v = evecs[i];
+      host_evecs[i] = ColorSpinorField(csParam);
+    }
+  }
+  
+  // Copy to host
+  memcpy(evals, space->evals.data(), sizeof(Complex)*Nvecs);
+  for( int i=0; i<Nvecs; i++ ) host_evecs[i] = space->evecs[i];
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaGetDeflationSpace
+
+// Load single parity deflation space with eigenvectors generated from eigensolve, loaded from file,
+// passed from MILC, or generated from other parity eigenvectors
 void qudaLoadDeflationSpace(int external_precision, int quda_precision, const void *const fatlink,
                           const void *const longlink, double mass, QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs,
                           void **evecs, QudaMilcEigLoad load_type)
@@ -1400,7 +1435,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   }
 
   qudamilc_called<false>(__func__, verbosity);
-} // qudaGetDeflationSpace
+} // qudaLoadDeflationSpace
 
 // Wrapper function for qudaInvertDeflatable to maintain backward compatibility with old(er) MILC
 void qudaInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
