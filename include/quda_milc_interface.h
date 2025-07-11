@@ -186,13 +186,13 @@ extern "C" {
     int t0; /** Set if the input spinor is on a time slice **/
     int laplaceDim; /** Dimension of Laplacian **/
   } QudaTwoLinkQuarkSmearArgs_t;
-  
+
   /**
     Options when loading deflation space
   **/
   typedef enum QudaMilcEigLoad_s {
-    QUDA_MILC_EIG_LOAD, /** Load this parity evecs from MILC **/
-    QUDA_MILC_EIG_COMPUTE, /** Compute this parity evecs (or load from file via QUDA) **/
+    QUDA_MILC_EIG_LOAD,              /** Load this parity evecs from MILC **/
+    QUDA_MILC_EIG_COMPUTE,           /** Compute this parity evecs (or load from file via QUDA) **/
     QUDA_MILC_EIG_FROM_OTHER_PARITY, /** Compute this parity evecs from the other parity **/
     QUDA_MILC_INVALID_EIG = QUDA_INVALID_ENUM
   } QudaMilcEigLoad;
@@ -400,14 +400,9 @@ extern "C" {
    * @param[in] n_evec Number of low modes to project off of the source vectors
    * @param[in] parity Parity to use
    */
-void qudaProject(int external_precision,
-                 int quda_precision,
-                 void **source,
-                 void **solution,
-                 int nvec,
-                 int n_evec,
-                 QudaParity parity);
-                           
+  void qudaProject(int external_precision, int quda_precision, void **source, void **solution, int nvec, int n_evec,
+                   QudaParity parity);
+
   /**
    * Get pointers to QUDA's deflation space objects.
    *
@@ -416,11 +411,8 @@ void qudaProject(int external_precision,
    * @param[in] parity Parity of the deflation space to return
    * @param[in] nvecs The number of eigenvectors
    */
-void qudaGetDeflationSpace(void **evecs,
-                            double *evals,
-                            QudaParity parity,
-                            int nvecs);
-                           
+  void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int nvecs);
+
   /**
    * Load the deflation space (eigenvalues and eigenvectors) for a particular parity
    * which is set in invargs.
@@ -435,15 +427,9 @@ void qudaGetDeflationSpace(void **evecs,
    * @param[in] evecs Evecs coming from MILC
    * @param[in] loadtype Whether to load from MILC, from file, compute, or check
    */
-void qudaLoadDeflationSpace(int external_precision,
-                           int quda_precision,
-                           const void *const milc_fatlink,
-                           const void *const milc_longlink,
-                           double mass,
-                           QudaInvertArgs_t invargs,
-                           QudaEigensolverArgs_t eigargs,
-                           void **evecs,
-                           QudaMilcEigLoad loadtype);
+  void qudaLoadDeflationSpace(int external_precision, int quda_precision, const void *const milc_fatlink,
+                              const void *const milc_longlink, double mass, QudaInvertArgs_t invargs,
+                              QudaEigensolverArgs_t eigargs, void **evecs, QudaMilcEigLoad loadtype);
 
   /**
    * Solve Ax=b for an improved staggered operator. All fields are fields
