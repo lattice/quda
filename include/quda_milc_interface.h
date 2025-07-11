@@ -390,6 +390,25 @@ extern "C" {
 		    int* num_iters);
 
   /**
+   * Project the low modes off of a source of given parity.
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] source Source vector(s)
+   * @param[out] source Solution vector(s)
+   * @param[in] nvec Number of source/solution vectors
+   * @param[in] n_evec Number of low modes to project off of the source vectors
+   * @param[in] parity Parity to use
+   */
+void qudaProject(int external_precision,
+                 int quda_precision,
+                 void **source,
+                 void **solution,
+                 int nvec,
+                 int n_evec,
+                 QudaParity parity);
+                           
+  /**
    * Get pointers to QUDA's deflation space objects.
    *
    * @param[out] evecs Pointer to eigenvectors

@@ -1205,6 +1205,69 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   qudamilc_called<false>(__func__, verbosity);
 } // qudaMultiShiftInvert
 
+// Project the low modes off of source vector(s)
+void qudaProject(int external_precision, int quda_precision, void **source, void **solution,
+                 int nvec, int n_evec, QudaParity parity)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+  logQuda(QUDA_VERBOSE, "Projecting %d vectors\n", n_evec);
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  
+  // MILC sends pointers to full parity vectors, but QUDA uses single parity vectors
+  // so for odd parity, need to use offset
+  int vec_offset = getColorVectorOffset(parity, false, localDim) * host_precision;
+  
+  // Device-side deflation space
+  void *preserved_deflation_space = nullptr;
+  preserved_deflation_space = parity==QUDA_EVEN_PARITY ? preserved_even_deflation_space : preserved_odd_deflation_space;
+  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+  if(!space) errorQuda("Failed to get deflation space!");
+  
+  // Wrap host vectors
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
+  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  std::vector<ColorSpinorField> src_h(nvec);
+  std::vector<ColorSpinorField> sol_h(nvec);
+  for( int i=0; i<nvec; i++) {
+    csParam.v = source[i] + vec_offset;
+    src_h[i] = ColorSpinorField(csParam);
+    csParam.v = solution[i] + vec_offset;
+    sol_h[i] = ColorSpinorField(csParam);
+  }
+  
+  // Setup device side vectors
+  ColorSpinorParam gpuParam(space->evecs[0]);
+  gpuParam.create = QUDA_ZERO_FIELD_CREATE;
+  std::vector<ColorSpinorField> src(nvec);
+  std::vector<ColorSpinorField> sol(nvec);
+  std::vector<ColorSpinorField> tmp(nvec);
+  for( int i=0; i<nvec; i++) {
+    sol[i] = ColorSpinorField(gpuParam);
+    sol[i] = sol_h[i];
+    tmp[i] = ColorSpinorField(gpuParam);
+    src[i] = ColorSpinorField(gpuParam);
+    src[i] = src_h[i]; // Copy host sources to device sources
+  }
+  
+  // 1. Take block inner product: (V_i)^dag * src = s_i
+  std::vector<Complex> s(n_evec * src.size());
+  blas::block::cDotProduct(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {src.begin(), src.end()});
+
+  // 2. Build projected component: Sum_i V_i * s_i = tmp
+  blas::block::caxpy(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {tmp.begin(), tmp.end()});
+  
+  // 3. Subtract projection: sol = src - tmp
+  for(int i=0; i<nvec; i++) blas::axpbyz(-1.0, tmp[i], 1.0, src[i], sol[i]);
+  
+  // Copy solution back to host
+  for( int i=0; i<nvec; i++) sol_h[i] = sol[i];
+  
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaProject
+
 // Get pointers to QUDA's deflation space objects
 // Useful for passing eigenvectors and eigenvalues back to MILC
 void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int Nvecs)
