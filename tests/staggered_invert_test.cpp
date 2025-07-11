@@ -31,6 +31,14 @@ bool use_multi_src = false;
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
 
+QudaPrecision last_prec = QUDA_INVALID_PRECISION;
+
+GaugeField cpuInQDP = {};
+GaugeField cpuFatQDP = {};
+GaugeField cpuLongQDP = {};
+GaugeField cpuFatMILC = {};
+GaugeField cpuLongMILC = {};
+
 // if --enable-testing true is passed, we run the tests defined in here
 #include <staggered_invert_test_gtest.hpp>
 
@@ -131,11 +139,6 @@ void display_legacy_info()
     "--test 6 -> --solve-type direct-pc --solution-type mat-pc --inv-type cg --matpc odd-odd   --multishift 8\n");
 }
 
-GaugeField cpuFatQDP = {};
-GaugeField cpuLongQDP = {};
-GaugeField cpuFatMILC = {};
-GaugeField cpuLongMILC = {};
-
 void init()
 {
   // Set QUDA internal parameters
@@ -202,7 +205,7 @@ void init()
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuParam.create = QUDA_NULL_FIELD_CREATE;
-  GaugeField cpuIn = GaugeField(cpuParam);
+  cpuInQDP = GaugeField(cpuParam);
   cpuFatQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
   cpuFatMILC = GaugeField(cpuParam);
@@ -214,7 +217,7 @@ void init()
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
   cpuLongMILC = GaugeField(cpuParam);
 
-  void *qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
+  void *qdp_inlink[4] = {cpuInQDP.data(0), cpuInQDP.data(1), cpuInQDP.data(2), cpuInQDP.data(3)};
   void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
   void *qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, true);
@@ -254,20 +257,22 @@ void init()
 
 std::vector<std::array<double, 2>> solve(test_t param)
 {
-  inv_param.inv_type = ::testing::get<0>(param);
-  inv_param.solution_type = ::testing::get<1>(param);
-  inv_param.solve_type = ::testing::get<2>(param);
-  inv_param.cuda_prec_sloppy = ::testing::get<3>(param);
-  multishift = ::testing::get<4>(param);
-  inv_param.solution_accumulator_pipeline = ::testing::get<5>(param);
+  inv_param.cuda_prec = ::testing::get<0>(param);
+  inv_param.cuda_prec_sloppy = ::testing::get<1>(param);
+  inv_param.cuda_prec_refinement_sloppy = ::testing::get<1>(param);
+  inv_param.inv_type = ::testing::get<2>(param);
+  inv_param.solution_type = ::testing::get<3>(param);
+  inv_param.solve_type = ::testing::get<4>(param);
+  multishift = ::testing::get<5>(param);
+  inv_param.solution_accumulator_pipeline = ::testing::get<6>(param);
 
   // schwarz parameters
-  auto schwarz_param = ::testing::get<6>(param);
+  auto schwarz_param = ::testing::get<7>(param);
   inv_param.schwarz_type = ::testing::get<0>(schwarz_param);
   inv_param.inv_type_precondition = ::testing::get<1>(schwarz_param);
   inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
 
-  inv_param.residual_type = ::testing::get<7>(param);
+  inv_param.residual_type = ::testing::get<8>(param);
 
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
@@ -463,6 +468,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
 void cleanup()
 {
+  cpuInQDP = {};
   cpuFatQDP = {};
   cpuLongQDP = {};
   cpuFatMILC = {};
@@ -569,7 +575,7 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
   } else {
     for (int rep = 0; rep < nrepeat; rep++)
-      solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
+      solve(test_t {prec, prec_sloppy, inv_type, solution_type, solve_type, multishift, solution_accumulator_pipeline,
                     schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
                     inv_param.residual_type});
   }
