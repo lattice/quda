@@ -1211,18 +1211,20 @@ void qudaProject(int external_precision, int quda_precision, void **source, void
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
-  logQuda(QUDA_VERBOSE, "Projecting %d vectors\n", n_evec);
+  logQuda(QUDA_VERBOSE, "Projecting %d low modes out of %d source vectors for parity %s\n", n_evec, nvec, parity==QUDA_EVEN_PARITY ? "EVEN" : "ODD");
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  
+ 
+  // Check inputs
+  for(int i=0; i<nvec; i++) if(!source[i] || !solution[i]) errorQuda("Source or solution vector %d is null!", i);
+
   // MILC sends pointers to full parity vectors, but QUDA uses single parity vectors
   // so for odd parity, need to use offset
   int vec_offset = getColorVectorOffset(parity, false, localDim) * host_precision;
   
   // Device-side deflation space
-  void *preserved_deflation_space = nullptr;
-  preserved_deflation_space = parity==QUDA_EVEN_PARITY ? preserved_even_deflation_space : preserved_odd_deflation_space;
+  void *preserved_deflation_space = (parity==QUDA_EVEN_PARITY) ? preserved_even_deflation_space : preserved_odd_deflation_space;
   deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
-  if(!space) errorQuda("Failed to get deflation space!");
+  if(!space) errorQuda("Failed to get %s parity deflation space!", parity==QUDA_EVEN_PARITY ? "EVEN" : "ODD");
   
   // Wrap host vectors
   ColorSpinorParam csParam;
@@ -1276,27 +1278,29 @@ void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int N
   qudamilc_called<true>(__func__, verbosity);
   
   // Device-side deflation space
-  void *preserved_deflation_space = nullptr;
-  preserved_deflation_space = parity==QUDA_EVEN_PARITY ? preserved_even_deflation_space : preserved_odd_deflation_space;
+  void *preserved_deflation_space = (parity==QUDA_EVEN_PARITY) ? preserved_even_deflation_space : preserved_odd_deflation_space;
   deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
-  if(!space) errorQuda("Failed to get deflation space!");
-  
-  // Set up host fields
-  ColorSpinorParam csParam(space->evecs[0]);
-  csParam.location = QUDA_CPU_FIELD_LOCATION;
-  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  std::vector<ColorSpinorField> host_evecs(Nvecs);
+  if(!space) errorQuda("Failed to get %s parity deflation space!", parity==QUDA_EVEN_PARITY ? "EVEN" : "ODD");
+  if(Nvecs > space->evecs.size())
+	  errorQuda("Requested %d eigenvectors, but deflation space has only %lu", Nvecs, space->evecs.size());
+
+  // Copy eigenvectors if requested
   if( evecs ) {
+    // Set up host fields
+    ColorSpinorParam csParam(space->evecs[0]);
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
+    csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    std::vector<ColorSpinorField> host_evecs(Nvecs);
     for( int i=0; i<Nvecs; i++) {
       csParam.v = evecs[i];
       host_evecs[i] = ColorSpinorField(csParam);
+      host_evecs[i] = space->evecs[i]; // Copy to host
     }
   }
-  
-  // Copy to host
-  memcpy(evals, space->evals.data(), sizeof(Complex)*Nvecs);
-  for( int i=0; i<Nvecs; i++ ) host_evecs[i] = space->evecs[i];
+
+  // Copy eigenvalues if requested
+  if( evals ) for(int i=0; i<Nvecs; i++) evals[i] = space->evals[i].real();
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaGetDeflationSpace
@@ -1432,6 +1436,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   } else if ( load_type==QUDA_MILC_EIG_LOAD ) {
     
     logQuda(QUDA_VERBOSE, "Loading deflation space of size %d for parity %d and mass %e\n", n_evecs, parity, mass);
+
+    if( !evecs ) errorQuda("qudaLoadDeflationSpace called with load_type QUDA_MILC_EIG_LOAD but evecs is null!");
     
     QudaInvertParam invertParam = newQudaInvertParam();
     setInvertParams(host_precision, device_precision, device_precision_sloppy, mass, 1.0,
