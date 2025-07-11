@@ -1618,44 +1618,27 @@ add_test(NAME gauge_path
   --dim 2 4 6 8 --enable-testing true --niter 1
   --gtest_output=xml:gauge_path_test.xml)
 
-foreach(prec IN LISTS TEST_PRECS)
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME unitarize_link
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
+           --dim 2 4 6 8 --enable-testing true
+           --gtest_output=xml:unitarize_link_test.xml)
 
-  if(QUDA_DIRAC_STAGGERED)
-    add_test(NAME unitarize_link_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:unitarize_link_test_${prec}.xml)
+  add_test(NAME hisq_unitarize_force
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --enable-testing true
+                   --gtest_output=xml:hisq_unitarize_force_test.xml)
 
-    add_test(NAME hisq_paths_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:hisq_paths_force_test_${prec}.xml)
+  add_test(NAME hisq_paths_force
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --enable-testing true
+                   --gtest_output=xml:hisq_paths_force_test}.xml)
 
-    add_test(NAME hisq_unitarize_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
-
-    set(KERNEL_TYPE TwoLink GaussianSmear)
-    foreach(kerneltp IN LISTS KERNEL_TYPE)
-      if(${kerneltp} STREQUAL "TwoLink")
-	set(laplace3D 4)
-	set(smear_t0 -1)
-      elseif(${kerneltp} STREQUAL "GaussianSmear")
-	set(laplace3D 3)
-	set(smear_t0 1)
-      endif()	    
-      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
-        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
-        --dim 6 8 10 12 --prec ${prec}
-        --test ${kerneltp}
-	--laplace3D ${laplace3D}
-	--smear-t0 ${smear_t0}
-        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
-    endforeach(kerneltp)
-  endif()
-
-endforeach(prec)
+  add_test(NAME staggered_gsmear
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+           --dim 6 8 10 12 --enable-testing true
+           --gtest_output=xml:staggered_gsmear_test.xml)
+endif()
 
 add_test(NAME gauge_alg
   COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}

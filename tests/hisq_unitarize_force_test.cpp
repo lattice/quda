@@ -1,35 +1,35 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sys/time.h>
 
 #include <quda.h>
+#include <instantiate.h>
+#include <gauge_field.h>
+
 #include "host_utils.h"
-#include <command_line_params.h>
-#include "gauge_field.h"
+#include "command_line_params.h"
 #include "misc.h"
 #include "test.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
-#include <sys/time.h>
-#include <gtest/gtest.h>
 
-quda::GaugeField *cudaFatLink = NULL;
-quda::GaugeField *cpuFatLink = NULL;
+using test_t = ::testing::tuple<QudaPrecision>;
 
-quda::GaugeField *cudaOprod = NULL;
-quda::GaugeField *cpuOprod = NULL;
-
-quda::GaugeField *cudaResult = NULL;
-quda::GaugeField *cpuResult = NULL;
-
-quda::GaugeField *cpuReference = NULL;
-
-static QudaGaugeParam gaugeParam;
-
-// allocate memory
-// set the layout, etc.
-static void hisq_force_init()
+class HisqUnitarizeTest : public ::testing::TestWithParam<test_t>
 {
+protected:
+  QudaPrecision precision;
+
+public:
+  HisqUnitarizeTest() : precision(::testing::get<0>(GetParam())) { }
+};
+
+void hisq_unitarize(QudaPrecision prec)
+{
+  setVerbosity(verbosity);
+  QudaGaugeParam gaugeParam;
+
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
   gaugeParam.X[2] = zdim;
@@ -48,45 +48,27 @@ static void hisq_force_init()
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.anisotropy = 1;
 
-  cpuFatLink = new quda::GaugeField(gParam);
-  cpuOprod = new quda::GaugeField(gParam);
-  cpuResult = new quda::GaugeField(gParam);
-  cpuReference = new quda::GaugeField(gParam);
+  quda::GaugeField cpuFatLink = quda::GaugeField(gParam);
+
+  auto cpuOprod = quda::GaugeField(gParam);
+  auto cpuResult = quda::GaugeField(gParam);
+  auto cpuReference = quda::GaugeField(gParam);
 
   // create "gauge fields"
-  createSiteLinkCPU(*cpuFatLink, gaugeParam.cpu_prec, SiteLinkType::SITELINK_NOISY);
-  createSiteLinkCPU(*cpuOprod, gaugeParam.cpu_prec, SiteLinkType::SITELINK_NOISY);
+  createSiteLinkCPU(cpuFatLink, gaugeParam.cpu_prec, SiteLinkType::SITELINK_NOISY);
+  createSiteLinkCPU(cpuOprod, gaugeParam.cpu_prec, SiteLinkType::SITELINK_NOISY);
 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
 
-  cudaFatLink = new quda::GaugeField(gParam);
-  cudaOprod = new quda::GaugeField(gParam);
-  cudaResult = new quda::GaugeField(gParam);
+  auto cudaFatLink = quda::GaugeField(gParam);
+  auto cudaOprod = quda::GaugeField(gParam);
+  auto cudaResult = quda::GaugeField(gParam);
 
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
-  cudaFatLink->copy(*cpuFatLink);
-  cudaOprod->copy(*cpuOprod);
-}
-
-static void hisq_force_end()
-{
-  delete cpuFatLink;
-  delete cpuOprod;
-  delete cpuResult;
-
-  delete cudaFatLink;
-  delete cudaOprod;
-  delete cudaResult;
-
-  delete cpuReference;
-}
-
-TEST(hisq_force_unitarize, verify)
-{
-  setVerbosity(verbosity);
-  hisq_force_init();
+  cudaFatLink.copy(cpuFatLink);
+  cudaOprod.copy(cpuOprod);
 
   double unitarize_eps = 1e-5;
   const double hisq_force_filter = 5e-5;
@@ -103,64 +85,65 @@ TEST(hisq_force_unitarize, verify)
   qudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForce\n");
-  quda::fermion_force::unitarizeForce(*cudaResult, *cudaOprod, *cudaFatLink, num_failures_dev);
+  quda::fermion_force::unitarizeForce(cudaResult, cudaOprod, cudaFatLink, num_failures_dev);
 
   device_free(num_failures_dev);
 
   if (verify_results) {
     printfQuda("Calling unitarizeForceCPU\n");
-    quda::fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
+    quda::fermion_force::unitarizeForceCPU(cpuResult, cpuOprod, cpuFatLink);
   }
 
-  cpuReference->copy(*cudaResult);
+  cpuReference.copy(cudaResult);
 
   printfQuda("Comparing CPU and GPU results\n");
   int res[4];
 
   double accuracy = prec == QUDA_DOUBLE_PRECISION ? 1e-10 : 1e-5;
   for (int dir = 0; dir < 4; ++dir) {
-    res[dir] = compare_floats(cpuReference->data<void *>(dir), cpuResult->data<void *>(dir),
-                              cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
+    res[dir] = compare_floats(cpuReference.data<void *>(dir), cpuResult.data<void *>(dir),
+                              cpuReference.Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 
     quda::comm_allreduce_int(res[dir]);
     res[dir] /= quda::comm_size();
   }
 
-  hisq_force_end();
-
   for (int dir = 0; dir < 4; ++dir) { ASSERT_EQ(res[dir], 1) << "Dir:" << dir; }
 }
 
-static void display_test_info()
+TEST_P(HisqUnitarizeTest, verify)
 {
-  printfQuda("running the following fermion force computation test:\n");
-
-  printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
-  printfQuda("%s                       %s                         %d/%d/%d                  %d \n", get_prec_str(prec),
-             get_recon_str(link_recon), xdim, ydim, zdim, tdim);
+  prec = ::testing::get<0>(GetParam());
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+  hisq_unitarize(prec);
 }
+
+auto test_str
+  = [](testing::TestParamInfo<test_t> param) { return std::string(get_prec_str(::testing::get<0>(param.param))); };
+
+INSTANTIATE_TEST_SUITE_P(, HisqUnitarizeTest, ::testing::Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), test_str);
+
+struct hisq_unitarize_test : public quda_test {
+  void display_info() const override
+  {
+    printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
+    printfQuda("%s                       %s                         %d/%d/%d                  %d \n",
+               get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim);
+  }
+
+  hisq_unitarize_test(int argc, char **argv) : quda_test("hisq_unitarize_test", argc, argv) { }
+};
 
 int main(int argc, char **argv)
 {
-  // initalize google test
-  ::testing::InitGoogleTest(&argc, argv);
+  hisq_unitarize_test test(argc, argv);
+  test.init();
+  int test_rc = 0;
 
-  auto app = make_app();
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
+  if (!enable_testing) {
+    hisq_unitarize(prec);
+  } else {
+    test_rc = test.execute();
   }
-
-  initComms(argc, argv, gridsize_from_cmdline);
-  initQuda(device_ordinal);
-
-  display_test_info();
-
-  int test_rc = RUN_ALL_TESTS();
-
-  endQuda();
-  finalizeComms();
-
   return test_rc;
 }

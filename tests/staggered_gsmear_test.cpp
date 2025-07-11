@@ -1,4 +1,3 @@
-#include "test.h"
 #include "staggered_gsmear_test_utils.h"
 
 using namespace quda;
@@ -6,43 +5,52 @@ using namespace quda;
 int argc_copy;
 char **argv_copy;
 
-class StaggeredGSmearTest : public ::testing::Test
+using test_t = ::testing::tuple<QudaPrecision, gsmear_test_type>;
+
+class StaggeredGSmearTest : public ::testing::TestWithParam<test_t>
 {
 protected:
   StaggeredGSmearTestWrapper gsmear_test_wrapper;
-
-  void display_test_info()
-  {
-    printfQuda("running the following test:\n");
-    printfQuda("prec     recon    test_type     S_dim         T_dimension\n");
-    printfQuda("%s   %s       %s       %d/%d/%d      %d \n", get_prec_str(prec), get_recon_str(link_recon),
-               get_string(gtest_type_map, gtest_type).c_str(), xdim, ydim, zdim, tdim);
-    printfQuda("Grid partition info:     X  Y  Z  T\n");
-    printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-               dimPartitioned(3));
-  }
 
 public:
   StaggeredGSmearTest() = default;
 
   virtual void SetUp()
   {
+    prec = ::testing::get<0>(GetParam());
+    gtest_type = ::testing::get<1>(GetParam());
+    if (!quda::is_enabled(prec)) GTEST_SKIP();
     gsmear_test_wrapper.init_test(argc_copy, argv_copy);
-    display_test_info();
   }
 
-  virtual void TearDown() { gsmear_test_wrapper.end(); }
+  virtual void TearDown()
+  {
+    if (!quda::is_enabled(prec)) GTEST_SKIP();
+    gsmear_test_wrapper.end();
+  }
 
-  static void SetUpTestCase() { initQuda(device_ordinal); }
+  static void SetUpTestCase() { }
 
-  static void TearDownTestCase() { endQuda(); }
+  static void TearDownTestCase() { }
 };
 
-TEST_F(StaggeredGSmearTest, benchmark) { gsmear_test_wrapper.run_test(niter, /**show_metrics =*/true); }
-
-TEST_F(StaggeredGSmearTest, verify)
+TEST_P(StaggeredGSmearTest, verify)
 {
-  if (!verify_results) GTEST_SKIP();
+  prec = ::testing::get<0>(GetParam());
+  gtest_type = ::testing::get<1>(GetParam());
+  if (!quda::is_enabled(prec)) GTEST_SKIP();
+
+  switch (gtest_type) {
+  case gsmear_test_type::TwoLink:
+    laplace3D = 4;
+    smear_t0 = -1;
+    break;
+  case gsmear_test_type::GaussianSmear:
+    laplace3D = 3;
+    smear_t0 = 1;
+    break;
+  default: errorQuda("Unexpected gsmear_type = %s", get_string(gtest_type_map, gtest_type).c_str());
+  }
 
   gsmear_test_wrapper.staggeredGSmearRef();
   gsmear_test_wrapper.run_test(2);
@@ -52,41 +60,55 @@ TEST_F(StaggeredGSmearTest, verify)
   ASSERT_LE(deviation, tol) << "reference and QUDA implementations do not agree";
 }
 
+struct gsmear_test : public quda_test {
+  void display_info() const override
+  {
+    printfQuda("prec     recon    test_type     S_dim         T_dimension\n");
+    printfQuda("%s   %s       %s       %d/%d/%d      %d \n", get_prec_str(prec), get_recon_str(link_recon),
+               get_string(gtest_type_map, gtest_type).c_str(), xdim, ydim, zdim, tdim);
+  }
+
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
+  {
+    quda_test::add_command_line_group(app);
+    app->add_option("--test", gtest_type, "Test method")->transform(CLI::CheckedTransformer(gtest_type_map));
+    add_quark_smear_option_group(app);
+    add_su3_option_group(app);
+  }
+
+  gsmear_test(int argc, char **argv) : quda_test("gsmear_test", argc, argv) { }
+};
+
+auto test_str = [](testing::TestParamInfo<test_t> param) {
+  return std::string(get_prec_str(::testing::get<0>(param.param))) + "_"
+    + get_string(gtest_type_map, ::testing::get<1>(param.param));
+};
+
+using ::testing::Combine;
+using ::testing::Values;
+
+INSTANTIATE_TEST_SUITE_P(, StaggeredGSmearTest,
+                         Combine(Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION),
+                                 Values(gsmear_test_type::TwoLink, gsmear_test_type::GaussianSmear)),
+                         test_str);
 
 int main(int argc, char **argv)
 {
-  // initalize google test
-  ::testing::InitGoogleTest(&argc, argv);
-
-  // command line options
-  auto app = make_app();
-  app->add_option("--test", gtest_type, "Test method")->transform(CLI::CheckedTransformer(gtest_type_map));
-  add_quark_smear_option_group(app);
-  add_su3_option_group(app);
-  add_comms_option_group(app);
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  initComms(argc, argv, gridsize_from_cmdline);
+  gsmear_test test(argc, argv);
+  test.init();
 
   // Same approach as in Staggered DslashTest
   argc_copy = argc;
   argv_copy = argv;
 
-  // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  if (link_recon != QUDA_RECONSTRUCT_NO) errorQuda("Error: link reconstruction is currently not supported");
 
-  if (link_recon != QUDA_RECONSTRUCT_NO) {
-    printfQuda("Error: link reconstruction is currently not supported.\n");
-    exit(0);
+  int test_rc = 0;
+  if (!enable_testing) {
+
+  } else {
+    test_rc = test.execute();
   }
 
-  int test_rc = RUN_ALL_TESTS();
-
-  finalizeComms();
   return test_rc;
 }
