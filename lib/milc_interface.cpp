@@ -1237,9 +1237,9 @@ void qudaProject(int external_precision, void **source, void **solution, int nve
   std::vector<ColorSpinorField> src_h(nvec);
   std::vector<ColorSpinorField> sol_h(nvec);
   for (int i = 0; i < nvec; i++) {
-    csParam.v = static_cast<void*>(static_cast<char*>(source[i]) + vec_offset);
+    csParam.v = static_cast<void *>(static_cast<char *>(source[i]) + vec_offset);
     src_h[i] = ColorSpinorField(csParam);
-    csParam.v = static_cast<void*>(static_cast<char*>(solution[i]) + vec_offset);
+    csParam.v = static_cast<void *>(static_cast<char *>(solution[i]) + vec_offset);
     sol_h[i] = ColorSpinorField(csParam);
   }
 
@@ -1372,8 +1372,10 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     // Get preserved other parity deflation space
     void *preserved_space = (parity == QUDA_EVEN_PARITY) ? preserved_odd_deflation_space : preserved_even_deflation_space;
     deflation_space *other_parity_space = reinterpret_cast<deflation_space *>(preserved_space);
-    if (!other_parity_space) errorQuda("Failed to get %s parity deflation space!", parity == QUDA_EVEN_PARITY ? "ODD" : "EVEN");
-    if (other_parity_space->evecs.size() < static_cast<size_t>(n_evecs)) errorQuda("Other parity deflation space too small!");
+    if (!other_parity_space)
+      errorQuda("Failed to get %s parity deflation space!", parity == QUDA_EVEN_PARITY ? "ODD" : "EVEN");
+    if (other_parity_space->evecs.size() < static_cast<size_t>(n_evecs))
+      errorQuda("Other parity deflation space too small!");
 
     // Setup new deflation space
     ColorSpinorParam gpuParam(other_parity_space->evecs[0]);
@@ -1470,7 +1472,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     for (int i = 0; i < n_evecs; i++) {
 
       // Copy each evec to host-side spinor and then to device-side deflation space
-      void* evec_ptr = static_cast<char*>(evecs[i]) + evec_offset;
+      void *evec_ptr = static_cast<char *>(evecs[i]) + evec_offset;
       ColorSpinorParam cpuParam(evec_ptr, invertParam, dims, true, QUDA_CPU_FIELD_LOCATION);
       ColorSpinorField in_evec(cpuParam);
       space->evecs[i] = in_evec;
