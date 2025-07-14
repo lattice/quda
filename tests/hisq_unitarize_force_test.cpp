@@ -27,8 +27,7 @@ public:
 
 void hisq_unitarize(QudaPrecision prec)
 {
-  setVerbosity(verbosity);
-  QudaGaugeParam gaugeParam;
+  QudaGaugeParam gaugeParam = newQudaGaugeParam();
 
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
@@ -42,6 +41,7 @@ void hisq_unitarize(QudaPrecision prec)
   gaugeParam.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gaugeParam.type = QUDA_WILSON_LINKS;
   quda::GaugeFieldParam gParam(gaugeParam);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;

@@ -43,7 +43,6 @@ public:
 
 void unitarize(QudaPrecision prec)
 {
-  setVerbosity(verbosity);
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.X[0] = xdim;
