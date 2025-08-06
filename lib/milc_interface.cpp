@@ -14,6 +14,8 @@
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
+#include <spin_taste.h>
+#include <contract_quda.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -1507,6 +1509,126 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaLoadDeflationSpace
+
+// Compute exact low mode contribution to current for a single mass
+void qudaExactCurrent(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                      const void *const links, QudaEigensolverArgs_t eigargs, double *jlow_mu)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy;
+  switch (inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
+  }
+  
+  // Load links
+  QudaGaugeParam gparam = newQudaGaugeParam();
+  QudaGaugeParam dparam = newQudaGaugeParam();
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, 1.0, 0.0);
+  gparam.type = QUDA_WILSON_LINKS;
+  gparam.make_resident_gauge = true;
+  if (links == nullptr) {
+    errorQuda("Can't offload a null gauge field\n");
+    exit(1);
+  }
+  loadGaugeQuda(const_cast<void *>(links), &gparam);
+  
+  // Get deflation spaces
+  deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_even_deflation_space);
+  deflation_space *space_odd = reinterpret_cast<deflation_space *>(preserved_odd_deflation_space);
+  if (!space_even || !space_odd) errorQuda("One or both deflation spaces is not loaded!");
+  if ( preserved_even_evals_mass != 0.0 || preserved_odd_evals_mass != 0.0 )
+    errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
+  int n_evecs = space_even->evecs.size();
+  
+  // Create Dslash operator
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 1.0, 0.0, inv_args.max_iter, 1e-1,
+                    QUDA_ODD_PARITY, verbosity, QUDA_CG_INVERTER, &invertParam);
+  invertParam.cuda_prec_eigensolver = eigargs.prec_eigensolver;
+  DiracParam diracEigParam;
+  setDiracEigParam(diracEigParam, &invertParam, true, false);
+  Dirac *dEig = Dirac::create(diracEigParam);
+  
+  // Create Gauge Covariant Derivative Operator
+  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
+  DiracParam diracParam;
+  setDiracParam(diracParam, &invertParam, false);
+  GaugeCovDev myCovDev(diracParam);
+  
+  // Full parity vectors on GPU
+  ColorSpinorParam gpuParam(space_even->evecs[0]);
+  gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  gpuParam.x[0] *= 2;
+  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam);
+  
+  // Device and host space for contractQuda output
+  size_t data_bytes = gr0.Volume() * gr0.Precision();
+  void *d_result = pool_device_malloc(data_bytes);
+  void *h_result = (void *)malloc(data_bytes);
+  
+  // Loop over eigenvectors
+  for (int i = 0; i < n_evecs; i++) {
+  
+    // Compute Dslash of eigenvector
+    dEig->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
+    double zscale = 1.0/(space_even->evals[i].real() + 4.0*mass*mass);
+    
+    for (int mu=0; mu<4; mu++) {
+  
+      // Do gauge covariant shift and flip sign on ODD sites
+      myCovDev.MCD(gr_mu, gr0, mu);
+      blas::copy(gr_mu.Odd(), gr0.Odd());
+      blas::ax(-1.0, gr_mu.Odd());
+      
+      // Do spin-taste operation
+      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
+      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
+      
+      // Save current for EVEN sites
+      contractQuda(space_even->evecs[i], gr_mu.Even(), d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      // Result is of size Volume*Complex, i.e. one complex number per site
+      // Copying to host because I'm not sure how to handle this on the device
+      // since the result is not a ColorSpinorField
+      qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+      auto *res = reinterpret_cast<Complex *>(h_result);
+      for (size_t j = 0; j < gr0.Volume()/2; j++) {
+        jlow_mu[4*j+mu] += -res[j].imag()*zscale;
+      }
+      
+      // Construct full parity eigenvector
+      blas::copy(tmp.Even(), space_even->evecs[i]);
+      blas::copy(tmp.Odd(), space_odd->evecs[i]);
+      
+      // Do gauge covariant shift and flip sign on ODD sites
+      myCovDev.MCD(gr_mu, tmp, mu);
+      blas::ax(-1.0, gr_mu.Odd());
+      
+      // Do spin-taste operation
+      applySpinTaste(tmp, gr_mu, QUDA_SPIN_TASTE_G1);
+      applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
+      
+      // Save current for ODD sites
+      contractQuda(gr0.Odd(), gr_mu.Odd(), d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+      auto *res2 = reinterpret_cast<Complex *>(h_result);
+      for (size_t j = 0; j < gr0.Volume()/2; j++) {
+        jlow_mu[4*j+mu + 2*gr0.Volume()] += res2[j].imag()*zscale;
+      }
+    }
+  }
+  // Cleanup
+  pool_device_free(d_result);
+  free(h_result);
+  delete dEig;
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaExactCurrent
 
 // Wrapper function for qudaInvertDeflatable to maintain backward compatibility with old(er) MILC
 void qudaInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,

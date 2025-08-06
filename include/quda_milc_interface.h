@@ -430,6 +430,20 @@ extern "C" {
                               QudaEigensolverArgs_t eigargs, void **evecs, QudaMilcEigLoad loadtype);
 
   /**
+   * Compute exact low mode contribution to the current for a single mass
+   *
+   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] mass Quark mass
+   * @param[in] invargs Struct containing information for the inverter
+   * @param[in] links Link field on the host
+   * @param[in] eigargs Struct containing information for the eigensolver
+   * @param[in] jlowmu Array to fill with current
+   */
+  void qudaExactCurrent(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+		  const void *const links, QudaEigensolverArgs_t eigargs, double *jlowmu);
+
+  /**
    * Solve Ax=b for an improved staggered operator. All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
    * function requires that persistent gauge and clover fields have
