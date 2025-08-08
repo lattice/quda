@@ -430,18 +430,20 @@ extern "C" {
                               QudaEigensolverArgs_t eigargs, void **evecs, QudaMilcEigLoad loadtype);
 
   /**
-   * Compute exact low mode contribution to the current for a single mass
+   * Compute exact low mode contribution to the current densities.
    *
    * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
-   * @param[in] mass Quark mass
+   * @param[in] nmasses The number of quark masses to include
+   * @param[in] masses Quark masses
    * @param[in] invargs Struct containing information for the inverter
    * @param[in] links Link field on the host
    * @param[in] eigargs Struct containing information for the eigensolver
-   * @param[in] jlowmu Array to fill with current
+   * @param[out] jlowmu1 Array to fill with current
+   * @param[out] jlowmu2 Array to fill with second current for the case where two mass differences are taken
    */
-  void qudaExactCurrent(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
-		  const void *const links, QudaEigensolverArgs_t eigargs, double *jlowmu);
+  void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, double *masses, QudaInvertArgs_t inv_args,
+		  const void *const links, QudaEigensolverArgs_t eigargs, double *jlowmu1, double *jlowmu2);
 
   /**
    * Solve Ax=b for an improved staggered operator. All fields are fields

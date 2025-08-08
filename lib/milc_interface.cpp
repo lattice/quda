@@ -1511,8 +1511,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 } // qudaLoadDeflationSpace
 
 // Compute exact low mode contribution to current for a single mass
-void qudaExactCurrent(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
-                      const void *const links, QudaEigensolverArgs_t eigargs, double *jlow_mu)
+void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, double *masses, QudaInvertArgs_t inv_args,
+                      const void *const links, QudaEigensolverArgs_t eigargs, double *jlow_mu, double *jlow_mu2)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1572,12 +1572,40 @@ void qudaExactCurrent(int external_precision, int quda_precision, double mass, Q
   void *d_result = pool_device_malloc(data_bytes);
   void *h_result = (void *)malloc(data_bytes);
   
+  double m_l, m_s, m_u, m_d, dl, ds, du, dd;
+  double zscale, zscale2;
+  
   // Loop over eigenvectors
   for (int i = 0; i < n_evecs; i++) {
   
     // Compute Dslash of eigenvector
     dEig->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
-    double zscale = 1.0/(space_even->evals[i].real() + 4.0*mass*mass);
+    
+    // Scaled eigenvalue
+    switch(nmasses){
+    case(1):
+      zscale = 1.0/(space_even->evals[i].real() + 4.0*masses[0]*masses[0]);
+      break;
+    case(2):
+      m_l = masses[0];
+      m_s = masses[1];
+      dl = space_even->evals[i].real() + 4.0*m_l*m_l;
+      ds = space_even->evals[i].real() + 4.0*m_s*m_s;
+      zscale = 4.0*(m_s*m_s - m_l*m_l)/(dl*ds);
+      break;
+    case(3):
+      m_u = masses[0];
+      m_d = masses[1];
+      m_s = masses[2];     
+      du = space_even->evals[i].real()+4.0*m_u*m_u;
+      dd = space_even->evals[i].real()+4.0*m_d*m_d;
+      ds = space_even->evals[i].real()+4.0*m_s*m_s;
+      zscale = 4.0*(m_d*m_d - m_u*m_u)/(du*dd);
+      zscale2 = 4.0*(m_s*m_s - m_u*m_u)/(du*ds);
+      break;
+    default:
+      errorQuda("Wrong number of masses %d!", nmasses);
+    }
     
     for (int mu=0; mu<4; mu++) {
   
@@ -1599,6 +1627,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, double mass, Q
       auto *res = reinterpret_cast<Complex *>(h_result);
       for (size_t j = 0; j < gr0.Volume()/2; j++) {
         jlow_mu[4*j+mu] += -res[j].imag()*zscale;
+        if(nmasses==3)
+          jlow_mu2[4*j+mu] += -res[j].imag()*zscale2;
       }
       
       // Construct full parity eigenvector
@@ -1619,6 +1649,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, double mass, Q
       auto *res2 = reinterpret_cast<Complex *>(h_result);
       for (size_t j = 0; j < gr0.Volume()/2; j++) {
         jlow_mu[4*j+mu + 2*gr0.Volume()] += res2[j].imag()*zscale;
+        if(nmasses==3)
+          jlow_mu2[4*j+mu + 2*gr0.Volume()] += res2[j].imag()*zscale2;
       }
     }
   }
