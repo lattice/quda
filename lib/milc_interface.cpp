@@ -1510,7 +1510,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   qudamilc_called<false>(__func__, verbosity);
 } // qudaLoadDeflationSpace
 
-// Compute exact low mode contribution to current for a single mass
+// Compute exact low mode contribution to current
 void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, double *masses, QudaInvertArgs_t inv_args,
                       const void *const links, QudaEigensolverArgs_t eigargs, double *jlow_mu, double *jlow_mu2)
 {
@@ -1519,17 +1519,12 @@ void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, d
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy;
-  switch (inv_args.mixed_precision) {
-  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
-  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
-  default: device_precision_sloppy = device_precision;
-  }
+  QudaPrecision device_precision_sloppy = device_precision;
   
   // Load links
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
-  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, 1.0, 0.0);
+  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
   gparam.type = QUDA_WILSON_LINKS;
   gparam.make_resident_gauge = true;
   if (links == nullptr) {
@@ -1537,7 +1532,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, d
     exit(1);
   }
   loadGaugeQuda(const_cast<void *>(links), &gparam);
-  
+
   // Get deflation spaces
   deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_even_deflation_space);
   deflation_space *space_odd = reinterpret_cast<deflation_space *>(preserved_odd_deflation_space);
@@ -1550,16 +1545,15 @@ void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, d
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 1.0, 0.0, inv_args.max_iter, 1e-1,
                     QUDA_ODD_PARITY, verbosity, QUDA_CG_INVERTER, &invertParam);
-  invertParam.cuda_prec_eigensolver = eigargs.prec_eigensolver;
-  DiracParam diracEigParam;
-  setDiracEigParam(diracEigParam, &invertParam, true, false);
-  Dirac *dEig = Dirac::create(diracEigParam);
+  DiracParam diracParam;
+  setDiracParam(diracParam, &invertParam, true);
+  Dirac *dirac = Dirac::create(diracParam);
   
   // Create Gauge Covariant Derivative Operator
   invertParam.dslash_type = QUDA_COVDEV_DSLASH;
-  DiracParam diracParam;
-  setDiracParam(diracParam, &invertParam, false);
-  GaugeCovDev myCovDev(diracParam);
+  DiracParam cDParam;
+  setDiracParam(cDParam, &invertParam, false);
+  GaugeCovDev myCovDev(cDParam);
   
   // Full parity vectors on GPU
   ColorSpinorParam gpuParam(space_even->evecs[0]);
@@ -1579,7 +1573,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, d
   for (int i = 0; i < n_evecs; i++) {
   
     // Compute Dslash of eigenvector
-    dEig->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
+    dirac->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
     
     // Scaled eigenvalue
     switch(nmasses){
@@ -1657,7 +1651,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, d
   // Cleanup
   pool_device_free(d_result);
   free(h_result);
-  delete dEig;
+  delete dirac;
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaExactCurrent
