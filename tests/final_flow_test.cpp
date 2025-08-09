@@ -8,7 +8,7 @@
 #include <quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-
+#include <blas_quda.h>
 // External headers
 #include <misc.h>
 #include <host_utils.h>
@@ -71,6 +71,7 @@ void display_test_info()
   printfQuda(" - Measurement interval %d\n", measurement_interval);
   printfQuda(" - n-naiks %d\n", n_naiks);
   printfQuda(" - eps-naiks %f\n", eps_naik);
+  printfQuda(" - fermion mass %f\n", mass);
   // printfQuda(" - eps-naiks %f\n", eps_naik);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -99,6 +100,12 @@ void check_naik(double &eps_naik, int &n_naiks)
     }
 }
 
+std::vector<unsigned int> read_meas_int_vec(std::string filename)
+{
+
+    
+}
+
 void write_files(const QudaFermMeasurements &ferm_meas)
 {
   std::string filename = "./testppb.txt";
@@ -110,7 +117,7 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
   for (const auto& row : *ppb_data) {
       for (const auto& elem : row) {
-          out_ppb << elem.real() << " " << elem.imag() << " ";
+          out_ppb << elem.real() << " ";
       }
       out_ppb << "\n"; // Newline after each row
   }
@@ -398,10 +405,15 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     out_ptr[n] = out[n].data();
     out_flowed_ptr[n] = out_flowed[n].data();
   }
-  
+
+  printfQuda("TEST INVERT\n");
   invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
   in_raw[0].PrintVector(0,0,0);
   out[0].PrintVector(0,0,0);
+  auto PsiPsibarTest = quda::blas::cDotProduct(out[0], out[0]);
+  printfQuda("dot product just out : %f\n",PsiPsibarTest);
+  PsiPsibarTest = quda::blas::cDotProduct(in_raw[0], out[0]);
+  printfQuda("dot product in out : %f\n",PsiPsibarTest);
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
 
   printfQuda("At end ppb has %li elements\n",ppb.size());

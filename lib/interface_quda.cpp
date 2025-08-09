@@ -6178,7 +6178,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     // set [3] = input spinor
     f_temp3[i] = fin[i];
   }
-  // The following is crucial when invert matrices on the GPU
+  // The following is crucial when inverting matrices on the GPU
   inv_param->input_location =QUDA_CUDA_FIELD_LOCATION;
   inv_param->output_location =QUDA_CUDA_FIELD_LOCATION;
   inv_param->dirac_order=QUDA_INTERNAL_DIRAC_ORDER;
@@ -6217,7 +6217,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   
       int Nsrc = (int) f_temp4.size();
       int Nsrc_tile = inv_param->num_src;
-      printfQuda("We are here now\n");
+      printfQuda("We are here now, m = %i\n",m);
       std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
       printfQuda("starting another meas\n");
       ferm_m.meas_list.push_back(ferm_m.i_glob);
@@ -6234,14 +6234,14 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
       std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
       smear_param->n_steps = m;
       cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
+      ferm_m.ppb.push_back(PsiPsibarTest);
       if (ferm_m.take_fwd_gflow){
         t_gf_list = {gaugeTemp,precise};
         gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier);
         printfQuda("checking again\n");
         f_temp4[0].PrintVector(0,0,0);
         cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m.vec_ref,f_temp4);
-        ferm_m.ppb.push_back(PsiPsibarR);
-        printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[2] - PsiPsibarTest[2]),imag(PsiPsibarR[2] - PsiPsibarTest[2]));
+        printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[0] - PsiPsibarTest[0]),imag(PsiPsibarR[0] - PsiPsibarTest[0]));
       }
 
       std::vector<std::vector<Complex>> ppb_t_el = {};
@@ -6260,7 +6260,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
       for (size_t nn = 0; nn < f_temp4.size(); nn++){
         std::fill(result_global.begin(), result_global.end(), 0.0);
-        contractSummedQuda(ferm_m.vec_ref[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
+        contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
         //necessary?
         comm_allreduce_sum(result_global);
         ppb_t_el.push_back(result_global);
