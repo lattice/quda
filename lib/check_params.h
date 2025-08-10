@@ -1230,6 +1230,7 @@ void printQudaFermMeasurements(QudaFermMeasurements *param)
 
 #ifdef INIT_PARAM
   P(meas_int, 5);
+  P(meas_int_vec, nullptr);
   P(take_meas, QUDA_BOOLEAN_FALSE);
   P(take_fwd_gflow, QUDA_BOOLEAN_FALSE);
   P(ppb, nullptr);

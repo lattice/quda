@@ -6200,7 +6200,6 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   else {
     for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
       smear_param->n_steps = m;
-      
       if (m <= adj_n_save_init)
         smear_param->adj_n_save = m - 1;
       else if (smear_param->n_steps == adj_n_save_init)

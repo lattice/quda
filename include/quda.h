@@ -864,6 +864,7 @@ extern "C" {
     void **ppb;
     void *ppb_t;
     unsigned int meas_int;
+    void *meas_int_vec;
     void *meas_list;
     QudaBoolean take_meas;
     QudaBoolean take_fwd_gflow;

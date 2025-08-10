@@ -28,6 +28,8 @@ QudaEigParam eig_param;
 bool use_split_grid = false;
 bool use_multi_src = false;
 
+std::string meas_vec_file_str = "";
+
 // print instructions on how to run the old tests
 bool print_legacy_info = false;
 
@@ -93,6 +95,16 @@ void add_adj_hisq_option_group(std::shared_ptr<QUDAApp> quda_app)
       take_fwd_gflow, "take forward gflow for testing purposes");
 }
 
+void add_meas_io_group(std::shared_ptr<QUDAApp> quda_app)
+{
+    auto opgroup = quda_app->add_option_group("Meas interval", "Options in controlling separate measurements");
+    opgroup
+    ->add_option(
+      "--meas-vec-txt",
+      meas_vec_file_str, "measurement interval text file");
+    
+}
+
 void check_naik(double &eps_naik, int &n_naiks)
 {
     if (eps_naik != 0 && n_naiks != 2) {
@@ -100,10 +112,24 @@ void check_naik(double &eps_naik, int &n_naiks)
     }
 }
 
-std::vector<unsigned int> read_meas_int_vec(std::string filename)
+std::vector<unsigned int> read_meas_int_vec()
 {
-
-    
+    std::vector<unsigned int> res = {};
+    std::ifstream file(meas_vec_file_str);
+    if (!file.is_open()) {
+        printfQuda("No measurement int file\n");
+    }
+    else {
+        printfQuda("Measurement int file registered\n");
+        double number;
+        
+        while (file >> number) {
+            res.push_back(number);
+            // std::cout<<number<<"\n";
+        }
+        file.close();
+    }
+    return res;
 }
 
 void write_files(const QudaFermMeasurements &ferm_meas)
@@ -278,6 +304,7 @@ int main(int argc, char **argv)
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
   add_comms_option_group(app);
+  add_meas_io_group(app);
   app->add_option("--legacy-test-info", print_legacy_info,
                   "Print info on how to reproduce the old '--test #' behavior with flags, then exit");
   try {
@@ -366,11 +393,12 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   std::vector<void *> out_ptr(Nsrc);
   std::vector<void *> out_flowed_ptr(Nsrc);
 
-    
+    auto meas_int_vec = read_meas_int_vec();
     QudaFermMeasurements ferm_meas = newQudaFermMeasurements();
     ferm_meas.take_meas = QUDA_BOOLEAN_TRUE;
     ferm_meas.take_fwd_gflow = (QudaBoolean) take_fwd_gflow;
     ferm_meas.meas_int = measurement_interval;
+    ferm_meas.meas_int_vec = (void *) &meas_int_vec;
     std::vector<std::vector<std::complex<double>>> ppb;
     std::vector<std::vector<std::vector<std::complex<double>>>> ppb_t;
     void* ptr_ppb = &ppb;
