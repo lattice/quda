@@ -434,16 +434,21 @@ extern "C" {
    *
    * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param[in] quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] milc_fatlink Fat-link field on the host
+   * @param[in] milc_longlink Long-link field on the host
+   * @param[in] milc_shiftlink Regular or APE link field on the host to use with covariant shift
    * @param[in] nmasses The number of quark masses to include
    * @param[in] masses Quark masses
    * @param[in] invargs Struct containing information for the inverter
-   * @param[in] links Link field on the host
    * @param[in] eigargs Struct containing information for the eigensolver
    * @param[out] jlowmu1 Array to fill with current
    * @param[out] jlowmu2 Array to fill with second current for the case where two mass differences are taken
+   * @param[in] reload Whether to reload the MILC fields
    */
-  void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, double *masses, QudaInvertArgs_t inv_args,
-		  const void *const links, QudaEigensolverArgs_t eigargs, double *jlowmu1, double *jlowmu2);
+  void qudaExactCurrent(int external_precision, int quda_precision, const void *const milc_fatlink,
+		  const void *const milc_longlink, const void *const milc_shiftlink, 
+		  int nmasses, double *masses, QudaInvertArgs_t inv_args,
+		  QudaEigensolverArgs_t eigargs, double *jlowmu1, double *jlowmu2, int reload);
 
   /**
    * Solve Ax=b for an improved staggered operator. All fields are fields

@@ -1511,8 +1511,9 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 } // qudaLoadDeflationSpace
 
 // Compute exact low mode contribution to current
-void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, double *masses, QudaInvertArgs_t inv_args,
-                      const void *const links, QudaEigensolverArgs_t eigargs, double *jlow_mu, double *jlow_mu2)
+void qudaExactCurrent(int external_precision, int quda_precision, const void *const fatlink,
+		const void *const longlink, const void *const links, int nmasses, double *masses, 
+		QudaInvertArgs_t inv_args, QudaEigensolverArgs_t eigargs, double *jlow_mu, double *jlow_mu2, int reload)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1522,16 +1523,23 @@ void qudaExactCurrent(int external_precision, int quda_precision, int nmasses, d
   QudaPrecision device_precision_sloppy = device_precision;
   
   // Load links
-  QudaGaugeParam gparam = newQudaGaugeParam();
-  QudaGaugeParam dparam = newQudaGaugeParam();
-  setGaugeParams(gparam, dparam, nullptr, localDim, host_precision, device_precision, device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
-  gparam.type = QUDA_WILSON_LINKS;
-  gparam.make_resident_gauge = true;
+  if(reload) invalidateGaugeQuda();
+  QudaGaugeParam fat_param = newQudaGaugeParam();
+  QudaGaugeParam long_param = newQudaGaugeParam();
+  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
+                 inv_args.tadpole, inv_args.naik_epsilon);
+  if (invalidate_quda_gauge || !create_quda_gauge) {
+    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
+    if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
+    invalidate_quda_gauge = false;
+  }
+  fat_param.type = QUDA_WILSON_LINKS;
+  fat_param.make_resident_gauge = true;
   if (links == nullptr) {
     errorQuda("Can't offload a null gauge field\n");
     exit(1);
   }
-  loadGaugeQuda(const_cast<void *>(links), &gparam);
+  loadGaugeQuda(const_cast<void *>(links), &fat_param);
 
   // Get deflation spaces
   deflation_space *space_even = reinterpret_cast<deflation_space *>(preserved_even_deflation_space);
