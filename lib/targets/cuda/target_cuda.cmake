@@ -99,7 +99,7 @@ option(QUDA_INTERFACE_NVTX "add NVTX markup to interface calls" OFF)
 
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
-  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
+  message(STATUS "Heterogeneous atomics support: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
@@ -133,8 +133,15 @@ set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTU
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
   OFF)
-message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
+message(STATUS "Large kernel arguments support: ${QUDA_LARGE_KERNEL_ARG}")
 mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# single-precision vectorization requires CUDA 13 or above
+cmake_dependent_option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.0 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  OFF)
+message(STATUS "Single-precision vectorization support: ${QUDA_VECTORIZE_SINGLE}")
+mark_as_advanced(QUDA_VECTORIZE_SINGLE)
 
 # Set the maximum multi-RHS per kernel
 if(QUDA_LARGE_KERNEL_ARG)
