@@ -351,7 +351,9 @@ endif()
 target_compile_options(
   quda 
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
-          -gpu=lineinfo
+          $<$<CONFIG:DEVEL>:-Xptxas
+          -warn-lmem-usage,-warn-spills
+          -gpu=lineinfo>
           $<$<CONFIG:STRICT>:-Werror>
           >)
 
