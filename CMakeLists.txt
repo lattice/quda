@@ -259,26 +259,12 @@ option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_O
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
-# set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
-set(QUDA_ALTERNATIVE_I_TO_F 0 CACHE STRING "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100)")
-set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
-if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
-    message(FATAL_ERROR
-        "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
-        "Valid values are: ${VALID_I2F_VALUES}")
-endif()
-set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
-message(STATUS "QUDA_ALTERNATIVE_I_TO_F set to: ${QUDA_ALTERNATIVE_I_TO_F}%")
-
-
 # mark as advanced
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
-
-mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_MAX_MULTI_RHS)

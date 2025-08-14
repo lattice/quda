@@ -84,11 +84,6 @@ set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single preci
 set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
 set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
 
-mark_as_advanced(QUDA_ORDER_DOUBLE)
-mark_as_advanced(QUDA_ORDER_SINGLE)
-mark_as_advanced(QUDA_ORDER_HALF)
-mark_as_advanced(QUDA_ORDER_QUARTER)
-
 # ######################################################################################################################
 # CUDA specific QUDA options
 set(QUDA_HETEROGENEOUS_ATOMIC OFF)

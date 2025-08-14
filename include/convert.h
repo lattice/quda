@@ -60,6 +60,15 @@ namespace quda
     }
   };
 
+  /**
+     @brief This is a LUT which is used to determine whether a given
+     int-to-float conversion in a array of numbers to be converted
+     using a direct cast, or whether to use the alternative path that
+     uses an IADD and FADD.  For an array of length n, we converth
+     i^th element using the (i % 4) LUT value.  For large n, the
+     expected rations between the two conversion paths will be
+     achieved.
+   */
 #if QUDA_ALTERNATIVE_I_TO_F == 100
   constexpr bool i2f_i[4] = {true, true, true, true};
 #elif QUDA_ALTERNATIVE_I_TO_F == 75
@@ -73,7 +82,7 @@ namespace quda
 #endif
 
   /**
-     @brief Fast float to integer round used on the device
+     @brief Fast float-to-integer round used on the device
   */
   template <> struct i2f<true> {
     template <typename T, typename alternative_t>
@@ -108,7 +117,7 @@ namespace quda
   };
 
   /**
-     @brief Regular float to integer round used on the host
+     @brief Regular float-to-integer round used on the host
   */
   template <bool is_device> struct f2i {
     constexpr int operator()(float f) { return static_cast<int>(rintf(f)); }
@@ -120,7 +129,7 @@ namespace quda
   };
 
   /**
-     @brief Fast float to integer round used on the device
+     @brief Fast float-to-integer round used on the device
   */
   template <> struct f2i<true> {
     __device__ inline int operator()(float f)
@@ -141,14 +150,14 @@ namespace quda
   };
 
   /**
-     @brief Regular double to integer round used on the host
+     @brief Regular double-to-integer round used on the host
   */
   template <bool is_device> struct d2i {
     constexpr int operator()(double d) { return static_cast<int>(rint(d)); }
   };
 
   /**
-     @brief Fast double to integer round used on the device
+     @brief Fast double-to-integer round used on the device
   */
   template <> struct d2i<true> {
     __device__ inline int operator()(double d)

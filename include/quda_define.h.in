@@ -266,19 +266,11 @@
  */
 #define QUDA_ORDER_DOUBLE @QUDA_ORDER_DOUBLE@
 
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_DOUBLE == 0 || QUDA_ORDER_DOUBLE == 2 || QUDA_ORDER_DOUBLE == 4 || QUDA_ORDER_DOUBLE == 8, "invalid QUDA_ORDER_DOUBLE");
-#endif
-
 /**
  * @def QUDA_ORDER_SINGLE
  * @brief This macro sets the data ordering for single precision fields
  */
 #define QUDA_ORDER_SINGLE @QUDA_ORDER_SINGLE@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_SINGLE == 0 || QUDA_ORDER_SINGLE == 2 || QUDA_ORDER_SINGLE == 4 || QUDA_ORDER_SINGLE == 8, "invalid QUDA_ORDER_SINGLE");
-#endif
 
 /**
  * @def QUDA_ORDER_HALF
@@ -286,19 +278,11 @@ static_assert(QUDA_ORDER_SINGLE == 0 || QUDA_ORDER_SINGLE == 2 || QUDA_ORDER_SIN
  */
 #define QUDA_ORDER_HALF @QUDA_ORDER_HALF@
 
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_HALF == 0 || QUDA_ORDER_HALF == 2 || QUDA_ORDER_HALF == 4 || QUDA_ORDER_HALF == 8 || QUDA_ORDER_HALF == 16, "invalid QUDA_ORDER_HALF");
-#endif
-
 /**
  * @def QUDA_ORDER_QUARTER
  * @brief This macro sets the data ordering for quarter precision fields
  */
 #define QUDA_ORDER_QUARTER @QUDA_ORDER_QUARTER@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_QUARTER == 0 || QUDA_ORDER_QUARTER == 2 || QUDA_ORDER_QUARTER == 4 || QUDA_ORDER_QUARTER == 8 || QUDA_ORDER_HALF == 16, "invalid QUDA_ORDER_QUARTER");
-#endif
 
 /**
  * @def QUDA_VECTORIZE_SINGLE
