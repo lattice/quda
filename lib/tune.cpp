@@ -916,6 +916,7 @@ namespace quda
 #endif
 
     TuneKey key = tunable.tuneKey();
+    if (tunable.tuneSharedCarveOut()) strcat(key.aux, ",carve_out");
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
     bool is_policy = strncmp(key.aux, "policy,", 7) == 0 ? true : false;
