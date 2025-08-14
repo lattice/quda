@@ -88,6 +88,21 @@ namespace quda
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
     }
 
+    bool tuneSharedCarveOut() const
+    {
+      static bool tune_shared = true; // default is to do carve out tuning
+      static bool init = false;
+
+      if (!init) {
+        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT_DSLASH");
+        if (enable_shared_env) {
+          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
+        }
+        init = true;
+      }
+      return tune_shared;
+    }
+
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
     virtual unsigned int minThreads() const override { return arg.threads; }
 
