@@ -129,6 +129,37 @@ endif()
 
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
+message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
+
+# ######################################################################################################################
+# data order variables
+cmake_dependent_option(VECTOR_256 "are 256-bit load/store instructions supported" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.9 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  OFF)
+
+if(VECTOR_256)
+  set(QUDA_ORDER_DOUBLE "4" CACHE STRING "which data order to use for double precision fields (4 = default, 0 = legacy)")
+  set(QUDA_ORDER_SINGLE "8" CACHE STRING "which data order to use for single precision fields (8 = default, 0 = legacy)")
+  set(QUDA_ORDER_HALF "16" CACHE STRING "which data order to use for half precision fields (16 = default, 0 = legacy)")
+  set(QUDA_ORDER_QUARTER "16" CACHE STRING "which data order to use for quarter precision fields (16 = default, 0 = legacy)")
+else()
+  set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
+  set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
+  set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
+  set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
+endif()
+
+message(STATUS "QUDA_ORDER_DOUBLE: ${QUDA_ORDER_DOUBLE}")
+message(STATUS "QUDA_ORDER_SINGLE: ${QUDA_ORDER_SINGLE}")
+message(STATUS "QUDA_ORDER_HALF: ${QUDA_ORDER_HALF}")
+message(STATUS "QUDA_ORDER_QUARTER: ${QUDA_ORDER_QUARTER}")
+
+mark_as_advanced(QUDA_ORDER_DOUBLE)
+mark_as_advanced(QUDA_ORDER_SINGLE)
+mark_as_advanced(QUDA_ORDER_HALF)
+mark_as_advanced(QUDA_ORDER_QUARTER)
+
+
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"

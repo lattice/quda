@@ -192,11 +192,6 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
-set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
-set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
-set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
-set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
-
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
