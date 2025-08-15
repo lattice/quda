@@ -93,6 +93,8 @@ namespace quda {
     virtual bool tuneSharedBytes() const;
     virtual bool tuneSharedCarveOut() const;
 
+    virtual int sharedCarveOutStep() const;
+
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
@@ -239,20 +241,7 @@ namespace quda {
       }
     }
 
-    virtual bool advanceSharedCarveOut(TuneParam &param) const
-    {
-      if (tuneSharedCarveOut()) {
-        if (param.shared_carve_out < 100) {
-          param.shared_carve_out += 25;
-          return true;
-        } else {
-          param.shared_carve_out = 0;
-          return false;
-        }
-      } else {
-        return false;
-      }
-    }
+    virtual bool advanceSharedCarveOut(TuneParam &param) const;
 
     virtual bool advanceAux(TuneParam &) const { return false; }
 

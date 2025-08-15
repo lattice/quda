@@ -726,17 +726,53 @@ namespace quda
 
   bool Tunable::tuneSharedCarveOut() const
   {
-    static bool tune_shared = false; // default is not to do carve out tuning
+    static bool tune_carve_out = false; // default is not to do carve out tuning
     static bool init = false;
 
     if (!init) {
       char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT");
       if (enable_shared_env) {
-        if (strcmp(enable_shared_env, "1") == 0) { tune_shared = true; }
+        if (strcmp(enable_shared_env, "1") == 0) { tune_carve_out = true; }
       }
       init = true;
     }
-    return tune_shared;
+    return tune_carve_out;
+  }
+
+  static std::string carve_out_step_str;
+
+  int Tunable::sharedCarveOutStep() const
+  {
+    static int carve_out_step = 25; // default is 25% increment
+    static bool init = false;
+
+    if (!init) {
+      char *carve_out_step_env = getenv("QUDA_TUNING_SHARED_CARVE_OUT_STEP");
+      if (carve_out_step_env) {
+        carve_out_step = atoi(carve_out_step_env);
+        if (carve_out_step <= 0 || carve_out_step > 100)
+          errorQuda("Invalid shared carve-out step size %d", carve_out_step);
+      }
+      init = true;
+
+      carve_out_step_str = std::string(",carve_out,step=") + std::to_string(carve_out_step);
+    }
+    return carve_out_step;
+  }
+
+  bool Tunable::advanceSharedCarveOut(TuneParam &param) const
+  {
+    if (tuneSharedCarveOut()) {
+      if (param.shared_carve_out < 100) {
+        param.shared_carve_out = std::min(param.shared_carve_out + sharedCarveOutStep(), 100);
+        return true;
+      } else {
+        param.shared_carve_out = 0;
+        return false;
+      }
+    } else {
+      return false;
+    }
   }
 
   int Tunable::blockStep() const { return device::warp_size(); }
@@ -748,6 +784,7 @@ namespace quda
     if (!getTuning()) return true;
 
     TuneKey key = tuneKey();
+    if (tuneSharedCarveOut()) strcat(key.aux, carve_out_step_str.c_str());
     if (use_managed_memory()) strcat(key.aux, ",managed");
     // if key is present in cache then already tuned
     return getTuneCache().find(key) != getTuneCache().end();
@@ -916,7 +953,7 @@ namespace quda
 #endif
 
     TuneKey key = tunable.tuneKey();
-    if (tunable.tuneSharedCarveOut()) strcat(key.aux, ",carve_out");
+    if (tunable.tuneSharedCarveOut()) strcat(key.aux, carve_out_step_str.c_str());
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
     bool is_policy = strncmp(key.aux, "policy,", 7) == 0 ? true : false;
