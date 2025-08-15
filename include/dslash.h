@@ -88,7 +88,7 @@ namespace quda
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
     }
 
-    bool tuneSharedCarveOut() const
+    bool tuneSharedCarveOut() const override
     {
       static bool tune_shared = true; // default is to do carve out tuning
       static bool init = false;
