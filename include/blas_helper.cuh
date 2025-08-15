@@ -330,33 +330,33 @@ namespace quda
     template <> constexpr int n_vector<double, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<double, 24>() : colorspinor::get_vector_order<double, 6>();
+        return nSpin == 4 ? colorspinor::get_vector_order<double>(24) : colorspinor::get_vector_order<double>(6);
       else
-        return colorspinor::get_vector_order<double, 4>();
+        return colorspinor::get_vector_order<double>(4);
     }
 
     template <> constexpr int n_vector<float, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<float, 24>() : colorspinor::get_vector_order<float, 6>();
+        return nSpin == 4 ? colorspinor::get_vector_order<float>(24) : colorspinor::get_vector_order<float>(6);
       else
-        return colorspinor::get_vector_order<float, 8>();
+        return colorspinor::get_vector_order<float>(8);
     }
 
     template <> constexpr int n_vector<short, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<short, 24>() : colorspinor::get_vector_order<short, 6>();
+        return nSpin == 4 ? colorspinor::get_vector_order<short>(24) : colorspinor::get_vector_order<short>(6);
       else
-        return colorspinor::get_vector_order<short, 16>();
+        return colorspinor::get_vector_order<short>(16);
     }
 
     template <> constexpr int n_vector<int8_t, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<int8_t, 24>() : colorspinor::get_vector_order<int8_t, 6>();
+        return nSpin == 4 ? colorspinor::get_vector_order<int8_t>(24) : colorspinor::get_vector_order<int8_t>(6);
       else
-        return colorspinor::get_vector_order<int8_t, 16>();
+        return colorspinor::get_vector_order<int8_t>(16);
     }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling

@@ -311,7 +311,7 @@ namespace quda {
       const int compressed_block_size;
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
-      static constexpr int Nvec = clover::get_vector_order<Float, 2 * decltype(recon)::compressed_block_size()>();
+      static constexpr int Nvec = clover::get_vector_order<Float>(2 * decltype(recon)::compressed_block_size());
 
       Accessor(const CloverField &A, bool inverse = false) :
         a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
@@ -572,7 +572,7 @@ namespace quda {
         static_assert(!enable_reconstruct || (enable_reconstruct && Nc == 3), "Reconstruct requires Nc=3");
         reconstruct_t<real, block, enable_reconstruct> recon;
         static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
-        static constexpr int N = clover::get_vector_order<real, 2 * compressed_block>();
+        static constexpr int N = clover::get_vector_order<real>(2 * compressed_block);
         static constexpr int M = (compressed_block + N - 1) / N; /** number of short vectors per chiral block we need to read */
         static constexpr int M_offset = compressed_block / N;    /** the block offset that contains the second chiral block */
         static constexpr int Nrem = compressed_block % N; /** the remainder of the chiral block not divisible by N */

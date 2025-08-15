@@ -300,7 +300,8 @@ namespace quda {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
     aux_ss << "vol=" << volume << ",stride=" << stride << ",precision=" << precision << ",geometry=" << geometry
-           << ",Nc=" << nColor;
+           << ",Nc=" << nColor << ",order=" << order;
+    if (isNative()) aux_ss << ",N=" << gauge::get_vector_order(precision, 128);
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << ",r=" << r[0] << r[1] << r[2] << r[3];
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());

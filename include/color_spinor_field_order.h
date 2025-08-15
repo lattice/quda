@@ -286,7 +286,7 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER> {
-      static constexpr int N = colorspinor::get_vector_order<Float, nSpin * nColor * 2>();
+      static constexpr int N = colorspinor::get_vector_order<Float>(nSpin * nColor * 2);
       int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
@@ -353,7 +353,7 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER> {
-      static constexpr int N = colorspinor::get_vector_order<Float, nSpin * nColor * nVec * 2>();
+      static constexpr int N = colorspinor::get_vector_order<Float>(nSpin * nColor * nVec * 2);
       int faceVolumeCB[4] = {};
       int ghostOffset[4] = {};
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
@@ -987,7 +987,7 @@ namespace quda
       static constexpr int length = 2 * Ns * Nc;
       static constexpr int length_ghost = spin_project ? length / 2 : length;
       // if spin projecting, check that short vector length is compatible, if not halve the vector length
-      static constexpr int N = colorspinor::get_vector_order<Float, length_ghost>();
+      static constexpr int N = colorspinor::get_vector_order<Float>(length_ghost);
       static constexpr int M = length_ghost / N;
       static constexpr int Nrem = length_ghost - M * N;
       using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc>;
@@ -1118,7 +1118,7 @@ namespace quda
     template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false, bool disable_ghost = false>
     struct FloatNOrder : GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost> {
       static constexpr int length = 2 * Ns * Nc;
-      static constexpr int N = colorspinor::get_vector_order<Float, length>();
+      static constexpr int N = colorspinor::get_vector_order<Float>(length);
       static constexpr int M = length / N;
       static constexpr int Nrem = length - M * N;
       using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
