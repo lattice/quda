@@ -223,6 +223,8 @@ set(QUDA_RECONSTRUCT
   "7"
   CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+option(QUDA_FLUSH_DENORMALS "Whether to fliush denormals to zero" OFF)
+
 option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
 option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
@@ -271,6 +273,7 @@ mark_as_advanced(QUDA_MAX_MULTI_RHS)
 mark_as_advanced(QUDA_MAX_MULTI_RHS_TILE)
 mark_as_advanced(QUDA_MAX_KERNEL_ARG_SIZE)
 mark_as_advanced(QUDA_PRECISION)
+mark_as_advanced(QUDA_FLUSH_DENORMALS)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)

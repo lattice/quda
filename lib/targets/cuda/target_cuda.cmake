@@ -185,15 +185,12 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-          -ftz=false
           -prec-div=false
           -prec-sqrt=false>
           $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
-          -Mflushz
           -Mfpapprox=div
           -Mfpapprox=sqrt>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-          -fcuda-flush-denormals-to-zero
           -fcuda-approx-transcendentals
           -Xclang
           -fcuda-allow-variadic-functions>)
@@ -201,7 +198,18 @@ target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                -Wno-deprecated-gpu-targets --expt-relaxed-constexpr>)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=false -prec-div=false -prec-sqrt=false>)
+if(QUDA_FLUSH_DENORMALS)
+  target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=flushz>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -Xclang -fcuda-flush-denormals-to-zero>)
+else()
+  target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=false>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=noflushz>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -Xclang -fno-cuda-flush-denormals-to-zero>)
+endif()
+
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
                                     --expt-relaxed-constexpr>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)

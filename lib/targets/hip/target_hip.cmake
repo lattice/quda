@@ -116,11 +116,17 @@ target_compile_options(
   PRIVATE -Wall
           -Wextra
           -Wno-unknown-pragmas
-				  -Wno-unused-result
+          -Wno-unused-result
           $<$<CONFIG:STRICT>:-Werror
           -Wno-error=pass-failed>
           $<$<CONFIG:SANITIZE>:-fsanitize=address
           -fsanitize=undefined>)
+
+if(QUDA_FLUSH_DENORMALS)
+  target_compile_options(quda PRIVATE -Xclang -fgpu-flush-denormals-to-zero>)
+else()
+  target_compile_options(quda PRIVATE -Xclang -fno-gpu-flush-denormals-to-zero>)
+endif()
 
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE HIP)
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
