@@ -73,7 +73,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
+  template <KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity, int, int thread_dim,
                                                bool &active, int src_idx)
   {
@@ -135,7 +135,7 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <int nParity, bool, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
+  template <bool, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr laplace(const Ftor &ftor) : arg(ftor.arg) { }
@@ -156,7 +156,7 @@ namespace quda
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
       if (arg.dd_out.isZero(coord)) {
         if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
@@ -167,11 +167,9 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3: applyLaplace<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 3: applyLaplace<mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       case 4:
-      default:
-        applyLaplace<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
+      default: applyLaplace<mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       }
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {

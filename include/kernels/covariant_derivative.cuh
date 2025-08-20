@@ -66,7 +66,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
+  template <bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyCovDev(Vector &out, const Arg &arg, Coord &coord, int parity, int,
                                               int thread_dim, bool &active, int src_idx)
   {
@@ -122,7 +122,7 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr covDev(const Ftor &ftor) : arg(ftor.arg) { }
@@ -142,7 +142,7 @@ namespace quda
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
 
       if (arg.dd_x.isZero(coord)) {
@@ -151,30 +151,14 @@ namespace quda
       }
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
-      case 0:
-        applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 1:
-        applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 2:
-        applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 3:
-        applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 4:
-        applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 5:
-        applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 6:
-        applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 7:
-        applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
+      case 0: applyCovDev<dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 1: applyCovDev<dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 2: applyCovDev<dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 3: applyCovDev<dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 4: applyCovDev<dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 5: applyCovDev<dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 6: applyCovDev<dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 7: applyCovDev<dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       }
 
       if (mykernel_type != INTERIOR_KERNEL && active) {

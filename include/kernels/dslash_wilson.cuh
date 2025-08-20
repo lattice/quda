@@ -74,14 +74,14 @@ namespace quda
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  template <bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
                                               int thread_dim, bool &active, int src_idx)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
     typedef Matrix<complex<real>, Arg::nColor> Link;
-    const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
+    const int their_spinor_parity = arg.nParity == 2 ? 1 - parity : 0;
 
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
@@ -154,7 +154,7 @@ namespace quda
     } // nDim
   }
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr wilson(const Ftor &ftor) : arg(ftor.arg) { }
@@ -173,7 +173,7 @@ namespace quda
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       Vector out;
       if (arg.dd_out.isZero(coord)) {
@@ -181,7 +181,7 @@ namespace quda
         return;
       }
 
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = arg.a * out;

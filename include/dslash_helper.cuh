@@ -474,16 +474,15 @@ namespace quda
      template template class (template parameter D), which is a
      functor that can apply the dslash.
    */
-  template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-            class D,
-            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <template <typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D,
+            typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   void dslashCPU(Arg arg)
   {
-    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
+    D<Float, nDim, nColor, dagger, xpay, kernel_type, Arg> dslash;
 
-    for (int parity = 0; parity < nParity; parity++) {
+    for (int parity = 0; parity < arg.nParity; parity++) {
       // for full fields then set parity from loop else use arg setting
-      parity = nParity == 2 ? parity : arg.parity;
+      parity = arg.nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
         dslash(arg, x_cb, 0, parity);
@@ -510,7 +509,7 @@ namespace quda
     }
   }
 
-  template <KernelType kernel_type, int nParity, class D, typename Arg>
+  template <KernelType kernel_type, class D, typename Arg>
   void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
@@ -616,15 +615,9 @@ namespace quda
 
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
-        int parity = nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
-#ifdef QUDA_FAST_COMPILE_DSLASH
+        int parity
+          = arg.nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
         dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
-#else
-        switch (parity) {
-        case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
-        case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
-        }
-#endif
         local_tid += target::block_dim().x * blocks_per_dir;
         tid += target::block_dim().x * blocks_per_dir;
       }
@@ -639,14 +632,13 @@ namespace quda
     parameter D), which is a functor that can apply the dslash.  The
     packing routine (P) to be used is similarly passed.
    */
-  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
-            template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
+  template <template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
+            template <bool dagger, QudaPCType pc, typename Arg> class P_, bool dagger_, bool xpay_,
             KernelType kernel_type_, typename Arg_>
   struct dslash_functor_arg : kernel_param<use_kernel_arg> {
     using Arg = Arg_;
-    using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
+    using D = D_<dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
-    static constexpr int nParity = nParity_;
     static constexpr bool dagger = dagger_;
     static constexpr bool xpay = xpay_;
     static constexpr KernelType kernel_type = kernel_type_;
@@ -669,7 +661,6 @@ namespace quda
    */
   template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
-    static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
@@ -683,7 +674,7 @@ namespace quda
     {
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
-      if (nParity == 1) parity = arg.parity;
+      if (arg.nParity == 1) parity = arg.parity;
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
@@ -699,7 +690,7 @@ namespace quda
                  && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                      || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
                          && target::block_idx().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
-        shmem_exterior<kernel_type, nParity>(dslash, arg, s);
+        shmem_exterior<kernel_type>(dslash, arg, s);
 #endif
       } else {
         const int dslash_block_offset
@@ -707,14 +698,7 @@ namespace quda
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
         if (x_cb >= arg.threads) return;
 
-#ifdef QUDA_FAST_COMPILE_DSLASH
         dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
-#else
-        switch (parity) {
-        case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
-        case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
-        }
-#endif
 #ifdef NVSHMEM_COMMS
         if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type>(arg);
 #endif

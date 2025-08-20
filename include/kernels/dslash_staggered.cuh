@@ -80,7 +80,7 @@ namespace quda
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
   */
-  template <int nParity, KernelType kernel_type, int n_src_tile, typename Coord, typename Arg, typename Vector>
+  template <KernelType kernel_type, int n_src_tile, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggered(array<Vector, n_src_tile> &out, const Arg &arg, Coord &coord,
                                                  int parity, int, int thread_dim, bool &active, int src_idx)
   {
@@ -190,8 +190,7 @@ namespace quda
   }
 
   // out(x) = M*in = (-D + m) * in(x-mu)
-  template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
-  struct staggered : dslash_default {
+  template <bool dummy, bool xpay, KernelType kernel_type, typename Arg> struct staggered : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr staggered(const Ftor &ftor) : arg(ftor.arg) { }
@@ -207,7 +206,7 @@ namespace quda
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
 
       array<Vector, n_src_tile> out;
       if (arg.dd_out.isZero(coord)) {
@@ -217,7 +216,7 @@ namespace quda
         return;
       }
 
-      applyStaggered<nParity, mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyStaggered<mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
 #pragma unroll
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;

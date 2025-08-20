@@ -27,8 +27,7 @@ namespace quda
      kernel.  For the wilson class example above, the WilsonArg class
      defined in the same file is the corresponding argument class.
   */
-  template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
-  class Dslash : public TunableKernel3D
+  template <template <bool, bool, KernelType, typename> class D, typename Arg> class Dslash : public TunableKernel3D
   {
 
   protected:
@@ -64,9 +63,6 @@ namespace quda
       strcat(aux_base, comm);
       strcat(aux_base, app_base.c_str());
 
-#ifdef QUDA_FAST_COMPILE_DSLASH
-      strcat(aux_base, ",fast_compile");
-#endif
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
       setRHSstring(aux_base, in.size());
@@ -267,12 +263,12 @@ namespace quda
        all dslash types, though in some cases we specialize to reduce
        compilation time.
     */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    template <template <bool, QudaPCType, typename> class P, bool dagger, bool xpay, KernelType kernel_type>
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
       launch_device<dslash_functor>(
-        tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
+        tp, stream, dslash_functor_arg<D, P, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
 
   public:
@@ -282,23 +278,23 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, bool dagger, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: launch<P, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
 #ifdef NVSHMEM_COMMS
-        case UBER_KERNEL: launch<P, nParity, dagger, xpay, UBER_KERNEL>(tp, stream); break;
+        case UBER_KERNEL: launch<P, dagger, xpay, UBER_KERNEL>(tp, stream); break;
 #endif
-        case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        case EXTERIOR_KERNEL_X: launch<P, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: launch<P, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: launch<P, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: launch<P, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: launch<P, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -313,29 +309,13 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The qudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
-    inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (arg.dagger)
-        instantiate<P, nParity, true, xpay>(tp, stream);
-      else
-        instantiate<P, nParity, false, xpay>(tp, stream);
-    }
-
-    /**
-       @brief This instantiate function is used to instantiate the
-       the nParity template
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The qudaStream_t where the kernel will run
-     */
     template <template <bool, QudaPCType, typename> class P, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-      switch (arg.nParity) {
-      case 1: instantiate<P, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, 2, xpay>(tp, stream); break;
-      default: errorQuda("nParity = %d undefined\n", arg.nParity);
-      }
+      if (arg.dagger)
+        instantiate<P, true, xpay>(tp, stream);
+      else
+        instantiate<P, false, xpay>(tp, stream);
     }
 
     /**
