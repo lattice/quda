@@ -83,6 +83,7 @@ namespace quda
     {
       strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
+      if (tuneSharedCarveOut()) strcat(aux, getSharedCarveOutStr().c_str());
       if (this->location == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef QUDA_LARGE_KERNEL_ARG
         strcat(aux, "large_kernel_arg,");
@@ -100,6 +101,7 @@ namespace quda
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
+      if (tuneSharedCarveOut()) strcat(aux, getSharedCarveOutStr().c_str());
       if (location == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef QUDA_LARGE_KERNEL_ARG
         strcat(aux, "large_kernel_arg,");
