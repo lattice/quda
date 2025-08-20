@@ -707,8 +707,6 @@ namespace quda {
         std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
         ::quda::transform_reduce<reducer>(location, result, v, count, h);
-        std::cout << "offset_cb = " << offset_cb << " stride = " << stride << " start " << start << " count " << count
-                  << " result = " << result[0] << " " << result[1] << std::endl;
         return reducer::apply(result[0], result[1]);
       }
     };
