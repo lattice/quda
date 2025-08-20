@@ -370,7 +370,8 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString().c_str());
+      if (!TunableKernel3D::tuneSharedCarveOut() && tuneSharedCarveOut())
+        strcat(TunableKernel3D::aux, getSharedCarveOutStr().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior,");

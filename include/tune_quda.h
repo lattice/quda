@@ -46,6 +46,12 @@ namespace quda {
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
   /**
+   * @brief Return the most recently used  TuneParam
+   * @retrn Most recent TuneParam
+   */
+  TuneParam getLastTuneParam();
+
+  /**
      @brief Unify all instances of the tunecache across ranks.  This
      is called after returning to a global communicator.
      @param[in] rank_list The list of ranks from whose tunecaches we
@@ -94,6 +100,7 @@ namespace quda {
     virtual bool tuneSharedCarveOut() const;
 
     virtual int sharedCarveOutStep() const;
+    virtual std::string getSharedCarveOutStr() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {

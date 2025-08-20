@@ -740,10 +740,10 @@ namespace quda
   }
 
   static std::string carve_out_step_str;
+  static int carve_out_step = 25; // default is 25% increment
 
-  int Tunable::sharedCarveOutStep() const
+  void set_carve_out_step()
   {
-    static int carve_out_step = 25; // default is 25% increment
     static bool init = false;
 
     if (!init) {
@@ -757,7 +757,18 @@ namespace quda
 
       carve_out_step_str = std::string(",carve_out,step=") + std::to_string(carve_out_step);
     }
+  }
+
+  int Tunable::sharedCarveOutStep() const
+  {
+    set_carve_out_step();
     return carve_out_step;
+  }
+
+  std::string Tunable::getSharedCarveOutStr() const
+  {
+    set_carve_out_step();
+    return carve_out_step_str;
   }
 
   bool Tunable::advanceSharedCarveOut(TuneParam &param) const
@@ -784,7 +795,6 @@ namespace quda
     if (!getTuning()) return true;
 
     TuneKey key = tuneKey();
-    if (tuneSharedCarveOut()) strcat(key.aux, carve_out_step_str.c_str());
     if (use_managed_memory()) strcat(key.aux, ",managed");
     // if key is present in cache then already tuned
     return getTuneCache().find(key) != getTuneCache().end();
@@ -940,6 +950,10 @@ namespace quda
     float getBestTime() const { return besttime; }
   };
 
+  static TuneParam last_tune_param = {};
+
+  TuneParam getLastTuneParam() { return last_tune_param; }
+
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
@@ -953,7 +967,6 @@ namespace quda
 #endif
 
     TuneKey key = tunable.tuneKey();
-    if (tunable.tuneSharedCarveOut()) strcat(key.aux, carve_out_step_str.c_str());
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
     bool is_policy = strncmp(key.aux, "policy,", 7) == 0 ? true : false;
@@ -1004,6 +1017,7 @@ namespace quda
         Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       }
       popVerbosity();
+      last_tune_param = param_tuned;
       return param_tuned;
     }
 
@@ -1028,6 +1042,7 @@ namespace quda
         Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
         Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       }
+      last_tune_param = param_default;
       popVerbosity();
       return param_default;
     } else if (!tuning) {
@@ -1247,6 +1262,7 @@ namespace quda
       Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
     }
 
+    last_tune_param = param;
     popVerbosity();
     return param;
   }
