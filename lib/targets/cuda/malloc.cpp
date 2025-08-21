@@ -275,6 +275,70 @@ namespace quda
     return ptr;
   }
 
+
+
+#define CUCHECK(cmd) do {                                     \
+    CUresult err = cmd;                                       \
+    if( err != CUDA_SUCCESS ) {                               \
+      const char *errStr;                                     \
+      (void) cuGetErrorString(err, &errStr);                  \
+      errorQuda("Cuda failure %s:%d %d '%s'\n",               \
+             __FILE__,__LINE__, err, errStr);                 \
+    }                                                         \
+} while(0)
+
+#ifdef MNNVL_COMMS
+  void *device_fabric_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr;
+    a.base_size = size;
+
+    CUmemGenericAllocationHandle *handle;
+    CUdevice cu_dev;
+    int device_id;
+    cudaGetDevice(&device_id);
+    cuDeviceGet(&cu_dev, device_id);
+
+    size_t granularity = 0;
+    CUmemAllocationProp prop = {};
+    CUmemAccessDesc accessDesc = {};
+    int flag = 0;
+
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
+    prop.location.id = cu_dev;
+
+    CUCHECK(cuDeviceGetAttribute(&flag, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cu_dev));
+    if (flag) prop.allocFlags.gpuDirectRDMACapable = 1;
+
+    CUCHECK(cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM));
+    size = ((size + granularity - 1) / granularity) * granularity;
+    a.size = size;
+
+    // Allocate the physical memory on the device
+    CUCHECK(cuMemCreate(handle, size, &prop, 0));
+
+    // Reserve a virtual address range
+    CUdeviceptr dev_ptr;
+    CUCHECK(cuMemAddressReserve(&dev_ptr, size, granularity, 0, 0));
+    ptr = (void*)dev_ptr;
+
+    // Map the virtual address range to the physical allocation
+    CUCHECK(cuMemMap(dev_ptr, size, 0, *handle, 0));
+
+    // Now allow RW access to the newly mapped memory
+    accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    accessDesc.location.id = cu_dev;
+    accessDesc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    CUCHECK(cuMemSetAccess(dev_ptr, size, &accessDesc, 1));
+
+    track_malloc(DEVICE_PINNED, a, ptr);
+    return ptr;
+}
+#endif
+
   /**
    * Perform a standard malloc() with error-checking.  This function
    * should only be called via the safe_malloc() macro, defined in
@@ -403,8 +467,10 @@ namespace quda
    */
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
-#ifdef NVSHMEM_COMMS
+#if defined(NVSHMEM_COMMS)
     return shmem_malloc_(func, file, line, size);
+#elif defined(MNNVL_COMMS)
+    return device_fabric_pinned_malloc_(func, file, line, size);
 #else
     return device_pinned_malloc_(func, file, line, size);
 #endif
@@ -458,6 +524,38 @@ namespace quda
     if (err != CUDA_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
   }
+
+#ifdef MNNVL_COMMS
+  void device_fabric_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (ptr == nullptr) return;
+    int result = 0;
+    size_t size = 0;
+    CUmemGenericAllocationHandle handle;
+    CUdeviceptr *pbase;
+  
+    //printf("freeing fabric memory at %p, size = %ld\n", ptr, size);
+  
+    CUCHECK(cuMemRetainAllocationHandle(&handle, ptr));
+    CUCHECK(cuMemRelease(handle));
+    //printf("got handle for %p, size = %ld\n", ptr, size);
+  
+    CUCHECK(cuMemGetAddressRange(nullptr, &size, (CUdeviceptr)ptr));
+    //printf("got base address for %p, base addr = %p, size = %ld\n", ptr, pbase, size);
+  
+    CUCHECK(cuMemUnmap((CUdeviceptr)ptr, size));
+    //printf("unmapped %p\n", pbase);
+  
+    CUCHECK(cuMemRelease(handle));
+    //printf("released handle for %p\n", ptr);
+  
+    CUCHECK(cuMemAddressFree((CUdeviceptr)ptr, size));
+    //printf("freed addr reservation for %p\n", ptr);
+  
+    track_free(DEVICE_PINNED, ptr);
+  }
+#endif
+#undef CUCHECK
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -538,6 +636,8 @@ namespace quda
   {
 #ifdef NVSHMEM_COMMS
     shmem_free_(func, file, line, ptr);
+#elif defined(MNNVL_COMMS)
+    device_fabric_pinned_free_(func, file, line, ptr);
 #else
     device_pinned_free_(func, file, line, ptr);
 #endif
