@@ -136,9 +136,12 @@ namespace quda
     if (search == cache.end()) {
       // if not tuning then we cache the configuration
       if (!activeTuning()) cache.insert(func);
-#if CUDA_VERSION < 12050
-      qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, tp.shared_carve_out);
-#endif
+
+      // if either the runtime or drive is less than 12.5, we need to use the legacy path
+      if (device::get_runtime_version() < 12050 || device::get_driver_version() < 12050) {
+        qudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, tp.shared_carve_out);
+      }
+
       // if launch requests the maximum shared memory and the device supports it then opt in
       if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
         cudaFuncAttributes attributes;
@@ -150,27 +153,32 @@ namespace quda
 
     // no driver API variant here since we have C++ functions
     void *args[] = {const_cast<void *>(arg)};
-#if CUDA_VERSION >= 12050
-    // Set up launch configuration
-    cudaLaunchConfig_t config = {};
-    config.gridDim = tp.grid;
-    config.blockDim = tp.block;
-    config.dynamicSmemBytes = tp.shared_bytes;
-    config.stream = get_stream(stream);
 
-    // Set up launch attribute for shared memory carve-out
-    cudaLaunchAttribute attr = {};
-    attr.id = cudaLaunchAttributePreferredSharedMemoryCarveout;
-    attr.val.sharedMemCarveout = tp.shared_carve_out;
+    // only take the extensible launch path if both runtime and driver are sufficient
+    cudaError_t error;
+    if (device::get_runtime_version() >= 12050 && device::get_driver_version() >= 12050) {
+      // Set up launch configuration
+      cudaLaunchConfig_t config = {};
+      config.gridDim = tp.grid;
+      config.blockDim = tp.block;
+      config.dynamicSmemBytes = tp.shared_bytes;
+      config.stream = get_stream(stream);
 
-    config.attrs = &attr;
-    config.numAttrs = 1;
-
-    PROFILE(cudaError_t error = cudaLaunchKernelExC(&config, func, args), QUDA_PROFILE_LAUNCH_KERNEL);
-#else // legacy path
-    PROFILE(cudaError_t error = cudaLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, get_stream(stream)),
-            QUDA_PROFILE_LAUNCH_KERNEL);
+#if CUDA_VERSION > 12050
+      // Set up launch attribute for shared memory carve-out
+      cudaLaunchAttribute attr = {};
+      attr.id = cudaLaunchAttributePreferredSharedMemoryCarveout;
+      attr.val.sharedMemCarveout = tp.shared_carve_out;
 #endif
+      config.attrs = &attr;
+      config.numAttrs = 1;
+
+      PROFILE(error = cudaLaunchKernelExC(&config, func, args), QUDA_PROFILE_LAUNCH_KERNEL);
+    } else {
+      PROFILE(error = cudaLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, get_stream(stream)),
+              QUDA_PROFILE_LAUNCH_KERNEL);
+    }
+
     set_runtime_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
     return error == cudaSuccess ? QUDA_SUCCESS : QUDA_ERROR;
   }
