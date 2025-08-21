@@ -145,11 +145,8 @@ namespace quda
        architecture we are running on.
     */
     constexpr int warp_size() {
-      #if defined(__GFX9__)
+      // FIXME: Need to handle devices with different wavefront sizes
       return 64;
-      #else
-      return 32;
-      #endif
     }
 
     /**
