@@ -2,7 +2,7 @@ name: oneapi_ghactions_build
 
 on:
   pull_request:
-    branches: [ "feature/sycl" ]
+    branches: [ "develop" ]
 
 defaults:
   run:
