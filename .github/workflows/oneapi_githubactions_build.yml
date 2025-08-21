@@ -26,6 +26,9 @@ jobs:
           sudo apt update
           sudo apt install intel-oneapi-hpc-toolkit
 
+      - name: Setup oneAPI
+        run: source /opt/intel/oneapi/setvars.sh
+
       - uses: actions/checkout@v4
 
       - name: Configure CMake
