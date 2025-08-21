@@ -31,6 +31,7 @@ jobs:
           source /opt/intel/oneapi/setvars.sh
           echo $PATH
           which icpx
+          icpx -v
 
       - uses: actions/checkout@v4
 
@@ -40,8 +41,8 @@ jobs:
             -B ${{github.workspace}}/build \
             -GNinja \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DCMAKE_C_COMPILER=icx \
-            -DCMAKE_CXX_COMPILER=icpx \
+            -DCMAKE_C_COMPILER=`which icx` \
+            -DCMAKE_CXX_COMPILER=`which icpx` \
             -DQUDA_TARGET_TYPE=SYCL \
             -DQUDA_SYCL_TARGETS=spir64_x86_64 \
             -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt" \
