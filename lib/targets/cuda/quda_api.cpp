@@ -169,9 +169,9 @@ namespace quda
       cudaLaunchAttribute attr = {};
       attr.id = cudaLaunchAttributePreferredSharedMemoryCarveout;
       attr.val.sharedMemCarveout = tp.shared_carve_out;
-#endif
       config.attrs = &attr;
       config.numAttrs = 1;
+#endif
 
       PROFILE(error = cudaLaunchKernelExC(&config, func, args), QUDA_PROFILE_LAUNCH_KERNEL);
     } else {
