@@ -123,9 +123,9 @@ target_compile_options(
           -fsanitize=undefined>)
 
 if(QUDA_FLUSH_DENORMALS)
-  target_compile_options(quda PRIVATE -Xclang -fgpu-flush-denormals-to-zero>)
+  target_compile_options(quda PRIVATE -Xclang -fgpu-flush-denormals-to-zero)
 else()
-  target_compile_options(quda PRIVATE -Xclang -fno-gpu-flush-denormals-to-zero>)
+  target_compile_options(quda PRIVATE -Xclang -fno-gpu-flush-denormals-to-zero)
 endif()
 
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE HIP)
