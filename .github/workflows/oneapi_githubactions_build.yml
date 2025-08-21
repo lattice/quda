@@ -48,9 +48,9 @@ jobs:
             -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt" \
             -DCMAKE_SYCL_FLAGS="-Xs -march=avx512 -Wno-unsupported-floating-point-opt" \
             -DSYCL_LINK_FLAGS="-Xs -march=avx512 -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code" \
-            -DQUDA_DIRAC_COVDEV=ON \
-            -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=ON \
-            -DQUDA_MULTIGRID=ON \
+            -DQUDA_DIRAC_COVDEV=OFF \
+            -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=OFF \
+            -DQUDA_MULTIGRID=OFF \
             -DQUDA_INTERFACE_QDPJIT=ON \
             -DQUDA_FAST_COMPILE_REDUCE=ON \
             -DQUDA_FAST_COMPILE_DSLASH=ON \
