@@ -32,30 +32,38 @@ jobs:
           printenv >> $GITHUB_ENV
           which icpx
           icpx -v
+          cat /proc/cpuinfo
 
       - uses: actions/checkout@v4
 
+      - name: Ccache for gh actions
+        uses: hendrikmuhs/ccache-action@v1.2.16
+        with:
+          key: ${{ github.job }}
+          max-size: 2000M
+
       - name: Configure CMake
-        run: |
-          cmake \
-            -B ${{github.workspace}}/build \
-            -GNinja \
-            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DCMAKE_C_COMPILER=icx \
-            -DCMAKE_CXX_COMPILER=icpx \
-            -DQUDA_TARGET_TYPE=SYCL \
-            -DQUDA_SYCL_TARGETS=spir64_x86_64 \
-            -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt" \
-            -DCMAKE_SYCL_FLAGS="-Xs -march=avx512 -Wno-unsupported-floating-point-opt" \
-            -DSYCL_LINK_FLAGS="-Xs -march=avx512 -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code" \
-            -DQUDA_DIRAC_COVDEV=OFF \
-            -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=OFF \
-            -DQUDA_MULTIGRID=OFF \
-            -DQUDA_INTERFACE_QDPJIT=ON \
-            -DQUDA_FAST_COMPILE_REDUCE=ON \
-            -DQUDA_FAST_COMPILE_DSLASH=ON \
-            -DQUDA_OPENMP=OFF \
-            -DQUDA_MPI=ON
+        run: >
+          cmake
+          -B ${{github.workspace}}/build
+          -GNinja
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          -DCMAKE_C_COMPILER=icx
+          -DCMAKE_CXX_COMPILER=icpx
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DQUDA_TARGET_TYPE=SYCL
+          -DQUDA_SYCL_TARGETS=spir64_x86_64
+          -DCMAKE_CXX_FLAGS="-Wno-unsupported-floating-point-opt"
+          -DCMAKE_SYCL_FLAGS="-Xs -march=avx512 -Wno-unsupported-floating-point-opt"
+          -DSYCL_LINK_FLAGS="-Xs -march=avx512 -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code"
+          -DQUDA_DIRAC_COVDEV=OFF
+          -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=OFF
+          -DQUDA_MULTIGRID=OFF
+          -DQUDA_INTERFACE_QDPJIT=ON
+          -DQUDA_FAST_COMPILE_REDUCE=ON
+          -DQUDA_FAST_COMPILE_DSLASH=ON
+          -DQUDA_OPENMP=OFF
+          -DQUDA_MPI=ON
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build
