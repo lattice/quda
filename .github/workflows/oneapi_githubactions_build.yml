@@ -1,8 +1,8 @@
 name: oneapi_ghactions_build
 
 on:
-  pull_request:
-    branches: [ "develop" ]
+  push:
+    branches: [ "feature/sycl" ]
 
 defaults:
   run:
