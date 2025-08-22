@@ -1556,26 +1556,28 @@ namespace quda
 
   std::ostream &operator<<(std::ostream &out, const ColorSpinorField &a)
   {
-    out << "location = " << a.Location() << std::endl;
-    out << "v = " << a.v.data() << std::endl;
+    out << static_cast<const LatticeField &>(a);
+    out << "init = " << a.init << std::endl;
     out << "alloc = " << a.alloc << std::endl;
     out << "reference = " << a.reference << std::endl;
-    out << "init = " << a.init << std::endl;
+    out << "ghost_only = " << a.ghost_only << std::endl;
+    out << "ghost_precision_allocated = " << a.ghost_precision_allocated << std::endl;
+    out << "nFace_allocated = " << a.nFace_allocated << std::endl;
+    out << "spin_project_allocated = " << a.spin_project_allocated << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
     out << "nVec = " << a.nVec << std::endl;
     out << "nVec_actual = " << a.nVec_actual << std::endl;
     out << "twistFlavor = " << a.twistFlavor << std::endl;
-    out << "nDim = " << a.nDim << std::endl;
-    for (int d = 0; d < a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
-    out << "volume = " << a.volume << std::endl;
     out << "pc_type = " << a.pc_type << std::endl;
     out << "suggested_parity = " << a.suggested_parity << std::endl;
-    out << "precision = " << a.precision << std::endl;
-    out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "length = " << a.length << std::endl;
+    out << "v = " << a.v.data() << std::endl;
+    out << "norm_offset = " << a.norm_offset << std::endl;
+    out << "ghostFace = " << a.ghostFace << std::endl;
+    out << "ghostFaceCB = " << a.ghostFaceCB << std::endl;
     out << "bytes = " << a.bytes << std::endl;
-    out << "siteSubset = " << a.siteSubset << std::endl;
+    out << "bytes_raw = " << a.bytes_raw << std::endl;
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
@@ -1587,7 +1589,9 @@ namespace quda
     }
     out << "Is component = " << a.composite_descr.is_component << std::endl;
     if (a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
-    out << "pc_type = " << a.pc_type << std::endl;
+    out << "dd.type = " << a.dd.type << std::endl;
+    out << "dd.flags = " << a.dd.flags << std::endl;
+    out << "dd.block_dim = " << a.dd.block_dim << std::endl;
     return out;
   }
 
