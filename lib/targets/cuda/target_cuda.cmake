@@ -424,6 +424,7 @@ endif()
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
+  message(STATUS "Building with NVSHMEM")
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
   add_library(quda_pack OBJECT ${QUDA_DSLASH_OBJS})
   # ####################################################################################################################
