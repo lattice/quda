@@ -291,24 +291,30 @@ namespace quda
   void *device_fabric_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
-    void *ptr;
     a.base_size = size;
 
-    CUmemGenericAllocationHandle *handle;
+    CUmemGenericAllocationHandle handle;
     CUdevice cu_dev;
     int device_id;
-    cudaGetDevice(&device_id);
-    cuDeviceGet(&cu_dev, device_id);
+    cudaError_t err = cudaGetDevice(&device_id);
+    if (err != cudaSuccess) {
+      errorQuda("Failed to get device ID (%s:%d in %s())\n", file, line, func);
+    }
+    auto err2 = cuDeviceGet(&cu_dev, device_id);
+    if (err2 != CUDA_SUCCESS) {
+      errorQuda("Failed to get device (%s:%d in %s())\n", file, line, func);
+    }
 
     size_t granularity = 0;
     CUmemAllocationProp prop = {};
-    CUmemAccessDesc accessDesc = {};
+    
     int flag = 0;
 
     prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
     prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
     prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
     prop.location.id = cu_dev;
+
 
     CUCHECK(cuDeviceGetAttribute(&flag, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cu_dev));
     if (flag) prop.allocFlags.gpuDirectRDMACapable = 1;
@@ -318,24 +324,25 @@ namespace quda
     a.size = size;
 
     // Allocate the physical memory on the device
-    CUCHECK(cuMemCreate(handle, size, &prop, 0));
+    CUCHECK(cuMemCreate(&handle, size, &prop, 0));
 
     // Reserve a virtual address range
     CUdeviceptr dev_ptr;
     CUCHECK(cuMemAddressReserve(&dev_ptr, size, granularity, 0, 0));
-    ptr = (void*)dev_ptr;
+   
 
     // Map the virtual address range to the physical allocation
-    CUCHECK(cuMemMap(dev_ptr, size, 0, *handle, 0));
+    CUCHECK(cuMemMap(dev_ptr, size, 0, handle, 0));
 
     // Now allow RW access to the newly mapped memory
+    CUmemAccessDesc accessDesc = {};
     accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
     accessDesc.location.id = cu_dev;
     accessDesc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
     CUCHECK(cuMemSetAccess(dev_ptr, size, &accessDesc, 1));
-
-    track_malloc(DEVICE_PINNED, a, ptr);
-    return ptr;
+    
+    track_malloc(DEVICE_PINNED, a, (void*)dev_ptr);
+    return (void*)dev_ptr;
 }
 #endif
 
