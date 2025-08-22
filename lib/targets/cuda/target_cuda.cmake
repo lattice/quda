@@ -507,7 +507,7 @@ if(QUDA_NVSHMEM)
   set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_property(TARGET quda PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
   target_link_libraries(quda PUBLIC MPI::MPI_C)
-  
+  target_compile_definitions(quda PUBLIC NVSHMEM_COMMS)
   if(QUDA_DOWNLOAD_NVSHMEM)
     add_dependencies(quda NVSHMEM)
     add_dependencies(quda_cpp NVSHMEM)
