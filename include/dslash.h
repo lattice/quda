@@ -426,6 +426,7 @@ namespace quda
       case Shmem:
         strcat(aux_pack, arg.exterior_dims > 0 ? ",shmemuber" : ",shmem");
         strcat(aux_pack, (arg.shmem & 1 && arg.shmem & 2) ? "3" : "1");
+        strcat(aux_pack, comm_dim_topology_string());
         break;
 
       default: errorQuda("Unknown pack target location %d\n", location);
