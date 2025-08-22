@@ -495,7 +495,9 @@ struct StaggeredDslashTestWrapper {
       printfQuda("GBYTES = %f\n", gbytes);
       ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
-      size_t ghost_bytes = cudaSpinor[0].GhostBytes();
+      int nFace = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 3;
+      auto halo = ColorSpinorField::create_comms_batch(cudaSpinor, nFace);
+      size_t ghost_bytes = static_cast<ColorSpinorField &>(halo).GhostBytes();
 
       ::testing::Test::RecordProperty("Halo_bidirectional_BW_GPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / dslash_time.event_time);
