@@ -108,7 +108,7 @@ void add_meas_io_group(std::shared_ptr<QUDAApp> quda_app)
 void check_naik(double &eps_naik, int &n_naiks)
 {
     if (eps_naik != 0 && n_naiks != 2) {
-     errorQuda("if eps naik is onzero, nnaiks must be 2\n");
+     errorQuda("if eps naik is nonzero, nnaiks must be 2\n");
     }
 }
 
@@ -436,14 +436,14 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     out_flowed_ptr[n] = out_flowed[n].data();
   }
 
-  printfQuda("TEST INVERT\n");
-  invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
-  in_raw[0].PrintVector(0,0,0);
-  out[0].PrintVector(0,0,0);
-  auto PsiPsibarTest = quda::blas::cDotProduct(out[0], out[0]);
-  printfQuda("dot product just out : %f\n",PsiPsibarTest);
-  PsiPsibarTest = quda::blas::cDotProduct(in_raw[0], out[0]);
-  printfQuda("dot product in out : %f\n",PsiPsibarTest);
+  // printfQuda("TEST INVERT\n");
+  // invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
+  // in_raw[0].PrintVector(0,0,0);
+  // out[0].PrintVector(0,0,0);
+  // auto PsiPsibarTest = quda::blas::cDotProduct(out[0], out[0]);
+  // printfQuda("dot product just out : %f\n",PsiPsibarTest);
+  // PsiPsibarTest = quda::blas::cDotProduct(in_raw[0], out[0]);
+  // printfQuda("dot product in out : %f\n",PsiPsibarTest);
   performAdjGFlowHier(in_ptr.data(),in_raw_ptr.data(), &inv_param, &smear_param, &ferm_meas, Nsrc);
 
   printfQuda("At end ppb has %li elements\n",ppb.size());
