@@ -6006,6 +6006,61 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 }
 
+void perform_ferm_ppb_meas(void **f_temp4, void **f_temp3,  QudaInvertParam *inv_param, FermMeasObj *ferm_m){
+      int Nsrc = (int) f_temp4.size();
+      int Nsrc_tile = inv_param->num_src;
+      printfQuda("We are here now, m = %i\n",m);
+      std::vector<void*> data_f_temp3_tiled(Nsrc_tile), data_f_temp4_tiled(Nsrc_tile);
+      printfQuda("starting another meas\n");
+      ferm_m.meas_list.push_back(ferm_m.i_glob);
+      f_temp3[0].PrintVector(0,0,0);
+      for (int j = 0; j < Nsrc; j += Nsrc_tile) {
+        for (int i = 0; i < Nsrc_tile; i++) {
+          data_f_temp3_tiled[i] = f_temp3[j + i].data();
+          data_f_temp4_tiled[i] = f_temp4[j + i].data();
+        }
+        // invertMultiSrcQudaEG(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param,*&gaugePrecise);
+        invertMultiSrcQuda(data_f_temp4_tiled.data(),data_f_temp3_tiled.data(),inv_param);
+      }
+      f_temp4[0].PrintVector(0,0,0);
+      std::vector<std::reference_wrapper<GaugeField>> t_gf_list;
+      smear_param->n_steps = m;
+      cvector<Complex> PsiPsibarTest = quda::blas::cDotProduct(f_temp3, f_temp4);
+      ferm_m.ppb.push_back(PsiPsibarTest);
+      if (ferm_m.take_fwd_gflow){
+        t_gf_list = {gaugeTemp,precise};
+        gfEvolve(f_temp4,t_gf_list, smear_param, inv_param, smear_param->n_steps, profileAdjGFlowHier);
+        printfQuda("checking again\n");
+        f_temp4[0].PrintVector(0,0,0);
+        cvector<Complex> PsiPsibarR = quda::blas::cDotProduct(ferm_m.vec_ref,f_temp4);
+        printfQuda("first element in delta ppb (%1.5e, %1.5e)\n",real(PsiPsibarR[0] - PsiPsibarTest[0]),imag(PsiPsibarR[0] - PsiPsibarTest[0]));
+      }
+
+      std::vector<std::vector<Complex>> ppb_t_el = {};
+    
+      QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+      printfQuda("here?\n");
+      std::array<int, 4> mom_modes = {0,0,0,0};
+      std::array<QudaFFTSymmType, 4> fft_modes = {eo,eo,eo,eo};
+      std::array<int, 4> source_position = {0,0,0,0};
+      //Why not this?
+      // int source_position = 0;
+      // QudaFFTSymmType fft_modes = eo;
+      // int mom_modes = 0;
+      QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+      std::vector<Complex> result_global(f_temp0[0].full_dim(3)*comm_dim(3));
+
+      for (size_t nn = 0; nn < f_temp4.size(); nn++){
+        std::fill(result_global.begin(), result_global.end(), 0.0);
+        contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
+        //necessary?
+        comm_allreduce_sum(result_global);
+        ppb_t_el.push_back(result_global);
+        }
+        ferm_m.ppb_t.push_back(ppb_t_el);
+    
+}
+
 void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list, std::vector<GaugeField> &gauge_stages,
                    std::vector<std::reference_wrapper<GaugeField>> sub_gf_list, GaugeField &gin, GaugeField &gout, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
                    TimeProfile &profile, FermMeasObj *ferm_m)
@@ -6195,9 +6250,26 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   auto n_steps_total = smear_param->n_steps;
   auto adj_n_save_init = smear_param->adj_n_save;
+
+  std::vector<unsigned int> meas_int_vec = {};
+  auto* meas_list_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas->meas_int_vec);
+  if (meas_list_pt == nullptr){
+    printfQuda("meas list not populated yet, populating now\n");
+    for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
+        meas_int_vec.push_back(m);
+    }
+  }
+  else{
+    printfQuda("meas list found\n");
+    meas_int_vec = *meas_list_pt;
+  }
+    
+  printfQuda("begin initial measurement\n");
+
   if (!ferm_meas->take_meas)
     algorithmHier(sf_list,gauge_stages,sub_gf_list,gin,gout,inv_param,smear_param,profileAdjGFlowHier,&ferm_m);
   else {
+      
     for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
       smear_param->n_steps = m;
       if (m <= adj_n_save_init)
