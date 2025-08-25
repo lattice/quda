@@ -5,6 +5,7 @@
 #include <quda_cuda_api.h>
 #include <nvml.h>
 #include "monitor.h"
+#include "mnnvl_helper.h"
 
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
@@ -12,6 +13,19 @@ static const int Nstream = 9;
 
 #define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
+#undef CU_CHECK
+#define CU_CHECK(stmt)                                                                  \
+    do {                                                                                \
+        CUresult result = (stmt);                                                       \
+        const char *str;                                                                \
+        if (CUDA_SUCCESS != result) {                                                   \
+            CUresult ret = cuGetErrorString(result, &str);                              \
+            if (ret == CUDA_ERROR_INVALID_VALUE) str = "Unknown error";                 \
+            fprintf(stderr, "[%s:%d] cuda failed with %s \n", __FILE__, __LINE__, str); \
+            exit(-1);                                                                   \
+        }                                                                               \
+    } while (0)
 
 #define NVML_CHECK(func)                                                                                               \
   {                                                                                                                    \
@@ -22,6 +36,7 @@ static const int Nstream = 9;
       errorQuda(" NVML returns %s", nvmlErrorString(ret));                                                             \
     }                                                                                                                  \
   }
+
 
 namespace quda
 {
@@ -34,6 +49,16 @@ namespace quda
     static int device_id = -1;
 
     static nvmlDevice_t monitor_device_id;
+
+    // forward declare
+    bool is_mnnvl_supported(int dev_id);
+    static bool mnnvl_capable = false;
+
+    // This is exposed via mnnvl_helper.h
+    bool get_mnnvl_capable()
+    {
+       return mnnvl_capable;
+    } 
 
     int get_driver_version()
     {
@@ -134,6 +159,7 @@ namespace quda
 
       printf("Initializing monitoring on device %d with pciBusId %s: %s\n", device_id, pciBusId, name);
       monitor::init();
+      mnnvl_capable=is_mnnvl_supported(device_id);
     }
 
     void init_thread()
@@ -369,6 +395,76 @@ namespace quda
       void stop() { cudaProfilerStop(); }
 
     } // namespace profile
+
+    bool is_mnnvl_supported(int dev_id) {
+      nvmlGpuFabricInfo_t fabricInfo = {};
+      const unsigned char zero[NVML_GPU_FABRIC_UUID_LEN] = {0};
+      cudaDeviceProp prop;
+      char pcie_bdf[50] = {0};
+      int nbytes = 0;
+      int attr;
+      nvmlReturn_t nvml_status;
+      nvmlDevice_t local_device;
+      CUdevice my_dev;
+      int cuda_drv_version;
+#if 0
+      fabricInfo.version = nvmlGpuFabricInfo_v2;
+#endif
+      CHECK_CUDA_ERROR(cudaDriverGetVersion(&cuda_drv_version));
+      CU_CHECK(cuDeviceGet(&my_dev, dev_id));
+
+      CHECK_CUDA_ERROR(cudaGetDeviceProperties(&prop, dev_id));
+      nbytes =
+        snprintf(pcie_bdf, 50, "%x:%x:%x.0", prop.pciDomainID, prop.pciBusID, prop.pciDeviceID);
+      if (nbytes < 0 || nbytes > 50) {
+        logQuda(QUDA_DEBUG_VERBOSE, "Unable to set device pcie bdf for our local device, disabling MNNVL\n");
+        return false;
+      }
+
+      if (cuda_drv_version >= 12040 && prop.major >= 9) {
+        nvml_status = nvmlDeviceGetHandleByPciBusId(pcie_bdf, &local_device);
+        if (nvml_status != NVML_SUCCESS) {
+            logQuda(QUDA_DEBUG_VERBOSE, "nvmlDeviceGetHandleByPciBusId failed %d, disabling MNNVL\n", nvml_status);
+            return false;
+        }
+
+#if 0
+        /* Some platforms with older driver may not support this API, so bypass MNNVL discovery */
+        if (nvmlDeviceGetGpuFabricInfoV == NULL) {
+            logQuda(QUDA_DEBUG_VERBOSE, "nvmlDeviceGetGpuFabricInfoV not found, MNNVL not supported\n");
+            return false;
+        }
+
+        nvml_status = nvmlDeviceGetGpuFabricInfoV(local_device, &fabricInfo);
+#endif
+
+        nvml_status = nvmlDeviceGetGpuFabricInfo(local_device, &fabricInfo);
+        if (nvml_status != NVML_SUCCESS) {
+            logQuda(QUDA_DEBUG_VERBOSE, "nvmlDeviceGetGpuFabricInfoV failed %d, disabling MNNVL\n", nvml_status);
+            return false;
+        }
+
+        CU_CHECK(
+            cuDeviceGetAttribute(&attr, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED, my_dev));
+        if (attr <= 0) {
+            logQuda(QUDA_DEBUG_VERBOSE, "CUDA EGM fabric not supported\n");
+            return false;
+        }
+
+        if (fabricInfo.state < NVML_GPU_FABRIC_STATE_COMPLETED ||
+            memcmp(fabricInfo.clusterUuid, zero, NVML_GPU_FABRIC_UUID_LEN) == 0) {
+            logQuda(QUDA_DEBUG_VERBOSE, "MNNVL not supported\n");
+            return false;
+        }
+    } else {
+        logQuda(QUDA_VERBOSE, "MNNVL disabled\n");
+        return false;
+    }
+
+    return true;
+}
+
+
 
   } // namespace device
 

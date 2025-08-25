@@ -8,6 +8,7 @@
 #include <device.h>
 #include <shmem_helper.cuh>
 #include "timer.h"
+#include "mnnvl_helper.h"
 
 #ifdef USE_QDPJIT
 #include "qdp_cache.h"
@@ -16,6 +17,17 @@
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 #endif
+
+// Do we have one of these elsewhere? 
+#define CUCHECK(cmd) do {                                   \
+  CUresult err = cmd;                                       \
+  if( err != CUDA_SUCCESS ) {                               \
+    const char *errStr;                                     \
+    (void) cuGetErrorString(err, &errStr);                  \
+    errorQuda("Cuda failure %s:%d:%s:  %d '%s'\n",          \
+           file,line,func, err, errStr);                    \
+  }                                                         \
+} while(0)
 
 namespace quda
 {
@@ -31,6 +43,11 @@ namespace quda
     int line;
     size_t size;
     size_t base_size;
+
+#ifdef NVSHMEM_COMMS
+    void *original_ptr;
+#endif
+
 #ifdef QUDA_BACKWARDSCPP
     backward::StackTrace st;
 #endif
@@ -249,104 +266,6 @@ namespace quda
   }
 
   /**
-   * Perform a cuMemAlloc with error-checking.  This function is to
-   * guarantee a unique memory allocation on the device, since
-   * cudaMalloc can be redirected (as is the case with QDPJIT).  This
-   * should only be called via the device_pinned_malloc() macro,
-   * defined in malloc_quda.h.
-   */
-  void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
-  {
-    if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
-
-    MemAlloc a(func, file, line);
-    void *ptr;
-
-    a.size = a.base_size = size;
-
-    CUresult err = cuMemAlloc((CUdeviceptr *)&ptr, size);
-    if (err != CUDA_SUCCESS) {
-      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
-    track_malloc(DEVICE_PINNED, a, ptr);
-#ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
-#endif
-    return ptr;
-  }
-
-
-
-#define CUCHECK(cmd) do {                                     \
-    CUresult err = cmd;                                       \
-    if( err != CUDA_SUCCESS ) {                               \
-      const char *errStr;                                     \
-      (void) cuGetErrorString(err, &errStr);                  \
-      errorQuda("Cuda failure %s:%d %d '%s'\n",               \
-             __FILE__,__LINE__, err, errStr);                 \
-    }                                                         \
-} while(0)
-
-#ifdef MNNVL_COMMS
-  void *device_fabric_pinned_malloc_(const char *func, const char *file, int line, size_t size)
-  {
-    MemAlloc a(func, file, line);
-    a.base_size = size;
-
-    CUmemGenericAllocationHandle handle;
-    CUdevice cu_dev;
-    int device_id;
-    cudaError_t err = cudaGetDevice(&device_id);
-    if (err != cudaSuccess) {
-      errorQuda("Failed to get device ID (%s:%d in %s())\n", file, line, func);
-    }
-    auto err2 = cuDeviceGet(&cu_dev, device_id);
-    if (err2 != CUDA_SUCCESS) {
-      errorQuda("Failed to get device (%s:%d in %s())\n", file, line, func);
-    }
-
-    size_t granularity = 0;
-    CUmemAllocationProp prop = {};
-    
-    int flag = 0;
-
-    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-    prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_FABRIC;
-    prop.location.id = cu_dev;
-
-
-    CUCHECK(cuDeviceGetAttribute(&flag, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cu_dev));
-    if (flag) prop.allocFlags.gpuDirectRDMACapable = 1;
-
-    CUCHECK(cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM));
-    size = ((size + granularity - 1) / granularity) * granularity;
-    a.size = size;
-
-    // Allocate the physical memory on the device
-    CUCHECK(cuMemCreate(&handle, size, &prop, 0));
-
-    // Reserve a virtual address range
-    CUdeviceptr dev_ptr;
-    CUCHECK(cuMemAddressReserve(&dev_ptr, size, granularity, 0, 0));
-   
-
-    // Map the virtual address range to the physical allocation
-    CUCHECK(cuMemMap(dev_ptr, size, 0, handle, 0));
-
-    // Now allow RW access to the newly mapped memory
-    CUmemAccessDesc accessDesc = {};
-    accessDesc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-    accessDesc.location.id = cu_dev;
-    accessDesc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-    CUCHECK(cuMemSetAccess(dev_ptr, size, &accessDesc, 1));
-    
-    track_malloc(DEVICE_PINNED, a, (void*)dev_ptr);
-    return (void*)dev_ptr;
-}
-#endif
-
-  /**
    * Perform a standard malloc() with error-checking.  This function
    * should only be called via the safe_malloc() macro, defined in
    * malloc_quda.h
@@ -444,29 +363,129 @@ namespace quda
 #endif
     return ptr;
   }
+
+  // We are going to rip off the function from the NVSHMEM docs to 
+  // allocate a user buffer with given Properties
+  constexpr size_t getNVSHMEMGranularity() {
+	  return 536870912UL;
+  }
+  
   /**
-   * Allocate shemm device memory. This function should only be called via
-   * device_comms_pinned_malloc_()
+   * Perform a cuMemAlloc with error-checking.  This function is to
+   * guarantee a unique memory allocation on the device, since
+   * cudaMalloc can be redirected (as is the case with QDPJIT).  This
+   * should only be called via the device_pinned_malloc() macro,
+   * defined in malloc_quda.h.
    */
+  std::pair<void *,size_t> device_pinned_malloc_impl_(const char *func, const char *file, int line, size_t size, bool nvshmem_allocation=false)
+  {
+    /* Determine the CUdevice from the current CUDA device */
+    CUdevice cu_dev;
+    int device_id;
+    cudaError_t err = cudaGetDevice(&device_id);
+    if (err != cudaSuccess) {
+      errorQuda("Failed to get device ID (%s:%d in %s())\n", file, line, func);
+    }
+    auto err2 = cuDeviceGet(&cu_dev, device_id);
+    if (err2 != CUDA_SUCCESS) {
+      errorQuda("Failed to get device (%s:%d in %s())\n", file, line, func);
+    }
+
+    /* Set up the allocation properties */
+    CUmemAllocationProp prop = {};
+    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.location.id = cu_dev;
+   
+    int flag=0; 
+    CUCHECK(cuDeviceGetAttribute(&flag, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cu_dev));
+    if (flag) prop.allocFlags.gpuDirectRDMACapable = 1; 
+    
+    if ( nvshmem_allocation ) {
+      if ( device::get_mnnvl_capable() ) prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_FABRIC);
+      else prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR);
+    }
+    else {
+      // For non-NVSHMEM we always ask for fabric for UCX (this is maybe a bit system specific)
+      prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_FABRIC);
+    }
+
+    size_t granularity = 0;
+    
+    if ( nvshmem_allocation ) granularity  = getNVSHMEMGranularity();
+    else {
+      CUCHECK(cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM));
+    }
+    size = ((size + granularity - 1) / granularity) * granularity;
+
+    void *dev_ptr = nullptr;
+
+    /* Set up the allocation and mapping */
+    CUmemAccessDesc accessDescriptor;
+    accessDescriptor.location.id = prop.location.id;
+    accessDescriptor.location.type = prop.location.type;
+    accessDescriptor.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+
+    CUmemGenericAllocationHandle allocHandle;
+    
+    CUCHECK(cuMemCreate(&allocHandle, size, (const CUmemAllocationProp *)&prop, 0));
+    CUCHECK(cuMemAddressReserve((CUdeviceptr *)&dev_ptr, size, 0, (CUdeviceptr)NULL, 0));
+    CUCHECK(cuMemMap((CUdeviceptr)dev_ptr, size, 0, allocHandle, 0));
+    CUCHECK(cuMemSetAccess((CUdeviceptr)dev_ptr, size, (const CUmemAccessDesc *)&accessDescriptor, 1));
+    
+    if (dev_ptr == nullptr) {
+      printfQuda("ERROR: Failed to create user buffer of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Aborting");
+    }
+#ifdef HOST_DEBUG
+    cudaMemset((void *)dev_ptr, 0xff, size);
+#endif
+    return std::make_pair((void *)dev_ptr, size);
+}
+
 #ifdef NVSHMEM_COMMS
   void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
+    a.base_size = size;
 
-    a.size = a.base_size = size;
-
-    auto ptr = nvshmem_malloc(size);
+    auto [ptr,new_size] = device_pinned_malloc_impl_(func, file, line, size, true);
     if (ptr == nullptr) {
       printfQuda("ERROR: Failed to allocate shmem memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
-    track_malloc(SHMEM, a, ptr);
-#ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
-#endif
-    return ptr;
+    a.original_ptr = ptr;
+    a.size = new_size;
+
+    /* Register the memory with NVSHMEM -- we will get a new pointer back*/
+    void *symm_ptr = nvshmemx_buffer_register_symmetric(ptr, new_size, 0);
+    if (symm_ptr == nullptr) {
+      printfQuda("ERROR: Failed to register shmem memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Aborting");
+    }
+
+    /* Track the new pointer */
+    /* Original pointer is still tracked in alloc[DEVICE_PINNED] */
+    track_malloc(SHMEM, a, symm_ptr);
+    cudaMemset(symm_ptr, 0xff, new_size);
+    return symm_ptr;
   }
 #endif
+
+   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+   {
+     // if P2P is not present, then likely we don't have IPC
+     // So we should just go for a regular device alloc
+     if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
+
+     MemAlloc a(func, file, line);
+     a.base_size = size;
+     a.size = size;
+     auto [ptr,new_size] = device_pinned_malloc_impl_(func, file, line, size, false);
+     a.size = new_size;
+     track_malloc(DEVICE_PINNED, a, (void*)ptr);
+     return (void *)ptr;
+   }
 
   /**
    * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
@@ -474,10 +493,8 @@ namespace quda
    */
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
-#if defined(NVSHMEM_COMMS)
+#ifdef NVSHMEM_COMMS
     return shmem_malloc_(func, file, line, size);
-#elif defined(MNNVL_COMMS)
-    return device_fabric_pinned_malloc_(func, file, line, size);
 #else
     return device_pinned_malloc_(func, file, line, size);
 #endif
@@ -510,59 +527,6 @@ namespace quda
 
     track_free(DEVICE, ptr);
   }
-
-  /**
-   * Free device memory allocated with device_pinned malloc().  This
-   * function should only be called via the device_pinned_free()
-   * macro, defined in malloc_quda.h
-   */
-  void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
-  {
-    if (!comm_peer2peer_present()) {
-      device_free_(func, file, line, ptr);
-      return;
-    }
-
-    if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
-    if (!alloc[DEVICE_PINNED].count(ptr)) {
-      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
-    }
-    CUresult err = cuMemFree((CUdeviceptr)ptr);
-    if (err != CUDA_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
-    track_free(DEVICE_PINNED, ptr);
-  }
-
-#ifdef MNNVL_COMMS
-  void device_fabric_pinned_free_(const char *func, const char *file, int line, void *ptr)
-  {
-    if (ptr == nullptr) return;
-    int result = 0;
-    size_t size = 0;
-    CUmemGenericAllocationHandle handle;
-    CUdeviceptr *pbase;
-  
-    //printf("freeing fabric memory at %p, size = %ld\n", ptr, size);
-  
-    CUCHECK(cuMemRetainAllocationHandle(&handle, ptr));
-    CUCHECK(cuMemRelease(handle));
-    //printf("got handle for %p, size = %ld\n", ptr, size);
-  
-    CUCHECK(cuMemGetAddressRange(nullptr, &size, (CUdeviceptr)ptr));
-    //printf("got base address for %p, base addr = %p, size = %ld\n", ptr, pbase, size);
-  
-    CUCHECK(cuMemUnmap((CUdeviceptr)ptr, size));
-    //printf("unmapped %p\n", pbase);
-  
-    CUCHECK(cuMemRelease(handle));
-    //printf("released handle for %p\n", ptr);
-  
-    CUCHECK(cuMemAddressFree((CUdeviceptr)ptr, size));
-    //printf("freed addr reservation for %p\n", ptr);
-  
-    track_free(DEVICE_PINNED, ptr);
-  }
-#endif
-#undef CUCHECK
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -616,6 +580,43 @@ namespace quda
     }
   }
 
+
+  void device_pinned_free_impl_(const char *func, const char *file, int line, void *ptr, size_t size)
+  {
+    if (ptr == nullptr ) return;
+    CUmemGenericAllocationHandle memHandle;
+    CUCHECK(cuMemRetainAllocationHandle(&memHandle, ptr));
+    CUCHECK(cuMemUnmap((CUdeviceptr)ptr, size));
+    CUCHECK(cuMemAddressFree((CUdeviceptr)ptr, size));
+    CUCHECK(cuMemRelease(memHandle));
+  }
+
+  /**
+   * Free device memory allocated with device_pinned malloc().  This
+   * function should only be called via the device_pinned_free()
+   * macro, defined in malloc_quda.h
+   */
+  void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (ptr == nullptr) return;
+
+    /* if we have no P2P then we will have allocated with device_malloc_ so use device_free_ */
+    if (!comm_peer2peer_present()) { 
+	device_free_(func, file, line, ptr); 
+	return;
+    }
+
+    auto it = alloc[DEVICE_PINNED].find(ptr);
+    if (it == alloc[DEVICE_PINNED].end()) {
+      printfQuda("ERROR: Failed to find original pointer in fabric allocator (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+
+    auto size = it->second.size;
+    device_pinned_free_impl_(func,file,line,ptr,size);
+    track_free(DEVICE_PINNED, ptr);
+  }
+
 #ifdef NVSHMEM_COMMS
   /**
    * Free symmetric memory allocated with shmem_malloc_. Should only be called via the device_comms_* functions.
@@ -626,11 +627,19 @@ namespace quda
       printfQuda("ERROR: Attempt to free NULL shmem pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
-    if (!alloc[SHMEM].count(ptr)) {
+    /* Need the original pointer */
+    auto it = alloc[SHMEM].find(ptr);
+    if (it == alloc[SHMEM].end()) {
       printfQuda("ERROR: Attempt to free invalid shmem pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
-    nvshmem_free(ptr);
+    /* Get back the orginal pointer -- from the found iterator into the alloc map*/
+    void *original_ptr = it->second.original_ptr;
+    auto size = it->second.size;
+
+    /* Now we can unregister the memory from NVSHMEM */
+    nvshmemx_buffer_unregister_symmetric(ptr, size);
+    device_pinned_free_impl_(func,file,line, original_ptr, size);
     track_free(SHMEM, ptr);
   }
 #endif
@@ -643,8 +652,6 @@ namespace quda
   {
 #ifdef NVSHMEM_COMMS
     shmem_free_(func, file, line, ptr);
-#elif defined(MNNVL_COMMS)
-    device_fabric_pinned_free_(func, file, line, ptr);
 #else
     device_pinned_free_(func, file, line, ptr);
 #endif

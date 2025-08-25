@@ -96,9 +96,6 @@ set(QUDA_GDRCOPY_HOME
     CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
 # NVTX options
 option(QUDA_INTERFACE_NVTX "add NVTX markup to interface calls" OFF)
-set(QUDA_MNNVL
-    OFF
-    CACHE BOOL "set to 'yes' to build the MNNVL multi-GPU code")
 
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
@@ -517,10 +514,6 @@ if(QUDA_NVSHMEM)
   get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
   target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${NVSHMEM_INCLUDE}>)
-endif()
-
-if(QUDA_MNNVL)
-  target_compile_definitions(quda PUBLIC MNNVL_COMMS)
 endif()
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
