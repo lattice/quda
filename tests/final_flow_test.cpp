@@ -28,6 +28,7 @@ QudaEigParam eig_param;
 bool use_split_grid = false;
 bool use_multi_src = false;
 
+int start_seed = 0;
 std::string meas_vec_file_str = "";
 
 // print instructions on how to run the old tests
@@ -102,6 +103,10 @@ void add_meas_io_group(std::shared_ptr<QUDAApp> quda_app)
     ->add_option(
       "--meas-vec-txt",
       meas_vec_file_str, "measurement interval text file");
+    opgroup
+    ->add_option(
+      "--start-seed",
+      start_seed, "start seed for random sources");
     
 }
 
@@ -109,6 +114,9 @@ void check_naik(double &eps_naik, int &n_naiks)
 {
     if (eps_naik != 0 && n_naiks != 2) {
      errorQuda("if eps naik is nonzero, nnaiks must be 2\n");
+    }
+    if (eps_naik == 0 && n_naiks == 2) {
+     errorQuda("eps naik is zero, and nnaiks is 2, dont be lazy and go back and change the configs\n");
     }
 }
 
@@ -136,7 +144,29 @@ std::vector<unsigned int> read_meas_int_vec()
 
 void write_files(const QudaFermMeasurements &ferm_meas)
 {
-  std::string filename = "./testppb.txt";
+  std::string quark_str = n_naiks > 1 ? "_cbarc_" : "_sbars_";
+  std::string start_marker = "/cfgs/";
+  std::string end_marker = "/";
+  size_t start_pos = latfile.find(start_marker);
+  if (start_pos == std::string::npos) {
+      errorQuda("something wrong with gauge filename format for loading\n"); // The start marker wasn't found, so we can't proceed.
+  }
+  size_t sequence_start = start_pos + start_marker.length();
+  size_t end_pos = latfile.find(end_marker, sequence_start);
+  if (end_pos == std::string::npos) {
+      errorQuda("something wrong with gauge filename format for loading, round 2\n"); //
+  }
+  size_t length = end_pos - sequence_start;
+  std::string ampi_substr = latfile.substr(sequence_start, length);
+  printfQuda((ampi_substr+" is the ampi substring\n").c_str());
+
+  std::string full_substr = latfile.substr(sequence_start);
+  std::replace( full_substr.begin(), full_substr.end(), '/', '_');
+  full_substr = full_substr + "_Nsrc" + std::to_string(Nsrc)+quark_str+"_epsN"+std::to_string(eps_naik)+"_ss_"+std::to_string(start_seed);
+  printfQuda((full_substr+" is the full substring\n").c_str());
+    
+    
+  std::string filename = "./data/comp_"+full_substr;
   std::ofstream out_ppb(filename);
   
   if (!out_ppb.is_open()) {
@@ -145,13 +175,13 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
   for (const auto& row : *ppb_data) {
       for (const auto& elem : row) {
-          out_ppb << elem.real() << " ";
+          out_ppb << elem.real()/(V*comm_size()) << " ";
       }
       out_ppb << "\n"; // Newline after each row
   }
   out_ppb.close();
   
-  filename ="./testppb_t.txt";
+  filename ="./data/conT_"+full_substr;
   std::ofstream out_ppb_t(filename);
   if (!out_ppb_t.is_open()) {
       std::cerr << "Failed to open file: " << filename << std::endl;
@@ -159,11 +189,11 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   auto* ppb_t_data = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas.ppb_t);
   
   for (const auto& flow_t: *ppb_t_data) {
-      out_ppb_t << "begin new flow time\n\n";
+      // out_ppb_t << "begin new flow time\n\n";
       for (const auto& s_src : flow_t) {
-        out_ppb_t << "next source\n";
+        // out_ppb_t << "next source\n";
         for (const auto& elem : s_src) {
-          out_ppb_t << elem.real() << " ";
+          out_ppb_t << elem.real()/(V*comm_size()) << " ";
         }
         out_ppb_t << "\n";
       }
@@ -429,7 +459,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
 
   for (int n = 0; n < Nsrc; n++) {
     // Populate the host spinor with random numbers.
-    quda::spinorNoise(in_raw[n], n, QUDA_NOISE_GAUSS);
+    quda::spinorNoise(in_raw[n], n + start_seed, QUDA_NOISE_GAUSS);
     in_raw_ptr[n] = in_raw[n].data();
     in_ptr[n] = in[n].data();
     out_ptr[n] = out[n].data();
