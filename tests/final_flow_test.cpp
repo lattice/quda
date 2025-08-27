@@ -164,16 +164,32 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   output_filestr += "_naik" + std::to_string(eps_naik);
   output_filestr += "_start" + std::to_string(start_seed) + "_Nsrc" + std::to_string(Nsrc);
 
-  std::string filename = output_dir.string()+"/allcon_"+output_filestr;
+  std::string filename_allcon = output_dir.string()+"/allcon_"+output_filestr;
+  std::string filename_tslice = output_dir.string()+"/tslice_"+output_filestr;
 
   auto* flow_int_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas.meas_int_vec);
   auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
   printfQuda("flow vec size %i \n",(*flow_int_pt).size());
   printfQuda("ppb data size %i \n",(*ppb_data).size());
 
-  std::ofstream out_ppb(filename);
+  std::ofstream out_ppb(filename_allcon);
+  std::vector<std::ofstream> out_ppb_vec, out_ppb_t_vec;
+  out_ppb_t_vec.reserve(ppb_data->size());
+  for (int i = 0; i < ppb_data->size(); i++){
+    std::string flowN_s = (i == 0) ? std::to_string(0) : std::to_string(flow_int_pt->at(i-1));
+    std::string epsF_s =  (i == 0) ? "" : "_epsF" + std::to_string(gauge_smear_epsilon);
+    std::string flow_file_name(filename_tslice+"_FT"+flowN_s+epsF_s);
+    out_ppb_t_vec.emplace_back(flow_file_name);
+    if (!out_ppb_t_vec.back().is_open()) {
+        printfQuda("Error: failed to open flow file #%i\n",i);
+    } else {
+        printfQuda("Successfully opened flow file #%i\n",i);
+    }
+  }
+  
+    //stuff works above
   if (!out_ppb.is_open()) {
-      std::cerr << "Failed to open file: " << filename << std::endl;
+      std::cerr << "Failed to open file: " << filename_allcon << std::endl;
   }
     
   for (const auto& row : *ppb_data) {
@@ -183,28 +199,31 @@ void write_files(const QudaFermMeasurements &ferm_meas)
       out_ppb << "\n"; // Newline after each row
   }
   out_ppb.close();
-  
-  filename = output_dir.string()+"/tslice_"+output_filestr;
-  std::ofstream out_ppb_t(filename);
+
+  std::ofstream out_ppb_t(filename_tslice);
   if (!out_ppb_t.is_open()) {
-      std::cerr << "Failed to open file: " << filename << std::endl;
+      std::cerr << "Failed to open file: " << filename_tslice << std::endl;
   }
   auto* ppb_t_data = reinterpret_cast<std::vector<std::vector<std::vector<Complex>>>*>(ferm_meas.ppb_t);
-  
+
+  unsigned int flow_idx = 0;
   for (const auto& flow_t: *ppb_t_data) {
-      // out_ppb_t << "begin new flow time\n\n";
+      assert(out_ppb_t_vec[flow_idx].good());
+      printfQuda("begin writing flow time #%i\n",flow_idx);
       for (const auto& s_src : flow_t) {
         // out_ppb_t << "next source\n";
         for (const auto& elem : s_src) {
           out_ppb_t << elem.real()/(V*comm_size()) << " ";
+          out_ppb_t_vec[flow_idx] << elem.real()/(V*comm_size()) << " ";
         }
         out_ppb_t << "\n";
+        out_ppb_t_vec[flow_idx] << "\n";
       }
     out_ppb_t << "\n";
+    // out_ppb_t_vec[flow_idx].close();
+    flow_idx += 1;
   }
   out_ppb_t.close();
- 
-  
 }
 
 void init()
