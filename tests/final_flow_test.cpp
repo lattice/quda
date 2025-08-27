@@ -17,6 +17,7 @@
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
+#include <filesystem>
 #include "test.h"
 
 QudaGaugeParam gauge_param;
@@ -144,35 +145,37 @@ std::vector<unsigned int> read_meas_int_vec()
 
 void write_files(const QudaFermMeasurements &ferm_meas)
 {
-  std::string quark_str = n_naiks > 1 ? "_cbarc_" : "_sbars_";
-  std::string start_marker = "/cfgs/";
-  std::string end_marker = "/";
-  size_t start_pos = latfile.find(start_marker);
-  if (start_pos == std::string::npos) {
-      errorQuda("something wrong with gauge filename format for loading\n"); // The start marker wasn't found, so we can't proceed.
+  std::filesystem::path latfile_path(latfile);
+  std::string latfile_dir = latfile_path.parent_path().string();
+  std::string latfile_filestr = latfile_path.filename().string(); 
+  std::vector<std::string> dirstr_vec;
+  for (const auto& entry : latfile_path.parent_path()){
+      dirstr_vec.push_back(entry.string());
   }
-  size_t sequence_start = start_pos + start_marker.length();
-  size_t end_pos = latfile.find(end_marker, sequence_start);
-  if (end_pos == std::string::npos) {
-      errorQuda("something wrong with gauge filename format for loading, round 2\n"); //
-  }
-  size_t length = end_pos - sequence_start;
-  std::string ampi_substr = latfile.substr(sequence_start, length);
-  printfQuda((ampi_substr+" is the ampi substring\n").c_str());
+  assert(dirstr_vec.size() >= 2);
+  printfQuda(("our file is " +latfile_filestr +"\n").c_str());
+  std::filesystem::path output_dir("/global/homes/r/rkarur/rohith_quda/data/"+dirstr_vec[dirstr_vec.size()-2]);
+  if (!std::filesystem::is_directory(output_dir)){
+      std::filesystem::create_directory(output_dir);
+  } 
+  std::string quark_str = n_naiks > 1 ? "_cbarc" : "_sbars";
+  std::string output_filestr;
+  output_filestr = latfile_filestr + "_mq" + std::to_string(mass);
+  output_filestr += "_naik" + std::to_string(eps_naik);
+  output_filestr += "_start" + std::to_string(start_seed) + "_Nsrc" + std::to_string(Nsrc);
 
-  std::string full_substr = latfile.substr(sequence_start);
-  std::replace( full_substr.begin(), full_substr.end(), '/', '_');
-  full_substr = full_substr + "_Nsrc" + std::to_string(Nsrc)+quark_str+"_epsN"+std::to_string(eps_naik)+"_ss_"+std::to_string(start_seed);
-  printfQuda((full_substr+" is the full substring\n").c_str());
-    
-    
-  std::string filename = "./data/comp_"+full_substr;
+  std::string filename = output_dir.string()+"/allcon_"+output_filestr;
+
+  auto* flow_int_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas.meas_int_vec);
+  auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
+  printfQuda("flow vec size %i \n",(*flow_int_pt).size());
+  printfQuda("ppb data size %i \n",(*ppb_data).size());
+
   std::ofstream out_ppb(filename);
-  
   if (!out_ppb.is_open()) {
       std::cerr << "Failed to open file: " << filename << std::endl;
   }
-  auto* ppb_data =reinterpret_cast<std::vector<std::vector<std::complex<double>>>*>(*ferm_meas.ppb);
+    
   for (const auto& row : *ppb_data) {
       for (const auto& elem : row) {
           out_ppb << elem.real()/(V*comm_size()) << " ";
@@ -181,7 +184,7 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   }
   out_ppb.close();
   
-  filename ="./data/conT_"+full_substr;
+  filename = output_dir.string()+"/tslice_"+output_filestr;
   std::ofstream out_ppb_t(filename);
   if (!out_ppb_t.is_open()) {
       std::cerr << "Failed to open file: " << filename << std::endl;

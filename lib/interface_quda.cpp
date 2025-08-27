@@ -6050,6 +6050,7 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
       // int source_position = 0;
       // QudaFFTSymmType fft_modes = eo;
       // int mom_modes = 0;
+
       QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
       std::vector<Complex> result_global(f_temp4[0].full_dim(3)*comm_dim(3));
 
@@ -6061,6 +6062,7 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
         ppb_t_el.push_back(result_global);
         }
         ferm_m->ppb_t.push_back(ppb_t_el);
+
     
 }
 
@@ -6172,7 +6174,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   pushOutputPrefix("performAdjGFlowQudaHier: ");
   checkGaugeSmearParam(smear_param);
 
-  if (smear_param->n_steps <= smear_param->adj_n_save && smear_param->n_steps != 0) {
+  if (smear_param->n_steps <= smear_param->adj_n_save && smear_param->n_steps >1) {
 
     errorQuda("Not good practice to have adj_n_save (%d) >= n_steps (%d); adj_n_save should be manually altered to "
               "min(nsteps, %d): \n",
@@ -6274,9 +6276,13 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
     printfQuda("begin initial measurement\n");
     perform_ferm_ppb_meas(f_temp4,f_temp3, inv_param, &ferm_m, smear_param, 0, gaugeTemp, precise);
     if (n_steps_total != 0)
-    for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
+    // for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
+    for (const auto& m : meas_int_vec){
+
       smear_param->n_steps = m;
-      if (m <= adj_n_save_init)
+      if (m == 1)
+        smear_param->adj_n_save = 1;
+      else if (m <= adj_n_save_init)
         smear_param->adj_n_save = m - 1;
       else if (smear_param->n_steps == adj_n_save_init)
         ;
