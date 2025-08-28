@@ -154,7 +154,11 @@ void write_files(const QudaFermMeasurements &ferm_meas)
   }
   assert(dirstr_vec.size() >= 2);
   printfQuda(("our file is " +latfile_filestr +"\n").c_str());
-  std::filesystem::path output_dir("/global/homes/r/rkarur/rohith_quda/data/"+dirstr_vec[dirstr_vec.size()-2]);
+  std::filesystem::path base_output_dir(std::filesystem::current_path().string() + "/data/");
+  if (!std::filesystem::is_directory(base_output_dir)){
+      std::filesystem::create_directory(base_output_dir);
+  } 
+  std::filesystem::path output_dir(base_output_dir.string()+"/"+dirstr_vec[dirstr_vec.size()-2]);
   if (!std::filesystem::is_directory(output_dir)){
       std::filesystem::create_directory(output_dir);
   } 
