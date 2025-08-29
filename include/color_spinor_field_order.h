@@ -312,13 +312,11 @@ namespace quda
         array<Float, length> tmp;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          auto ld_tmp
-            = vector_load<Float, N>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), i * stride + x_cb);
+          auto ld_tmp = vector_load<Float, N>(in + parity * offset_cb, i * stride + x_cb);
           memcpy(&tmp[i * N], &ld_tmp, sizeof(ld_tmp));
         }
         if constexpr (Nrem > 0) {
-          auto ld_tmp
-            = vector_load<Float, Nrem>(reinterpret_cast<const vec_t *>(in + parity * offset_cb + M * stride), x_cb);
+          auto ld_tmp = vector_load<Float, Nrem>(reinterpret_cast<vec_t *>(in + parity * offset_cb) + M * stride, x_cb);
           memcpy(&tmp[M * N], &ld_tmp, sizeof(ld_tmp));
         }
 
@@ -345,8 +343,7 @@ namespace quda
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<short> out[3], complex<short> *in, int parity, int x_cb, int, int) const
       {
-        using vec_t = typename VectorType<float, 4>::type;
-        vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb);
+        auto tmp = vector_load<float, 4>(in + parity * offset_cb, x_cb);
         memcpy(out, &tmp, 3 * sizeof(complex<short>));
       }
     };
