@@ -286,7 +286,7 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER> {
-      static constexpr int N = colorspinor::get_vector_order<Float>(nSpin * nColor * 2);
+      static constexpr int N = colorspinor::get_vector_order<Float>(nSpin * nColor * nVec * 2);
       int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;

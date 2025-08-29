@@ -136,18 +136,19 @@ namespace quda {
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
             && B[0].FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
-          typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,disable_ghost> Vector;
+          using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, vFloat, vFloat,
+                                       disable_ghost>;
+          using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, bFloat, bFloat,
+                                      disable_ghost>;
           launch_host_<Rotator, Vector>(tp, stream);
         } else {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
       } else {
-        constexpr auto vOrder = QUDA_NATIVE_FIELD_ORDER;
-        constexpr auto bOrder = QUDA_NATIVE_FIELD_ORDER;
-        if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
-          typedef FieldOrderCB<real,nSpin,nColor,nVec,vOrder,vFloat,vFloat,disable_ghost> Rotator;
-          typedef FieldOrderCB<real,nSpin,nColor,1,bOrder,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
+        if (V.isNative() && B[0].isNative()) {
+          using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
+          using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER, bFloat, bFloat, disable_ghost,
+                                      isFixed<bFloat>::value>;
           launch_device_<Rotator, Vector>(tp, stream);
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
