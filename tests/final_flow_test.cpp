@@ -145,6 +145,7 @@ std::vector<unsigned int> read_meas_int_vec()
 
 void write_files(const QudaFermMeasurements &ferm_meas)
 {
+   std::cout << "File QUDA rank: " << quda::comm_rank() << "\n";
   std::filesystem::path latfile_path(latfile);
   std::string latfile_dir = latfile_path.parent_path().string();
   std::string latfile_filestr = latfile_path.filename().string(); 
@@ -518,6 +519,7 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   out_flowed = {};
   // tmp = {};
   // delete *rng;
+  if (quda::comm_rank() == 0)
   write_files(ferm_meas);
   
   
