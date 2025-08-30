@@ -359,8 +359,14 @@ namespace quda {
 
       // Create either a real or a dummy L field
       GaugeFieldParam lgf_param(longGauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, longGauge.Geometry());
-      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
+      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
         for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
+        lgf_param.nFace = 0;
+        lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      } else {
+        lgf_param.nFace = 3;
+        lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      }
       lgf_param.location = location;
       lgf_param.order = QUDA_QDP_GAUGE_ORDER;
       lgf_param.fixed = longGauge.GaugeFixed();
@@ -418,6 +424,8 @@ namespace quda {
         lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         lgf_param.setPrecision(lgf_param.Precision(), true);
         lgf_param.create = QUDA_NULL_FIELD_CREATE;
+        lgf_param.nFace = 0;
+        lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
         tmp_L = std::make_unique<GaugeField>(lgf_param);
         need_tmp_L = true;
       } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
