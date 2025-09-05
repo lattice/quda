@@ -18,16 +18,16 @@
 #include "backward.hpp"
 #endif
 
-// Do we have one of these elsewhere? 
-#define CUCHECK(cmd) do {                                   \
-  CUresult err = cmd;                                       \
-  if( err != CUDA_SUCCESS ) {                               \
-    const char *errStr;                                     \
-    (void) cuGetErrorString(err, &errStr);                  \
-    errorQuda("Cuda failure %s:%d:%s:  %d '%s'\n",          \
-           file,line,func, err, errStr);                    \
-  }                                                         \
-} while(0)
+// Do we have one of these elsewhere?
+#define CUCHECK(cmd)                                                                                                   \
+  do {                                                                                                                 \
+    CUresult err = cmd;                                                                                                \
+    if (err != CUDA_SUCCESS) {                                                                                         \
+      const char *errStr;                                                                                              \
+      (void)cuGetErrorString(err, &errStr);                                                                            \
+      errorQuda("Cuda failure %s:%d:%s:  %d '%s'\n", file, line, func, err, errStr);                                   \
+    }                                                                                                                  \
+  } while (0)
 
 namespace quda
 {
@@ -52,7 +52,7 @@ namespace quda
     backward::StackTrace st;
 #endif
 
-    MemAlloc() : line(-1), size(0), base_size(0) {}
+    MemAlloc() : line(-1), size(0), base_size(0) { }
 
     MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
     {
@@ -209,7 +209,7 @@ namespace quda
 #if defined(QDP_USE_CUDA_MANAGED_MEMORY) || defined(QDP_ENABLE_MANAGED_MEMORY)
     return true;
 #else
-    return false;
+  return false;
 #endif
   }
 
@@ -253,8 +253,8 @@ namespace quda
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 #else
-    // QDPJIT version -- barfs internally if it fails
-    QDP::QDP_get_global_cache().addDeviceStatic(&ptr, size, true);
+  // QDPJIT version -- barfs internally if it fails
+  QDP::QDP_get_global_cache().addDeviceStatic(&ptr, size, true);
 #endif
 
     if (is_prefetch_enabled()) qudaMemPrefetchAsync(ptr, size, QUDA_CUDA_FIELD_LOCATION, device::get_default_stream());
@@ -364,12 +364,10 @@ namespace quda
     return ptr;
   }
 
-  // We are going to rip off the function from the NVSHMEM docs to 
+  // We are going to rip off the function from the NVSHMEM docs to
   // allocate a user buffer with given Properties
-  constexpr size_t getNVSHMEMGranularity() {
-	  return 536870912UL;
-  }
-  
+  constexpr size_t getNVSHMEMGranularity() { return 536870912UL; }
+
   /**
    * Perform a cuMemAlloc with error-checking.  This function is to
    * guarantee a unique memory allocation on the device, since
@@ -377,42 +375,41 @@ namespace quda
    * should only be called via the device_pinned_malloc() macro,
    * defined in malloc_quda.h.
    */
-  std::pair<void *,size_t> device_pinned_malloc_impl_(const char *func, const char *file, int line, size_t size, bool nvshmem_allocation=false)
+  std::pair<void *, size_t> device_pinned_malloc_impl_(const char *func, const char *file, int line, size_t size,
+                                                       bool nvshmem_allocation = false)
   {
     /* Determine the CUdevice from the current CUDA device */
     CUdevice cu_dev;
     int device_id;
     cudaError_t err = cudaGetDevice(&device_id);
-    if (err != cudaSuccess) {
-      errorQuda("Failed to get device ID (%s:%d in %s())\n", file, line, func);
-    }
+    if (err != cudaSuccess) { errorQuda("Failed to get device ID (%s:%d in %s())\n", file, line, func); }
     auto err2 = cuDeviceGet(&cu_dev, device_id);
-    if (err2 != CUDA_SUCCESS) {
-      errorQuda("Failed to get device (%s:%d in %s())\n", file, line, func);
-    }
+    if (err2 != CUDA_SUCCESS) { errorQuda("Failed to get device (%s:%d in %s())\n", file, line, func); }
 
     /* Set up the allocation properties */
     CUmemAllocationProp prop = {};
     prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
     prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
     prop.location.id = cu_dev;
-   
-    int flag=0; 
+
+    int flag = 0;
     CUCHECK(cuDeviceGetAttribute(&flag, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cu_dev));
-    if (flag) prop.allocFlags.gpuDirectRDMACapable = 1; 
-    
-    if ( nvshmem_allocation ) {
-      if ( device::get_mnnvl_capable() ) prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_FABRIC);
-      else prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR);
-    }
-    else {
+    if (flag) prop.allocFlags.gpuDirectRDMACapable = 1;
+
+    if (nvshmem_allocation) {
+      if (device::get_mnnvl_capable())
+        prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_FABRIC);
+      else
+        prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR);
+    } else {
       // For non-NVSHMEM we always ask for fabric for UCX (this is maybe a bit system specific)
       prop.requestedHandleTypes = (CUmemAllocationHandleType)(CU_MEM_HANDLE_TYPE_FABRIC);
     }
 
     size_t granularity = 0;
-    
-    if ( nvshmem_allocation ) granularity  = getNVSHMEMGranularity();
+
+    if (nvshmem_allocation)
+      granularity = getNVSHMEMGranularity();
     else {
       CUCHECK(cuMemGetAllocationGranularity(&granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM));
     }
@@ -427,12 +424,12 @@ namespace quda
     accessDescriptor.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
 
     CUmemGenericAllocationHandle allocHandle;
-    
+
     CUCHECK(cuMemCreate(&allocHandle, size, (const CUmemAllocationProp *)&prop, 0));
     CUCHECK(cuMemAddressReserve((CUdeviceptr *)&dev_ptr, size, 0, (CUdeviceptr)NULL, 0));
     CUCHECK(cuMemMap((CUdeviceptr)dev_ptr, size, 0, allocHandle, 0));
     CUCHECK(cuMemSetAccess((CUdeviceptr)dev_ptr, size, (const CUmemAccessDesc *)&accessDescriptor, 1));
-    
+
     if (dev_ptr == nullptr) {
       printfQuda("ERROR: Failed to create user buffer of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
@@ -441,7 +438,7 @@ namespace quda
     cudaMemset((void *)dev_ptr, 0xff, size);
 #endif
     return std::make_pair((void *)dev_ptr, size);
-}
+  }
 
 #ifdef NVSHMEM_COMMS
   void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
@@ -449,7 +446,7 @@ namespace quda
     MemAlloc a(func, file, line);
     a.base_size = size;
 
-    auto [ptr,new_size] = device_pinned_malloc_impl_(func, file, line, size, true);
+    auto [ptr, new_size] = device_pinned_malloc_impl_(func, file, line, size, true);
     if (ptr == nullptr) {
       printfQuda("ERROR: Failed to allocate shmem memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
@@ -472,20 +469,20 @@ namespace quda
   }
 #endif
 
-   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
-   {
-     // if P2P is not present, then likely we don't have IPC
-     // So we should just go for a regular device alloc
-     if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
+  void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    // if P2P is not present, then likely we don't have IPC
+    // So we should just go for a regular device alloc
+    if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
 
-     MemAlloc a(func, file, line);
-     a.base_size = size;
-     a.size = size;
-     auto [ptr,new_size] = device_pinned_malloc_impl_(func, file, line, size, false);
-     a.size = new_size;
-     track_malloc(DEVICE_PINNED, a, (void*)ptr);
-     return (void *)ptr;
-   }
+    MemAlloc a(func, file, line);
+    a.base_size = size;
+    a.size = size;
+    auto [ptr, new_size] = device_pinned_malloc_impl_(func, file, line, size, false);
+    a.size = new_size;
+    track_malloc(DEVICE_PINNED, a, (void *)ptr);
+    return (void *)ptr;
+  }
 
   /**
    * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
@@ -496,7 +493,7 @@ namespace quda
 #ifdef NVSHMEM_COMMS
     return shmem_malloc_(func, file, line, size);
 #else
-    return device_pinned_malloc_(func, file, line, size);
+  return device_pinned_malloc_(func, file, line, size);
 #endif
   }
 
@@ -521,8 +518,8 @@ namespace quda
     cudaError_t err = cudaFree(ptr);
     if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
 #else
-    // QDPJIT: Barfs if it fails internally
-    QDP::QDP_get_global_cache().signoffViaPtr(ptr);
+  // QDPJIT: Barfs if it fails internally
+  QDP::QDP_get_global_cache().signoffViaPtr(ptr);
 #endif
 
     track_free(DEVICE, ptr);
@@ -566,12 +563,12 @@ namespace quda
       if (err != cudaSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
       track_free(MAPPED, ptr);
 #else
-      cudaError_t err = cudaHostUnregister(ptr);
-      if (err != cudaSuccess) {
-        errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
-      }
-      track_free(MAPPED, ptr);
-      free(ptr);
+    cudaError_t err = cudaHostUnregister(ptr);
+    if (err != cudaSuccess) {
+      errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
+    }
+    track_free(MAPPED, ptr);
+    free(ptr);
 #endif
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
@@ -580,10 +577,9 @@ namespace quda
     }
   }
 
-
   void device_pinned_free_impl_(const char *func, const char *file, int line, void *ptr, size_t size)
   {
-    if (ptr == nullptr ) return;
+    if (ptr == nullptr) return;
     CUmemGenericAllocationHandle memHandle;
     CUCHECK(cuMemRetainAllocationHandle(&memHandle, ptr));
     CUCHECK(cuMemUnmap((CUdeviceptr)ptr, size));
@@ -601,9 +597,9 @@ namespace quda
     if (ptr == nullptr) return;
 
     /* if we have no P2P then we will have allocated with device_malloc_ so use device_free_ */
-    if (!comm_peer2peer_present()) { 
-	device_free_(func, file, line, ptr); 
-	return;
+    if (!comm_peer2peer_present()) {
+      device_free_(func, file, line, ptr);
+      return;
     }
 
     auto it = alloc[DEVICE_PINNED].find(ptr);
@@ -613,7 +609,7 @@ namespace quda
     }
 
     auto size = it->second.size;
-    device_pinned_free_impl_(func,file,line,ptr,size);
+    device_pinned_free_impl_(func, file, line, ptr, size);
     track_free(DEVICE_PINNED, ptr);
   }
 
@@ -639,7 +635,7 @@ namespace quda
 
     /* Now we can unregister the memory from NVSHMEM */
     nvshmemx_buffer_unregister_symmetric(ptr, size);
-    device_pinned_free_impl_(func,file,line, original_ptr, size);
+    device_pinned_free_impl_(func, file, line, original_ptr, size);
     track_free(SHMEM, ptr);
   }
 #endif
@@ -653,7 +649,7 @@ namespace quda
 #ifdef NVSHMEM_COMMS
     shmem_free_(func, file, line, ptr);
 #else
-    device_pinned_free_(func, file, line, ptr);
+  device_pinned_free_(func, file, line, ptr);
 #endif
   }
 
