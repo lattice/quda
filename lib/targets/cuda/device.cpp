@@ -407,9 +407,6 @@ namespace quda
       nvmlDevice_t local_device;
       CUdevice my_dev;
       int cuda_drv_version;
-#if 0
-      fabricInfo.version = nvmlGpuFabricInfo_v2;
-#endif
       CHECK_CUDA_ERROR(cudaDriverGetVersion(&cuda_drv_version));
       CU_CHECK(cuDeviceGet(&my_dev, dev_id));
 
@@ -427,16 +424,6 @@ namespace quda
             logQuda(QUDA_DEBUG_VERBOSE, "nvmlDeviceGetHandleByPciBusId failed %d, disabling MNNVL\n", nvml_status);
             return false;
         }
-
-#if 0
-        /* Some platforms with older driver may not support this API, so bypass MNNVL discovery */
-        if (nvmlDeviceGetGpuFabricInfoV == NULL) {
-            logQuda(QUDA_DEBUG_VERBOSE, "nvmlDeviceGetGpuFabricInfoV not found, MNNVL not supported\n");
-            return false;
-        }
-
-        nvml_status = nvmlDeviceGetGpuFabricInfoV(local_device, &fabricInfo);
-#endif
 
         nvml_status = nvmlDeviceGetGpuFabricInfo(local_device, &fabricInfo);
         if (nvml_status != NVML_SUCCESS) {
