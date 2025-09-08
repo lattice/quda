@@ -18,13 +18,13 @@ namespace quda
     using DomainWall4DArg::a_5;
     using DomainWall4DArg::dagger;
     using DomainWall4DArg::in;
+    using DomainWall4DArg::max_regs;
     using DomainWall4DArg::nParity;
     using DomainWall4DArg::out;
+    using DomainWall4DArg::spill_shared;
     using DomainWall4DArg::threads;
     using DomainWall4DArg::x;
     using DomainWall4DArg::xpay;
-    using DomainWall4DArg::max_regs;
-    using DomainWall4DArg::spill_shared;
 
     using F = typename DomainWall4DArg::F;
 

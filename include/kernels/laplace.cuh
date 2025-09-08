@@ -87,9 +87,9 @@ namespace quda
         if (arg.dd_in.doHopping(coord, d, +1)) {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
-	  
+
           if (doHalo<kernel_type>(d) && ghost) {
-	    
+
             // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);

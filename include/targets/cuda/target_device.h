@@ -171,7 +171,8 @@ namespace quda
       }
     }
 
-    template <class T> constexpr bool vectorize() {
+    template <class T> constexpr bool vectorize()
+    {
 #ifdef QUDA_VECTORIZE_SINGLE
       return std::is_same_v<T, float>;
 #else

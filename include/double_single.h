@@ -16,10 +16,12 @@ struct doublesingle {
   __host__ __device__ inline doublesingle(const float a) : a({a, 0.0}) { ; }
 
   __host__ __device__ inline void operator+=(const doublesingle &b) { dsadd(this->a, this->a, b.a); }
-  __host__ __device__ inline void operator+=(const float &b) {
+  __host__ __device__ inline void operator+=(const float &b)
+  {
     float2 b2 = {b, 0.0};
-    dsadd(this->a, this->a, b2); }
-  
+    dsadd(this->a, this->a, b2);
+  }
+
   __host__ __device__ inline doublesingle& operator=(const doublesingle &b)
     { a.x = b.a.x; a.y = b.a.y; return *this; }
     

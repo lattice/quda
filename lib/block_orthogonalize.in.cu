@@ -136,10 +136,10 @@ namespace quda {
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
             && B[0].FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          using Rotator = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, vFloat, vFloat,
-                                       disable_ghost>;
-          using Vector = FieldOrderCB<real, nSpin, nColor, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, bFloat, bFloat,
-                                      disable_ghost>;
+          using Rotator
+            = FieldOrderCB<real, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, vFloat, vFloat, disable_ghost>;
+          using Vector
+            = FieldOrderCB<real, nSpin, nColor, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, bFloat, bFloat, disable_ghost>;
           launch_host_<Rotator, Vector>(tp, stream);
         } else {
           errorQuda("Unsupported field order %d", V.FieldOrder());

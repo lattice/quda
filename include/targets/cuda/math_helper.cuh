@@ -219,9 +219,11 @@ namespace quda {
     __device__ inline float2 operator()(float2 a, float2 b, float2 c)
     {
 #ifdef QUDA_VECTORIZE_SINGLE
-      if constexpr (target::vectorize<float>()) return __ffma2_rn(a, b, c); else
+      if constexpr (target::vectorize<float>())
+        return __ffma2_rn(a, b, c);
+      else
 #endif
-      return {a.x * b.x + c.x, a.y * b.y + c.y};
+        return {a.x * b.x + c.x, a.y * b.y + c.y};
     }
   };
 
@@ -239,9 +241,11 @@ namespace quda {
     __device__ inline float2 operator()(float2 a, float2 b)
     {
 #ifdef QUDA_VECTORIZE_SINGLE
-      if constexpr (target::vectorize<float>()) return __fmul2_rn(a, b); else
+      if constexpr (target::vectorize<float>())
+        return __fmul2_rn(a, b);
+      else
 #endif
-      return {a.x * b.x, a.y * b.y};
+        return {a.x * b.x, a.y * b.y};
     }
   };
 
@@ -256,10 +260,11 @@ namespace quda {
     __device__ inline float2 operator()(float2 a, float2 b)
     {
 #ifdef QUDA_VECTORIZE_SINGLE
-      if constexpr (target::vectorize<float>()) return __fadd2_rn(a, b);
+      if constexpr (target::vectorize<float>())
+        return __fadd2_rn(a, b);
       else
 #endif
-      return {a.x + b.x, a.y + b.y};
+        return {a.x + b.x, a.y + b.y};
     }
   };
 

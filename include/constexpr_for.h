@@ -1,6 +1,7 @@
 #pragma once
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief An implementation of a constexpr evaluated for loop.  This
@@ -21,4 +22,4 @@ namespace quda {
     }
   }
 
-}
+} // namespace quda

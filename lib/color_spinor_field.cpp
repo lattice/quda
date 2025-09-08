@@ -887,8 +887,8 @@ namespace quda
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
-    coarseParam.fieldOrder = (new_location == QUDA_CUDA_FIELD_LOCATION) ?
-      QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    coarseParam.fieldOrder
+      = (new_location == QUDA_CUDA_FIELD_LOCATION) ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     coarseParam.setPrecision(new_precision);
 

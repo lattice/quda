@@ -46,7 +46,8 @@ namespace quda
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
               const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
-      DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, spin_project,
+                                    comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -106,7 +107,8 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) : idx;
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) :
+            idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
@@ -134,7 +136,8 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) : idx;
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dc.X, d, arg.nFace) :
+            idx;
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);

@@ -134,8 +134,8 @@ namespace quda {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
-    param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER :
-                                                                     QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.fieldOrder
+      = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD

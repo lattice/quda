@@ -32,8 +32,7 @@ namespace quda {
     static constexpr bool from_non_rel = from_non_rel_;
 
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<real, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, in_t, in_t, true,
-                           isFixed<in_t>::value>;
+    using F = FieldOrderCB<real, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, in_t, in_t, true, isFixed<in_t>::value>;
     using C = FieldOrderCB<real, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, out_t, out_t, true>;
     using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, v_t>;
 

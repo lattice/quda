@@ -241,8 +241,8 @@ namespace quda
     static constexpr int nDim = nDim_;
     static constexpr int nFace = nFace_;
     static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
-    static constexpr int max_regs = 0; // by default we don't limit register count
-    static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
+    static constexpr int max_regs = 0;             // by default we don't limit register count
+    static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -623,7 +623,8 @@ namespace quda
 
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
-        int parity = arg.nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
+        int parity
+          = arg.nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
         apply_dslash<EXTERIOR_KERNEL_ALL>(dslash, tid, s, parity);
         local_tid += target::block_dim().x * blocks_per_dir;
         tid += target::block_dim().x * blocks_per_dir;

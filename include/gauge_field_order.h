@@ -1012,19 +1012,19 @@ namespace quda {
       {
         if constexpr (isFixed<Float>::value) {
 #pragma unroll
-            for (int i = 0; i < N / 2; i++) {
-              auto outi = mul2({scale_inv, scale_inv}, in[i]);
-              out[2 * i + 0] = outi.x;
-              out[2 * i + 1] = outi.y;
-            }
-          } else {
+          for (int i = 0; i < N / 2; i++) {
+            auto outi = mul2({scale_inv, scale_inv}, in[i]);
+            out[2 * i + 0] = outi.x;
+            out[2 * i + 1] = outi.y;
+          }
+        } else {
 #pragma unroll
-            for (int i = 0; i < N / 2; i++) {
-              out[2 * i + 0] = in[i].real();
-              out[2 * i + 1] = in[i].imag();
-            }
+          for (int i = 0; i < N / 2; i++) {
+            out[2 * i + 0] = in[i].real();
+            out[2 * i + 1] = in[i].imag();
           }
         }
+      }
 
         template <typename I>
         __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
