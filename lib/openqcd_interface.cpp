@@ -1137,8 +1137,18 @@ static void openQCD_qudaSolverUpdate(void *param_)
     WITH_COMM(logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n"));
     void *h_gauge = qudaState.layout.h_gauge();
     PUSH_RANGE("openQCD_qudaGaugeLoad", 3);
-    QudaReconstructType rec
-      = qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3 ? QUDA_RECONSTRUCT_8 : QUDA_RECONSTRUCT_9;
+
+#ifdef BUILD_QCD_PLUS_QED
+    QudaReconstructType rec = QUDA_RECONSTRUCT_9;
+    if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
+      WITH_COMM(warningQuda("QUDA was built with QCD+QED support, but gauge group does not require it (set QUDA_QCD_PLUS_QED=OFF)"));
+    }
+#else
+    QudaReconstructType rec = QUDA_RECONSTRUCT_8;
+    if (qudaState.layout.flds_parms().gauge != OPENQCD_GAUGE_SU3) {
+      WITH_COMM(errorQuda("QUDA was not built with QCD+QED support, but gauge group requires it (set QUDA_QCD_PLUS_QED=ON)"));
+    }
+#endif
 
     /**
      * We set t_boundary = QUDA_ANTI_PERIODIC_T. This setting is a label that
@@ -2225,4 +2235,12 @@ void openQCD_qudaEigensolverDestroy(int id)
     delete eig_param;
     qudaState.eig_handles[id] = nullptr;
   }
+}
+
+bool openQCD_qudaQCDPlusQEDEnabled(void) {
+#ifdef BUILD_QCD_PLUS_QED
+  return true;
+#else
+  return false;
+#endif
 }

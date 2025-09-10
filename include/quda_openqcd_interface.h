@@ -468,6 +468,11 @@ void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals
 void openQCD_qudaEigensolverDestroy(int id);
 
 /**
+ * @brief      Whether QUDA was built with QCD+QED or not.
+ */
+bool openQCD_qudaQCDPlusQEDEnabled(void);
+
+/**
  * @brief      Wrapper for the plaquette. We could call plaqQuda() directly in
  *             openQCD, but we have to make sure manually that the gauge field
  *             is loaded
