@@ -518,7 +518,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   }
 
   MPI_Bcast((void *)&qudaState.init.verbosity, sizeof(qudaState.init.verbosity), MPI_INT, 0, layout.quda_comm);
-  setVerbosityQuda(qudaState.init.verbosity, prefix, qudaState.init.logfile);
+  setVerbosityQuda(qudaState.init.verbosity, prefix, my_rank == 0 ? qudaState.init.logfile : stdout);
   initQuda(device);
 }
 
