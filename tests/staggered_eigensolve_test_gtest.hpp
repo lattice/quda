@@ -122,6 +122,13 @@ public:
       // gauge fields with different parameters.
       void *qdp_inlink[4] = {cpuInQDP.data(0), cpuInQDP.data(1), cpuInQDP.data(2), cpuInQDP.data(3)};
 
+      // Load the gauge field to the device
+      gauge_param.cuda_prec = ::testing::get<0>(param);
+      gauge_param.cuda_prec_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_precondition = ::testing::get<0>(param);
+      gauge_param.cuda_prec_refinement_sloppy = ::testing::get<0>(param);
+      gauge_param.cuda_prec_eigensolver = ::testing::get<0>(param);
+
       double plaq[3];
       computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
       printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
@@ -135,12 +142,6 @@ public:
 
       freeGaugeQuda();
 
-      // Load the gauge field to the device
-      gauge_param.cuda_prec = ::testing::get<0>(param);
-      gauge_param.cuda_prec_sloppy = ::testing::get<0>(param);
-      gauge_param.cuda_prec_precondition = ::testing::get<0>(param);
-      gauge_param.cuda_prec_refinement_sloppy = ::testing::get<0>(param);
-      gauge_param.cuda_prec_eigensolver = ::testing::get<0>(param);
       loadFatLongGaugeQuda(cpuFatMILC.data(), cpuLongMILC.data(), gauge_param);
 
       last_prec = ::testing::get<0>(param);
@@ -175,6 +176,13 @@ TEST_P(StaggeredEigensolveTest, verify)
   // account for summation error scaling with number of processors
   auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
   tol *= (1 + log(quda::comm_size()) / log(dof));
+
+  // for Arnoldi we double the Krylov space size
+  if (::testing::get<1>(GetParam()) == QUDA_EIG_IR_ARNOLDI) {
+    eig_param.n_kr = 2 * eig_n_kr;
+  } else {
+    eig_param.n_kr = eig_n_kr;
+  }
 
   // For the 3-d eigensolver, we need to set orthoDir
   if (dslash_type == QUDA_LAPLACE_DSLASH) laplace3D = (eig_type == QUDA_EIG_TR_LANCZOS_3D) ? 3 : 4;
