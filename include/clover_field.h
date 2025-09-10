@@ -90,8 +90,8 @@ namespace quda {
     template <typename T> constexpr int get_vector_order();
     template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
     template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
-    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
-    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF <= 8 ? QUDA_ORDER_HALF : 8; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER <= 8 ? QUDA_ORDER_QUARTER : 8; }
 
     template <typename T> constexpr int get_vector_order(int length)
     {

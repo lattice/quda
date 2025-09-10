@@ -327,28 +327,29 @@ namespace quda {
       {
         int row = s_row * nColor + c_row;
         int col = s_col * nColor + c_col;
-        const Float *a_ = a + parity * offset_cb + stride * chirality * compressed_block_size;
+        const Float *a_ = a + parity * offset_cb;
+        auto base = chirality * compressed_block_size;
 
         if (row == col) {
-          auto a = a_[indexFloatN<Nvec>(recon.pack_compress_idx(row), stride, x)];
+          auto a = a_[indexFloatN<Nvec>(recon.pack_compress_idx(row) + base, stride, x)];
           return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a, row));
         } else if (col < row) {
           // switch coordinates to count from bottom right instead of top left of matrix
-	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
-          int idx = N + 2*k;
+          int k = N * (N - 1) / 2 - (N - col) * (N - col - 1) / 2 + row - col - 1;
+          int idx = N + 2 * k;
 
-          auto a = complex<Float>(a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 0), stride, x)],
-                                  a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 1), stride, x)]);
+          auto a = complex<Float>(a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 0) + base, stride, x)],
+                                  a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 1) + base, stride, x)]);
           return static_cast<Float>(2.0)
             * complex<Float>(recon.decompress(a.real(), idx), recon.decompress(a.imag(), idx + 1));
         } else {
           // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
-	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
-          int idx = N + 2*k;
+          int k = N * (N - 1) / 2 - (N - row) * (N - row - 1) / 2 + col - row - 1;
+          int idx = N + 2 * k;
 
-          auto a = complex<Float>(a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 0), stride, x)],
-                                  a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 1), stride, x)]);
+          auto a = complex<Float>(a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 0) + base, stride, x)],
+                                  a_[indexFloatN<Nvec>(recon.pack_compress_idx(idx + 1) + base, stride, x)]);
           return static_cast<Float>(2.0)
             * complex<Float>(recon.decompress(a.real(), idx), -recon.decompress(a.imag(), idx + 1));
         }
@@ -572,7 +573,7 @@ namespace quda {
         static_assert(!enable_reconstruct || (enable_reconstruct && Nc == 3), "Reconstruct requires Nc=3");
         reconstruct_t<real, block, enable_reconstruct> recon;
         static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
-        static constexpr int N = clover::get_vector_order<real>(2 * compressed_block);
+        static constexpr int N = clover::get_vector_order<Float>(2 * compressed_block);
         static constexpr int M = (compressed_block + N - 1) / N; /** number of short vectors per chiral block we need to read */
         static constexpr int M_offset = compressed_block / N;    /** the block offset that contains the second chiral block */
         static constexpr int Nrem = compressed_block % N; /** the remainder of the chiral block not divisible by N */
