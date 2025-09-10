@@ -65,10 +65,13 @@ jobs:
           -DQUDA_OPENMP=OFF
           -DQUDA_MPI=ON
           -DQUDA_PRECISION=8
-          -DQUDA_DIRAC_DEFAULT_OFF=ON
+          -DQUDA_DIRAC_DEFAULT_OFF=OFF
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build
 
       - name: Install
         run: cmake --install ${{github.workspace}}/build
+
+      - name: Run
+        run: ctest
