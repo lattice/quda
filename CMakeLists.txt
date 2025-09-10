@@ -166,10 +166,12 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not available for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+option(QUDA_QCD_PLUS_QED "Enable QCD+QED features (builds QUDA_RECONSTRUCT_9/13 instead of 8/12 for Wilson-type operators)" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
-option(QUDA_INTERFACE_OPENQCD "build OpenQCD interface" OFF)
+option(QUDA_INTERFACE_OPENQCD "build OpenQCD interface (for QCD+QED support, see QUDA_QCD_PLUS_QED)" OFF)
 option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)

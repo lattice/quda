@@ -549,6 +549,10 @@ if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
 
+if(QUDA_QCD_PLUS_QED)
+  target_compile_definitions(quda PUBLIC BUILD_QCD_PLUS_QED)
+endif(QUDA_QCD_PLUS_QED)
+
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
 endif(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)

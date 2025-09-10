@@ -145,9 +145,9 @@ namespace quda
   };
 
   struct ReconstructWilson {
-#ifdef BUILD_OPENQCD_INTERFACE
-    static constexpr std::array<QudaReconstructType, 5> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
 #else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
@@ -155,13 +155,8 @@ namespace quda
   };
 
   struct ReconstructStaggered {
-#ifdef BUILD_OPENQCD_INTERFACE
-    static constexpr std::array<QudaReconstructType, 5> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
-#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
-#endif
   };
 
   struct ReconstructNo12 {
@@ -626,9 +621,9 @@ namespace quda
 #endif
 
   struct WilsonReconstruct {
-#ifdef BUILD_OPENQCD_INTERFACE
-    static constexpr std::array<QudaReconstructType, 5> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
 #else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
@@ -636,13 +631,8 @@ namespace quda
   };
 
   struct StaggeredReconstruct {
-#ifdef BUILD_OPENQCD_INTERFACE
-    static constexpr std::array<QudaReconstructType, 5> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
-#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
-#endif
   };
 
 #ifdef GPU_DISTANCE_PRECONDITIONING
