@@ -64,6 +64,9 @@ namespace quda
       strcat(aux_base, comm);
       strcat(aux_base, app_base.c_str());
 
+#ifdef QUDA_FAST_COMPILE_DSLASH
+      strcat(aux_base, ",fast_compile");
+#endif
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
       setRHSstring(aux_base, in.size());

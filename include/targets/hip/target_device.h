@@ -153,7 +153,10 @@ namespace quda
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return warpSize; }
+    constexpr int warp_size() {
+      // FIXME: Need to handle devices with different wavefront sizes
+      return 64;
+    }
 
     /**
        @brief Return the thread mask for a converged warp.

@@ -148,8 +148,6 @@ option(QUDA_DIRAC_STAGGERED "build staggered Dirac operators" ${QUDA_DIRAC_DEFAU
 option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
-option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
-option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_LAPLACE "build laplace operator" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_COVDEV "build code for covariant derivative" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_DISTANCE_PRECONDITIONING "build code for distance preconditioned Wilson/clover Dirac operators" OFF)

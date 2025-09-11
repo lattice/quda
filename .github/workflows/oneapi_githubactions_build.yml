@@ -58,11 +58,11 @@ jobs:
           -DSYCL_LINK_FLAGS="-Xs -march=avx512 -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=4 -flink-huge-device-code"
           -DQUDA_DIRAC_COVDEV=OFF
           -DQUDA_DIRAC_DISTANCE_PRECONDITIONING=OFF
-          -DQUDA_MULTIGRID=OFF
+          -DQUDA_MULTIGRID=ON
           -DQUDA_INTERFACE_QDPJIT=ON
           -DQUDA_FAST_COMPILE_REDUCE=ON
           -DQUDA_FAST_COMPILE_DSLASH=ON
-          -DQUDA_OPENMP=OFF
+          -DQUDA_OPENMP=ON
           -DQUDA_MPI=ON
           -DQUDA_PRECISION=12
           -DQUDA_DIRAC_DEFAULT_OFF=ON

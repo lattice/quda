@@ -63,6 +63,9 @@ namespace quda
     static constexpr Dslash5Type dslash5_type = Arg::type;
     static constexpr bool shared = domainWall4DFusedM5shared;
 
+    // The fused kernel has __syncthreads in its operator()
+    constexpr static bool use_syncthreads = true;
+
     const Arg &arg;
     using typename d5Params<Arg_, shared>::Ops::KernelOpsT;
     template <typename Ftor> constexpr domainWall4DFusedM5(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) { }
