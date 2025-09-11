@@ -888,22 +888,22 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
   /* gamma_i run within QUDA using QUDA fields */
   if (in_comm()) {
     switch (dir) {
-    case 0: /* t direction */ gamma3(*out, *in); break;
-    case 1: /* x direction */ gamma0(*out, *in); break;
-    case 2: /* y direction */ gamma1(*out, *in); break;
-    case 3: /* z direction */ gamma2(*out, *in); break;
-    case 4:
-    case 5:
-      gamma5(*out, *in);
-      /* UKQCD uses a different convention for Gamma matrices:
-       * gamma5_ukqcd = gammax gammay gammaz gammat,
-       * gamma5_openqcd = gammat gammax gammay gammaz,
-       * and thus
-       * gamma5_openqcd = -1 * U gamma5_ukqcd U^dagger,
-       * with U the transformation matrix from OpenQCD to UKQCD. */
-      blas::ax(-1.0, *out);
-      break;
-    default: errorQuda("Unknown gamma: %d\n", dir);
+      case 0: ApplyGamma(*out, *in, QUDA_GAMMA_T); break;
+      case 1: ApplyGamma(*out, *in, QUDA_GAMMA_X); break;
+      case 2: ApplyGamma(*out, *in, QUDA_GAMMA_Y); break;
+      case 3: ApplyGamma(*out, *in, QUDA_GAMMA_Z); break;
+      case 4:
+      case 5:
+        ApplyGamma(*out, *in, QUDA_GAMMA_5);
+        /* UKQCD uses a different convention for Gamma matrices:
+         * gamma5_ukqcd = gammax gammay gammaz gammat,
+         * gamma5_openqcd = gammat gammax gammay gammaz,
+         * and thus
+         * gamma5_openqcd = -1 * U gamma5_ukqcd U^dagger,
+         * with U the transformation matrix from OpenQCD to UKQCD. */
+        blas::ax(-1.0, *out);
+        break;
+      default: errorQuda("Unknown gamma: %d\n", dir);
     }
   }
 

@@ -345,6 +345,14 @@
 #define QUDA_DIRAC_PAULI_GAMMA_BASIS 3
 #define QUDA_INVALID_GAMMA_BASIS QUDA_INVALID_ENUM
 
+#define QudaGammaDirection integer(4)
+#define QUDA_GAMMA_X 0
+#define QUDA_GAMMA_Y 1
+#define QUDA_GAMMA_Z 2
+#define QUDA_GAMMA_T 3
+#define QUDA_GAMMA_5 4
+#define QUDA_INVALID_GAMMA_DIRECTION QUDA_INVALID_ENUM
+
 #define QudaSourceType integer(4)
 #define QUDA_POINT_SOURCE 0
 #define QUDA_RANDOM_SOURCE 1

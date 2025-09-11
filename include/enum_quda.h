@@ -388,6 +388,15 @@ typedef enum QudaGammaBasis_s { // gamj=((top 2 rows)(bottom 2 rows))  s1,s2,s3 
 //  UKQCD       -> DeGrand-Rossi   T = i/sqrt(2)*((-s2,-s2)(-s2,s2))   field_DR = T * field_UK
 //  Chiral      -> DeGrand-Rossi   T = i*((0,-s2)(s2,0))               field_DR = T * field_chiral
 
+typedef enum QudaGammaDirection_s {
+  QUDA_GAMMA_X,
+  QUDA_GAMMA_Y,
+  QUDA_GAMMA_Z,
+  QUDA_GAMMA_T,
+  QUDA_GAMMA_5,
+  QUDA_INVALID_GAMMA_INDEX = QUDA_INVALID_ENUM
+} QudaGammaDirection;
+
 typedef enum QudaSourceType_s {
   QUDA_POINT_SOURCE,
   QUDA_RANDOM_SOURCE,
