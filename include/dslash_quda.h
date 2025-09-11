@@ -930,12 +930,6 @@ namespace quda
   */
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
-  /* RG: I have added these */
-  void gamma0(ColorSpinorField &out, const ColorSpinorField &in);
-  void gamma1(ColorSpinorField &out, const ColorSpinorField &in);
-  void gamma2(ColorSpinorField &out, const ColorSpinorField &in);
-  void gamma3(ColorSpinorField &out, const ColorSpinorField &in);
-
   /**
      @brief Applies a (1 \pm gamma5)/2 projection matrix to a spinor
      @param[out] out Output field
