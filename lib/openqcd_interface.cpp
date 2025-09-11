@@ -2239,3 +2239,5 @@ bool openQCD_qudaQCDPlusQEDEnabled(void) {
   return false;
 #endif
 }
+
+#undef WITH_COMM
