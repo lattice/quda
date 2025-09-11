@@ -959,7 +959,7 @@ inline bool gauge_field_get_unset(void)
  */
 inline bool clover_field_get_up2date(void)
 {
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   bool test = gauge_field_get_up2date();
   return (test && qudaState.swd_ud_rev == qudaState.ud_rev && qudaState.swd_ad_rev == qudaState.ad_rev
           && qudaState.swd_kappa == 1.0 / (2.0 * (dp.m0 + 4.0)) && qudaState.swd_su3csw == dp.su3csw
@@ -978,7 +978,7 @@ inline bool clover_field_get_up2date(void)
 inline bool mg_get_up2date(QudaInvertParam *param)
 {
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   int test = param->preconditioner != nullptr;
 
   MPI_Bcast(&test, 1, MPI_INT, 0, qudaState.layout.world_comm);
@@ -997,7 +997,7 @@ inline bool mg_get_up2date(QudaInvertParam *param)
 inline void mg_set_revision(QudaInvertParam *param)
 {
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   additional_prop->mg_ud_rev = qudaState.ud_rev;
   additional_prop->mg_ad_rev = qudaState.ad_rev;
   additional_prop->mg_kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
@@ -1011,7 +1011,7 @@ inline void mg_set_revision(QudaInvertParam *param)
  */
 inline void clover_field_set_revision(void)
 {
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
   qudaState.swd_ud_rev = qudaState.ud_rev;
   qudaState.swd_ad_rev = qudaState.ad_rev;
   qudaState.swd_kappa = 1.0 / (2.0 * (dp.m0 + 4.0));
@@ -1039,7 +1039,7 @@ static int openQCD_qudaInvertParamCheck(void *param_)
   QudaInvertParam *param = static_cast<QudaInvertParam *>(param_);
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   bool ret = true;
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
 
   if (param->kappa != (1.0 / (2.0 * (dp.m0 + 4.0)))) {
     WITH_COMM(logQuda(
@@ -1120,7 +1120,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
 
   QudaInvertParam *param = static_cast<QudaInvertParam *>(param_);
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
 
   bool do_param_update = !openQCD_qudaInvertParamCheck(param_);
   bool do_gauge_transfer = (!gauge_field_get_up2date() && !gauge_field_get_unset())
@@ -1274,7 +1274,7 @@ static void openQCD_qudaSolverUpdate(void *param_)
 static void *openQCD_qudaSolverReadIn(int id)
 {
   int my_rank;
-  dirac_parms_t dp = qudaState.layout.dirac_parms();
+  openQCD_dirac_parms_t dp = qudaState.layout.dirac_parms();
 
   MPI_Comm_rank(qudaState.layout.world_comm, &my_rank);
 
@@ -1827,14 +1827,14 @@ void openQCD_qudaSolverPrintSetup(int id)
   }
 }
 
-double openQCD_qudaInvert(int id, double mu, spinor_dble* source, spinor_dble* solution, int *status)
+double openQCD_qudaInvert(int id, double mu, void* source, void* solution, int *status)
 {
   double residual;
   openQCD_qudaInvertMultiSrc(id, mu, &source, &solution, status, &residual);
   return residual;
 }
 
-void openQCD_qudaInvertMultiSrc(int id, double mu, spinor_dble** sources, spinor_dble** solutions, int *status, double *residual)
+void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
