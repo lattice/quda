@@ -494,12 +494,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout, char *infile)
   setMPICommHandleQuda(&layout.quda_comm);
 
 #ifdef MULTI_GPU
-/* TODO: would we ever want to run with QMP COMMS? */
-#ifdef QMP_COMMS
-  initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
-#else
   initCommsGridQuda(4, layout.nproc, rankFromCoords, (void *)(layout.data));
-#endif
   static int device = -1; /* enable a default allocation of devices to processes */
 #else
   static int device = layout.device;

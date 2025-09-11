@@ -321,6 +321,9 @@ if(QUDA_MPI AND QUDA_QMP)
     "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
+if(QUDA_INTERFACE_OPENQCD AND QUDA_QMP)
+  message(SEND_ERROR "OpenQCD does not support QMP comms.")
+endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
