@@ -66,6 +66,8 @@ jobs:
           -DQUDA_MPI=ON
           -DQUDA_PRECISION=12
           -DQUDA_DIRAC_DEFAULT_OFF=ON
+          -DQUDA_DIRAC_STAGGERED=ON
+          -DQUDA_DIRAC_WILSON=ON
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build
