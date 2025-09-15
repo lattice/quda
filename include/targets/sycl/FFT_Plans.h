@@ -6,7 +6,7 @@
 
 #include <quda_internal.h>
 #include <quda_sycl_api.h>
-#include <oneapi/mkl/dfti.hpp>
+#include <oneapi/mkl/dft.hpp>
 using namespace oneapi::mkl::dft;
 
 #define FFT_FORWARD 0

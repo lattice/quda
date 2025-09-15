@@ -20,8 +20,10 @@ namespace quda
   template <template <typename> class Functor, typename Arg> void Kernel3D_host(const Arg &arg)
   {
     if constexpr (needsSharedMem<getKernelOps<Functor<Arg>>>) {
+      const int maxsmemsize = 64*1024;
       auto smemsize = sharedMemSize<getKernelOps<Functor<Arg>>>(dim3(1, 1, 1), arg);
-      char smem[smemsize];
+      if (smemsize > maxsmemsize) errorQuda("Smem size (%d) > Max Smem size (%d)", smemsize, maxsmemsize);
+      char smem[maxsmemsize];
       Functor<Arg> f {arg, &smem[0]};
       for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {
         for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
