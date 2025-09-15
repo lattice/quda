@@ -68,7 +68,7 @@ namespace quda
     GaugeFieldParam tensorParam(x, u.Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
     tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+    tensorParam.order = QUDA_NATIVE_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     GaugeField gaugeFmunu(tensorParam);
 

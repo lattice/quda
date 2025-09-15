@@ -41,9 +41,10 @@ namespace quda
       out(out),
       in(in)
     {
+      strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
       if (out.GammaBasis() != in.GammaBasis()) {
-        strcat(aux, "to_");
+        strcat(aux, ",to_");
         strcat(aux, get_basis_str(out.GammaBasis()).c_str());
         strcat(aux, ",from_");
         strcat(aux, get_basis_str(in.GammaBasis()).c_str());

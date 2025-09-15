@@ -17,6 +17,12 @@
 #define GRID_CONSTANT
 #endif
 
+#if defined(__NVCC__) && (CUDA_VERSION >= 12040)
+#define MAXNREG(x) __maxnreg__(x)
+#else
+#define MAXNREG(x)
+#endif
+
 namespace quda
 {
 
@@ -163,6 +169,15 @@ namespace quda
       case 3:
       default: return block_dim().z * block_dim().y * block_dim().x;
       }
+    }
+
+    template <class T> constexpr bool vectorize()
+    {
+#ifdef QUDA_VECTORIZE_SINGLE
+      return std::is_same_v<T, float>;
+#else
+      return false;
+#endif
     }
 
   } // namespace target

@@ -43,7 +43,7 @@ namespace quda {
     using store_t = typename type_mapper<T, fixed>::store_t;
     double norm_ = 0.0;
     switch (u.FieldOrder()) {
-    case QUDA_FLOAT2_GAUGE_ORDER: norm_ = norm<reg_t, store_t, nColor, QUDA_FLOAT2_GAUGE_ORDER>(u, d, type); break;
+    case QUDA_NATIVE_GAUGE_ORDER: norm_ = norm<reg_t, store_t, nColor, QUDA_NATIVE_GAUGE_ORDER>(u, d, type); break;
     case QUDA_QDP_GAUGE_ORDER:    norm_ = norm<reg_t, store_t, nColor, QUDA_QDP_GAUGE_ORDER>(u, d, type); break;
     case QUDA_MILC_GAUGE_ORDER:   norm_ = norm<reg_t, store_t, nColor, QUDA_MILC_GAUGE_ORDER>(u, d, type); break;
     default: errorQuda("Gauge field %d order not supported", u.Order());
@@ -124,8 +124,8 @@ namespace quda {
   void genericPrintMatrix(const GaugeField &a, int d, int parity, unsigned int x_cb)
   {
     switch (a.FieldOrder()) {
-    case QUDA_FLOAT2_GAUGE_ORDER:
-      print_matrix(FieldOrder<double, nColor, 1, QUDA_FLOAT2_GAUGE_ORDER, true, Float>(a), d, parity, x_cb);
+    case QUDA_NATIVE_GAUGE_ORDER:
+      print_matrix(FieldOrder<double, nColor, 1, QUDA_NATIVE_GAUGE_ORDER, true, Float>(a), d, parity, x_cb);
       break;
     case QUDA_QDP_GAUGE_ORDER:
       print_matrix(FieldOrder<double, nColor, 1, QUDA_QDP_GAUGE_ORDER, true, Float>(a), d, parity, x_cb);

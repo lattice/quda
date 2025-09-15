@@ -43,12 +43,12 @@ namespace quda
 
       if (arg.xpay) {
         if (arg.dagger) errorQuda("xpay operator not only defined for not dagger");
-        Dslash::template instantiate<packShmem, 1, false, true>(tp, stream);
+        Dslash::template instantiate<packShmem, false, true>(tp, stream);
       } else {
         if (arg.dagger)
-          Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
+          Dslash::template instantiate<packShmem, true, false>(tp, stream);
         else
-          Dslash::template instantiate<packShmem, 1, false, false>(tp, stream);
+          Dslash::template instantiate<packShmem, false, false>(tp, stream);
       }
     }
 

@@ -12,24 +12,13 @@ namespace quda {
 
   template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
-  template<class T>
-    struct Identity
-    {
-      __device__  __host__ inline
-        static T val();
-    };
+  template <class T> struct Identity {
+    __device__ __host__ inline static T val();
+  };
 
-  template<>
-    __device__ __host__ inline
-    float2 Identity<float2>::val(){
-      return make_float2(1.,0.);
-    }
+  template <> __device__ __host__ inline float2 Identity<float2>::val() { return {1., 0.}; }
 
-  template<>
-    __device__ __host__ inline
-    double2 Identity<double2>::val(){
-      return make_double2(1.,0.);
-    }
+  template <> __device__ __host__ inline double2 Identity<double2>::val() { return {1., 0.}; }
 
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;

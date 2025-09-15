@@ -11,27 +11,36 @@ namespace quda {
   namespace gauge
   {
 
-    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct)
+    template <typename T> constexpr int get_vector_order();
+    template <> constexpr int get_vector_order<double>() { return QUDA_ORDER_DOUBLE; }
+    template <> constexpr int get_vector_order<float>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<int>() { return QUDA_ORDER_SINGLE; }
+    template <> constexpr int get_vector_order<short>() { return QUDA_ORDER_HALF; }
+    template <> constexpr int get_vector_order<int8_t>() { return QUDA_ORDER_QUARTER; }
+
+    template <typename T> constexpr int get_vector_order(int length)
     {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
-          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13
-                   || reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-        }
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
-          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-          if (order == static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP)) return true;
-        }
+      constexpr int N = get_vector_order<T>();
+      if constexpr (N == 0) {                    // legacy path
+        int Nvec = length & (~(length - 1));     // greatest vector size that is a divisor of length
+        while (Nvec * sizeof(T) > 16) Nvec /= 2; // ensure we don't choose a size greater than 16 bytes
+        return Nvec;
+      } else {
+        int Nvec = N;
+        while (Nvec > length) Nvec /= 2;
+        return Nvec;
       }
-      return false;
+    }
+
+    constexpr int get_vector_order(size_t word_size, int length)
+    {
+      switch (word_size) {
+      case 1: return get_vector_order<int8_t>(length);
+      case 2: return get_vector_order<short>(length);
+      case 4: return get_vector_order<float>(length);
+      case 8: return get_vector_order<double>(length);
+      }
+      return 0;
     }
 
   } // namespace gauge
@@ -126,22 +135,9 @@ namespace quda {
     */
     void setPrecision(QudaPrecision precision, bool force_native = false)
     {
-      // is the current status in native field order?
-      bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
       this->precision = precision;
       this->ghost_precision = precision;
-
-      if (native) {
-        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
-            || reconstruct == QUDA_RECONSTRUCT_10) {
-          order = QUDA_FLOAT2_GAUGE_ORDER;
-        } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-                   && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
-          order = static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP);
-        } else {
-          order = QUDA_FLOAT4_GAUGE_ORDER;
-        }
-      }
+      if (force_native) order = QUDA_NATIVE_GAUGE_ORDER;
     }
   };
 
@@ -424,7 +420,7 @@ namespace quda {
        This function returns true if the field is stored in an
        internal field order for the given precision.
     */
-    bool isNative() const { return gauge::isNative(order, precision, reconstruct); }
+    bool isNative() const { return order == QUDA_NATIVE_GAUGE_ORDER ? true : false; }
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
