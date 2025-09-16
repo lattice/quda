@@ -27,9 +27,13 @@
 #define WITH_COMM(expr) do { if (in_comm()) { expr; } } while (0)
 
 typedef struct {
+  bool ready;
   bool created;
   pthread_t thread;
-  MPI_Comm comm;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+  MPI_Comm main_comm;   /** MPI communicator holding the main threads */
+  MPI_Comm worker_comm; /** MPI communicator holding the worker threads */
 } openQCD_QudaThread_t;
 
 typedef struct {
@@ -77,7 +81,7 @@ typedef struct openQCD_QudaSolver_s {
   int mg_qhat;                  /** qhat corresponding to the current mg-instance in QUDA */
 } openQCD_QudaSolver;
 
-static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, 1, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
+static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, false, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, MPI_COMM_NULL, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
 
 using namespace quda;
 
@@ -643,7 +647,7 @@ double openQCD_qudaPlaquette(void)
 
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  void *buf = qudaState.init.buffer_field(0, gauge);
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, gauge);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_GAUGE, gauge, buf)) {
     QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
     loadGaugeQuda(buf, &param);
@@ -652,7 +656,7 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec, QudaReconstructType 
 
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec, QudaReconstructType rec, QudaTboundary t_boundary)
 {
-  void *buf = qudaState.init.buffer_field(0, gauge);
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, gauge);
   if (in_comm()) {
     QudaGaugeParam param = newOpenQCDGaugeParam(prec, rec, t_boundary);
     saveGaugeQuda(buf, &param);
@@ -682,7 +686,7 @@ void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
   param.clover_csw = csw;
   param.clover_coeff = 0.0;
 
-  void *buf = qudaState.init.buffer_field(0, clover);
+  void *buf = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, clover);
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_CLOVER, clover, buf)) {
     loadCloverQuda(buf, NULL, &param);
   }
@@ -777,7 +781,7 @@ static ColorSpinorField *openQCD_qudaSpinorAlloc(void)
 
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 {
-  void *out = qudaState.init.buffer_field(0, openQCD_field);
+  void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
 
   if (in_comm()) {
     /* sets up the necessary parameters */
@@ -796,7 +800,7 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 
 void *openQCD_qudaH2D(void *openQCD_field)
 {
-  void *in = qudaState.init.buffer_field(0, openQCD_field);
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
 
   if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in)) {
 
@@ -1643,8 +1647,8 @@ void *openQCD_qudaSolverGetHandle(int id)
 
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
 {
-  void *in = qudaState.init.buffer_field(0, src);
-  void *out = qudaState.init.buffer_field(1, dst);
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, src);
+  void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 1, dst);
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, src, in);
 
   if (in_comm()) {
@@ -1682,8 +1686,8 @@ void openQCD_qudaDw(double mu, void *src, void *dst)
   param->input_location = QUDA_CPU_FIELD_LOCATION;
   param->output_location = QUDA_CPU_FIELD_LOCATION;
 
-  void *in = qudaState.init.buffer_field(0, src);
-  void *out = qudaState.init.buffer_field(1, dst);
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, src);
+  void *out = qudaState.init.buffer_field(qudaState.layout.world_comm, 1, dst);
 
   qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, src, in);
   WITH_COMM(MatQuda(static_cast<char *>(out), static_cast<char *>(in), param));
@@ -1855,8 +1859,8 @@ void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** soluti
   void **h_solutions = (void**) malloc(param->num_src*sizeof(void*));
 
   for (int i = 0; i < param->num_src; ++i) {
-    h_sources[i] = qudaState.init.buffer_field(i, sources[i]);
-    h_solutions[i] = qudaState.init.buffer_field(i+param->num_src, solutions[i]);
+    h_sources[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i, sources[i]);
+    h_solutions[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i+param->num_src, solutions[i]);
     qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, sources[i], h_sources[i]);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solutions[i], h_solutions[i]);
@@ -1898,6 +1902,13 @@ static void *openQCD_qudaInvertAsyncWrapper(void*)
   /* enable the thread to use QUDA */
   WITH_COMM(device::init_thread());
 
+  /* split the world_comm communicator, then signal the main threads to continue */
+  pthread_mutex_lock(&qudaState.thread.mutex);
+  MPI_Comm_split(qudaState.layout.world_comm, 0, 0, &qudaState.thread.worker_comm);
+  qudaState.thread.ready = true;
+  pthread_cond_signal(&qudaState.thread.cond);
+  pthread_mutex_unlock(&qudaState.thread.mutex);
+
   int Ns = qudaState.async_params.num_src;  /* num sources */
   int Nd = qudaState.inv_args.size();       /* num dispatched */
   int Nc = Nd > Ns ? ((Ns+Nd-1)/Ns) : 1;    /* num calls */
@@ -1910,8 +1921,8 @@ static void *openQCD_qudaInvertAsyncWrapper(void*)
 
     for (int s = 0; s < qudaState.async_params.num_src; ++s) {
       int i = c*Ns + s;
-      h_sources[s] = qudaState.init.buffer_field(s, qudaState.inv_args[i].source);
-      h_solutions[s] = qudaState.init.buffer_field(s+qudaState.async_params.num_src, qudaState.inv_args[i].solution);
+      h_sources[s] = qudaState.init.buffer_field(qudaState.thread.worker_comm, s, qudaState.inv_args[i].source);
+      h_solutions[s] = qudaState.init.buffer_field(qudaState.thread.worker_comm, s+qudaState.async_params.num_src, qudaState.inv_args[i].solution);
       qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, qudaState.inv_args[i].source, h_sources[s]);
       if (qudaState.async_params.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, qudaState.inv_args[i].solution, h_solutions[s]);
@@ -1943,12 +1954,14 @@ static void *openQCD_qudaInvertAsyncWrapper(void*)
       WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq[%d] = %.2e\n", s, qudaState.async_params.true_res_hq[s]));
       WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", s, *(qudaState.inv_args[i].status)));
 
-      MPI_Bcast(qudaState.inv_args[i].status, 1, MPI_INT, 0, qudaState.layout.world_comm);
-      MPI_Bcast((void *)&qudaState.inv_args[i].retval, 1, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+      MPI_Bcast(qudaState.inv_args[i].status, 1, MPI_INT, 0, qudaState.thread.worker_comm);
+      MPI_Bcast((void *)&qudaState.inv_args[i].retval, 1, MPI_DOUBLE, 0, qudaState.thread.worker_comm);
     }
   }
   free(h_sources);
   free(h_solutions);
+  MPI_Comm_free(&qudaState.thread.worker_comm);
+
   return nullptr;
 }
 
@@ -1999,15 +2012,23 @@ MPI_Comm openQCD_qudaInvertAsyncStart(void)
   if (qudaState.thread.created == true)
     WITH_COMM(errorQuda("Thread already created"));
 
+  MPI_Comm_split(qudaState.layout.world_comm, 1, 0, &qudaState.thread.main_comm);
+
   int rc = pthread_create(&qudaState.thread.thread, nullptr, openQCD_qudaInvertAsyncWrapper, nullptr);
   if (rc != 0) {
     perror("Error in openQCD_qudaInvertStart");
     WITH_COMM(errorQuda("pthread_create failed"));
   }
 
+  /* wait for the worker threads to split the world_comm communicator properly */
+  pthread_mutex_lock(&qudaState.thread.mutex);
+  while (!qudaState.thread.ready) {
+    pthread_cond_wait(&qudaState.thread.cond, &qudaState.thread.mutex);
+  }
+  pthread_mutex_unlock(&qudaState.thread.mutex);
+
   qudaState.thread.created = true;
-  MPI_Comm_dup(qudaState.layout.world_comm, &qudaState.thread.comm);
-  return qudaState.thread.comm;
+  return qudaState.thread.main_comm;
 }
 
 void openQCD_qudaInvertAsyncWait(double *residual)
@@ -2022,7 +2043,15 @@ void openQCD_qudaInvertAsyncWait(double *residual)
     perror("Error in openQCD_qudaInvertWait");
     WITH_COMM(errorQuda("pthread_join failed"));
   }
+
+  /* reset the thread state properly */
+  MPI_Comm_free(&qudaState.thread.main_comm);
   qudaState.thread.created = false;
+  qudaState.thread.ready = false;
+  qudaState.thread.cond = PTHREAD_COND_INITIALIZER;
+  qudaState.thread.mutex = PTHREAD_MUTEX_INITIALIZER;
+  qudaState.thread.worker_comm = MPI_COMM_NULL;
+  qudaState.thread.main_comm = MPI_COMM_NULL;
 
   if (residual != nullptr) {
     int i = 0;
@@ -2032,7 +2061,6 @@ void openQCD_qudaInvertAsyncWait(double *residual)
     }
   }
 
-  MPI_Comm_free(&qudaState.thread.comm);
   qudaState.inv_args.clear();
 }
 
@@ -2196,7 +2224,7 @@ void openQCD_qudaEigensolve(int id, int solver_id, void **h_evecs, void *h_evals
   int N = eig_param->n_conv*(eig_param->compute_svd ? 2 : 1);
   void **evecs = (void**) malloc(N*sizeof(void*));
   for (int i = 0; i < N; ++i) {
-    evecs[i] = qudaState.init.buffer_field(i, h_evecs[i]);
+    evecs[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i, h_evecs[i]);
     qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, h_evecs[i], evecs[i]);
   }
 

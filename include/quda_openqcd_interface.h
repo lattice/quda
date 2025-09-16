@@ -139,7 +139,7 @@ typedef struct {
   int volume;              /** VOLUME */
   int bndry;               /** BNDRY */
   int two_grids_equal;     /** Whether the QUDA and the openqxd process grids are equal or not */
-  void *(*buffer_field)(int idx, void *field);        /** obtain buffer field */
+  void *(*buffer_field)(MPI_Comm comm, int idx, void *field);        /** obtain buffer field */
 } openQCD_QudaInitArgs_t;
 
 
