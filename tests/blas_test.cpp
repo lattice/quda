@@ -791,7 +791,7 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double4 d = blas::cDotProductNormAB(xD, yD);
+        auto d = blas::cDotProductNormAB(xD, yD);
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
