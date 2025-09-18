@@ -44,15 +44,14 @@ namespace quda
 
       if (arg.dagger) {
         if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, true, xpay_<Arg::asymmetric>()>(tp, stream);
+          Dslash::template instantiate<packShmem, true, xpay_<Arg::asymmetric>()>(tp, stream);
         else
-          Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
+          Dslash::template instantiate<packShmem, true, false>(tp, stream);
       } else {
         if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp,
-                                                                                                               stream);
+          Dslash::template instantiate<packShmem, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp, stream);
         else
-          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), false>(tp, stream);
+          Dslash::template instantiate<packShmem, not_dagger_<Arg::asymmetric>(), false>(tp, stream);
       }
     }
 

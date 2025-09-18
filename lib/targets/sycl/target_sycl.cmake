@@ -94,6 +94,11 @@ enable_language(SYCL)
 # ######################################################################################################################
 # SYCL specific QUDA options
 
+set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
+set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
+set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
+set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
+
 # ######################################################################################################################
 # SYCL specific variables
 

@@ -78,6 +78,13 @@ message(STATUS "HIP Compiler is" ${CMAKE_HIP_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_HIP_COMPILER_ID})
 
 # ######################################################################################################################
+# data order variables
+set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
+set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
+set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
+set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
+
+# ######################################################################################################################
 # CUDA specific QUDA options
 set(QUDA_HETEROGENEOUS_ATOMIC OFF)
 set(QUDA_LARGE_KERNEL_ARG OFF)
@@ -109,11 +116,15 @@ target_compile_options(
   PRIVATE -Wall
           -Wextra
           -Wno-unknown-pragmas
-				  -Wno-unused-result
+          -Wno-unused-result
           $<$<CONFIG:STRICT>:-Werror
           -Wno-error=pass-failed>
           $<$<CONFIG:SANITIZE>:-fsanitize=address
           -fsanitize=undefined>)
+
+if(QUDA_FLUSH_DENORMALS)
+  message(FATAL_ERROR "QUDA_FLUSH_DENORMALS is not supported on this target")
+endif()
 
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE HIP)
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub

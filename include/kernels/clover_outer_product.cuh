@@ -18,8 +18,7 @@ namespace quda {
     static constexpr bool doublet = doublet_; // whether we applying the operator to a doublet
     static constexpr int n_flavor = doublet ? 2 : 1;
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, false, true>::type;
-    using Ghost =
-      typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin), spin_project, false, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, false, false>;
     using Gauge = typename gauge_mapper<Float, recon, 18>::type;
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
 
@@ -71,7 +70,7 @@ namespace quda {
           ghost[2 * dim + dir] = (char *)x_halo.Ghost2() + x_halo.GhostOffset(dim, dir);
         }
       }
-      this->x_halo.resetGhost(ghost);
+      this->x_halo.resetGhost(ghost, x_halo.SiteSubset());
       ColorSpinorField::bufferIndex = (1 - ColorSpinorField::bufferIndex);
 
       for (int dim = 0; dim < 4; dim++) {
@@ -79,7 +78,7 @@ namespace quda {
           ghost[2 * dim + dir] = (char *)p_halo.Ghost2() + p_halo.GhostOffset(dim, dir);
         }
       }
-      this->p_halo.resetGhost(ghost);
+      this->p_halo.resetGhost(ghost, x_halo.SiteSubset());
       ColorSpinorField::bufferIndex = (1 - ColorSpinorField::bufferIndex);
     }
   };

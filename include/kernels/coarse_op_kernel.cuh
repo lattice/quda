@@ -1005,7 +1005,6 @@ namespace quda {
 
             out = mv_add(arg.kd_dagger ? conj(Xinv) : Xinv, in, out);
             nbr_corner++;
-
           }
         }
       }

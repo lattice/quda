@@ -70,9 +70,9 @@ namespace quda {
 
     } else {
 
-      constexpr QudaFieldOrder csOrder = colorspinor::getNative<vFloat>(fineSpin);
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
-      constexpr QudaCloverFieldOrder clOrder = QUDA_FLOAT4_CLOVER_ORDER;
+      constexpr QudaFieldOrder csOrder = QUDA_NATIVE_FIELD_ORDER;
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_NATIVE_GAUGE_ORDER;
+      constexpr QudaCloverFieldOrder clOrder = QUDA_NATIVE_CLOVER_ORDER;
 
       if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
@@ -179,8 +179,7 @@ namespace quda {
       //Create a copy of the gauge field with no reconstruction, required for fine-grained access
       GaugeFieldParam gf_param(gauge);
       gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-      gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-      gf_param.setPrecision(gf_param.Precision());
+      gf_param.setPrecision(gf_param.Precision(), true);
       U = new GaugeField(gf_param);
 
       U->copy(gauge);
