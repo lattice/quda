@@ -19,17 +19,7 @@ namespace quda {
       coeff_t a, b;
       cvector_ref<ColorSpinorField> &x, &y, &z, &w, &v;
       vector<host_reduce_t> &result;
-
-      bool advanceSharedBytes(TuneParam &param) const override
-      {
-        TuneParam next(param);
-        advanceBlockDim(next); // to get next blockDim
-        int nthreads = next.block.x * next.block.y * next.block.z;
-        param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(param) ?
-            sharedBytesPerThread() * nthreads :
-            sharedBytesPerBlock(param);
-        return false;
-      }
+      bool tuneSharedBytes() const { return false; }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>

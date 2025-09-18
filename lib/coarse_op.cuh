@@ -713,6 +713,11 @@ namespace quda {
       return ((type == COMPUTE_VUV || type == COMPUTE_VLV) ? (advanceAtomic(param) || advanceParityFlip(param) || advanceSwizzle(param)) : false);
     }
 
+    bool tuneSharedBytes(TuneParam &param) const override
+    {
+      return (!arg.shared_atomic && !from_coarse && (type == COMPUTE_VUV || type == COMPUTE_VLV)) || type == COMPUTE_COARSE_CLOVER;
+    }
+
     bool advanceSharedBytes(TuneParam &param) const override
     {
       return ( (!arg.shared_atomic && !from_coarse && (type == COMPUTE_VUV || type == COMPUTE_VLV)) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);

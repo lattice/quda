@@ -95,7 +95,7 @@ namespace quda
       }
     }
 
-    bool advanceSharedBytes(TuneParam &) const { return false; }
+    bool tuneSharedBytes() const { return false; }
 
     bool advanceAux(TuneParam &param) const
     {

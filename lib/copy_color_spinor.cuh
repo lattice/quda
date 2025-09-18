@@ -18,7 +18,7 @@ namespace quda
     ColorSpinorField &out;
     const ColorSpinorField &in;
 
-    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
+    bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return in.VolumeCB(); }
 
     std::string get_basis_str(QudaGammaBasis basis)
