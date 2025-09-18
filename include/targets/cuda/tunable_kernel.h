@@ -21,7 +21,14 @@ namespace quda
      @param[in] arg Host address of argument struct
      @param[in] stream Stream identifier
   */
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
+  qudaError_t qudaLaunchKernel(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
+
+  /**
+     @brief Wrapper around cudaOccupancyMaxActiveBlocks
+     @param[in] func Device function symbol
+     @param[in] tp TuneParam containing the launch parameters
+  */
+  int qudaOccupancyMaxActiveBlocks(const kernel_t &kernel, const TuneParam &tp);
 
   class TunableKernel : public Tunable
   {
@@ -37,7 +44,7 @@ namespace quda
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
 #endif
       return launch_error;
     }
@@ -58,7 +65,7 @@ namespace quda
 #else
       check_arg_size(arg);
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
 #endif
       return launch_error;
     }

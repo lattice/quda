@@ -12,13 +12,20 @@ namespace quda
 {
 
   /**
-      @brief Wrapper around cudaLaunchKernel
-      @param[in] func Device function symbol
-      @param[in] tp TuneParam containing the launch parameters
-      @param[in] arg Host address of argument struct
-      @param[in] stream Stream identifier
-   */
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
+     @brief Wrapper around hipLaunchKernel
+     @param[in] func Device function symbol
+     @param[in] tp TuneParam containing the launch parameters
+     @param[in] arg Host address of argument struct
+     @param[in] stream Stream identifier
+  */
+  qudaError_t qudaLaunchKernel(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
+
+  /**
+     @brief Wrapper around hipOccupancyMaxActiveBlocks
+     @param[in] func Device function symbol
+     @param[in] tp TuneParam containing the launch parameters
+  */
+  int qudaOccupancyMaxActiveBlocks(const kernel_t &kernel, const TuneParam &tp);
 
   class TunableKernel : public Tunable
   {
@@ -31,7 +38,7 @@ namespace quda
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       checkSharedBytes<Functor>(tp, arg);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
       return launch_error;
     }
 
@@ -42,7 +49,7 @@ namespace quda
       checkSharedBytes<Functor>(tp, arg);
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
       return launch_error;
     }
 
