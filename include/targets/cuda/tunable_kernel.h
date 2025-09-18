@@ -36,6 +36,22 @@ namespace quda
   protected:
     QudaFieldLocation location;
 
+    /**
+       @brief Set the maximum number of blocks that can reside on an
+       SM.  This is called when we are autotuning to allow us to work
+       out how many different shared memory over allocations we should
+       use to minimally cover all occupancy variations.
+     */
+    void setMaxActiveBlocks(const kernel_t &kernel, const TuneParam &tp) const
+    {
+      if (activeTuningWarmup() && tuneSharedBytes()) {
+        auto tp2 = tp;
+        setSharedBytes(tp2);
+        // only compute max number blocks when we have no shared memory over subscription
+        if (tp.shared_bytes == tp2.shared_bytes) max_active_blocks = qudaOccupancyMaxActiveBlocks(kernel, tp);
+      }
+    }
+
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
@@ -44,6 +60,7 @@ namespace quda
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
+      setMaxActiveBlocks(kernel, tp);
       launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
 #endif
       return launch_error;
@@ -65,6 +82,7 @@ namespace quda
 #else
       check_arg_size(arg);
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
+      setMaxActiveBlocks(kernel, tp);
       launch_error = qudaLaunchKernel(kernel, tp, stream, static_cast<const void *>(&arg));
 #endif
       return launch_error;
