@@ -1,4 +1,6 @@
+#ifdef QUDA_MMA_AVAILABLE
 #include <cub/block/block_reduce.cuh>
+#endif
 
 #include <color_spinor_field.h>
 #include <multigrid.h>
