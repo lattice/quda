@@ -19,7 +19,7 @@ namespace quda {
       coeff_t a, b;
       cvector_ref<ColorSpinorField> &x, &y, &z, &w, &v;
       vector<host_reduce_t> &result;
-      bool tuneSharedBytes() const { return false; }
+      bool tuneSharedBytes() const override { return false; }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>

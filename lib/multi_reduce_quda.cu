@@ -21,7 +21,7 @@ namespace quda {
       cvector_ref<ColorSpinorField> &x, &y, &z, &w;
       T &result;
       QudaFieldLocation location;
-      bool tuneSharedBytes() const { return false; }
+      bool tuneSharedBytes() const override { return false; }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw>
