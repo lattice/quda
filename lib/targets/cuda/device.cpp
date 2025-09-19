@@ -361,6 +361,8 @@ namespace quda
       return max_blocks_per_sm;
     }
 
+    bool shared_carve_out_supported() { return true; }
+
     namespace profile
     {
 

@@ -729,6 +729,9 @@ namespace quda
 
   bool Tunable::tuneSharedCarveOut() const
   {
+    // if carve out tuning is not supported then just return false
+    if (!device::shared_carve_out_supported()) return false;
+
     static bool tune_carve_out = false; // default is not to do carve out tuning
     static bool init = false;
 
