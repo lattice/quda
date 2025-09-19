@@ -7,6 +7,7 @@
 #include <target_device.h>
 #include <hip/hip_runtime.h>
 #include <quda_hip_api.h>
+#include <kernel_helper.h>
 
 // if this macro is defined then we profile the HIP API calls
 //#define API_PROFILE
