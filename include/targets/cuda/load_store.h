@@ -15,53 +15,82 @@ namespace quda
   // pre-declaration of vector_load that we wish to specialize
   template <bool> struct vector_load_impl;
 
+  // pre-declaration of the prefetch type
+  template <size_t prefetch> struct prefetch_t;
+
   // CUDA specializations of the vector_load
   template <> struct vector_load_impl<true> {
-    template <typename T> __device__ inline void operator()(T &value, const void *ptr, int idx)
-    {
+    template <typename T, size_t prefetch_size>
+    __device__ inline void operator()(T &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &) {
       value = reinterpret_cast<const T *>(ptr)[idx];
     }
 
-    __device__ inline void operator()(float4 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(float4 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
-      load_cached_float4(value, reinterpret_cast<const float4 *>(ptr) + idx);
+      load_cached_float4<prefetch_size>(value, reinterpret_cast<const float4 *>(ptr) + idx);
     }
 
-    __device__ inline void operator()(float2 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(float2 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
-      load_cached_float2(value, reinterpret_cast<const float2 *>(ptr) + idx);
+      load_cached_float2<prefetch_size>(value, reinterpret_cast<const float2 *>(ptr) + idx);
+    }
+
+    template <size_t prefetch_size>
+    __device__ inline void operator()(float &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
+    {
+      load_cached_float<prefetch_size>(value, reinterpret_cast<const float *>(ptr) + idx);
     }
 
 #if __COMPUTE_CAPABILITY__ >= 1000
-    __device__ inline void operator()(double4 &value, const void *ptr, int idx)
+    template <typename T, size_t prefetch_size>
+    __device__ inline void operator()(double4 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
-      load_cached_double4(value, reinterpret_cast<const double4 *>(ptr) + idx);
+      load_cached_double4<prefetch_size>(value, reinterpret_cast<const double4 *>(ptr) + idx);
     }
 
-    __device__ inline void operator()(float8 &value, const void *ptr, int idx)
+    template <typename T, size_t prefetch_size>
+    __device__ inline void operator()(float8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
-      load_cached_float8(value, reinterpret_cast<const float8 *>(ptr) + idx);
+      load_cached_float8<prefetch_size>(value, reinterpret_cast<const float8 *>(ptr) + idx);
     }
 #endif
 
-    __device__ inline void operator()(double2 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(double2 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
-      load_cached_double2(value, reinterpret_cast<const double2 *>(ptr) + idx);
+      load_cached_double2<prefetch_size>(value, reinterpret_cast<const double2 *>(ptr) + idx);
     }
 
-    __device__ inline void operator()(short8 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(short2 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
+    {
+      load_cached_short2<prefetch_size>(value, reinterpret_cast<const short2 *>(ptr) + idx);      
+    }
+
+    template <size_t prefetch_size>
+    __device__ inline void operator()(short4 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
+    {
+      load_cached_short4<prefetch_size>(value, reinterpret_cast<const short4 *>(ptr) + idx);      
+    }
+
+    template <size_t prefetch_size>
+    __device__ inline void operator()(short8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
     {
       float4 tmp;
-      operator()(tmp, ptr, idx);
+      operator()(tmp, ptr, idx, prefetch);
       memcpy(&value, &tmp, sizeof(float4));
     }
 
-    __device__ inline void operator()(char8 &value, const void *ptr, int idx)
+    template <size_t prefetch_size>
+    __device__ inline void operator()(char8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
     {
       float2 tmp;
-      operator()(tmp, ptr, idx);
+      operator()(tmp, ptr, idx, prefetch);
       memcpy(&value, &tmp, sizeof(float2));
     }
+
   };
 
   // pre-declaration of vector_store that we wish to specialize

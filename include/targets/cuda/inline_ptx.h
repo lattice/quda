@@ -18,119 +18,425 @@ namespace quda {
   // If you're bored...
   // http://docs.nvidia.com/cuda/parallel-thread-execution/index.html#data-movement-and-conversion-instructions-st
 
-  __device__ inline void load_streaming_double4(double4 &a, const double4 *addr)
+// Helper macro for prefetch size validation
+#define VALIDATE_PREFETCH_SIZE(prefetch_size)                                                                          \
+  static_assert(prefetch_size == 0 || prefetch_size == 64 || prefetch_size == 128 || prefetch_size == 256,             \
+                "prefetch_size must be 0, 64, 128, or 256")
+
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_streaming_double4(double4 &a, const double4 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     double x, y, z, w;
-    asm("ld.cs.global.v4.f64 {%0, %1, %2, %3}, [%4+0];" : "=d"(x), "=d"(y), "=d"(z), "=d"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain streaming load, no prefetch hint
+      asm volatile("ld.global.cs.v4.f64 {%0, %1, %2, %3}, [%4];\n" : "=d"(x), "=d"(y), "=d"(z), "=d"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cs.L2::64B.v4.f64 {%0, %1, %2, %3}, [%4];\n"
+                   : "=d"(x), "=d"(y), "=d"(z), "=d"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cs.L2::128B.v4.f64 {%0, %1, %2, %3}, [%4];\n"
+                   : "=d"(x), "=d"(y), "=d"(z), "=d"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cs.L2::256B.v4.f64 {%0, %1, %2, %3}, [%4];\n"
+                   : "=d"(x), "=d"(y), "=d"(z), "=d"(w)
+                   : "l"(addr));
+    }
+
     a.x = x;
     a.y = y;
     a.z = z;
     a.w = w;
   }
 
-  __device__ inline void load_streaming_double2(double2 &a, const double2* addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_streaming_double2(double2 &a, const double2 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     double x, y;
-    asm("ld.cs.global.v2.f64 {%0, %1}, [%2+0];" : "=d"(x), "=d"(y) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain streaming load, no prefetch hint
+      asm volatile("ld.global.cs.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cs.L2::64B.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cs.L2::128B.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cs.L2::256B.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    }
+
     a.x = x; a.y = y;
   }
 
-  __device__ inline void load_streaming_float8(float8 &v, const float8 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_streaming_float8(float8 &v, const float8 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     float x, y, z, w, a, b, c, d;
-    asm("ld.cs.global.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8+0];"
-        : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
-        : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain streaming load, no prefetch hint
+      asm volatile("ld.global.cs.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cs.L2::64B.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cs.L2::128B.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cs.L2::256B.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    }
+
     v = {{x, y, z, w}, {a, b, c, d}};
   }
 
-  __device__ inline void load_streaming_float4(float4 &a, const float4* addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_streaming_float4(float4 &a, const float4 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     float x, y, z, w;
-    asm("ld.cs.global.v4.f32 {%0, %1, %2, %3}, [%4+0];" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain streaming load, no prefetch hint
+      asm volatile("ld.global.cs.v4.f32 {%0, %1, %2, %3}, [%4];\n" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cs.L2::64B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cs.L2::128B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cs.L2::256B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    }
+
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
-  __device__ inline void load_cached_short4(short4 &a, const short4 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_short4(short4 &a, const short4 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     short x, y, z, w;
-    asm("ld.ca.global.v4.s16 {%0, %1, %2, %3}, [%4+0];" : "=h"(x), "=h"(y), "=h"(z), "=h"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v4.s16 {%0, %1, %2, %3}, [%4];\n" : "=h"(x), "=h"(y), "=h"(z), "=h"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v4.s16 {%0, %1, %2, %3}, [%4];\n"
+                   : "=h"(x), "=h"(y), "=h"(z), "=h"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v4.s16 {%0, %1, %2, %3}, [%4];\n"
+                   : "=h"(x), "=h"(y), "=h"(z), "=h"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v4.s16 {%0, %1, %2, %3}, [%4];\n"
+                   : "=h"(x), "=h"(y), "=h"(z), "=h"(w)
+                   : "l"(addr));
+    }
+
     a.x = x;
     a.y = y;
     a.z = z;
     a.w = w;
   }
 
-  __device__ inline void load_cached_short2(short2 &a, const short2 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_short2(short2 &a, const short2 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     short x, y;
-    asm("ld.ca.global.v2.s16 {%0, %1}, [%2+0];" : "=h"(x), "=h"(y) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    }
+
     a.x = x;
     a.y = y;
   }
 
-  __device__ inline void load_global_short4(short4 &a, const short4 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_global_short4(short4 &a, const short4 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     short x, y, z, w;
-    asm("ld.cg.global.v4.s16 {%0, %1, %2, %3}, [%4+0];" : "=h"(x), "=h"(y), "=h"(z), "=h"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain global load, no prefetch hint
+      asm volatile("ld.global.cg.v4.s16 {%0, %1, %2, %3}, [%4];\n" : "=h"(x), "=h"(y), "=h"(z), "=h"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cg.L2::64B.v4.s16 {%0, %1, %2, %3}, [%4];\n"
+                   : "=h"(x), "=h"(y), "=h"(z), "=h"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cg.L2::128B.v4.s16 {%0, %1, %2, %3}, [%4];\n"
+                   : "=h"(x), "=h"(y), "=h"(z), "=h"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cg.L2::256B.v4.s16 {%0, %1, %2, %3}, [%4];\n"
+                   : "=h"(x), "=h"(y), "=h"(z), "=h"(w)
+                   : "l"(addr));
+    }
+
     a.x = x;
     a.y = y;
     a.z = z;
     a.w = w;
   }
 
-  __device__ inline void load_global_short2(short2 &a, const short2 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_global_short2(short2 &a, const short2 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     short x, y;
-    asm("ld.cg.global.v2.s16 {%0, %1}, [%2+0];" : "=h"(x), "=h"(y) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain global load, no prefetch hint
+      asm volatile("ld.global.cg.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cg.L2::64B.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cg.L2::128B.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cg.L2::256B.v2.s16 {%0, %1}, [%2];\n" : "=h"(x), "=h"(y) : "l"(addr));
+    }
+
     a.x = x;
     a.y = y;
   }
 
-  __device__ inline void load_global_float4(float4 &a, const float4* addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_global_float4(float4 &a, const float4 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     float x, y, z, w;
-    asm("ld.cg.global.v4.f32 {%0, %1, %2, %3}, [%4+0];" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain global load, no prefetch hint
+      asm volatile("ld.global.cg.v4.f32 {%0, %1, %2, %3}, [%4];\n" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.cg.L2::64B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.cg.L2::128B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.cg.L2::256B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    }
+
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
-  __device__ inline void load_cached_float4(float4 &a, const float4* addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_float4(float4 &a, const float4 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     float x, y, z, w;
-    asm("ld.ca.global.v4.f32 {%0, %1, %2, %3}, [%4+0];" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v4.f32 {%0, %1, %2, %3}, [%4];\n" : "=f"(x), "=f"(y), "=f"(z), "=f"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v4.f32 {%0, %1, %2, %3}, [%4];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w)
+                   : "l"(addr));
+    }
+
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
-  __device__ inline void load_cached_float8(float8 &v, const float8 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_float8(float8 &v, const float8 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     float x, y, z, w, a, b, c, d;
-    asm("ld.ca.global.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8+0];"
-        : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
-        : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v8.f32 {%0, %1, %2, %3, %4, %5, %6, %7}, [%8];\n"
+                   : "=f"(x), "=f"(y), "=f"(z), "=f"(w), "=f"(a), "=f"(b), "=f"(c), "=f"(d)
+                   : "l"(addr));
+    }
+
     v = {{x, y, z, w}, {a, b, c, d}};
   }
 
-  __device__ inline void load_cached_float2(float2 &a, const float2* addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_float2(float2 &a, const float2 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     float x, y;
-    asm("ld.ca.global.v2.f32 {%0, %1}, [%2+0];" : "=f"(x), "=f"(y) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v2.f32 {%0, %1}, [%2];\n" : "=f"(x), "=f"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v2.f32 {%0, %1}, [%2];\n" : "=f"(x), "=f"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v2.f32 {%0, %1}, [%2];\n" : "=f"(x), "=f"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v2.f32 {%0, %1}, [%2];\n" : "=f"(x), "=f"(y) : "l"(addr));
+    }
+
     a.x = x; a.y = y;
   }
 
-  __device__ inline void load_cached_double4(double4 &a, const double4 *addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_float(float &a, const float *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
+    float x;
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.f32 {%0}, [%1];\n" : "=f"(x) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.f32 {%0}, [%1];\n" : "=f"(x) : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.f32 {%0}, [%1];\n" : "=f"(x) : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.f32 {%0}, [%1];\n" : "=f"(x) : "l"(addr));
+    }
+
+    a = x;
+  }
+
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_double4(double4 &a, const double4 *addr)
+  {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     double x, y, z, w;
-    asm("ld.ca.global.v4.f64 {%0, %1, %2, %3}, [%4+0];" : "=d"(x), "=d"(y), "=d"(z), "=d"(w) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v4.f64 {%0, %1, %2, %3}, [%4];\n" : "=d"(x), "=d"(y), "=d"(z), "=d"(w) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v4.f64 {%0, %1, %2, %3}, [%4];\n"
+                   : "=d"(x), "=d"(y), "=d"(z), "=d"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v4.f64 {%0, %1, %2, %3}, [%4];\n"
+                   : "=d"(x), "=d"(y), "=d"(z), "=d"(w)
+                   : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v4.f64 {%0, %1, %2, %3}, [%4];\n"
+                   : "=d"(x), "=d"(y), "=d"(z), "=d"(w)
+                   : "l"(addr));
+    }
+
     a.x = x;
     a.y = y;
     a.z = z;
     a.w = w;
   }
 
-  __device__ inline void load_cached_double2(double2 &a, const double2* addr)
+  // Valid values for prefetch_size: 0 (no prefetch), 64, 128, 256
+  // Note: 256B prefetch requires SM 80+. For older architectures, 256B -> 128B
+  template <size_t prefetch_size = 0> __device__ inline void load_cached_double2(double2 &a, const double2 *addr)
   {
+    VALIDATE_PREFETCH_SIZE(prefetch_size);
+    constexpr size_t prefetch_ = __COMPUTE_CAPABILITY__ < 800 ? 0 : prefetch_size;
+
     double x, y;
-    asm("ld.ca.global.v2.f64 {%0, %1}, [%2+0];" : "=d"(x), "=d"(y) : __PTR(addr));
+
+    if constexpr (prefetch_ == 0) {
+      // Plain cached load, no prefetch hint
+      asm volatile("ld.global.ca.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 64) {
+      asm volatile("ld.global.ca.L2::64B.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 128) {
+      asm volatile("ld.global.ca.L2::128B.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    } else if constexpr (prefetch_ == 256) {
+      asm volatile("ld.global.ca.L2::256B.v2.f64 {%0, %1}, [%2];\n" : "=d"(x), "=d"(y) : "l"(addr));
+    }
+
     a.x = x; a.y = y;
   }
 

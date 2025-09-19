@@ -5,28 +5,34 @@
 namespace quda
 {
 
+  template <size_t prefetch> struct prefetch_t {
+    static constexpr int size = prefetch;
+  };
+
   /**
      @brief Non-specialized load operation
   */
   template <bool is_device> struct vector_load_impl {
-    template <typename T> __device__ __host__ inline void operator()(T &value, const void *ptr, int idx)
+    template <typename T, size_t prefetch_size>
+    __device__ __host__ inline void operator()(T &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
       value = reinterpret_cast<const T *>(ptr)[idx];
     }
   };
 
-  template <typename vector_t> __device__ __host__ inline vector_t vector_load(const void *ptr, int idx)
+  template <typename vector_t, size_t prefetch = 0>
+  __device__ __host__ inline vector_t vector_load_internal(const void *ptr, int idx)
   {
     vector_t value;
-    target::dispatch<vector_load_impl>(value, ptr, idx);
+    target::dispatch<vector_load_impl>(value, ptr, idx, prefetch_t<prefetch>());
     return value;
   }
 
-  template <typename scalar_t, int N>
+  template <typename scalar_t, int N, size_t prefetch = 0>
   __device__ __host__ inline array<scalar_t, N> vector_load(const void *ptr, int idx)
   {
     using vector_t = typename VectorType<scalar_t, N>::type;
-    auto value_v = vector_load<vector_t>(ptr, idx);
+    auto value_v = vector_load_internal<vector_t, prefetch>(ptr, idx);
     array<scalar_t, N> value_a;
     static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
     memcpy(&value_a, &value_v, sizeof(vector_t));
