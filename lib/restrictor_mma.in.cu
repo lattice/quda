@@ -1,3 +1,5 @@
+#include <cub/block/block_reduce.cuh>
+
 #include <color_spinor_field.h>
 #include <multigrid.h>
 #include <power_of_two_array.h>
