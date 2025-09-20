@@ -1547,7 +1547,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   if (!space_even || !space_odd) errorQuda("One or both deflation spaces is not loaded!");
   if ( preserved_even_evals_mass != 0.0 || preserved_odd_evals_mass != 0.0 )
     errorQuda("Requires eigenvalues of the massless operator but preserved eigenvalues are of the massive operator!");
-  int n_evecs = space_even->evecs.size();
+  int n_evecs = eigargs.n_ev;
   
   // Create Dslash operator
   QudaInvertParam invertParam = newQudaInvertParam();
