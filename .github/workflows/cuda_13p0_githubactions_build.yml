@@ -16,7 +16,7 @@ jobs:
     build:
       strategy:
         matrix:
-          compiler: [g++-15]
+          compiler: [g++-14]
       runs-on: ubuntu-24.04
 
       steps:
