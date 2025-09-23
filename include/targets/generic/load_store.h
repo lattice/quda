@@ -52,7 +52,7 @@ namespace quda
     }
   };
 
-  template <typename vector_t> __device__ __host__ inline void vector_store(void *ptr, int idx, const vector_t &value)
+  template <typename vector_t> __device__ __host__ inline void vector_storeV(void *ptr, int idx, const vector_t &value)
   {
     target::dispatch<vector_store_impl>(ptr, idx, value);
   }
@@ -64,7 +64,9 @@ namespace quda
     vector_t value_v;
     static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
     memcpy(&value_v, &value_a, sizeof(vector_t));
-    vector_store<vector_t>(ptr, idx, value_v);
+    //vector_storeV<vector_t>(ptr, idx, value_v);
+    scalar_t *a = static_cast<scalar_t *>(ptr) + N*idx;
+    memcpy(a, &value_v, sizeof(value_v));
   }
 
 } // namespace quda
