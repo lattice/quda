@@ -141,8 +141,10 @@ namespace quda
   /** tuning in progress? */
   static bool tuning = false;
   static bool candidatetuning = true;
+  static bool warmup_tuning = false;
 
   bool activeTuning() { return tuning; }
+  bool activeTuningWarmup() { return warmup_tuning; }
 
   static bool profile_count = true;
 
@@ -727,6 +729,9 @@ namespace quda
 
   bool Tunable::tuneSharedCarveOut() const
   {
+    // if carve out tuning is not supported then just return false
+    if (!device::shared_carve_out_supported()) return false;
+
     static bool tune_carve_out = false; // default is not to do carve out tuning
     static bool init = false;
 
@@ -1102,7 +1107,9 @@ namespace quda
             static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x),
             static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
+          warmup_tuning = true;
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
+          warmup_tuning = false;
 
           timer.start();
           for (int i = 0; i < candidate_iterations; i++) {

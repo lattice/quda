@@ -217,6 +217,14 @@ namespace quda {
      */
     virtual unsigned int maxSharedBytesPerBlock() const { return device::max_default_shared_memory(); }
 
+    mutable int max_active_blocks = 0;
+
+    /**
+       @brief Return the maximum number of blocks resident per SM
+       @param[in] param TuneParam containing the launch parameters
+    */
+    virtual int maxBlocksPerMultiprocessor(const TuneParam &) const { return max_active_blocks; }
+
     /**
      * The goal here is to throttle the number of thread blocks per SM
      * by over-allocating shared memory (in order to improve L2
@@ -228,9 +236,7 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
         const auto max_shared = maxSharedBytesPerBlock();
-        const int max_blocks_per_sm
-          = std::min(device::max_threads_per_processor() / (param.block.x * param.block.y * param.block.z),
-                     device::max_blocks_per_processor());
+        int max_blocks_per_sm = maxBlocksPerMultiprocessor(param);
         int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -423,6 +429,12 @@ namespace quda {
      @return tuning in progress?
   */
   bool activeTuning();
+
+  /**
+     @brief query if tuning warmup is in progress
+     @return tuning warming up in progress?
+  */
+  bool activeTuningWarmup();
 
   void loadTuneCache();
   void saveTuneCache(bool error = false);

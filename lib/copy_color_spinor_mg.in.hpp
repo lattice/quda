@@ -25,7 +25,7 @@ namespace quda {
     FloatOut *Out;
     FloatIn *In;
 
-    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
+    bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
