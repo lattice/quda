@@ -1,3 +1,4 @@
+#include <quda_arch.h>
 #ifdef QUDA_MMA_AVAILABLE
 #include <cub/block/block_reduce.cuh>
 #endif
