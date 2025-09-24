@@ -17,8 +17,8 @@ endif()
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90)
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80 sm_90 sm_100)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80 sm_90 sm_100)
 set(QUDA_GPU_ARCH_SUFFIX
     ""
     CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
@@ -99,7 +99,7 @@ option(QUDA_INTERFACE_NVTX "add NVTX markup to interface calls" OFF)
 
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
-  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
+  message(STATUS "Heterogeneous atomics support: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
 cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
                        "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
@@ -129,12 +129,39 @@ endif()
 
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
+message(STATUS "QUDA_GPU_ARCH: ${QUDA_GPU_ARCH}")
+
+# ######################################################################################################################
+# data order variables
+cmake_dependent_option(LDG256 "are 256-bit load instructions supported" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.9 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  OFF)
+
+if(LDG256)
+  set(QUDA_ORDER_DOUBLE "4" CACHE STRING "which data order to use for double precision fields (4 = default, 0 = legacy)")
+  set(QUDA_ORDER_SINGLE "8" CACHE STRING "which data order to use for single precision fields (8 = default, 0 = legacy)")
+  set(QUDA_ORDER_HALF "16" CACHE STRING "which data order to use for half precision fields (16 = default, 0 = legacy)")
+  set(QUDA_ORDER_QUARTER "16" CACHE STRING "which data order to use for quarter precision fields (16 = default, 0 = legacy)")
+else()
+  set(QUDA_ORDER_DOUBLE "2" CACHE STRING "which data order to use for double precision fields (2 = default, 0 = legacy)")
+  set(QUDA_ORDER_SINGLE "4" CACHE STRING "which data order to use for single precision fields (4 = default, 0 = legacy)")
+  set(QUDA_ORDER_HALF "8" CACHE STRING "which data order to use for half precision fields (8 = default, 0 = legacy)")
+  set(QUDA_ORDER_QUARTER "8" CACHE STRING "which data order to use for quarter precision fields (8 = default, 0 = legacy)")
+endif()
+
 # large arg support requires CUDA 12.1 and Volta+
 cmake_dependent_option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" ON
   "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 12.1 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70"
   OFF)
-message(STATUS "Large kernel arguments supported: ${QUDA_LARGE_KERNEL_ARG}")
+message(STATUS "Large kernel arguments support: ${QUDA_LARGE_KERNEL_ARG}")
 mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+
+# single-precision vectorization requires CUDA 13 or above
+cmake_dependent_option(QUDA_VECTORIZE_SINGLE "use vector instructions for single precision device code" ON
+  "${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.0 AND ${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 100"
+  OFF)
+message(STATUS "Single-precision vectorization support: ${QUDA_VECTORIZE_SINGLE}")
+mark_as_advanced(QUDA_VECTORIZE_SINGLE)
 
 # Set the maximum multi-RHS per kernel
 if(QUDA_LARGE_KERNEL_ARG)
@@ -143,6 +170,11 @@ else()
   set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
 endif()
 message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
+
+# Enable shared memory spilling
+option(QUDA_SHARED_MEMORY_SPILL "enable shared memory spilling?" OFF)
+mark_as_advanced(QUDA_SHARED_MEMORY_SPILL)
+message(STATUS "Shared memory spilling: ${QUDA_SHARED_MEMORY_SPILL}")
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
@@ -153,15 +185,12 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-          -ftz=true
           -prec-div=false
           -prec-sqrt=false>
           $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
-          -Mflushz
           -Mfpapprox=div
           -Mfpapprox=sqrt>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-          -fcuda-flush-denormals-to-zero
           -fcuda-approx-transcendentals
           -Xclang
           -fcuda-allow-variadic-functions>)
@@ -169,7 +198,18 @@ target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                -Wno-deprecated-gpu-targets --expt-relaxed-constexpr>)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
+if(QUDA_FLUSH_DENORMALS)
+  target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=flushz>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -Xclang -fcuda-flush-denormals-to-zero>)
+else()
+  target_compile_options(quda PRIVATE
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=false>
+  $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=noflushz>
+  $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: -Xclang -fno-cuda-flush-denormals-to-zero>)
+endif()
+
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
                                     --expt-relaxed-constexpr>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
@@ -346,7 +386,9 @@ endif()
 target_compile_options(
   quda 
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
-          -gpu=lineinfo
+          $<$<CONFIG:DEVEL>:-Xptxas
+          -warn-lmem-usage,-warn-spills
+          -gpu=lineinfo>
           $<$<CONFIG:STRICT>:-Werror>
           >)
 

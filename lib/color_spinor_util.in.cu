@@ -339,7 +339,7 @@ namespace quda {
   void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
   {
     if (a.isNative()) {
-      constexpr auto order = colorspinor::getNative<Float>(nSpin);
+      constexpr auto order = QUDA_NATIVE_FIELD_ORDER;
       print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       constexpr auto order = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;

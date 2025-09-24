@@ -23,6 +23,7 @@ namespace quda {
     dim3 grid;
     unsigned int shared_bytes = 0;
     bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
+    int shared_carve_out = 0;          // what to set the shared carve out
     int4 aux = {1, 1, 1, 1};           // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
@@ -43,6 +44,12 @@ namespace quda {
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
+
+  /**
+   * @brief Return the most recently used  TuneParam
+   * @retrn Most recent TuneParam
+   */
+  TuneParam getLastTuneParam();
 
   /**
      @brief Unify all instances of the tunecache across ranks.  This
@@ -90,6 +97,10 @@ namespace quda {
     virtual bool tuneAuxDim() const { return false; }
 
     virtual bool tuneSharedBytes() const;
+    virtual bool tuneSharedCarveOut() const;
+
+    virtual int sharedCarveOutStep() const;
+    virtual std::string getSharedCarveOutStr() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -237,6 +248,8 @@ namespace quda {
       }
     }
 
+    virtual bool advanceSharedCarveOut(TuneParam &param) const;
+
     virtual bool advanceAux(TuneParam &) const { return false; }
 
     char vol[TuneKey::volume_n];
@@ -312,6 +325,7 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
+      param.shared_carve_out = 0; // set default carve out to prefer L1 cache
       setSharedBytes(param);
     }
 
@@ -324,7 +338,8 @@ namespace quda {
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
+      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
+        || advanceGridDim(param) || advanceAux(param);
     }
 
     /**

@@ -18,7 +18,7 @@ extern int Vh;
 template <typename real_t> struct ComputeLinkOrderedOuterProduct {
   void operator()(const void *const src_, quda::GaugeField &dest, size_t nhops)
   {
-    auto src = reinterpret_cast<const su3_vector<real_t> *const>(src_);
+    auto src = reinterpret_cast<const su3_vector<real_t> *>(src_);
 
 #pragma omp parallel for
     for (int i = 0; i < V; ++i) {
@@ -890,9 +890,9 @@ template <class real_t> struct ComputeLongLinkField {
   void operator()(const int dim[4], const void *const *const oprod_, const void *const *const link_, int sig,
                   real_t coeff, void *const *const output_)
   {
-    auto oprod = reinterpret_cast<const matrix *const *const>(oprod_);
-    auto link = reinterpret_cast<const matrix *const *const>(link_);
-    auto output = reinterpret_cast<matrix *const *const>(output_);
+    auto oprod = reinterpret_cast<const matrix *const *>(oprod_);
+    auto link = reinterpret_cast<const matrix *const *>(link_);
+    auto output = reinterpret_cast<matrix *const *>(output_);
 
     int volume = 1;
     for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
@@ -947,9 +947,9 @@ template <class real_t> struct CompleteForceField {
   void operator()(const int dim[4], const void *const *const oprod_, const void *const *const link_, int sig,
                   void *const mom_)
   {
-    auto oprod = reinterpret_cast<const matrix *const *const>(oprod_);
-    auto link = reinterpret_cast<const matrix *const *const>(link_);
-    auto mom = reinterpret_cast<real_t *const>(mom_);
+    auto oprod = reinterpret_cast<const matrix *const *>(oprod_);
+    auto link = reinterpret_cast<const matrix *const *>(link_);
+    auto mom = reinterpret_cast<real_t *>(mom_);
 
     int volume = dim[0] * dim[1] * dim[2] * dim[3];
     const int half_volume = volume / 2;

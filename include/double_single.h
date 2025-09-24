@@ -10,16 +10,18 @@ __host__ __device__ inline void dsadd(float2 &c, const float2 &a, const float2 &
 }
 
 struct doublesingle {
-  float2 a;
-  __host__ __device__ inline doublesingle() : a(make_float2(0.0f,0.0f)) { ; }
-  __host__ __device__ inline doublesingle(const doublesingle &b) : a(make_float2(b.a.x, b.a.y)) { ; }
-  __host__ __device__ inline doublesingle(const float a) : a(make_float2(a, 0.0)) { ; }
+  float2 a = {};
+  __host__ __device__ inline doublesingle() = default;
+  __host__ __device__ inline doublesingle(const doublesingle &b) : a({b.a.x, b.a.y}) { ; }
+  __host__ __device__ inline doublesingle(const float a) : a({a, 0.0}) { ; }
 
   __host__ __device__ inline void operator+=(const doublesingle &b) { dsadd(this->a, this->a, b.a); }
-  __host__ __device__ inline void operator+=(const float &b) { 
-    float2 b2 = make_float2(b, 0.0); 
-    dsadd(this->a, this->a, b2); }
-  
+  __host__ __device__ inline void operator+=(const float &b)
+  {
+    float2 b2 = {b, 0.0};
+    dsadd(this->a, this->a, b2);
+  }
+
   __host__ __device__ inline doublesingle& operator=(const doublesingle &b)
     { a.x = b.a.x; a.y = b.a.y; return *this; }
     

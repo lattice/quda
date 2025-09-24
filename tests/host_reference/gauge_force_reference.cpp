@@ -101,10 +101,10 @@ template <typename real_t> struct ComputePathProduct {
                   const void *const loop_coeff_, int coeff_index, int dir, const lattice_t &lat)
   {
     using matrix = Matrix<3, std::complex<real_t>>;
-    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
+    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
 
-    auto staple = reinterpret_cast<matrix *const>(staple_);
-    auto loop_coeff = reinterpret_cast<const real_t *const>(loop_coeff_);
+    auto staple = reinterpret_cast<matrix *>(staple_);
+    auto loop_coeff = reinterpret_cast<const real_t *>(loop_coeff_);
     auto coeff = loop_coeff[coeff_index];
 
 #pragma omp parallel for
@@ -144,7 +144,7 @@ template <typename real_t> struct ComputeLoopTrace {
                                   const lattice_t &lat)
   {
     using matrix = Matrix<3, std::complex<real_t>>;
-    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
+    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
 
     std::complex<double> accum = 0;
 
@@ -185,9 +185,9 @@ template <typename real_t> struct UpdateMomentum {
   {
     using matrix = Matrix<3, std::complex<real_t>>;
 
-    auto momentum = reinterpret_cast<anti_hermitmat<real_t> *const>(momentum_);
-    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
-    auto staple = reinterpret_cast<const matrix *const>(staple_);
+    auto momentum = reinterpret_cast<anti_hermitmat<real_t> *>(momentum_);
+    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
+    auto staple = reinterpret_cast<const matrix *>(staple_);
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {
@@ -228,9 +228,9 @@ template <typename real_t> struct UpdateGauge {
   {
     using matrix = Matrix<3, std::complex<real_t>>;
 
-    auto gauge = reinterpret_cast<matrix *const>(gauge_);
-    auto sitelink = reinterpret_cast<const matrix *const *const>(sitelink_);
-    auto staple = reinterpret_cast<const matrix *const>(staple_);
+    auto gauge = reinterpret_cast<matrix *>(gauge_);
+    auto sitelink = reinterpret_cast<const matrix *const *>(sitelink_);
+    auto staple = reinterpret_cast<const matrix *>(staple_);
 
 #pragma omp parallel for
     for (size_t i = 0; i < lat.volume; i++) {

@@ -23,8 +23,7 @@ namespace quda
     }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedMass : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct nDegTwistedMass : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr nDegTwistedMass(const Ftor &ftor) : arg(ftor.arg) { }
@@ -49,7 +48,7 @@ namespace quda
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
       if (arg.dd_out.isZero(coord)) {
@@ -58,7 +57,7 @@ namespace quda
       }
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = arg.a * out;

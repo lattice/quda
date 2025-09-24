@@ -42,6 +42,16 @@ namespace quda
     state_t get_state();
 
     /**
+       @brief Get device driver version
+     */
+    int get_driver_version();
+
+    /**
+       @brief Get device runtime version
+     */
+    int get_runtime_version();
+
+    /**
        @brief Get number of devices present on node
     */
     int get_device_count();
