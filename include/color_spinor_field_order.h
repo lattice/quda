@@ -1023,7 +1023,7 @@ namespace quda
       {
         real v[length_ghost];
         norm_type nrm
-          = isFixed<Float>::value ? vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x) : 0.0;
+          = isFixed<Float>::value ? vector_load<float, 1>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x)[0] : 0.0;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
@@ -1161,7 +1161,7 @@ namespace quda
         auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
         auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
 #endif
-        norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
+        norm_type nrm = isFixed<Float>::value ? vector_load<float, 1>(norm, x + parity * norm_offset)[0] : 0.0;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
