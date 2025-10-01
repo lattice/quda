@@ -186,6 +186,7 @@ void computeTwoLinkCPU(void **twolink, su3_matrix **sitelinkEx)
   for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
   const int extended_volume = E[3] * E[2] * E[1] * E[0];
 
+#pragma omp parallel for
   for (int t = 0; t < Z[3]; ++t) {
     for (int z = 0; z < Z[2]; ++z) {
       for (int y = 0; y < Z[1]; ++y) {
@@ -698,6 +699,7 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
 // data reordering routines
 template <typename Out, typename In> void reorderQDPtoMILC(Out *milc_out, In **qdp_in, int V, int siteSize)
 {
+#pragma omp parallel for
   for (int i = 0; i < V; i++) {
     for (int dir = 0; dir < 4; dir++) {
       for (int j = 0; j < siteSize; j++) {

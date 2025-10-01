@@ -181,6 +181,7 @@ void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 template <typename real_t> struct ConstructCloverField {
   void operator()(void *res, double norm, double diag)
   {
+#pragma omp parallel for
     for (auto i = 0lu; i < static_cast<size_t>(Vh); i++) {
       for (auto parity = 0lu; parity < 2lu; parity++) {
         auto clover_matrix = reinterpret_cast<real_t *>(res) + 72 * (parity * Vh + i);
