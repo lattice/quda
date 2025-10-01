@@ -61,6 +61,7 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
       constructRandomGaugeField(longlink, param, precision, dslash_type);
       // incorporate non-trivial phase into long links
       for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
         for (int i = 0; i < Vh; ++i) {
           for (int parity = 0; parity < 2; parity++) {
             double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
@@ -93,6 +94,7 @@ void constructFatLongGaugeField(void *const *fatlink, void *const *longlink, Gau
 
       // incorporate non-trivial phase into long links
       for (int dir = 0; dir < 4; ++dir) {
+#pragma omp parallel for
         for (int i = 0; i < Vh; ++i) {
           for (int parity = 0; parity < 2; parity++) {
             double phase = random_uniform_host<double>(i, parity, 0, 2 * M_PI);
