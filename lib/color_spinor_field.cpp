@@ -384,6 +384,7 @@ namespace quda
       dc.X2X1 = X[1] * X[0];
       dc.X3X2X1 = X[2] * X[1] * X[0];
       dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
+      dc.X5X4X3X2X1 = X[4] * X[3] * X[2] * X[1] * X[0];
       dc.X2X1mX1 = (X[1] - 1) * X[0];
       dc.X3X2X1mX2X1 = (X[2] - 1) * X[1] * X[0];
       dc.X4X3X2X1mX3X2X1 = (X[3] - 1) * X[2] * X[1] * X[0];

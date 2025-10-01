@@ -238,42 +238,9 @@ namespace quda {
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
     constexpr int& operator[](int i) { return x[i]; }
-    array_2d<bool, 2, nDim> in_boundary = {};
+    array_2d<int, 2, nDim> in_boundary = {};
     constexpr int size() const { return nDim; }
   };
-
-  /**
-     @brief Compute the checkerboard 1-d index for the nearest
-     neighbor
-     @param[in] lattice coordinates
-     @param[in] mu dimension in which to add 1
-     @param[in] dir direction (+1 or -1)
-     @param[in] arg parameter struct
-     @return 1-d checkboard index
-   */
-  template <typename Coord, typename Arg>
-  __device__ __host__ inline int getNeighborIndexCB(const Coord &x, int mu, int dir, const Arg &arg)
-  {
-    switch (dir) {
-    case +1: // positive direction
-      switch (mu) {
-      case 0: return (x.in_boundary[1][0] ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
-      case 1: return (x.in_boundary[1][1] ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
-      case 2: return (x.in_boundary[1][2] ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
-      case 3: return (x.in_boundary[1][3] ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
-      case 4: return (x.in_boundary[1][4] ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
-      }
-    case -1:
-      switch (mu) {
-      case 0: return (x.in_boundary[0][0] ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
-      case 1: return (x.in_boundary[0][1] ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
-      case 2: return (x.in_boundary[0][2] ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
-      case 3: return (x.in_boundary[0][3] ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
-      case 4: return (x.in_boundary[0][4] ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
-      }
-    }
-    return 0; // should never reach here
-  }
 
   /**
      Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity

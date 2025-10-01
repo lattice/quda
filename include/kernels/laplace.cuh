@@ -86,7 +86,7 @@ namespace quda
       if (d != dir) {
         if (arg.dd_in.doHopping(coord, d, +1)) {
           // Forward gather - compute fwd offset for vector fetch
-          const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
           if (doHalo<kernel_type>(d) && ghost) {
 
@@ -111,7 +111,7 @@ namespace quda
           const int back_idx = linkIndexM1(coord, arg.dc.X, d);
           const int gauge_idx = back_idx;
 
-          const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+          const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
           if (doHalo<kernel_type>(d) && ghost) {
 

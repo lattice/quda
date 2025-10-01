@@ -90,6 +90,15 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
+    Coord coord1 = coord;
+    if constexpr (arg.improved) { // need to compute 1-hop in_boundary
+#pragma unroll
+      for (int d = 0; d < 4; d++) {
+        coord1.in_boundary[1][d] = -(coord[d] + 1 >= arg.dc.X[d]);
+        coord1.in_boundary[0][d] = -(coord[d] - 1 < 0);
+      }
+    }
+
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension
 
@@ -105,7 +114,7 @@ namespace quda
             out[s] = mv_add(U, in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int fwd_idx = linkIndexP1(coord, arg.dc.X, d);
+          const int fwd_idx = getNeighborIndexCB<1>(coord1, d, 1, arg.dc);
           const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -117,7 +126,7 @@ namespace quda
 
       // improved - forward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, +3)) {
-        const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
           const Link L = arg.L(d, coord.x_cb, parity);
@@ -128,7 +137,7 @@ namespace quda
             out[s] = mv_add(L, in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int fwd3_idx = linkIndexP3(coord, arg.dc.X, d);
+          const int fwd3_idx = getNeighborIndexCB<3>(coord, d, 1, arg.dc);
           const Link L = arg.L(d, coord.x_cb, parity);
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -153,7 +162,7 @@ namespace quda
             out[s] = mv_sub(conj(U), in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int back_idx = linkIndexM1(coord, arg.dc.X, d);
+          const int back_idx = getNeighborIndexCB<1>(coord1, d, -1, arg.dc);
           const int gauge_idx = back_idx;
           const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
             arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
@@ -167,7 +176,7 @@ namespace quda
 
       // improved - backward direction
       if (arg.improved && arg.dd_in.doHopping(coord, d, -3)) {
-        const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
@@ -178,7 +187,7 @@ namespace quda
             out[s] = mv_sub(conj(L), in, out[s]);
           }
         } else if (doBulk<kernel_type>() && !ghost) {
-          const int back3_idx = linkIndexM3(coord, arg.dc.X, d);
+          const int back3_idx = getNeighborIndexCB<3>(coord, d, -1, arg.dc);
           const int gauge_idx = back3_idx;
           const Link L = arg.L(d, gauge_idx, 1 - parity);
 #pragma unroll

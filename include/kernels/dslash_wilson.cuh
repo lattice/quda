@@ -102,7 +102,7 @@ namespace quda
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
 
-        const bool ghost = coord.in_boundary[1][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
@@ -131,7 +131,7 @@ namespace quda
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
 
-        const bool ghost = coord.in_boundary[0][d] && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours

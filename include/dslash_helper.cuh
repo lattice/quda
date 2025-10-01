@@ -158,11 +158,66 @@ namespace quda
 
 #pragma unroll
     for (int d = 0; d < nDim; d++) {
-      coord.in_boundary[1][d] = coord[d] + arg.nFace >= arg.dc.X[d];
-      coord.in_boundary[0][d] = coord[d] - arg.nFace < 0;
+      coord.in_boundary[1][d] = -(coord[d] + arg.nFace >= arg.dc.X[d]);
+      coord.in_boundary[0][d] = -(coord[d] - arg.nFace < 0);
     }
 
     return coord;
+  }
+
+  /**
+     @brief Compute the checkerboard 1-d index for the nearest
+     neighbor
+     @param[in] lattice coordinates
+     @param[in] mu dimension in which to add 1
+     @param[in] dir direction (+1 or -1)
+     @param[in] arg parameter struct
+     @return 1-d checkboard index
+   */
+  template <int nFace = 1, typename Coord, typename Arg>
+  __device__ __host__ inline int getNeighborIndexCB(const Coord &x, int mu, int dir, const Arg &arg)
+  {
+    switch (nFace) {
+    case 1:
+      switch (dir) {
+      case +1: // positive direction
+        switch (mu) {
+        case 0: return (x.X + 1 - (x.in_boundary[1][0] & arg.X[0])) >> 1;
+        case 1: return (x.X + arg.X[0] - (x.in_boundary[1][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X + arg.X2X1 - (x.in_boundary[1][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X + arg.X3X2X1 - (x.in_boundary[1][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X + arg.X4X3X2X1 - (x.in_boundary[1][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      case -1:
+        switch (mu) {
+        case 0: return (x.X - 1 + (x.in_boundary[0][0] & arg.X[0])) >> 1;
+        case 1: return (x.X - arg.X[0] + (x.in_boundary[0][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X - arg.X2X1 + (x.in_boundary[0][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X - arg.X3X2X1 + (x.in_boundary[0][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X - arg.X4X3X2X1 + (x.in_boundary[0][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      }
+    case 3:
+      switch (dir) {
+      case +1: // positive direction
+        switch (mu) {
+        case 0: return (x.X + 3 - (x.in_boundary[1][0] & arg.X[0])) >> 1;
+        case 1: return (x.X + 3 * arg.X[0] - (x.in_boundary[1][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X + 3 * arg.X2X1 - (x.in_boundary[1][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X + 3 * arg.X3X2X1 - (x.in_boundary[1][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X + 3 * arg.X4X3X2X1 - (x.in_boundary[1][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      case -1:
+        switch (mu) {
+        case 0: return (x.X - 3 + (x.in_boundary[0][0] & arg.X[0])) >> 1;
+        case 1: return (x.X - 3 * arg.X[0] + (x.in_boundary[0][1] & arg.X2X1)) >> 1;
+        case 2: return (x.X - 3 * arg.X2X1 + (x.in_boundary[0][2] & arg.X3X2X1)) >> 1;
+        case 3: return (x.X - 3 * arg.X3X2X1 + (x.in_boundary[0][3] & arg.X4X3X2X1)) >> 1;
+        case 4: return (x.X - 3 * arg.X4X3X2X1 + (x.in_boundary[0][4] & arg.X5X4X3X2X1)) >> 1;
+        }
+      }
+    }
+    return 0; // should never reach here
   }
 
   /**
