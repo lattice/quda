@@ -670,6 +670,17 @@ namespace quda {
   void genericPrintMatrix(const GaugeField &a, int dim, int parity, unsigned int x_cb, int rank = 0);
 
   /**
+     @brief Shift the gauge field by shift in each dimension and store
+     the resulting shifted field.  This is used to move the backwards
+     links on to this site.  The input field must be a padded field
+     with the ghost pre-exchanged if communications are enabled.
+     @param[out] out Output shifted field
+     @param[in] in Input shifted field
+     @param[in] shift value (1 or 3 supported)
+   */
+  void shift(GaugeField &out, const GaugeField &in, int shift);
+
+  /**
      @brief This is a debugging function, where we cast a gauge field
      into a spinor field so we can compute its L1 norm.
      @param u The gauge field that we want the norm of
