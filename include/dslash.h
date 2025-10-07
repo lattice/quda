@@ -9,6 +9,9 @@
 #include <instantiate.h>
 #include <instantiate_dslash.h>
 
+// enable experimental double store of gauge fields
+//#define QUDA_DSLASH_DOUBLE_STORE
+
 namespace quda
 {
 
@@ -70,6 +73,9 @@ namespace quda
       char tile_str[16];
       i32toa(tile_str, Arg::n_src_tile);
       strcat(aux_base, tile_str);
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+      strcat(aux_base, ",double_store");
+#endif
     }
 
     /**

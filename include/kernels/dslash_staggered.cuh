@@ -43,7 +43,9 @@ namespace quda
     const Ghost halo;      /** accessor for reading the halo */
     F x[MAX_MULTI_RHS];    /** input vector when doing xpay */
     const GU U; /** the gauge field */
+    const GU Uback; /** the gauge field */
     const GL L; /** the long gauge field */
+    const GL Lback; /** the long gauge field */
 
     const real a; /** xpay scale factor */
     const real tboundary; /** temporal boundary condition */
@@ -54,13 +56,14 @@ namespace quda
     const real dagger_scale;
 
     StaggeredArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                 const ColorSpinorField &halo, const GaugeField &U, const GaugeField &L, double a,
-                 cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
+                 const ColorSpinorField &halo, const GaugeField &U, const GaugeField &Uback, const GaugeField &L,
+                 const GaugeField &Lback, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
+                 const int *comm_override) :
       DslashArg < Float,
     nDim, DDArg, improved ? 3 : 1, n_src_tile
       > (out, in, halo, U, x, parity, dagger, a == 0.0 ? false : true, spin_project, comm_override),
-    halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U), L(L), a(a), tboundary(U.TBoundary()),
-    is_first_time_slice(comm_coord(3) == 0 ? true : false),
+    halo_pack(halo, improved_ ? 3 : 1), halo(halo, improved_ ? 3 : 1), U(U), Uback(Uback), L(L), Lback(Lback), a(a),
+    tboundary(U.TBoundary()), is_first_time_slice(comm_coord(3) == 0 ? true : false),
     is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
     dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
@@ -154,8 +157,13 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 3) : ghost_idx2;
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+          const Link U = arg.improved ? arg.Uback(d, coord.x_cb, parity) :
+                                        arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg));
+#else
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
             arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
+#endif
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -163,9 +171,14 @@ namespace quda
           }
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = getNeighborIndexCB<1>(coord1, d, -1, arg.dc);
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+          const Link U = arg.improved ? arg.Uback(d, coord.x_cb, parity) :
+                                        arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg));
+#else
           const int gauge_idx = back_idx;
           const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
             arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
+#endif
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.in[src_idx + s](back_idx, their_spinor_parity);
@@ -179,7 +192,11 @@ namespace quda
         const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+          const Link L = arg.Lback(d, coord.x_cb, parity);
+#else
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
+#endif
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
@@ -188,8 +205,12 @@ namespace quda
           }
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back3_idx = getNeighborIndexCB<3>(coord, d, -1, arg.dc);
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+          const Link L = arg.Lback(d, coord.x_cb, parity);
+#else
           const int gauge_idx = back3_idx;
           const Link L = arg.L(d, gauge_idx, 1 - parity);
+#endif
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in = arg.in[src_idx + s](back3_idx, their_spinor_parity);

@@ -43,7 +43,14 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, a, x, parity, dagger,
+
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+      GaugeField Uback = shift(U, 1);
+#else
+      const GaugeField &Uback = U;
+#endif
+
+      WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, Uback, a, x, parity, dagger,
                                                                     comm_override, alpha0, t0);
       Wilson<decltype(arg)> wilson(arg, out, in, halo);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);

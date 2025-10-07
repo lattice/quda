@@ -38,19 +38,21 @@ namespace quda
     Ghost halo_pack;
     Ghost halo;
     const G U;    /** the gauge field */
+    const G Uback; /** the backwards gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     /** parameters for distance preconditioning */
     const real alpha0;
     const int t0;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-              const GaugeField &U, double a, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger,
-              const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
+              const GaugeField &U, const GaugeField &Uback, double a, cvector_ref<const ColorSpinorField> &x,
+              int parity, bool dagger, const int *comm_override, double alpha0 = 0.0, int t0 = -1) :
       DslashArg<Float, nDim, DDArg>(out, in, halo, U, x, parity, dagger, a != 0.0 ? true : false, spin_project,
                                     comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
+      Uback(Uback),
       a(a),
       alpha0(alpha0),
       t0(t0)
@@ -128,7 +130,11 @@ namespace quda
       if (arg.dd_in.doHopping(coord, d, -1)) {
         const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+        const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
+#else
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
+#endif
         constexpr int proj_dir = dagger ? -1 : +1;
 
         const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -140,14 +146,22 @@ namespace quda
             idx;
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+          Link U = arg.Uback(d, gauge_idx, gauge_parity);
+#else
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
+#endif
           HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
                                          their_spinor_parity);
 
           out += bwd_coeff * (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+          Link U = arg.Uback(d, gauge_idx, gauge_parity);
+#else
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
+#endif
           Vector in = arg.in[src_idx](back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
