@@ -18,6 +18,10 @@ namespace quda
       TunableKernel3D(in, 2, 4), out(out), in(in), shift(shift)
     {
       assert(shift == 1 || shift == 3);
+      strcat(aux, ",shift=");
+      char shift_str[16];
+      u32toa(shift_str, shift);
+      strcat(aux, shift_str);
       apply(device::get_default_stream());
     }
 
