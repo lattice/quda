@@ -678,7 +678,7 @@ namespace quda {
      @param[in] in Input shifted field
      @param[in] shift value (1 or 3 supported)
    */
-  void shift(GaugeField &out, const GaugeField &in, int shift);
+  GaugeField shift(const GaugeField &in, int shift);
 
   /**
      @brief This is a debugging function, where we cast a gauge field

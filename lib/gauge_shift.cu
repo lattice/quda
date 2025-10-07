@@ -31,11 +31,19 @@ namespace quda
     long long bytes() const { return out.Bytes() + in.Bytes(); }
   };
 
-  void shift(GaugeField &out, const GaugeField &in, int shift)
+  GaugeField shift(const GaugeField &in, int shift)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+    if (in.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED)
+      errorQuda("Extended ghost exchange not supported");
+    if (in.GhostExchange() == QUDA_GHOST_EXCHANGE_NO && comm_partitioned())
+      errorQuda("comm_dim_partition() == true requires we have GhostExchange = QUDA_GHOST_EXCHANGE_PAD");
+    GaugeFieldParam param(in);
+    param.create = QUDA_NULL_FIELD_CREATE;
+    GaugeField out(param);
     instantiate<GaugeShifter, ReconstructGauge>(out, in, shift);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    return out;
   }
 
 } // namespace quda
