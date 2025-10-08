@@ -503,14 +503,7 @@ namespace quda
   template <KernelType kernel_type, class D>
   __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool active)
   {
-#ifdef QUDA_FAST_COMPILE_DSLASH
     dslash.template operator()<kernel_type, true>(x_cb, s, parity, active);
-#else
-    switch (parity) {
-    case 0: dslash.template operator()<kernel_type, true>(x_cb, s, 0, active); break;
-    case 1: dslash.template operator()<kernel_type, true>(x_cb, s, 1, active); break;
-    }
-#endif
   }
 
 #ifdef NVSHMEM_COMMS
