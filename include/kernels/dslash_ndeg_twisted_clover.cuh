@@ -67,7 +67,7 @@ namespace quda
 
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
@@ -75,12 +75,11 @@ namespace quda
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
 
-      if (!allthreads || active) {
-        if (arg.dd_out.isZero(coord)) {
-          if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-          if (!allthreads) return;
-          active = false;
-        }
+      active &= mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
+      if (arg.dd_out.isZero(coord)) {
+	if (active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+	if constexpr (!allthreads) return;
+	else active = false;
       }
 
       if (!allthreads || active) {
@@ -89,12 +88,14 @@ namespace quda
       }
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
-        if (active && arg.dd_x.isZero(coord)) {
-          out = arg.a * out;
+        if (arg.dd_x.isZero(coord)) {
+	  if (!allthreads || active) {
+	    out = arg.a * out;
+	  }
         } else {
           SharedMemoryCache<Vector> cache {*this};
           Vector tmp;
-          if (active) {
+	  if (!allthreads || active) {
             // apply the chiral and flavor twists
             // use consistent load order across s to ensure better cache locality
             Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
@@ -119,7 +120,7 @@ namespace quda
             // tmp += (c * tau_1) * x
           }
           cache.sync();
-          if (active) {
+	  if (!allthreads || active) {
             tmp += arg.c * cache.load_y(target::thread_idx().y + 1 - 2 * flavor);
 
             // add the Wilson part with normalisation

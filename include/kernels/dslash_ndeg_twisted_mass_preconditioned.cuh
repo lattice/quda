@@ -73,7 +73,7 @@ namespace quda
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
 
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
@@ -86,6 +86,7 @@ namespace quda
           active = false;
         }
       }
+      active &= mykernel_type != EXTERIOR_KERNEL_ALL // is thread active (non-trival for fused kernel only)
 
       if (!allthreads || active) {
 	if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh

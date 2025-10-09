@@ -309,7 +309,7 @@ namespace quda
           memcpy(&vecTmp[6], &norm, sizeof(norm_t)); // pack the norm
           array<store_t, 6> vecTmp2;
           copy_and_scale<store_t, real, 6>(vecTmp2, &v_[0], scale_inv);
-          std::memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
+          memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }

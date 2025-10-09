@@ -75,19 +75,17 @@ namespace quda
 
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
-
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
-      if (!allthreads || active) {
-        if (arg.dd_out.isZero(coord)) {
-          if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-          if (!allthreads) return;
-          active = false;
-        }
+      active &= mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
+      if (arg.dd_out.isZero(coord)) {
+	if (active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+	if constexpr (!allthreads) return;
+	else active = false;
       }
 
       if (!allthreads || active) {
@@ -101,12 +99,13 @@ namespace quda
         out += x;
       }
 
-      if (isComplete<mykernel_type>(arg, coord) && active) { out.toRel(); }
-
       constexpr int n_flavor = 2;
       HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
+      if (isComplete<mykernel_type>(arg, coord) && active) {
+	out.toRel();
 #pragma unroll
-      for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
+	for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
+      }
 
       int chirality = flavor; // relabel flavor as chirality
       SharedMemoryCache<HalfVector> cache {*this};
