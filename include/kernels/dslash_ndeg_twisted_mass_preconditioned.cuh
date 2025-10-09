@@ -86,7 +86,7 @@ namespace quda
           active = false;
         }
       }
-      active &= mykernel_type != EXTERIOR_KERNEL_ALL // is thread active (non-trival for fused kernel only)
+      active &= mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
 
       if (!allthreads || active) {
 	if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
