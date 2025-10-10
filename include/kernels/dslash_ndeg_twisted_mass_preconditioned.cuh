@@ -65,7 +65,7 @@ namespace quda
     */
 
     template <KernelType mykernel_type = kernel_type, bool allthreads = false>
-    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity, bool active = true)
+    __device__ __host__ __forceinline__ void operator()(int idx, int src_flavor, int parity, bool alive = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -73,29 +73,27 @@ namespace quda
       int src_idx = src_flavor / 2;
       int flavor = src_flavor % 2;
 
-      bool active2 = mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
+      bool active = mykernel_type != EXTERIOR_KERNEL_ALL; // is thread active (non-trival for fused kernel only)
       int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
         if (arg.dd_out.isZero(coord)) {
-          if (mykernel_type != EXTERIOR_KERNEL_ALL) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
-          if (!allthreads) return;
-          active = false;
+	  if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+          if constexpr (!allthreads) return;
+          else alive = false;
         }
       }
 
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
 	if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-	  applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active2, src_idx);
+	  applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 	else // defined in dslash_twisted_mass_preconditioned
-	  applyWilsonTM<dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active2, src_idx);
-      }
+	  applyWilsonTM<dagger, 2, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
-      if (!allthreads || active) {
         if (xpay && mykernel_type == INTERIOR_KERNEL && !arg.dd_x.isZero(coord)) {
           if constexpr (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
             // use consistent load order across s to ensure better cache locality
@@ -109,7 +107,7 @@ namespace quda
             Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
             out += x; // just directly add since twist already applied in the dslash
           }
-        } else if (mykernel_type != INTERIOR_KERNEL && active2) {
+        } else if (mykernel_type != INTERIOR_KERNEL && active) {
           // if we're not the interior kernel, then we must sum the partial
           Vector x = arg.out[src_idx](my_flavor_idx, my_spinor_parity);
           out += x;
@@ -118,15 +116,15 @@ namespace quda
 
       if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
         SharedMemoryCache<Vector> cache {*this};
-	if (!allthreads || active) {
-	  if (isComplete<mykernel_type>(arg, coord) && active2) {
+	if (!allthreads || alive) {
+	  if (isComplete<mykernel_type>(arg, coord) && active) {
 	    // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
 	    cache.save(out);
 	  }
 	}
         cache.sync(); // safe to sync here since other threads will exit if allowed, or all be here
-	if (!allthreads || active) {
-	  if (isComplete<mykernel_type>(arg, coord) && active2) {
+	if (!allthreads || alive) {
+	  if (isComplete<mykernel_type>(arg, coord) && active) {
 	    if (flavor == 0)
 	      out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(target::thread_idx().y + 1));
 	    else
@@ -135,7 +133,8 @@ namespace quda
 	}
       }
 
-      if (active && active2) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+      if (!allthreads || alive)
+	if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
     }
   };
 
