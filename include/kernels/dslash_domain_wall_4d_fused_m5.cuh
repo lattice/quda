@@ -18,8 +18,10 @@ namespace quda
     using DomainWall4DArg::a_5;
     using DomainWall4DArg::dagger;
     using DomainWall4DArg::in;
+    using DomainWall4DArg::max_regs;
     using DomainWall4DArg::nParity;
     using DomainWall4DArg::out;
+    using DomainWall4DArg::spill_shared;
     using DomainWall4DArg::threads;
     using DomainWall4DArg::x;
     using DomainWall4DArg::xpay;
@@ -56,7 +58,7 @@ namespace quda
   };
 
   constexpr bool domainWall4DFusedM5shared = true; // Use shared memory
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg_>
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg_>
   struct domainWall4DFusedM5 : dslash_default, d5Params<Arg_, domainWall4DFusedM5shared>::Ops {
     using Arg = Arg_;
 
@@ -85,9 +87,9 @@ namespace quda
       int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector stencil_out;
-      applyWilson<nParity, dagger, mykernel_type>(stencil_out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(stencil_out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       Vector out;
 

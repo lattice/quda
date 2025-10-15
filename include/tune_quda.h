@@ -23,6 +23,7 @@ namespace quda {
     dim3 grid;
     unsigned int shared_bytes = 0;
     bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
+    int shared_carve_out = 0;          // what to set the shared carve out
     int4 aux = {1, 1, 1, 1};           // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
@@ -43,6 +44,12 @@ namespace quda {
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
+
+  /**
+   * @brief Return the most recently used  TuneParam
+   * @retrn Most recent TuneParam
+   */
+  TuneParam getLastTuneParam();
 
   /**
      @brief Unify all instances of the tunecache across ranks.  This
@@ -90,6 +97,10 @@ namespace quda {
     virtual bool tuneAuxDim() const { return false; }
 
     virtual bool tuneSharedBytes() const;
+    virtual bool tuneSharedCarveOut() const;
+
+    virtual int sharedCarveOutStep() const;
+    virtual std::string getSharedCarveOutStr() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -206,6 +217,14 @@ namespace quda {
      */
     virtual unsigned int maxSharedBytesPerBlock() const { return device::max_default_shared_memory(); }
 
+    mutable int max_active_blocks = 0;
+
+    /**
+       @brief Return the maximum number of blocks resident per SM
+       @param[in] param TuneParam containing the launch parameters
+    */
+    virtual int maxBlocksPerMultiprocessor(const TuneParam &) const { return max_active_blocks; }
+
     /**
      * The goal here is to throttle the number of thread blocks per SM
      * by over-allocating shared memory (in order to improve L2
@@ -217,9 +236,7 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
         const auto max_shared = maxSharedBytesPerBlock();
-        const int max_blocks_per_sm
-          = std::min(device::max_threads_per_processor() / (param.block.x * param.block.y * param.block.z),
-                     device::max_blocks_per_processor());
+        int max_blocks_per_sm = maxBlocksPerMultiprocessor(param);
         int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -236,6 +253,8 @@ namespace quda {
 	return false;
       }
     }
+
+    virtual bool advanceSharedCarveOut(TuneParam &param) const;
 
     virtual bool advanceAux(TuneParam &) const { return false; }
 
@@ -312,6 +331,7 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
+      param.shared_carve_out = 0; // set default carve out to prefer L1 cache
       setSharedBytes(param);
     }
 
@@ -324,7 +344,8 @@ namespace quda {
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
+      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceSharedCarveOut(param)
+        || advanceGridDim(param) || advanceAux(param);
     }
 
     /**
@@ -408,6 +429,12 @@ namespace quda {
      @return tuning in progress?
   */
   bool activeTuning();
+
+  /**
+     @brief query if tuning warmup is in progress
+     @return tuning warming up in progress?
+  */
+  bool activeTuningWarmup();
 
   void loadTuneCache();
   void saveTuneCache(bool error = false);

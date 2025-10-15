@@ -25,9 +25,9 @@ namespace quda {
     static constexpr bool to_non_rel = to_non_rel_;
 
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<Float, fineSpin, fineColor, 1, colorspinor::getNative<Float>(fineSpin), Float, Float, true>;
-    using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, colorspinor::getNative<Float>(coarseSpin), Float, Float, true>;
-    using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat, vFloat>;
+    using F = FieldOrderCB<Float, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, Float, Float, true>;
+    using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, Float, Float, true>;
+    using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat>;
 
     const int_fastdiv n_src;
     F out[MAX_MULTI_RHS];

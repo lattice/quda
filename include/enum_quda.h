@@ -39,11 +39,7 @@ typedef enum QudaLinkType_s {
 } QudaLinkType;
 
 typedef enum QudaGaugeFieldOrder_s {
-  QUDA_FLOAT_GAUGE_ORDER = 1,
-  QUDA_FLOAT2_GAUGE_ORDER = 2,  // no reconstruct and double precision
-  QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 reconstruct single, and 12 reconstruct single, half, quarter
-  QUDA_FLOAT8_GAUGE_ORDER = 8,  // 8 reconstruct half and quarter
-  QUDA_NATIVE_GAUGE_ORDER,      // used to denote one of the above types in a trait, not used directly
+  QUDA_NATIVE_GAUGE_ORDER,      // used to denote the internal QUDA ordering
   QUDA_QDP_GAUGE_ORDER,         // expect *gauge[mu], even-odd, spacetime, row-column color
   QUDA_QDPJIT_GAUGE_ORDER,      // expect *gauge[mu], even-odd, complex-column-row-spacetime
   QUDA_CPS_WILSON_GAUGE_ORDER,  // expect *gauge, even-odd, mu, spacetime, column-row color
@@ -260,13 +256,10 @@ typedef enum QudaDiracFieldOrder_s {
 } QudaDiracFieldOrder;
 
 typedef enum QudaCloverFieldOrder_s {
-  QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
-  QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
-  QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
-  QUDA_FLOAT8_CLOVER_ORDER = 8, // even-odd float8 ordering
-  QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
-  QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
-  QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
+  QUDA_NATIVE_CLOVER_ORDER, // even-odd, Fload-N ordering
+  QUDA_PACKED_CLOVER_ORDER, // even-odd, QDP packed
+  QUDA_QDPJIT_CLOVER_ORDER, // (diagonal / off-diagonal)-chirality-spacetime
+  QUDA_BQCD_CLOVER_ORDER,   // even-odd, super-diagonal packed and reordered
   QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
 } QudaCloverFieldOrder;
 
@@ -351,10 +344,7 @@ typedef enum QudaSiteOrder_s {
 
 // Degree of freedom ordering
 typedef enum QudaFieldOrder_s {
-  QUDA_FLOAT_FIELD_ORDER = 1,               // spin-color-complex-space
-  QUDA_FLOAT2_FIELD_ORDER = 2,              // (spin-color-complex)/2-space-(spin-color-complex)%2
-  QUDA_FLOAT4_FIELD_ORDER = 4,              // (spin-color-complex)/4-space-(spin-color-complex)%4
-  QUDA_FLOAT8_FIELD_ORDER = 8,              // (spin-color-complex)/8-space-(spin-color-complex)%8
+  QUDA_NATIVE_FIELD_ORDER,                  // spin-color-complex-space
   QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,        // CPS/QDP++ ordering
   QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,        // QLA ordering (spin inside color)
   QUDA_QDPJIT_FIELD_ORDER,                  // QDP field ordering (complex-color-spin-spacetime)

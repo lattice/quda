@@ -42,8 +42,7 @@ namespace quda
 
       constexpr bool dagger = false;
       constexpr bool xpay = false;
-      constexpr int nParity = 2;
-      Dslash::template instantiate<packStaggeredShmem, nParity, xpay, dagger>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem, xpay, dagger>(tp, stream);
     }
 
     long long flops() const override

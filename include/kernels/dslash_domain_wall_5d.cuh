@@ -29,8 +29,7 @@ namespace quda
     }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct domainWall5D : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall5D : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr domainWall5D(const Ftor &ftor) : arg(ftor.arg) { }
@@ -54,7 +53,7 @@ namespace quda
       // we pass s=0, since idx is a 5-d index that includes s
       auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
 
       if (arg.dd_out.isZero(coord)) {
@@ -62,12 +61,12 @@ namespace quda
         return;
       }
 
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (mykernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
         const int s = coord[4];
-        const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
+        const int their_spinor_parity = arg.nParity == 2 ? 1 - parity : 0;
         if (arg.dd_in.doHopping(coord, d, +1)) {
           const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
           constexpr int proj_dir = dagger ? +1 : -1;
