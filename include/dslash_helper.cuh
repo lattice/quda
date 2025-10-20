@@ -26,7 +26,7 @@ namespace quda
      @param[in] dim Dimension we are working on.  If dim=-1 (default
      argument) then we return true if type is any halo kernel.
   */
-  template <KernelType type> __host__ __device__ __forceinline__ bool doHalo(int dim = -1)
+  template <KernelType type> __host__ __device__ __forceinline__ constexpr bool doHalo(int dim = -1)
   {
     switch (type) {
     case EXTERIOR_KERNEL_ALL: return true;
@@ -44,7 +44,7 @@ namespace quda
      computation
      @param[in] dim Dimension we are working on
   */
-  template <KernelType type> __host__ __device__ __forceinline__ bool doBulk()
+  template <KernelType type> __host__ __device__ __forceinline__ constexpr bool doBulk()
   {
     switch (type) {
     case EXTERIOR_KERNEL_ALL:
