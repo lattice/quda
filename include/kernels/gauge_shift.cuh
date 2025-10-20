@@ -39,7 +39,7 @@ namespace quda
       byte_array<int8_t, 4> x = {};
       getCoords(x, x_cb, arg.X, parity);
 
-      if (x[dir] < arg.shift && arg.comms_dim[dir]) { // on the boundary so we need to fetch from the ghost zone
+      if (x[dir] < arg.shift && arg.comms_dim[dir] > 1) { // on the boundary so we need to fetch from the ghost zone
         const int ghost_idx = ghostFaceIndex<0, 4>(x, arg.X, dir, arg.shift);
         Link U = arg.in.Ghost(dir, ghost_idx, 1 - parity);
         arg.out(dir, x_cb, parity) = U;

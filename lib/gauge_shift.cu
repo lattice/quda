@@ -6,7 +6,7 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeShifter : public TunableKernel3D
+  template <typename Float, int nColor> class GaugeShifter : public TunableKernel3D
   {
     GaugeField &out;
     const GaugeField &in;
@@ -28,8 +28,22 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      GaugeShiftArg<Float, nColor, recon> arg(out, in, shift);
-      launch<GaugeShift>(tp, stream, arg);
+      if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_NO> arg(out, in, shift);
+        launch<GaugeShift>(tp, stream, arg);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
+        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_13> arg(out, in, shift);
+        launch<GaugeShift>(tp, stream, arg);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
+        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_12> arg(out, in, shift);
+        launch<GaugeShift>(tp, stream, arg);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
+        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_9> arg(out, in, shift);
+        launch<GaugeShift>(tp, stream, arg);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
+        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_8> arg(out, in, shift);
+        launch<GaugeShift>(tp, stream, arg);
+      }
     }
 
     long long bytes() const { return out.Bytes() + in.Bytes(); }
@@ -45,7 +59,7 @@ namespace quda
     GaugeFieldParam param(in);
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField out(param);
-    instantiate<GaugeShifter, ReconstructGauge>(out, in, shift);
+    instantiate<GaugeShifter>(out, in, shift);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return out;
   }
