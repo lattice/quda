@@ -1181,6 +1181,21 @@ namespace quda
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
       }
 
+      __device__ __host__ inline void prefetch(int x, int parity = 0) const
+      {
+#ifndef LEGACY_ACCESSOR_NORM
+        auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
+        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+#endif
+        if constexpr (isFixed<Float>::value) prefetch_cache_line(norm + x + parity * norm_offset);
+
+#pragma unroll
+        for (int i = 0; i < M; i++) prefetch_cache_line(field + parity * offset + (volumeCB * i + x) * N);
+
+        // now load any remainder
+        if constexpr (Nrem > 0) prefetch_cache_line(field + parity * offset + volumeCB * M * N + x * Nrem);
+      }
+
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];

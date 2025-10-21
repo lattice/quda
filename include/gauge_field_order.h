@@ -1632,6 +1632,39 @@ namespace quda {
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
 
+      __device__ inline void prefetch(int x, int dir, int parity) const
+      {
+#pragma unroll
+        for (int i = 0; i < M; i++)
+          prefetch_cache_line(gauge + parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N);
+
+        // now load any remainder
+        if constexpr (Nrem > 0)
+          prefetch_cache_line(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem);
+
+        constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
+        if constexpr (load_phase) prefetch_cache_line(gauge + parity * offset + phaseOffset + stride * dir + x);
+      }
+
+      __device__ inline void prefetch_bulk(int x, int dir, int parity, int block_size) const
+      {
+        if (target::is_thread_zero()) {
+#pragma unroll
+          for (int i = 0; i < M; i++)
+            prefetch_cache_bulk(gauge + parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N,
+                                block_size * N * sizeof(Float));
+
+          // now load any remainder
+          if constexpr (Nrem > 0)
+            prefetch_cache_bulk(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem,
+                                block_size * Nrem * sizeof(Float));
+
+          constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
+          if constexpr (load_phase)
+            prefetch_cache_bulk(gauge + parity * offset + phaseOffset + stride * dir, block_size * sizeof(Float));
+        }
+      }
+
       __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
       {
         real tmp[reconLen];
