@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <device.h>
 #include <quda_cuda_api.h>
+#include <kernel_helper.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
@@ -129,8 +130,9 @@ namespace quda
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 #endif
 
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
+  qudaError_t qudaLaunchKernel(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
   {
+    auto func = kernel.func;
     static std::unordered_set<const void *> cache;
     auto search = cache.find(func);
     if (search == cache.end()) {
@@ -179,7 +181,7 @@ namespace quda
               QUDA_PROFILE_LAUNCH_KERNEL);
     }
 
-    set_runtime_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+    set_runtime_error(error, __func__, kernel.name.c_str(), __FILE__, __STRINGIFY__(__LINE__), activeTuning());
     return error == cudaSuccess ? QUDA_SUCCESS : QUDA_ERROR;
   }
 
@@ -618,6 +620,15 @@ namespace quda
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncGetAttributes(&attr, kernel), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
     set_runtime_error(error, __func__, func, file, line);
+  }
+
+  int qudaOccupancyMaxActiveBlocks(const kernel_t &kernel, const TuneParam &tp)
+  {
+    int numBlocks;
+    cudaError_t error = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &numBlocks, kernel.func, tp.block.x * tp.block.y * tp.block.z, tp.shared_bytes);
+    set_runtime_error(error, __func__, kernel.name.c_str(), __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+    return numBlocks;
   }
 
   void printAPIProfile()

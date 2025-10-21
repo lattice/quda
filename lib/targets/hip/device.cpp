@@ -193,6 +193,8 @@ namespace quda
 
     unsigned int max_blocks_per_processor() { return 32; }
 
+    bool shared_carve_out_supported() { return false; }
+
     namespace profile
     {
 

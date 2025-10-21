@@ -21,16 +21,7 @@ namespace quda {
       cvector_ref<ColorSpinorField> &x, &y, &z, &w;
       T &result;
       QudaFieldLocation location;
-
-      virtual bool advanceSharedBytes(TuneParam &param) const override
-      {
-        TuneParam next(param);
-        advanceBlockDim(next); // to get next blockDim
-        int nthreads = next.block.x * next.block.y * next.block.z;
-        param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(param) ?
-          sharedBytesPerThread() * nthreads : sharedBytesPerBlock(param);
-        return false;
-      }
+      bool tuneSharedBytes() const override { return false; }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw>
