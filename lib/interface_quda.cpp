@@ -520,7 +520,7 @@ void initQudaDevice(int dev)
 /*
  * Any persistent memory allocations that QUDA uses are done here.
  */
-void initQudaMemory()
+void initQudaMemory(void)
 {
   auto profile = pushProfile(profileInit);
   profileInit.TPSTART(QUDA_PROFILE_INIT);
@@ -546,7 +546,7 @@ void initQudaMemory()
   profileInit.TPSTOP(QUDA_PROFILE_INIT);
 }
 
-void updateR()
+void updateR(void)
 {
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 }
