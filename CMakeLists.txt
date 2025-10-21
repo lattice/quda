@@ -325,6 +325,10 @@ if(QUDA_INTERFACE_OPENQCD AND QUDA_QMP)
   message(SEND_ERROR "OpenQCD does not support QMP comms.")
 endif()
 
+if(QUDA_INTERFACE_OPENQCD AND NOT (QUDA_MPI))
+  message(SEND_ERROR "OpenQCD requires QUDA built with MPI comms.")
+endif()
+
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()

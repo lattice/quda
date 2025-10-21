@@ -1,7 +1,7 @@
 #pragma once
 
-#include "mpi.h"
-#include "pthread.h"
+#include <mpi.h>
+#include <pthread.h>
 
 #define OPENQCD_MAX_INVERTERS 32
 #define OPENQCD_MAX_EIGENSOLVERS 32
