@@ -1132,7 +1132,7 @@ namespace quda {
      *
      * @return     Surface
      */
-    __device__ __host__ inline int surface(const int *X, const int mu)
+    __device__ __host__ inline int surface(const int X[4], const int mu)
     {
       if (mu == 0) {
         return X[1] * X[2] * X[3];
@@ -1152,7 +1152,7 @@ namespace quda {
      *
      * @return     BNDRY
      */
-    __device__ __host__ inline int bndry(const int *L, const int *nproc)
+    __device__ __host__ inline int bndry(const int L[4], const int nproc[4])
     {
       return 2
         * (((1 - (nproc[0] % 2)) * surface(L, 0)) + ((1 - (nproc[1] % 2)) * surface(L, 1))
@@ -1168,7 +1168,7 @@ namespace quda {
      *
      * @return     The offset
      */
-    __device__ __host__ inline int ifc(const int *L, const int *nproc, const int mu)
+    __device__ __host__ inline int ifc(const int L[4], const int nproc[4], const int mu)
     {
       if (mu == 0) {
         return ((1 - (nproc[0] % 2)) * surface(L, 0)) / 2;
@@ -1191,7 +1191,7 @@ namespace quda {
      *
      * @return     The offset
      */
-    __device__ __host__ inline int face_offset(const int *L, const int *nproc, const int mu)
+    __device__ __host__ inline int face_offset(const int L[4], const int nproc[4], const int mu)
     {
       if (mu == 0) {
         return 0;
@@ -1212,7 +1212,7 @@ namespace quda {
      * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
      *                        convention (txyz)
      */
-    __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD)
+    __device__ __host__ inline void rotate_coords(const int x_quda[4], int x_openQCD[4])
     {
       x_openQCD[1] = x_quda[0];
       x_openQCD[2] = x_quda[1];
@@ -1247,7 +1247,7 @@ namespace quda {
      *
      * @return     Volume
      */
-    __device__ __host__ inline int vol(const int *X) { return X[0] * X[1] * X[2] * X[3]; }
+    __device__ __host__ inline int vol(const int X[4]) { return X[0] * X[1] * X[2] * X[3]; }
 
     /**
      * @brief      Return cbs[]. This is the cache block size in openQCD, which
@@ -1258,7 +1258,7 @@ namespace quda {
      *
      * @return     cbs
      */
-    __device__ __host__ inline int setup_cbs(const int mu, const int *X)
+    __device__ __host__ inline int setup_cbs(const int mu, const int X[4])
     {
       if (mu == 0) {
         return X[0];
@@ -1286,7 +1286,7 @@ namespace quda {
      * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
      *             openQCD
      */
-    __device__ __host__ inline int ipt(const int *x, const int *L)
+    __device__ __host__ inline int ipt(const int x[4], const int L[4])
     {
       int xb[4], xn[4];
 
@@ -1321,7 +1321,7 @@ namespace quda {
      *
      * @return     Number of prior boundary points
      */
-    __device__ __host__ inline int boundary_pts(const int mu, const int *x, const int *X)
+    __device__ __host__ inline int boundary_pts(const int mu, const int x[4], const int X[4])
     {
       int ret = 0;
 
@@ -1361,7 +1361,7 @@ namespace quda {
      *
      * @return     iup[ix][mu]
      */
-    __device__ __host__ inline int iup(const int *x, const int mu, const int *L, const int *nproc)
+    __device__ __host__ inline int iup(const int x[4], const int mu, const int L[4], const int nproc[4])
     {
       int i, ret, xb[4], xn[4];
 
