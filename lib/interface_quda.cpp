@@ -694,7 +694,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // set update_split_gauge to reuse backup or not and free the buf if needed
   // always update the flag even gauge reuse with checksum
   // better way would be do the checks more consistently along with clover/stagger
-  if (param->use_split_gauge_bkup == true) {
+  if (param->use_split_gauge_bkup) {
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   } else {
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_OFF;
