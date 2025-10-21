@@ -791,7 +791,7 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double4 d = blas::cDotProductNormAB(xD, yD);
+        auto d = blas::cDotProductNormAB(xD, yD);
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
@@ -845,7 +845,7 @@ protected:
       zD = zH;
       {
         double3 d = blas::tripleCGReduction(xD, yD, zD);
-        double3 h = make_double3(blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH));
+        double3 h = {blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH)};
         error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
       }
       break;

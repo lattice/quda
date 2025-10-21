@@ -1,3 +1,8 @@
+#include <quda_arch.h>
+#ifdef QUDA_MMA_AVAILABLE
+#include <cub/block/block_reduce.cuh>
+#endif
+
 #include <color_spinor_field.h>
 #include <multigrid.h>
 #include <power_of_two_array.h>

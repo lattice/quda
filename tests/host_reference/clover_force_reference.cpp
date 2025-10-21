@@ -790,7 +790,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
 
   quda::GaugeFieldParam gparam(gauge_param, oprod, QUDA_GENERAL_LINKS);
   gparam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gparam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gparam.order = QUDA_NATIVE_GAUGE_ORDER;
   gparam.geometry = QUDA_TENSOR_GEOMETRY;
   auto oprod_ex = quda::createExtendedGauge(quda::GaugeField(gparam), R);
 

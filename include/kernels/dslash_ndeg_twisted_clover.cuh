@@ -45,7 +45,7 @@ namespace quda
       = std::conditional_t<kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL, KernelOps<Cache>, NoKernelOps>;
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<kernel_type, Arg>::Ops {
 
     const Arg &arg;
@@ -73,7 +73,7 @@ namespace quda
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
 
@@ -83,7 +83,7 @@ namespace quda
       }
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if constexpr (mykernel_type == INTERIOR_KERNEL) {
         if (arg.dd_x.isZero(coord)) {

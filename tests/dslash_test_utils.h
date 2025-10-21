@@ -339,11 +339,9 @@ struct DslashTestWrapper {
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
 
-      for (int i = 0; i < Nsrc; i++) {
-        double cpu_norm = blas::norm2(spinor[i]);
-        double cuda_norm = blas::norm2(cudaSpinor[i]);
-        printfQuda("Source %d: CPU = %e, CUDA = %e\n", i, cpu_norm, cuda_norm);
-      }
+      auto cpu_norm = blas::norm2(spinor);
+      auto cuda_norm = blas::norm2(cudaSpinor);
+      for (int i = 0; i < Nsrc; i++) printfQuda("Source %d: CPU = %e, CUDA = %e\n", i, cpu_norm[i], cuda_norm[i]);
 
       bool pc = (dtest_type != dslash_test_type::Mat && dtest_type != dslash_test_type::MatDagMat);
 
@@ -353,10 +351,8 @@ struct DslashTestWrapper {
       dirac = Dirac::create(diracParam);
 
     } else {
-      for (int i = 0; i < Nsrc; i++) {
-        double cpu_norm = blas::norm2(spinor[i]);
-        printfQuda("Source %d: CPU = %e\n", i, cpu_norm);
-      }
+      auto cpu_norm = blas::norm2(spinor);
+      for (int i = 0; i < Nsrc; i++) printfQuda("Source %d: CPU = %e\n", i, cpu_norm[i]);
     }
   }
 
@@ -1174,7 +1170,8 @@ struct DslashTestWrapper {
       printfQuda("GBYTES = %f\n", gbytes);
       ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
-      size_t ghost_bytes = cudaSpinor[0].GhostBytes();
+      auto halo = ColorSpinorField::create_comms_batch(cudaSpinor);
+      size_t ghost_bytes = static_cast<ColorSpinorField &>(halo).GhostBytes();
 
       printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
                  "aggregate message size %lu bytes\n",
