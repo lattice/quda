@@ -440,6 +440,8 @@ namespace quda
       return max_blocks_per_sm;
     }
 
+    bool shared_carve_out_supported() { return false; }
+
     unsigned int max_parameter_size()
     {
       static unsigned int max_parameter_size = 0;
