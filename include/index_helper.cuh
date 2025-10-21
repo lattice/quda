@@ -1118,7 +1118,7 @@ namespace quda {
    *
    * The main helper functions are ipt() and iup(), giving pure function
    * implementations of the ipt[] and iup[][] arrays (see
-   * openqcd:include/global.h) that are needed to calculate the correct offsets
+   * https://doi.org/10.22323/1.466.0280) that are needed to calculate the correct offsets
    * of the fields base pointers.
    */
   namespace openqcd
