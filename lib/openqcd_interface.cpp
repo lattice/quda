@@ -724,7 +724,7 @@ inline void set_su3csw(QudaInvertParam *param, double su3csw)
     param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 
     if (qudaState.layout.flds_parms().gauge == OPENQCD_GAUGE_SU3) {
-      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
+      param->clover_order = QUDA_NATIVE_CLOVER_ORDER; /* what implication has this? */
       param->compute_clover = true;
     } else {
       param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
