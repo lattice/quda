@@ -419,6 +419,13 @@ if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
+CPMAddPackage(
+    NAME CCCL
+    GITHUB_REPOSITORY nvidia/cccl
+    GIT_TAG main # Fetches the latest commit on the main branch
+)
+target_link_libraries(quda PRIVATE CCCL::CCCL)
+
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)

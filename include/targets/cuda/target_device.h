@@ -7,6 +7,8 @@
 #include <nv/target>
 #endif
 
+#include <cuda/ptx>
+
 #if defined(__CUDACC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
 #define QUDA_CUDA_CC
 #endif
@@ -170,6 +172,55 @@ namespace quda
       default: return block_dim().z * block_dim().y * block_dim().x;
       }
     }
+
+    template <bool is_device> struct is_thread_zero_impl {
+      template <class T> bool operator()(const T &) { return true; }
+    };
+
+#ifdef QUDA_CUDA_CC
+    template <> struct is_thread_zero_impl<true> {
+      template <class T> __device__ bool operator()(const T &)
+      {
+        unsigned int tid = thread_idx_linear<T::value>();
+        unsigned int warp_id = tid / 32;
+        unsigned int uniform_warp_id = __shfl_sync(0xFFFFFFFF, warp_id, 0); // Broadcast from lane 0
+        // unsigned int uniform_warp_id = __reduce_min_sync(~0, warp_id == 0); perhaps faster on sm_100
+        return (uniform_warp_id == 0 && cuda::ptx::elect_sync(0xFFFFFFFF));
+      }
+    };
+#endif
+
+    /**
+       @brief Return true only for a single thread in a thread block.
+       This function assumes all warps in the thread block are
+       converged.  Note that the single thread that is returned is not
+       necessarily thread 0 in the thread block.
+       @tparam dim The dimension of the thread block
+       @return true for a single thread in the thread block, else
+       false
+    */
+    template <int dim = 3> __device__ __host__ inline bool is_thread_zero()
+    {
+      return target::dispatch<is_thread_zero_impl>(std::integral_constant<int, dim>());
+    }
+
+    template <bool is_device> struct is_lane_zero_impl {
+      bool operator()() { return true; }
+    };
+#ifdef QUDA_CUDA_CC
+    template <> struct is_lane_zero_impl<true> {
+      __device__ bool operator()() { return cuda::ptx::elect_sync(0xFFFFFFFF); }
+    };
+#endif
+
+    /**
+       @brief Return true only for a single lane in a warp.
+       This function assumes the warp is converged.
+       Note that the single thread that is returned is not
+       necessarily lane 0 in the warp.
+       @return true for a single lane in the warp, else false
+    */
+    __device__ __host__ inline bool is_lane_zero() { return target::dispatch<is_lane_zero_impl>(); }
 
     template <class T> constexpr bool vectorize()
     {
