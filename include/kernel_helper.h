@@ -19,7 +19,9 @@ namespace quda
     static constexpr bool check_bounds = check_bounds_;
     static constexpr int max_regs = 0;          // by default we don't limit register count
     static constexpr bool spill_shared = false; // whether a given kernel should use shared memory spilling
+    static constexpr bool is_dslash = false;    // whether the arg is for a dslash (with its nested arg struct)
     dim3 threads;          /** number of active threads required */
+    int block_size;        /** product of thread block dimensions */
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */

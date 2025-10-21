@@ -76,6 +76,11 @@ namespace quda
 #ifdef QUDA_DSLASH_DOUBLE_STORE
       strcat(aux_base, ",double_store");
 #endif
+      if constexpr (Arg::prefetch_distance > 0) {
+        strcat(aux_base, ",prefetch=");
+        i32toa(tile_str, Arg::prefetch_distance);
+        strcat(aux_base, tile_str);
+      }
     }
 
     /**

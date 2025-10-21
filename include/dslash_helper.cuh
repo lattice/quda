@@ -109,6 +109,7 @@ namespace quda
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;
+      coord.x_cb_0 = (target::block_idx().x - arg.pack_blocks) * target::block_dim().x;
       if (nDim == 5)
         coord.X = getCoords5CB(coord, idx, arg.dc.X, arg.X0h, parity, pc_type);
       else
@@ -298,6 +299,7 @@ namespace quda
     static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
     static constexpr int max_regs = 0;             // by default we don't limit register count
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
+    static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -340,6 +342,7 @@ namespace quda
     int pack_blocks = 0;   // total number of blocks used for packing in the dslash
     int exterior_dims = 0; // dimension to run in the exterior Dslash
     int exterior_blocks = 0;
+    int block_size = 0;
 
     DDArg dd_out;
     DDArg dd_in;
@@ -707,6 +710,7 @@ namespace quda
     static constexpr KernelType kernel_type = kernel_type_;
     static constexpr int max_regs = Arg::max_regs;
     static constexpr bool spill_shared = Arg::spill_shared;
+    static constexpr bool is_dslash = true;
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :

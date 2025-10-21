@@ -234,6 +234,7 @@ namespace quda {
     array<int, nDim> gx = {};   // nDim global lattice coordinates
     array<int, nDim> gDim = {}; // global lattice dimensions
     int x_cb;    // checkerboard lattice site index
+    int x_cb_0;  // value of x_cb on first thread in block
     int s;       // fifth dimension coord
     int X;       // full lattice site index
     constexpr const int& operator[](int i) const { return x[i]; }
