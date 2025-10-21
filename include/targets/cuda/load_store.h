@@ -156,6 +156,24 @@ namespace quda
     }
   };
 
+  // pre-declaration of the prefetch_cache that we wish to specialize
+  template <bool> struct prefetch_cache_line_imp;
+
+  // CUDA specialization of the prefetch_cache that uses inline ptx
+  template <> struct prefetch_cache_line_imp<true> {
+    __device__ inline void operator()(const void *p) { prefetch_L2(p); }
+  };
+
+  // pre-declaration of the prefetch_cache that we wish to specialize
+  template <bool> struct prefetch_cache_bulk_imp;
+
+#if __COMPUTE_CAPABILITY__ >= 900
+  // CUDA specialization of the prefetch_cache_bulk that uses TMA (requires Hopper+)
+  template <> struct prefetch_cache_bulk_imp<true> {
+    __device__ inline void operator()(const void *p, size_t bytes) { prefetch_tma(p, bytes); }
+  };
+#endif
+
 } // namespace quda
 
 #include "../generic/load_store.h"

@@ -64,4 +64,19 @@ namespace quda
     vector_store<vector_t>(ptr, idx, value_v);
   }
 
+  template <bool is_device> struct prefetch_cache_line_imp {
+    __device__ __host__ inline void operator()(const void *) { }
+  };
+
+  __device__ __host__ inline void prefetch_cache_line(const void *p) { target::dispatch<prefetch_cache_line_imp>(p); }
+
+  template <bool is_device> struct prefetch_cache_bulk_imp {
+    __device__ __host__ inline void operator()(const void *, size_t) { }
+  };
+
+  __device__ __host__ inline void prefetch_cache_bulk(const void *p, size_t bytes)
+  {
+    target::dispatch<prefetch_cache_bulk_imp>(p, bytes);
+  }
+
 } // namespace quda
