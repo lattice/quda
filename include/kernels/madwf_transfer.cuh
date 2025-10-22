@@ -112,7 +112,7 @@ namespace quda
         @param[in] s The output Ls dimension coordinate
        */
       template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool alive = true)
       {
         constexpr bool dagger = Arg::dagger;
 
@@ -133,7 +133,7 @@ namespace quda
         }
         cache.sync();
 
-        if (!allthreads || active) {
+        if (!allthreads || alive) {
           Vector out;
           // t -> s_in, s-> s_out
           for (int t = 0; t < Ls_in; t++) {

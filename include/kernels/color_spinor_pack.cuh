@@ -221,15 +221,14 @@ namespace quda {
   */
   template <bool allthreads, typename Ftor>
   __device__ __host__ inline std::enable_if_t<Ftor::Arg::block_float, typename Ftor::Arg::real>
-  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block,
-                   bool active)
+  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block, bool alive)
   {
     using real = typename Ftor::Arg::real;
     const int Ms = spins_per_thread(Ftor::Arg::nSpin);
     const int Mc = colors_per_thread(Ftor::Arg::nColor);
     complex<real> thread_max = {0.0, 0.0};
 
-    if (!allthreads || active) {
+    if (!allthreads || alive) {
 #pragma unroll
       for (int spin_local = 0; spin_local < Ms; spin_local++) {
         int s = spin_block + spin_local;
@@ -310,7 +309,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-    __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool active = true)
+    __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool alive = true)
     {
       const int Ms = spins_per_thread(Arg::nSpin);
       const int Mc = colors_per_thread(Arg::nColor);
@@ -326,9 +325,9 @@ namespace quda {
 
       int src_idx;
       int x_cb = indexFromFaceIndex(src_idx, dim, dir, ghost_idx, parity, arg);
-      auto max = compute_site_max<allthreads>(*this, src_idx, x_cb, spinor_parity, spin_block, color_block, active);
+      auto max = compute_site_max<allthreads>(*this, src_idx, x_cb, spinor_parity, spin_block, color_block, alive);
 
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
 #pragma unroll
         for (int spin_local = 0; spin_local < Ms; spin_local++) {
           int s = spin_block + spin_local;

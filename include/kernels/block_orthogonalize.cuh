@@ -136,7 +136,7 @@ namespace quda {
     }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool active = true)
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool alive = true)
     {
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
@@ -147,7 +147,7 @@ namespace quda {
       int x_cb[n_sites_per_thread];
 
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
-        if (!allthreads || active) {
+        if (!allthreads || alive) {
           int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
           // all threads with x_fine_offset greater than aggregate_size_cb are second parity
           int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
