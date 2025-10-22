@@ -86,7 +86,8 @@ namespace quda
 
     bool tuneSharedCarveOut() const override
     {
-      static bool tune_shared = true; // default is to do carve out tuning
+      // default is to do carve out tuning if the architecture supports it
+      static bool tune_shared = device::shared_carve_out_supported();
       static bool init = false;
 
       if (!init) {

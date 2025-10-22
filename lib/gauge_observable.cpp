@@ -19,7 +19,7 @@ namespace quda
     }
 
     if (param.compute_rectangle) {
-      double4 plqrct = plaquetteRectangle(u);
+      auto plqrct = plaquetteRectangle(u);
       param.plaquette[0] = 0.5 * (plqrct.x + plqrct.y);
       param.plaquette[1] = plqrct.x;
       param.plaquette[2] = plqrct.y;
@@ -27,7 +27,7 @@ namespace quda
       param.rectangle[1] = plqrct.z;
       param.rectangle[2] = plqrct.w;
     } else if (param.compute_plaquette) {
-      double3 plaq = plaquette(u);
+      auto plaq = plaquette(u);
       param.plaquette[0] = plaq.x;
       param.plaquette[1] = plaq.y;
       param.plaquette[2] = plaq.z;
