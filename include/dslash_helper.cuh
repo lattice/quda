@@ -303,7 +303,7 @@ namespace quda
 #ifdef QUDA_DSLASH_PREFETCH_BULK
     static constexpr bool prefetch_bulk = true;
 #ifndef QUDA_DSLASH_DOUBLE_STORE
-    static_assert(!bulk, "Cannot use bulk prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
+    static_assert(!prefetch_bulk, "Cannot use bulk prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
 #endif
 #else
     static constexpr bool prefetch_bulk = false;
