@@ -153,6 +153,9 @@ option(QUDA_DIRAC_COVDEV "build code for covariant derivative" ${QUDA_DIRAC_DEFA
 option(QUDA_DIRAC_DISTANCE_PRECONDITIONING "build code for distance preconditioned Wilson/clover Dirac operators" OFF)
 set(QUDA_DOMAIN_DECOMPOSITION "0" CACHE STRING "which domain decomposition to instantiate in QUDA (1-bit number - RedBlack)")
 
+option(QUDA_DSLASH_DOUBLE_STORE "store a forwards shifted copy of the gauge fields for simplified Dslash indexing" OFF)
+mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
+
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
@@ -236,7 +239,7 @@ option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest 
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
-option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
+option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in coarse grid dslash kernels (significant perf impact)" OFF)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD

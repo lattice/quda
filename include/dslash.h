@@ -9,9 +9,6 @@
 #include <instantiate.h>
 #include <instantiate_dslash.h>
 
-// enable experimental double store of gauge fields
-//#define QUDA_DSLASH_DOUBLE_STORE
-
 namespace quda
 {
 
