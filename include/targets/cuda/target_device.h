@@ -231,6 +231,27 @@ namespace quda
 #endif
     }
 
+    template <bool is_device> struct uniform_impl {
+      template <typename T> T operator()(const T &t) { return t; }
+    };
+#ifdef QUDA_CUDA_CC
+    template <> struct uniform_impl<true> {
+      template <typename T> __device__ inline T operator()(const T &t) { return __shfl_sync(0xFFFFFFFF, t, 0); }
+    };
+#endif
+
+    /**
+       @brief Return the warp uniform variant of a given operand.
+       This is used to suggest to a compiler that a variable is
+       constant across the warp.
+       @param[in] t The input value we want to make warp uniform
+       @return The warp uniform variant
+    */
+    template <typename T> __device__ __host__ inline bool uniform(const T &t)
+    {
+      return target::dispatch<uniform_impl>(t);
+    }
+
   } // namespace target
 
   namespace device
