@@ -155,6 +155,19 @@ set(QUDA_DOMAIN_DECOMPOSITION "0" CACHE STRING "which domain decomposition to in
 
 option(QUDA_DSLASH_DOUBLE_STORE "store a forwards shifted copy of the gauge fields for simplified Dslash indexing" OFF)
 mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
+option(QUDA_DSLASH_PREFETCH_BULK "enable bulk prefetching (Hopper+)" OFF)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_BULK)
+
+set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions")
+set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions")
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+if(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON GREATER 7)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON is greater than pipeline length")
+endif()
+if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
+endif()
 
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 

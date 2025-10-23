@@ -43,7 +43,7 @@ namespace quda
     /** parameters for distance preconditioning */
     const real alpha0;
     const int t0;
-    static constexpr int prefetch_distance = 0;
+    static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_WILSON;
 
     WilsonArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, const GaugeField &Uback, double a, cvector_ref<const ColorSpinorField> &x,
@@ -85,17 +85,20 @@ namespace quda
     // for TMA use arg.block_size
     int dim2 = step / 2;
     // need warp uniform variants of these and parity
-    const int x_cb = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
+
+    // if using a bulk prefetch we need to use block's first coordinate
+    auto x_cb = arg.prefetch_bulk ? coord.x_cb_0 : coord.x_cb;
+    x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
     switch (step % 2) {
-    case 0: arg.U.prefetch(x_cb, dim2, parity); break;
+    case 0: arg.U.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
 #ifdef QUDA_DSLASH_DOUBLE_STORE
-    case 1: arg.Uback.prefetch(x_cb, dim2, parity); break;
+    case 1: arg.Uback.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
 #else
     case 1: {
       const int back_idx = getNeighborIndexCB(coord, dim2, -1, arg.dc);
       const int idx1 = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
-      arg.U.prefetch(idx1, dim2, 1 - parity);
+      arg.U.prefetch<Arg::prefetch_bulk>(idx1, dim2, 1 - parity);
     } break;
 #endif
     }

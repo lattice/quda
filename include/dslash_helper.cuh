@@ -300,7 +300,14 @@ namespace quda
     static constexpr int max_regs = 0;             // by default we don't limit register count
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
     static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
-
+#ifdef QUDA_DSLASH_PREFETCH_BULK
+    static constexpr bool prefetch_bulk = true;
+#ifndef QUDA_DSLASH_DOUBLE_STORE
+    static_assert(!bulk, "Cannot use bulk prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
+#endif
+#else
+    static constexpr bool prefetch_bulk = false;
+#endif
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const QudaReconstructType reconstruct;
@@ -742,6 +749,11 @@ namespace quda
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
       if (arg.nParity == 1) parity = arg.parity;
+
+      // FIXME need warp uniform parity which is not composable with
+      // NVSHMEM since the latter requires blockDim.y and blockDim.z to
+      // cover the entire extent
+      parity = target::block_idx().z; // ensure parity is warp uniform
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {

@@ -52,7 +52,7 @@ namespace quda
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
-    static constexpr int prefetch_distance = 0;
+    static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
 
     const real dagger_scale;
 
@@ -96,18 +96,24 @@ namespace quda
       int step = 4 * dim + 2 * dir + hop + arg.prefetch_distance;
       if (step >= 16) return;
 
-      // for TMA use arg.block_size and coord.x_cb_0
-      // also should have warp uniform parity
+      // if using a bulk prefetch we need to use block's first coordinate
+      auto x_cb = arg.prefetch_bulk ? coord.x_cb_0 : coord.x_cb;
+      x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
+
       int dim2 = step / 4;
       switch (step % 4) {
-      case 0: arg.U.prefetch(coord.x_cb, dim2, parity); break;
-      case 1: arg.L.prefetch(coord.x_cb, dim2, parity); break;
+      case 0: arg.U.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
+      case 1: arg.L.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
 #ifdef QUDA_DSLASH_DOUBLE_STORE
-      case 2: arg.Uback.prefetch(coord.x_cb, dim2, parity); break;
-      case 3: arg.Lback.prefetch(coord.x_cb, dim2, parity); break;
+      case 2: arg.Uback.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
+      case 3: arg.Lback.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
 #else
-      case 2: arg.U.prefetch(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity); break;
-      case 3: arg.L.prefetch(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity); break;
+      case 2:
+        arg.U.prefetch<Arg::prefetch_bulk>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
+      case 3:
+        arg.L.prefetch<Arg::prefetch_bulk>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
 #endif
       }
     }
