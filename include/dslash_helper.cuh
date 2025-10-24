@@ -501,16 +501,9 @@ namespace quda
   }
 
   template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool active)
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive)
   {
-#ifdef QUDA_FAST_COMPILE_DSLASH
-    dslash.template operator()<kernel_type, true>(x_cb, s, parity, active);
-#else
-    switch (parity) {
-    case 0: dslash.template operator()<kernel_type, true>(x_cb, s, 0, active); break;
-    case 1: dslash.template operator()<kernel_type, true>(x_cb, s, 1, active); break;
-    }
-#endif
+    dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
   }
 
 #ifdef NVSHMEM_COMMS
@@ -692,7 +685,7 @@ namespace quda
     }
 
     template <bool allthreads = false>
-    __forceinline__ __device__ void operator()(int, int s, int parity, bool active = true)
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true)
     {
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
@@ -700,7 +693,7 @@ namespace quda
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        if (!allthreads || active) {
+        if (!allthreads || alive) {
           // first few blocks do packing kernel
           typename Arg::template P<dslash.pc_type()> packer;
           packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
@@ -748,13 +741,13 @@ namespace quda
         } else {
 	  if (x_cb >= arg.threads) {
 	    if constexpr (allthreads)
-	      active = false;
+	      alive = false;
 	    else
 	      return;
 	  }
 
 	  if constexpr (allthreads) {
-	    apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity, active);
+	    apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity, alive);
 	  } else {
 	    apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
 	  }
