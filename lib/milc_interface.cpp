@@ -1571,7 +1571,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   
   // Device and host space for contractQuda output
   size_t data_bytes = gr0.Volume() * gr0.Precision();
-  void *d_result = qudaAllocatePinned(data_bytes);
+  void *d_result = pool_device_malloc(data_bytes);
   void *h_result = (void *)malloc(data_bytes);
   
   double m_l, m_s, m_u, m_d, dl, ds, du, dd;
@@ -1657,7 +1657,7 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
     }
   }
   // Cleanup
-  qudaFreePinned(d_result);
+  pool_device_free(d_result);
   free(h_result);
   delete dirac;
 
