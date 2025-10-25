@@ -1567,10 +1567,10 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   ColorSpinorParam gpuParam(space_even->evecs[0]);
   gpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gpuParam.x[0] *= 2;
-  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam);
+  ColorSpinorField gr0(gpuParam), gr_mu(gpuParam), tmp(gpuParam), evec(gpuParam);
   
   // Device and host space for contractQuda output
-  size_t data_bytes = gr0.Volume() * gr0.Precision();
+  size_t data_bytes = 2 * gr0.Volume() * gr0.Precision();
   void *d_result = pool_device_malloc(data_bytes);
   void *h_result = (void *)malloc(data_bytes);
   
@@ -1582,6 +1582,10 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
   
     // Compute Dslash of eigenvector
     dirac->Dslash(gr0.Odd(), space_even->evecs[i], QUDA_ODD_PARITY);
+    
+    // Construct full parity eigenvector
+    blas::copy(evec.Even(), space_even->evecs[i]);
+    blas::copy(evec.Odd(), space_odd->evecs[i]);
     
     // Scaled eigenvalue
     switch(nmasses){
@@ -1621,11 +1625,9 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
       
       // Save current for EVEN sites
-      contractQuda(space_even->evecs[i], gr_mu.Even(), d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      contractQuda(evec, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
       // Result is of size Volume*Complex, i.e. one complex number per site
-      // Copying to host because I'm not sure how to handle this on the device
-      // since the result is not a ColorSpinorField
-      qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpy(h_result, d_result, data_bytes/2, qudaMemcpyDeviceToHost);
       auto *res = reinterpret_cast<Complex *>(h_result);
       for (size_t j = 0; j < gr0.Volume()/2; j++) {
         jlow_mu[4*j+mu] += -res[j].imag()*zscale;
@@ -1633,12 +1635,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
           jlow_mu2[4*j+mu] += -res[j].imag()*zscale2;
       }
       
-      // Construct full parity eigenvector
-      blas::copy(tmp.Even(), space_even->evecs[i]);
-      blas::copy(tmp.Odd(), space_odd->evecs[i]);
-      
       // Do gauge covariant shift and flip sign on ODD sites
-      myCovDev.MCD(gr_mu, tmp, mu);
+      myCovDev.MCD(gr_mu, evec, mu);
       blas::ax(-1.0, gr_mu.Odd());
       
       // Do spin-taste operation
@@ -1646,8 +1644,8 @@ void qudaExactCurrent(int external_precision, int quda_precision, const void *co
       applySpinTaste(gr_mu, tmp, QUDA_SPIN_TASTE_G5);
       
       // Save current for ODD sites
-      contractQuda(gr0.Odd(), gr_mu.Odd(), d_result, QUDA_CONTRACT_TYPE_STAGGERED);
-      qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+      contractQuda(gr0, gr_mu, d_result, QUDA_CONTRACT_TYPE_STAGGERED);
+      qudaMemcpy((char*)h_result, (char*)d_result + data_bytes/2, data_bytes/2, qudaMemcpyDeviceToHost);
       auto *res2 = reinterpret_cast<Complex *>(h_result);
       for (size_t j = 0; j < gr0.Volume()/2; j++) {
         jlow_mu[4*j+mu + 2*gr0.Volume()] += res2[j].imag()*zscale;
