@@ -1662,7 +1662,7 @@ namespace quda {
 
             constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
             if constexpr (load_phase)
-              prefetch_cache_bulk(gauge + parity * offset + phaseOffset + stride * dir, block_size * sizeof(Float));
+              prefetch_cache_bulk(gauge + parity * offset + phaseOffset + stride * dir + x, block_size * sizeof(Float));
           }
         }
       }
