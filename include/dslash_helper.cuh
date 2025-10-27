@@ -747,13 +747,14 @@ namespace quda
     __forceinline__ __device__ void operator()(int, int s, int parity)
     {
       typename Arg::D dslash(*this);
-      // for full fields set parity from z thread index else use arg setting
-      if (arg.nParity == 1) parity = arg.parity;
 
       // FIXME need warp uniform parity which is not composable with
       // NVSHMEM since the latter requires blockDim.y and blockDim.z to
       // cover the entire extent
       parity = target::block_idx().z; // ensure parity is warp uniform
+
+      // for full fields set parity from z thread index else use arg setting
+      if (arg.nParity == 1) parity = arg.parity;
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
