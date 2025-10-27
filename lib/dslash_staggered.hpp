@@ -52,7 +52,7 @@ namespace quda
 #ifdef QUDA_DSLASH_DOUBLE_STORE
       GaugeField Uback = shift(U, 1);
 #else
-      const GaugeField &Uback = shift(U, 1);
+      const GaugeField &Uback = U;
 #endif
 
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC
