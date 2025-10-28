@@ -485,4 +485,20 @@ namespace quda {
     asm volatile("cp.async.bulk.prefetch.L2.global [%0], %1;\n" ::"l"(p), "r"(static_cast<uint32_t>(bytes)));
   }
 
+  using tensor_desc_t = CUtensorMap;
+
+  __device__ __forceinline__ void prefetch_tma_3d(const tensor_desc_t &tensor_map, int x, int y, int z)
+  {
+    asm volatile("cp.async.bulk.prefetch.tensor.3d.L2.global.tile [%0, {%1, %2, %3}];" ::"l"(&tensor_map), "r"(x),
+                 "r"(y), "r"(z)
+                 : "memory");
+  }
+
+  __device__ __forceinline__ void prefetch_tma_4d(const tensor_desc_t &tensor_map, int x, int y, int z, int t)
+  {
+    asm volatile("cp.async.bulk.prefetch.tensor.4d.L2.global.tile [%0, {%1, %2, %3, %4}];" ::"l"(&tensor_map), "r"(x),
+                 "r"(y), "r"(z), "r"(t)
+                 : "memory");
+  }
+
 } // namespace quda

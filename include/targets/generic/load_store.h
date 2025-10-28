@@ -71,12 +71,30 @@ namespace quda
   __device__ __host__ inline void prefetch_cache_line(const void *p) { target::dispatch<prefetch_cache_line_imp>(p); }
 
   template <bool is_device> struct prefetch_cache_bulk_imp {
-    __device__ __host__ inline void operator()(const void *, size_t) { }
+    constexpr void operator()(const void *, size_t) { }
   };
 
   __device__ __host__ inline void prefetch_cache_bulk(const void *p, size_t bytes)
   {
     target::dispatch<prefetch_cache_bulk_imp>(p, bytes);
+  }
+
+  template <bool is_device> struct prefetch_cache_tensor_3d_imp {
+    constexpr void operator()(const tensor_desc_t &desc, int x, int y, int z) { }
+  };
+
+  __device__ __host__ inline void prefetch_cache_tensor_3d(const tensor_desc_t &desc, int x, int y, int z)
+  {
+    target::dispatch<prefetch_cache_tensor_3d_imp>(desc, x, y, z);
+  }
+
+  template <bool is_device> struct prefetch_cache_tensor_4d_imp {
+    constexpr void operator()(const tensor_desc_t &desc, int x, int y, int z, int t) { }
+  };
+
+  __device__ __host__ inline void prefetch_cache_tensor_4d(const tensor_desc_t &desc, int x, int y, int z, int t)
+  {
+    target::dispatch<prefetch_cache_tensor_4d_imp>(desc, x, y, z, t);
   }
 
 } // namespace quda
