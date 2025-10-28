@@ -44,9 +44,9 @@ namespace quda {
     }
 
     struct tensor_desc_t {
-      alignas(64) CUtensorMap N;
-      alignas(64) CUtensorMap Nrem;
-      alignas(64) CUtensorMap phase;
+      CUtensorMap N;
+      CUtensorMap Nrem;
+      CUtensorMap phase;
     };
 
   } // namespace gauge

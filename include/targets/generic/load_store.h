@@ -80,7 +80,7 @@ namespace quda
   }
 
   template <bool is_device> struct prefetch_cache_tensor_3d_imp {
-    constexpr void operator()(const tensor_desc_t &desc, int x, int y, int z) { }
+    constexpr void operator()(const tensor_desc_t &, int, int, int) { }
   };
 
   __device__ __host__ inline void prefetch_cache_tensor_3d(const tensor_desc_t &desc, int x, int y, int z)
@@ -89,7 +89,7 @@ namespace quda
   }
 
   template <bool is_device> struct prefetch_cache_tensor_4d_imp {
-    constexpr void operator()(const tensor_desc_t &desc, int x, int y, int z, int t) { }
+    constexpr void operator()(const tensor_desc_t &, int, int, int, int) { }
   };
 
   __device__ __host__ inline void prefetch_cache_tensor_4d(const tensor_desc_t &desc, int x, int y, int z, int t)
