@@ -176,16 +176,11 @@
 #cmakedefine QUDA_DSLASH_DOUBLE_STORE
 
 /**
- * @def QUDA_DSLASH_PREFETCH_BULK
- * @brief This macro sets whether to use the TMA for L2 prefetching
+ * @def QUDA_DSLASH_PREFETCH_TMA @brief This macro sets whether to use
+ * the TMA for L2 prefetching: 0 - no TMA, 1 - use bulk prefetch, 2 -
+ * use tensor prefetch
  */
-#cmakedefine QUDA_DSLASH_PREFETCH_BULK
-
-/**
- * @def QUDA_DSLASH_PREFETCH_BULK
- * @brief This macro sets whether to use the TMA for L2 prefetching
- */
-#cmakedefine QUDA_DSLASH_PREFETCH_BULK
+#define QUDA_DSLASH_PREFETCH_TMA @QUDA_DSLASH_PREFETCH_TMA@
 
 /**
  * @def QUDA_DSLASH_PREFETCH_DISTANCE_WILSON

@@ -155,8 +155,9 @@ set(QUDA_DOMAIN_DECOMPOSITION "0" CACHE STRING "which domain decomposition to in
 
 option(QUDA_DSLASH_DOUBLE_STORE "store a forwards shifted copy of the gauge fields for simplified Dslash indexing" OFF)
 mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
-option(QUDA_DSLASH_PREFETCH_BULK "enable bulk prefetching (Hopper+)" OFF)
-mark_as_advanced(QUDA_DSLASH_PREFETCH_BULK)
+set(QUDA_DSLASH_PREFETCH_TMA "0" CACHE STRING "enable TMA prefetching (Hopper+, 0 - disable, 1 - bulk, 2 - tensor)")
+set_property(CACHE QUDA_DSLASH_PREFETCH_TMA PROPERTY STRINGS 0 1 2)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_TMA)
 
 set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions")
 set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions")

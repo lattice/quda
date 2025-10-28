@@ -43,6 +43,12 @@ namespace quda {
       return 0;
     }
 
+    struct tensor_desc_t {
+      alignas(64) CUtensorMap N;
+      alignas(64) CUtensorMap Nrem;
+      alignas(64) CUtensorMap phase;
+    };
+
   } // namespace gauge
 
   struct GaugeFieldParam : public LatticeFieldParam {
@@ -655,6 +661,9 @@ namespace quda {
      * @param[in] rank The rank we are requesting from (default is rank = 0)
      */
     void PrintMatrix(int dim, int parity, unsigned int x_cb, int rank = 0) const;
+
+    gauge::tensor_desc_t create_tensor_descriptor(uint32_t block_size) const;
+    gauge::tensor_desc_t &get_tensor_descriptor(uint32_t block_size) const;
 
     friend struct GaugeFieldParam;
   };

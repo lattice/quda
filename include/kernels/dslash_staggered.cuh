@@ -97,22 +97,22 @@ namespace quda
       if (step >= 16) return;
 
       // if using a bulk prefetch we need to use block's first coordinate
-      auto x_cb = arg.prefetch_bulk ? coord.x_cb_0 : coord.x_cb;
+      auto x_cb = arg.prefetch_tma ? coord.x_cb_0 : coord.x_cb;
       x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
       int dim2 = step / 4;
       switch (step % 4) {
-      case 0: arg.U.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
-      case 1: arg.L.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
+      case 0: arg.U.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
+      case 1: arg.L.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
 #ifdef QUDA_DSLASH_DOUBLE_STORE
-      case 2: arg.Uback.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
-      case 3: arg.Lback.prefetch<Arg::prefetch_bulk>(x_cb, dim2, parity); break;
+      case 2: arg.Uback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
+      case 3: arg.Lback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
 #else
       case 2:
-        arg.U.prefetch<Arg::prefetch_bulk>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
+        arg.U.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
       case 3:
-        arg.L.prefetch<Arg::prefetch_bulk>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
+        arg.L.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
 #endif
       }

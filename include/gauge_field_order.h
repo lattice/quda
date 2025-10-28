@@ -1563,6 +1563,7 @@ namespace quda {
         Reconstruct<length, Float, recon, ghostExchange_, stag_phase> reconstruct;
         static constexpr int reconLen = recon;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
+        static constexpr bool loadPhase = hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase));
         static constexpr int N = gauge::get_vector_order<Float>(reconLen - hasPhase);
         static constexpr int M = (reconLen - hasPhase) / N;
         static constexpr int Nrem = reconLen - hasPhase - M * N;
@@ -1580,6 +1581,7 @@ namespace quda {
         const int geometry;
         const AllocInt phaseOffset;
         size_t bytes;
+        gauge::tensor_desc_t tensor_desc;
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
@@ -1623,8 +1625,7 @@ namespace quda {
           copy(tmp + M * N, vecTmp);
         }
 
-        constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
-        if constexpr (load_phase) {
+        if constexpr (loadPhase) {
           copy(phase, gauge[parity * offset + phaseOffset + stride * dir + x]);
           phase *= static_cast<real>(2.0);
         }
@@ -1632,10 +1633,9 @@ namespace quda {
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
 
-      template <bool bulk = false> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
+      template <int type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
       {
-        if constexpr (!bulk) {
-          // use per thread prefetching
+        if constexpr (type == 0) { // use per thread prefetching
 #pragma unroll
           for (int i = 0; i < M; i++)
             prefetch_cache_line(gauge + parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N);
@@ -1644,10 +1644,8 @@ namespace quda {
           if constexpr (Nrem > 0)
             prefetch_cache_line(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem);
 
-          constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
-          if constexpr (load_phase) prefetch_cache_line(gauge + parity * offset + phaseOffset + stride * dir + x);
-        } else {
-          // bulk prefetch
+          if constexpr (loadPhase) prefetch_cache_line(gauge + parity * offset + phaseOffset + stride * dir + x);
+        } else if constexpr (type == 1) { // bulk prefetch
           if (block_size == 0) block_size = blockDim.x;
           if (target::is_thread_zero()) {
 #pragma unroll
@@ -1660,9 +1658,17 @@ namespace quda {
               prefetch_cache_bulk(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem,
                                   block_size * Nrem * sizeof(Float));
 
-            constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
-            if constexpr (load_phase)
+            if constexpr (loadPhase)
               prefetch_cache_bulk(gauge + parity * offset + phaseOffset + stride * dir + x, block_size * sizeof(Float));
+          }
+        } else {                          // tensor prefetch
+          if (target::is_thread_zero()) { // perhaps 3-d is better here?
+            // prefetch_cache_tensor_3d(tensor_desc_N, x, dir, parity);
+            // if constexpr (Nrem > 0) prefetch_cache_tensor_3d(tensor_desc_Nrem, x, dir, parity);
+            // if constexpr (loadPhase) prefetch_cache_tensor_3d(tensor_desc_phase, x, dir, parity);
+            prefetch_cache_tensor_4d(tensor_desc.N, x, 0, dir, parity);
+            if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, 0, dir, parity);
+            if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, 0, dir, parity);
           }
         }
       }

@@ -300,13 +300,9 @@ namespace quda
     static constexpr int max_regs = 0;             // by default we don't limit register count
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
     static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
-#ifdef QUDA_DSLASH_PREFETCH_BULK
-    static constexpr bool prefetch_bulk = true;
+    static constexpr int prefetch_tma = QUDA_DSLASH_PREFETCH_TMA;
 #ifndef QUDA_DSLASH_DOUBLE_STORE
-    static_assert(!prefetch_bulk, "Cannot use bulk prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
-#endif
-#else
-    static constexpr bool prefetch_bulk = false;
+    static_assert(!prefetch_tma, "Cannot use TMA prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
 #endif
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on

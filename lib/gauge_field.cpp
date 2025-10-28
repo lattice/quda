@@ -239,6 +239,82 @@ namespace quda {
     if (param.compute_fat_link_max) fat_link_max = this->abs_max();
   }
 
+  static std::map<int, gauge::tensor_desc_t> tensor_map;
+
+  gauge::tensor_desc_t GaugeField::create_tensor_descriptor(uint32_t block_size) const
+  {
+    gauge::tensor_desc_t tensor;
+
+    auto get_tensor_data_type = [&](size_t word_size) {
+      switch (word_size) {
+      case 1: return CU_TENSOR_MAP_DATA_TYPE_UINT8;
+      case 2: return CU_TENSOR_MAP_DATA_TYPE_UINT16;
+      case 4: return CU_TENSOR_MAP_DATA_TYPE_UINT32;
+      case 8: return CU_TENSOR_MAP_DATA_TYPE_UINT64;
+      default: errorQuda("Unsupported word size %d", precision);
+      }
+      return CU_TENSOR_MAP_DATA_TYPE_UINT8;
+    };
+
+    auto hasPhase = reconstruct == 9 || reconstruct == 13;
+    uint32_t N = gauge::get_vector_order(precision, reconstruct - hasPhase);
+    uint32_t M = (reconstruct - hasPhase) / N;
+    uint32_t Nrem = reconstruct - hasPhase - M * N;
+
+    CUtensorMapDataType dtype = get_tensor_data_type(precision);
+    {
+      uint64_t global_dim[4] = {uint64_t(stride * N), uint64_t(M), uint64_t(geometry), 2llu};
+      uint64_t global_stride[] = {precision * N * stride, precision * (N * M + Nrem) * stride, bytes / 2};
+      uint32_t box_dim[] = {block_size * N, M, 1, 1};
+      uint32_t element_stride[] = {1, 1, 1, 1};
+      auto data = this->data();
+      if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
+      auto res = cuTensorMapEncodeTiled(&tensor.N, dtype, 4, data, global_dim, global_stride, box_dim, element_stride,
+                                        CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,
+                                        CU_TENSOR_MAP_L2_PROMOTION_NONE, CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
+      if (res != CUDA_SUCCESS) errorQuda("cuTensorMapEncodeTiled failed: %d", (int)res);
+    }
+
+    if (Nrem > 0) {
+      uint64_t global_dim[4] = {uint64_t(stride * Nrem), 1llu, uint64_t(geometry), 2llu};
+      uint64_t global_stride[] = {precision * Nrem * stride, precision * Nrem * stride, bytes / 2};
+      uint32_t box_dim[] = {block_size * Nrem, 1, 1, 1};
+      uint32_t element_stride[] = {1, 1, 1, 1};
+      auto data = this->data<char *>() + M * N * stride * precision;
+      if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
+      auto res = cuTensorMapEncodeTiled(&tensor.Nrem, dtype, 4, data, global_dim, global_stride, box_dim,
+                                        element_stride, CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,
+                                        CU_TENSOR_MAP_L2_PROMOTION_NONE, CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
+      if (res != CUDA_SUCCESS) errorQuda("cuTensorMapEncodeTiled failed: %d", (int)res);
+    }
+
+    if (hasPhase) {
+      uint64_t global_dim[4] = {uint64_t(stride), 1llu, uint64_t(geometry), 2llu};
+      uint64_t global_stride[] = {precision * stride, precision * stride, bytes / 2};
+      uint32_t box_dim[] = {block_size, 1, 1, 1};
+      uint32_t element_stride[] = {1, 1, 1, 1};
+      auto data = this->data<char *>() + PhaseOffset();
+      if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
+      auto res = cuTensorMapEncodeTiled(&tensor.phase, dtype, 4, data, global_dim, global_stride, box_dim,
+                                        element_stride, CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,
+                                        CU_TENSOR_MAP_L2_PROMOTION_NONE, CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
+      if (res != CUDA_SUCCESS) errorQuda("cuTensorMapEncodeTiled failed: %d", (int)res);
+    }
+
+    return tensor;
+  }
+
+  gauge::tensor_desc_t &GaugeField::get_tensor_descriptor(uint32_t block_size) const
+  {
+    auto tensor = tensor_map.find(block_size);
+    if (tensor != tensor_map.end()) {
+      return tensor->second;
+    } else {
+      tensor_map[block_size] = create_tensor_descriptor(block_size);
+    }
+    return tensor_map[block_size];
+  }
+
   void GaugeField::move(GaugeField &&src)
   {
     init = std::exchange(src.init, {});

@@ -18,11 +18,12 @@ namespace quda
   template <typename Arg> class Wilson : public Dslash<wilson, Arg>
   {
     using Dslash = Dslash<wilson, Arg>;
+    const GaugeField &U;
 
   public:
-    Wilson(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+    Wilson(Arg &arg, const GaugeField &U, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
            const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
@@ -30,6 +31,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
+      const_cast<quda::gauge::tensor_desc_t&>(Dslash::arg.U.tensor_desc) = U.get_tensor_descriptor(tp.block.x);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
   };
@@ -52,7 +54,7 @@ namespace quda
 
       WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, Uback, a, x, parity, dagger,
                                                                     comm_override, alpha0, t0);
-      Wilson<decltype(arg)> wilson(arg, out, in, halo);
+      Wilson<decltype(arg)> wilson(arg, U, out, in, halo);
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
     }
   };
