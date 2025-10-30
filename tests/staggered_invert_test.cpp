@@ -140,11 +140,7 @@ void init()
 {
   // Set QUDA internal parameters
   gauge_param = newQudaGaugeParam();
-  if (use_split_gauge_bkup == 1) {
-    gauge_param.use_split_gauge_bkup = true;
-  } else {
-    gauge_param.use_split_gauge_bkup = false;
-  }
+  gauge_param.use_split_gauge_bkup = use_split_gauge_bkup == 1;
   setStaggeredGaugeParam(gauge_param);
   QudaGaugeSmearParam smear_param;
   if (gauge_smear) {

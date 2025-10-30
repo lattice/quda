@@ -142,10 +142,17 @@ namespace quda {
           errorQuda("TIFR interface has not been built");
         }
 
+      } else if (u.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+
+        if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>()) {
+          ExtractGhostEx<OpenQCDOrder<Float, length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("OpenQCD interface has not been built");
+        }
+
       } else {
         errorQuda("Gauge field %d order not supported", u.Order());
       }
-
     }
   };
 

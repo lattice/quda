@@ -265,6 +265,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Joel Giedt (Rensselaer Polytechnic Institute) 
 *  Steven Gottlieb (Indiana University) 
 *  Anthony Grebe (Fermilab)
+*  Roman Gruber (ETH)
 *  Kyriakos Hadjiyiannakou (Cyprus)
 *  Ben Hoerz (Intel)
 *  Leon Hostetler (Indiana University)
