@@ -1614,14 +1614,14 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(gauge + parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
+          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
           // second do copy converting into register type
           copy(tmp + i * N, vecTmp);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
           copy(tmp + M * N, vecTmp);
         }
 
@@ -1635,40 +1635,37 @@ namespace quda {
 
       template <int type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
       {
-        if constexpr (type == 0) { // use per thread prefetching
+        if constexpr (type == 0) { // use per-thread prefetching
 #pragma unroll
           for (int i = 0; i < M; i++)
-            prefetch_cache_line(gauge + parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N);
+            prefetch_cache_line(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
 
           // now load any remainder
           if constexpr (Nrem > 0)
-            prefetch_cache_line(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem);
+            prefetch_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
 
-          if constexpr (loadPhase) prefetch_cache_line(gauge + parity * offset + phaseOffset + stride * dir + x);
+          if constexpr (loadPhase) prefetch_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
         } else if constexpr (type == 1) { // bulk prefetch
           if (block_size == 0) block_size = blockDim.x;
           if (target::is_thread_zero()) {
 #pragma unroll
             for (int i = 0; i < M; i++)
-              prefetch_cache_bulk(gauge + parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N,
+              prefetch_cache_bulk(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N),
                                   block_size * N * sizeof(Float));
 
             // now load any remainder
             if constexpr (Nrem > 0)
-              prefetch_cache_bulk(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem,
+              prefetch_cache_bulk(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem),
                                   block_size * Nrem * sizeof(Float));
 
             if constexpr (loadPhase)
-              prefetch_cache_bulk(gauge + parity * offset + phaseOffset + stride * dir + x, block_size * sizeof(Float));
+              prefetch_cache_bulk(gauge + (parity * offset + phaseOffset + stride * dir + x), block_size * sizeof(Float));
           }
-        } else {                          // tensor prefetch
-          if (target::is_thread_zero()) { // perhaps 3-d is better here?
-            // prefetch_cache_tensor_3d(tensor_desc_N, x, dir, parity);
-            // if constexpr (Nrem > 0) prefetch_cache_tensor_3d(tensor_desc_Nrem, x, dir, parity);
-            // if constexpr (loadPhase) prefetch_cache_tensor_3d(tensor_desc_phase, x, dir, parity);
-            prefetch_cache_tensor_4d(tensor_desc.N, x, 0, dir, parity);
-            if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, 0, dir, parity);
-            if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, 0, dir, parity);
+        } else { // n-d tensor prefetch
+          if (target::is_thread_zero()) {
+            prefetch_cache_tensor_5d(tensor_desc.N, x, x / 16, 0, dir, parity);
+            if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, x / 16, dir, parity);
+            if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, x / 16, dir, parity);
           }
         }
       }

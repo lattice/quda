@@ -263,42 +263,61 @@ namespace quda {
 
     CUtensorMapDataType dtype = get_tensor_data_type(precision);
     {
-      uint64_t global_dim[4] = {uint64_t(stride * N), uint64_t(M), uint64_t(geometry), 2llu};
-      uint64_t global_stride[] = {precision * N * stride, precision * (N * M + Nrem) * stride, bytes / 2};
-      uint32_t box_dim[] = {block_size * N, M, 1, 1};
-      uint32_t element_stride[] = {1, 1, 1, 1};
+      if (stride % 16 != 0) errorQuda("Volume requirements not met: stride mod 16 = %lu", stride % 16);
+      uint64_t global_dim[] = {16llu * N, uint64_t(stride / 16), uint64_t(M), uint64_t(geometry), 2llu};
+      uint64_t global_stride[]
+        = {precision * 16llu * N, precision * stride * N, precision * stride * (N * M + Nrem), bytes / 2};
+      uint32_t box_dim[] = {16u * N, std::max(1u, block_size / 16), M, 1, 1};
+      uint32_t element_stride[] = {1, 1, 1, 1, 1};
       auto data = this->data();
       if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
-      auto res = cuTensorMapEncodeTiled(&tensor.N, dtype, 4, data, global_dim, global_stride, box_dim, element_stride,
+      auto res = cuTensorMapEncodeTiled(&tensor.N, dtype, 5, data, global_dim, global_stride, box_dim, element_stride,
                                         CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,
                                         CU_TENSOR_MAP_L2_PROMOTION_NONE, CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
-      if (res != CUDA_SUCCESS) errorQuda("cuTensorMapEncodeTiled failed: %d", (int)res);
+      if (res != CUDA_SUCCESS) {
+        const char *errStr = nullptr;
+        cuGetErrorString(res, &errStr);
+        errorQuda("cuTensorMapEncodeTiled failed: %s", errStr);
+      }
     }
 
     if (Nrem > 0) {
-      uint64_t global_dim[4] = {uint64_t(stride * Nrem), 1llu, uint64_t(geometry), 2llu};
-      uint64_t global_stride[] = {precision * Nrem * stride, precision * Nrem * stride, bytes / 2};
-      uint32_t box_dim[] = {block_size * Nrem, 1, 1, 1};
+      if (stride % 16 != 0) errorQuda("Volume requirements not met: stride mod 16 = %lu", stride % 16);
+      uint64_t global_dim[]
+        = {16llu * Nrem, uint64_t(stride / 16), uint64_t(geometry), 2llu}; // can remove the M dimension?
+      uint64_t global_stride[] = {precision * 16llu * Nrem, precision * stride * (N * M + Nrem), bytes / 2};
+      uint32_t box_dim[] = {16u * Nrem, std::max(1u, block_size / 16), 1, 1, 1};
       uint32_t element_stride[] = {1, 1, 1, 1};
       auto data = this->data<char *>() + M * N * stride * precision;
       if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
       auto res = cuTensorMapEncodeTiled(&tensor.Nrem, dtype, 4, data, global_dim, global_stride, box_dim,
                                         element_stride, CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,
                                         CU_TENSOR_MAP_L2_PROMOTION_NONE, CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
-      if (res != CUDA_SUCCESS) errorQuda("cuTensorMapEncodeTiled failed: %d", (int)res);
+      if (res != CUDA_SUCCESS) {
+        const char *errStr = nullptr;
+        cuGetErrorString(res, &errStr);
+        errorQuda("cuTensorMapEncodeTiled failed: %s box = {%u, %u, %u, %u}", errStr, box_dim[0], box_dim[1],
+                  box_dim[2], box_dim[3]);
+      }
     }
 
     if (hasPhase) {
-      uint64_t global_dim[4] = {uint64_t(stride), 1llu, uint64_t(geometry), 2llu};
-      uint64_t global_stride[] = {precision * stride, precision * stride, bytes / 2};
-      uint32_t box_dim[] = {block_size, 1, 1, 1};
+      if (stride % 16 != 0) errorQuda("Volume requirements not met: stride mod 16 = %lu", stride % 16);
+      uint64_t global_dim[] = {16llu, uint64_t(stride / 16), uint64_t(geometry), 2llu};
+      uint64_t global_stride[] = {precision * 16llu, precision * stride, bytes / 2};
+      uint32_t box_dim[] = {16u, std::max(1u, block_size / 16u), 1, 1};
       uint32_t element_stride[] = {1, 1, 1, 1};
       auto data = this->data<char *>() + PhaseOffset();
       if (reinterpret_cast<uintptr_t>(data) % 16 != 0) errorQuda("Pointer is not 16-byte aligned");
       auto res = cuTensorMapEncodeTiled(&tensor.phase, dtype, 4, data, global_dim, global_stride, box_dim,
                                         element_stride, CU_TENSOR_MAP_INTERLEAVE_NONE, CU_TENSOR_MAP_SWIZZLE_NONE,
                                         CU_TENSOR_MAP_L2_PROMOTION_NONE, CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
-      if (res != CUDA_SUCCESS) errorQuda("cuTensorMapEncodeTiled failed: %d", (int)res);
+      if (res != CUDA_SUCCESS) {
+        const char *errStr = nullptr;
+        cuGetErrorString(res, &errStr);
+        errorQuda("cuTensorMapEncodeTiled failed: %s box = {%u, %u, %u, %u}", errStr, box_dim[0], box_dim[1],
+                  box_dim[2], box_dim[3]);
+      }
     }
 
     return tensor;
