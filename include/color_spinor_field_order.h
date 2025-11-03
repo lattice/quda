@@ -1166,14 +1166,14 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(field + parity * offset, volumeCB * i + x);
+          auto vecTmp = vector_load<Float, N>(field, parity * offset, volumeCB * i + x);
           // now copy into output and scale
           copy_and_scale(v + i * N, vecTmp, nrm);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(field + parity * offset + volumeCB * M * N, x);
+          auto vecTmp = vector_load<Float, Nrem>(field, parity * offset + volumeCB * M * N, x);
           copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
@@ -1187,13 +1187,13 @@ namespace quda
         auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
         auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
 #endif
-        if constexpr (isFixed<Float>::value) prefetch_cache_line(norm + x + parity * norm_offset);
+        if constexpr (isFixed<Float>::value) prefetch_cache_line(norm + (x + parity * norm_offset));
 
 #pragma unroll
-        for (int i = 0; i < M; i++) prefetch_cache_line(field + parity * offset + (volumeCB * i + x) * N);
+        for (int i = 0; i < M; i++) prefetch_cache_line(field + (parity * offset + (volumeCB * i + x) * N));
 
         // now load any remainder
-        if constexpr (Nrem > 0) prefetch_cache_line(field + parity * offset + volumeCB * M * N + x * Nrem);
+        if constexpr (Nrem > 0) prefetch_cache_line(field + (parity * offset + volumeCB * M * N + x * Nrem));
       }
 
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
@@ -1201,7 +1201,7 @@ namespace quda
         real v[length];
 #ifndef LEGACY_ACCESSOR_NORM
         auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
-        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
+        auto norm = reinterpret_cast<float *>(field + (volumeCB * 2 * Nc * Ns));
 #endif
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {
@@ -1229,14 +1229,14 @@ namespace quda
           // first do scalar copy converting into storage type
           copy_and_scale<Float, real, N>(vecTmp, v + i * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(field + parity * offset, volumeCB * i + x, vecTmp);
+          vector_store(field, parity * offset, volumeCB * i + x, vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           array<Float, Nrem> vecTmp;
           copy_and_scale<Float, real, Nrem>(vecTmp, v + M * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(field + parity * offset + volumeCB * M * N, x, vecTmp);
+          vector_store(field, parity * offset + volumeCB * M * N, x, vecTmp);
         }
       }
 
