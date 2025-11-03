@@ -168,6 +168,7 @@ namespace quda
   template <bool> struct prefetch_cache_bulk_imp;
   template <bool> struct prefetch_cache_tensor_3d_imp;
   template <bool> struct prefetch_cache_tensor_4d_imp;
+  template <bool> struct prefetch_cache_tensor_5d_imp;
 
 #if __COMPUTE_CAPABILITY__ >= 900
   // CUDA specialization of the prefetch_cache_bulk that uses TMA (requires Hopper+)
@@ -185,9 +186,17 @@ namespace quda
 
   // CUDA specialization of the prefetch_cache_tensor_4d that uses TMA (requires Hopper+)
   template <> struct prefetch_cache_tensor_4d_imp<true> {
-    __device__ inline void operator()(const tensor_desc_t &desc, int x, int y, int z, int t)
+    __device__ inline void operator()(const tensor_desc_t &desc, int x, int y, int z, int w)
     {
-      prefetch_tma_4d(desc, x, y, z, t);
+      prefetch_tma_4d(desc, x, y, z, w);
+    }
+  };
+
+  // CUDA specialization of the prefetch_cache_tensor_5d that uses TMA (requires Hopper+)
+  template <> struct prefetch_cache_tensor_5d_imp<true> {
+    __device__ inline void operator()(const tensor_desc_t &desc, int x, int y, int z, int w, int u)
+    {
+      prefetch_tma_5d(desc, x, y, z, w, u);
     }
   };
 #endif

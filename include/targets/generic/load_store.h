@@ -39,6 +39,12 @@ namespace quda
     return value_a;
   }
 
+  template <typename scalar_t, int N, size_t prefetch = 0>
+  __device__ __host__ inline array<scalar_t, N> vector_load(const scalar_t *ptr, unsigned int offset, int idx)
+  {
+    return vector_load<scalar_t, N, prefetch>(ptr + (offset + N * idx), 0);
+  }
+
   /**
      @brief Non-specialized store operation
   */
@@ -62,6 +68,12 @@ namespace quda
     static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
     memcpy(&value_v, &value_a, sizeof(vector_t));
     vector_store<vector_t>(ptr, idx, value_v);
+  }
+
+  template <typename scalar_t, int N>
+  __device__ __host__ inline void vector_store(scalar_t *ptr, unsigned offset, int idx, const array<scalar_t, N> &value_a)
+  {
+    vector_store<scalar_t, N>(ptr + (offset + N * idx), 0, value_a);
   }
 
   template <bool is_device> struct prefetch_cache_line_imp {
@@ -92,9 +104,18 @@ namespace quda
     constexpr void operator()(const tensor_desc_t &, int, int, int, int) { }
   };
 
-  __device__ __host__ inline void prefetch_cache_tensor_4d(const tensor_desc_t &desc, int x, int y, int z, int t)
+  __device__ __host__ inline void prefetch_cache_tensor_4d(const tensor_desc_t &desc, int x, int y, int z, int w)
   {
-    target::dispatch<prefetch_cache_tensor_4d_imp>(desc, x, y, z, t);
+    target::dispatch<prefetch_cache_tensor_4d_imp>(desc, x, y, z, w);
+  }
+
+  template <bool is_device> struct prefetch_cache_tensor_5d_imp {
+    constexpr void operator()(const tensor_desc_t &, int, int, int, int, int) { }
+  };
+
+  __device__ __host__ inline void prefetch_cache_tensor_5d(const tensor_desc_t &desc, int x, int y, int z, int w, int u)
+  {
+    target::dispatch<prefetch_cache_tensor_5d_imp>(desc, x, y, z, w, u);
   }
 
 } // namespace quda

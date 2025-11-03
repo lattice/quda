@@ -494,10 +494,17 @@ namespace quda {
                  : "memory");
   }
 
-  __device__ __forceinline__ void prefetch_tma_4d(const tensor_desc_t &tensor_map, int x, int y, int z, int t)
+  __device__ __forceinline__ void prefetch_tma_4d(const tensor_desc_t &tensor_map, int x, int y, int z, int w)
   {
     asm volatile("cp.async.bulk.prefetch.tensor.4d.L2.global.tile [%0, {%1, %2, %3, %4}];" ::"l"(&tensor_map), "r"(x),
-                 "r"(y), "r"(z), "r"(t)
+                 "r"(y), "r"(z), "r"(w)
+                 : "memory");
+  }
+
+  __device__ __forceinline__ void prefetch_tma_5d(const tensor_desc_t &tensor_map, int x, int y, int z, int w, int u)
+  {
+    asm volatile("cp.async.bulk.prefetch.tensor.5d.L2.global.tile [%0, {%1, %2, %3, %4, %5}];" ::"l"(&tensor_map),
+                 "r"(x), "r"(y), "r"(z), "r"(w), "r"(u)
                  : "memory");
   }
 
