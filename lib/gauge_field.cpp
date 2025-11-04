@@ -245,6 +245,7 @@ namespace quda {
   {
     gauge::tensor_desc_t tensor;
 
+#if __COMPUTE_CAPABILITY__ >= 900
     auto get_tensor_data_type = [&](size_t word_size) {
       switch (word_size) {
       case 1: return CU_TENSOR_MAP_DATA_TYPE_UINT8;
@@ -319,6 +320,7 @@ namespace quda {
                   box_dim[2], box_dim[3]);
       }
     }
+#endif // __COMPUTE_CAPABILITY__ >= 900
 
     return tensor;
   }
