@@ -1030,14 +1030,12 @@ namespace quda {
         __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
                                                const int *) const
         {
-          if constexpr (isFixed<Float>::value) {
+          // For recon==18, scaling is handled in FloatNOrder::load() via copy_and_scale
+          // For other recon types, this Unpack is never called (they have their own specializations)
 #pragma unroll
-            for (int i = 0; i < N / 2; i++) { out[i] = scale * complex(in[2 * i + 0], in[2 * i + 1]); }
-          } else {
-#pragma unroll
-            for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
-          }
+          for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
         }
+
         __device__ __host__ inline real getPhase(const complex[]) const { return 0; }
     };
 
@@ -1582,6 +1580,7 @@ namespace quda {
         const AllocInt phaseOffset;
         size_t bytes;
         gauge::tensor_desc_t tensor_desc;
+        const real combined_scale; // Precomputed scale for copy_and_scale: fixedInvMaxValue * reconstruct.scale
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
@@ -1592,7 +1591,16 @@ namespace quda {
           stride(u.Stride()),
           geometry(u.Geometry()),
           phaseOffset(u.PhaseOffset() / sizeof(Float)),
-          bytes(u.Bytes())
+          bytes(u.Bytes()),
+          combined_scale([&]() {
+            if constexpr (recon == 18) {
+              // QUDA_RECONSTRUCT_NO: combine fixedInvMaxValue with reconstruct.scale
+              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value * reconstruct.scale : 1.0;
+            } else {
+              // Other reconstruction types: only need fixedInvMaxValue (reconstruct.scale doesn't exist)
+              return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : 1.0;
+            }
+          }())
         {
           if (geometry == QUDA_COARSE_GEOMETRY)
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -1615,14 +1623,14 @@ namespace quda {
         for (int i = 0; i < M; i++) {
           // first load from memory
           auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
-          // second do copy converting into register type
-          copy(tmp + i * N, vecTmp);
+          // second do copy converting into register type with combined scaling
+          copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
-          copy(tmp + M * N, vecTmp);
+          copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
         if constexpr (loadPhase) {
