@@ -1385,29 +1385,31 @@ namespace quda {
           real r_inv2 = u0_inv * row_sum_inv;
           {
             complex A = cmul(conj(out[0]), out[3]);
+            complex u0A = u0 * A;
 
             // out[4] = -(conj(out[6])*conj(out[2]) + u0*A*out[1])*r_inv2; // U11
             out[4] = cmul(conj(out[6]), conj(out[2]));
-            out[4] = cmac(u0 * A, out[1], out[4]);
+            out[4] = cmac(u0A, out[1], out[4]);
             out[4] = -r_inv2 * out[4];
 
             // out[5] = (conj(out[6])*conj(out[1]) - u0*A*out[2])*r_inv2;  // U12
             out[5] = cmul(conj(out[6]), conj(out[1]));
-            out[5] = cmac(-u0 * A, out[2], out[5]);
+            out[5] = cmac(-u0A, out[2], out[5]);
             out[5] = r_inv2 * out[5];
           }
 
           {
             complex A = cmul(conj(out[0]), out[6]);
+            complex u0A = u0 * A;
 
             // out[7] = (conj(out[3])*conj(out[2]) - u0*A*out[1])*r_inv2;  // U21
             out[7] = cmul(conj(out[3]), conj(out[2]));
-            out[7] = cmac(-u0 * A, out[1], out[7]);
+            out[7] = cmac(-u0A, out[1], out[7]);
             out[7] = r_inv2 * out[7];
 
             // out[8] = -(conj(out[3])*conj(out[1]) + u0*A*out[2])*r_inv2; // U12
             out[8] = cmul(conj(out[3]), conj(out[1]));
-            out[8] = cmac(u0 * A, out[2], out[8]);
+            out[8] = cmac(u0A, out[2], out[8]);
             out[8] = -r_inv2 * out[8];
           }
 
