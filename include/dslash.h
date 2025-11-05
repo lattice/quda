@@ -75,6 +75,7 @@ namespace quda
         strcat(aux_base, ",prefetch=");
         i32toa(tile_str, Arg::prefetch_distance);
         strcat(aux_base, tile_str);
+        if constexpr (Arg::prefetch_tma) strcat(aux_base, Arg::prefetch_tma == 1 ? ",tma=bulk" : ",tma=tensor");
       }
     }
 
