@@ -1030,8 +1030,6 @@ namespace quda {
         __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
                                                const int *) const
         {
-          // For recon==18, scaling is handled in FloatNOrder::load() via copy_and_scale
-          // For other recon types, this Unpack is never called (they have their own specializations)
 #pragma unroll
           for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
         }
@@ -1581,6 +1579,7 @@ namespace quda {
         size_t bytes;
         gauge::tensor_desc_t tensor_desc;
         const real combined_scale; // Precomputed scale for copy_and_scale: fixedInvMaxValue * reconstruct.scale
+        const real phase_scale; // Precomputed scale for phase loading: fixedInvMaxValue * 2.0 (or just 2.0 for float)
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
@@ -1600,7 +1599,9 @@ namespace quda {
               // Other reconstruction types: only need fixedInvMaxValue (reconstruct.scale doesn't exist)
               return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : 1.0;
             }
-          }())
+          }()),
+          phase_scale(isFixed<Float>::value ? fixedInvMaxValue<Float>::value * static_cast<real>(2.0) :
+                                              static_cast<real>(2.0))
         {
           if (geometry == QUDA_COARSE_GEOMETRY)
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -1634,8 +1635,12 @@ namespace quda {
         }
 
         if constexpr (loadPhase) {
-          copy(phase, gauge[parity * offset + phaseOffset + stride * dir + x]);
-          phase *= static_cast<real>(2.0);
+          if constexpr (isFixed<Float>::value) {
+            copy_and_scale(phase, gauge[parity * offset + phaseOffset + stride * dir + x], phase_scale);
+          } else {
+            copy(phase, gauge[parity * offset + phaseOffset + stride * dir + x]);
+            phase *= static_cast<real>(2.0);
+          }
         }
 
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
@@ -1736,15 +1741,15 @@ namespace quda {
             // first do vectorized copy from memory into registers
             auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
 
-            // second do copy converting into register type
-            copy(tmp + i * N, vecTmp);
+            // second do copy converting into register type with combined scaling
+            copy_and_scale(tmp + i * N, vecTmp, combined_scale);
           }
 
           // now load any remainder
           if constexpr (Nrem > 0) {
             auto vecTmp
               = vector_load<Float, Nrem>(ghost[dir] + 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
-            copy(tmp + M * N, vecTmp);
+            copy_and_scale(tmp + M * N, vecTmp, combined_scale);
           }
 
           real phase = 0.;
@@ -1753,8 +1758,13 @@ namespace quda {
             // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
             //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
             // } else {
-            copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
-            phase *= static_cast<real>(2.0);
+            if constexpr (isFixed<Float>::value) {
+              copy_and_scale(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
+                             phase_scale);
+            } else {
+              copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
+              phase *= static_cast<real>(2.0);
+            }
             // }
           }
           reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
@@ -1839,8 +1849,8 @@ namespace quda {
           auto vecTmp = vector_load<Float, N>(ghost[dim] + dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
                                               ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
-          // second do copy converting into register type
-          copy(tmp + i * N, vecTmp);
+          // second do copy converting into register type with combined scaling
+          copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
@@ -1849,14 +1859,23 @@ namespace quda {
             = vector_load<Float, Nrem>(ghost[dim] + (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
                                        (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
-          copy(tmp + M * N, vecTmp);
+          copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
         real phase = 0.;
-        if constexpr (hasPhase)
-          copy(phase,
-               ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                          + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x]);
+        if constexpr (hasPhase) {
+          if constexpr (isFixed<Float>::value) {
+            copy_and_scale(phase,
+                           ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
+                                      + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
+                           phase_scale);
+          } else {
+            copy(phase,
+                 ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
+                            + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x]);
+            phase *= static_cast<real>(2.0);
+          }
+        }
 
         // use the extended_idx to determine the boundary condition
         reconstruct.Unpack(v, tmp, extended_idx, g, 2. * phase, X, R);
