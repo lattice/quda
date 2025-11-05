@@ -1697,7 +1697,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge + parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
+          vector_store(gauge, parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
         }
 
         // now save any remainder
@@ -1706,7 +1706,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge + parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
+          vector_store(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
         }
 
         if constexpr (hasPhase) {
@@ -1750,7 +1750,7 @@ namespace quda {
           // now load any remainder
           if constexpr (Nrem > 0) {
             auto vecTmp
-              = vector_load<Float, Nrem>(ghost[dir] + 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
+              = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
             copy_and_scale(tmp + M * N, vecTmp, combined_scale);
           }
 
@@ -1797,7 +1797,7 @@ namespace quda {
 #pragma unroll
             for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
             // second do vectorized copy into memory
-            vector_store(ghost[dir] + 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x, vecTmp);
+            vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x, vecTmp);
           }
 
           if constexpr (hasPhase) {
@@ -1848,7 +1848,7 @@ namespace quda {
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
-          auto vecTmp = vector_load<Float, N>(ghost[dim] + dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
+          auto vecTmp = vector_load<Float, N>(ghost[dim], dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
                                               ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
@@ -1858,7 +1858,7 @@ namespace quda {
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp
-            = vector_load<Float, Nrem>(ghost[dim] + (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
+            = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
                                        (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           copy_and_scale(tmp + M * N, vecTmp, combined_scale);
@@ -1896,7 +1896,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy to memory
-          vector_store(ghost[dim] + dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
+          vector_store(ghost[dim], dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
                        ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
@@ -1906,7 +1906,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(ghost[dim] + (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
+          vector_store(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
                        (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
