@@ -33,19 +33,22 @@ namespace quda
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
     static constexpr QudaStaggeredPhase phase = phase_;
-    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
-    using GL =
-        typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
+    template <bool shifted>
+    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase,
+                                     QUDA_NATIVE_GAUGE_ORDER, shifted>::type;
+    template <bool shifted>
+    using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost,
+                                     use_inphase, QUDA_NATIVE_GAUGE_ORDER, shifted>::type;
 
     F out[MAX_MULTI_RHS];  /** output vector field */
     F in[MAX_MULTI_RHS];   /** input vector field */
     const Ghost halo_pack; /** accessor for writing the halo */
     const Ghost halo;      /** accessor for reading the halo */
     F x[MAX_MULTI_RHS];    /** input vector when doing xpay */
-    const GU U; /** the gauge field */
-    const GU Uback; /** the gauge field */
-    const GL L; /** the long gauge field */
-    const GL Lback; /** the long gauge field */
+    const GU<false> U;     /** the gauge field */
+    const GU<true> Uback;  /** the gauge field */
+    const GL<false> L;     /** the long gauge field */
+    const GL<true> Lback;  /** the long gauge field */
 
     const real a; /** xpay scale factor */
     const real tboundary; /** temporal boundary condition */

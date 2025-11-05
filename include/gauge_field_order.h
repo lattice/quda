@@ -997,7 +997,7 @@ namespace quda {
          type)
       */
     template <int N, typename Float, QudaReconstructType, QudaGhostExchange ghostExchange_,
-              QudaStaggeredPhase = QUDA_STAGGERED_PHASE_NO>
+              QudaStaggeredPhase = QUDA_STAGGERED_PHASE_NO, bool = false>
     struct Reconstruct {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1048,36 +1048,40 @@ namespace quda {
          @param isLastTimeSlide if we're on the last time slice of nodes
          @param ghostExchange if the field is extended or not (determines indexing type)
       */
-      template <QudaGhostExchange ghostExchange_, typename T, typename I>
-      __device__ __host__ inline T timeBoundary(int idx, const I X[QUDA_MAX_DIM], const int R[QUDA_MAX_DIM],
-          T tBoundary, T scale, int firstTimeSliceBound, int lastTimeSliceBound, bool isFirstTimeSlice,
-          bool isLastTimeSlice, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_NO)
-      {
+    template <QudaGhostExchange ghostExchange_, bool shifted, typename T, typename I>
+    __device__ __host__ inline T timeBoundary(int idx, const I X[QUDA_MAX_DIM], const int R[QUDA_MAX_DIM], T tBoundary,
+                                              T scale, int firstTimeSliceBound, int lastTimeSliceBound,
+                                              bool isFirstTimeSlice, bool isLastTimeSlice,
+                                              QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_NO)
+    {
 
-        // MWTODO: should this return tBoundary : scale or tBoundary*scale : scale
+      // MWTODO: should this return tBoundary : scale or tBoundary*scale : scale
 
-        if (ghostExchange_ == QUDA_GHOST_EXCHANGE_PAD
-            || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED)) {
-          if (idx >= firstTimeSliceBound) { // halo region on the first time slice
-            return isFirstTimeSlice ? tBoundary : scale;
-          } else if (idx >= lastTimeSliceBound) { // last link on the last time slice
-            return isLastTimeSlice ? tBoundary : scale;
-          } else {
-            return scale;
-          }
-        } else if (ghostExchange_ == QUDA_GHOST_EXCHANGE_EXTENDED
-            || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED)) {
-          if (idx >= (R[3] - 1) * X[0] * X[1] * X[2] / 2 && idx < R[3] * X[0] * X[1] * X[2] / 2) {
-            // the boundary condition is on the R[3]-1 time slice
-            return isFirstTimeSlice ? tBoundary : scale;
-          } else if (idx >= (X[3] - R[3] - 1) * X[0] * X[1] * X[2] / 2 && idx < (X[3] - R[3]) * X[0] * X[1] * X[2] / 2) {
-            // the boundary condition lies on the X[3]-R[3]-1 time slice
-            return isLastTimeSlice ? tBoundary : scale;
-          } else {
-            return scale;
-          }
+      if (ghostExchange_ == QUDA_GHOST_EXCHANGE_PAD
+          || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED)) {
+
+        if (!shifted && idx >= firstTimeSliceBound) { // halo region on the first time slice
+          return isFirstTimeSlice ? tBoundary : scale;
+        } else if (shifted && idx < firstTimeSliceBound) { // shifted link on first time slice
+          return isFirstTimeSlice ? tBoundary : scale;
+        } else if (!shifted && idx >= lastTimeSliceBound) { // last link on the last time slice
+          return isLastTimeSlice ? tBoundary : scale;
+        } else {
+          return scale;
         }
-        return scale;
+      } else if (ghostExchange_ == QUDA_GHOST_EXCHANGE_EXTENDED
+                 || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED)) {
+        if (idx >= (R[3] - 1) * X[0] * X[1] * X[2] / 2 && idx < R[3] * X[0] * X[1] * X[2] / 2) {
+          // the boundary condition is on the R[3]-1 time slice
+          return isFirstTimeSlice ? tBoundary : scale;
+        } else if (idx >= (X[3] - R[3] - 1) * X[0] * X[1] * X[2] / 2 && idx < (X[3] - R[3]) * X[0] * X[1] * X[2] / 2) {
+          // the boundary condition lies on the X[3]-R[3]-1 time slice
+          return isLastTimeSlice ? tBoundary : scale;
+        } else {
+          return scale;
+        }
+      }
+      return scale;
       }
 
       // not actually used - here for reference
@@ -1100,8 +1104,8 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange
          type to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_>
-      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_12, ghostExchange_> {
+      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase phase, bool shifted>
+      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_12, ghostExchange_, phase, shifted> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         const real anisotropy;
@@ -1115,7 +1119,7 @@ namespace quda {
         Reconstruct(const GaugeField &u) :
           anisotropy(u.Anisotropy()),
           tBoundary(static_cast<real>(u.TBoundary())),
-          firstTimeSliceBound(u.VolumeCB()),
+          firstTimeSliceBound(!shifted ? u.VolumeCB() : u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
           isLastTimeSlice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
@@ -1141,8 +1145,8 @@ namespace quda {
 
           const real u0 = dir < 3 ?
             anisotropy :
-            timeBoundary<ghostExchange_>(idx, X, R, tBoundary, static_cast<real>(1.0), firstTimeSliceBound,
-                                         lastTimeSliceBound, isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+            timeBoundary<ghostExchange_, shifted>(idx, X, R, tBoundary, static_cast<real>(1.0), firstTimeSliceBound,
+                                                  lastTimeSliceBound, isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
           // out[6] = u0*conj(out[1]*out[5] - out[2]*out[4]);
           out[6] = cmul(out[2], out[4]);
@@ -1173,8 +1177,8 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange
          type to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_>
-      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_10, ghostExchange_> {
+      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase phase, bool shifted>
+      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_10, ghostExchange_, phase, shifted> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
 
@@ -1221,8 +1225,8 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange
          type to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase>
-      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_13, ghostExchange_, stag_phase> {
+      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase, bool shifted>
+      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_13, ghostExchange_, stag_phase, shifted> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         const Reconstruct<18, Float, QUDA_RECONSTRUCT_12, ghostExchange_> reconstruct_12;
@@ -1298,8 +1302,8 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange type
          to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_>
-      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_8, ghostExchange_> {
+      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase, bool shifted>
+      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_8, ghostExchange_, stag_phase, shifted> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         const complex anisotropy; // imaginary value stores inverse
@@ -1314,7 +1318,7 @@ namespace quda {
         Reconstruct(const GaugeField &u, real scale = 1.0) :
           anisotropy(u.Anisotropy() * scale, 1.0 / (u.Anisotropy() * scale)),
           tBoundary(static_cast<real>(u.TBoundary()) * scale, 1.0 / (static_cast<real>(u.TBoundary()) * scale)),
-          firstTimeSliceBound(u.VolumeCB()),
+          firstTimeSliceBound(!shifted ? u.VolumeCB() : u.X()[0] * u.X()[1] * u.X()[2] / 2),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
           isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
           isLastTimeSlice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
@@ -1431,8 +1435,8 @@ namespace quda {
         {
           complex u = dir < 3 ?
             anisotropy :
-            timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
-                                         isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+            timeBoundary<ghostExchange_, shifted>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
+                                                  isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
           Unpack(out, in, idx, dir, phase, X, R, scale, u);
         }
@@ -1448,11 +1452,11 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange type
          to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase>
-      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_9, ghostExchange_, stag_phase> {
+      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase, bool shifted>
+      struct Reconstruct<18, Float, QUDA_RECONSTRUCT_9, ghostExchange_, stag_phase, shifted> {
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        const Reconstruct<18, Float, QUDA_RECONSTRUCT_8, ghostExchange_> reconstruct_8;
+        const Reconstruct<18, Float, QUDA_RECONSTRUCT_8, ghostExchange_, stag_phase, shifted> reconstruct_8;
         const real scale;
         const real scale_inv;
 
@@ -1549,16 +1553,16 @@ namespace quda {
 
       template <typename Float, int length_, QudaReconstructType recon,
                 QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
-                QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
+                QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false, bool shifted = false>
       struct FloatNOrder {
-        using Accessor = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
+        using Accessor = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted>;
 
         using store_t = Float;
         static constexpr int length = length_;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         typedef typename AllocType<huge_alloc>::type AllocInt;
-        Reconstruct<length, Float, recon, ghostExchange_, stag_phase> reconstruct;
+        Reconstruct<length, Float, recon, ghostExchange_, stag_phase, shifted> reconstruct;
         static constexpr int reconLen = recon;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
         static constexpr bool loadPhase = hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase));
@@ -2512,20 +2516,20 @@ namespace quda {
 
   template <typename T, QudaReconstructType recon, int N = 18, QudaStaggeredPhase stag = QUDA_STAGGERED_PHASE_NO,
             bool huge_alloc = gauge::default_huge_alloc, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID,
-            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER>
+            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false>
   struct gauge_mapper {
-    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase, shifted> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER> {
+            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted>
+  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted> {
     typedef gauge::MILCOrder<T, N> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER> {
+            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted>
+  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted> {
     typedef gauge::QDPOrder<T, N> type;
   };
 

@@ -59,6 +59,7 @@ namespace quda
     GaugeFieldParam param(in);
     param.create = QUDA_NULL_FIELD_CREATE;
     GaugeField out(param);
+    const_cast<double&>(out.LinkMax()) = in.LinkMax();
     instantiate<GaugeShifter>(out, in, shift);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return out;

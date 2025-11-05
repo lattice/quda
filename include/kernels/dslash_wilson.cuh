@@ -28,7 +28,9 @@ namespace quda
     static constexpr bool distance_pc = distance_pc_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+    template <bool shifted>
+    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, false,
+                                    QUDA_NATIVE_GAUGE_ORDER, shifted>::type;
 
     typedef typename mapper<Float>::type real;
 
@@ -37,8 +39,8 @@ namespace quda
     F x[MAX_MULTI_RHS];   /** input vector set when doing xpay */
     Ghost halo_pack;
     Ghost halo;
-    const G U;    /** the gauge field */
-    const G Uback; /** the backwards gauge field */
+    const G<false> U;    /** the gauge field */
+    const G<true> Uback; /** the backwards gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     /** parameters for distance preconditioning */
     const real alpha0;
