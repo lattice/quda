@@ -49,17 +49,12 @@ namespace quda
       constexpr int nDim = 4;
       constexpr bool improved = false;
       auto halo = ColorSpinorField::create_comms_batch(in);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-      GaugeField Uback = shift(U, 1);
-#else
-      const GaugeField &Uback = U;
-#endif
 
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC
           || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
         if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
           StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
-            out, in, halo, U, Uback, U, Uback, a, x, parity, dagger, comm_override);
+            out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
           dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
@@ -69,7 +64,7 @@ namespace quda
       } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
         if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
           StaggeredArg<Float, nColor, nDim, DDArg, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
-            out, in, halo, U, Uback, U, Uback, a, x, parity, dagger, comm_override);
+            out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
           dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);

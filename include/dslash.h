@@ -70,9 +70,7 @@ namespace quda
       char tile_str[16];
       i32toa(tile_str, Arg::n_src_tile);
       strcat(aux_base, tile_str);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-      strcat(aux_base, ",double_store");
-#endif
+      if constexpr (dslash_double_store()) strcat(aux_base, ",double_store");
       if constexpr (Arg::prefetch_distance > 0) {
         strcat(aux_base, ",prefetch=");
         i32toa(tile_str, Arg::prefetch_distance);

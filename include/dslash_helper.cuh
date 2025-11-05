@@ -20,6 +20,13 @@ constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 
 namespace quda
 {
+
+#ifdef QUDA_DSLASH_DOUBLE_STORE
+  constexpr bool dslash_double_store() { return true; }
+#else
+  constexpr bool dslash_double_store() { return false; }
+#endif
+
   /**
      @brief Helper function to determine if we should do halo
      computation
@@ -301,9 +308,8 @@ namespace quda
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
     static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
     static constexpr int prefetch_tma = QUDA_DSLASH_PREFETCH_TMA;
-#ifndef QUDA_DSLASH_DOUBLE_STORE
-    static_assert(!prefetch_tma, "Cannot use TMA prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
-#endif
+    static_assert(!prefetch_tma || dslash_double_store(),
+                  "Cannot use TMA prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const QudaReconstructType reconstruct;

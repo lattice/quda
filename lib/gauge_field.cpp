@@ -1516,6 +1516,13 @@ namespace quda {
     }
   }
 
+  GaugeField& GaugeField::shift(int shift_offset) const
+  {
+    // If we don't yet have a cached shifted copy or the shift value changed
+    if (!shifted) shifted = std::make_unique<GaugeField>(::quda::shift(*this, shift_offset));
+    return *shifted;
+  }
+
   void GaugeField::PrintMatrix(int dim, int parity, unsigned int x_cb, int rank) const
   {
     genericPrintMatrix(*this, dim, parity, x_cb, rank);

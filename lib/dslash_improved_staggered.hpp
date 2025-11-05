@@ -154,15 +154,8 @@ namespace quda
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
       auto halo = ColorSpinorField::create_comms_batch(in, 3);
 
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-      GaugeField Uback = shift(U, 1);
-      GaugeField Lback = shift(L, 3);
-#else
-      const GaugeField &Uback = U;
-      const GaugeField &Lback = L;
-#endif
-      StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, Uback, L, Lback, a, x,
-                                                                               parity, dagger, comm_override);
+      StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity,
+                                                                               dagger, comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
       dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
     }

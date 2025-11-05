@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
@@ -198,6 +199,8 @@ namespace quda {
     double anisotropy = 0.0;
     double tadpole = 0.0;
     double fat_link_max = 0.0;
+
+    mutable std::unique_ptr<GaugeField> shifted; // shifted copy of the gauge field, used for double-store enabled dslash
 
     mutable array<quda_ptr, 2 *QUDA_MAX_DIM> ghost
       = {}; // stores the ghost zone of the gauge field (non-native fields only)
@@ -654,6 +657,14 @@ namespace quda {
     }
 
     /**
+       @brief Return the shifted gauge field by shift in each
+       dimension.  Shifted field is cached for subsequent reuse.
+       @param[in] shift value (1 or 3 supported)
+       @return Reference to shifted field
+    */
+    GaugeField &shift(int shift) const;
+
+    /**
      * @brief Print the site data
      * @param[in] parity Parity index
      * @param[in] dim The dimension in which we are printing
@@ -683,9 +694,9 @@ namespace quda {
      the resulting shifted field.  This is used to move the backwards
      links on to this site.  The input field must be a padded field
      with the ghost pre-exchanged if communications are enabled.
-     @param[out] out Output shifted field
      @param[in] in Input shifted field
      @param[in] shift value (1 or 3 supported)
+     @return Shifted field
    */
   GaugeField shift(const GaugeField &in, int shift);
 
