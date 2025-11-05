@@ -208,7 +208,7 @@ namespace quda
 
       if (arg.dd_in.doHopping(coord, d, -1)) {
         // Backward gather - compute back offset for spinor and gauge fetch
-        const bool ghost = coord1.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        const bool ghost = coord1.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
