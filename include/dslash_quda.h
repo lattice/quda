@@ -19,7 +19,7 @@ namespace quda
     int_fastdiv X[QUDA_MAX_DIM];
     int Ls;
 
-    int volume_4d;
+    int_fastdiv volume_4d;
     int_fastdiv volume_4d_cb;
 
     int_fastdiv face_X[4];

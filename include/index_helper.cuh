@@ -822,7 +822,7 @@ namespace quda {
     int s = face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
 
-    int dims[3] = {};
+    std::remove_const_t<std::remove_reference_t<decltype(arg.dc.X[0])>> dims[3] = {};
     int d1 = 0;
 #pragma unroll 4
     for (int d2 = 0; d2 < 4; d2++) { // this will evaluate at compile time
