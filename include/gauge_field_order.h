@@ -1249,25 +1249,27 @@ namespace quda {
 
           out[6] = cmul(out[2], out[4]);
           out[6] = cmac(out[1], out[5], -out[6]);
-          out[6] = scale_inv * conj(out[6]);
+          out[6] = conj(out[6]);
 
           out[7] = cmul(out[0], out[5]);
           out[7] = cmac(out[2], out[3], -out[7]);
-          out[7] = scale_inv * conj(out[7]);
+          out[7] = conj(out[7]);
 
           out[8] = cmul(out[1], out[3]);
           out[8] = cmac(out[0], out[4], -out[8]);
-          out[8] = scale_inv * conj(out[8]);
+          out[8] = conj(out[8]);
 
           if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
             // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
             real cos_sin[2];
             sincospi(static_cast<real>(3.0) * phase, &cos_sin[1], &cos_sin[0]);
             complex A(cos_sin[0], cos_sin[1]);
+            A *= scale_inv;
             out[6] = cmul(A, out[6]);
             out[7] = cmul(A, out[7]);
             out[8] = cmul(A, out[8]);
           } else { // phase is +/- 1 so real multiply is sufficient
+            phase *= scale_inv;
             out[6] *= phase;
             out[7] *= phase;
             out[8] *= phase;
