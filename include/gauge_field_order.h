@@ -1553,12 +1553,11 @@ namespace quda {
         }
       }
 
-      template <typename Float, int length_, QudaReconstructType recon, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO,
-                bool huge_alloc = default_huge_alloc, QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID,
-                bool use_inphase = false, bool shifted = false, bool use_parity_mask = false>
+      template <typename Float, int length_, QudaReconstructType recon,
+                QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
+                QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false, bool shifted = false>
       struct FloatNOrder {
-        using Accessor
-          = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted, use_parity_mask>;
+        using Accessor = FloatNOrder<Float, length_, recon, stag_phase, huge_alloc, ghostExchange_, use_inphase, shifted>;
 
         using store_t = Float;
         static constexpr int length = length_;
@@ -1632,27 +1631,26 @@ namespace quda {
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
       {
         real tmp[reconLen];
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(gauge, parity_offset + dir * (M * N + Nrem) * stride, i * stride + x);
+          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale, combined_shift);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(gauge, parity_offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
           copy_and_scale(tmp + M * N, vecTmp, combined_scale, combined_shift);
         }
 
         if constexpr (loadPhase) {
           if constexpr (isFixed<Float>::value) {
-            copy_and_scale(phase, gauge[parity_offset + phaseOffset + stride * dir + x], phase_scale, phase_shift);
+            copy_and_scale(phase, gauge[parity * offset + phaseOffset + stride * dir + x], phase_scale, phase_shift);
           } else {
-            copy(phase, gauge[parity_offset + phaseOffset + stride * dir + x]);
+            copy(phase, gauge[parity * offset + phaseOffset + stride * dir + x]);
             phase *= static_cast<real>(2.0);
           }
         }
@@ -1663,39 +1661,36 @@ namespace quda {
       template <int type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
       {
         if constexpr (type == 0) { // use per-thread prefetching
-          const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
 #pragma unroll
           for (int i = 0; i < M; i++)
-            prefetch_cache_line(gauge + (parity_offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
+            prefetch_cache_line(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
 
           // now load any remainder
           if constexpr (Nrem > 0)
-            prefetch_cache_line(gauge + (parity_offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
+            prefetch_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
 
-          if constexpr (loadPhase) prefetch_cache_line(gauge + (parity_offset + phaseOffset + stride * dir + x));
+          if constexpr (loadPhase) prefetch_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
         } else if constexpr (type == 1) { // bulk prefetch
           if (block_size == 0) block_size = blockDim.x;
           if (target::is_thread_zero()) {
-            const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
 #pragma unroll
             for (int i = 0; i < M; i++)
-              prefetch_cache_bulk(gauge + (parity_offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N),
+              prefetch_cache_bulk(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N),
                                   block_size * N * sizeof(Float));
 
             // now load any remainder
             if constexpr (Nrem > 0)
-              prefetch_cache_bulk(gauge + (parity_offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem),
+              prefetch_cache_bulk(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem),
                                   block_size * Nrem * sizeof(Float));
 
             if constexpr (loadPhase)
-              prefetch_cache_bulk(gauge + (parity_offset + phaseOffset + stride * dir + x), block_size * sizeof(Float));
+              prefetch_cache_bulk(gauge + (parity * offset + phaseOffset + stride * dir + x), block_size * sizeof(Float));
           }
         } else { // n-d tensor prefetch
           if (target::is_thread_zero()) {
-            const auto parity_idx = use_parity_mask ? (parity & 1) : parity;
-            prefetch_cache_tensor_5d(tensor_desc.N, x, x / 16, 0, dir, parity_idx);
-            if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, x / 16, dir, parity_idx);
-            if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, x / 16, dir, parity_idx);
+            prefetch_cache_tensor_5d(tensor_desc.N, x, x / 16, 0, dir, parity);
+            if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, x / 16, dir, parity);
+            if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, x / 16, dir, parity);
           }
         }
       }
@@ -1704,7 +1699,6 @@ namespace quda {
       {
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
@@ -1713,7 +1707,7 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge, parity_offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
+          vector_store(gauge, parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
         }
 
         // now save any remainder
@@ -1722,12 +1716,12 @@ namespace quda {
 #pragma unroll
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
-          vector_store(gauge, parity_offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
+          vector_store(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
         }
 
         if constexpr (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(gauge[parity_offset + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
+          copy(gauge[parity * offset + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
         }
       }
 
@@ -1753,12 +1747,11 @@ namespace quda {
           // This also works perfectly when phases are stored. No need to change this.
         } else {
           real tmp[reconLen];
-          const auto parity_offset = use_parity_mask ? (parity & faceVolumeCB[dir]) : (parity * faceVolumeCB[dir]);
 
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first do vectorized copy from memory into registers
-            auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2) * faceVolumeCB[dir] + parity_offset + x);
+            auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
 
             // second do copy converting into register type with combined scaling
             copy_and_scale(tmp + i * N, vecTmp, combined_scale, combined_shift);
@@ -1766,7 +1759,8 @@ namespace quda {
 
           // now load any remainder
           if constexpr (Nrem > 0) {
-            auto vecTmp = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity_offset + x);
+            auto vecTmp
+              = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
             copy_and_scale(tmp + M * N, vecTmp, combined_scale, combined_shift);
           }
 
@@ -1777,10 +1771,10 @@ namespace quda {
             //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
             // } else {
             if constexpr (isFixed<Float>::value) {
-              copy_and_scale(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity_offset + x],
+              copy_and_scale(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
                              phase_scale, phase_shift);
             } else {
-              copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity_offset + x]);
+              copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
               phase *= static_cast<real>(2.0);
             }
             // }
@@ -1796,7 +1790,6 @@ namespace quda {
         } else {
           real tmp[reconLen];
           reconstruct.Pack(tmp, v);
-          const auto parity_offset = use_parity_mask ? (parity & faceVolumeCB[dir]) : (parity * faceVolumeCB[dir]);
 
 #pragma unroll
           for (int i = 0; i < M; i++) {
@@ -1805,7 +1798,7 @@ namespace quda {
 #pragma unroll
             for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
             // second do vectorized copy into memory
-            vector_store(ghost[dir], (i * 2) * faceVolumeCB[dir] + parity_offset + x, vecTmp);
+            vector_store(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x, vecTmp);
           }
 
           // now save any remainder
@@ -1814,12 +1807,13 @@ namespace quda {
 #pragma unroll
             for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
             // second do vectorized copy into memory
-            vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity_offset + x, vecTmp);
+            vector_store(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x, vecTmp);
           }
 
           if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
-            copy(ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity_offset + x], static_cast<real>(0.5) * phase);
+            copy(ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
+                 static_cast<real>(0.5) * phase);
           }
         }
       }
@@ -1860,13 +1854,12 @@ namespace quda {
                                                   int g, int parity, const int R[]) const
       {
         real tmp[reconLen];
-        const auto parity_idx = use_parity_mask ? (parity & 1) : parity;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first do vectorized copy from memory
           auto vecTmp = vector_load<Float, N>(ghost[dim], dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                                              ((i * 2 + parity_idx) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
+                                              ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
           copy_and_scale(tmp + i * N, vecTmp, combined_scale, combined_shift);
@@ -1876,7 +1869,7 @@ namespace quda {
         if constexpr (Nrem > 0) {
           auto vecTmp
             = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                                       (parity_idx * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
+                                       (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           copy_and_scale(tmp + M * N, vecTmp, combined_scale, combined_shift);
         }
@@ -1886,12 +1879,12 @@ namespace quda {
           if constexpr (isFixed<Float>::value) {
             copy_and_scale(phase,
                            ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                                      + (parity_idx * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
+                                      + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
                            phase_scale, phase_shift);
           } else {
             copy(phase,
                  ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                            + (parity_idx * geometry + g) * R[dim] * faceVolumeCB[dim] + x]);
+                            + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x]);
             phase *= static_cast<real>(2.0);
           }
         }
@@ -1905,7 +1898,6 @@ namespace quda {
       {
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
-        const auto parity_idx = use_parity_mask ? (parity & 1) : parity;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
@@ -1915,7 +1907,7 @@ namespace quda {
           for (int j = 0; j < N; j++) copy(vecTmp[j], tmp[i * N + j]);
           // second do vectorized copy to memory
           vector_store(ghost[dim], dir * reconLen * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                       ((i * 2 + parity_idx) * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
+                       ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
         // now save any remainder
@@ -1925,13 +1917,13 @@ namespace quda {
           for (int j = 0; j < Nrem; j++) copy(vecTmp[j], tmp[M * N + j]);
           // second do vectorized copy into memory
           vector_store(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
-                       (parity_idx * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
+                       (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x, vecTmp);
         }
 
         if constexpr (hasPhase) {
           real phase = reconstruct.getPhase(v);
           copy(ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
-                          + (parity_idx * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
+                          + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
                static_cast<real>(0.5) * phase);
         }
       }
@@ -2530,22 +2522,20 @@ namespace quda {
 
   template <typename T, QudaReconstructType recon, int N = 18, QudaStaggeredPhase stag = QUDA_STAGGERED_PHASE_NO,
             bool huge_alloc = gauge::default_huge_alloc, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID,
-            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false,
-            bool use_parity_mask = false>
+            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER, bool shifted = false>
   struct gauge_mapper {
-    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase, shifted, use_parity_mask> type;
+    typedef gauge::FloatNOrder<T, N, recon, stag, huge_alloc, ghostExchange, use_inphase, shifted> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted, bool use_parity_mask>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted,
-                      use_parity_mask> {
+            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted>
+  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER, shifted> {
     typedef gauge::MILCOrder<T, N> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
-            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted, bool use_parity_mask>
-  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted, use_parity_mask> {
+            QudaGhostExchange ghostExchange, bool use_inphase, bool shifted>
+  struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER, shifted> {
     typedef gauge::QDPOrder<T, N> type;
   };
 

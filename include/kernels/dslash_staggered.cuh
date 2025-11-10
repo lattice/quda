@@ -23,12 +23,9 @@ namespace quda
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    static constexpr bool use_parity_mask = true;
-    using F =
-      typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true, use_parity_mask>::type;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type;
 
-    using Ghost =
-      typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false, use_parity_mask>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct_u = reconstruct_u_;
     static constexpr QudaReconstructType reconstruct_l = reconstruct_l_;
@@ -38,10 +35,10 @@ namespace quda
     static constexpr QudaStaggeredPhase phase = phase_;
     template <bool shifted>
     using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase,
-                                     QUDA_NATIVE_GAUGE_ORDER, shifted, use_parity_mask>::type;
+                                     QUDA_NATIVE_GAUGE_ORDER, shifted>::type;
     template <bool shifted>
     using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost,
-                                     use_inphase, QUDA_NATIVE_GAUGE_ORDER, shifted, use_parity_mask>::type;
+                                     use_inphase, QUDA_NATIVE_GAUGE_ORDER, shifted>::type;
 
     F out[MAX_MULTI_RHS];  /** output vector field */
     F in[MAX_MULTI_RHS];   /** input vector field */
@@ -107,15 +104,6 @@ namespace quda
       x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
       int dim2 = step / 4;
-      // Compute opposite parity/mask depending on optimization mode
-      int opposite_parity;
-      if constexpr (Arg::use_parity_mask) {
-        const int parity_orig = (parity == 0) ? 0 : 1;
-        opposite_parity = -(1 - parity_orig);
-      } else {
-        opposite_parity = 1 - parity;
-      }
-
       switch (step % 4) {
       case 0: arg.U.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
       case 1: arg.L.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
@@ -124,10 +112,10 @@ namespace quda
       case 3: arg.Lback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
 #else
       case 2:
-        arg.U.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, opposite_parity);
+        arg.U.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
       case 3:
-        arg.L.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, opposite_parity);
+        arg.L.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
 #endif
       }
@@ -150,21 +138,7 @@ namespace quda
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
-    // Note: parity parameter is already converted to mask if use_parity_mask is true
-    // Compute their_spinor_parity and one_minus_parity in same format (mask or original)
-    int their_spinor_parity;
-    int one_minus_parity;
-    if constexpr (Arg::use_parity_mask) {
-      // parity is the parity mask (-parity_orig), recover original parity for logic operations
-      const int parity_orig = (parity == 0) ? 0 : 1;
-      their_spinor_parity = (arg.nParity == 2) ? 1 - parity_orig : 0;
-      their_spinor_parity = -their_spinor_parity; // convert to mask
-      one_minus_parity = -(1 - parity_orig);
-    } else {
-      // parity is the original parity value
-      their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
-      one_minus_parity = 1 - parity;
-    }
+    const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
     Coord coord1 = coord;
     if constexpr (arg.improved) { // need to compute 1-hop in_boundary
@@ -246,8 +220,8 @@ namespace quda
           const Link U = arg.improved ? arg.Uback(d, coord.x_cb, parity) :
                                         arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg));
 #else
-          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, one_minus_parity) :
-                                        arg.U.Ghost(d, ghost_idx2, one_minus_parity, StaggeredPhase(coord, d, -1, arg));
+          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
+            arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
 #endif
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -264,8 +238,8 @@ namespace quda
                                           arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg));
 #else
             const int gauge_idx = back_idx;
-            const Link U = arg.improved ? arg.U(d, gauge_idx, one_minus_parity) :
-                                          arg.U(d, gauge_idx, one_minus_parity, StaggeredPhase(coord, d, -1, arg));
+            const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
+                                          arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
 #endif
 #pragma unroll
             for (auto s = 0; s < n_src_tile; s++) {
@@ -285,7 +259,7 @@ namespace quda
 #ifdef QUDA_DSLASH_DOUBLE_STORE
           const Link L = arg.Lback(d, coord.x_cb, parity);
 #else
-          const Link L = arg.L.Ghost(d, ghost_idx, one_minus_parity);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
 #endif
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
@@ -302,7 +276,7 @@ namespace quda
             const Link L = arg.Lback(d, coord.x_cb, parity);
 #else
             const int gauge_idx = back3_idx;
-            const Link L = arg.L(d, gauge_idx, one_minus_parity);
+            const Link L = arg.L(d, gauge_idx, 1 - parity);
 #endif
 #pragma unroll
             for (auto s = 0; s < n_src_tile; s++) {
@@ -333,22 +307,17 @@ namespace quda
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
-      int my_spinor_parity = arg.nParity == 2 ? parity : 0;
-      // Convert to parity mask for optimized indexing if enabled
-      int parity_for_load = Arg::use_parity_mask ? -parity : parity;
-      int my_spinor_parity_for_load = Arg::use_parity_mask ? -my_spinor_parity : my_spinor_parity;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
 
       array<Vector, n_src_tile> out;
       if (arg.dd_out.isZero(coord)) {
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active)
 #pragma unroll
-          for (auto s = 0; s < n_src_tile; s++) {
-            arg.out[src_idx + s](coord.x_cb, my_spinor_parity_for_load) = out[s];
-          }
+          for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity) = out[s]; }
         return;
       }
 
-      applyStaggered<mykernel_type, n_src_tile>(out, arg, coord, parity_for_load, idx, thread_dim, active, src_idx);
+      applyStaggered<mykernel_type, n_src_tile>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
 #pragma unroll
       for (auto s = 0; s < n_src_tile; s++) out[s] *= arg.dagger_scale;
@@ -358,19 +327,19 @@ namespace quda
       } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
-          Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity_for_load);
+          Vector x = arg.x[src_idx + s](coord.x_cb, my_spinor_parity);
           out[s] = axpy(arg.a, x, -out[s]);
         }
       } else if (mykernel_type != INTERIOR_KERNEL) {
 #pragma unroll
         for (auto s = 0; s < n_src_tile; s++) {
-          Vector x = arg.out[src_idx + s](coord.x_cb, my_spinor_parity_for_load);
+          Vector x = arg.out[src_idx + s](coord.x_cb, my_spinor_parity);
           out[s] = xpay ? x - out[s] : x + out[s];
         }
       }
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) {
 #pragma unroll
-        for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity_for_load) = out[s]; }
+        for (auto s = 0; s < n_src_tile; s++) { arg.out[src_idx + s](coord.x_cb, my_spinor_parity) = out[s]; }
       }
     }
 

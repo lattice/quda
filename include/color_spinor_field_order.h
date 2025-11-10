@@ -971,8 +971,7 @@ namespace quda
       }
     };
 
-    template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false,
-              bool disable_ghost = false, bool use_parity_mask = false>
+    template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false, bool disable_ghost = false>
     struct GhostNOrder {
       GhostNOrder() = default;
       GhostNOrder(const GhostNOrder &) = default;
@@ -980,15 +979,15 @@ namespace quda
       GhostNOrder &operator=(const GhostNOrder &) = default;
     };
 
-    template <typename Float, int Ns, int Nc, bool spin_project, bool huge_alloc, bool use_parity_mask>
-    struct GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, false, use_parity_mask> {
+    template <typename Float, int Ns, int Nc, bool spin_project, bool huge_alloc>
+    struct GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, false> {
       static constexpr int length = 2 * Ns * Nc;
       static constexpr int length_ghost = spin_project ? length / 2 : length;
       // if spin projecting, check that short vector length is compatible, if not halve the vector length
       static constexpr int N = colorspinor::get_vector_order<Float>(length_ghost);
       static constexpr int M = length_ghost / N;
       static constexpr int Nrem = length_ghost - M * N;
-      using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, false, use_parity_mask>;
+      using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using norm_type = float;
@@ -1026,21 +1025,20 @@ namespace quda
       __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
       {
         real v[length_ghost];
-        const auto parity_offset = use_parity_mask ? (parity & faceVolumeCB[dim]) : (parity * faceVolumeCB[dim]);
         norm_type nrm
-          = isFixed<Float>::value ? vector_load<float, 1>(ghost_norm[2 * dim + dir], parity_offset + x)[0] : 0.0;
+          = isFixed<Float>::value ? vector_load<float, 1>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x)[0] : 0.0;
         norm_type nrm_shift = -nrm * 12582912.0f;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          auto vecTmp
-            = vector_load<Float, N>(ghost[2 * dim + dir] + parity_offset * length_ghost, i * faceVolumeCB[dim] + x);
+          auto vecTmp = vector_load<Float, N>(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost,
+                                              i * faceVolumeCB[dim] + x);
           copy_and_scale(v + i * N, vecTmp, nrm, nrm_shift);
         }
 
         if constexpr (Nrem > 0) { // now load any remainder
           auto vecTmp = vector_load<Float, Nrem>(
-            ghost[2 * dim + dir] + parity_offset * length_ghost + faceVolumeCB[dim] * M * N, x);
+            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost + faceVolumeCB[dim] * M * N, x);
           copy_and_scale(v + M * N, vecTmp, nrm, nrm_shift);
         }
 
@@ -1058,7 +1056,6 @@ namespace quda
           v[2 * i + 1] = in[i].imag();
         }
 
-        const auto parity_offset = use_parity_mask ? (parity & faceVolumeCB[dim]) : (parity * faceVolumeCB[dim]);
         norm_type scale = 0.0;
         norm_type scale_inv = 0.0;
         if constexpr (isFixed<Float>::value) {
@@ -1069,7 +1066,7 @@ namespace quda
             max_[i] = fmaxf((norm_type)fabsf((norm_type)v[i]), (norm_type)fabsf((norm_type)v[i + length_ghost / 2]));
 #pragma unroll
           for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
-          ghost_norm[2 * dim + dir][parity_offset + x] = scale * fixedInvMaxValue<Float>::value;
+          ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale * fixedInvMaxValue<Float>::value;
           scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
         }
 
@@ -1079,14 +1076,15 @@ namespace quda
           // first do scalar copy converting into storage type
           copy_and_scale<Float, real, N>(vecTmp, v + i * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(ghost[2 * dim + dir] + parity_offset * length_ghost, i * faceVolumeCB[dim] + x, vecTmp);
+          vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost, i * faceVolumeCB[dim] + x,
+                       vecTmp);
         }
 
         if constexpr (Nrem > 0) { // now load any remainder
           array<Float, Nrem> vecTmp;
           copy_and_scale<Float, real, Nrem>(vecTmp, v + M * N, scale_inv);
-          vector_store<Float, Nrem>(ghost[2 * dim + dir] + parity_offset * length_ghost + faceVolumeCB[dim] * M * N, x,
-                                    vecTmp);
+          vector_store<Float, Nrem>(
+            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost + faceVolumeCB[dim] * M * N, x, vecTmp);
         }
       }
 
@@ -1118,15 +1116,14 @@ namespace quda
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false,
-              bool disable_ghost = false, bool use_parity_mask = false>
-    struct FloatNOrder : GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost, use_parity_mask> {
+    template <typename Float, int Ns, int Nc, bool spin_project = false, bool huge_alloc = false, bool disable_ghost = false>
+    struct FloatNOrder : GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost> {
       static constexpr int length = 2 * Ns * Nc;
       static constexpr int N = colorspinor::get_vector_order<Float>(length);
       static constexpr int M = length / N;
       static constexpr int Nrem = length - M * N;
-      using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost, use_parity_mask>;
-      using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost, use_parity_mask>;
+      using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
+      using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using AllocInt = typename AllocType<huge_alloc>::type;
@@ -1168,22 +1165,20 @@ namespace quda
         auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
         auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns)); // FIXME - optimize 64-bit indexing here
 #endif
-        const auto parity_norm_offset = use_parity_mask ? (parity & norm_offset) : (parity * norm_offset);
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
-        norm_type nrm = isFixed<Float>::value ? vector_load<float, 1>(norm, x + parity_norm_offset)[0] : 0.0;
+        norm_type nrm = isFixed<Float>::value ? vector_load<float, 1>(norm, x + parity * norm_offset)[0] : 0.0;
         norm_type nrm_shift = -nrm * 12582912.0f;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          auto vecTmp = vector_load<Float, N>(field, parity_offset, volumeCB * i + x);
+          auto vecTmp = vector_load<Float, N>(field, parity * offset, volumeCB * i + x);
           // now copy into output and scale
           copy_and_scale(v + i * N, vecTmp, nrm, nrm_shift);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
-          auto vecTmp = vector_load<Float, Nrem>(field, parity_offset + volumeCB * M * N, x);
+          auto vecTmp = vector_load<Float, Nrem>(field, parity * offset + volumeCB * M * N, x);
           copy_and_scale(v + M * N, vecTmp, nrm, nrm_shift);
         }
 
@@ -1197,15 +1192,13 @@ namespace quda
         auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
         auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
 #endif
-        const auto parity_norm_offset = use_parity_mask ? (parity & norm_offset) : (parity * norm_offset);
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
-        if constexpr (isFixed<Float>::value) prefetch_cache_line(norm + (x + parity_norm_offset));
+        if constexpr (isFixed<Float>::value) prefetch_cache_line(norm + (x + parity * norm_offset));
 
 #pragma unroll
-        for (int i = 0; i < M; i++) prefetch_cache_line(field + (parity_offset + (volumeCB * i + x) * N));
+        for (int i = 0; i < M; i++) prefetch_cache_line(field + (parity * offset + (volumeCB * i + x) * N));
 
         // now load any remainder
-        if constexpr (Nrem > 0) prefetch_cache_line(field + (parity_offset + volumeCB * M * N + x * Nrem));
+        if constexpr (Nrem > 0) prefetch_cache_line(field + (parity * offset + volumeCB * M * N + x * Nrem));
       }
 
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
@@ -1221,8 +1214,6 @@ namespace quda
           v[2 * i + 1] = in[i].imag();
         }
 
-        const auto parity_norm_offset = use_parity_mask ? (parity & norm_offset) : (parity * norm_offset);
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
         norm_type scale = 0.0;
         norm_type scale_inv = 0.0;
         if constexpr (isFixed<Float>::value) {
@@ -1233,7 +1224,7 @@ namespace quda
             max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-          norm[x + parity_norm_offset] = scale * fixedInvMaxValue<Float>::value;
+          norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
           scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
         }
 
@@ -1243,14 +1234,14 @@ namespace quda
           // first do scalar copy converting into storage type
           copy_and_scale<Float, real, N>(vecTmp, v + i * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(field, parity_offset, volumeCB * i + x, vecTmp);
+          vector_store(field, parity * offset, volumeCB * i + x, vecTmp);
         }
 
         if constexpr (Nrem > 0) {
           array<Float, Nrem> vecTmp;
           copy_and_scale<Float, real, Nrem>(vecTmp, v + M * N, scale_inv);
           // second do vectorized copy into memory
-          vector_store(field, parity_offset + volumeCB * M * N, x, vecTmp);
+          vector_store(field, parity * offset + volumeCB * M * N, x, vecTmp);
         }
       }
 
@@ -1271,13 +1262,12 @@ namespace quda
       size_t Bytes() const { return offset * 2ll * sizeof(Float) * N; }
     };
 
-    template <bool spin_project, bool huge_alloc, bool use_parity_mask>
-    struct GhostNOrder<short, 1, 3, spin_project, huge_alloc, false, use_parity_mask> {
+    template <bool spin_project, bool huge_alloc> struct GhostNOrder<short, 1, 3, spin_project, huge_alloc, false> {
       using Float = short;
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
       static constexpr int length_ghost = 2 * Ns * Nc;
-      using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, false, use_parity_mask>;
+      using Accessor = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using norm_type = float;
@@ -1308,8 +1298,7 @@ namespace quda
       __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
       {
         real v[length_ghost];
-        const auto parity_offset = use_parity_mask ? (parity & faceVolumeCB[dim]) : (parity * faceVolumeCB[dim]);
-        auto vecTmp = vector_load<Float, 8>(ghost[2 * dim + dir], parity_offset + x);
+        auto vecTmp = vector_load<Float, 8>(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
 
         // extract the norm
         norm_type nrm;
@@ -1353,8 +1342,7 @@ namespace quda
         array<Float, 6> vecTmp2;
         copy_and_scale<Float, real, 6>(vecTmp2, v, scale_inv);
         memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
-        const auto parity_offset = use_parity_mask ? (parity & faceVolumeCB[dim]) : (parity * faceVolumeCB[dim]);
-        vector_store(ghost[2 * dim + dir], parity_offset + x, vecTmp);
+        vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
 
       /**
@@ -1384,15 +1372,15 @@ namespace quda
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <bool spin_project, bool huge_alloc, bool disable_ghost, bool use_parity_mask>
-    struct FloatNOrder<short, 1, 3, spin_project, huge_alloc, disable_ghost, use_parity_mask>
-      : GhostNOrder<short, 1, 3, spin_project, huge_alloc, disable_ghost, use_parity_mask> {
+    template <bool spin_project, bool huge_alloc, bool disable_ghost>
+    struct FloatNOrder<short, 1, 3, spin_project, huge_alloc, disable_ghost>
+      : GhostNOrder<short, 1, 3, spin_project, huge_alloc, disable_ghost> {
       using Float = short;
       static constexpr int Ns = 1;
       static constexpr int Nc = 3;
       static constexpr int length = 2 * Ns * Nc;
-      using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost, use_parity_mask>;
-      using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost, use_parity_mask>;
+      using Accessor = FloatNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
+      using GhostNOrder = GhostNOrder<Float, Ns, Nc, spin_project, huge_alloc, disable_ghost>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using AllocInt = typename AllocType<huge_alloc>::type;
@@ -1417,8 +1405,7 @@ namespace quda
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
         real v[length];
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
-        auto vecTmp = vector_load<Float, 8>(field, parity_offset + x);
+        auto vecTmp = vector_load<Float, 8>(field, parity * offset + x);
 
         // extract the norm
         norm_type nrm;
@@ -1463,8 +1450,7 @@ namespace quda
         copy_and_scale<Float, real, 6>(vecTmp2, v, scale_inv);
         memcpy(&vecTmp, &vecTmp2, sizeof(vecTmp2));
 
-        const auto parity_offset = use_parity_mask ? (parity & offset) : (parity * offset);
-        vector_store(field, parity_offset + x, vecTmp);
+        vector_store(field, parity * offset + x, vecTmp);
       }
 
       /**
@@ -1797,10 +1783,9 @@ namespace quda
 
   } // namespace colorspinor
 
-  template <typename T, int Ns, int Nc, bool project = false, bool huge_alloc = false, bool disable_ghost = false,
-            bool use_parity_mask = false>
+  template <typename T, int Ns, int Nc, bool project = false, bool huge_alloc = false, bool disable_ghost = false>
   struct colorspinor_mapper {
-    typedef colorspinor::FloatNOrder<T, Ns, Nc, project, huge_alloc, disable_ghost, use_parity_mask> type;
+    typedef colorspinor::FloatNOrder<T, Ns, Nc, project, huge_alloc, disable_ghost> type;
   };
 
   template <typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper {
