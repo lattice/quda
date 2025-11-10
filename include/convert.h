@@ -60,6 +60,14 @@ namespace quda
     }
   };
 
+  template <bool is_device> struct i2f_fma {
+    template <typename T> constexpr float operator()(int a, T, float b, float) { return static_cast<float>(a) * b; }
+    template <typename T> constexpr float2 operator()(int a1, int a2, T, float b, float)
+    {
+      return mul2(float2 {static_cast<float>(a1), static_cast<float>(a2)}, float2 {b, b});
+    }
+  };
+
   /**
      @brief This is a LUT which is used to determine whether a given
      int-to-float conversion in a array of numbers to be converted
@@ -112,6 +120,38 @@ namespace quda
         float2 f;
         memcpy(&f, &i, sizeof(int2));
         return add2(f, {-12582912.0f, -12582912.0f});
+      }
+    }
+  };
+
+  template <> struct i2f_fma<true> {
+    template <typename T, typename alternative_t>
+    __device__ std::enable_if_t<std::is_same_v<alternative_t, std::integral_constant<bool, alternative_t::value>>, float>
+    operator()(T a, alternative_t, float b, float c)
+    {
+      if constexpr (!alternative_t::value) {
+        return b * static_cast<float>(a);
+      } else {
+        // will work for up to 23-bit int
+        int32_t i = a + 0x4B400000;
+        float f;
+        memcpy(&f, &i, sizeof(int32_t));
+        return b * f + c;
+      }
+    }
+
+    template <typename T, typename alternative_t>
+    __device__ std::enable_if_t<std::is_same_v<alternative_t, std::integral_constant<bool, alternative_t::value>>, float2>
+    operator()(const T &a1, const T &a2, alternative_t, float b, float c)
+    {
+      if constexpr (!alternative_t::value) {
+        return mul2(float2 {b, b}, float2 {static_cast<float>(a1), static_cast<float>(a2)});
+      } else {
+        // will work for up to 23-bit int
+        int2 i = {a1 + 0x4B400000, a2 + 0x4B400000};
+        float2 f;
+        memcpy(&f, &i, sizeof(int2));
+        return fma2({b, b}, f, {c, c});
       }
     }
   };
@@ -282,6 +322,52 @@ namespace quda
     static_assert(n % 2 == 0);
     constexpr_for<0, n, 2>([&](auto i) {
       auto ai = target::dispatch<f2i>(float2 {(float)b[i + 0], (float)b[i + 1]}, c);
+      a[i + 0] = ai.x;
+      a[i + 1] = ai.y;
+    });
+  }
+
+  /**
+     @brief Specialized variants of the copy_and_scale that passes the
+     alternative i2f constant to be subtracted (this allows for
+     optimal FMA issuance).  Note the scale factors are ignored unless
+     the input type (b) is either a short or char vector.
+  */
+  template <typename T1, typename T2, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b,
+                                                                                              const T3 &, const T3 &)
+  {
+    copy(a, b);
+  }
+
+  template <typename T1, typename T2, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b,
+                                                                                             const T3 &c, const T3 &d)
+  {
+    a = target::dispatch<i2f_fma>(b, std::integral_constant<bool, i2f_i[0]>(), c, d);
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void>
+  copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &, const T3 &)
+  {
+    for (int i = 0; i < n; i++) copy(a[i], b[i]);
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void>
+  copy_and_scale(array<T1, n> &a, const T2 *b, const T3 &, const T3 &)
+  {
+    for (int i = 0; i < n; i++) copy(a[i], b[i]);
+  }
+
+  template <typename T1, typename T2, int n, typename T3>
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void>
+  copy_and_scale(T1 *a, const array<T2, n> &b, const T3 &c, const T3 &d)
+  {
+    static_assert(n % 2 == 0);
+    constexpr_for<0, n, 2>([&](auto i) {
+      auto ai = target::dispatch<i2f_fma>(b[i + 0], b[i + 1], std::integral_constant<bool, i2f_i[(i / 2) % 4]>(), c, d);
       a[i + 0] = ai.x;
       a[i + 1] = ai.y;
     });
