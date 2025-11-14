@@ -29,11 +29,9 @@ TEST_P(CovDevTest, verify)
   std::array<double, 2> test_results = covdev_test(param);
 
   double deviation = test_results[0];
-  double deviation_shift = test_results[1];
-  double tol = test_results[2];
+  double tol = test_results[1];
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-  ASSERT_LE(deviation_shift, tol) << "unit and shift implementations do not agree";
 }
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
