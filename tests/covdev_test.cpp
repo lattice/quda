@@ -47,7 +47,11 @@ void init(int argc, char **argv)
 
   // Allocate host side memory for the gauge field.
   for (int dir = 0; dir < 4; dir++) { links[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size); }
-  constructHostGaugeField(links, gauge_param, argc, argv);
+  if (covdev_shift) {
+    constructIdentityGaugeField(links, gauge_param.cpu_prec);
+  } else {
+    constructHostGaugeField(links, gauge_param, argc, argv);
+  }
 
   // cpuLink is only used for ghost allocation
   GaugeFieldParam cpuParam(gauge_param, links);
@@ -61,12 +65,12 @@ void end(void)
   cpuLink = {};
 }
 
-double dslashCUDA(GaugeCovDev &dirac, ColorSpinorField &out, const ColorSpinorField &in, int niter, int mu)
+double dslashCUDA(GaugeCovDev &dirac, ColorSpinorField &out, const ColorSpinorField &in, int niter)
 {
   device_timer_t timer;
   timer.start();
 
-  for (int i = 0; i < niter; i++) dirac.MCD(out, in, mu);
+  for (int i = 0; i < niter; i++) dirac.M(out, in);
 
   timer.stop();
   return timer.last();
@@ -85,6 +89,7 @@ std::array<double, 2> covdev_test(test_t param)
   QudaPrecision test_prec = ::testing::get<0>(param);
   QudaDagType test_dagger = ::testing::get<1>(param);
   int mu = ::testing::get<2>(param);
+  bool shift = ::testing::get<3>(param);
 
   printfQuda("Links sending...");
   gauge_param.cuda_prec = test_prec;
@@ -100,6 +105,10 @@ std::array<double, 2> covdev_test(test_t param)
   inv_param.cuda_prec = test_prec;
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
   inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  inv_param.covdev_nspin = test_type == 0 ? 4 : 1;
+  inv_param.covdev_mu = mu + (test_dagger ? 4 : 0);
+  inv_param.covdev_shift = shift;
 
   ColorSpinorParam csParam;
   csParam.nColor = nColor;
@@ -153,12 +162,12 @@ std::array<double, 2> covdev_test(test_t param)
 
   { // warm-up run
     printfQuda("Tuning...\n");
-    dslashCUDA(dirac, cudaSpinorOut, cudaSpinor, 1, muQuda);
+    dslashCUDA(dirac, cudaSpinorOut, cudaSpinor, 1);
   }
   printfQuda("Executing %d kernel loop(s)...", niter);
 
   auto flops0 = quda::Tunable::flops_global();
-  double secs = dslashCUDA(dirac, cudaSpinorOut, cudaSpinor, niter, muQuda);
+  double secs = dslashCUDA(dirac, cudaSpinorOut, cudaSpinor, niter);
   auto flops = (quda::Tunable::flops_global() - flops0);
 
   spinorOut = cudaSpinorOut;
@@ -206,7 +215,7 @@ int main(int argc, char **argv)
   if (enable_testing) { // tests are defined in invert_test_gtest.hpp
     result = test.execute();
   } else { //
-    covdev_test(test_t {prec, dagger ? QUDA_DAG_YES : QUDA_DAG_NO, covdev_mu});
+    covdev_test(test_t {prec, dagger ? QUDA_DAG_YES : QUDA_DAG_NO, covdev_mu, covdev_shift});
   }
 
   end();

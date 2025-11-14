@@ -78,7 +78,11 @@ namespace quda {
   void GaugeCovDev::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                            QudaParity parity) const
   {
-    DslashCD(out, in, parity, covdev_mu);
+    if (covdev_shift) {
+      DslashS(out, in, parity, covdev_mu);
+    } else {
+      DslashCD(out, in, parity, covdev_mu);
+    }
   }
 
   void GaugeCovDev::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
