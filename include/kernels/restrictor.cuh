@@ -32,11 +32,9 @@ namespace quda {
     static constexpr bool from_non_rel = from_non_rel_;
 
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<real, fineSpin, fineColor, 1, colorspinor::getNative<in_t>(fineSpin), in_t, in_t, true,
-                           isFixed<in_t>::value>;
-    using C
-      = FieldOrderCB<real, coarseSpin, coarseColor, 1, colorspinor::getNative<out_t>(coarseSpin), out_t, out_t, true>;
-    using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, colorspinor::getNative<v_t>(fineSpin), v_t>;
+    using F = FieldOrderCB<real, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, in_t, in_t, true, isFixed<in_t>::value>;
+    using C = FieldOrderCB<real, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, out_t, out_t, true>;
+    using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, v_t>;
 
     const int_fastdiv n_src;
     C out[MAX_MULTI_RHS];
@@ -125,11 +123,20 @@ namespace quda {
     }
   }
 
-  template <typename Arg> struct Restrictor {
+  template <typename Arg> struct RestrictorParams {
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
+    static constexpr int block_dim = 1;
+    using BlockReduce_t = BlockReduce<vector, block_dim, Arg::n_vector_z>;
+  };
+  template <typename Arg> struct Restrictor : KernelOps<typename RestrictorParams<Arg>::BlockReduce_t> {
+    static constexpr int coarse_color_per_thread = RestrictorParams<Arg>::coarse_color_per_thread;
+    using vector = typename RestrictorParams<Arg>::vector;
+    using BlockReduce_t = typename RestrictorParams<Arg>::BlockReduce_t;
     const Arg &arg;
-    constexpr Restrictor(const Arg &arg) : arg(arg) {}
+    using typename KernelOps<BlockReduce_t>::KernelOpsT;
+    template <typename... Ops>
+    constexpr Restrictor(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)
@@ -174,8 +181,7 @@ namespace quda {
         x_fine_offset += target::block_dim().x;
       }
 
-      constexpr int block_dim = 1;
-      reduced = BlockReduce<vector, block_dim, Arg::n_vector_z>(thread.z).Sum(reduced);
+      reduced = BlockReduce_t(*this, thread.z).Sum(reduced);
 
       if (target::thread_idx().x == 0) {
         const int parity_coarse = x_coarse >= arg.out[src_idx].VolumeCB() ? 1 : 0;
@@ -192,5 +198,4 @@ namespace quda {
       }
     }
   };
-
 }

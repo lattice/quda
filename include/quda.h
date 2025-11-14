@@ -72,6 +72,7 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
+    int use_split_gauge_bkup; /**< Used by gauge split buffers (default=true keep split gauge after usage)*/
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
@@ -468,6 +469,9 @@ extern "C" {
     double distance_pc_alpha0;
     /** The t0 parameter for distance preconditioning, the timeslice where the source is located */
     int distance_pc_t0;
+
+    /** Additional user-defined properties */
+    void *additional_prop;
 
   } QudaInvertParam;
 
@@ -1029,7 +1033,7 @@ extern "C" {
    * initQuda.  Calling initQudaMemory requires that the user has
    * previously called initQudaDevice.
    */
-  void initQudaMemory();
+  void initQudaMemory(void);
 
   /**
    * Initialize the library.  This function is actually a wrapper
@@ -1052,7 +1056,7 @@ extern "C" {
    * @details This should only be needed for automated testing when
    * different partitioning is applied within a single run.
    */
-  void updateR();
+  void updateR(void);
 
   /**
    * A new QudaGaugeParam should always be initialized immediately
@@ -1914,7 +1918,7 @@ extern "C" {
   void flushPoolQuda(QudaMemoryType type);
 
   void setMPICommHandleQuda(void *mycomm);
-  
+
   // Parameter set for quark smearing operations
   typedef struct QudaQuarkSmearParam_s {
     //-------------------------------------------------

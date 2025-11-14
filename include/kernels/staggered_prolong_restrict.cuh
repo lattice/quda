@@ -85,8 +85,8 @@ namespace quda {
     static constexpr int inSpin = StaggeredTransferInSpin<fineSpin,coarseSpin,theTransferType>::inSpin;
     static constexpr int outColor = StaggeredTransferOutColor<fineColor,coarseColor,theTransferType>::outColor;
     static constexpr int inColor = StaggeredTransferInColor<fineColor,coarseColor,theTransferType>::inColor;
-    static constexpr QudaFieldOrder outOrder = native ? colorspinor::getNative<Float>(outSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    static constexpr QudaFieldOrder inOrder = native ? colorspinor::getNative<Float>(inSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaFieldOrder outOrder = native ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaFieldOrder inOrder = native ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     FieldOrderCB<Float, outSpin, outColor, 1, outOrder> out;
     const FieldOrderCB<Float, inSpin, inColor, 1, inOrder> in;

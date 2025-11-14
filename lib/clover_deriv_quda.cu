@@ -13,7 +13,6 @@ namespace quda {
     const GaugeField &oprod;
     double coeff;
     unsigned int minThreads() const override { return gauge.LocalVolumeCB(); }
-    unsigned int sharedBytesPerThread() const override { return 4 * sizeof(int); } // for thread_array
 
   public:
     DerivativeClover(const GaugeField &gauge, GaugeField &force, const GaugeField &oprod, double coeff) :

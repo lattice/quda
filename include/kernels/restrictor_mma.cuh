@@ -89,7 +89,7 @@ namespace quda
   };
 
   template <int contiguous_dim, int contiguous_limit, int elements_per_thread, class gmem_obj_t, class Arg, class Op>
-  __device__ inline void loop_over(const gmem_obj_t &gmem, int x_coarse, int coarse_spin, int contiguous_dim_offset,
+  __device__ inline void loop_over(const gmem_obj_t &gmem, int, int coarse_spin, int contiguous_dim_offset,
                                    int aggregate_k_offset, int *coarse_to_fine, const Arg &arg, Op op)
   {
     int thread = target::thread_idx().y + Arg::block_y * target::thread_idx().z;
@@ -174,7 +174,11 @@ namespace quda
       // block all-reduce thread_max
       using block_reduce_t = cub::BlockReduce<float, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, Arg::block_y, Arg::block_z>;
       __shared__ typename block_reduce_t::TempStorage temp_storage;
-      float block_max = block_reduce_t(temp_storage).Reduce(thread_max, cub::Max());
+#if CUDA_VERSION >= 12090
+      float block_max = block_reduce_t(temp_storage).Reduce(thread_max, ::cuda::maximum());
+#else
+      float block_max = block_reduce_t(temp_storage).Reduce(thread_max, ::cub::Max());
+#endif
 
       __shared__ float block_max_all;
       if (threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) == 0) {

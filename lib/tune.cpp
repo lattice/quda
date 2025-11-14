@@ -141,8 +141,10 @@ namespace quda
   /** tuning in progress? */
   static bool tuning = false;
   static bool candidatetuning = true;
+  static bool warmup_tuning = false;
 
   bool activeTuning() { return tuning; }
+  bool activeTuningWarmup() { return warmup_tuning; }
 
   static bool profile_count = true;
 
@@ -208,8 +210,8 @@ namespace quda
       if (check < 0 || check >= key.name_n) errorQuda("Error writing name string (check=%d)", check);
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
       if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string (check=%d)", check);
-      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y
-        >> param.aux.z >> param.aux.w >> param.time;
+      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.shared_carve_out >> param.aux.x
+        >> param.aux.y >> param.aux.z >> param.aux.w >> param.time;
       ls.ignore(1);               // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
       param.comment += "\n";      // our convention is to include the newline, since ctime() likes to do this
@@ -231,8 +233,8 @@ namespace quda
       out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t"
-          << param.aux.w << "\t";
+      out << param.shared_bytes << "\t" << param.shared_carve_out << "\t";
+      out << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t" << param.aux.w << "\t";
       out << param.time << "\t" << param.comment; // param.comment ends with a newline
     }
   }
@@ -518,7 +520,8 @@ namespace quda
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << std::setw(16) << "volume"
-                 << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux."
+                 << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tshared_carve_"
+                    "out\taux.x\taux.y\taux."
                     "z\taux.w\ttime\tcomment"
                  << std::endl;
       serializeTuneCache(cache_file);
@@ -704,7 +707,7 @@ namespace quda
   {
     output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
     output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    output << "shared_bytes=" << param.shared_bytes;
+    output << "shared_bytes=" << param.shared_bytes << ", shared_carve_out=" << param.shared_carve_out;
     output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
     return output;
   }
@@ -722,6 +725,71 @@ namespace quda
       init = true;
     }
     return tune_shared;
+  }
+
+  bool Tunable::tuneSharedCarveOut() const
+  {
+    // if carve out tuning is not supported then just return false
+    if (!device::shared_carve_out_supported()) return false;
+
+    static bool tune_carve_out = false; // default is not to do carve out tuning
+    static bool init = false;
+
+    if (!init) {
+      char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED_CARVE_OUT");
+      if (enable_shared_env) {
+        if (strcmp(enable_shared_env, "1") == 0) { tune_carve_out = true; }
+      }
+      init = true;
+    }
+    return tune_carve_out;
+  }
+
+  static std::string carve_out_step_str;
+  static int carve_out_step = 25; // default is 25% increment
+
+  void set_carve_out_step()
+  {
+    static bool init = false;
+
+    if (!init) {
+      char *carve_out_step_env = getenv("QUDA_TUNING_SHARED_CARVE_OUT_STEP");
+      if (carve_out_step_env) {
+        carve_out_step = atoi(carve_out_step_env);
+        if (carve_out_step <= 0 || carve_out_step > 100)
+          errorQuda("Invalid shared carve-out step size %d", carve_out_step);
+      }
+      init = true;
+
+      carve_out_step_str = std::string(",carve_out,step=") + std::to_string(carve_out_step);
+    }
+  }
+
+  int Tunable::sharedCarveOutStep() const
+  {
+    set_carve_out_step();
+    return carve_out_step;
+  }
+
+  std::string Tunable::getSharedCarveOutStr() const
+  {
+    set_carve_out_step();
+    return carve_out_step_str;
+  }
+
+  bool Tunable::advanceSharedCarveOut(TuneParam &param) const
+  {
+    if (tuneSharedCarveOut()) {
+      if (param.shared_carve_out < 100) {
+        param.shared_carve_out = std::min(param.shared_carve_out + sharedCarveOutStep(), 100);
+        return true;
+      } else {
+        param.shared_carve_out = 0;
+        return false;
+      }
+    } else {
+      return false;
+    }
   }
 
   int Tunable::blockStep() const { return device::warp_size(); }
@@ -791,8 +859,8 @@ namespace quda
    *
    */
 
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, aux, comment, time,
-                                     n_calls)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, shared_carve_out, aux,
+                                     comment, time, n_calls)
 
   class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
   {
@@ -888,6 +956,10 @@ namespace quda
     float getBestTime() const { return besttime; }
   };
 
+  static TuneParam last_tune_param = {};
+
+  TuneParam getLastTuneParam() { return last_tune_param; }
+
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
@@ -951,6 +1023,7 @@ namespace quda
         Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       }
       popVerbosity();
+      last_tune_param = param_tuned;
       return param_tuned;
     }
 
@@ -975,6 +1048,7 @@ namespace quda
         Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
         Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       }
+      last_tune_param = param_default;
       popVerbosity();
       return param_default;
     } else if (!tuning) {
@@ -1026,14 +1100,16 @@ namespace quda
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          logQuda(QUDA_DEBUG_VERBOSE,
-                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                  static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
-                  static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
-                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
-                  static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
+          logQuda(
+            QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d shared_carve_out=%d aux=(%d,%d,%d,%d)\n",
+            static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
+            static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+            static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x),
+            static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
+          warmup_tuning = true;
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
+          warmup_tuning = false;
 
           timer.start();
           for (int i = 0; i < candidate_iterations; i++) {
@@ -1086,12 +1162,12 @@ namespace quda
           param = tc.top();
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          logQuda(QUDA_DEBUG_VERBOSE,
-                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                  static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
-                  static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
-                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
-                  static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
+          logQuda(
+            QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d shared_carve_out=%d aux=(%d,%d,%d,%d)\n",
+            static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
+            static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+            static_cast<int>(param.shared_bytes), param.shared_carve_out, static_cast<int>(param.aux.x),
+            static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
@@ -1194,6 +1270,7 @@ namespace quda
       Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
     }
 
+    last_tune_param = param;
     popVerbosity();
     return param;
   }

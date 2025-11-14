@@ -301,6 +301,7 @@ extern int &ydim;
 extern int &zdim;
 extern int &tdim;
 extern int Lsdim;
+extern int use_split_gauge_bkup;
 extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
@@ -605,4 +606,4 @@ extern bool enable_testing;
 
 extern bool detratio;
 
-extern std::array<int, 4> covdev_mu;
+extern int covdev_mu;

@@ -102,7 +102,7 @@ namespace quda
         int n = (mn % t_n) * Arg::bN;
         int m = (mn / t_n) * Arg::bM;
 
-        if (x_cb >= arg.Y.VolumeCB()) return;
+        if (static_cast<unsigned>(x_cb) >= arg.Y.VolumeCB()) return;
 
         int parity = blockIdx.y;
         int d = blockIdx.z;
@@ -117,7 +117,8 @@ namespace quda
         }
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
-          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
+          KernelOps<BlockReduce<unsigned, block_dim>> ops {};
+          unsigned aggregate = BlockReduce<unsigned, block_dim> {ops}.Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }

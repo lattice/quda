@@ -101,7 +101,7 @@ set (QUDA_OBJS
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
-  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp milc_interface_internal.cpp
+  unitarize_force_quda.cu unitarize_links_quda.cu openqcd_interface.cpp milc_interface.cpp milc_interface_internal.cpp
   tune.cpp
   device_vector.cu
   inv_gmresdr_quda.cpp
@@ -165,7 +165,7 @@ if(QUDA_DIRAC_STAGGERED)
   list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_staggered")
   list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_improved_staggered")
 endif()
-if(QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_TWISTED_CLOVER)
+if(QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_CLOVER_HASENBUSCH)
   list(APPEND QUDA_DSLASH_FILENAME_LIST "dslash_domain_wall_4d")
 endif()
 if(QUDA_DIRAC_DOMAIN_WALL)
@@ -456,6 +456,58 @@ if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
 
+# order variables will be set in the target file
+set(VALID_ORDER_DOUBLE_VALUES "0" "2" "4")
+set(VALID_ORDER_SINGLE_VALUES "0" "2" "4" "8")
+set(VALID_ORDER_HALF_VALUES "0" "2" "4" "8" "16")
+set(VALID_ORDER_QUARTER_VALUES "0" "2" "4" "8" "16")
+
+if(NOT QUDA_ORDER_DOUBLE IN_LIST VALID_ORDER_DOUBLE_VALUES)
+  message(FATAL_ERROR  "Invalid value for QUDA_ORDER_DOUBLE: '${QUDA_ORDER_DOUBLE}'\n"
+                       "Valid values are: ${VALID_ORDER_DOUBLE_VALUES}")
+endif()
+
+if(NOT QUDA_ORDER_SINGLE IN_LIST VALID_ORDER_SINGLE_VALUES)
+  message(FATAL_ERROR "Invalid value for QUDA_ORDER_SINGLE: '${QUDA_ORDER_SINGLE}'\n"
+                      "Valid values are: ${VALID_ORDER_SINGLE_VALUES}")
+endif()
+
+if(NOT QUDA_ORDER_HALF IN_LIST VALID_ORDER_HALF_VALUES)
+  message(FATAL_ERROR "Invalid value for QUDA_ORDER_HALF: '${QUDA_ORDER_HALF}'\n"
+                      "Valid values are: ${VALID_ORDER_HALF_VALUES}")
+endif()
+
+if(NOT QUDA_ORDER_QUARTER IN_LIST VALID_ORDER_QUARTER_VALUES)
+  message(FATAL_ERROR "Invalid value for QUDA_ORDER_QUARTER: '${QUDA_ORDER_QUARTER}'\n"
+                      "Valid values are: ${VALID_ORDER_QUARTER_VALUES}")
+endif()
+
+set_property(CACHE QUDA_ORDER_DOUBLE PROPERTY STRINGS ${VALID_ORDER_DOUBLE_VALUES})
+set_property(CACHE QUDA_ORDER_SINGLE PROPERTY STRINGS ${VALID_ORDER_SINGLE_VALUES})
+set_property(CACHE QUDA_ORDER_HALF PROPERTY STRINGS ${VALID_ORDER_HALF_VALUES})
+set_property(CACHE QUDA_ORDER_QUARTER PROPERTY STRINGS ${VALID_ORDER_QUARTER_VALUES})
+
+message(STATUS "QUDA_ORDER_DOUBLE: ${QUDA_ORDER_DOUBLE}")
+message(STATUS "QUDA_ORDER_SINGLE: ${QUDA_ORDER_SINGLE}")
+message(STATUS "QUDA_ORDER_HALF: ${QUDA_ORDER_HALF}")
+message(STATUS "QUDA_ORDER_QUARTER: ${QUDA_ORDER_QUARTER}")
+
+mark_as_advanced(QUDA_ORDER_DOUBLE)
+mark_as_advanced(QUDA_ORDER_SINGLE)
+mark_as_advanced(QUDA_ORDER_HALF)
+mark_as_advanced(QUDA_ORDER_QUARTER)
+
+# set the percentage of I2F conversions that use the alternative conversion path (using FFMA)
+set(QUDA_ALTERNATIVE_I_TO_F 0 CACHE STRING "percentage of I2F conversions to use alternative integer-to-float conversion (0, 25, 50, 75, 100)")
+set(VALID_I2F_VALUES "0" "25" "50" "75" "100")
+if(NOT QUDA_ALTERNATIVE_I_TO_F IN_LIST VALID_I2F_VALUES)
+    message(FATAL_ERROR "Invalid value for QUDA_ALTERNATIVE_I_TO_F: '${QUDA_ALTERNATIVE_I_TO_F}'\n"
+                        "Valid values are: ${VALID_I2F_VALUES}")
+endif()
+set_property(CACHE QUDA_ALTERNATIVE_I_TO_F PROPERTY STRINGS ${VALID_I2F_VALUES})
+message(STATUS "QUDA_ALTERNATIVE_I_TO_F set to: ${QUDA_ALTERNATIVE_I_TO_F}%")
+mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
+
 # Set the maximum multi-RHS per kernel if not already set by the target
 if(NOT DEFINED QUDA_MAX_MULTI_RHS)
   set(QUDA_MAX_MULTI_RHS "16" CACHE STRING "maximum number of simultaneous RHS in a kernel")
@@ -478,7 +530,9 @@ if(NOT QUDA_BACKWARDS)
   endif()
   if(${QUDA_COMPRESS_DEBUG})
     target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
-    target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+    if(NOT ${CMAKE_CUDA_COMPILER} MATCHES "clang")
+      target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+    endif()
   endif()
 endif()
 
@@ -548,6 +602,10 @@ if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
 
+if(QUDA_QCD_PLUS_QED)
+  target_compile_definitions(quda PUBLIC BUILD_QCD_PLUS_QED)
+endif(QUDA_QCD_PLUS_QED)
+
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
 endif(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
@@ -571,6 +629,10 @@ endif(QUDA_INTERFACE_BQCD OR QUDA_INTERFACE_ALL)
 if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
+
+if(QUDA_INTERFACE_OPENQCD OR QUDA_INTERFACE_ALL)
+  target_compile_definitions(quda PUBLIC BUILD_OPENQCD_INTERFACE)
+endif(QUDA_INTERFACE_OPENQCD OR QUDA_INTERFACE_ALL)
 
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
@@ -657,10 +719,6 @@ endif()
 
 if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
-endif()
-
-if(QUDA_ALTERNATIVE_I_TO_F)
-  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
 endif()
 
 if(QUDA_BACKWARDS)

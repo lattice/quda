@@ -42,6 +42,18 @@ namespace quda {
     instantiate_recurse2<GammaApply>(out, in, d);
   }
 
+  void ApplyGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaGammaDirection_s dir)
+  {
+    switch (dir) {
+      case QUDA_GAMMA_X: ApplyGamma(out, in, 0); break;
+      case QUDA_GAMMA_Y: ApplyGamma(out, in, 1); break;
+      case QUDA_GAMMA_Z: ApplyGamma(out, in, 2); break;
+      case QUDA_GAMMA_T: ApplyGamma(out, in, 3); break;
+      case QUDA_GAMMA_5: ApplyGamma(out, in, 4); break;
+      default: errorQuda("Unknown gamma: %d\n", dir);
+    }
+  }
+
   // Applies out(x) = 1/2 * [(1 +/- gamma5) * in] + out
   void ApplyChiralProj(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const int proj)
   {

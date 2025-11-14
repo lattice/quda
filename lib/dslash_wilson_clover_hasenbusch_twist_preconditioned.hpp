@@ -34,14 +34,11 @@ namespace quda
       Dslash::setParam(tp);
 
       // specialize here to constrain the template instantiation
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
-        else
-          errorQuda("Operator only defined for xpay=true");
-      } else {
-        errorQuda("Operator not defined nParity=%d", arg.nParity);
-      }
+      if (arg.nParity != 1) errorQuda("Operator not defined nParity=%d", arg.nParity);
+      if (arg.xpay)
+        Dslash::template instantiate<packShmem, true>(tp, stream);
+      else
+        errorQuda("Operator only defined for xpay=true");
     }
 
     long long flops() const
@@ -161,14 +158,11 @@ namespace quda
       Dslash::setParam(tp);
 
       // specialize here to constrain the template instantiation
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
-        else
-          errorQuda("Operator only defined for xpay=true");
-      } else {
-        errorQuda("Operator not defined nParity=%d", arg.nParity);
-      }
+      if (arg.nParity != 1) errorQuda("Operator not defined nParity=%d", arg.nParity);
+      if (arg.xpay)
+        Dslash::template instantiate<packShmem, true>(tp, stream);
+      else
+        errorQuda("Operator only defined for xpay=true");
     }
 
     long long flops() const

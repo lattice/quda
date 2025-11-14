@@ -22,8 +22,7 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
 
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
-                                                    spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
@@ -43,7 +42,7 @@ namespace quda
 
     CovDevArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, int mu, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim, DDArg>(out, in, halo, U, in, parity, dagger, false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim, DDArg>(out, in, halo, U, in, parity, dagger, false, spin_project, comm_override),
       halo_pack(halo),
       halo(halo),
       U(U),
@@ -69,7 +68,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
+  template <bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyCovDev(Vector &out, const Arg &arg, Coord &coord, int parity, int,
                                               int thread_dim, bool &active, int src_idx)
   {
@@ -83,11 +82,11 @@ namespace quda
       // Forward gather - compute fwd offset for vector fetch
 
       const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
-      const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+      const bool ghost = (coord[d] + 1 >= arg.dc.X[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
       if (doHalo<kernel_type>(d) && ghost) {
 
-        const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+        const int ghost_idx = ghostFaceIndex<1>(coord, arg.dc.X, d, arg.nFace);
         const Vector in = arg.halo.Ghost(d, 1, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
         if constexpr (Arg::shift) {
@@ -117,7 +116,8 @@ namespace quda
 
       if (doHalo<kernel_type>(d) && ghost) {
 
-        const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+        const int ghost_idx = ghostFaceIndex<0>(coord, arg.dc.X, d, arg.nFace);
+        const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
         const Vector in = arg.halo.Ghost(d, 0, ghost_idx + src_idx * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
         if constexpr (Arg::shift) {
@@ -142,7 +142,7 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr covDev(const Ftor &ftor) : arg(ftor.arg) { }
@@ -162,7 +162,7 @@ namespace quda
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
 
       if (arg.dd_x.isZero(coord)) {
@@ -171,30 +171,14 @@ namespace quda
       }
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
-      case 0:
-        applyCovDev<nParity, dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 1:
-        applyCovDev<nParity, dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 2:
-        applyCovDev<nParity, dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 3:
-        applyCovDev<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 4:
-        applyCovDev<nParity, dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 5:
-        applyCovDev<nParity, dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 6:
-        applyCovDev<nParity, dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
-      case 7:
-        applyCovDev<nParity, dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-        break;
+      case 0: applyCovDev<dagger, mykernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 1: applyCovDev<dagger, mykernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 2: applyCovDev<dagger, mykernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 3: applyCovDev<dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 4: applyCovDev<dagger, mykernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 5: applyCovDev<dagger, mykernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 6: applyCovDev<dagger, mykernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
+      case 7: applyCovDev<dagger, mykernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active, src_idx); break;
       }
 
       if (mykernel_type != INTERIOR_KERNEL && active) {

@@ -125,16 +125,12 @@ namespace quda
                              double m_5, int parity, bool dagger, const int *comm_override, double m_f,
                              Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
-#ifdef NVSHMEM_COMMS
-      errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
-#else
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, DDArg, recon, dslash5_type_impl>;
       Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
-#endif
     }
   };
 

@@ -9,18 +9,18 @@
 namespace quda
 {
 
-  template <typename Float, int nColor_, QudaReconstructType recon_, int wflow_dim_, QudaGaugeSmearType wflow_type_,
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int wflow_dim_, QudaGaugeSmearType wflow_type_,
             QudaWFlowStepType step_type_>
   struct GaugeWFlowArg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int wflow_dim = wflow_dim_;
     static constexpr QudaGaugeSmearType wflow_type = wflow_type_;
     static constexpr QudaWFlowStepType step_type = step_type_;
-    typedef typename gauge_mapper<Float, recon>::type Gauge;
-    typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
 
     Gauge out;
     Matrix temp;
@@ -55,10 +55,10 @@ namespace quda
   template <typename Arg> struct computeStapleOpsWF {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using WilsonOps = computeStapleOps;                                  // Ops for case of QUDA_GAUGE_SMEAR_WILSON_FLOW
-    using StapOp = ThreadLocalCache<Link, 0, computeStapleRectangleOps>; // offset by computeStapleRectangleOps
-    using RectOp = ThreadLocalCache<Link, 0, StapOp>;                    // offset by StapOp
-    using SymanzikOps = combineOps<computeStapleRectangleOps, KernelOps<StapOp, RectOp>>; // GAUGE_SMEAR_SYMANZIK_FLOW
+    using WilsonOps = NoKernelOps;                    // Ops for case of QUDA_GAUGE_SMEAR_WILSON_FLOW
+    using StapOp = ThreadLocalCache<Link>;            // zero offset
+    using RectOp = ThreadLocalCache<Link, 0, StapOp>; // offset by StapOp
+    using SymanzikOps = KernelOps<StapOp, RectOp>;    // GAUGE_SMEAR_SYMANZIK_FLOW
     using Ops = std::conditional_t<Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, SymanzikOps, WilsonOps>;
   };
 
@@ -74,14 +74,14 @@ namespace quda
     static_assert(Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW);
     if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim, arg.anisotropy);
+      computeStaple(arg, x, arg.E, parity, dir, Z, Arg::wflow_dim, arg.anisotropy);
     } else if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
       typename computeStapleOpsWF<Arg>::StapOp Stap {ftor};
       typename computeStapleOpsWF<Arg>::RectOp Rect {ftor};
-      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim, arg.anisotropy);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim, arg.anisotropy);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
     }
     return Z;

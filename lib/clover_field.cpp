@@ -185,7 +185,8 @@ namespace quda {
   {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
-    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor;
+    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor << ",order=" << order;
+    if (isNative()) aux_ss << ",N=" << clover::get_vector_order(precision, 128);
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
@@ -418,7 +419,7 @@ namespace quda {
     spinor_param.setPrecision(a.Precision());
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = colorspinor::getNative(a.Precision(), a.Nspin());
+    spinor_param.fieldOrder = QUDA_NATIVE_FIELD_ORDER;
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = a.data(inverse);

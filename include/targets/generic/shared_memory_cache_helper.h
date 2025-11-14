@@ -4,6 +4,7 @@
 #include <kernel_ops.h>
 #include <target_device.h>
 #include <shared_memory_helper.h>
+#include <cassert>
 
 /**
    @file shared_memory_cache_helper.h
@@ -28,8 +29,13 @@ namespace quda
      A byte offset into the shared memory region can be specified with
      the type O, and is given by
      O::shared_mem_size(target::block_dim()) if O is not void.
-   */
-  template <typename T, typename D = DimsBlock, typename O = void>
+
+     warp_stride = true is an experimental feature where we use warp
+     striding for the shared memory.  This means allow load and store
+     operations can done with immediate offsets, potentially cutting
+     down on the integer arithmetic.
+  */
+  template <typename T, typename D = DimsBlock, typename O = void, bool warp_stride = false>
   class SharedMemoryCache : SharedMemory<atom_t<T>, SizeDims<D, sizeof(T) / sizeof(atom_t<T>)>, O>
   {
     using Smem = SharedMemory<atom_t<T>, SizeDims<D, sizeof(T) / sizeof(atom_t<T>)>, O>;
@@ -46,6 +52,7 @@ namespace quda
     using Smem::sharedMem;
     using atom_t = atom_t<T>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
+    static constexpr int W = device::warp_size() / (sizeof(atom_t) / sizeof(int));
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
     static constexpr int n_element = sizeof(T) / sizeof(atom_t);
@@ -57,17 +64,41 @@ namespace quda
     {
       atom_t tmp[n_element];
       memcpy(tmp, (void *)&a, sizeof(T));
-      int j = (z * block.y + y) * block.x + x;
+
+      const int j = (z * block.y + y) * block.x + x;
+      if constexpr (warp_stride) {
+        // const auto B = block.x * block.y * block.z;
+        // assert(B % W == 0); // Block size must be divisible by warp size
+        const int warp_id = j / W;
+        const int lane_id = j % W;
+
 #pragma unroll
-      for (int i = 0; i < n_element; i++) sharedMem()[i * stride + j] = tmp[i];
+        for (int i = 0; i < n_element; i++) { // [warp_id][element_id][lane_id]
+          sharedMem()[(n_element * warp_id + i) * W + lane_id] = tmp[i];
+        }
+      } else {
+#pragma unroll
+        for (int i = 0; i < n_element; i++) sharedMem()[i * stride + j] = tmp[i];
+      }
     }
 
     template <typename dummy = void> __device__ __host__ inline maybeT<dummy> load_detail(int x, int y, int z) const
     {
       atom_t tmp[n_element];
-      int j = (z * block.y + y) * block.x + x;
+      const int j = (z * block.y + y) * block.x + x;
+
+      if constexpr (warp_stride) {
+        const int warp_id = j / W;
+        const int lane_id = j % W;
+
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = sharedMem()[i * stride + j];
+        for (int i = 0; i < n_element; i++) { // [warp_id][element_id][lane_id]
+          tmp[i] = sharedMem()[(n_element * warp_id + i) * W + lane_id];
+        }
+      } else {
+#pragma unroll
+        for (int i = 0; i < n_element; i++) tmp[i] = sharedMem()[i * stride + j];
+      }
       T a;
       memcpy((void *)&a, tmp, sizeof(T));
       return a;
@@ -91,14 +122,19 @@ namespace quda
     /**
        @brief Constructor for SharedMemoryCache.
     */
-    template <typename... U, typename... Arg>
-    constexpr SharedMemoryCache(const KernelOps<U...> &ops, Arg... arg) :
-      Smem(ops), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
+    template <typename... U, typename... Args>
+    constexpr SharedMemoryCache(const KernelOps<U...> &ops, const Args &...dim_args) :
+      Smem(ops), block(D::dims(target::block_dim(), dim_args...)), stride(block.x * block.y * block.z)
     {
+      // for when enable warp striding we may want to test for
+      // something or explcitly require opt in, e.g., to enforce
+      // sufficient threads are running or shared memory is padded.
+      // we could also enfore this in the checkSharedBytes in the tuner
+      // static_assert(KernelOps<U...>::Arg::shared_memory_warp_stride......
       checkKernelOps<SharedMemoryCache<T, D, O>>(ops);
       // sanity check
-      static_assert(shared_mem_size(dim3 {32, 16, 8})
-                    == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}) * sizeof(T));
+      assert(shared_mem_size(dim3 {32, 16, 8}, dim_args...)
+             == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}, dim_args...) * sizeof(T));
     }
 
     constexpr SharedMemoryCache(const SharedMemoryCache<T, D, O> &) = delete;

@@ -30,7 +30,6 @@ namespace quda
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int ghostFace[QUDA_MAX_DIM + 1];
     int ghostFaceCB[QUDA_MAX_DIM + 1];
 
     int X2X1;
@@ -41,9 +40,6 @@ namespace quda
     int X3X2X1mX2X1;
     int X4X3X2X1mX3X2X1;
     int X5X4X3X2X1mX4X3X2X1;
-    int X4X3X2X1hmX3X2X1h;
-
-    int_fastdiv dims[4][3];
   };
 
   /**

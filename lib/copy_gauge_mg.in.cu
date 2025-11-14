@@ -31,10 +31,10 @@ namespace quda {
 
       if constexpr (fine_grain()) {
         if (outGhost) {
-          typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_FLOAT2_GAUGE_ORDER, false, sFloatOut> G;
+          typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, false, sFloatOut> G;
           copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
         } else {
-          typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_FLOAT2_GAUGE_ORDER, true, sFloatOut> G;
+          typedef typename gauge::FieldOrder<FloatOut, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, true, sFloatOut> G;
           copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
         }
       } else {
@@ -79,11 +79,11 @@ namespace quda {
     if (in.isNative()) {
       if constexpr (fine_grain()) {
         if (inGhost) {
-          typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_FLOAT2_GAUGE_ORDER, false, sFloatIn> G;
+          typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, false, sFloatIn> G;
           copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, Out,
                                               outGhost, type);
         } else {
-          typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_FLOAT2_GAUGE_ORDER, true, sFloatIn> G;
+          typedef typename gauge::FieldOrder<FloatIn, Nc, 1, QUDA_NATIVE_GAUGE_ORDER, true, sFloatIn> G;
           copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, Out,
                                               outGhost, type);
         }

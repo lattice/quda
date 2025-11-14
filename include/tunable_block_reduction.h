@@ -191,6 +191,7 @@ namespace quda
       Tunable::initTuneParam(param);
       param.block.z = step_z;
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
+      setSharedBytes(param);
     }
 
     /**
