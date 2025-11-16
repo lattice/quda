@@ -1265,9 +1265,9 @@ namespace quda {
             sincospi(static_cast<real>(3.0) * phase, &cos_sin[1], &cos_sin[0]);
             complex A(cos_sin[0], cos_sin[1]);
             A *= scale_inv;
-            out[6] = cmul(A, out[6]);
-            out[7] = cmul(A, out[7]);
-            out[8] = cmul(A, out[8]);
+            out[6] = cmul(out[6], A);
+            out[7] = cmul(out[7], A);
+            out[8] = cmul(out[8], A);
           } else { // phase is +/- 1 so real multiply is sufficient
             phase *= scale_inv;
             out[6] *= phase;
