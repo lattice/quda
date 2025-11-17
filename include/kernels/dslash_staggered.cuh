@@ -56,6 +56,7 @@ namespace quda
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
+    static constexpr int prefetch_distance_l1 = 1;
 
     const real dagger_scale;
 
@@ -89,38 +90,42 @@ namespace quda
      @param[in] parity Partiry that we are working on
      @param[in] arg Paramter struct
    */
-  template <class coord_t, class Arg>
+  template <int prefetch_type, int distance, class coord_t, class Arg>
   __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
                                     const Arg &arg)
   {
-    if constexpr (arg.prefetch_distance == 0) return;
-
     if constexpr (arg.improved) {
-      int step = 4 * dim + 2 * dir + hop + arg.prefetch_distance;
+      int step = 4 * dim + 2 * dir + hop + distance;
       if (step >= 16) return;
 
       // if using a bulk prefetch we need to use block's first coordinate
-      auto x_cb = arg.prefetch_tma ? coord.x_cb_0 : coord.x_cb;
+      auto x_cb = (prefetch_type == 1 || prefetch_type == 2) ? coord.x_cb_0 : coord.x_cb;
       x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
       int dim2 = step / 4;
       switch (step % 4) {
-      case 0: arg.U.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
-      case 1: arg.L.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
+      case 0: arg.U.prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 1: arg.L.prefetch<prefetch_type>(x_cb, dim2, parity); break;
 #ifdef QUDA_DSLASH_DOUBLE_STORE
-      case 2: arg.Uback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
-      case 3: arg.Lback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
+      case 2: arg.Uback.prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 3: arg.Lback.prefetch<prefetch_type>(x_cb, dim2, parity); break;
 #else
-      case 2:
-        arg.U.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
-        break;
-      case 3:
-        arg.L.prefetch<Arg::prefetch_tma>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
-        break;
+      case 2: arg.U.prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity); break;
+      case 3: arg.L.prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity); break;
 #endif
       }
     }
   }
+
+  template <class coord_t, class Arg>
+  __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
+                                    const Arg &arg)
+  {
+    if constexpr (Arg::prefetch_distance_l1 > 0) // L1 prefetch
+      prefetch<3, Arg::prefetch_distance_l1>(dim, dir, hop, coord, coord1, parity, arg);
+    if constexpr (Arg::prefetch_distance > 0) // L2 prefetch
+      prefetch<Arg::prefetch_tma, Arg::prefetch_distance>(dim, dir, hop, coord, coord1, parity, arg);
+  };
 
   /**
      @brief Applies the off-diagonal part of the Staggered / Asqtad

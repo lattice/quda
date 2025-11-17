@@ -1686,12 +1686,22 @@ namespace quda {
             if constexpr (loadPhase)
               prefetch_cache_bulk(gauge + (parity * offset + phaseOffset + stride * dir + x), block_size * sizeof(Float));
           }
-        } else { // n-d tensor prefetch
+        } else if constexpr (type == 2) { // n-d tensor prefetch
           if (target::is_thread_zero()) {
             prefetch_cache_tensor_5d(tensor_desc.N, x, x / 16, 0, dir, parity);
             if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, x / 16, dir, parity);
             if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, x / 16, dir, parity);
           }
+        } else { // L1 prefetching
+#pragma unroll
+          for (int i = 0; i < M; i++)
+            prefetch_L1_cache_line(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
+
+          // now load any remainder
+          if constexpr (Nrem > 0)
+            prefetch_L1_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
+
+          if constexpr (loadPhase) prefetch_L1_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
         }
       }
 

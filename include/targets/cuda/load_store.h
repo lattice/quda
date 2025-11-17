@@ -165,6 +165,17 @@ namespace quda
   };
 
   // pre-declaration of the prefetch_cache that we wish to specialize
+  template <bool> struct prefetch_L1_cache_line_imp;
+
+  template <> struct prefetch_L1_cache_line_imp<true> {
+    __device__ inline void operator()(const void *p)
+    {
+      static __shared__ float smem[1]; // dummy shared memory allocation
+      prefetch_L1(smem, p);
+    }
+  };
+
+  // pre-declaration of the prefetch_cache that we wish to specialize
   template <bool> struct prefetch_cache_bulk_imp;
   template <bool> struct prefetch_cache_tensor_3d_imp;
   template <bool> struct prefetch_cache_tensor_4d_imp;

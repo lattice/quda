@@ -82,6 +82,15 @@ namespace quda
 
   __device__ __host__ inline void prefetch_cache_line(const void *p) { target::dispatch<prefetch_cache_line_imp>(p); }
 
+  template <bool is_device> struct prefetch_L1_cache_line_imp {
+    __device__ __host__ inline void operator()(const void *) { }
+  };
+
+  __device__ __host__ inline void prefetch_L1_cache_line(const void *p)
+  {
+    target::dispatch<prefetch_L1_cache_line_imp>(p);
+  }
+
   template <bool is_device> struct prefetch_cache_bulk_imp {
     constexpr void operator()(const void *, size_t) { }
   };

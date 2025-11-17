@@ -476,7 +476,13 @@ namespace quda {
     asm("st.cs.global.v2.s16 [%0+0], {%1, %2};" :: __PTR(addr), "h"(x), "h"(y));
   }
 
-  __device__ __forceinline__ void prefetch_L1(const void *p) { asm volatile("prefetch.global.L1 [%0];" ::"l"(p)); }
+  __device__ inline void prefetch_L1(void *smem_ptr_, const void *gmem_ptr)
+  {
+    uint32_t smem_ptr = __cvta_generic_to_shared(smem_ptr_);
+    asm volatile("cp.async.ca.shared.global [%0], [%1], 4;\n" ::"r"(smem_ptr), "l"(gmem_ptr));
+  }
+
+  __device__ __forceinline__ void prefetch_L1(const void *p) { asm volatile("prefetch.global.L2 [%0];" ::"l"(p)); }
 
   __device__ __forceinline__ void prefetch_L2(const void *p) { asm volatile("prefetch.global.L2 [%0];" ::"l"(p)); }
 
