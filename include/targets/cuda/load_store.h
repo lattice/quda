@@ -171,7 +171,7 @@ namespace quda
     __device__ inline void operator()(const void *p)
     {
       static __shared__ float smem[1]; // dummy shared memory allocation
-      auto tid = target::thread_idx_linear<dim>();
+      auto tid = target::thread_idx_linear<3>();
       auto lane_id = tid & 31;
       prefetch_L1(smem, p + lane_id);
     }
