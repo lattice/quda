@@ -56,7 +56,7 @@ namespace quda
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
     static constexpr int prefetch_distance = QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED;
-    static constexpr int prefetch_distance_l1 = 1;
+    static constexpr int prefetch_distance_l1 = 0;
 
     const real dagger_scale;
 

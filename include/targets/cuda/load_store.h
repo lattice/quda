@@ -170,10 +170,10 @@ namespace quda
   template <> struct prefetch_L1_cache_line_imp<true> {
     __device__ inline void operator()(const void *p)
     {
-      static __shared__ float smem[1]; // dummy shared memory allocation
+      static __shared__ float smem[32]; // dummy shared memory allocation
       auto tid = target::thread_idx_linear<3>();
       auto lane_id = tid & 31;
-      prefetch_L1(smem, p + lane_id);
+      prefetch_L1(smem + lane_id, p);
     }
   };
 
