@@ -1628,15 +1628,24 @@ static void *openQCD_qudaSolverReadIn(int id)
 void *openQCD_qudaSolverGetHandle(int id)
 {
   check_solver_id(id);
-  if (qudaState.inv_handles[id] == nullptr) {
+
+  void *ptr = id == -1 ? qudaState.dirac_handle : qudaState.inv_handles[id];
+
+  if (ptr == nullptr) {
     if (id != -1) {
       WITH_COMM(logQuda(QUDA_VERBOSE, "Read in solver parameters from file %s for solver (id=%d)\n", qudaState.infile, id));
     }
-    qudaState.inv_handles[id] = openQCD_qudaSolverReadIn(id);
+    ptr = openQCD_qudaSolverReadIn(id);
   }
 
-  openQCD_qudaSolverUpdate(qudaState.inv_handles[id]);
-  return qudaState.inv_handles[id];
+  if (id == -1) {
+    qudaState.dirac_handle = ptr;
+  } else {
+    qudaState.inv_handles[id] = ptr;
+  }
+
+  openQCD_qudaSolverUpdate(ptr);
+  return ptr;
 }
 
 void openQCD_qudaDw_deprecated(void *src, void *dst, openQCD_QudaDiracParam_t p)
