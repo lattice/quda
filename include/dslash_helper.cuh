@@ -494,16 +494,13 @@ namespace quda
     }   // parity
   }
 
-  template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
+  template <KernelType kernel_type, bool allthreads = false, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive = true)
   {
-    dslash.template operator()<kernel_type>(x_cb, s, parity);
-  }
-
-  template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive)
-  {
-    dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
+    if constexpr (allthreads)
+      dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
+    else
+      dslash.template operator()<kernel_type>(x_cb, s, parity);
   }
 
 #ifdef NVSHMEM_COMMS
@@ -745,11 +742,8 @@ namespace quda
             else
               return;
           }
-          if constexpr (allthreads) {
-            apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity, alive);
-          } else {
-            apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
-          }
+          apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(dslash, x_cb, s, parity,
+                                                                                               alive);
           if constexpr (use_nvshmem_comms && kernel_type == UBER_KERNEL) {
             __syncthreads();
             if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0)
