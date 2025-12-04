@@ -158,6 +158,7 @@ namespace quda {
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
+    stride = (stride + 31) & ~31; // round up to be a multiple of 32 to guarantee alignment
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
     for (int i = 0; i < nDim; i++) {
