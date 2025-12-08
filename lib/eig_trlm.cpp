@@ -76,7 +76,10 @@ namespace quda
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < n_kr; step++) lanczosStep(kSpace, step);
+      for (int step = num_keep; step < n_kr; step++) {
+        if (step%100==0) logQuda(QUDA_VERBOSE, " starting lanczosStep %d\n", step);
+        lanczosStep(kSpace, step);
+      }
       iter += (n_kr - num_keep);
 
       // The eigenvalues are returned in the alpha array
