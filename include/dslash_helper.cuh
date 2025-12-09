@@ -750,10 +750,12 @@ namespace quda
     {
       typename Arg::D dslash(*this);
 
-      // FIXME need warp uniform parity which is not composable with
-      // NVSHMEM since the latter requires blockDim.y and blockDim.z to
-      // cover the entire extent
-      parity = target::block_idx().z; // ensure parity is warp uniform
+      if constexpr (QUDA_DSLASH_PREFETCH_TMA > 0) {
+        // FIXME need warp uniform parity which is not composable with
+        // NVSHMEM since the latter requires blockDim.y and blockDim.z to
+        // cover the entire extent
+        parity = target::block_idx().z; // ensure parity is warp uniform
+      }
 
       // for full fields set parity from z thread index else use arg setting
       if (arg.nParity == 1) parity = arg.parity;

@@ -12,6 +12,10 @@
 namespace quda
 {
 
+#if defined(NVSHMEM_COMMS) && QUDA_DSLASH_PREFETCH_TMA > 0
+#error NVSHMEM cannot be used in combination with TMA prefetching at present
+#endif
+
   /**
      @brief This is the generic driver for launching Dslash kernels
      (the base kernel of which is defined in dslash_helper.cuh).  This
@@ -224,6 +228,15 @@ namespace quda
       } else {
         return false;
       }
+    }
+
+    virtual bool advanceBlockDim(TuneParam &param) const override
+    {
+      // if TMA is enabled we must keep parity separate in the block (2-d tuning)
+      if constexpr (QUDA_DSLASH_PREFETCH_TMA > 0)
+        return TunableKernel2D::advanceBlockDim(param);
+      else
+        return TunableKernel3D::advanceBlockDim(param);
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const override
