@@ -1484,17 +1484,23 @@ namespace quda
 
   void ColorSpinorField::backup() const
   {
-    if (backup_h.size()) return; // ColorSpinorField already backed up
-    backup_h.resize(1);
-    backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
-    qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
+    if (backup_depth == 0) {
+      backup_h.resize(1);
+      backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
+      qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
+    }
+    backup_depth++;
   }
 
   void ColorSpinorField::restore() const
   {
-    if (!backup_h.size()) return; // not backed up
-    qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
-    backup_h.resize(0);
+    backup_depth--;
+    if (backup_depth < 0) errorQuda("Cannot restore since not backed up");
+
+    if (backup_depth == 0) {
+      qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
+      backup_h.resize(0);
+    }
   }
 
   void ColorSpinorField::copy_to_buffer(void *buffer) const
