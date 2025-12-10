@@ -122,9 +122,9 @@ namespace quda
     /**
        @brief Constructor for SharedMemoryCache.
     */
-    template <typename... U, typename... Args>
-    constexpr SharedMemoryCache(const KernelOps<U...> &ops, const Args &...dim_args) :
-      Smem(ops), block(D::dims(target::block_dim(), dim_args...)), stride(block.x * block.y * block.z)
+    template <typename... U, typename... Arg>
+    constexpr SharedMemoryCache(const KernelOps<U...> &ops, const Arg &...arg) :
+      Smem(ops, arg...), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
     {
       // for when enable warp striding we may want to test for
       // something or explcitly require opt in, e.g., to enforce
@@ -133,8 +133,8 @@ namespace quda
       // static_assert(KernelOps<U...>::Arg::shared_memory_warp_stride......
       checkKernelOps<SharedMemoryCache<T, D, O>>(ops);
       // sanity check
-      assert(shared_mem_size(dim3 {32, 16, 8}, dim_args...)
-             == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}, dim_args...) * sizeof(T));
+      assert(shared_mem_size(dim3 {32, 16, 8}, arg...)
+             == Smem::get_offset(dim3 {32, 16, 8}) + SizeDims<D>::size(dim3 {32, 16, 8}, arg...) * sizeof(T));
     }
 
     constexpr SharedMemoryCache(const SharedMemoryCache<T, D, O> &) = delete;

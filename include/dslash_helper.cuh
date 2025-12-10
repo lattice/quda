@@ -494,10 +494,13 @@ namespace quda
     }   // parity
   }
 
-  template <KernelType kernel_type, class D>
-  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity)
+  template <KernelType kernel_type, bool allthreads = false, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive = true)
   {
-    dslash.template operator()<kernel_type>(x_cb, s, parity);
+    if constexpr (allthreads)
+      dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
+    else
+      dslash.template operator()<kernel_type>(x_cb, s, parity);
   }
 
 #ifdef NVSHMEM_COMMS
@@ -678,7 +681,8 @@ namespace quda
     {
     }
 
-    __forceinline__ __device__ void operator()(int, int s, int parity)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true)
     {
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
@@ -686,10 +690,11 @@ namespace quda
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        // first few blocks do packing kernel
-        typename Arg::template P<dslash.pc_type()> packer;
-        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
+        if (!allthreads || alive) {
+          // first few blocks do packing kernel
+          typename Arg::template P<dslash.pc_type()> packer;
+          packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+        }
         // we use that when running the exterior -- this is either
         // * an explicit call to the exterior when not merged with the interior or
         // * the interior with exterior_blocks > 0
@@ -731,9 +736,14 @@ namespace quda
           }
 #endif
         } else {
-          if (x_cb >= arg.threads) return;
-
-          apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
+          if (x_cb >= arg.threads) {
+            if constexpr (allthreads)
+              alive = false;
+            else
+              return;
+          }
+          apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(dslash, x_cb, s, parity,
+                                                                                               alive);
           if constexpr (use_nvshmem_comms && kernel_type == UBER_KERNEL) {
             __syncthreads();
             if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0)
