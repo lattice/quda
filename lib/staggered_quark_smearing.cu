@@ -195,7 +195,7 @@ namespace quda
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity,
                                                                          dir, dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin = %d", in.Nspin());
       }

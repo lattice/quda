@@ -1484,7 +1484,7 @@ namespace quda
 
   void ColorSpinorField::backup() const
   {
-    if (backup_h.size()) errorQuda("ColorSpinorField already backed up");
+    if (backup_h.size()) return; // ColorSpinorField already backed up
     backup_h.resize(1);
     backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
     qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
@@ -1492,7 +1492,7 @@ namespace quda
 
   void ColorSpinorField::restore() const
   {
-    if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
+    if (!backup_h.size()) return; // not backed up
     qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
     backup_h.resize(0);
   }
