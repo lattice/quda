@@ -156,7 +156,7 @@ namespace quda
       StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity,
                                                                                dagger, comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
-      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
     }
   };
 

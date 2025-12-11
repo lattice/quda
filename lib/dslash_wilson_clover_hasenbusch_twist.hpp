@@ -84,7 +84,7 @@ namespace quda
       WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, A, a, b, x, parity,
                                                                             dagger, comm_override);
       WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

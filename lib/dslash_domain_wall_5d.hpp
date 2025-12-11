@@ -75,7 +75,7 @@ namespace quda
       DomainWall5DArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, m_f, a != 0.0, x, parity, dagger,
                                                              comm_override);
       DomainWall5D<decltype(arg)> dwf(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, out, in, halo, profile);
     }
   };
 
