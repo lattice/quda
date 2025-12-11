@@ -23,6 +23,7 @@
 #include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
+#include <tma_helper.hpp>
 
 namespace quda {
 

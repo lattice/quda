@@ -234,7 +234,7 @@ namespace quda
     {
       // if TMA is enabled we must keep parity separate in the block (2-d tuning)
       if constexpr (QUDA_DSLASH_PREFETCH_TMA > 0)
-        return TunableKernel2D::advanceBlockDim(param);
+        return TunableKernel2D_base<false>::advanceBlockDim(param);
       else
         return TunableKernel3D::advanceBlockDim(param);
     }

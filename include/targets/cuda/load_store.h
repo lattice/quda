@@ -2,6 +2,7 @@
 
 #include <register_traits.h>
 #include <inline_ptx.h>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -191,25 +192,25 @@ namespace quda
 
   // CUDA specialization of the prefetch_cache_tensor_3d that uses TMA (requires Hopper+)
   template <> struct prefetch_cache_tensor_3d_imp<true> {
-    __device__ inline void operator()(const tensor_desc_t &desc, int x, int y, int z)
+    __device__ inline void operator()(const tma_descriptor_t &desc, int x, int y, int z)
     {
-      prefetch_tma_3d(desc, x, y, z);
+      prefetch_tma_3d(desc.map, x, y, z);
     }
   };
 
   // CUDA specialization of the prefetch_cache_tensor_4d that uses TMA (requires Hopper+)
   template <> struct prefetch_cache_tensor_4d_imp<true> {
-    __device__ inline void operator()(const tensor_desc_t &desc, int x, int y, int z, int w)
+    __device__ inline void operator()(const tma_descriptor_t &desc, int x, int y, int z, int w)
     {
-      prefetch_tma_4d(desc, x, y, z, w);
+      prefetch_tma_4d(desc.map, x, y, z, w);
     }
   };
 
   // CUDA specialization of the prefetch_cache_tensor_5d that uses TMA (requires Hopper+)
   template <> struct prefetch_cache_tensor_5d_imp<true> {
-    __device__ inline void operator()(const tensor_desc_t &desc, int x, int y, int z, int w, int u)
+    __device__ inline void operator()(const tma_descriptor_t &desc, int x, int y, int z, int w, int u)
     {
-      prefetch_tma_5d(desc, x, y, z, w, u);
+      prefetch_tma_5d(desc.map, x, y, z, w, u);
     }
   };
 #endif

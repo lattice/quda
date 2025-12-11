@@ -493,21 +493,21 @@ namespace quda {
 
   using tensor_desc_t = CUtensorMap;
 
-  __device__ __forceinline__ void prefetch_tma_3d(const tensor_desc_t &tensor_map, int x, int y, int z)
+  __device__ __forceinline__ void prefetch_tma_3d(const CUtensorMap &tensor_map, int x, int y, int z)
   {
     asm volatile("cp.async.bulk.prefetch.tensor.3d.L2.global.tile [%0, {%1, %2, %3}];" ::"l"(&tensor_map), "r"(x),
                  "r"(y), "r"(z)
                  : "memory");
   }
 
-  __device__ __forceinline__ void prefetch_tma_4d(const tensor_desc_t &tensor_map, int x, int y, int z, int w)
+  __device__ __forceinline__ void prefetch_tma_4d(const CUtensorMap &tensor_map, int x, int y, int z, int w)
   {
     asm volatile("cp.async.bulk.prefetch.tensor.4d.L2.global.tile [%0, {%1, %2, %3, %4}];" ::"l"(&tensor_map), "r"(x),
                  "r"(y), "r"(z), "r"(w)
                  : "memory");
   }
 
-  __device__ __forceinline__ void prefetch_tma_5d(const tensor_desc_t &tensor_map, int x, int y, int z, int w, int u)
+  __device__ __forceinline__ void prefetch_tma_5d(const CUtensorMap &tensor_map, int x, int y, int z, int w, int u)
   {
     asm volatile("cp.async.bulk.prefetch.tensor.5d.L2.global.tile [%0, {%1, %2, %3, %4, %5}];" ::"l"(&tensor_map),
                  "r"(x), "r"(y), "r"(z), "r"(w), "r"(u)

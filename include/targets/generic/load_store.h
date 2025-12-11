@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -101,28 +102,28 @@ namespace quda
   }
 
   template <bool is_device> struct prefetch_cache_tensor_3d_imp {
-    constexpr void operator()(const tensor_desc_t &, int, int, int) { }
+    constexpr void operator()(const tma_descriptor_t &, int, int, int) { }
   };
 
-  __device__ __host__ inline void prefetch_cache_tensor_3d(const tensor_desc_t &desc, int x, int y, int z)
+  __device__ __host__ inline void prefetch_cache_tensor_3d(const tma_descriptor_t &desc, int x, int y, int z)
   {
     target::dispatch<prefetch_cache_tensor_3d_imp>(desc, x, y, z);
   }
 
   template <bool is_device> struct prefetch_cache_tensor_4d_imp {
-    constexpr void operator()(const tensor_desc_t &, int, int, int, int) { }
+    constexpr void operator()(const tma_descriptor_t &, int, int, int, int) { }
   };
 
-  __device__ __host__ inline void prefetch_cache_tensor_4d(const tensor_desc_t &desc, int x, int y, int z, int w)
+  __device__ __host__ inline void prefetch_cache_tensor_4d(const tma_descriptor_t &desc, int x, int y, int z, int w)
   {
     target::dispatch<prefetch_cache_tensor_4d_imp>(desc, x, y, z, w);
   }
 
   template <bool is_device> struct prefetch_cache_tensor_5d_imp {
-    constexpr void operator()(const tensor_desc_t &, int, int, int, int, int) { }
+    constexpr void operator()(const tma_descriptor_t &, int, int, int, int, int) { }
   };
 
-  __device__ __host__ inline void prefetch_cache_tensor_5d(const tensor_desc_t &desc, int x, int y, int z, int w, int u)
+  __device__ __host__ inline void prefetch_cache_tensor_5d(const tma_descriptor_t &desc, int x, int y, int z, int w, int u)
   {
     target::dispatch<prefetch_cache_tensor_5d_imp>(desc, x, y, z, w, u);
   }
