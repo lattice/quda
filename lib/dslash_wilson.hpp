@@ -50,7 +50,7 @@ namespace quda
       WilsonArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, a, x, parity, dagger,
                                                                     comm_override, alpha0, t0);
       Wilson<decltype(arg)> wilson(arg, U, out, in, halo);
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

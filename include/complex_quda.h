@@ -515,13 +515,13 @@ namespace quda
   template <typename ValueType>
   __host__ __device__ inline complex<ValueType> operator+(const complex<ValueType> &lhs, const ValueType &rhs)
   {
-    return add2(lhs, {rhs, rhs});
+    return {lhs.real() + rhs, lhs.imag()};
   }
 
   template <typename ValueType>
   __host__ __device__ inline complex<ValueType> operator+(const ValueType &lhs, const complex<ValueType> &rhs)
   {
-    return add2({lhs, lhs}, rhs);
+    return {lhs + rhs.real(), rhs.imag()};
   }
 
   template <typename ValueType>
@@ -533,13 +533,13 @@ namespace quda
   template <typename ValueType>
   __host__ __device__ inline complex<ValueType> operator-(const complex<ValueType> &lhs, const ValueType &rhs)
   {
-    return add2(lhs, {-rhs, -rhs});
+    return {lhs.real() - rhs, lhs.imag()};
   }
 
   template <typename ValueType>
   __host__ __device__ inline complex<ValueType> operator-(const ValueType &lhs, const complex<ValueType> &rhs)
   {
-    return add2({lhs, lhs}, -rhs);
+    return {lhs - rhs.real(), -rhs.imag()};
   }
 
   template <typename ValueType>

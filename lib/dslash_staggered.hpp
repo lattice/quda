@@ -57,7 +57,7 @@ namespace quda
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
-          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
         } else {
           errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
         }
@@ -67,7 +67,7 @@ namespace quda
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
-          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
         } else {
           errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
         }

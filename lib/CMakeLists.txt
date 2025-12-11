@@ -116,6 +116,11 @@ set (QUDA_OBJS
   block_transpose.cu )
 # cmake-format: on
 
+# only add the OpenQCD interface file if we're compiling with it enabled
+if(QUDA_INTERFACE_OPENQCD)
+  list(APPEND QUDA_OBJS openqcd_interface.cpp)
+endif()
+
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
   dslash_quda.cu color_spinor_pack.cu
@@ -602,6 +607,10 @@ if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
 
+if(QUDA_QCD_PLUS_QED)
+  target_compile_definitions(quda PUBLIC BUILD_QCD_PLUS_QED)
+endif(QUDA_QCD_PLUS_QED)
+
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
 endif(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
@@ -625,6 +634,10 @@ endif(QUDA_INTERFACE_BQCD OR QUDA_INTERFACE_ALL)
 if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
+
+if(QUDA_INTERFACE_OPENQCD OR QUDA_INTERFACE_ALL)
+  target_compile_definitions(quda PUBLIC BUILD_OPENQCD_INTERFACE)
+endif(QUDA_INTERFACE_OPENQCD OR QUDA_INTERFACE_ALL)
 
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)

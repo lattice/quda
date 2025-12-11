@@ -207,6 +207,9 @@ namespace quda
       } else if (inv_param.dirac_order == QUDA_TIFR_PADDED_DIRAC_ORDER) {
         fieldOrder = QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER;
         siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+      } else if (inv_param.dirac_order == QUDA_OPENQCD_DIRAC_ORDER) {
+        fieldOrder = QUDA_OPENQCD_FIELD_ORDER;
+        siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
       } else {
         errorQuda("Dirac order %d not supported", inv_param.dirac_order);
       }
@@ -289,6 +292,9 @@ namespace quda
     bool alloc = false;     // whether we allocated memory
     bool reference = false; // whether the field is a reference or not
     bool ghost_only = false; // whether the field is only a ghost wrapper
+
+    /** call-depth of backup and restore methods */
+    mutable int backup_depth = 0;
 
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
