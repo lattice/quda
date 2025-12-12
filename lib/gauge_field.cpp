@@ -7,7 +7,7 @@ namespace quda {
 
   GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u) { u.fill(*this); }
 
-  GaugeField::GaugeField(const GaugeFieldParam &param) : LatticeField(param)
+  GaugeField::GaugeField(const GaugeFieldParam &param) : LatticeField(param, param.order == QUDA_NATIVE_GAUGE_ORDER)
   {
     create(param);
 

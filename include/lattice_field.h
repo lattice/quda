@@ -160,8 +160,9 @@ namespace quda {
     /**
        @brief Create the field as specified by the param
        @param[in] Parameter struct
+       @param[in] native_gauge Whether the field is a native gauge field
     */
-    void create(const LatticeFieldParam &param);
+    void create(const LatticeFieldParam &param, bool is_native_gauge);
 
     /**
        @brief Move the contents of a field to this
@@ -500,7 +501,7 @@ namespace quda {
        @brief Constructor for creating a LatticeField from a LatticeFieldParam
        @param param Contains the metadata for creating the field
     */
-    LatticeField(const LatticeFieldParam &param);
+    LatticeField(const LatticeFieldParam &param, bool is_native_gauge = false);
 
     /**
        @brief Destructor for LatticeField

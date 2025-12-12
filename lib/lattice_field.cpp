@@ -25,7 +25,7 @@ namespace quda {
     }
   }
 
-  LatticeField::LatticeField(const LatticeFieldParam &param) :
+  LatticeField::LatticeField(const LatticeFieldParam &param, bool is_native_gauge) :
     volume(1),
     localVolume(1),
     pad(param.pad),
@@ -57,7 +57,7 @@ namespace quda {
     mh_send_rdma {},
     mem_type(param.mem_type)
   {
-    create(param);
+    create(param, is_native_gauge);
   }
 
   LatticeField::LatticeField(const LatticeField &field) noexcept :
@@ -98,7 +98,7 @@ namespace quda {
   {
     LatticeFieldParam param;
     field.fill(param);
-    create(param);
+    create(param, field.isNative());
   }
 
   LatticeField::LatticeField(LatticeField &&field) noexcept { move(std::move(field)); }
@@ -111,7 +111,7 @@ namespace quda {
       destroyComms();
       LatticeFieldParam param;
       src.fill(param);
-      create(param);
+      create(param, src.isNative());
     }
     return *this;
   }
@@ -125,7 +125,7 @@ namespace quda {
     return *this;
   }
 
-  void LatticeField::create(const LatticeFieldParam &param)
+  void LatticeField::create(const LatticeFieldParam &param, bool is_native_gauge)
   {
     if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Invalid field location");
     location = param.location;
@@ -158,7 +158,10 @@ namespace quda {
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
-    stride = (stride + 31) & ~31; // round up to be a multiple of 32 to guarantee alignment
+    if (is_native_gauge) { // if a native gauge field we need to ensure padded volume is aligned
+      stride = (stride + 31) & ~31; // round up to be a multiple of 32 to guarantee alignment
+      pad = stride - volumeCB;
+    }
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
     for (int i = 0; i < nDim; i++) {
