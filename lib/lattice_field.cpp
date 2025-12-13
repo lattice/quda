@@ -98,7 +98,7 @@ namespace quda {
   {
     LatticeFieldParam param;
     field.fill(param);
-    create(param, field.isNative());
+    create(param, false);
   }
 
   LatticeField::LatticeField(LatticeField &&field) noexcept { move(std::move(field)); }
@@ -111,7 +111,7 @@ namespace quda {
       destroyComms();
       LatticeFieldParam param;
       src.fill(param);
-      create(param, src.isNative());
+      create(param, false);
     }
     return *this;
   }
