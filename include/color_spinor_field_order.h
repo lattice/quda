@@ -1027,19 +1027,18 @@ namespace quda
         real v[length_ghost];
         norm_type nrm
           = isFixed<Float>::value ? vector_load<float, 1>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x)[0] : 0.0;
-        norm_type nrm_shift = -nrm * 12582912.0f;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           auto vecTmp = vector_load<Float, N>(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost,
                                               i * faceVolumeCB[dim] + x);
-          copy_and_scale(v + i * N, vecTmp, nrm, nrm_shift);
+          copy_and_scale(v + i * N, vecTmp, nrm);
         }
 
         if constexpr (Nrem > 0) { // now load any remainder
           auto vecTmp = vector_load<Float, Nrem>(
             ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * length_ghost + faceVolumeCB[dim] * M * N, x);
-          copy_and_scale(v + M * N, vecTmp, nrm, nrm_shift);
+          copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
 #pragma unroll
@@ -1166,20 +1165,19 @@ namespace quda
         auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns)); // FIXME - optimize 64-bit indexing here
 #endif
         norm_type nrm = isFixed<Float>::value ? vector_load<float, 1>(norm, x + parity * norm_offset)[0] : 0.0;
-        norm_type nrm_shift = -nrm * 12582912.0f;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
           auto vecTmp = vector_load<Float, N>(field, parity * offset, volumeCB * i + x);
           // now copy into output and scale
-          copy_and_scale(v + i * N, vecTmp, nrm, nrm_shift);
+          copy_and_scale(v + i * N, vecTmp, nrm);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<Float, Nrem>(field, parity * offset + volumeCB * M * N, x);
-          copy_and_scale(v + M * N, vecTmp, nrm, nrm_shift);
+          copy_and_scale(v + M * N, vecTmp, nrm);
         }
 
 #pragma unroll
@@ -1303,10 +1301,9 @@ namespace quda
         // extract the norm
         norm_type nrm;
         memcpy(&nrm, &vecTmp[6], sizeof(norm_type));
-        norm_type nrm_shift = -nrm * 12582912.0f;
         array<Float, 6> vecTmp2;
         memcpy(&vecTmp2, &vecTmp, sizeof(vecTmp2));
-        copy_and_scale(v, vecTmp2, nrm, nrm_shift);
+        copy_and_scale(v, vecTmp2, nrm);
 
 #pragma unroll
         for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
@@ -1412,9 +1409,8 @@ namespace quda
         memcpy(&nrm, &vecTmp[6], sizeof(norm_type));
         array<Float, 6> vecTmp2;
         memcpy(&vecTmp2, &vecTmp, sizeof(vecTmp2));
-        norm_type nrm_shift = -nrm * 12582912.0f;
         // now copy into output and scale
-        copy_and_scale(v, vecTmp2, nrm, nrm_shift);
+        copy_and_scale(v, vecTmp2, nrm);
 
 #pragma unroll
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);

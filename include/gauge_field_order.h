@@ -1588,9 +1588,7 @@ namespace quda {
         size_t bytes;
         gauge::tensor_desc_t tensor_desc;
         const real combined_scale; // Precomputed scale for copy_and_scale: fixedInvMaxValue * reconstruct.scale
-        const real combined_shift; // Precomputed shift for the alternate i2f_fma combined_scale * -12582912.0f
         const real phase_scale; // Precomputed scale for phase loading: fixedInvMaxValue * 2.0 (or just 2.0 for float)
-        const real phase_shift; // Precomputed shift for the alternative i2f_fma phase_scale *  -12582912.0f
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
@@ -1611,10 +1609,8 @@ namespace quda {
               return isFixed<Float>::value ? fixedInvMaxValue<Float>::value : 1.0;
             }
           }()),
-          combined_shift(combined_scale * -12582912.0f),
           phase_scale(isFixed<Float>::value ? fixedInvMaxValue<Float>::value * static_cast<real>(2.0) :
-                                              static_cast<real>(2.0)),
-          phase_shift(phase_scale * -12582912.0f)
+                                              static_cast<real>(2.0))
         {
           if (geometry == QUDA_COARSE_GEOMETRY)
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -1638,18 +1634,18 @@ namespace quda {
           // first load from memory
           auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
           // second do copy converting into register type with combined scaling
-          copy_and_scale(tmp + i * N, vecTmp, combined_scale, combined_shift);
+          copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
         if constexpr (Nrem > 0) {
           auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
-          copy_and_scale(tmp + M * N, vecTmp, combined_scale, combined_shift);
+          copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
         if constexpr (loadPhase) {
           if constexpr (isFixed<Float>::value) {
-            copy_and_scale(phase, gauge[parity * offset + phaseOffset + stride * dir + x], phase_scale, phase_shift);
+            copy_and_scale(phase, gauge[parity * offset + phaseOffset + stride * dir + x], phase_scale);
           } else {
             copy(phase, gauge[parity * offset + phaseOffset + stride * dir + x]);
             phase *= static_cast<real>(2.0);
@@ -1765,14 +1761,14 @@ namespace quda {
             auto vecTmp = vector_load<Float, N>(ghost[dir], (i * 2 + parity) * faceVolumeCB[dir] + x);
 
             // second do copy converting into register type with combined scaling
-            copy_and_scale(tmp + i * N, vecTmp, combined_scale, combined_shift);
+            copy_and_scale(tmp + i * N, vecTmp, combined_scale);
           }
 
           // now load any remainder
           if constexpr (Nrem > 0) {
             auto vecTmp
               = vector_load<Float, Nrem>(ghost[dir], 2 * faceVolumeCB[dir] * M * N, parity * faceVolumeCB[dir] + x);
-            copy_and_scale(tmp + M * N, vecTmp, combined_scale, combined_shift);
+            copy_and_scale(tmp + M * N, vecTmp, combined_scale);
           }
 
           real phase = 0.;
@@ -1783,7 +1779,7 @@ namespace quda {
             // } else {
             if constexpr (isFixed<Float>::value) {
               copy_and_scale(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x],
-                             phase_scale, phase_shift);
+                             phase_scale);
             } else {
               copy(phase, ghost[dir][2 * faceVolumeCB[dir] * (reconLen - 1) + parity * faceVolumeCB[dir] + x]);
               phase *= static_cast<real>(2.0);
@@ -1873,7 +1869,7 @@ namespace quda {
                                               ((i * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
           // second do copy converting into register type with combined scaling
-          copy_and_scale(tmp + i * N, vecTmp, combined_scale, combined_shift);
+          copy_and_scale(tmp + i * N, vecTmp, combined_scale);
         }
 
         // now load any remainder
@@ -1882,7 +1878,7 @@ namespace quda {
             = vector_load<Float, Nrem>(ghost[dim], (dir * reconLen + M * N) * 2 * geometry * R[dim] * faceVolumeCB[dim],
                                        (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x);
 
-          copy_and_scale(tmp + M * N, vecTmp, combined_scale, combined_shift);
+          copy_and_scale(tmp + M * N, vecTmp, combined_scale);
         }
 
         real phase = 0.;
@@ -1891,7 +1887,7 @@ namespace quda {
             copy_and_scale(phase,
                            ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
                                       + (parity * geometry + g) * R[dim] * faceVolumeCB[dim] + x],
-                           phase_scale, phase_shift);
+                           phase_scale);
           } else {
             copy(phase,
                  ghost[dim][(dir * reconLen + M * N + Nrem) * 2 * geometry * R[dim] * faceVolumeCB[dim]
