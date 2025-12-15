@@ -173,6 +173,9 @@ TEST_P(StaggeredEigensolveTest, verify)
     tol *= 5;
   }
 
+  // with block TRLM some of eigenvectors can have a small deviation
+  if (::testing::get<1>(GetParam()) == QUDA_EIG_BLK_TR_LANCZOS) tol *= 2;
+
   // account for summation error scaling with number of processors
   auto dof = 6lu * dim[0] * dim[1] * dim[2] * dim[3];
   tol *= (1 + log(quda::comm_size()) / log(dof));
