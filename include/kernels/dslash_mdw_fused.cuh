@@ -37,7 +37,7 @@ namespace quda {
       static constexpr bool reload = reload_;
       static constexpr bool spin_project = true;
       static constexpr bool spinor_direct_load = true; // false means texture load
-      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load>::type; // color spin field order
+      using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load, true>::type; // color spin field order
       static constexpr bool gauge_direct_load = true;                          // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED; // gauge field used is an extended one
       using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order

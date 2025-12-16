@@ -77,7 +77,7 @@ namespace quda
     }
 
     template <size_t prefetch_size>
-    __device__ inline void operator()(short8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
+    __device__ inline void operator()(short8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
     {
       float4 tmp;
       operator()(tmp, ptr, idx, prefetch);
@@ -85,7 +85,7 @@ namespace quda
     }
 
     template <size_t prefetch_size>
-    __device__ inline void operator()(char8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
+    __device__ inline void operator()(char8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
     {
       float2 tmp;
       operator()(tmp, ptr, idx, prefetch);
