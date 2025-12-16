@@ -65,19 +65,19 @@ namespace quda
     }
 
     template <size_t prefetch_size>
-    __device__ inline void operator()(short2 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
+    __device__ inline void operator()(short2 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
       load_cached_short2<prefetch_size>(value, reinterpret_cast<const short2 *>(ptr) + idx);      
     }
 
     template <size_t prefetch_size>
-    __device__ inline void operator()(short4 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
+    __device__ inline void operator()(short4 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
       load_cached_short4<prefetch_size>(value, reinterpret_cast<const short4 *>(ptr) + idx);      
     }
 
     template <size_t prefetch_size>
-    __device__ inline void operator()(short8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
+    __device__ inline void operator()(short8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
       float4 tmp;
       operator()(tmp, ptr, idx, prefetch);
@@ -85,7 +85,7 @@ namespace quda
     }
 
     template <size_t prefetch_size>
-    __device__ inline void operator()(char8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &prefetch)
+    __device__ inline void operator()(char8 &value, const void *ptr, int idx, const prefetch_t<prefetch_size> &)
     {
       float2 tmp;
       operator()(tmp, ptr, idx, prefetch);
