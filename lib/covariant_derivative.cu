@@ -144,11 +144,11 @@ namespace quda
       if (in.Nspin() == 4) {
         CovDevArg<Float, 4, nColor, DDArg, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
         CovDev<decltype(arg)> covDev(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
       } else if (in.Nspin() == 1) {
         CovDevArg<Float, 1, nColor, DDArg, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
         CovDev<decltype(arg)> covDev(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
       } else {
         errorQuda("Spin not supported");
       }

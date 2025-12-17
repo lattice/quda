@@ -368,6 +368,9 @@ module quda_fortran
      ! The t0 parameter for distance preconditioning, the timeslice where the source is located
      integer(4) distance_pc_t0
 
+     ! Additional user-defined properties
+     integer(8) :: additional_prop
+
   end type quda_invert_param
 
 end module quda_fortran

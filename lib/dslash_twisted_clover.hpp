@@ -77,7 +77,7 @@ namespace quda
       WilsonCloverArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, halo, U, C, a, b, x, parity, dagger,
                                                                    comm_override);
       TwistedClover<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 

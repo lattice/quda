@@ -139,8 +139,8 @@ namespace quda {
     constexpr Restrictor(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    template <bool allthreads = false>
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool active = true)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool alive = true)
     {
       int x_fine_offset = thread.x;
       const int x_coarse = block.x;
@@ -150,7 +150,7 @@ namespace quda {
       const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
 
       vector reduced{0};
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
         while (x_fine_offset < arg.aggregate_size) {
           // all threads with x_fine_offset greater than aggregate_size_cb are second parity
           const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
@@ -186,7 +186,7 @@ namespace quda {
 
       reduced = BlockReduce_t(*this, thread.z).Sum(reduced);
 
-      if (!allthreads || active) {
+      if (!allthreads || alive) {
         if (target::thread_idx().x == 0) {
           const int parity_coarse = x_coarse >= arg.out[src_idx].VolumeCB() ? 1 : 0;
           const int x_coarse_cb = x_coarse - parity_coarse * arg.out[src_idx].VolumeCB();

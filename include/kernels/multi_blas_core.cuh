@@ -65,15 +65,14 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    // template <typename Arg> struct MultiBlas_ {
-    template <typename Arg> struct MultiBlas_ : only_warp_combine<array<complex<typename Arg::real>, Arg::n / 2>> {
-      //  std::conditional_t<Arg::Functor::write.Y||Arg::Functor::write.W,BlockSync,void> {
+    template <typename Arg>
+    struct MultiBlas_ : KernelOps<op_warp_combine<array<complex<typename Arg::real>, Arg::n / 2>>> {
       const Arg &arg;
       constexpr MultiBlas_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      template <bool allthreads = false> // true if all threads in group will enter, even if out of range
-      __device__ __host__ inline void operator()(int i, int k, int parity, bool active = true)
+      template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+      __device__ __host__ inline void operator()(int i, int k, int parity, bool alive = true)
       {
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
@@ -87,7 +86,7 @@ namespace quda
         const int l_idx = lane_id / vector_site_width;
 
         vec x, y, z, w;
-        if (!allthreads || active) {
+        if (!allthreads || alive) {
           if (l_idx == 0 || warp_split == 1) {
             if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
             if (arg.f.read.W) arg.W[k].load(w, idx, parity);
@@ -112,7 +111,7 @@ namespace quda
         if (arg.f.write.Y) y = warp_combine<warp_split>(y);
         if (arg.f.write.W) w = warp_combine<warp_split>(w);
 
-        if (!allthreads || active) {
+        if (!allthreads || alive) {
           if (l_idx == 0 || warp_split == 1) {
             if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
             if (arg.f.write.W) arg.W[k].save(w, idx, parity);
