@@ -251,14 +251,14 @@ namespace quda
     }
     if (store) {
       scale = block_wise_reduce_vector(ftor, v);
+      auto scale_inv = __fdividef(1.0f, scale);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
         for (int color = 0; color < 3; color++) {
-          float real = v(spin, color).real() / scale;
-          float imag = v(spin, color).imag() / scale;
+          auto c = v(spin, color) * scale_inv;
           int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + 3 * threadIdx.x + color;
-          sm_b[idx] = __floats2half2_rn(real, imag);
+          sm_b[idx] = __floats2half2_rn(c.real(), c.imag());
         }
       }
     }
@@ -266,7 +266,7 @@ namespace quda
 
   // Store results(scaled short/char values and scale) in shared memroy to global
   // memroy.
-  template <class storage_type, int N_sm, class Output>
+  template <class store_t, int N_sm, class Output>
   __device__ inline void store_matrix_c(Output &output, half2 *sm_b, int sid, const float scale)
   {
     half max_ = 0.0f;
@@ -281,23 +281,23 @@ namespace quda
     }
 
     auto norm = reinterpret_cast<float *>(output.field + output.volumeCB * 24);
-    norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<storage_type>::value;
+    norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<store_t>::value;
 
-    const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
-    array<short2, 12> o;
+    const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<store_t>::value, max_));
+    array<typename VectorType<store_t, 2>::type, 12> o;
     for (int s = 0; s < 4; s++) {
 #pragma unroll
       for (int c = 0; c < 3; c++) {
         auto tmp = __hmul2(sm_b[(threadIdx.y * 4 + s) * N_sm_d2 + 3 * threadIdx.x + c], max_i_div_max2_);
-        o[s * 3 + c] = {__half2short_rn(tmp.x), __half2short_rn(tmp.y)};
+        o[s * 3 + c] = {static_cast<store_t>(__half2short_rn(tmp.x)), static_cast<store_t>(__half2short_rn(tmp.y))};
       }
     }
 
-    constexpr int N = colorspinor::get_vector_order<storage_type>(24);
+    constexpr int N = colorspinor::get_vector_order<store_t>(24);
     constexpr int M = 24 / N;
     constexpr int Nrem = 24 - N * M;
 
-    array<short, N> outN;
+    array<store_t, N> outN;
 #pragma unroll
     for (int i = 0; i < M; i++) {
       memcpy(&outN, &o[i * N / 2], sizeof(outN));
@@ -305,7 +305,7 @@ namespace quda
     }
 
     if constexpr (Nrem > 0) {
-      array<short, Nrem> outNrem;
+      array<store_t, Nrem> outNrem;
       memcpy(&outNrem, &o[N * M / 2], sizeof(outNrem));
       vector_store(output.field, N * M * output.volumeCB, sid, outNrem);
     }
