@@ -33,7 +33,6 @@ namespace quda
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::real;
       using Link = typename Arg::Link;
 
       byte_array<int8_t, 4> x = {};
