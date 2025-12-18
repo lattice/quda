@@ -167,6 +167,7 @@ namespace quda
     return get_tma_descriptor<T, 4>(key);
   }
 
+#ifdef QUDA_CUDA_CC
   /**
     @brief Launch TMA load from a 5-d tensor in global memory to a 2-d box in shared memory.
     @param smem_ptr The destination shared memory pointer
@@ -182,13 +183,11 @@ namespace quda
   __device__ void inline tma_load_gmem_5d_box_2d(complex<T> *smem_ptr, const CUtensorMap *map, int offset_a,
                                                  int offset_b, int offset_c, int offset_d, int offset_e, barrier_t *bar)
   {
-#ifdef __CUDACC__
     static_assert(box_a <= tma_box_limit);
     static_assert(box_b <= tma_box_limit);
     int32_t coords[5] = {offset_a, offset_b, offset_c, offset_d, offset_e};
     cuda::ptx::cp_async_bulk_tensor(cuda::ptx::space_shared, cuda::ptx::space_global, smem_ptr, map, coords,
                                     reinterpret_cast<uint64_t *>(bar));
-#endif
   }
 
   /**
@@ -205,14 +204,13 @@ namespace quda
   __device__ void inline tma_load_gmem_4d_box_2d(complex<T> *smem_ptr, const CUtensorMap *map, int offset_a,
                                                  int offset_b, int offset_c, int offset_d, barrier_t *bar)
   {
-#ifdef __CUDACC__
     static_assert(box_a <= tma_box_limit);
     static_assert(box_b <= tma_box_limit);
     int32_t coords[4] = {offset_a, offset_b, offset_c, offset_d};
     cuda::ptx::cp_async_bulk_tensor(cuda::ptx::space_shared, cuda::ptx::space_global, smem_ptr, map, coords,
                                     reinterpret_cast<uint64_t *>(bar));
-#endif
   }
+#endif
 
   namespace gauge
   {
