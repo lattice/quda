@@ -1,6 +1,7 @@
 #pragma once
 
 #include <quda_define.h>
+#include <target_device.h>
 #include <gauge_field.h>
 #include <complex_quda.h>
 
