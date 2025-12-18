@@ -168,7 +168,7 @@ namespace quda
     return get_tma_descriptor<T, 4>(key);
   }
 
-#ifdef QUDA_CUDA_CC
+#if defined(__CUDACC__) || defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
   /**
     @brief Launch TMA load from a 5-d tensor in global memory to a 2-d box in shared memory.
     @param smem_ptr The destination shared memory pointer
