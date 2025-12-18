@@ -84,9 +84,7 @@ namespace quda
     int step = 2 * dim + dir + arg.prefetch_distance;
     if (step >= 8) return;
 
-    // for TMA use arg.block_size
     int dim2 = step / 2;
-    // need warp uniform variants of these and parity
 
     // if using a bulk prefetch we need to use block's first coordinate
     auto x_cb = arg.prefetch_tma ? coord.x_cb_0 : coord.x_cb;
@@ -94,15 +92,14 @@ namespace quda
 
     switch (step % 2) {
     case 0: arg.U.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-    case 1: arg.Uback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
-#else
-    case 1: {
-      const int back_idx = getNeighborIndexCB(coord, dim2, -1, arg.dc);
-      const int idx1 = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
-      arg.U.prefetch<Arg::prefetch_tma>(idx1, dim2, 1 - parity);
-    } break;
-#endif
+    case 1:
+      if (dslash_double_store()) {
+        arg.Uback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity);
+      } else {
+        int idx = getNeighborIndexCB(coord, dim2, -1, arg.dc);
+        arg.U.prefetch<Arg::prefetch_tma>(Arg::nDim == 5 ? idx % arg.dc.volume_4d_cb : idx, dim2, 1 - parity);
+      }
+      break;
     }
   }
 

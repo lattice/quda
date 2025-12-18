@@ -106,13 +106,14 @@ namespace quda
       switch (step % 4) {
       case 0: arg.U.prefetch<prefetch_type>(x_cb, dim2, parity); break;
       case 1: arg.L.prefetch<prefetch_type>(x_cb, dim2, parity); break;
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-      case 2: arg.Uback.prefetch<prefetch_type>(x_cb, dim2, parity); break;
-      case 3: arg.Lback.prefetch<prefetch_type>(x_cb, dim2, parity); break;
-#else
-      case 2: arg.U.prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity); break;
-      case 3: arg.L.prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity); break;
-#endif
+      case 2:
+        if constexpr (dslash_double_store()) arg.Uback.prefetch<prefetch_type>(x_cb, dim2, parity);
+        else arg.U.prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
+      case 3:
+        if constexpr (dslash_double_store()) arg.Lback.prefetch<prefetch_type>(x_cb, dim2, parity);
+        else arg.L.prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
       }
     }
   }
