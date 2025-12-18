@@ -149,7 +149,7 @@ namespace quda
       return thread_idx_linear<dim>() == 0;
     }
 
-    template __device__ __host__ inline bool is_lane_zero()
+    __device__ __host__ inline bool is_lane_zero()
     {
       return (thread_idx_linear<3>() % 64) == 0; // switch this to warp_size
     }
