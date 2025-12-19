@@ -151,7 +151,7 @@ namespace quda
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
     Coord coord1 = coord;
-    if constexpr (arg.improved) { // need to compute 1-hop in_boundary
+    if constexpr (Arg::improved) { // need to compute 1-hop in_boundary
 #pragma unroll
       for (int d = 0; d < 4; d++) {
         coord1.in_boundary[1][d] = -(coord[d] + 1 >= arg.dc.X[d]);
