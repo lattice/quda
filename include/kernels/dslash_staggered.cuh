@@ -94,7 +94,7 @@ namespace quda
   __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
                                     const Arg &arg)
   {
-    if constexpr (arg.improved) {
+    if constexpr (Arg::improved) {
       int step = 4 * dim + 2 * dir + hop + distance;
       if (step >= 16) return;
 
