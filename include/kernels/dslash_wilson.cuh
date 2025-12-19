@@ -79,15 +79,15 @@ namespace quda
   template <class coord_t, class Arg>
   __device__ __host__ void prefetch(int dim, int dir, const coord_t &coord, int parity, const Arg &arg)
   {
-    if constexpr (arg.prefetch_distance == 0) return;
+    if constexpr (Arg::prefetch_distance == 0) return;
 
-    int step = 2 * dim + dir + arg.prefetch_distance;
+    int step = 2 * dim + dir + Arg::prefetch_distance;
     if (step >= 8) return;
 
     int dim2 = step / 2;
 
     // if using a bulk prefetch we need to use block's first coordinate
-    auto x_cb = arg.prefetch_tma ? coord.x_cb_0 : coord.x_cb;
+    auto x_cb = Arg::prefetch_tma ? coord.x_cb_0 : coord.x_cb;
     x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
     switch (step % 2) {
