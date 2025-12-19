@@ -91,13 +91,13 @@ namespace quda
     x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
     switch (step % 2) {
-    case 0: arg.U.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
+    case 0: arg.U.template prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
     case 1:
       if (dslash_double_store()) {
-        arg.Uback.prefetch<Arg::prefetch_tma>(x_cb, dim2, parity);
+        arg.Uback.template prefetch<Arg::prefetch_tma>(x_cb, dim2, parity);
       } else {
         int idx = getNeighborIndexCB(coord, dim2, -1, arg.dc);
-        arg.U.prefetch<Arg::prefetch_tma>(Arg::nDim == 5 ? idx % arg.dc.volume_4d_cb : idx, dim2, 1 - parity);
+        arg.U.template prefetch<Arg::prefetch_tma>(Arg::nDim == 5 ? idx % arg.dc.volume_4d_cb : idx, dim2, 1 - parity);
       }
       break;
     }

@@ -104,15 +104,19 @@ namespace quda
 
       int dim2 = step / 4;
       switch (step % 4) {
-      case 0: arg.U.prefetch<prefetch_type>(x_cb, dim2, parity); break;
-      case 1: arg.L.prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 0: arg.U.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 1: arg.L.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
       case 2:
-        if constexpr (dslash_double_store()) arg.Uback.prefetch<prefetch_type>(x_cb, dim2, parity);
-        else arg.U.prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
+        if constexpr (dslash_double_store())
+          arg.Uback.template prefetch<prefetch_type>(x_cb, dim2, parity);
+        else
+          arg.U.template prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
       case 3:
-        if constexpr (dslash_double_store()) arg.Lback.prefetch<prefetch_type>(x_cb, dim2, parity);
-        else arg.L.prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
+        if constexpr (dslash_double_store())
+          arg.Lback.template prefetch<prefetch_type>(x_cb, dim2, parity);
+        else
+          arg.L.template prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
       }
     }
