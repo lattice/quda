@@ -146,21 +146,21 @@ namespace quda
         if (shift) {
           CovDevArg<Float, 4, nColor, DDArg, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
-          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         } else {
           CovDevArg<Float, 4, nColor, DDArg, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
-          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         }
       } else if (in.Nspin() == 1) {
         if (shift) {
           CovDevArg<Float, 1, nColor, DDArg, recon, nDim, true> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
-          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         } else {
           CovDevArg<Float, 1, nColor, DDArg, recon, nDim, false> arg(out, in, halo, U, mu, parity, dagger, comm_override);
           CovDev<decltype(arg)> covDev(arg, out, in, halo);
-          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
         }
       } else {
         errorQuda("Spin not supported");

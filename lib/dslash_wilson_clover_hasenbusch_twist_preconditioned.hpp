@@ -128,7 +128,7 @@ namespace quda
       ArgType arg(out, in, halo, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in, halo);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 
@@ -254,7 +254,7 @@ namespace quda
       using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, true>;
       ArgType arg(out, in, halo, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

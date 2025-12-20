@@ -293,6 +293,9 @@ namespace quda
     bool reference = false; // whether the field is a reference or not
     bool ghost_only = false; // whether the field is only a ghost wrapper
 
+    /** call-depth of backup and restore methods */
+    mutable int backup_depth = 0;
+
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
 

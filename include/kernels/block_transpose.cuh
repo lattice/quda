@@ -73,7 +73,8 @@ namespace quda
         - V: spatial -> spin/color -> nVec
         The transpose uses shared memory to avoid strided memory accesses.
      */
-    __device__ __host__ inline void operator()(int x_cb, int)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __device__ __host__ inline void operator()(int x_cb, int, bool = true)
     {
       int parity_color = target::block_idx().z;
       int color = parity_color % Arg::nColor;

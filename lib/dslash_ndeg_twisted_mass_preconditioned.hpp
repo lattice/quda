@@ -106,12 +106,12 @@ namespace quda
         NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon, true> arg(out, in, halo, U, a, b, c, xpay, x, parity,
                                                                         dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       } else {
         NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, halo, U, a, b, c, xpay, x, parity,
                                                                          dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       }
     }
   };

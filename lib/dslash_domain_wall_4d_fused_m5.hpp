@@ -130,7 +130,7 @@ namespace quda
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, DDArg, recon, dslash5_type_impl>;
       Arg arg(out, in, halo, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in, halo, y);
-      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, out, in, halo, profile);
     }
   };
 

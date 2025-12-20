@@ -124,7 +124,7 @@ namespace quda
       TwistedCloverArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, C, a, b, xpay, x, parity, dagger,
                                                               comm_override);
       TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 
