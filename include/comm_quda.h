@@ -50,6 +50,13 @@ namespace quda
   int comm_dim(int dim);
 
   /**
+     Return whether the dimension dim is a C* dimension or not
+     @param dim Dimension which we are querying
+     @return C* dimension or nor
+  */
+  bool comm_dim_cstar(int dim);
+
+  /**
      Return the global number of processes in the dimension dim
      @param dim Dimension which we are querying
      @return Length of process dimensions

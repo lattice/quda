@@ -48,6 +48,7 @@ typedef enum QudaGaugeFieldOrder_s {
   QUDA_BQCD_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime+halos, column-row order
   QUDA_TIFR_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime, column-row order
   QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
+  QUDA_OPENQCD_GAUGE_ORDER, // expect *gauge, spacetime, mu, parity row-column order -- links attached to odd points only
   QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
 } QudaGaugeFieldOrder;
 
@@ -252,14 +253,16 @@ typedef enum QudaDiracFieldOrder_s {
   QUDA_CPS_WILSON_DIRAC_ORDER,  // odd-even, color inside spin
   QUDA_LEX_DIRAC_ORDER,         // lexicographical order, color inside spin
   QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
+  QUDA_OPENQCD_DIRAC_ORDER,     // openqcd
   QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
 } QudaDiracFieldOrder;
 
 typedef enum QudaCloverFieldOrder_s {
-  QUDA_NATIVE_CLOVER_ORDER, // even-odd, Fload-N ordering
-  QUDA_PACKED_CLOVER_ORDER, // even-odd, QDP packed
-  QUDA_QDPJIT_CLOVER_ORDER, // (diagonal / off-diagonal)-chirality-spacetime
-  QUDA_BQCD_CLOVER_ORDER,   // even-odd, super-diagonal packed and reordered
+  QUDA_NATIVE_CLOVER_ORDER,  // even-odd, Fload-N ordering
+  QUDA_PACKED_CLOVER_ORDER,  // even-odd, QDP packed
+  QUDA_QDPJIT_CLOVER_ORDER,  // (diagonal / off-diagonal)-chirality-spacetime
+  QUDA_BQCD_CLOVER_ORDER,    // even-odd, super-diagonal packed and reordered
+  QUDA_OPENQCD_CLOVER_ORDER, // openqcd
   QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
 } QudaCloverFieldOrder;
 
@@ -350,6 +353,7 @@ typedef enum QudaFieldOrder_s {
   QUDA_QDPJIT_FIELD_ORDER,                  // QDP field ordering (complex-color-spin-spacetime)
   QUDA_QOP_DOMAIN_WALL_FIELD_ORDER,         // QOP domain-wall ordering
   QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
+  QUDA_OPENQCD_FIELD_ORDER,                 // OPENQCD ordering
   QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
 } QudaFieldOrder;
 
@@ -363,15 +367,25 @@ typedef enum QudaFieldCreate_s {
 } QudaFieldCreate;
 
 typedef enum QudaGammaBasis_s { // gamj=((top 2 rows)(bottom 2 rows))  s1,s2,s3 are Pauli spin matrices, 1 is 2x2 identity
-  QUDA_DEGRAND_ROSSI_GAMMA_BASIS, // gam1=((0,i*s1)(-i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,i*s3)(-i*s3,0)) gam4=((0,1)(1,0))  gam5=((1,0)(0,-1))
-  QUDA_UKQCD_GAMMA_BASIS,         // gam1=((0,i*s1)(-i*s1,0)) gam2=((0,i*s2)(-i*s2,0)) gam3=((0,i*s3)(-i*s3,0)) gam4=((1,0)(0,-1)) gam5=((0,1)(1,0))
-  QUDA_CHIRAL_GAMMA_BASIS,        // gam1=((0,-i*s1)(i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,-i*s3)(i*s3,0)) gam4=((0,-1)(-1,0))gam5=((-1,0)(0,1))
-  QUDA_DIRAC_PAULI_GAMMA_BASIS,   // gam1=((0,-i*s1)(i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,-i*s3)(i*s3,0)) gam4=((1,0)(0,-1)) gam5=((0,-1)(-1,0))
+  QUDA_DEGRAND_ROSSI_GAMMA_BASIS, // gam1=((0,i*s1)(-i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,i*s3)(-i*s3,0)) gam4=((0,1)(1,0))        gam5=((1,0)(0,-1))
+  QUDA_UKQCD_GAMMA_BASIS,         // gam1=((0,i*s1)(-i*s1,0)) gam2=((0,i*s2)(-i*s2,0)) gam3=((0,i*s3)(-i*s3,0)) gam4=((1,0)(0,-1))       gam5=((0,1)(1,0))
+  QUDA_CHIRAL_GAMMA_BASIS,        // gam1=((0,-i*s1)(i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,-i*s3)(i*s3,0)) gam4=((0,-1)(-1,0))      gam5=((-1,0)(0,1))
+  QUDA_OPENQCD_GAMMA_BASIS,       // gam1=((0,-i*s3)(i*s3,0)) gam2=((0,-1)(-1,0))      gam3=((0,-s1)(s1,0))     gam4=((0,-i*s2)(i*s2,0)) gam5=((1,0)(0,-1))
+  QUDA_DIRAC_PAULI_GAMMA_BASIS,   // gam1=((0,-i*s1)(i*s1,0)) gam2=((0,-i*s2)(i*s2,0)) gam3=((0,-i*s3)(i*s3,0)) gam4=((1,0)(0,-1))       gam5=((0,-1)(-1,0))
   QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM //  gam5=gam1*gam2*gam3*gam4
 } QudaGammaBasis;
 //  Dirac-Pauli -> DeGrand-Rossi   T = i/sqrt(2)*((s2,-s2)(s2,s2))     field_DR = T * field_DP
 //  UKQCD       -> DeGrand-Rossi   T = i/sqrt(2)*((-s2,-s2)(-s2,s2))   field_DR = T * field_UK
 //  Chiral      -> DeGrand-Rossi   T = i*((0,-s2)(s2,0))               field_DR = T * field_chiral
+
+typedef enum QudaGammaDirection_s {
+  QUDA_GAMMA_X,
+  QUDA_GAMMA_Y,
+  QUDA_GAMMA_Z,
+  QUDA_GAMMA_T,
+  QUDA_GAMMA_5,
+  QUDA_INVALID_GAMMA_INDEX = QUDA_INVALID_ENUM
+} QudaGammaDirection;
 
 typedef enum QudaSourceType_s {
   QUDA_POINT_SOURCE,
@@ -653,4 +667,3 @@ typedef enum QudaUpdateSplitGauge_s {
 #ifdef __cplusplus
 }
 #endif
-

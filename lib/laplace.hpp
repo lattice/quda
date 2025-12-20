@@ -152,12 +152,12 @@ namespace quda
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, out, in, halo, profile);
       } else if (in.Nspin() == 4) {
         constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }

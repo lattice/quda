@@ -46,6 +46,16 @@ namespace quda
 #else
         errorQuda("BQCD interface has not been built\n");
 #endif
+      } else if (in.Order() == QUDA_OPENQCD_CLOVER_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+        using C = OpenQCDOrder<Float, length>;
+        C out_accessor(out, inverse);
+        C in_accessor(in, inverse);
+        CopyFieldOffsetArg<Field, Element, C> arg(out_accessor, out, in_accessor, in, offset);
+        CopyFieldOffset<decltype(arg)> copier(arg, in);
+#else
+        errorQuda("OpenQCD interface has not been built\n");
+#endif
       } else {
         errorQuda("Clover field %d order not supported", in.Order());
       }

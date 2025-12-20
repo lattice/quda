@@ -84,13 +84,13 @@ namespace quda
                                                                     comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       } else {
         TwistedMassArg<Float, nColor, nDim, DDArg, recon, false> arg(out, in, halo, U, a, b, xpay, x, parity, dagger,
                                                                      comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in, halo);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
       }
     }
   };

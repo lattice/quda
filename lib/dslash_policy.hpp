@@ -1826,6 +1826,7 @@ namespace quda
     Dslash &dslash;
     using Arg = std::remove_reference_t<decltype(dslash.dslashParam)>;
     Arg &dslashParam;
+    cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &in;
     const ColorSpinorField &halo;
     TimeProfile &profile;
@@ -1836,9 +1837,9 @@ namespace quda
     unsigned int sharedBytesPerBlock(const TuneParam &) const override { return 0; }
 
   public:
-    DslashPolicyTune(Dslash &dslash, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
-                     TimeProfile &profile) :
-      dslash(dslash), dslashParam(dslash.dslashParam), in(in), halo(halo), profile(profile)
+    DslashPolicyTune(Dslash &dslash, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                     const ColorSpinorField &halo, TimeProfile &profile) :
+      dslash(dslash), dslashParam(dslash.dslashParam), out(out), in(in), halo(halo), profile(profile)
     {
       if (!dslash_policy_init) {
 
@@ -1977,6 +1978,7 @@ namespace quda
       // constituents have been tuned since we can't do nested tuning
       if (!tuned()) {
         disableProfileCount();
+        preTune();
 
         for (auto &p2p : p2p_policies) {
 
@@ -2034,6 +2036,7 @@ namespace quda
           comm_enable_peer2peer(p2p_enabled); // restore p2p state
         }                                     // p2p policies
 
+        postTune();
         enableProfileCount();
         setPolicyTuning(true);
       }
@@ -2124,9 +2127,9 @@ namespace quda
      return bytes_;
    }
 
-   void preTune() override { dslash.preTune(); }
+   void preTune() override { out.backup(); }
 
-   void postTune() override { dslash.postTune(); }
+   void postTune() override { out.restore(); }
 
    int32_t getTuneRank() const override { return dslash.getTuneRank(); }
   };
