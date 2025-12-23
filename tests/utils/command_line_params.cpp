@@ -190,6 +190,7 @@ quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
 bool mg_allow_truncation = false;
 bool mg_staggered_kd_dagger_approximation = false;
+double mg_kappa_dwf_null = 0.12498; // mass ~= 0.001, as a placeholder
 
 #ifdef NVSHMEM_COMMS
 bool use_mobius_fused_kernel = false;
@@ -1008,6 +1009,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                    "If saving eigenvectors, use this precision to save. No-op if mg-eig-save-prec is greater than or "
                    "equal to precision of eigensolver (default = double)")
     ->transform(prec_transform);
+
+  quda_app->add_option("--mg-kappa-dwf-null", mg_kappa_dwf_null,
+                         "The Wilson kappa value to use for near-null vector generation in DWF MG (default 0.12498)");
 
   opgroup->add_option(
     "--mg-low-mode-check", low_mode_check,

@@ -184,6 +184,7 @@ namespace quda
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       param.x[0] /= 2; // set single parity dimensions
+      param.gammaBasis = gammaBasis;
       param.is_composite = false;
       param.composite_dim = 0;
       param.is_component = composite_descr.is_component;

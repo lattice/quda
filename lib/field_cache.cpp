@@ -55,6 +55,12 @@ namespace quda {
     if constexpr (std::is_same_v<T, ColorSpinorField>) {
       tmp.GammaBasis(param.gammaBasis);
       tmp.Nvec_actual(param.nVec_actual);
+      if (tmp.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+        tmp.Even().GammaBasis(param.gammaBasis);
+        tmp.Odd().GammaBasis(param.gammaBasis);
+        tmp.Even().Nvec_actual(param.nVec_actual);
+        tmp.Odd().Nvec_actual(param.nVec_actual);
+      }
     }
   }
 

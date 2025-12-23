@@ -311,6 +311,16 @@ namespace quda {
         // split, prolongate, join
         Split5DTo4DFields(in_4d, in[0]);
         Prolongate(out_4d, in_4d, V, fine_to_coarse_d, spin_map, _use_mma, parity);
+
+        /*for (int s = 1; s < out.X(4) - 1; s++)
+          blas::zero(out_4d[s]);
+        ApplyChiralProj(out_4d[1], out_4d[0], +1);
+        ApplyChiralProj(out_4d[2], out_4d[out.X(4)-1], -1);
+        blas::copy(out_4d[0], out_4d[1]);
+        blas::copy(out_4d[out.X(4) - 1], out_4d[2]);
+        blas::zero(out_4d[1]);
+        blas::zero(out_4d[2]);*/
+
         Join4DTo5DField(out[0], out_4d);
       } else if (out.Ndim() == 4 && in.Ndim() == 4) {
         Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
@@ -372,6 +382,16 @@ namespace quda {
 
         // split, prolongate, join
         Split5DTo4DFields(in_4d, in[0]);
+
+        /*for (int s = 1; s < out.X(4) - 1; s++)
+          blas::zero(in_4d[s]);
+        ApplyChiralProj(in_4d[1], in_4d[0], -1);
+        ApplyChiralProj(in_4d[2], in_4d[out.X(4)-1], +1);
+        blas::copy(in_4d[0], in_4d[1]);
+        blas::copy(in_4d[out.X(4) - 1], in_4d[2]);
+        blas::zero(in_4d[1]);
+        blas::zero(in_4d[2]);*/
+
         Restrict(out_4d, in_4d, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
         Join4DTo5DField(out[0], out_4d);
       } else if (out.Ndim() == 4 && in.Ndim() == 4) {

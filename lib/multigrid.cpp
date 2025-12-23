@@ -36,7 +36,19 @@ namespace quda
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
 
-    rng = new RNG(param.B[0], 1234);
+    // for 4-d-aggregated dwf MG, we need to be careful about the size of RNG
+    if (diracResidual->getLs() == 1) {
+      rng = new RNG(param.B[0], 1234);
+    } else {
+      // we need to create a dummy larger field
+      ColorSpinorParam csParam(param.B[0]);
+      csParam.nDim = 5;
+      csParam.x[4] = diracResidual->getLs();
+      csParam.create = QUDA_REFERENCE_FIELD_CREATE; // just create a metadata "container"
+      csParam.v = nullptr;
+      ColorSpinorField dummy(csParam);
+      rng = new RNG(dummy, 1234);
+    }
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE && param.level < param.Nlevel - 1) {
       if (param.B[0].Ndim() == 5 && param.level == 0)
@@ -599,7 +611,7 @@ namespace quda
 
     // Create the Dirac operators, first common parameters
     DiracParam diracParamPV;
-    diracParamPV.kappa = diracSmoother->Kappa();
+    diracParamPV.kappa = param.mg_global.kappa_dwf_null;
     diracParamPV.mass = diracSmoother->Mass();
     diracParamPV.mu = diracSmoother->Mu();              // doesn't matter
     diracParamPV.mu_factor = diracSmoother->MuFactor(); // doesn't matter
@@ -642,8 +654,7 @@ namespace quda
 
     // near-null vectors are generated with the Wilson operator
     diracParamPV.type = QUDA_WILSON_DIRAC;
-    warningQuda("The Wilson mass/kappa hasn't been properly set");
-    // diracParamPV.kappa = param.mg_global.kappa_dwf_null;
+    diracParamPV.kappa = param.mg_global.kappa_dwf_null;
     diracParamPV.gauge = fine_gauge;
     diracCoarseNull = new DiracWilson(diracParamPV);
     diracParamPV.gauge = sloppy_gauge;
@@ -680,8 +691,7 @@ namespace quda
 
     // Parameters that matter for coarse construction and application
     diracParam.dirac = const_cast<Dirac *>(diracNull);
-    diracParam.kappa = diracParam.dirac->Kappa();
-    warningQuda("diracParam.kappa needs to be set properly for null space generation");
+    diracParam.kappa = param.mg_global.kappa_dwf_null;
     diracParam.mass = diracParam.dirac->Mass();
     diracParam.mu = diracParam.dirac->Mu(); // ignored
     diracParam.mu_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level]; // ignored
@@ -1181,7 +1191,7 @@ namespace quda
         // populate x_coarse[0] with random values
         spinorNoise(x_coarse[0], *rng, QUDA_NOISE_UNIFORM);
 
-        // create a temporary 5-d fine vectors
+        // create a temporary 5-d fine vector
         csParamFine = ColorSpinorParam(tmp2);
         csParamFine.nDim = 5;
         csParamFine.x[4] = Ls;
@@ -1269,9 +1279,11 @@ namespace quda
 
       // check 4-d dslash
       {
+        printfQuda("Checking the internal 4-d coarse operator\n");
+
         // make sure diracCoarseNull is the coarse operator
         if (diracCoarseNull->getDiracType() != QUDA_COARSE_DIRAC)
-          errorQuda("Unexpected Dirac type %d", diracCoarseNull->getDiracType());
+          errorQuda("  Unexpected Dirac type %d", diracCoarseNull->getDiracType());
 
         // create 4-d coarse vectors
         ColorSpinorParam csParam(x_coarse[0]);
@@ -1309,20 +1321,22 @@ namespace quda
         auto max_deviation = blas::max_deviation(coarse_4_lhs[1], coarse_4_lhs[0]);
         auto l2_deviation = sqrt(xmyNorm(coarse_4_lhs[0], coarse_4_lhs[1]) / norm2(coarse_4_lhs[0]));
 
-        logQuda(QUDA_VERBOSE, "4-d L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+        logQuda(QUDA_VERBOSE, "  4-d L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
                 norm2(x_coarse[0]), r_nrm, l2_deviation, max_deviation[0]);
 
         if (check_deviation(l2_deviation, tol))
-          errorQuda("4-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+          errorQuda("  4-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
         if (check_deviation(max_deviation[0], tol))
-          warningQuda("4-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+          warningQuda("  4-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
       }
 
       // check 5-d dslash
       {
+        printfQuda("Checking the 5-d coarse dwf operator\n");
+
         // make sure diracCoarseResidual is the coarse pv operator
         if (diracCoarseResidual->getDiracType() != QUDA_COARSEPV_DIRAC)
-          errorQuda("Unexpected Dirac type %d", diracCoarseResidual->getDiracType());
+          errorQuda("  Unexpected Dirac type %d", diracCoarseResidual->getDiracType());
 
         // create 5-d coarse vectors
         ColorSpinorParam csParam(x_coarse[0]);
@@ -1354,7 +1368,7 @@ namespace quda
 
         // fine operator, which has different paths depending on if it's fine or coarse
         if (diracSmoother->getDiracType() == QUDA_COARSE_DIRAC) {
-          errorQuda("\"Fine\" PV level being coarse isn't supported yet");
+          errorQuda("  \"Fine\" PV level being coarse isn't supported yet");
         } else {
           // we need an extra basis change...
           csParamFine.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
@@ -1365,7 +1379,7 @@ namespace quda
           if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4DPV_DIRAC) {
             static_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
           } else {
-            errorQuda("The coarse MobiusPV op has not been implemented yet");
+            errorQuda("  The coarse MobiusPV op has not been implemented yet");
             // static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
           }
 
@@ -1382,13 +1396,88 @@ namespace quda
         auto max_deviation = blas::max_deviation(coarse_5d_lhs[1], coarse_5d_lhs[0]);
         auto l2_deviation = sqrt(xmyNorm(coarse_5d_lhs[0], coarse_5d_lhs[1]) / norm2(coarse_5d_lhs[0]));
 
-        logQuda(QUDA_VERBOSE, "5-d L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+        logQuda(QUDA_VERBOSE, "  5-d L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
                 norm2(coarse_5d_lhs[0]), r_nrm, l2_deviation, max_deviation[0]);
 
         if (check_deviation(l2_deviation, tol))
-          errorQuda("5-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+          errorQuda("  5-d Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
         if (check_deviation(max_deviation[0], tol))
-          warningQuda("5-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+          warningQuda("  5-d Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+      }
+
+      // check 5-d PV operator
+      {
+        printfQuda("Checking the 5-d coarse PV operator\n");
+
+        // make sure diracCoarseResidual is the coarse pv operator
+        if (diracCoarseResidual->getDiracType() != QUDA_COARSEPV_DIRAC)
+          errorQuda("  Unexpected Dirac type %d", diracCoarseResidual->getDiracType());
+
+        // create 5-d coarse vectors
+        ColorSpinorParam csParam(x_coarse[0]);
+        csParam.nDim = 5;
+        csParam.x[4] = diracResidual->getLs();
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+        auto coarse_5d_rhs = ColorSpinorField(csParam);
+        std::vector<ColorSpinorField> coarse_5d_lhs(2); // create two fields
+        for (auto &f : coarse_5d_lhs) f = ColorSpinorField(csParam);
+
+        // populate the coarse rhs with random noise
+        spinorNoise(coarse_5d_rhs, *rng, QUDA_NOISE_UNIFORM);
+
+        // create 5-d fine vectors
+        ColorSpinorParam csParamFine(tmp2);
+        csParamFine.nDim = 5;
+        csParamFine.x[4] = diracCoarseResidual->getLs();
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+        csParamFine.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+        auto fine_5d_rhs = ColorSpinorField(csParamFine);
+        auto fine_5d_lhs = ColorSpinorField(csParamFine);
+
+        // emulated
+
+        transfer->P(fine_5d_rhs, coarse_5d_rhs);
+
+        // fine operator, which has different paths depending on if it's fine or coarse
+        if (diracSmoother->getDiracType() == QUDA_COARSE_DIRAC) {
+          errorQuda("  \"Fine\" PV level being coarse isn't supported yet");
+        } else {
+          // we need an extra basis change...
+          csParamFine.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+          auto fine_5d_rhs_inter = ColorSpinorField(csParamFine);
+          auto fine_5d_lhs_inter = ColorSpinorField(csParamFine);
+
+          blas::copy(fine_5d_rhs_inter, fine_5d_rhs);
+          if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4DPV_DIRAC) {
+            static_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
+          } else {
+            errorQuda("  The coarse MobiusPV op has not been implemented yet");
+            // static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
+          }
+
+          blas::copy(fine_5d_lhs, fine_5d_lhs_inter);
+        }
+
+        transfer->R(coarse_5d_lhs[0], fine_5d_lhs);
+
+        // non-emulated
+        static_cast<DiracCoarsePV *>(diracCoarseResidual)->ApplyPVDagger(coarse_5d_lhs[1], coarse_5d_rhs);
+
+        // check
+        double r_nrm = norm2(coarse_5d_lhs[1]);
+        auto max_deviation = blas::max_deviation(coarse_5d_lhs[1], coarse_5d_lhs[0]);
+        auto l2_deviation = sqrt(xmyNorm(coarse_5d_lhs[0], coarse_5d_lhs[1]) / norm2(coarse_5d_lhs[0]));
+
+        logQuda(QUDA_VERBOSE, "  5-d PV L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
+                norm2(coarse_5d_lhs[0]), r_nrm, l2_deviation, max_deviation[0]);
+
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("  5-d Coarse PV operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          warningQuda("  5-d Coarse PV operator failed: max deviation = %e > %e", max_deviation[0], tol);
       }
 
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
@@ -1519,8 +1608,6 @@ namespace quda
         errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
-    if (is_verify_coarse_pv) errorQuda("Coarse PV verify starts breaking here");
-
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -1541,13 +1628,34 @@ namespace quda
 
     { // normal operator check for residual operator
       logQuda(QUDA_SUMMARIZE, "Checking normality of residual operator\n");
-      if (tmp2.Nspin() != 1 || tmp2.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+      Complex dot;
+      if (diracResidual->getLs() != 1) {
+        // dwf pv, create two temporary 
+
+        ColorSpinorParam csParamFine(tmp2);
+        csParamFine.nDim = 5;
+        csParamFine.x[4] = diracResidual->getLs();
+        csParamFine.create = QUDA_NULL_FIELD_CREATE;
+        csParamFine.gammaBasis = (param.level == 0 || param.level == 1) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+        // prepare vectors of fine 4-d fields for tmp2
+        auto tmp1_5d = ColorSpinorField(csParamFine);
+        auto tmp2_5d = ColorSpinorField(csParamFine);
+
+        spinorNoise(tmp1_5d, *rng, QUDA_NOISE_UNIFORM);
+
+        diracResidual->MdagM(tmp2_5d, tmp1_5d);
+
+        dot = cDotProduct(tmp1_5d, tmp2_5d);
+      } else if (tmp2.Nspin() != 1 || tmp2.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
         diracResidual->MdagM(tmp2, tmp1);
+        dot = cDotProduct(tmp1, tmp2);
       } else {
         // staggered preconditioned op.
         diracResidual->M(tmp2, tmp1);
+        dot = cDotProduct(tmp1, tmp2);
       }
-      Complex dot = cDotProduct(tmp1, tmp2);
+
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
@@ -1656,11 +1764,12 @@ namespace quda
     csParam.nDim = 4;
     csParam.x[4] = 1;
     csParam.create = QUDA_NULL_FIELD_CREATE;
+    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     // prepare vectors of 4-d fields for the rhs and emulated lhs
     auto rhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
     auto emul_lhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
-    vector_ref<ColorSpinorField> rhs_4d(rhs_4d_), emul_lhs_4d(emul_lhs_4d_);
+    cvector_ref<ColorSpinorField> rhs_4d(rhs_4d_), emul_lhs_4d(emul_lhs_4d_);
 
     // split rhs
     Split5DTo4DFields(rhs_4d, rhs);
@@ -1668,7 +1777,7 @@ namespace quda
     // prepare vectors to hold intermediate chiral projections
     auto chiral_plus_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
     auto chiral_minus_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
-    vector_ref<ColorSpinorField> chiral_plus(chiral_plus_4d_), chiral_minus(chiral_minus_4d_);
+    cvector_ref<ColorSpinorField> chiral_plus(chiral_plus_4d_), chiral_minus(chiral_minus_4d_);
 
     if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
       auto kappa5 = 0.5 / (5.0 + m5);

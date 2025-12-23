@@ -644,6 +644,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.staggered_kd_dagger_approximation
     = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  // the Wilson kappa value to use for near-null vector generation in DWF MG
+  mg_param.kappa_dwf_null = mg_kappa_dwf_null;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
@@ -1084,6 +1087,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   // whether or not to use the dagger approximation to Xinv, which is X^dagger
   mg_param.staggered_kd_dagger_approximation
     = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // the Wilson kappa value to use for near-null vector generation in DWF MG
+  mg_param.kappa_dwf_null = mg_kappa_dwf_null;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;

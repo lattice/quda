@@ -174,8 +174,8 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracMobiusPV::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                     double mu_factor, bool) const
+  void DiracMobiusPV::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double,
+                                     double, bool) const
   {
     errorQuda("DiracMobiusPV::createCoarseOp has not been implemented yet");
 
