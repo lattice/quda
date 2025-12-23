@@ -1168,6 +1168,7 @@ namespace quda
     if (inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
+
     if (param.level < param.Nlevel - 1) {
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
@@ -1469,7 +1470,21 @@ namespace quda
       saveVectors(B);
     }
 
+    if (param.mg_global.vec_copy_out[param.level] != nullptr) copyOutVectors(B);
+
     popLevel();
+  }
+
+  void MG::copyInVectors(std::vector<ColorSpinorField> &B)
+  {
+    auto* in = reinterpret_cast<std::vector<ColorSpinorField>*>(param.mg_global.vec_copy_in[param.level]);
+    blas::copy(B, *in);
+  }
+
+  void MG::copyOutVectors(std::vector<ColorSpinorField> &B)
+  {
+    auto* out = reinterpret_cast<std::vector<ColorSpinorField>*>(param.mg_global.vec_copy_out[param.level]);
+    blas::copy(*out, B);
   }
 
   // generate a full span of free vectors.
@@ -1703,6 +1718,8 @@ namespace quda
 
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }
+
+    if (param.mg_global.vec_copy_out[param.level] != nullptr) copyOutVectors(param.B);
 
     popLevel();
   }

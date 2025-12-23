@@ -1900,6 +1900,143 @@ void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** soluti
   free(h_solutions);
 }
 
+double openQCD_qudaInvertMG(int id, double mu, void* source, void* solution, int *status)
+{
+  double residual;
+  openQCD_qudaInvertMultiSrcMG(id, mu, &source, &solution, status, &residual);
+  return residual;
+}
+
+
+void *openQCD_qudaH2DPrec(void *openQCD_field, QudaPrecision prec)
+{
+  void *in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
+
+  if (qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in)) {
+
+    /* sets up the necessary parameters */
+    QudaInvertParam param = newOpenQCDParam();
+
+    /* creates a field on the CPU */
+    ColorSpinorParam cpuParam(in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+    ColorSpinorField in_h(cpuParam);
+
+    /* creates a field on the GPU with the same parameter set as the CPU field */
+    param.cuda_prec = prec;
+    ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+    ColorSpinorField *in_d = new ColorSpinorField(cudaParam);
+
+    *in_d = in_h; /* transfer the CPU field to GPU */
+    return in_d;
+  }
+
+  return nullptr;
+}
+
+
+static ColorSpinorField *openQCD_qudaSpinorAllocPrec(QudaPrecision prec)
+{
+  if (in_comm()) {
+    QudaInvertParam param = newOpenQCDParam();
+    param.cuda_prec = prec;
+    ColorSpinorParam cpuParam(nullptr, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+    ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+    ColorSpinorField *out_d = new ColorSpinorField(cudaParam);
+    return out_d;
+  } else {
+    return nullptr;
+  }
+}
+
+
+void openQCD_qudaInvertMultiSrcMG(int id, double mu, void** sources, void** solutions, int *status, double *residual)
+{
+  if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
+
+  /**
+   * This is to make sure we behave in the same way as openQCDs solvers, we call
+   * h_sw() which in turn calls sw_term(). We have to make sure that the SW-term
+   * in openQxD is setup and in sync with QUDAs.
+   */
+  if (qudaState.layout.h_sw != nullptr) {
+    qudaState.layout.h_sw();
+  } else {
+    WITH_COMM(errorQuda("qudaState.layout.h_sw is not set."));
+  }
+
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+  param->mu = mu;
+
+  if (!openQCD_qudaInvertParamCheck(param)) {
+    WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
+  }
+
+  if (param->inv_type_precondition != QUDA_MG_INVERTER) {
+    WITH_COMM(errorQuda("No MG preconditioner defined."));
+  }
+
+  void **h_sources = (void**) malloc(param->num_src*sizeof(void*));
+  void **h_solutions = (void**) malloc(param->num_src*sizeof(void*));
+
+  for (int i = 0; i < param->num_src; ++i) {
+    h_sources[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i, sources[i]);
+    h_solutions[i] = qudaState.init.buffer_field(qudaState.layout.world_comm, i+param->num_src, solutions[i]);
+    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, sources[i], h_sources[i]);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, solutions[i], h_solutions[i]);
+    }
+  }
+
+  ColorSpinorField *in = reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2DPrec(h_sources[0], QUDA_SINGLE_PRECISION));
+  ColorSpinorField *out = param->use_init_guess == QUDA_USE_INIT_GUESS_YES
+                        ? reinterpret_cast<ColorSpinorField *>(openQCD_qudaH2DPrec(h_solutions[0], QUDA_SINGLE_PRECISION))
+                        : openQCD_qudaSpinorAllocPrec(QUDA_SINGLE_PRECISION);
+
+  if (in_comm()) {
+    logQuda(QUDA_VERBOSE, "In CUDA %e\n", blas::norm2(*in));
+    logQuda(QUDA_VERBOSE, "Out CUDA %e\n", blas::norm2(*out));
+    auto mg_instance = (multigrid_solver*) param->preconditioner;
+    auto mg = (MG*) mg_instance->mg;
+    (*mg)(*out, *in);
+    logQuda(QUDA_VERBOSE, "mg_instance = %p\n", mg_instance);
+    logQuda(QUDA_VERBOSE, "mg = %p\n", mg);
+    logQuda(QUDA_VERBOSE, "In CUDA %e\n", blas::norm2(*in));
+    logQuda(QUDA_VERBOSE, "Out CUDA %e\n", blas::norm2(*out));
+  }
+
+  openQCD_qudaD2H(out, h_solutions[0]);
+  openQCD_qudaSpinorFree((void**) &in);
+  openQCD_qudaSpinorFree((void**) &out);
+
+
+  for (int i = 0; i < param->num_src; ++i) {
+    qudaState.layout.quda2openqcd(OPENQCD_FIELD_SPINOR, h_solutions[i], solutions[i]);
+    status[i] = param->true_res[i] <= param->tol ? param->iter : -1;
+    residual[i] = param->true_res[i];
+  }
+
+  if (!qudaState.init.two_grids_equal) {
+    MPI_Bcast(status, param->num_src, MPI_INT, 0, qudaState.layout.world_comm);
+    MPI_Bcast(residual, param->num_src, MPI_DOUBLE, 0, qudaState.layout.world_comm);
+  }
+
+  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaInvertMultiSrcMG()\n"));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  iter           = %d\n", param->iter));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops         = %.2e\n", param->gflops));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "  secs           = %.2e\n", param->secs));
+  for (int i = 0; i < param->num_src; ++i) {
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res[%d]    = %.2e\n", i, param->true_res[i]));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  true_res_hq[%d] = %.2e\n", i, param->true_res_hq[i]));
+    WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", i, status[i]));
+  }
+
+  free(h_sources);
+  free(h_solutions);
+}
+
+
 static void *openQCD_qudaInvertAsyncWrapper(void*)
 {
   /* enable the thread to use QUDA */

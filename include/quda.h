@@ -810,6 +810,12 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
+    /** Pointer to explicit null vectors to copy from */
+    void* vec_copy_in[QUDA_MAX_MG_LEVEL];
+
+    /** Pointer to explicit null vectors to copy to */
+    void* vec_copy_out[QUDA_MAX_MG_LEVEL];
+
     /** Whether to store the null-space vectors in singlefile or partfile format */
     QudaBoolean mg_vec_partfile[QUDA_MAX_MG_LEVEL];
 

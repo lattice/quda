@@ -373,6 +373,46 @@ double openQCD_qudaInvert(int id, double mu, void* source, void* solution, int *
 void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual);
 
 /**
+ * @brief      Apply the MG preconditioner. All fields passed and returned are
+ *             host (CPU) field in openQCD order.
+ *
+ * @param[in]  id        The solver identifier in the input file, i.e.
+ *                       "Solver #". The input file is the one given by
+ *                       quda_init
+ * @param[in]  mu        Twisted mass parameter
+ * @param[in]  source    The source
+ * @param[out] solution  The solution
+ * @param[out] status    If the function is able to solve the Dirac equation to
+ *                       the desired accuracy (invert_param->tol), status
+ *                       reports the total number of iteration steps. -1
+ *                       indicates that the inversion failed.
+ *
+ * @return     Residual
+ */
+double openQCD_qudaInvertMG(int id, double mu, void* source, void* solution, int *status);
+
+/**
+ * @brief      Apply the MG preconditioner. All fields passed and returned are
+ *             host (CPU) field in openQCD order. The source and solution fields
+ *             can be multiple fields, indicated by num_src (see
+ *             QudaInvertParam)
+ *
+ * @param[in]  id         The solver identifier in the input file, i.e.
+ *                        "Solver #". The input file is the one given by
+ *                        quda_init
+ * @param[in]  mu         Twisted mass parameter
+ * @param[in]  sources    The source(s)
+ * @param[out] solutions  The solution(s)
+ * @param[out] status     If the function is able to solve the Dirac equation to
+ *                        the desired accuracy (invert_param->tol), status[i]
+ *                        reports the total number of iteration steps for source
+ *                        i, where i = 0, ..., param->num_src-1. -1 indicates
+ *                        that the inversion failed.
+ * @param      residual   The num_src residuals
+ */
+void openQCD_qudaInvertMultiSrcMG(int id, double mu, void** sources, void** solutions, int *status, double *residual);
+
+/**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
  *             about the parameters.
  */
