@@ -34,17 +34,10 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       // operator is anti-Hermitian so do not instantiate dagger
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
-      } else if (arg.nParity == 2) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
-      }
+      if (arg.xpay)
+        Dslash::template instantiate<packStaggeredShmem, false, true>(tp, stream);
+      else
+        Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
     }
   };
 
@@ -64,7 +57,7 @@ namespace quda
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
-          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
         } else {
           errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
         }
@@ -74,7 +67,7 @@ namespace quda
             out, in, halo, U, U, a, x, parity, dagger, comm_override);
           Staggered<decltype(arg)> staggered(arg, out, in, halo);
 
-          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+          dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
         } else {
           errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
         }

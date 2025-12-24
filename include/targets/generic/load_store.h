@@ -15,11 +15,22 @@ namespace quda
     }
   };
 
-  template <typename VectorType> __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
+  template <typename vector_t> __device__ __host__ inline vector_t vector_load(const void *ptr, int idx)
   {
-    VectorType value;
+    vector_t value;
     target::dispatch<vector_load_impl>(value, ptr, idx);
     return value;
+  }
+
+  template <typename scalar_t, int N>
+  __device__ __host__ inline array<scalar_t, N> vector_load(const void *ptr, int idx)
+  {
+    using vector_t = typename VectorType<scalar_t, N>::type;
+    auto value_v = vector_load<vector_t>(ptr, idx);
+    array<scalar_t, N> value_a;
+    static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
+    memcpy(&value_a, &value_v, sizeof(vector_t));
+    return value_a;
   }
 
   /**
@@ -32,10 +43,19 @@ namespace quda
     }
   };
 
-  template <typename VectorType>
-  __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value)
+  template <typename vector_t> __device__ __host__ inline void vector_store(void *ptr, int idx, const vector_t &value)
   {
     target::dispatch<vector_store_impl>(ptr, idx, value);
+  }
+
+  template <typename scalar_t, int N>
+  __device__ __host__ inline void vector_store(void *ptr, int idx, const array<scalar_t, N> &value_a)
+  {
+    using vector_t = typename VectorType<scalar_t, N>::type;
+    vector_t value_v;
+    static_assert(sizeof(value_a) == sizeof(value_v), "array type and vector type are different sizes");
+    memcpy(&value_v, &value_a, sizeof(vector_t));
+    vector_store<vector_t>(ptr, idx, value_v);
   }
 
 } // namespace quda

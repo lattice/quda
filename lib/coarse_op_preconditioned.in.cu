@@ -95,7 +95,7 @@ namespace quda
       }
     }
 
-    bool advanceSharedBytes(TuneParam &) const { return false; }
+    bool tuneSharedBytes() const { return false; }
 
     bool advanceAux(TuneParam &param) const
     {
@@ -289,7 +289,7 @@ namespace quda
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
       calculateYhat<QUDA_CPU_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     } else {
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_NATIVE_GAUGE_ORDER;
       // if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
       calculateYhat<QUDA_CUDA_FIELD_LOCATION, storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X, use_mma);
     }

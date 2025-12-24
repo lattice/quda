@@ -520,7 +520,7 @@ void initQudaDevice(int dev)
 /*
  * Any persistent memory allocations that QUDA uses are done here.
  */
-void initQudaMemory()
+void initQudaMemory(void)
 {
   auto profile = pushProfile(profileInit);
   profileInit.TPSTART(QUDA_PROFILE_INIT);
@@ -546,7 +546,7 @@ void initQudaMemory()
   profileInit.TPSTOP(QUDA_PROFILE_INIT);
 }
 
-void updateR()
+void updateR(void)
 {
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 }
@@ -694,7 +694,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // set update_split_gauge to reuse backup or not and free the buf if needed
   // always update the flag even gauge reuse with checksum
   // better way would be do the checks more consistently along with clover/stagger
-  if (param->use_split_gauge_bkup == true) {
+  if (param->use_split_gauge_bkup) {
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_TRUE;
   } else {
     update_split_gauge = QUDA_UPDATE_SPLIT_GAUGE_OFF;
@@ -5605,6 +5605,7 @@ void performGFlowQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, Qud
   }
 
   popOutputPrefix();
+  popVerbosity();
 
 } /* end of performGFlowQuda */
 
@@ -5742,6 +5743,7 @@ void performAdjGFlowSafe(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   }
 
   popOutputPrefix();
+  popVerbosity();
 }
 
 void adjSafeEvolve(std::vector<std::reference_wrapper<std::vector<ColorSpinorField>>> sf_list,
@@ -6057,6 +6059,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
 
   logQuda(QUDA_DEBUG_VERBOSE, "Spinor written to cpu \n");
   popOutputPrefix();
+  popVerbosity();
 }
 
 /* save list of gauge vectors */

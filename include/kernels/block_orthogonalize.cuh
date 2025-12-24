@@ -135,7 +135,8 @@ namespace quda {
         for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, i) = v(s, c);
     }
 
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool alive = true)
     {
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
@@ -146,14 +147,20 @@ namespace quda {
       int x_cb[n_sites_per_thread];
 
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
-        int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
-        // all threads with x_fine_offset greater than aggregate_size_cb are second parity
-        int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
-        x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
-        parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
+        if (!allthreads || alive) {
+          int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
+          // all threads with x_fine_offset greater than aggregate_size_cb are second parity
+          int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
+          x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
+          parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
 
-        x_cb[tx] = x_offset_cb[tx] >= arg.aggregate_size_cb ? 0 :
-          arg.coarse_to_fine[ (x_coarse*2 + parity[tx]) * arg.aggregate_size_cb + x_offset_cb[tx] ] - parity[tx]*arg.fineVolumeCB;
+          x_cb[tx] = x_offset_cb[tx] >= arg.aggregate_size_cb ?
+            0 :
+            arg.coarse_to_fine[(x_coarse * 2 + parity[tx]) * arg.aggregate_size_cb + x_offset_cb[tx]]
+              - parity[tx] * arg.fineVolumeCB;
+        } else {
+          x_offset_cb[tx] = arg.aggregate_size_cb;
+        }
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
@@ -200,7 +207,8 @@ namespace quda {
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
-              for (int m = 0; m < mVec; m++) caxpy(-complex<real>(dot[m].real(), dot[m].imag()), vi[tx], v[m][tx]);
+              for (int m = 0; m < mVec; m++)
+                v[m][tx] = caxpy(-complex<real>(dot[m].real(), dot[m].imag()), vi[tx], v[m][tx]);
             }
           } // i
 
@@ -221,7 +229,9 @@ namespace quda {
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
-              for (int i = 0; i < m; i++) caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx], v[m][tx]); // subtract the blocks to orthogonalise
+              for (int i = 0; i < m; i++)
+                v[m][tx] = caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx],
+                                 v[m][tx]); // subtract the blocks to orthogonalise
               nrm += norm2(v[m][tx]);
             }
 

@@ -97,7 +97,7 @@ namespace quda {
         CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(Y, X, g, mass);
         launch_host<ComputeStaggeredVUV>(tp, stream, arg);
       } else if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        constexpr QudaGaugeFieldOrder order = QUDA_FLOAT2_GAUGE_ORDER;
+        constexpr QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER;
         CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(Y, X, g, mass);
         launch_device<ComputeStaggeredVUV>(tp, stream, arg);
       }
@@ -190,8 +190,8 @@ namespace quda {
         T.coarseToFine(Y.Location()));
     } else {
 
-      constexpr QudaFieldOrder csOrder = colorspinor::getNative<vFloat>(fineSpin);
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
+      constexpr QudaFieldOrder csOrder = QUDA_NATIVE_FIELD_ORDER;
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_NATIVE_GAUGE_ORDER;
 
       if (T.Vectors().FieldOrder() != csOrder) errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
@@ -359,8 +359,14 @@ namespace quda {
 
       // Create either a real or a dummy L field
       GaugeFieldParam lgf_param(longGauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, longGauge.Geometry());
-      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
+      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
         for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
+        lgf_param.nFace = 0;
+        lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      } else {
+        lgf_param.nFace = 3;
+        lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      }
       lgf_param.location = location;
       lgf_param.order = QUDA_QDP_GAUGE_ORDER;
       lgf_param.fixed = longGauge.GaugeFixed();
@@ -416,17 +422,17 @@ namespace quda {
         GaugeFieldParam lgf_param(longGauge);
         for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
         lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-        lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-        lgf_param.setPrecision(lgf_param.Precision());
+        lgf_param.setPrecision(lgf_param.Precision(), true);
         lgf_param.create = QUDA_NULL_FIELD_CREATE;
+        lgf_param.nFace = 0;
+        lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
         tmp_L = std::make_unique<GaugeField>(lgf_param);
         need_tmp_L = true;
       } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
         // create a copy of the gauge field with no reconstruction
         GaugeFieldParam lgf_param(longGauge);
         lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-        lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-        lgf_param.setPrecision(lgf_param.Precision());
+        lgf_param.setPrecision(lgf_param.Precision(), true);
         tmp_L = std::make_unique<GaugeField>(lgf_param);
 
         tmp_L->copy(longGauge);
@@ -440,8 +446,7 @@ namespace quda {
         for (int i = 0; i < xgf_param.nDim; i++) xgf_param.x[i] = 0;
         xgf_param.location = location;
         xgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-        xgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-        xgf_param.setPrecision(xgf_param.Precision());
+        xgf_param.setPrecision(xgf_param.Precision(), true);
         xgf_param.create = QUDA_NULL_FIELD_CREATE;
         tmp_Xinv = std::make_unique<GaugeField>(xgf_param);
         need_tmp_Xinv = true;
@@ -452,8 +457,7 @@ namespace quda {
         //Create a copy of the gauge field with no reconstruction, required for fine-grained access
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-        gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-        gf_param.setPrecision(gf_param.Precision());
+        gf_param.setPrecision(gf_param.Precision(), true);
         tmp_U = std::make_unique<GaugeField>(gf_param);
         need_tmp_U = true;
 

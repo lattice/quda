@@ -166,9 +166,12 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not available for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+option(QUDA_QCD_PLUS_QED "Enable QCD+QED features (builds QUDA_RECONSTRUCT_9/13 instead of 8/12 for Wilson-type operators)" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
+option(QUDA_INTERFACE_OPENQCD "build OpenQCD interface (for QCD+QED support, see QUDA_QCD_PLUS_QED)" OFF)
 option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
@@ -191,14 +194,6 @@ set(QUDA_OPENBLAS_HOME
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
-
-set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
-set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
-set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
-
-set_property(CACHE QUDA_ORDER_FP PROPERTY STRINGS 4 8)
-set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
-set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
@@ -231,6 +226,8 @@ set(QUDA_RECONSTRUCT
   "7"
   CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+option(QUDA_FLUSH_DENORMALS "Whether to fliush denormals to zero" OFF)
+
 option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
 option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
@@ -243,8 +240,6 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
-
-option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conversion" OFF)
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
@@ -273,19 +268,15 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_ORDER_FP)
-mark_as_advanced(QUDA_ORDER_SP_MG)
-mark_as_advanced(QUDA_ORDER_FP_MG)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
-
-mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_MAX_MULTI_RHS)
 mark_as_advanced(QUDA_MAX_MULTI_RHS_TILE)
 mark_as_advanced(QUDA_MAX_KERNEL_ARG_SIZE)
 mark_as_advanced(QUDA_PRECISION)
+mark_as_advanced(QUDA_FLUSH_DENORMALS)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
@@ -318,6 +309,13 @@ if(QUDA_MPI AND QUDA_QMP)
     "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
+if(QUDA_INTERFACE_OPENQCD AND QUDA_QMP)
+  message(SEND_ERROR "OpenQCD does not support QMP comms.")
+endif()
+
+if(QUDA_INTERFACE_OPENQCD AND NOT (QUDA_MPI))
+  message(SEND_ERROR "OpenQCD requires QUDA built with MPI comms.")
+endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")

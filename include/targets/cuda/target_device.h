@@ -17,6 +17,12 @@
 #define GRID_CONSTANT
 #endif
 
+#if defined(__NVCC__) && (CUDA_VERSION >= 12040)
+#define MAXNREG(x) __maxnreg__(x)
+#else
+#define MAXNREG(x)
+#endif
+
 namespace quda
 {
 
@@ -26,24 +32,42 @@ namespace quda
 #ifdef _NVHPC_CUDA
 
     // nvc++: run-time dispatch using if target
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
       if target (nv::target::is_device) {
-        return f<true>()(args...);
+        if constexpr (sizeof...(Params) == 0) {
+          return f<true>()(args...);
+        } else {
+          return f<true>().template operator()<Params...>(args...);
+        }
       } else {
-        return f<false>()(args...);
+        if constexpr (sizeof...(Params) == 0) {
+          return f<false>()(args...);
+        } else {
+          return f<false>().template operator()<Params...>(args...);
+        }
       }
     }
 
 #else
 
     // nvcc or clang: compile-time dispatch
-    template <template <bool, typename...> class f, typename... Args> __host__ __device__ auto dispatch(Args &&...args)
+    template <template <bool, typename...> class f, auto... Params, typename... Args>
+    __host__ __device__ auto dispatch(Args &&...args)
     {
 #ifdef __CUDA_ARCH__
-      return f<true>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<true>()(args...);
+      } else {
+        return f<true>().template operator()<Params...>(args...);
+      }
 #else
-      return f<false>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+        return f<false>()(args...);
+      } else {
+        return f<false>().template operator()<Params...>(args...);
+      }
 #endif
     }
 
@@ -163,6 +187,15 @@ namespace quda
       case 3:
       default: return block_dim().z * block_dim().y * block_dim().x;
       }
+    }
+
+    template <class T> constexpr bool vectorize()
+    {
+#ifdef QUDA_VECTORIZE_SINGLE
+      return std::is_same_v<T, float>;
+#else
+      return false;
+#endif
     }
 
   } // namespace target

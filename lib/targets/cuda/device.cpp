@@ -35,21 +35,30 @@ namespace quda
 
     static nvmlDevice_t monitor_device_id;
 
+    int get_driver_version()
+    {
+      int driver_version;
+      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
+      return driver_version;
+    }
+
+    int get_runtime_version()
+    {
+      int runtime_version;
+      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
+      return runtime_version;
+    }
+
     void init(int dev)
     {
       if (initialized) return;
       initialized = true;
 
-      int driver_version;
-      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
-      printfQuda("CUDA Driver version = %d\n", driver_version);
-
-      int runtime_version;
-      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
-      printfQuda("CUDA Runtime version = %d\n", runtime_version);
+      printfQuda("CUDA Driver version = %d\n", get_driver_version());
+      printfQuda("CUDA Runtime version = %d\n", get_runtime_version());
 
 #ifdef QUDA_LARGE_KERNEL_ARG
-      if (driver_version < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
+      if (get_driver_version() < 12010) errorQuda("Large kernel arguments not supported on pre CUDA 12.1 driver");
 #endif
 
       NVML_CHECK(nvmlInit());
@@ -351,6 +360,8 @@ namespace quda
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
       return max_blocks_per_sm;
     }
+
+    bool shared_carve_out_supported() { return true; }
 
     namespace profile
     {

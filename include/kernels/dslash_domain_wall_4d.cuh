@@ -26,8 +26,7 @@ namespace quda
     }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct domainWall4D : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall4D : dslash_default {
 
     const Arg &arg;
     template <typename Ftor> constexpr domainWall4D(const Ftor &ftor) : arg(ftor.arg) { }
@@ -47,7 +46,7 @@ namespace quda
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
@@ -56,7 +55,7 @@ namespace quda
         return;
       }
 
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
         out = arg.a_5[s] * out;

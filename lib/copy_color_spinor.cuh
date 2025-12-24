@@ -18,7 +18,7 @@ namespace quda
     ColorSpinorField &out;
     const ColorSpinorField &in;
 
-    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
+    bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return in.VolumeCB(); }
 
     std::string get_basis_str(QudaGammaBasis basis)
@@ -27,6 +27,7 @@ namespace quda
       case QUDA_DEGRAND_ROSSI_GAMMA_BASIS: return "degrand_rossi";
       case QUDA_UKQCD_GAMMA_BASIS: return "ukqcd";
       case QUDA_CHIRAL_GAMMA_BASIS: return "chiral";
+      case QUDA_OPENQCD_GAMMA_BASIS: return "openqcd";
       case QUDA_DIRAC_PAULI_GAMMA_BASIS: return "dirac_pauli";
       default: errorQuda("Unknown gamma basis %d", basis);
       }
@@ -41,9 +42,10 @@ namespace quda
       out(out),
       in(in)
     {
+      strcat(aux, ",");
       strcat(aux, out.AuxString().c_str());
       if (out.GammaBasis() != in.GammaBasis()) {
-        strcat(aux, "to_");
+        strcat(aux, ",to_");
         strcat(aux, get_basis_str(out.GammaBasis()).c_str());
         strcat(aux, ",from_");
         strcat(aux, get_basis_str(in.GammaBasis()).c_str());
@@ -67,6 +69,10 @@ namespace quda
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToNonRelBasis>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToChiralBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<OpenqcdToNonRelBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToOpenqcdBasis>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<DegrandRossiToDiracPaulBasis>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS) {
@@ -122,6 +128,12 @@ namespace quda
         CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
       else
         errorQuda("QDPJIT interface has not been built");
+    } else if (out.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
+      using O = OpenQCDDiracOrder<FloatOut, Ns, Nc>;
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>())
+        CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
+      else
+        errorQuda("OpenQCD interface has not been built");
     } else {
       errorQuda("Order %d not defined (Ns = %d, Nc = %d, precision = %d)", out.FieldOrder(), Ns, Nc, out.Precision());
     }
@@ -153,6 +165,12 @@ namespace quda
         genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
       else
         errorQuda("QDPJIT interface has not been built");
+    } else if (in.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
+      using ColorSpinor = OpenQCDDiracOrder<FloatIn, Ns, Nc>;
+      if constexpr (is_enabled<QUDA_OPENQCD_GAUGE_ORDER>())
+        genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
+      else
+        errorQuda("OpenQCD interface has not been built");
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d, precision = %d)", in.FieldOrder(), Ns, Nc, in.Precision());
     }

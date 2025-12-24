@@ -137,7 +137,7 @@ namespace quda {
     if (dir != 3) errorQuda("Unsupported direction %d", dir);
 
     // output array
-    array<double, 2> loop;
+    array<double, 2> loop = {};
 
     std::unique_ptr<GaugeField> condensed_field;
 

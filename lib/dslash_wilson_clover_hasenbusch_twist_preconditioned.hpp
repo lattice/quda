@@ -34,14 +34,11 @@ namespace quda
       Dslash::setParam(tp);
 
       // specialize here to constrain the template instantiation
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
-        else
-          errorQuda("Operator only defined for xpay=true");
-      } else {
-        errorQuda("Operator not defined nParity=%d", arg.nParity);
-      }
+      if (arg.nParity != 1) errorQuda("Operator not defined nParity=%d", arg.nParity);
+      if (arg.xpay)
+        Dslash::template instantiate<packShmem, true>(tp, stream);
+      else
+        errorQuda("Operator only defined for xpay=true");
     }
 
     long long flops() const
@@ -131,7 +128,7 @@ namespace quda
       ArgType arg(out, in, halo, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in, halo);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 
@@ -161,14 +158,11 @@ namespace quda
       Dslash::setParam(tp);
 
       // specialize here to constrain the template instantiation
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
-        else
-          errorQuda("Operator only defined for xpay=true");
-      } else {
-        errorQuda("Operator not defined nParity=%d", arg.nParity);
-      }
+      if (arg.nParity != 1) errorQuda("Operator not defined nParity=%d", arg.nParity);
+      if (arg.xpay)
+        Dslash::template instantiate<packShmem, true>(tp, stream);
+      else
+        errorQuda("Operator only defined for xpay=true");
     }
 
     long long flops() const
@@ -260,7 +254,7 @@ namespace quda
       using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, DDArg, recon, true>;
       ArgType arg(out, in, halo, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

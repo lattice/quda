@@ -62,7 +62,7 @@ namespace quda
       NdegTwistedMassArg<Float, nColor, nDim, DDArg, recon> arg(out, in, halo, U, a, b, c, x, parity, dagger,
                                                                 comm_override);
       NdegTwistedMass<decltype(arg)> twisted(arg, out, in, halo);
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, out, in, halo, profile);
     }
   };
 
