@@ -1215,6 +1215,9 @@ void qudaProject(int external_precision, void **source, void **solution, int nve
           parity == QUDA_EVEN_PARITY ? "EVEN" : "ODD");
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
+  // Multiple sweeps of projection to improve precision
+  int nsweeps = 2;
+
   // Check inputs
   for (int i = 0; i < nvec; i++)
     if (!source[i] || !solution[i]) errorQuda("Source or solution vector %d is null!", i);
@@ -1247,28 +1250,32 @@ void qudaProject(int external_precision, void **source, void **solution, int nve
   ColorSpinorParam gpuParam(space->evecs[0]);
   gpuParam.create = QUDA_ZERO_FIELD_CREATE;
   std::vector<ColorSpinorField> src(nvec);
-  std::vector<ColorSpinorField> sol(nvec);
   std::vector<ColorSpinorField> tmp(nvec);
   for (int i = 0; i < nvec; i++) {
-    sol[i] = ColorSpinorField(gpuParam);
-    sol[i] = sol_h[i];
     tmp[i] = ColorSpinorField(gpuParam);
     src[i] = ColorSpinorField(gpuParam);
     src[i] = src_h[i]; // Copy host sources to device sources
   }
 
-  // 1. Take block inner product: (V_i)^dag * src = s_i
-  std::vector<Complex> s(n_evec * src.size());
-  blas::block::cDotProduct(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {src.begin(), src.end()});
+  // Do nsweeps of projection on device
+  for (int sweep = 0; sweep < nsweeps; sweep++) {
 
-  // 2. Build projected component: Sum_i V_i * s_i = tmp
-  blas::block::caxpy(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {tmp.begin(), tmp.end()});
+    for (int i = 0; i < nvec; i++) blas::zero(tmp[i]);
 
-  // 3. Subtract projection: sol = src - tmp
-  for (int i = 0; i < nvec; i++) blas::axpbyz(-1.0, tmp[i], 1.0, src[i], sol[i]);
+    // 1. Take block inner product: (V_i)^dag * src = s_i
+    std::vector<Complex> s(n_evec * src.size());
+    blas::block::cDotProduct(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {src.begin(), src.end()});
+
+    // 2. Build projected component: Sum_i V_i * s_i = tmp
+    blas::block::caxpy(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {tmp.begin(), tmp.end()});
+
+    // 3. Subtract projection in place: src = src - tmp
+    for (int i = 0; i < nvec; i++) blas::axpy(-1.0, tmp[i], src[i]);;
+
+  }
 
   // Copy solution back to host
-  for (int i = 0; i < nvec; i++) sol_h[i] = sol[i];
+  for (int i = 0; i < nvec; i++) sol_h[i] = src[i];
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaProject
