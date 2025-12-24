@@ -66,10 +66,8 @@ static bool invalidate_quda_mg = true;
 
 static void *df_preconditioner = nullptr;
 
-static void *preserved_even_deflation_space = nullptr;
-static void *preserved_odd_deflation_space = nullptr;
-static double preserved_even_evals_mass = -1;
-static double preserved_odd_evals_mass = -1;
+static void *preserved_deflation_space[2] = {nullptr, nullptr};
+static double preserved_evals_mass[2] = {-1.0, -1.0};
 
 using namespace quda;
 using namespace quda::fermion_force;
@@ -117,21 +115,16 @@ void qudaInit(QudaInitArgs_t input)
 void qudaCleanUpDeflationSpace()
 {
   qudamilc_called<true>(__func__);
-  if (preserved_even_deflation_space) {
-    deflation_space *space = reinterpret_cast<deflation_space *>(preserved_even_deflation_space);
-    logQuda(QUDA_VERBOSE, "Cleaning up even parity deflation space of size %lu\n", space->evecs.size());
-    space->evecs.clear();
-    space->evals.clear();
-    delete space;
-    preserved_even_deflation_space = nullptr;
-  }
-  if (preserved_odd_deflation_space) {
-    deflation_space *space = reinterpret_cast<deflation_space *>(preserved_odd_deflation_space);
-    logQuda(QUDA_VERBOSE, "Cleaning up odd parity deflation space of size %lu\n", space->evecs.size());
-    space->evecs.clear();
-    space->evals.clear();
-    delete space;
-    preserved_odd_deflation_space = nullptr;
+  for (int p = 0; p < 2; p++) {
+    if (preserved_deflation_space[p]) {
+      deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space[p]);
+      logQuda(QUDA_VERBOSE, "Cleaning up parity %d deflation space of size %lu\n", p, space->evecs.size());
+      space->evecs.clear();
+      space->evals.clear();
+      delete space;
+      preserved_deflation_space[p] = nullptr;
+      preserved_evals_mass[p] = -1.0;
+    }
   }
   qudamilc_called<false>(__func__);
 }
@@ -1227,9 +1220,8 @@ void qudaProject(int external_precision, void **source, void **solution, int nve
   int vec_offset = getColorVectorOffset(parity, false, localDim) * host_precision;
 
   // Device-side deflation space
-  void *preserved_deflation_space
-    = (parity == QUDA_EVEN_PARITY) ? preserved_even_deflation_space : preserved_odd_deflation_space;
-  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+  if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d", parity);
+  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space[parity]);
   if (!space) errorQuda("Failed to get %s parity deflation space!", parity == QUDA_EVEN_PARITY ? "EVEN" : "ODD");
 
   // Wrap host vectors
@@ -1288,9 +1280,8 @@ void qudaGetDeflationSpace(void **evecs, double *evals, QudaParity parity, int N
   qudamilc_called<true>(__func__, verbosity);
 
   // Device-side deflation space
-  void *preserved_deflation_space
-    = (parity == QUDA_EVEN_PARITY) ? preserved_even_deflation_space : preserved_odd_deflation_space;
-  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space);
+  if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d", parity);
+  deflation_space *space = reinterpret_cast<deflation_space *>(preserved_deflation_space[parity]);
   if (!space) errorQuda("Failed to get %s parity deflation space!", parity == QUDA_EVEN_PARITY ? "EVEN" : "ODD");
   if (static_cast<size_t>(Nvecs) > space->evecs.size())
     errorQuda("Requested %d eigenvectors, but deflation space has only %lu", Nvecs, space->evecs.size());
@@ -1335,6 +1326,7 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
   default: device_precision_sloppy = device_precision;
   }
   QudaParity parity = inv_args.evenodd;
+  if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d", parity);
   QudaParity other_parity = parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
   double epsilon = device_precision == QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
   int n_evecs = eigargs.n_conv;
@@ -1374,11 +1366,10 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
 
   } else if (load_type == QUDA_MILC_EIG_FROM_OTHER_PARITY) {
     logQuda(QUDA_VERBOSE, "Computing deflation space for parity %d from parity %d\n", parity, other_parity);
-    double other_parity_mass = parity == QUDA_EVEN_PARITY ? preserved_odd_evals_mass : preserved_even_evals_mass;
+    double other_parity_mass = preserved_evals_mass[other_parity];
 
     // Get preserved other parity deflation space
-    void *preserved_space = (parity == QUDA_EVEN_PARITY) ? preserved_odd_deflation_space : preserved_even_deflation_space;
-    deflation_space *other_parity_space = reinterpret_cast<deflation_space *>(preserved_space);
+    deflation_space *other_parity_space = reinterpret_cast<deflation_space *>(preserved_deflation_space[other_parity]);
     if (!other_parity_space)
       errorQuda("Failed to get %s parity deflation space!", parity == QUDA_EVEN_PARITY ? "ODD" : "EVEN");
     if (other_parity_space->evecs.size() < static_cast<size_t>(n_evecs))
@@ -1432,13 +1423,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     delete dEig;
 
     // Preserve deflation space
-    if (parity == QUDA_EVEN_PARITY) {
-      preserved_even_deflation_space = space;
-      preserved_even_evals_mass = mass;
-    } else {
-      preserved_odd_deflation_space = space;
-      preserved_odd_evals_mass = mass;
-    }
+    preserved_deflation_space[parity] = space;
+    preserved_evals_mass[parity] = mass;
 
   } else if (load_type == QUDA_MILC_EIG_LOAD) {
 
@@ -1500,13 +1486,8 @@ void qudaLoadDeflationSpace(int external_precision, int quda_precision, const vo
     delete dEig;
 
     // Preserve deflation space
-    if (parity == QUDA_EVEN_PARITY) {
-      preserved_even_deflation_space = space;
-      preserved_even_evals_mass = mass;
-    } else {
-      preserved_odd_deflation_space = space;
-      preserved_odd_evals_mass = mass;
-    }
+    preserved_deflation_space[parity] = space;
+    preserved_evals_mass[parity] = mass;
 
   } else {
     errorQuda("Unrecognized load_type");
@@ -1767,6 +1748,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
                  inv_args.tadpole, inv_args.naik_epsilon);
 
   QudaParity local_parity = inv_args.evenodd;
+  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+  if (local_parity != QUDA_EVEN_PARITY && local_parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d", local_parity);
   const double reliable_delta = 1e-1;
 
   QudaInvertParam invertParam = newQudaInvertParam();
@@ -1782,33 +1765,24 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
 
   // Deflation space
   if (invertParam.eig_param && qep.preserve_deflation) { // if want deflation and use preserved space
-    qep.preserve_deflation_space
-      = local_parity == QUDA_EVEN_PARITY ? preserved_even_deflation_space : preserved_odd_deflation_space;
+    qep.preserve_deflation_space = preserved_deflation_space[local_parity];
     if (!qep.preserve_deflation_space) { // if does not exist yet
       // Check if other parity space exists
       // If so, construct this parity deflation space from other parity deflation space
       // Else, this is skipped and the deflation space is constructed via eigensolve during the call to the inverter
-      if (local_parity == QUDA_EVEN_PARITY ? preserved_odd_deflation_space : preserved_even_deflation_space) {
+      if (preserved_deflation_space[other_parity]) {
         qudaLoadDeflationSpace(external_precision, quda_precision, fatlink, longlink, mass, inv_args, eig_args, nullptr,
                                QUDA_MILC_EIG_FROM_OTHER_PARITY);
         // This parity deflation space should now exist
-        qep.preserve_deflation_space
-          = local_parity == QUDA_EVEN_PARITY ? preserved_even_deflation_space : preserved_odd_deflation_space;
+	qep.preserve_deflation_space = preserved_deflation_space[local_parity];
         if (!qep.preserve_deflation_space) errorQuda("Failed to load deflation space!");
       }
     }
     // Check that preserved eigenvalues are for this mass
     double epsilon = device_precision == QUDA_DOUBLE_PRECISION ? __DBL_EPSILON__ : __FLT_EPSILON__;
-    if (local_parity == QUDA_EVEN_PARITY) {
-      if (fabs(mass - preserved_even_evals_mass) > epsilon) {
-        logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
-        qep.preserve_evals = QUDA_BOOLEAN_FALSE;
-      }
-    } else if (local_parity == QUDA_ODD_PARITY) {
-      if (fabs(mass - preserved_odd_evals_mass) > epsilon) {
-        logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
-        qep.preserve_evals = QUDA_BOOLEAN_FALSE;
-      }
+    if (fabs(mass - preserved_evals_mass[local_parity]) > epsilon) {
+      logQuda(QUDA_VERBOSE, "Resetting eigenvalues to mass %e\n", invertParam.mass);
+      qep.preserve_evals = QUDA_BOOLEAN_FALSE;
     }
   }
 
@@ -1837,13 +1811,8 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
 
   // Preserve deflation space
   if (invertParam.eig_param && qep.preserve_deflation) {
-    if (local_parity == QUDA_EVEN_PARITY) {
-      preserved_even_deflation_space = qep.preserve_deflation_space;
-      preserved_even_evals_mass = mass;
-    } else if (local_parity == QUDA_ODD_PARITY) {
-      preserved_odd_deflation_space = qep.preserve_deflation_space;
-      preserved_odd_evals_mass = mass;
-    }
+    preserved_deflation_space[local_parity] = qep.preserve_deflation_space;
+    preserved_evals_mass[local_parity] = mass;
   }
 
   // The conventions for num_iters, final_residual, and final_fermilab_residual are taken from the
