@@ -1262,8 +1262,8 @@ void qudaProject(int external_precision, void **source, void **solution, int nve
     blas::block::caxpy(s, {space->evecs.begin(), space->evecs.begin() + n_evec}, {tmp.begin(), tmp.end()});
 
     // 3. Subtract projection in place: src = src - tmp
-    for (int i = 0; i < nvec; i++) blas::axpy(-1.0, tmp[i], src[i]);;
-
+    for (int i = 0; i < nvec; i++) blas::axpy(-1.0, tmp[i], src[i]);
+    ;
   }
 
   // Copy solution back to host
@@ -1774,7 +1774,7 @@ void qudaInvertMsrcDeflatable(int external_precision, int quda_precision, double
         qudaLoadDeflationSpace(external_precision, quda_precision, fatlink, longlink, mass, inv_args, eig_args, nullptr,
                                QUDA_MILC_EIG_FROM_OTHER_PARITY);
         // This parity deflation space should now exist
-	qep.preserve_deflation_space = preserved_deflation_space[local_parity];
+        qep.preserve_deflation_space = preserved_deflation_space[local_parity];
         if (!qep.preserve_deflation_space) errorQuda("Failed to load deflation space!");
       }
     }
