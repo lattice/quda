@@ -897,6 +897,58 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
 }
 
+/** Write gauge field to disk **/
+void writeGaugeQuda(const char *file, QudaGaugeParam *param)
+{
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  // Set the device field parameters
+  GaugeFieldParam gauge_param(*param);
+  gauge_param.pad = 0;
+  gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
+  gauge_param.create = QUDA_NULL_FIELD_CREATE;
+  gauge_param.setPrecision(param->cuda_prec, true);
+  GaugeField *cudaGauge = nullptr;
+  switch (param->type) {
+  case QUDA_WILSON_LINKS:
+    if (gaugePrecise == nullptr) errorQuda("gaugePrecise is not loaded");
+    cudaGauge = gaugePrecise;
+    break;
+  case QUDA_ASQTAD_FAT_LINKS:
+    if (gaugeFatPrecise == nullptr) errorQuda("gaugeFatPrecise is not loaded");
+    cudaGauge = gaugeFatPrecise;
+    break;
+  case QUDA_ASQTAD_LONG_LINKS:
+    if (gaugeLongPrecise == nullptr) errorQuda("gaugeLongPrecise is not loaded");
+    cudaGauge = gaugeLongPrecise;
+    break;
+  case QUDA_SMEARED_LINKS:
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared is not loaded");
+    cudaGauge = new GaugeField(gauge_param);
+    copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    break;
+  default: errorQuda("Invalid gauge type");
+  }
+
+  // Copy device field to host
+  quda::GaugeFieldParam cpu_param(gauge_param);
+  cpu_param.location      = QUDA_CPU_FIELD_LOCATION;
+  cpu_param.order         = QUDA_QDP_GAUGE_ORDER;
+  cpu_param.create        = QUDA_NULL_FIELD_CREATE;
+  quda::GaugeField cpuGauge(cpu_param);
+  cpuGauge.copy(*cudaGauge);
+
+  // Write to disk using QIO writer
+  write_gauge_field(file, reinterpret_cast<void **>(cpuGauge.raw_pointer()),
+                    cpuGauge.Precision(), param->X, 0, (char **)0);
+
+  // Clean up
+  if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
+
+} // writeGaugeQuda
+
 void loadSloppyCloverQuda(const QudaPrecision prec[]);
 void freeSloppyCloverQuda();
 
