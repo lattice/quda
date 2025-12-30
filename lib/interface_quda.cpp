@@ -934,16 +934,16 @@ void writeGaugeQuda(const char *file, QudaGaugeParam *param)
 
   // Copy device field to host
   quda::GaugeFieldParam cpu_param(gauge_param);
-  cpu_param.location      = QUDA_CPU_FIELD_LOCATION;
-  cpu_param.order         = QUDA_QDP_GAUGE_ORDER;
-  cpu_param.create        = QUDA_NULL_FIELD_CREATE;
+  cpu_param.location = QUDA_CPU_FIELD_LOCATION;
+  cpu_param.order = QUDA_QDP_GAUGE_ORDER;
+  cpu_param.create = QUDA_NULL_FIELD_CREATE;
   cpu_param.setPrecision(param->cpu_prec);
   quda::GaugeField cpuGauge(cpu_param);
   cpuGauge.copy(*cudaGauge);
 
   // Write to disk using QIO writer
-  write_gauge_field(file, reinterpret_cast<void **>(cpuGauge.raw_pointer()),
-                    cpuGauge.Precision(), param->X, 0, (char **)0);
+  write_gauge_field(file, reinterpret_cast<void **>(cpuGauge.raw_pointer()), cpuGauge.Precision(), param->X, 0,
+                    (char **)0);
 
   // Clean up
   if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
