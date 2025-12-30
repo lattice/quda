@@ -909,7 +909,7 @@ void writeGaugeQuda(const char *file, QudaGaugeParam *param)
   gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
-  gauge_param.setPrecision(param->cuda_prec, true);
+  gauge_param.setPrecision(param->cuda_prec);
   GaugeField *cudaGauge = nullptr;
   switch (param->type) {
   case QUDA_WILSON_LINKS:
@@ -937,6 +937,7 @@ void writeGaugeQuda(const char *file, QudaGaugeParam *param)
   cpu_param.location      = QUDA_CPU_FIELD_LOCATION;
   cpu_param.order         = QUDA_QDP_GAUGE_ORDER;
   cpu_param.create        = QUDA_NULL_FIELD_CREATE;
+  cpu_param.setPrecision(param->cpu_prec);
   quda::GaugeField cpuGauge(cpu_param);
   cpuGauge.copy(*cudaGauge);
 
