@@ -927,21 +927,19 @@ void writeGaugeQuda(const char *file, QudaGaugeParam *param)
     if (gaugeLongPrecise == nullptr) errorQuda("gaugeLongPrecise is not loaded");
     cpuGauge.copy(*gaugeLongPrecise);
     break;
-  case QUDA_SMEARED_LINKS:
-    {
-      if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared is not loaded");
-      // Copy to intermediate non-extended field before copying to cpuGauge
-      GaugeFieldParam cuda_param(*param);
-      cuda_param.location = QUDA_CUDA_FIELD_LOCATION;
-      cuda_param.create = QUDA_NULL_FIELD_CREATE;
-      cuda_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      cuda_param.pad = 0;
-      cuda_param.setPrecision(param->cuda_prec);
-      GaugeField cudaGauge(cuda_param);
-      copyExtendedGauge(cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-      cpuGauge.copy(cudaGauge);
-    }
-    break;
+  case QUDA_SMEARED_LINKS: {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared is not loaded");
+    // Copy to intermediate non-extended field before copying to cpuGauge
+    GaugeFieldParam cuda_param(*param);
+    cuda_param.location = QUDA_CUDA_FIELD_LOCATION;
+    cuda_param.create = QUDA_NULL_FIELD_CREATE;
+    cuda_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    cuda_param.pad = 0;
+    cuda_param.setPrecision(param->cuda_prec);
+    GaugeField cudaGauge(cuda_param);
+    copyExtendedGauge(cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    cpuGauge.copy(cudaGauge);
+  } break;
   default: errorQuda("Invalid gauge type");
   }
 
