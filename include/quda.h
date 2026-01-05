@@ -1175,6 +1175,13 @@ extern "C" {
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
   /**
+   * Write the gauge field to disk
+   * @param file Filename to write to
+   * @param param   Contains all metadata regarding host and device storage
+   */
+  void writeGaugeQuda(const char *file, QudaGaugeParam *param);
+
+  /**
    * Load the clover term and/or the clover inverse from the host.
    * Either h_clover or h_clovinv may be set to NULL.
    * @param h_clover    Base pointer to host clover field

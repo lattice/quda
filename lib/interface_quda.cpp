@@ -897,6 +897,58 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
 }
 
+/** Write gauge field to disk **/
+void writeGaugeQuda(const char *file, QudaGaugeParam *param)
+{
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  // Create CPU field
+  GaugeFieldParam cpu_param(*param);
+  cpu_param.pad = 0;
+  cpu_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cpu_param.location = QUDA_CPU_FIELD_LOCATION;
+  cpu_param.order = QUDA_QDP_GAUGE_ORDER;
+  cpu_param.create = QUDA_NULL_FIELD_CREATE;
+  cpu_param.setPrecision(param->cpu_prec);
+  GaugeField cpuGauge(cpu_param);
+
+  // Select source and copy into cpuGauge
+  switch (param->type) {
+  case QUDA_WILSON_LINKS:
+    if (gaugePrecise == nullptr) errorQuda("gaugePrecise is not loaded");
+    cpuGauge.copy(*gaugePrecise);
+    break;
+  case QUDA_ASQTAD_FAT_LINKS:
+    if (gaugeFatPrecise == nullptr) errorQuda("gaugeFatPrecise is not loaded");
+    cpuGauge.copy(*gaugeFatPrecise);
+    break;
+  case QUDA_ASQTAD_LONG_LINKS:
+    if (gaugeLongPrecise == nullptr) errorQuda("gaugeLongPrecise is not loaded");
+    cpuGauge.copy(*gaugeLongPrecise);
+    break;
+  case QUDA_SMEARED_LINKS: {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared is not loaded");
+    // Copy to intermediate non-extended field before copying to cpuGauge
+    GaugeFieldParam cuda_param(*param);
+    cuda_param.location = QUDA_CUDA_FIELD_LOCATION;
+    cuda_param.create = QUDA_NULL_FIELD_CREATE;
+    cuda_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    cuda_param.pad = 0;
+    cuda_param.setPrecision(param->cuda_prec);
+    GaugeField cudaGauge(cuda_param);
+    copyExtendedGauge(cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    cpuGauge.copy(cudaGauge);
+  } break;
+  default: errorQuda("Invalid gauge type");
+  }
+
+  // Write to disk using QIO writer
+  write_gauge_field(file, reinterpret_cast<void **>(cpuGauge.raw_pointer()), cpuGauge.Precision(), param->X, 0,
+                    (char **)0);
+
+} // writeGaugeQuda
+
 void loadSloppyCloverQuda(const QudaPrecision prec[]);
 void freeSloppyCloverQuda();
 
