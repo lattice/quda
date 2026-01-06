@@ -4173,28 +4173,6 @@ void computeKSLinkNew(void *fatlink, void *longlink, void *ulink, void *inlink)
     delete cudaInLinkEx2;
     
 }
-
-void computeKSLinkO(GaugeField &FatLink, GaugeField &LongLink, GaugeField &ULink, GaugeField &InLink){
-    double act_path[6];
-    GaugeFieldParam gParam(*gaugeSmeared);
-    gParam.location = QUDA_CUDA_FIELD_LOCATION;
-    gParam.link_type = QUDA_GENERAL_LINKS;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO; 
-    gParam.gauge = ULink.data();
-    GaugeField *cudaInLink = new GaugeField(gParam);
-    GaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
-    delete cudaInLink;
-    set_act_path(act_path,0);
-    fatKSLink(FatLink, *cudaInLinkEx, act_path);
-    unitarize_fat(FatLink,ULink);
-    delete cudaInLinkEx;
-    GaugeField *cudaInLinkEx2 = createExtendedGauge(ULink, R, profileFatLink);
-    set_act_path(act_path,1);
-    longKSLink(LongLink, *cudaInLinkEx2, act_path);
-    fatKSLink(FatLink, *cudaInLinkEx2, act_path);
-    delete cudaInLinkEx2;
-}
     
 void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 {
