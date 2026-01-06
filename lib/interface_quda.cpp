@@ -6418,7 +6418,7 @@ void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, 
   auto* meas_list_pt = reinterpret_cast<std::vector<unsigned int>*>(ferm_meas->meas_int_vec);
   if (meas_list_pt == nullptr){
     printfQuda("meas list not populated yet, populating now\n");
-    for (int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
+    for (unsigned int m=ferm_meas->meas_int; m <= n_steps_total; m = m + ferm_meas->meas_int){
         meas_int_vec.push_back(m);
     }
   }
