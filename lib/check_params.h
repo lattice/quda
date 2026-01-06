@@ -111,11 +111,13 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
   P(overlap, 0);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_TRUE);
 #else
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
   P(staggered_phase_applied, INVALID_INT);
   P(i_mu, INVALID_DOUBLE);
   P(overlap, INVALID_INT);
+  P(use_split_gauge_bkup, QUDA_BOOLEAN_FALSE);
 #endif
 
 #if defined INIT_PARAM
@@ -212,6 +214,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
+  P(spectrum, QUDA_SPECTRUM_INVALID);
   P(n_ev, INVALID_INT);
   P(n_kr, INVALID_INT);
   P(n_conv, INVALID_INT);
@@ -760,16 +763,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#ifdef NVSHMEM_COMMS
-  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
-#else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
-#endif
 #else
   P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
+  P(additional_prop, 0);
   P(distance_pc_alpha0, 0.0);
   P(distance_pc_t0, -1);
 #else

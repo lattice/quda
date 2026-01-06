@@ -81,7 +81,7 @@ namespace quda
                                                                                  dagger, comm_override, alpha0, t0);
       WilsonClover<decltype(arg)> wilson(arg, out, in, halo, A);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 

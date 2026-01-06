@@ -56,11 +56,7 @@ namespace quda
       Dslash::setParam(tp);
 
       // operator is Hermitian so do not instantiate dagger
-      if (arg.nParity == 1) {
-        Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
-      } else if (arg.nParity == 2) {
-        Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
-      }
+      Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
     }
 
     long long flops() const override
@@ -199,7 +195,7 @@ namespace quda
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, t0, is_tslice_kernel, parity,
                                                                          dir, dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(staggered_qsmear, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin = %d", in.Nspin());
       }

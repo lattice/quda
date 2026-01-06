@@ -54,6 +54,7 @@ module quda_fortran
      integer(4) :: staple_pad   ! Used by link fattening
      integer(4) :: llfat_ga_pad ! Used by link fattening
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
+     integer(4) :: use_split_gauge_bkup ! Used by gauge split buffers (default=true keep split gauge after usage)
 
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
@@ -366,6 +367,9 @@ module quda_fortran
      real(8) distance_pc_alpha0
      ! The t0 parameter for distance preconditioning, the timeslice where the source is located
      integer(4) distance_pc_t0
+
+     ! Additional user-defined properties
+     integer(8) :: additional_prop
 
   end type quda_invert_param
 

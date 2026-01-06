@@ -44,7 +44,7 @@ namespace quda
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     array<double, 4> plqrct {0.0, 0.0, 0.0, 0.0};
     instantiate<GaugePlaqRect, ReconstructGauge>(U, plqrct);
-    double4 plaqrect = make_double4(plqrct[0], plqrct[1], plqrct[2], plqrct[3]);
+    double4 plaqrect = {plqrct[0], plqrct[1], plqrct[2], plqrct[3]};
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return plaqrect;
   }

@@ -96,7 +96,7 @@ namespace quda
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
+  template <QudaPCType pc_type, KernelType kernel_type, typename Arg>
   __host__ __device__ __forceinline__ auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
   {
     constexpr auto nDim = Arg::nDim;
@@ -105,70 +105,64 @@ namespace quda
     dim = kernel_type; // keep compiler happy
 
     // only for 5-d checkerboarding where we need to include the fifth dimension
-    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dim[4] : 1);
+    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dc.X[4] : 1);
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;
       if (nDim == 5)
-        coord.X = getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
+        coord.X = getCoords5CB(coord, idx, arg.dc.X, arg.X0h, parity, pc_type);
       else
-        coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+        coord.X = getCoordsCB(coord, idx, arg.dc.X, arg.X0h, parity);
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_size = nface_ * arg.dc.ghostFaceCB[kernel_type] * Ls;
+      const int face_size = arg.dc.ghostFaceCB[kernel_type] * Ls;
       const int face_num = idx >= face_size;
       idx -= face_num * face_size;
-      coordsFromFaceIndex<nDim, pc_type, kernel_type, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+      coordsFromFaceIndex<nDim, pc_type, kernel_type, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
       // work out which dimension this thread corresponds to, then compute coords
       if (idx < arg.threadDimMapUpper[0] * Ls) { // x face
         dim = 0;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 0, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 0, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1] * Ls) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1] * Ls;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 1, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 1, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2] * Ls) { // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2] * Ls;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 2, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 2, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3] * Ls;
-        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 3, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 3, Arg::nFace>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       }
     }
     for (int i = 0; i < nDim; i++) { coord.gx[i] = arg.commCoord[i] + coord.x[i]; }
     coord.s = s;
+
+#pragma unroll
+    for (int d = 0; d < nDim; d++) {
+      coord.in_boundary[1][d] = coord[d] + arg.nFace >= arg.dc.X[d];
+      coord.in_boundary[0][d] = coord[d] - arg.nFace < 0;
+    }
+
     return coord;
-  }
-
-  /**
-     @brief Compute whether the provided coordinate is within the halo
-     region boundary of a given dimension.
-
-     @param[in] coord Coordinates
-     @param[in] Arg Dslash argument struct
-     @return True if in boundary, else false
-  */
-  template <int dim, typename Coord, typename Arg> inline __host__ __device__ bool inBoundary(const Coord &coord, const Arg &arg)
-  {
-    return ((coord[dim] >= arg.dim[dim] - arg.nFace) || (coord[dim] < arg.nFace));
   }
 
   /**
@@ -216,20 +210,20 @@ namespace quda
 
       case 2: // threadDim = Z
         if (!arg.commDim[3]) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.commDim[3] && (coord.in_boundary[0][3] || coord.in_boundary[1][3])) return false;
         break;
 
       case 1: // threadDim = Y
         if ((!arg.commDim[3]) && (!arg.commDim[2])) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
+        if (arg.commDim[3] && (coord.in_boundary[0][3] || coord.in_boundary[1][3])) return false;
+        if (arg.commDim[2] && (coord.in_boundary[0][2] || coord.in_boundary[1][2])) return false;
         break;
 
       case 0: // threadDim = X
         if ((!arg.commDim[3]) && (!arg.commDim[2]) && (!arg.commDim[1])) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
-        if (arg.commDim[1] && inBoundary<1>(coord, arg)) return false;
+        if (arg.commDim[3] && (coord.in_boundary[0][3] || coord.in_boundary[1][3])) return false;
+        if (arg.commDim[2] && (coord.in_boundary[0][2] || coord.in_boundary[1][2])) return false;
+        if (arg.commDim[1] && (coord.in_boundary[0][1] || coord.in_boundary[1][1])) return false;
         break;
 
       default: break;
@@ -240,22 +234,23 @@ namespace quda
     return true;
   }
 
-  template <typename Float_, int nDim_, typename DDArg, int n_src_tile_ = 1> struct DslashArg {
+  template <typename Float_, int nDim_, typename DDArg, int nFace_ = 1, int n_src_tile_ = 1> struct DslashArg {
 
     using Float = Float_;
     using real = typename mapper<Float>::type;
     static constexpr int nDim = nDim_;
+    static constexpr int nFace = nFace_;
     static constexpr int n_src_tile = n_src_tile_; // how many RHS per thread
+    static constexpr int max_regs = 0;             // by default we don't limit register count
+    static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
-    const int nFace;   // hard code to 1 for now
     const QudaReconstructType reconstruct;
 
     const int_fastdiv X0h;
-    const int_fastdiv dim[5]; // full lattice dimensions
+    const int dim[5];         // full lattice dimensions
     const int gDim[5];        // global full lattice dimensions
-    const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 
     const int commCoord[5];
@@ -269,27 +264,27 @@ namespace quda
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
 
     int_fastdiv threads; // number of threads in x-thread dimension
-    int_fastdiv exterior_threads; // number of threads in x-thread dimension for fused exterior dslash
-    int threadDimMapLower[4];
-    int threadDimMapUpper[4];
+    int_fastdiv exterior_threads = 0; // number of threads in x-thread dimension for fused exterior dslash
+    int threadDimMapLower[4] = {};
+    int threadDimMapUpper[4] = {};
 
     int_fastdiv n_src;
     int_fastdiv Ls;
 
     // these are set with symmetric preconditioned twisted-mass dagger
     // operator for the packing (which needs to a do a twist)
-    real twist_a; // scale factor
-    real twist_b; // chiral twist
-    real twist_c; // flavor twist
+    real twist_a = 0.0; // scale factor
+    real twist_b = 0.0; // chiral twist
+    real twist_c = 0.0; // flavor twist
 
-    int pack_threads; // really number of face sites we have to pack
-    int_fastdiv blocks_per_dir;
+    int pack_threads = 0; // really number of face sites we have to pack
+    int_fastdiv blocks_per_dir = 1;
     int sites_per_block;
-    int dim_map[4];
-    int active_dims;
-    int pack_blocks; // total number of blocks used for packing in the dslash
-    int exterior_dims; // dimension to run in the exterior Dslash
-    int exterior_blocks;
+    int dim_map[4] = {};
+    int active_dims = 0;
+    int pack_blocks = 0;   // total number of blocks used for packing in the dslash
+    int exterior_dims = 0; // dimension to run in the exterior Dslash
+    int exterior_blocks = 0;
 
     DDArg dd_out;
     DDArg dd_in;
@@ -305,7 +300,7 @@ namespace quda
     dslash::shmem_sync_t counter = 0;
 #else
     int shmem;
-    dslash::shmem_sync_t counter;
+    dslash::shmem_sync_t counter = 0;
     dslash::shmem_sync_t *sync_arr;
     dslash::shmem_interior_done_t &interior_done;
     dslash::shmem_interior_count_t &interior_count;
@@ -316,7 +311,7 @@ namespace quda
     // constructor needed for staggered to set xpay from derived class
     DslashArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &halo,
               const GaugeField &U, cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, bool xpay,
-              int nFace, int spin_project, const int *comm_override,
+              int spin_project, const int *comm_override,
 #ifdef NVSHMEM_COMMS
               int shmem_ = 0) :
 #else
@@ -324,39 +319,23 @@ namespace quda
 #endif
       parity(parity),
       nParity(in.SiteSubset()),
-      nFace(nFace),
       reconstruct(U.Reconstruct()),
       X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
       dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
       gDim {comm_dim(0) * dim[0], comm_dim(1) * dim[1], comm_dim(2) * dim[2], comm_dim(3) * dim[3], dim[4]},
-      volumeCB(in.VolumeCB()),
       commCoord {comm_coord(0) * dim[0], comm_coord(1) * dim[1], comm_coord(2) * dim[2], comm_coord(3) * dim[3], dim[4]},
       globalDim3(comm_dim(3) * this->dim[3]),
       dagger(dagger),
       xpay(xpay),
       kernel_type(INTERIOR_KERNEL),
       threads(in.VolumeCB()),
-      exterior_threads(0),
-      threadDimMapLower {},
-      threadDimMapUpper {},
       n_src(in.size()),
       Ls(halo.X(4) / in.size()),
-      twist_a(0.0),
-      twist_b(0.0),
-      twist_c(0.0),
-      pack_threads(0),
-      blocks_per_dir(1),
-      dim_map {},
-      active_dims(0),
-      pack_blocks(0),
-      exterior_dims(0),
-      exterior_blocks(0),
       dd_out(out.DD()),
       dd_in(in.DD()),
-      dd_x(x.DD()),
-#ifndef NVSHMEM_COMMS
-      counter(0)
-#else
+      dd_x(x.DD())
+#ifdef NVSHMEM_COMMS
+      ,
       shmem(shmem_),
       counter(dslash::get_dslash_shmem_sync_counter()),
       sync_arr(dslash::get_dslash_shmem_sync_arr()),
@@ -384,7 +363,9 @@ namespace quda
         halo.createComms(nFace, spin_project);
       }
       dc = halo.getDslashConstant();
+
       for (int dim = 0; dim < 4; dim++) {
+        dc.ghostFaceCB[dim] *= nFace;
         for (int dir = 0; dir < 2; dir++) {
           neighbor_ranks[2 * dim + dir] = commDim[dim] ? comm_neighbor_rank(dir, dim) : -1;
           bytes[2 * dim + dir] = halo.GhostFaceBytes(dim);
@@ -401,7 +382,7 @@ namespace quda
         pack_threads = 0;
         for (int i = 0; i < 4; i++) {
           if (!commDim[i]) continue;
-          pack_threads += 2 * nFace * dc.ghostFaceCB[i]; // 2 for fwd/back faces
+          pack_threads += 2 * dc.ghostFaceCB[i]; // 2 for fwd/back faces
           dim_map[d++] = i;
         }
         active_dims = d;
@@ -432,16 +413,16 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim, typename DDArg>
-  std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim, DDArg> &arg)
+  template <typename Float, int nDim, typename DDArg, int nFace, int n_src_tile>
+  std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim, DDArg, nFace, n_src_tile> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;
     out << "nFace = " << arg.nFace << std::endl;
     out << "reconstruct = " << arg.reconstruct << std::endl;
     out << "X0h = " << arg.X0h << std::endl;
-    out << "dim = { ";
-    for (int i = 0; i < 5; i++) out << arg.dim[i] << (i < 4 ? ", " : " }");
+    out << "dc.X = { ";
+    for (int i = 0; i < 5; i++) out << arg.dc.X[i] << (i < 4 ? ", " : " }");
     out << std::endl;
     out << "commDim = { ";
     for (int i = 0; i < 4; i++) out << arg.commDim[i] << (i < 3 ? ", " : " }");
@@ -483,6 +464,10 @@ namespace quda
      classed.
    */
   struct dslash_default {
+
+    // By default the dslash types do not have __syncthreads() in their operator();
+    constexpr static bool use_syncthreads = false;
+
     constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
     constexpr int twist_pack() const { return 0; }
   };
@@ -493,16 +478,15 @@ namespace quda
      template template class (template parameter D), which is a
      functor that can apply the dslash.
    */
-  template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-            class D,
-            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <template <typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D,
+            typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   void dslashCPU(Arg arg)
   {
-    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
+    D<Float, nDim, nColor, dagger, xpay, kernel_type, Arg> dslash;
 
-    for (int parity = 0; parity < nParity; parity++) {
+    for (int parity = 0; parity < arg.nParity; parity++) {
       // for full fields then set parity from loop else use arg setting
-      parity = nParity == 2 ? parity : arg.parity;
+      parity = arg.nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
         dslash(arg, x_cb, 0, parity);
@@ -510,26 +494,33 @@ namespace quda
     }   // parity
   }
 
+  template <KernelType kernel_type, bool allthreads = false, class D>
+  __forceinline__ __device__ void apply_dslash(D &dslash, int x_cb, int s, int parity, bool alive = true)
+  {
+    if constexpr (allthreads)
+      dslash.template operator()<kernel_type, true>(x_cb, s, parity, alive);
+    else
+      dslash.template operator()<kernel_type>(x_cb, s, parity);
+  }
+
 #ifdef NVSHMEM_COMMS
   /**
-   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed
+   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed.
+      This function is supposed to be called only by the last thread of the block.
    */
-  template <KernelType kernel_type, typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
+  template <typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
-    if (kernel_type == UBER_KERNEL) {
-      __syncthreads();
-      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
-        int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
-        if (amlast == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z - 1) {
-          arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
-          arg.interior_done.notify_all();
-          arg.interior_count.store(0, cuda::std::memory_order_relaxed);
-        }
-      }
+    int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
+    if (amlast
+        == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z
+          - 1) {
+      arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
+      arg.interior_done.notify_all();
+      arg.interior_count.store(0, cuda::std::memory_order_relaxed);
     }
   }
 
-  template <KernelType kernel_type, int nParity, class D, typename Arg>
+  template <KernelType kernel_type, class D, typename Arg>
   void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
@@ -635,15 +626,9 @@ namespace quda
 
       while (local_tid < threads_my_dir) {
         // for full fields set parity from z thread index else use arg setting
-        int parity = nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
-#ifdef QUDA_FAST_COMPILE_DSLASH
-        dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
-#else
-        switch (parity) {
-        case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
-        case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
-        }
-#endif
+        int parity
+          = arg.nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
+        apply_dslash<EXTERIOR_KERNEL_ALL>(dslash, tid, s, parity);
         local_tid += target::block_dim().x * blocks_per_dir;
         tid += target::block_dim().x * blocks_per_dir;
       }
@@ -658,17 +643,18 @@ namespace quda
     parameter D), which is a functor that can apply the dslash.  The
     packing routine (P) to be used is similarly passed.
    */
-  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
-            template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
+  template <template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
+            template <bool dagger, QudaPCType pc, typename Arg> class P_, bool dagger_, bool xpay_,
             KernelType kernel_type_, typename Arg_>
   struct dslash_functor_arg : kernel_param<use_kernel_arg> {
     using Arg = Arg_;
-    using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
+    using D = D_<dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
-    static constexpr int nParity = nParity_;
     static constexpr bool dagger = dagger_;
     static constexpr bool xpay = xpay_;
     static constexpr KernelType kernel_type = kernel_type_;
+    static constexpr int max_regs = Arg::max_regs;
+    static constexpr bool spill_shared = Arg::spill_shared;
     Arg arg;
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
@@ -686,7 +672,6 @@ namespace quda
    */
   template <typename Arg> struct dslash_functor : getKernelOps<typename Arg::D> {
     const typename Arg::Arg &arg;
-    static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
@@ -696,18 +681,20 @@ namespace quda
     {
     }
 
-    __forceinline__ __device__ void operator()(int, int s, int parity)
+    template <bool allthreads = false> // true if all threads in block will enter, even if out of range
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true)
     {
       typename Arg::D dslash(*this);
       // for full fields set parity from z thread index else use arg setting
-      if (nParity == 1) parity = arg.parity;
+      if (arg.nParity == 1) parity = arg.parity;
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        // first few blocks do packing kernel
-        typename Arg::template P<dslash.pc_type()> packer;
-        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
+        if (!allthreads || alive) {
+          // first few blocks do packing kernel
+          typename Arg::template P<dslash.pc_type()> packer;
+          packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+        }
         // we use that when running the exterior -- this is either
         // * an explicit call to the exterior when not merged with the interior or
         // * the interior with exterior_blocks > 0
@@ -716,25 +703,53 @@ namespace quda
                  && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                      || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
                          && target::block_idx().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
-        shmem_exterior<kernel_type, nParity>(dslash, arg, s);
+        shmem_exterior<kernel_type>(dslash, arg, s);
 #endif
       } else {
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
 
-#ifdef QUDA_FAST_COMPILE_DSLASH
-        dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
-#else
-        switch (parity) {
-        case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
-        case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
-        }
-#endif
 #ifdef NVSHMEM_COMMS
-        if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type>(arg);
+        constexpr bool use_nvshmem_comms = true;
+#else
+        constexpr bool use_nvshmem_comms = false;
 #endif
+        if constexpr (use_nvshmem_comms && Arg::D::use_syncthreads) {
+#ifdef NVSHMEM_COMMS
+          // Initialize a shared memory counter for the threads in the block
+          __shared__ cuda::atomic<int, cuda::thread_scope_block> block_counter;
+          if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
+            block_counter.store(0, cuda::std::memory_order_relaxed);
+          }
+          __syncthreads();
+
+          if (x_cb < arg.threads) {
+            apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(dslash, x_cb, s, parity);
+          }
+          // Use the shared memory counter to see if is the last thread in the block.
+          // If yes, signal that interior is done for this block.
+          int am_last_thread = block_counter.fetch_add(1, cuda::std::memory_order_acq_rel);
+          if constexpr (kernel_type == UBER_KERNEL) {
+            if (am_last_thread == (target::block_dim().x * target::block_dim().y * target::block_dim().z - 1))
+              shmem_signalinterior(arg);
+          }
+#endif
+        } else {
+          if (x_cb >= arg.threads) {
+            if constexpr (allthreads)
+              alive = false;
+            else
+              return;
+          }
+          apply_dslash<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(dslash, x_cb, s, parity,
+                                                                                               alive);
+          if constexpr (use_nvshmem_comms && kernel_type == UBER_KERNEL) {
+            __syncthreads();
+            if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0)
+              shmem_signalinterior(arg);
+          }
+        }
       }
     }
   };

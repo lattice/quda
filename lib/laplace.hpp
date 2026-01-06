@@ -39,17 +39,10 @@ namespace quda
       Dslash::setParam(tp);
 
       // operator is Hermitian so do not instantiate dagger
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
-      } else if (arg.nParity == 2) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
-      }
+      if (arg.xpay)
+        Dslash::template instantiate<packStaggeredShmem, false, true>(tp, stream);
+      else
+        Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
     }
 
     long long flops() const override
@@ -159,12 +152,12 @@ namespace quda
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, out, in, halo, profile);
       } else if (in.Nspin() == 4) {
         constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, DDArg, recon> arg(out, in, halo, U, dir, a, b, x, parity, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in, halo);
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, halo, profile);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, out, in, halo, profile);
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }

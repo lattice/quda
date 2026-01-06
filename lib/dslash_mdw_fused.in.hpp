@@ -22,6 +22,13 @@ namespace quda
                                  const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
                                  int halo_shift[4], MdwfFusedDslashType type);
 
+    void inline apply_fused_dslash_list(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                        ColorSpinorField &, const ColorSpinorField &, double, double, const Complex *,
+                                        const Complex *, bool, int, int[4], int[4], MdwfFusedDslashType, IntList<>)
+    {
+      errorQuda("No Ls has not been instantiated");
+    }
+
     template <int Ls, int... N>
     void apply_fused_dslash_list(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                  ColorSpinorField &y, const ColorSpinorField &x, double m_f, double m_5,
@@ -51,10 +58,9 @@ namespace quda
       apply_fused_dslash_list(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type, int_list);
     }
 #else
-    void inline apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                   ColorSpinorField &, const ColorSpinorField &, double, double,
-                                   const Complex *, const Complex *, bool, int, int[4],
-                                   int[4], MdwfFusedDslashType)
+    void inline apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
+                                   const ColorSpinorField &, double, double, const Complex *, const Complex *, bool,
+                                   int, int[4], int[4], MdwfFusedDslashType)
     {
       errorQuda("Domain wall dslash with tensor cores has not been built");
     }

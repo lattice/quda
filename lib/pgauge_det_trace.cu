@@ -54,14 +54,14 @@ namespace quda {
   {
     array<double, 2> det{0.0, 0.0};
     instantiate<CalcFunc>(data, det, compute_type::determinant);
-    return make_double2(det[0], det[1]);
+    return {det[0], det[1]};
   }
 
   double2 getLinkTrace(GaugeField& data)
   {
     array<double, 2> tr{0.0, 0.0};
     instantiate<CalcFunc>(data, tr, compute_type::trace);
-    return make_double2(tr[0], tr[1]);
+    return {tr[0], tr[1]};
   }
 
 } // namespace quda

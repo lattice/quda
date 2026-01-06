@@ -38,17 +38,10 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       // operator is anti-Hermitian so do not instantiate dagger
-      if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
-      } else if (arg.nParity == 2) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
-      }
+      if (arg.xpay)
+        Dslash::template instantiate<packStaggeredShmem, false, true>(tp, stream);
+      else
+        Dslash::template instantiate<packStaggeredShmem, false, false>(tp, stream);
     }
 
     /*
@@ -163,7 +156,7 @@ namespace quda
       StaggeredArg<Float, nColor, nDim, DDArg, recon_u, recon_l, improved> arg(out, in, halo, U, L, a, x, parity,
                                                                                dagger, comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in, halo, L);
-      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, out, in, halo, profile);
     }
   };
 

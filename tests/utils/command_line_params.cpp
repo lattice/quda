@@ -40,6 +40,7 @@ int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
+int use_split_gauge_bkup = 1;
 
 bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -195,11 +196,7 @@ quda::mgarray<std::array<int, 4>> geo_block_size = {};
 bool mg_allow_truncation = false;
 bool mg_staggered_kd_dagger_approximation = false;
 
-#ifdef NVSHMEM_COMMS
-bool use_mobius_fused_kernel = false;
-#else
 bool use_mobius_fused_kernel = true;
-#endif
 
 int n_ev = 8;
 int max_search_dim = 64;
@@ -345,7 +342,7 @@ bool prop_read_sources = false;
 int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
-std::array<int, 4> covdev_mu = {1, 1, 1, 1};
+int covdev_mu = 3;
 
 // Parameters for the (gaussian) quark smearing operator
 int    smear_n_steps = 50;
@@ -577,6 +574,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--laplace3D", laplace3D,
     "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
+  quda_app->add_option("--use-split-gauge-bkup", use_split_gauge_bkup, "Use gauge split buff or not");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");
 
@@ -1354,5 +1352,5 @@ void add_clover_force_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_covdev_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Covdev", "Options controlling  cov derivative parameteres");
-  opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction(s) (default 1 1 1 1 - all directions)")->expected(4);
+  opgroup->add_option("--covdev-mu", covdev_mu, "Set the direction for the covariant derivative");
 }

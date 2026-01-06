@@ -1,3 +1,5 @@
+#pragma once
+
 /**
    @file quda_define.h
    @brief Macros defined set by the cmake build system.  This file
@@ -38,6 +40,12 @@
  */
 #define MAX_MULTI_RHS_TILE @QUDA_MAX_MULTI_RHS_TILE@
 
+/**
+ * @def   QUDA_ALTERNATIVE_I_TO_F
+ * @brief This sets the percentage of I2F conversions using the alternative path
+ */
+#define QUDA_ALTERNATIVE_I_TO_F @QUDA_ALTERNATIVE_I_TO_F@
+
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**
@@ -58,6 +66,8 @@
 #define HETEROGENEOUS_ATOMIC_INF_INIT
 #undef QUDA_HETEROGENEOUS_ATOMIC_INF_INIT
 #endif
+
+#cmakedefine QUDA_SHARED_MEMORY_SPILL
 
 #cmakedefine QUDA_LARGE_KERNEL_ARG
 
@@ -80,7 +90,7 @@
 #endif
 
 #cmakedefine QUDA_DIRAC_CLOVER
-#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH)
 /**
  * @def   GPU_CLOVER_DIRAC
  * @brief This macro is set when we have clover fermions enabled
@@ -251,35 +261,34 @@
 #endif
 
 /**
- * @def QUDA_ORDER_FP
- * @brief This macro sets the data ordering for Wilson, gauge
- * (recon-8/9) and clover fixed-point fields
+ * @def QUDA_ORDER_DOUBLE
+ * @brief This macro sets the data ordering for double precision fields
  */
-#define QUDA_ORDER_FP @QUDA_ORDER_FP@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
-#endif
+#define QUDA_ORDER_DOUBLE @QUDA_ORDER_DOUBLE@
 
 /**
- * @def QUDA_ORDER_SP
- * @brief This macro sets the data ordering for single-precision multigrid fields
+ * @def QUDA_ORDER_SINGLE
+ * @brief This macro sets the data ordering for single precision fields
  */
-#define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
-
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
-#endif
+#define QUDA_ORDER_SINGLE @QUDA_ORDER_SINGLE@
 
 /**
- * @def QUDA_ORDER_FP_MG
- * @brief This macro sets the data ordering for fixed-point multigrid fields
+ * @def QUDA_ORDER_HALF
+ * @brief This macro sets the data ordering for half precision fields
  */
-#define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
+#define QUDA_ORDER_HALF @QUDA_ORDER_HALF@
 
-#ifdef __cplusplus
-static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
-#endif
+/**
+ * @def QUDA_ORDER_QUARTER
+ * @brief This macro sets the data ordering for quarter precision fields
+ */
+#define QUDA_ORDER_QUARTER @QUDA_ORDER_QUARTER@
+
+/**
+ * @def QUDA_VECTORIZE_SINGLE
+ * @brief Whether to employ vectorized instruction for single precision (where supported)
+ */
+#cmakedefine QUDA_VECTORIZE_SINGLE
 
 /**
  * @def QUDA_BUILD_NATIVE_FFT

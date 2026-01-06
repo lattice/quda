@@ -7,6 +7,7 @@
 #include <target_device.h>
 #include <hip/hip_runtime.h>
 #include <quda_hip_api.h>
+#include <kernel_helper.h>
 
 // if this macro is defined then we profile the HIP API calls
 //#define API_PROFILE
@@ -95,10 +96,10 @@ namespace quda
     }
   } // namespace
 
-  // No need to abstract these across the library so keep these definitions local to CUDA target
+  // No need to abstract these across the library so keep these definitions local to HIP target
 
   /**
-     @brief Wrapper around cudaFuncSetAttribute with built-in error checking
+     @brief Wrapper around hipFuncSetAttribute with built-in error checking
      @param[in] kernel Kernel function for which we are setting the attribute
      @param[in] attr Attribute to set
      @param[in] value Value to set
@@ -107,8 +108,8 @@ namespace quda
                              const char *line);
 
   /**
-     @brief Wrapper around cudaFuncGetAttributes with built-in error checking
-     @param[in] attr the cudaFuncGetAttributes object to store the output
+     @brief Wrapper around hipFuncGetAttributes with built-in error checking
+     @param[in] attr the hipFuncGetAttributes object to store the output
      @param[in] kernel Kernel function for which we are setting the attribute
   */
   void qudaFuncGetAttributes_(hipFuncAttributes &attr, const void *kernel, const char *func, const char *file,
@@ -122,13 +123,13 @@ namespace quda
 
   static TimeProfile apiTimer("HIP API calls (runtime)");
 
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
+  qudaError_t qudaLaunchKernel(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
   {
-    // no driver API variant here since we have C++ functions
+    auto func = kernel.func;
     void *args[] = {const_cast<void *>(arg)};
     PROFILE(hipError_t error = hipLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, get_stream(stream)),
             QUDA_PROFILE_LAUNCH_KERNEL);
-    set_runtime_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+    set_runtime_error(error, __func__, kernel.name.c_str(), __FILE__, __STRINGIFY__(__LINE__), activeTuning());
     return error == hipSuccess ? QUDA_SUCCESS : QUDA_ERROR;
   }
 
@@ -225,7 +226,7 @@ namespace quda
           case hipMemcpyHostToDevice: type = QUDA_PROFILE_MEMCPY_H2D_ASYNC; break;
           case hipMemcpyDeviceToDevice: type = QUDA_PROFILE_MEMCPY_D2D_ASYNC; break;
           case hipMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
-          default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
+          default: errorQuda("Unsupported hipMemcpyTypeAsync %d", kind);
           }
 #endif
           hipError_t error;
@@ -455,6 +456,15 @@ namespace quda
     PROFILE(hipError_t error = hipFuncGetAttributes(&attr, reinterpret_cast<const void *>(kernel)),
             QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
     set_runtime_error(error, "hipFuncGetAttributes", func, file, line);
+  }
+
+  int qudaOccupancyMaxActiveBlocks(const kernel_t &kernel, const TuneParam &tp)
+  {
+    int numBlocks;
+    hipError_t error = hipOccupancyMaxActiveBlocksPerMultiprocessor(
+      &numBlocks, kernel.func, tp.block.x * tp.block.y * tp.block.z, tp.shared_bytes);
+    set_runtime_error(error, __func__, kernel.name.c_str(), __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+    return numBlocks;
   }
 
   void printAPIProfile()

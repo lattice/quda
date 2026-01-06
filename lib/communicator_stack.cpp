@@ -113,6 +113,8 @@ namespace quda
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
 
+  bool comm_dim_cstar(int dim) { return get_current_communicator().comm_dim_cstar(dim); }
+
   int comm_dim_global(int dim) { return get_default_communicator().comm_dim(dim); }
 
   int comm_coord(int dim) { return get_current_communicator().comm_coord(dim); }
