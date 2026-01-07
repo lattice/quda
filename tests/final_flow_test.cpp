@@ -143,6 +143,11 @@ std::vector<unsigned int> read_meas_int_vec()
     return res;
 }
 
+int linkIndex(const int* x, const int* X) {
+    int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
+    return idx;
+}
+
 void write_files(const QudaFermMeasurements &ferm_meas)
 {
    std::cout << "File QUDA rank: " << quda::comm_rank() << "\n";
@@ -493,7 +498,24 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
     out_flowed_ptr[n] = out_flowed[n].data();
   }
 
-  // printfQuda("TEST INVERT\n");
+  quda::ColorSpinorField pion_source(cs_param);
+  quda::ColorSpinorField one_field(cs_param);
+  // genericSource(pion_source,QUDA_CONSTANT_SOURCE,0,0,0);
+  genericSource(pion_source,QUDA_POINT_SOURCE,0,0,0);
+  genericSource(one_field,QUDA_CONSTANT_SOURCE,1,0,0);
+  auto dott = quda::blas::cDotProduct(pion_source,one_field);
+  auto dot_real = dott.real();
+  pion_source.PrintVector(0,0,0);
+  one_field.PrintVector(0,0,0);
+  printfQuda("dott %d\n",dot_real);
+  printfQuda("comm_dim first %d\n",comm_dim(3));
+  int origin[4] = {0, 0, 0, 0};
+  auto x_cb_true = linkIndex(origin, pion_source.X() );
+  auto which_rank = lex_rank_from_coords_t(origin, (void*)pion_source.X());
+  
+  // Topology *topo = quda::comm_default_topology();
+  // auto which_rank = quda::comm_rank_from_coords(topo,origin);
+  // auto which_rank = comm_coords(origin);
   // invertQuda(out[0].data(), in_raw[0].data(), &inv_param);
   // in_raw[0].PrintVector(0,0,0);
   // out[0].PrintVector(0,0,0);

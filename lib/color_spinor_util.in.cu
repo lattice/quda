@@ -7,6 +7,7 @@
 #include <instantiate.h>
 #include <domain_decomposition_helper.cuh>
 #include <int_list.hpp>
+#include <comm_quda.h>
 
 namespace quda {
 
@@ -32,7 +33,13 @@ namespace quda {
      Create a point source at spacetime point x, spin s and colour c
   */
   template <class T>
-  void point(T &t, int x, int s, int c) { t(x%2, x/2, s, c) = 1.0; }
+  void point(T &t, int x, int s, int c, const ColorSpinorField &meta) {
+      int origin[4] = {0, 0, 0, 0};
+      int X[4] = { meta.X(0), meta.X(1), meta.X(2), meta.X(3) };
+      int which_rank = origin[0];
+      for (int i = 1; i < 4; i++) { which_rank = X[i] * which_rank + origin[i]; }
+      if (comm_rank() == which_rank) t(x%2, x/2, s, c) = 1.0;
+  }
 
   /**
      Set all space-time real elements at spin s and color c of the
@@ -122,7 +129,7 @@ namespace quda {
 
     FieldOrderCB<Float,nSpin,nColor,1,order> A(a);
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
-    else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
+    else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c, a);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
     else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s, c, a);
     else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c, a);

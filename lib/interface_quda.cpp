@@ -6056,7 +6056,7 @@ void perform_ferm_ppb_meas(std::vector<ColorSpinorField>&f_temp4, std::vector<Co
 
       for (size_t nn = 0; nn < f_temp4.size(); nn++){
         std::fill(result_global.begin(), result_global.end(), 0.0);
-        contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes,  0, 0);
+        contractSummedQuda(f_temp3[nn], f_temp4[nn], result_global, cType, (int*)&source_position,(int*) &mom_modes, (QudaFFTSymmType*)&fft_modes, 0, 0);
         //necessary?
         comm_allreduce_sum(result_global);
         ppb_t_el.push_back(result_global);
@@ -6169,7 +6169,6 @@ void algorithmHier(std::vector<std::reference_wrapper<std::vector<ColorSpinorFie
 void performAdjGFlowHier(void **h_out, void **h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, QudaFermMeasurements *ferm_meas,
                          size_t nSpinors)
 {
-
   auto profile = pushProfile(profileAdjGFlowHier);
   pushOutputPrefix("performAdjGFlowQudaHier: ");
   checkGaugeSmearParam(smear_param);
