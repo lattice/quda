@@ -298,6 +298,7 @@ namespace quda
       aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",Ns=" << nSpin
              << ",Nc=" << nColor << ",order=" << fieldOrder;
       if (isNative()) aux_ss << ",N=" << colorspinor::get_vector_order(precision, 128);
+      if (precision < QUDA_SINGLE_PRECISION) aux_ss << ",alt_i2f=" << QUDA_ALTERNATIVE_I_TO_F;
       if (nVec > 1) aux_ss << ",nVec=" << nVec;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
