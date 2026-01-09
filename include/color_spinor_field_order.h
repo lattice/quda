@@ -1126,16 +1126,9 @@ namespace quda
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       using AllocInt = typename AllocType<huge_alloc>::type;
-      using norm_type = float;
+      using norm_t = float;
       Float *field = nullptr;
-      //#define LEGACY_ACCESSOR_NORM // legacy code where norm pointer and offset are stored instead of computed
-#ifdef LEGACY_ACCESSOR_NORM
-      norm_type *norm = nullptr;
-#endif
       AllocInt offset = 0; // offset can be 32-bit or 64-bit
-#ifdef LEGACY_ACCESSOR_NORM
-      AllocInt norm_offset = 0;
-#endif
       int volumeCB = 0;
 
       FloatNOrder() = default;
@@ -1144,14 +1137,7 @@ namespace quda
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         GhostNOrder(a, nFace, ghost_),
         field(buffer ? buffer : a.data<Float *>()),
-#ifdef LEGACY_ACCESSOR_NORM
-        norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
-                      const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
-#endif
         offset(a.Bytes() / (2 * sizeof(Float))),
-#ifdef LEGACY_ACCESSOR_NORM
-        norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
-#endif
         volumeCB(a.VolumeCB())
       {
       }
@@ -1160,12 +1146,8 @@ namespace quda
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
         real v[length];
-#ifndef LEGACY_ACCESSOR_NORM
-        auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
-        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns)); // FIXME - optimize 64-bit indexing here
-#endif
-        norm_type nrm = isFixed<Float>::value ? vector_load<float, 1>(norm, x + parity * norm_offset)[0] : 0.0;
-
+        auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
+        norm_t nrm = isFixed<Float>::value ? vector_load<norm_t, 1>(field, x + norm_offset)[0] : 0.0;
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
@@ -1186,11 +1168,8 @@ namespace quda
 
       __device__ __host__ inline void prefetch(int x, int parity = 0) const
       {
-#ifndef LEGACY_ACCESSOR_NORM
-        auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
-        auto norm = reinterpret_cast<float *>(field + volumeCB * (2 * Nc * Ns));
-#endif
-        if constexpr (isFixed<Float>::value) prefetch_cache_line(norm + (x + parity * norm_offset));
+        auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
+        if constexpr (isFixed<Float>::value) prefetch_cache_line(reinterpret_cast<norm_t*>(field) + (x + norm_offset));
 
 #pragma unroll
         for (int i = 0; i < M; i++) prefetch_cache_line(field + (parity * offset + (volumeCB * i + x) * N));
@@ -1202,27 +1181,25 @@ namespace quda
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];
-#ifndef LEGACY_ACCESSOR_NORM
-        auto norm_offset = offset / (sizeof(Float) < sizeof(float) ? sizeof(norm_type) / sizeof(Float) : 1);
-        auto norm = reinterpret_cast<float *>(field + (volumeCB * 2 * Nc * Ns));
-#endif
+        auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
+
 #pragma unroll
         for (int i = 0; i < length / 2; i++) {
           v[2 * i + 0] = in[i].real();
           v[2 * i + 1] = in[i].imag();
         }
 
-        norm_type scale = 0.0;
-        norm_type scale_inv = 0.0;
+        norm_t scale = 0.0;
+        norm_t scale_inv = 0.0;
         if constexpr (isFixed<Float>::value) {
-          norm_type max_[length / 2];
+          norm_t max_[length / 2];
           // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
           for (int i = 0; i < length / 2; i++)
-            max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
+            max_[i] = fmaxf(fabsf((norm_t)v[i]), fabsf((norm_t)v[i + length / 2]));
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-          norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
+          reinterpret_cast<norm_t*>(field)[x + norm_offset] = scale * fixedInvMaxValue<Float>::value;
           scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
         }
 
