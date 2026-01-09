@@ -12,7 +12,7 @@ namespace quda {
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
 
-    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, colorspinor::getNative<real>(nSpin)>;
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, QUDA_NATIVE_FIELD_ORDER>;
     
     F out[MAX_MULTI_RHS]; // output vector field
     F in[MAX_MULTI_RHS];  // input vector field
