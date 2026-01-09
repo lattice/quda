@@ -92,6 +92,7 @@ namespace quda
     template <typename U> static inline void comm_reduce(U &) { }
 
     // Final param is unused in the MultiReduce functor in this use case.
+    template <int s1>
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
     {
       constexpr int nSpin = Arg::nSpin;
@@ -100,10 +101,9 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      constexpr array<array<int, nSpin>, nSpin *nSpin> gm_i = get_dr_gm_i();
-      constexpr array<array<complex<real>, nSpin>, nSpin *nSpin> g5gm_z = get_dr_g5gm_z<real>();
+      constexpr array<array<int, nSpin>, nSpin * nSpin> gm_i = get_dr_gm_i();
+      constexpr array<array<complex<real>, nSpin>, nSpin * nSpin> g5gm_z = get_dr_g5gm_z<real>();
 
-      int s1 = arg.s1;
       int b1 = arg.b1;
 
       // The coordinate of the sink
@@ -126,7 +126,9 @@ namespace quda
 
       // loop over channels
       reduce_t result_all_channels = {};
+#pragma unroll
       for (int G_idx = 0; G_idx < 16; G_idx++) {
+#pragma unroll
         for (int s2 = 0; s2 < nSpin; s2++) {
 
           // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
@@ -146,6 +148,18 @@ namespace quda
       }
 
       return operator()(result_all_channels, result);
+    }
+
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int dummy, int t)
+    {
+      switch (arg.s1) {
+      case 0: return operator()<0>(result, xyz, dummy, t);
+      case 1: return operator()<1>(result, xyz, dummy, t);
+      case 2: return operator()<2>(result, xyz, dummy, t);
+      case 3:
+      default:
+        return operator()<3>(result, xyz, dummy, t);
+      }
     }
   };
 

@@ -8,30 +8,32 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int apeDim_>
   struct GaugeAPEArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int apeDim = apeDim_;
-    typedef typename gauge_mapper<Float, recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
 
     int X[4]; // grid dimensions
     int border[4];
-    const Float alpha;
+    const real alpha;
     const int dir_ignore;
-    const Float tolerance;
+    const real anisotropy;
+    const real tolerance;
 
-    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore) :
+    GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha, int dir_ignore, real anisotropy) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),
       alpha(alpha),
       dir_ignore(dir_ignore),
+      anisotropy(anisotropy),
       tolerance(in.toleranceSU3())
     {
       for (int dir = 0; dir < 4; ++dir) {
@@ -41,16 +43,14 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct APE : computeStapleOps {
+  template <typename Arg> struct APE {
     const Arg &arg;
-    template <typename... OpsArgs> constexpr APE(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg)
-    {
-    }
+    constexpr APE(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords
@@ -67,7 +67,7 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(*this, x, X, parity, dir, Stap, arg.dir_ignore);
+      computeStaple(arg, x, X, parity, dir, Stap, arg.dir_ignore, arg.anisotropy);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);

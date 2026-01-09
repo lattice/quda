@@ -3,12 +3,14 @@
 
 #include <instantiate.h>
 #include <color_spinor_field.h>
-#include <misc.h>
 #include <qio_field.h> // for QIO routines
 #include <vector_io.h>
 #include <blas_quda.h>
 #include <quda.h>
-#include <test.h>
+
+#include "gauge_utils.h"
+#include "test.h"
+#include "misc.h"
 
 // tuple types: precision
 using gauge_test_t = ::testing::tuple<QudaPrecision>;

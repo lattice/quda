@@ -34,6 +34,7 @@ namespace quda
     n_conv = eig_param->n_conv;
     n_ev_deflate = (eig_param->n_ev_deflate == -1 ? n_conv : eig_param->n_ev_deflate);
     tol = eig_param->tol;
+    qr_tol = eig_param->qr_tol;
     reverse = false;
 
     // Algorithm variables
@@ -196,6 +197,7 @@ namespace quda
 
     logQuda(QUDA_VERBOSE, "spectrum %s\n", spectrum.c_str());
     logQuda(QUDA_VERBOSE, "tol %.4e\n", tol);
+    if (qr_tol != 0) logQuda(QUDA_VERBOSE, "qr_tol %.4e\n", qr_tol);
     logQuda(QUDA_VERBOSE, "n_conv %d\n", n_conv);
     logQuda(QUDA_VERBOSE, "n_ev %d\n", n_ev);
     logQuda(QUDA_VERBOSE, "n_kr %d\n", n_kr);
@@ -496,7 +498,7 @@ namespace quda
     }
   }
 
-  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
+  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, bool dagger)
   {
     logQuda(QUDA_SUMMARIZE, "Computing SVD of M\n");
 
@@ -521,9 +523,15 @@ namespace quda
 
       // Lambda already contains the square root of the eigenvalue of the norm op.
 
-      // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat.Expose()->M({evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper},
-                      {evecs.begin() + lower, evecs.begin() + upper});
+      if (dagger) {
+        // Mdag*Lev_i = Mdag*Lsv_i = sigma_i Rsv_i
+        mat.Expose()->Mdag({evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper},
+                           {evecs.begin() + lower, evecs.begin() + upper});
+      } else {
+        // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+        mat.Expose()->M({evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper},
+                        {evecs.begin() + lower, evecs.begin() + upper});
+      }
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
       auto sigma = blas::norm2({evecs.begin() + n_conv + lower, evecs.begin() + n_conv + upper});

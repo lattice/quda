@@ -28,6 +28,7 @@ namespace quda
     int n_conv = 0;       /** Number of converged eigenvalues requested */
     int n_ev_deflate = 0; /** Number of converged eigenvalues to use in deflation */
     double tol = 0.0;     /** Tolerance on eigenvalues */
+    double qr_tol = 0.0;  /** Tolerance on QR (IRAM) */
     bool reverse = false; /** True if using polynomial acceleration */
     std::string spectrum; /** Part of the spectrum to be computed */
     bool compute_svd; /** Compute the SVD if requested **/
@@ -254,10 +255,11 @@ namespace quda
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
-       @param[in] evecs Computed eigenvectors of NormOp
-       @param[in] evals Computed eigenvalues of NormOp
+       @param[in,out] evecs Computed eigenvectors of NormOp
+       @param[in,out] evals Computed eigenvalues of NormOp
+       @param[in] dagger Whether NormOp was MdagM (false) or MMdag (true)
     */
-    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals);
+    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals, bool dagger = false);
 
     /**
        @brief Compute eigenvalues and their residiua

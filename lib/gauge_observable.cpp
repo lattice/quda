@@ -18,8 +18,16 @@ namespace quda
       pool_pinned_free(num_failures_h);
     }
 
-    if (param.compute_plaquette) {
-      double3 plaq = plaquette(u);
+    if (param.compute_rectangle) {
+      auto plqrct = plaquetteRectangle(u);
+      param.plaquette[0] = 0.5 * (plqrct.x + plqrct.y);
+      param.plaquette[1] = plqrct.x;
+      param.plaquette[2] = plqrct.y;
+      param.rectangle[0] = 0.5 * (plqrct.z + plqrct.w);
+      param.rectangle[1] = plqrct.z;
+      param.rectangle[2] = plqrct.w;
+    } else if (param.compute_plaquette) {
+      auto plaq = plaquette(u);
       param.plaquette[0] = plaq.x;
       param.plaquette[1] = plaq.y;
       param.plaquette[2] = plaq.z;
@@ -60,7 +68,7 @@ namespace quda
     GaugeFieldParam tensorParam(x, u.Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
     tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+    tensorParam.order = QUDA_NATIVE_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     GaugeField gaugeFmunu(tensorParam);
 

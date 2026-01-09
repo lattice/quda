@@ -13,11 +13,12 @@
 #include <util_quda.h>
 #include <blas_quda.h>
 
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <dslash_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
+#include "host_utils.h"
+#include "gauge_utils.h"
+#include "command_line_params.h"
+#include "dslash_reference.h"
+#include "wilson_dslash_reference.h"
+#include "domain_wall_dslash_reference.h"
 #include "misc.h"
 #include "dslash_test_helpers.h"
 
@@ -63,6 +64,7 @@ struct DslashTestWrapper {
   // CUDA color spinor fields
   std::vector<ColorSpinorField> cudaSpinor;
   std::vector<ColorSpinorField> cudaSpinorOut;
+  std::vector<ColorSpinorField> cudaSpinorTmp;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -83,11 +85,15 @@ struct DslashTestWrapper {
   QudaParity parity = QUDA_EVEN_PARITY;
   static inline dslash_test_type dtest_type = dslash_test_type::Dslash;
   static inline bool test_split_grid = false;
+  static inline bool test_domain_decomposition = false;
   int num_src = 1;
+
+  static inline QudaDomainDecompositionColor dd_col = QUDA_DD_COLOR_RED_RED;
 
   const bool transfer = false;
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon,
+                  QudaDomainDecompositionType dd_value, QudaDomainDecompositionColor dd_color)
   {
     if (first_time) {
       gauge_param = newQudaGaugeParam();
@@ -114,6 +120,8 @@ struct DslashTestWrapper {
     inv_param.clover_cuda_prec_sloppy = cuda_prec;
     inv_param.clover_cuda_prec_precondition = cuda_prec;
     inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec;
+
+    init_domain_decomposition(dd_value, dd_color);
 
     init();
   }
@@ -144,6 +152,8 @@ struct DslashTestWrapper {
     }
 
     if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
+
+    test_domain_decomposition = dd_red_black;
 
     for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
@@ -279,6 +289,30 @@ struct DslashTestWrapper {
     inv_param.verbosity = verbosity;
   }
 
+  void init_domain_decomposition(QudaDomainDecompositionType value, QudaDomainDecompositionColor color)
+  {
+    if (value == QUDA_NO_DD) {
+      test_domain_decomposition = false;
+      return;
+    }
+    test_domain_decomposition = true;
+    dd_col = color;
+
+    if (value == QUDA_DDBLOCK_HALFLOCALL) {
+      dd_red_black = true;
+      // dd_block_size is half of the local lattice
+      for (auto i = 0u; i < 4; i++) dd_block_size[i] = gauge_param.X[i] / 2;
+      return;
+    }
+    // dd_block_size is half of the global lattice
+    else if (value == QUDA_DDBLOCK_HALFGLOBALL) {
+      dd_red_black = true;
+      for (auto i = 0u; i < 4; i++) dd_block_size[i] = (gauge_param.X[i] * comm_dim(i)) / 2;
+      return;
+    }
+    errorQuda("Unexpected value for domain decomposition (%d)", value);
+  }
+
   void init()
   {
     printfQuda("Sending gauge field to GPU\n");
@@ -301,20 +335,17 @@ struct DslashTestWrapper {
       csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
 
       printfQuda("Creating cudaSpinor with nParity = %d\n", csParam.siteSubset);
-      cudaSpinor.resize(Nsrc);
-      for (int i = 0; i < Nsrc; i++) cudaSpinor[i] = ColorSpinorField(csParam);
+      resize(cudaSpinor, Nsrc, csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
-      cudaSpinorOut.resize(Nsrc);
-      for (int i = 0; i < Nsrc; i++) cudaSpinorOut[i] = ColorSpinorField(csParam);
+      resize(cudaSpinorOut, Nsrc, csParam);
+      if (test_domain_decomposition) { resize(cudaSpinorTmp, Nsrc, csParam); }
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
 
-      for (int i = 0; i < Nsrc; i++) {
-        double cpu_norm = blas::norm2(spinor[i]);
-        double cuda_norm = blas::norm2(cudaSpinor[i]);
-        printfQuda("Source %d: CPU = %e, CUDA = %e\n", i, cpu_norm, cuda_norm);
-      }
+      auto cpu_norm = blas::norm2(spinor);
+      auto cuda_norm = blas::norm2(cudaSpinor);
+      for (int i = 0; i < Nsrc; i++) printfQuda("Source %d: CPU = %e, CUDA = %e\n", i, cpu_norm[i], cuda_norm[i]);
 
       bool pc = (dtest_type != dslash_test_type::Mat && dtest_type != dslash_test_type::MatDagMat);
 
@@ -324,10 +355,8 @@ struct DslashTestWrapper {
       dirac = Dirac::create(diracParam);
 
     } else {
-      for (int i = 0; i < Nsrc; i++) {
-        double cpu_norm = blas::norm2(spinor[i]);
-        printfQuda("Source %d: CPU = %e\n", i, cpu_norm);
-      }
+      auto cpu_norm = blas::norm2(spinor);
+      for (int i = 0; i < Nsrc; i++) printfQuda("Source %d: CPU = %e\n", i, cpu_norm[i]);
     }
   }
 
@@ -344,12 +373,21 @@ struct DslashTestWrapper {
   static void destroy()
   {
     for (int dir = 0; dir < 4; dir++)
-      if (hostGauge[dir]) host_free(hostGauge[dir]);
+      if (hostGauge[dir]) {
+        host_free(hostGauge[dir]);
+        hostGauge[dir] = nullptr;
+      }
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      if (hostClover) host_free(hostClover);
-      if (hostCloverInv) host_free(hostCloverInv);
+      if (hostClover) {
+        host_free(hostClover);
+        hostClover = nullptr;
+      }
+      if (hostCloverInv) {
+        host_free(hostCloverInv);
+        hostCloverInv = nullptr;
+      }
     }
 
     spinor = {};
@@ -362,6 +400,7 @@ struct DslashTestWrapper {
       vp_spinorOut.clear();
       vp_spinorRef.clear();
     }
+    first_time = true;
   }
 
   void dslashRef()
@@ -369,6 +408,7 @@ struct DslashTestWrapper {
     const QudaDagType not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
     // compare to dslash reference implementation
     printfQuda("Calculating reference implementation...");
+    using complex = std::complex<double>;
 
     for (int i = 0; i < Nsrc; i++) {
       if (dslash_type == QUDA_WILSON_DSLASH) {
@@ -614,7 +654,7 @@ struct DslashTestWrapper {
         default: printf("Test type not supported for domain wall\n"); exit(-1);
         }
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-        double *kappa_5 = (double *)safe_malloc(Ls * sizeof(double));
+        std::vector<double> kappa_5(Ls);
         for (int xs = 0; xs < Ls; xs++) kappa_5[xs] = kappa5;
         switch (dtest_type) {
         case dslash_test_type::Dslash:
@@ -651,7 +691,6 @@ struct DslashTestWrapper {
           break;
         default: printf("Test type not supported for domain wall\n"); exit(-1);
         }
-        host_free(kappa_5);
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_PV_DSLASH) {
         switch (dtest_type) {
         case dslash_test_type::Mat:
@@ -667,15 +706,15 @@ struct DslashTestWrapper {
         default: errorQuda("Test type %d supported for domain wall 4d PV", static_cast<int>(dtest_type));
         }
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-        double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-        double _Complex *kappa_5 = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-        double _Complex *kappa_mdwf = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+        std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), kappa_5(Lsdim), kappa_mdwf(Lsdim), b5(Lsdim),
+          c5(Lsdim);
         for (int xs = 0; xs < Lsdim; xs++) {
-          kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-          kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+          kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+          kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
           kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
           kappa_mdwf[xs] = -kappa_5[xs];
+          b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+          c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
         }
         switch (dtest_type) {
         case dslash_test_type::Dslash:
@@ -688,7 +727,7 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::Dslash4pre:
           mdw_dslash_4_pre(spinorRef[i].data(), hostGauge, spinor[i].data(), parity, inv_param.dagger,
-                           gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5, true);
+                           gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5, true);
           break;
         case dslash_test_type::M5inv:
           mdw_dslash_5_inv(spinorRef[i].data(), hostGauge, spinor[i].data(), parity, inv_param.dagger,
@@ -696,45 +735,41 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::MatPC:
           mdw_matpc(spinorRef[i].data(), hostGauge, spinor[i].data(), kappa_b, kappa_c, inv_param.matpc_type,
-                    inv_param.dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                    inv_param.dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           break;
         case dslash_test_type::Mat:
           mdw_mat(spinorRef[i].data(), hostGauge, spinor[i].data(), kappa_b, kappa_c, inv_param.dagger,
-                  gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                  gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           break;
         case dslash_test_type::MatPCDagMatPC:
           mdw_matpc(spinorTmp[i].data(), hostGauge, spinor[i].data(), kappa_b, kappa_c, inv_param.matpc_type,
-                    inv_param.dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                    inv_param.dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           mdw_matpc(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), kappa_b, kappa_c, inv_param.matpc_type,
-                    not_dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                    not_dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           break;
         case dslash_test_type::MatDagMat:
           mdw_mat(spinorTmp[i].data(), hostGauge, spinor[i].data(), kappa_b, kappa_c, inv_param.dagger,
-                  gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                  gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           mdw_mat(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), kappa_b, kappa_c, not_dagger,
-                  gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                  gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           break;
         case dslash_test_type::MatPCDagMatPCLocal:
           // reference for MdagM local operator
           mdw_mdagm_local(spinorRef[i].data(), hostGauge, spinor[i].data(), kappa_b, kappa_c, inv_param.matpc_type,
-                          gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+                          gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5);
           break;
         default: printf("Test type not supported for Mobius domain wall\n"); exit(-1);
         }
-        host_free(kappa_b);
-        host_free(kappa_c);
-        host_free(kappa_5);
-        host_free(kappa_mdwf);
       } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-        double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-        double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-        double _Complex *kappa_5 = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
-        double _Complex *kappa_mdwf = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+        std::vector<std::complex<double>> kappa_b(Lsdim), kappa_c(Lsdim), kappa_5(Lsdim), kappa_mdwf(Lsdim), b5(Lsdim),
+          c5(Lsdim);
         for (int xs = 0; xs < Lsdim; xs++) {
-          kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
-          kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+          kappa_b[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.b_5[xs]) * (4.0 + inv_param.m5) + 1.0));
+          kappa_c[xs] = 1.0 / (2.0 * (static_cast<complex>(inv_param.c_5[xs]) * (4.0 + inv_param.m5) - 1.0));
           kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
           kappa_mdwf[xs] = -kappa_5[xs];
+          b5[xs] = static_cast<complex>(inv_param.b_5[xs]);
+          c5[xs] = static_cast<complex>(inv_param.c_5[xs]);
         }
         switch (dtest_type) {
         case dslash_test_type::Dslash:
@@ -743,58 +778,59 @@ struct DslashTestWrapper {
           break;
         case dslash_test_type::M5:
           mdw_eofa_m5(spinorRef[i].data(), spinor[i].data(), parity, inv_param.dagger, inv_param.mass, inv_param.m5,
-                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+                      std::real(static_cast<complex>(inv_param.b_5[0])),
+                      std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                      inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
           break;
         case dslash_test_type::Dslash4pre:
           mdw_dslash_4_pre(spinorRef[i].data(), hostGauge, spinor[i].data(), parity, inv_param.dagger,
-                           gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5, true);
+                           gauge_param.cpu_prec, gauge_param, inv_param.mass, b5, c5, true);
           break;
         case dslash_test_type::M5inv:
           mdw_eofa_m5inv(spinorRef[i].data(), spinor[i].data(), parity, inv_param.dagger, inv_param.mass, inv_param.m5,
-                         (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                         inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
           break;
         case dslash_test_type::Mat:
           mdw_eofa_mat(spinorRef[i].data(), hostGauge, spinor[i].data(), inv_param.dagger, gauge_param.cpu_prec,
-                       gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                       (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                       inv_param.eofa_shift);
+                       gauge_param, inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         case dslash_test_type::MatDagMat:
           mdw_eofa_mat(spinorTmp[i].data(), hostGauge, spinor[i].data(), inv_param.dagger, gauge_param.cpu_prec,
-                       gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                       (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                       inv_param.eofa_shift);
-          mdw_eofa_mat(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), not_dagger, gauge_param.cpu_prec, gauge_param,
-                       inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
-                       inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+                       gauge_param, inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
+          mdw_eofa_mat(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), not_dagger, gauge_param.cpu_prec,
+                       gauge_param, inv_param.mass, inv_param.m5, std::real(static_cast<complex>(inv_param.b_5[0])),
+                       std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                       inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         case dslash_test_type::MatPC:
           mdw_eofa_matpc(spinorRef[i].data(), hostGauge, spinor[i].data(), inv_param.matpc_type, inv_param.dagger,
-                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                         (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                         inv_param.eofa_shift);
+                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5,
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         case dslash_test_type::MatPCDagMatPC:
           mdw_eofa_matpc(spinorTmp[i].data(), hostGauge, spinor[i].data(), inv_param.matpc_type, inv_param.dagger,
-                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                         (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                         inv_param.eofa_shift);
+                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5,
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift);
           mdw_eofa_matpc(spinorRef[i].data(), hostGauge, spinorTmp[i].data(), inv_param.matpc_type, not_dagger,
-                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]),
-                         (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm,
-                         inv_param.eofa_shift);
+                         gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.m5,
+                         std::real(static_cast<complex>(inv_param.b_5[0])),
+                         std::real(static_cast<complex>(inv_param.c_5[0])), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                         inv_param.eofa_pm, inv_param.eofa_shift);
           break;
         default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
         }
-        host_free(kappa_b);
-        host_free(kappa_c);
-        host_free(kappa_5);
-        host_free(kappa_mdwf);
       } else {
-        printfQuda("Unsupported dslash_type\n");
-        exit(-1);
+        errorQuda("Unsupported dslash_type");
       }
     }
 
@@ -822,6 +858,88 @@ struct DslashTestWrapper {
       }
 
       dslashMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity);
+
+    } else if (test_domain_decomposition) {
+
+      vector_ref<ColorSpinorField> spinor = cudaSpinor;
+      vector_ref<ColorSpinorField> out = cudaSpinorOut;
+      vector_ref<ColorSpinorField> tmp = cudaSpinorTmp;
+
+      if (dd_red_black) {
+        for (int n = 0; n < Nsrc; n++) {
+          for (auto i = 0u; i < 4; i++) {
+            cudaSpinor[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorOut[n].DD().block_dim[i] = dd_block_size[i];
+            cudaSpinorTmp[n].DD().block_dim[i] = dd_block_size[i];
+          }
+        }
+
+        blas::zero(cudaSpinorOut);
+        blas::zero(cudaSpinorTmp);
+
+        spinor.DD(DD::reset, DD::red_black_type,
+                  (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_RED_BLACK) ? DD::red_active :
+                                                                                           DD::black_active);
+        out.DD(DD::reset, DD::red_black_type,
+               (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_BLACK_RED) ? DD::red_active :
+                                                                                        DD::black_active);
+
+        for (int i = 0; i < niter; i++) {
+          host_timer.start();
+          switch (dtest_type) {
+          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorOut, cudaSpinor, parity); break;
+          case dslash_test_type::MatPC:
+          case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinor); break;
+          case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinor); break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+          host_timer.stop();
+
+          dslash_time.cpu_time += host_timer.last();
+          // skip first and last iterations since they may skew these metrics if comms are not synchronous
+          if (i > 0 && i < niter) {
+            dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+            dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
+          }
+        }
+
+        spinor.DD(DD::reset);
+        out.DD(DD::reset);
+        spinorOut = cudaSpinorOut;
+
+        if (niter < 2) { // HACK: when benchmarking we do not produce reference solution
+          // We also test that Dyx is same as D applied to projected in and out spinors
+          blas::copy(tmp, cudaSpinor);
+          tmp.DD(DD::reset, DD::red_black_type,
+                 (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_RED_BLACK) ? DD::red_active :
+                                                                                          DD::black_active);
+          tmp.projectDD();
+          tmp.DD(DD::reset);
+
+          blas::zero(cudaSpinorOut);
+          switch (dtest_type) {
+          case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorOut, cudaSpinorTmp, parity); break;
+          case dslash_test_type::MatPC:
+          case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinorTmp); break;
+          case dslash_test_type::MatPCDagMatPC:
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinorTmp); break;
+          default:
+            errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
+          }
+
+          out.DD(DD::reset, DD::red_black_type,
+                 (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_BLACK_RED) ? DD::red_active :
+                                                                                          DD::black_active);
+          out.projectDD();
+          out.DD(DD::reset);
+
+          spinorRef = cudaSpinorOut;
+        }
+      } else {
+        errorQuda("Test dd type not supported");
+      }
 
     } else {
 
@@ -1073,7 +1191,7 @@ struct DslashTestWrapper {
     unsigned long long bytes = (quda::Tunable::bytes_global() - bytes0);
 
     if (!test_split_grid) {
-      if (!transfer) spinorOut = cudaSpinorOut;
+      if (!transfer && !test_domain_decomposition) spinorOut = cudaSpinorOut;
 
       // print timing information
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
@@ -1089,7 +1207,8 @@ struct DslashTestWrapper {
       printfQuda("GBYTES = %f\n", gbytes);
       ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
-      size_t ghost_bytes = cudaSpinor[0].GhostBytes();
+      auto halo = ColorSpinorField::create_comms_batch(cudaSpinor);
+      size_t ghost_bytes = static_cast<ColorSpinorField &>(halo).GhostBytes();
 
       printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
                  "aggregate message size %lu bytes\n",
@@ -1121,6 +1240,18 @@ struct DslashTestWrapper {
                    norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
         deviation
           = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[0], vp_spinorOut[n]))));
+      }
+    } else if (test_domain_decomposition) {
+      for (int n = 0; n < Nsrc; n++) {
+        auto norm_cpu = blas::norm2(spinorRef[n]);
+        auto norm_cpu_quda = blas::norm2(spinorOut[n]);
+        auto max_deviation = blas::max_deviation(spinorRef[n], spinorOut[n]);
+        printfQuda("Results for (D-PDP)_{%s,%s}*spinor: reference = %f, QUDA = %f, L2 relative deviation = %e, max "
+                   "deviation = %e\n",
+                   (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_RED_BLACK) ? "red" : "black",
+                   (dd_col == QUDA_DD_COLOR_RED_RED || dd_col == QUDA_DD_COLOR_BLACK_RED) ? "red" : "black", norm_cpu,
+                   norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
+        deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef[n], spinorOut[n]))));
       }
     } else {
       for (int n = 0; n < Nsrc; n++) {

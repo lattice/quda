@@ -110,6 +110,7 @@ namespace quda {
 
   void DiracTwistedClover::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -237,6 +238,7 @@ namespace quda {
   void DiracTwistedCloverPC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                                         QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     if (in.TwistFlavor() != out.TwistFlavor())
@@ -261,6 +263,7 @@ namespace quda {
 
   void DiracTwistedCloverPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     double kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(out);
 
@@ -281,6 +284,7 @@ namespace quda {
 
   void DiracTwistedCloverPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     // need extra temporary because of symmetric preconditioning dagger
     auto tmp = getFieldTmp(out);
     M(tmp, in);

@@ -68,6 +68,11 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return false; }
   template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return false; }
 #endif
+#ifdef BUILD_OPENQCD_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_OPENQCD_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_OPENQCD_GAUGE_ORDER>() { return false; }
+#endif
 
   /**
      @brief Helper function for returning if a given precision is enabled
@@ -85,6 +90,24 @@ namespace quda
   }
 
   /**
+     @brief precision_type_mapper Struct used to convert QudaPrecision to data-type.
+  */
+  template <QudaPrecision precision> struct precision_type_mapper {
+  };
+  template <> struct precision_type_mapper<QUDA_DOUBLE_PRECISION> {
+    using type = double;
+  };
+  template <> struct precision_type_mapper<QUDA_SINGLE_PRECISION> {
+    using type = float;
+  };
+  template <> struct precision_type_mapper<QUDA_HALF_PRECISION> {
+    using type = short;
+  };
+  template <> struct precision_type_mapper<QUDA_QUARTER_PRECISION> {
+    using type = int8_t;
+  };
+
+  /**
      @brief Helper function for returning if a given reconstruct is enabled
      @tparam reconstruct The reconstruct requested
      @return True if enabled, false if not
@@ -97,6 +120,20 @@ namespace quda
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_8>() { return (QUDA_RECONSTRUCT & 1) ? true : false; }
   template <> constexpr bool is_enabled<QUDA_RECONSTRUCT_10>() { return true; }
 
+  /**
+     @brief Helper function for returning if a given domain decomposition is enabled
+     @tparam DD The domain decomposition requested
+     @return True if enabled, false if not
+  */
+  constexpr bool is_enabled(QudaDDType DD)
+  {
+    switch (DD) {
+    case QUDA_DD_NO: return true;
+    case QUDA_DD_RED_BLACK: return (QUDA_DOMAIN_DECOMPOSITION & 1) ? true : false;
+    default: return false;
+    }
+  }
+
   struct ReconstructFull {
     static constexpr std::array<QudaReconstructType, 6> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_10};
@@ -108,8 +145,13 @@ namespace quda
   };
 
   struct ReconstructWilson {
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
   };
 
   struct ReconstructStaggered {
@@ -577,6 +619,21 @@ namespace quda
 #ifdef GPU_COVDEV
   template <> constexpr bool is_enabled<QUDA_COVDEV_DSLASH>() { return true; }
 #endif
+
+  struct WilsonReconstruct {
+#ifdef BUILD_QCD_PLUS_QED
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+#else
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+#endif
+  };
+
+  struct StaggeredReconstruct {
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+  };
 
 #ifdef GPU_DISTANCE_PRECONDITIONING
   constexpr bool is_enabled_distance_precondition() { return true; }

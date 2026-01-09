@@ -55,6 +55,12 @@ namespace quda {
 
   using Complex = std::complex<double>;
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 13000
+  using double4 = ::double4_32a;
+#else
+  using double4 = ::double4;
+#endif
+
   /**
      Array object type used to storing lattice dimensions
    */

@@ -50,7 +50,7 @@ namespace quda
     // (  2m     -D_eo ) (x_e) = (b_e)
     // ( -D_oe   2m    ) (x_o) = (b_o)
     // ... but under the hood we need to catch the zero mass case.
-
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
 
     auto tmp = getFieldTmp(out);
@@ -83,6 +83,7 @@ namespace quda
 
   void DiracImprovedStaggeredKD::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

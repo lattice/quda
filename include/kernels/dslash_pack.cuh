@@ -32,8 +32,7 @@ namespace quda
 
     static constexpr bool packkernel = true;
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load, true>::type F;
-    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, colorspinor::getNative<Float>(nSpin),
-                                                    spin_project, spinor_direct_load, false>;
+    using Ghost = typename colorspinor::GhostNOrder<Float, nSpin, nColor, spin_project, spinor_direct_load, false>;
 
     F in[MAX_MULTI_RHS]; // field we are packing
     Ghost halo_pack;
@@ -42,15 +41,15 @@ namespace quda
     const int parity;         // only use this for single parity fields
     const int nParity;        // number of parities we are working on
 
-    const DslashConstant dc; // pre-computed dslash constants for optimized indexing
+    DslashConstant dc; // pre-computed dslash constants for optimized indexing
 
     real twist_a; // preconditioned twisted-mass scaling parameter
     real twist_b; // preconditioned twisted-mass chiral twist factor
     real twist_c; // preconditioned twisted-mass flavor twist factor
 
     int_fastdiv work_items;
-    int threadDimMapLower[4];
-    int threadDimMapUpper[4];
+    int threadDimMapLower[4] = {};
+    int threadDimMapUpper[4] = {};
 
     int_fastdiv blocks_per_dir;
     int dim_map[4];
@@ -97,8 +96,6 @@ namespace quda
       twist_b(b),
       twist_c(c),
       work_items(work_items),
-      threadDimMapLower {},
-      threadDimMapUpper {},
       sites_per_block((work_items + grid - 1) / grid),
       n_src(in.size()),
       Ls(halo.X(4) / in.size())
@@ -125,9 +122,10 @@ namespace quda
       int d = 0;
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
+        dc.ghostFaceCB[i] *= nFace;
         if (!getPackComms()[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
-        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc.ghostFaceCB[i];
         prev = i;
 
         dim_map[d++] = i;
@@ -149,7 +147,7 @@ namespace quda
     constexpr int nDim = pc;
 
     // for 5-d preconditioning the face_size includes the Ls dimension
-    const int face_size = nFace * arg.dc.ghostFaceCB[dim] * (pc == QUDA_5D_PC ? (int)arg.Ls : 1);
+    const int face_size = arg.dc.ghostFaceCB[dim] * (pc == QUDA_5D_PC ? (int)arg.Ls : 1);
 
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
@@ -223,22 +221,22 @@ namespace quda
     // read spinor and write spinor to face buffer
 
     // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-    const int face_num = (ghost_idx >= nFace * arg.dc.ghostFaceCB[dim]) ? 1 : 0;
-    ghost_idx -= face_num * nFace * arg.dc.ghostFaceCB[dim];
+    const int face_num = (ghost_idx >= arg.dc.ghostFaceCB[dim]) ? 1 : 0;
+    ghost_idx -= face_num * arg.dc.ghostFaceCB[dim];
 
     if (face_num == 0) { // backwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 0>(ghost_idx, parity, arg);
 #pragma unroll
       for (auto src = src_idx; src < src_idx + n_src_tile; src++) {
         Vector f = arg.in[src](idx, spinor_parity);
-        arg.halo_pack.Ghost(dim, 0, ghost_idx + src * nFace * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.halo_pack.Ghost(dim, 0, ghost_idx + src * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     } else { // forwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 1>(ghost_idx, parity, arg);
 #pragma unroll
       for (auto src = src_idx; src < src_idx + n_src_tile; src++) {
         Vector f = arg.in[src](idx, spinor_parity);
-        arg.halo_pack.Ghost(dim, 1, ghost_idx + src * nFace * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.halo_pack.Ghost(dim, 1, ghost_idx + src * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     }
   }
@@ -264,23 +262,23 @@ namespace quda
         int ghost_idx;
         const int dim = dimFromFaceIndex(ghost_idx, tid, arg);
 
-        if (Arg::pc_type == QUDA_5D_PC) { // 5-d checkerboarded, include s (not ghostFaceCB since both faces)
+        if (Arg::pc_type == QUDA_5D_PC) { // 5-d checkerboarded, include s (2x ghostFaceCB since both faces)
           switch (dim) {
           case 0:
-            pack<Arg::dagger, Arg::twist, 0, Arg::pc_type, Arg::n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0,
-                                                                            parity, src_idx);
+            pack<Arg::dagger, Arg::twist, 0, Arg::pc_type, Arg::n_src_tile>(
+              arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[0], 0, parity, src_idx);
             break;
           case 1:
-            pack<Arg::dagger, Arg::twist, 1, Arg::pc_type, Arg::n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0,
-                                                                            parity, src_idx);
+            pack<Arg::dagger, Arg::twist, 1, Arg::pc_type, Arg::n_src_tile>(
+              arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[1], 0, parity, src_idx);
             break;
           case 2:
-            pack<Arg::dagger, Arg::twist, 2, Arg::pc_type, Arg::n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0,
-                                                                            parity, src_idx);
+            pack<Arg::dagger, Arg::twist, 2, Arg::pc_type, Arg::n_src_tile>(
+              arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[2], 0, parity, src_idx);
             break;
           case 3:
-            pack<Arg::dagger, Arg::twist, 3, Arg::pc_type, Arg::n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0,
-                                                                            parity, src_idx);
+            pack<Arg::dagger, Arg::twist, 3, Arg::pc_type, Arg::n_src_tile>(
+              arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[3], 0, parity, src_idx);
             break;
           }
         } else { // 4-d checkerboarding, keeping s separate (if it exists)
@@ -345,7 +343,7 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[0]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 0, pc, n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity, src_idx);
+              pack<dagger, twist, 0, pc, n_src_tile>(arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[0], 0, parity, src_idx);
             else
               pack<dagger, twist, 0, pc, n_src_tile>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
@@ -355,7 +353,7 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[1]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 1, pc, n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity, src_idx);
+              pack<dagger, twist, 1, pc, n_src_tile>(arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[1], 0, parity, src_idx);
             else
               pack<dagger, twist, 1, pc, n_src_tile>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
@@ -365,7 +363,7 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[2]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 2, pc, n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity, src_idx);
+              pack<dagger, twist, 2, pc, n_src_tile>(arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[2], 0, parity, src_idx);
             else
               pack<dagger, twist, 2, pc, n_src_tile>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
@@ -375,7 +373,7 @@ namespace quda
           while (local_tid < arg.dc.ghostFaceCB[3]) {
             int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
             if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 3, pc, n_src_tile>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity, src_idx);
+              pack<dagger, twist, 3, pc, n_src_tile>(arg, ghost_idx + s * 2 * arg.dc.ghostFaceCB[3], 0, parity, src_idx);
             else
               pack<dagger, twist, 3, pc, n_src_tile>(arg, ghost_idx, s, parity, src_idx);
             local_tid += arg.blocks_per_dir * target::block_dim().x;
@@ -393,7 +391,7 @@ namespace quda
     {
       int src_s_block = MAX_MULTI_RHS == 1 ? 0 : src_s_block_;
       int src_s_idx = src_s_block * Arg::n_src_tile;
-      if (src_s_idx + n_src_tile * arg.Ls <= arg.n_src * arg.Ls) {
+      if (src_s_idx + n_src_tile <= arg.n_src * arg.Ls) {
         switch (twist_pack) {
         case 0: this->operator()<0, n_src_tile>(arg, src_s_idx, parity); break;
         case 1: this->operator()<1, n_src_tile>(arg, src_s_idx, parity); break;
@@ -480,8 +478,8 @@ namespace quda
 #endif
         switch (dim) {
         case 0:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
+          while (local_tid < arg.dc.ghostFaceCB[0]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
             if (arg.nFace == 1)
               packStaggered<0, 1, n_src_tile>(arg, ghost_idx, parity, src_idx);
             else
@@ -490,8 +488,8 @@ namespace quda
           }
           break;
         case 1:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
+          while (local_tid < arg.dc.ghostFaceCB[1]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
             if (arg.nFace == 1)
               packStaggered<1, 1, n_src_tile>(arg, ghost_idx, parity, src_idx);
             else
@@ -500,8 +498,8 @@ namespace quda
           }
           break;
         case 2:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
+          while (local_tid < arg.dc.ghostFaceCB[2]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
             if (arg.nFace == 1)
               packStaggered<2, 1, n_src_tile>(arg, ghost_idx, parity, src_idx);
             else
@@ -510,8 +508,8 @@ namespace quda
           }
           break;
         case 3:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
+          while (local_tid < arg.dc.ghostFaceCB[3]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
             if (arg.nFace == 1)
               packStaggered<3, 1, n_src_tile>(arg, ghost_idx, parity, src_idx);
             else

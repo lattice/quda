@@ -859,22 +859,36 @@ namespace quda {
   };
 
   /**
-     @brief caxpy operation on ColorSpinor objects
+     @brief z = a * x + y (axpy) operation on ColorSpinor objects
+     @param[in] a real scalar
+     @param[in] x Vector that is scaled
+     @param[in] y Auxiliary vector
+     @return The result vector z
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline auto axpy(const Float &a, const ColorSpinor<Float, Nc, Ns> &x,
+                                       const ColorSpinor<Float, Nc, Ns> &y)
+  {
+    ColorSpinor<Float, Nc, Ns> z;
+#pragma unroll
+    for (int i = 0; i < Nc * Ns; i++) z(i) = fma2({a, a}, x(i), y(i));
+    return z;
+  }
+
+  /**
+     @brief z = a * x + y (caxpy) operation on ColorSpinor objects
      @param[in] a complex scalar
      @param[in] x Vector that is scaled
      @param[in,out] y Accumulation vector
   */
   template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
-                                        ColorSpinor<Float, Nc, Ns> &y)
+  __device__ __host__ inline auto caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
+                                        const ColorSpinor<Float, Nc, Ns> &y)
   {
+    ColorSpinor<Float, Nc, Ns> z;
 #pragma unroll
-    for (int i = 0; i < Nc * Ns; i++) {
-      y(i).real(a.real() * x(i).real() + y(i).real());
-      y(i).real(-a.imag() * x(i).imag() + y(i).real());
-      y(i).imag(a.imag() * x(i).real() + y(i).imag());
-      y(i).imag(a.real() * x(i).imag() + y(i).imag());
-    }
+    for (int i = 0; i < Nc * Ns; i++) z(i) = cmac(a, x(i), y(i));
+    return z;
   }
 
   /**
@@ -1107,17 +1121,16 @@ namespace quda {
      @param[in] x Input vector
      @return The vector a * x
   */
-  template<typename Float, int Nc, int Ns, typename S> __device__ __host__ inline
-    ColorSpinor<Float,Nc,Ns> operator*(const S &a, const ColorSpinor<Float,Nc,Ns> &x) {
+  template <typename Float, int Nc, int Ns, typename S>
+  __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator*(const S &a, const ColorSpinor<Float, Nc, Ns> &x)
+  {
 
-    ColorSpinor<Float,Nc,Ns> y;
+    ColorSpinor<Float, Nc, Ns> y;
 
 #pragma unroll
-    for (int i=0; i<Nc; i++) {
+    for (int i = 0; i < Nc; i++) {
 #pragma unroll
-      for (int s=0; s<Ns; s++) {
-	y.data[s*Nc + i] = a * x.data[s*Nc + i];
-      }
+      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = a * x.data[s * Nc + i]; }
     }
 
     return y;
@@ -1129,32 +1142,21 @@ namespace quda {
      @param[in] x Input vector
      @return The vector A * x
   */
-  template<typename Float, int Nc, int Ns> __device__ __host__ inline
-    ColorSpinor<Float,Nc,Ns> operator*(const Matrix<complex<Float>,Nc> &A, const ColorSpinor<Float,Nc,Ns> &x) {
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator*(const Matrix<complex<Float>, Nc> &A,
+                                                                  const ColorSpinor<Float, Nc, Ns> &x)
+  {
+    ColorSpinor<Float, Nc, Ns> y;
 
-    ColorSpinor<Float,Nc,Ns> y;
-
+    for (int i = 0; i < Nc; i++) {
 #pragma unroll
-    for (int i=0; i<Nc; i++) {
+      for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = cmul(A(i, 0), x.data[s * Nc + 0]); }
 #pragma unroll
-      for (int s=0; s<Ns; s++) {
-	y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
-	y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
-      }
+      for (int j = 1; j < Nc; j++) {
 #pragma unroll
-      for (int j=1; j<Nc; j++) {
-#pragma unroll
-	for (int s=0; s<Ns; s++) {
-	  y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
-	  y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
-	}
+        for (int s = 0; s < Ns; s++) { y.data[s * Nc + i] = cmac(A(i, j), x.data[s * Nc + j], y.data[s * Nc + i]); }
       }
     }
-
     return y;
   }
 
@@ -1174,21 +1176,38 @@ namespace quda {
 #pragma unroll
     for (int i = 0; i < Nc; i++) {
 #pragma unroll
-      for (int s = 0; s < Ns; s++) {
-        z.data[s * Nc + i].x = y.data[s * Nc + i].real() + A(i, 0).real() * x.data[s * Nc + 0].real();
-        z.data[s * Nc + i].x -= A(i, 0).imag() * x.data[s * Nc + 0].imag();
-        z.data[s * Nc + i].y = y.data[s * Nc + i].imag() + A(i, 0).real() * x.data[s * Nc + 0].imag();
-        z.data[s * Nc + i].y += A(i, 0).imag() * x.data[s * Nc + 0].real();
-      }
+      for (int s = 0; s < Ns; s++) { z.data[s * Nc + i] = cmac(A(i, 0), x.data[s * Nc + 0], y.data[s * Nc + i]); }
 #pragma unroll
       for (int j = 1; j < Nc; j++) {
 #pragma unroll
-        for (int s = 0; s < Ns; s++) {
-          z.data[s * Nc + i].x += A(i, j).real() * x.data[s * Nc + j].real();
-          z.data[s * Nc + i].x -= A(i, j).imag() * x.data[s * Nc + j].imag();
-          z.data[s * Nc + i].y += A(i, j).real() * x.data[s * Nc + j].imag();
-          z.data[s * Nc + i].y += A(i, j).imag() * x.data[s * Nc + j].real();
-        }
+        for (int s = 0; s < Ns; s++) { z.data[s * Nc + i] = cmac(A(i, j), x.data[s * Nc + j], z.data[s * Nc + i]); }
+      }
+    }
+
+    return z;
+  }
+
+  /**
+     @brief Compute the matrix-vector product z = A * x + y
+     @param[in] A Input matrix
+     @param[in] x Input vector
+     @param[in] z Input vector
+     @return The vector z = A * x + y
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline ColorSpinor<Float, Nc, Ns>
+  mv_sub(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x, const ColorSpinor<Float, Nc, Ns> &y)
+  {
+    ColorSpinor<Float, Nc, Ns> z;
+
+#pragma unroll
+    for (int i = 0; i < Nc; i++) {
+#pragma unroll
+      for (int s = 0; s < Ns; s++) { z.data[s * Nc + i] = cmac(-A(i, 0), x.data[s * Nc + 0], y.data[s * Nc + i]); }
+#pragma unroll
+      for (int j = 1; j < Nc; j++) {
+#pragma unroll
+        for (int s = 0; s < Ns; s++) { z.data[s * Nc + i] = cmac(-A(i, j), x.data[s * Nc + j], z.data[s * Nc + i]); }
       }
     }
 
@@ -1208,27 +1227,19 @@ namespace quda {
     constexpr int N = Ns * Nc;
 
 #pragma unroll
-    for (int i=0; i<N; i++) {
-      if (i==0) {
-	y.data[i].x  = A(i,0).real() * x.data[0].real();
-	y.data[i].y  = A(i,0).real() * x.data[0].imag();
+    for (int i = 0; i < N; i++) {
+      if (i == 0) {
+        y.data[i] = mul2({A(i, 0).real(), A(i, 0).real()}, x.data[0]);
       } else {
-	y.data[i].x  = A(i,0).real() * x.data[0].real();
-	y.data[i].x -= A(i,0).imag() * x.data[0].imag();
-	y.data[i].y  = A(i,0).real() * x.data[0].imag();
-	y.data[i].y += A(i,0).imag() * x.data[0].real();
+        y.data[i] = cmul(A(i, 0), x.data[0]);
       }
 #pragma unroll
       for (int j=1; j<N; j++) {
 	if (i==j) {
-	  y.data[i].x += A(i,j).real() * x.data[j].real();
-	  y.data[i].y += A(i,j).real() * x.data[j].imag();
-	} else {
-	  y.data[i].x += A(i,j).real() * x.data[j].real();
-	  y.data[i].x -= A(i,j).imag() * x.data[j].imag();
-	  y.data[i].y += A(i,j).real() * x.data[j].imag();
-	  y.data[i].y += A(i,j).imag() * x.data[j].real();
-	}
+          y.data[i] = fma2({A(i, j).real(), A(i, j).real()}, x.data[j], y.data[i]);
+        } else {
+          y.data[i] = cmac(A(i, j), x.data[j], y.data[i]);
+        }
       }
     }
 

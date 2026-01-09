@@ -1315,6 +1315,15 @@ namespace quda {
     virtual QudaDiracType getDiracType() const override { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
   };
 
+  /**
+   * @brief      Applies gamma matrices to spinor fields
+   *
+   * @param[out] out   Output field
+   * @param[in]  in    Input field
+   * @param[in]  dir   Direction index of gamma matrix
+   */
+  void ApplyGamma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaGammaDirection_s dir);
+
   void gamma5(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in);
 
   /**

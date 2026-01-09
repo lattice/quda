@@ -7,10 +7,10 @@
 
 namespace quda
 {
-  
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-    struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
-    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
+
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = clover::dynamic_inverse();
     
@@ -27,7 +27,8 @@ namespace quda
                                        const ColorSpinorField &halo, const GaugeField &U, const CloverField &A,
                                        double a, double b, double c, bool xpay, cvector_ref<const ColorSpinorField> &x,
                                        int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? 1.0 : 0.0, x, parity, dagger,
+                                                          comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a),
@@ -37,16 +38,27 @@ namespace quda
     {
       checkPrecision(U, A);
       checkLocation(U, A);
-      }
+    }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct nDegTwistedCloverPreconditioned : dslash_default {
-    
+  template <typename Arg> struct nDegTwistedCloverPreconditionedParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 2>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = KernelOps<Cache>;
+  };
+
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct nDegTwistedCloverPreconditioned : dslash_default, nDegTwistedCloverPreconditionedParams<Arg>::Ops {
+
     const Arg &arg;
-    constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedCloverPreconditionedParams<Arg>::Ops::KernelOpsT;
+    template <typename Ftor>
+    constexpr nDegTwistedCloverPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg)
+    {
+    }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
-  
+
     /**
        @brief Apply the preconditioned twisted-clover dslash
        out(x) = M*in = a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == false )
@@ -69,13 +81,16 @@ namespace quda
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
+      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](my_flavor_idx, my_spinor_parity) = out;
+        return;
+      }
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
-
-      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
@@ -93,7 +108,7 @@ namespace quda
 
         int chirality = flavor; // relabel flavor as chirality
 
-        SharedMemoryCache<HalfVector> cache;
+        SharedMemoryCache<HalfVector> cache {*this};
 
         auto swizzle = [&](HalfVector x[2], int chirality) {
           if (chirality == 0)
@@ -121,7 +136,7 @@ namespace quda
           A_chi[flavor_] += arg.c * out_chi[1 - flavor_];
         }
 
-        if (arg.dynamic_clover) {
+        if constexpr (Arg::dynamic_clover) {
           HMat A2 = A.square();
           A2 += arg.b2_minus_c2;
           Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
@@ -142,7 +157,7 @@ namespace quda
         Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
         tmp.toNonRel(); // switch back to non-chiral basis
 
-        if (xpay) {
+        if (xpay && !arg.dd_x.isZero(coord)) {
           Vector x = arg.x[src_idx](my_flavor_idx, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {

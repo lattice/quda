@@ -61,6 +61,7 @@ namespace quda {
 
   void DiracDomainWall4D::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
 
     // printfQuda("Calling DiracDomainWall4D::M%s with kappa5 = %e , mass = %e\n", dagger == QUDA_DAG_YES ? "Dag" : "", kappa5, mass);
@@ -73,6 +74,7 @@ namespace quda {
 
   void DiracDomainWall4D::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     checkFullSpinor(out, in);
     auto tmp = getFieldTmp(out);
 
@@ -134,6 +136,7 @@ namespace quda {
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
   void DiracDomainWall4DPC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     double kappa2 = kappa5*kappa5;
     auto tmp = getFieldTmp(out);
@@ -163,6 +166,7 @@ namespace quda {
 
   void DiracDomainWall4DPC::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
+    assertNoDD(out, in); // TODO: DD not supported yet
     auto tmp = getFieldTmp(out);
     M(tmp, in);
     Mdag(out, tmp);

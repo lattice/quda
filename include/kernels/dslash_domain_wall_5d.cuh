@@ -7,8 +7,8 @@ namespace quda
 
   // fixme: fused kernel (thread dim mappers set after construction?) and xpay
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
-  struct DomainWall5DArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+  template <typename Float, int nColor, int nDim, typename DDArg, QudaReconstructType reconstruct_>
+  struct DomainWall5DArg : WilsonArg<Float, nColor, nDim, DDArg, reconstruct_> {
     typedef typename mapper<Float>::type real;
     int_fastdiv Ls; /** fifth dimension length */
     real a;   /** xpay scale factor */
@@ -17,22 +17,22 @@ namespace quda
     DomainWall5DArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                     const ColorSpinorField &halo, const GaugeField &U, double a, double m_f, bool xpay,
                     cvector_ref<const ColorSpinorField> &x, int parity, bool dagger, const int *comm_override) :
-      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, DDArg, reconstruct_>(out, in, halo, U, xpay ? a : 0.0, x, parity, dagger,
+                                                          comm_override),
       Ls(in.X(4)),
       a(a),
       m_f(m_f)
     {
       // remove the batch dimension from these constants, since these are used for 5-d checkerboard indexing
-      DslashArg<Float, nDim>::dc.X[4] = in.X(4);
-      DslashArg<Float, nDim>::dc.X5X4X3X2X1mX4X3X2X1 = (in.X(4) - 1) * DslashArg<Float, nDim>::dc.X4X3X2X1;
+      DslashArg<Float, nDim, DDArg>::dc.X[4] = in.X(4);
+      DslashArg<Float, nDim, DDArg>::dc.X5X4X3X2X1mX4X3X2X1 = (in.X(4) - 1) * DslashArg<Float, nDim, DDArg>::dc.X4X3X2X1;
     }
   };
 
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct domainWall5D : dslash_default {
+  template <bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct domainWall5D : dslash_default {
 
     const Arg &arg;
-    constexpr domainWall5D(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr domainWall5D(const Ftor &ftor) : arg(ftor.arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
@@ -53,16 +53,21 @@ namespace quda
       // we pass s=0, since idx is a 5-d index that includes s
       auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
-      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = arg.nParity == 2 ? parity : 0;
       Vector out;
 
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
+      if (arg.dd_out.isZero(coord)) {
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out[src_idx](coord.x_cb, my_spinor_parity) = out;
+        return;
+      }
+
+      applyWilson<dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active, src_idx);
 
       if (mykernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
         const int s = coord[4];
-        const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
-        {
+        const int their_spinor_parity = arg.nParity == 2 ? 1 - parity : 0;
+        if (arg.dd_in.doHopping(coord, d, +1)) {
           const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
           constexpr int proj_dir = dagger ? +1 : -1;
           Vector in = arg.in[src_idx](fwd_idx, their_spinor_parity);
@@ -73,7 +78,7 @@ namespace quda
           }
         }
 
-        {
+        if (arg.dd_in.doHopping(coord, d, -1)) {
           const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
           constexpr int proj_dir = dagger ? -1 : +1;
           Vector in = arg.in[src_idx](back_idx, their_spinor_parity);
@@ -85,7 +90,9 @@ namespace quda
         }
       }
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL && arg.dd_x.isZero(coord)) {
+        out = arg.a * out;
+      } else if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x[src_idx](coord.x_cb, my_spinor_parity);
         out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {

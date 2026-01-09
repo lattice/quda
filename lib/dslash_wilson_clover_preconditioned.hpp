@@ -37,12 +37,12 @@ namespace quda
       if (arg.nParity == 1) {
         if (arg.xpay) {
           if (arg.dagger) errorQuda("xpay operator only defined for not dagger");
-          Dslash::template instantiate<packShmem, 1, false, true>(tp, stream);
+          Dslash::template instantiate<packShmem, false, true>(tp, stream);
         } else {
           if (arg.dagger)
-            Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
+            Dslash::template instantiate<packShmem, true, false>(tp, stream);
           else
-            Dslash::template instantiate<packShmem, 1, false, false>(tp, stream);
+            Dslash::template instantiate<packShmem, false, false>(tp, stream);
         }
       } else {
         errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);
@@ -113,10 +113,8 @@ namespace quda
     }
   };
 
-  template <bool distance_pc> struct DistanceType {
-  };
-
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
+  template <typename Float, int nColor, typename DDArg, QudaReconstructType recon>
+  struct WilsonCloverPreconditionedApply {
 
     template <bool distance_pc>
     WilsonCloverPreconditionedApply(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -126,11 +124,11 @@ namespace quda
     {
       constexpr int nDim = 4;
       auto halo = ColorSpinorField::create_comms_batch(in);
-      WilsonCloverArg<Float, nColor, nDim, recon, distance_pc> arg(out, in, halo, U, A, a, x, parity, dagger,
-                                                                   comm_override, alpha0, t0);
+      WilsonCloverArg<Float, nColor, nDim, DDArg, recon, distance_pc> arg(out, in, halo, U, A, a, x, parity, dagger,
+                                                                          comm_override, alpha0, t0);
       WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in, halo, A);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, halo, profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, out, in, halo, profile);
     }
   };
 
