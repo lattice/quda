@@ -164,7 +164,7 @@ namespace quda
             out += fwd_coeff * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
 
-          prefetch(d, 0, coord, parity, arg);
+          prefetch(d, 0, coord, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
@@ -199,7 +199,7 @@ namespace quda
           out += bwd_coeff * (conj(U) * in).reconstruct(d, proj_dir);
         }
 
-        if (doBulk<kernel_type>()) {
+        if constexpr (doBulk<kernel_type>()) {
           if (!ghost) {
 #ifdef QUDA_DSLASH_DOUBLE_STORE
             Link U = arg.Uback(d, gauge_idx, gauge_parity);
@@ -210,7 +210,7 @@ namespace quda
             out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
 
-          prefetch(d, 1, coord, parity, arg);
+          prefetch(d, 1, coord, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
     } // nDim

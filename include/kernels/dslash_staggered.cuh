@@ -187,7 +187,7 @@ namespace quda
               out[s] = mv_add(U, in, out[s]);
             }
           }
-          prefetch(d, 0, 0, coord, coord1, parity, arg);
+          prefetch(d, 0, 0, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
@@ -215,7 +215,7 @@ namespace quda
               out[s] = mv_add(L, in, out[s]);
             }
           }
-          prefetch(d, 0, 1, coord, coord1, parity, arg);
+          prefetch(d, 0, 1, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
@@ -257,7 +257,7 @@ namespace quda
               out[s] = mv_sub(conj(U), in, out[s]);
             }
           }
-          prefetch(d, 1, 0, coord, coord1, parity, arg);
+          prefetch(d, 1, 0, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
 
@@ -294,7 +294,7 @@ namespace quda
               out[s] = mv_sub(conj(L), in, out[s]);
             }
           }
-          prefetch(d, 1, 1, coord, coord1, parity, arg);
+          prefetch(d, 1, 1, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
     } // nDim

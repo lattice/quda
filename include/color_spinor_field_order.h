@@ -1169,7 +1169,7 @@ namespace quda
       __device__ __host__ inline void prefetch(int x, int parity = 0) const
       {
         auto norm_offset = (volumeCB * 2 * Nc * Ns + parity * offset) * sizeof(Float) / sizeof(norm_t);
-        if constexpr (isFixed<Float>::value) prefetch_cache_line(reinterpret_cast<norm_t*>(field) + (x + norm_offset));
+        if constexpr (isFixed<Float>::value) prefetch_cache_line(reinterpret_cast<norm_t *>(field) + (x + norm_offset));
 
 #pragma unroll
         for (int i = 0; i < M; i++) prefetch_cache_line(field + (parity * offset + (volumeCB * i + x) * N));
@@ -1195,11 +1195,10 @@ namespace quda
           norm_t max_[length / 2];
           // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-          for (int i = 0; i < length / 2; i++)
-            max_[i] = fmaxf(fabsf((norm_t)v[i]), fabsf((norm_t)v[i + length / 2]));
+          for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_t)v[i]), fabsf((norm_t)v[i + length / 2]));
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-          reinterpret_cast<norm_t*>(field)[x + norm_offset] = scale * fixedInvMaxValue<Float>::value;
+          reinterpret_cast<norm_t *>(field)[x + norm_offset] = scale * fixedInvMaxValue<Float>::value;
           scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
         }
 
