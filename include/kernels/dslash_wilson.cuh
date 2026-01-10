@@ -93,7 +93,7 @@ namespace quda
     switch (step % 2) {
     case 0: arg.U.template prefetch<Arg::prefetch_tma>(x_cb, dim2, parity); break;
     case 1:
-      if (dslash_double_store()) {
+      if constexpr (dslash_double_store()) {
         arg.Uback.template prefetch<Arg::prefetch_tma>(x_cb, dim2, parity);
       } else {
         int idx = getNeighborIndexCB(coord, dim2, -1, arg.dc);

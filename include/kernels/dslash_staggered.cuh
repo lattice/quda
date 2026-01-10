@@ -94,14 +94,14 @@ namespace quda
   __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
                                     const Arg &arg)
   {
+    int step = 4 * dim + 2 * dir + hop + distance;
+    if (step >= Arg::improved ? 16 : 8) return;
+
+    // if using a bulk prefetch we need to use block's first coordinate
+    auto x_cb = (prefetch_type == 1 || prefetch_type == 2) ? coord.x_cb_0 : coord.x_cb;
+    x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
+
     if constexpr (Arg::improved) {
-      int step = 4 * dim + 2 * dir + hop + distance;
-      if (step >= 16) return;
-
-      // if using a bulk prefetch we need to use block's first coordinate
-      auto x_cb = (prefetch_type == 1 || prefetch_type == 2) ? coord.x_cb_0 : coord.x_cb;
-      x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
-
       int dim2 = step / 4;
       switch (step % 4) {
       case 0: arg.U.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
@@ -117,6 +117,17 @@ namespace quda
           arg.Lback.template prefetch<prefetch_type>(x_cb, dim2, parity);
         else
           arg.L.template prefetch<prefetch_type>(getNeighborIndexCB<3>(coord, dim2, -1, arg.dc), dim2, 1 - parity);
+        break;
+      }
+    } else {
+      int dim2 = step / 2;
+      switch (step % 2) {
+      case 0: arg.U.template prefetch<prefetch_type>(x_cb, dim2, parity); break;
+      case 1:
+        if constexpr (dslash_double_store())
+          arg.Uback.template prefetch<prefetch_type>(x_cb, dim2, parity);
+        else
+          arg.U.template prefetch<prefetch_type>(getNeighborIndexCB<1>(coord1, dim2, -1, arg.dc), dim2, 1 - parity);
         break;
       }
     }
