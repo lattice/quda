@@ -35,8 +35,8 @@ fermion actions:
 Implementations of CG, multi-shift CG, BiCGStab, BiCGStab(l), and
 DD-preconditioned GCR are provided, including robust mixed-precision
 variants supporting combinations of double, single, half and quarter
-precisions (where the latter two are 16-bit and 8-bit "block floating
-point", respectively).  The library also includes auxiliary routines
+precisions (where the latter two are 16-bit and 8-bit _"block floating
+point_", respectively).  The library also includes auxiliary routines
 necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
 terms and clover- field construction.  Use of many GPUs in parallel is
 supported throughout, with communication handled by QMP or MPI.
@@ -64,15 +64,15 @@ POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
 supported, with the minimum recommended versions being 7.x and 6, respectively.
 CMake 3.15 or greater to required to build QUDA.
 
-See also Known Issues below.
+See also "**Known Issues**" below.
 
 
 ## Hardware Compatibility:
 
 For a list of supported devices, see <a href=http://developer.nvidia.com/cuda-gpus>nvidia/cuda-gpus</a>.
 
-Before building the library, you should determine the "compute
-capability" of your card, either from NVIDIA's documentation or by
+Before building the library, you should determine the _"compute
+capability_" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
@@ -80,7 +80,7 @@ QUDA 1.1.0, supports devices of compute capability 3.0 or greater.
 QUDA is no longer supported on the older Tesla (1.x) and Fermi (2.x)
 architectures.
 
-See also "Known Issues" below.
+See also "**Known Issues**" below.
 
 
 ## Installation:
@@ -166,7 +166,7 @@ subsequent runs (using the same action, solver, lattice volume, etc.),
 the optimal parameters are cached to disk.  For this to work, the
 `QUDA_RESOURCE_PATH` environment variable must be set, pointing to a
 writable directory.  Note that since the tuned parameters are hardware-
-specific, this "resource directory" should not be shared between jobs
+specific, this _"resource directory_" should not be shared between jobs
 running on different systems (e.g., two clusters with different GPUs
 installed).  Attempting to use parameters tuned for one card on a
 different card may lead to unexpected errors.
@@ -176,13 +176,13 @@ kernel profile: since the autotuner measures how long a kernel takes
 to run, if we simply keep track of the number of kernel calls, from
 the product of these two quantities we have a time profile of a given
 job run.  If `QUDA_RESOURCE_PATH` is set, then this profiling
-information is output to the file "profile.tsv" in this specified
+information is output to the file `profile.tsv` in this specified
 directory.  Optionally, the output filename can be specified using the
 `QUDA_PROFILE_OUTPUT` environment variable, to avoid overwriting
 previously generated profile outputs.  In addition to the kernel
 profile, a policy profile, e.g., collections of kernels and/or other
 algorithms that are auto-tuned, is also output to the file
-"profile_async.tsv".  The policy profile for example includes
+`profile_async.tsv`.  The policy profile for example includes
 the entire multi-GPU dslash, whose style and order of communication is
 autotuned.  Hence while the dslash kernel entries appearing the kernel
 profile do include communication time, the entries in the policy
@@ -222,37 +222,37 @@ reports are especially welcome.
   
 If you find this software useful in your work, please cite:
 
-M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
-Lattice QCD systems of equations using mixed precision solvers on GPUs,"
+M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, _"Solving
+Lattice QCD systems of equations using mixed precision solvers on GPUs_,"
 Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
 
 When taking advantage of multi-GPU support, please also cite:
 
 R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb,
-"Scaling lattice QCD beyond 100 GPUs," International Conference for High
+_"Scaling lattice QCD beyond 100 GPUs_," International Conference for High
 Performance Computing, Networking, Storage and Analysis (SC), 2011
 [arXiv:1109.2935 [hep-lat]].
 
 When taking advantage of adaptive multigrid, please also cite:
 
 M. A. Clark, B. Joo, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
-"Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
-Parallelization," International Conference for High Performance
+_"Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
+Parallelization_," International Conference for High Performance
 Computing, Networking, Storage and Analysis (SC), 2016
 [arXiv:1612.07873 [hep-lat]].
 
 When taking advantage of block CG, please also cite:
 
 M. A. Clark, A. Strelchenko, A. Vaquero, M. Wagner, and E. Weinberg,
-"Pushing Memory Bandwidth Limitations Through Efficient
-Implementations of Block-Krylov Space Solvers on GPUs,"
+_"Pushing Memory Bandwidth Limitations Through Efficient
+Implementations of Block-Krylov Space Solvers on GPUs_,"
 Comput. Phys. Commun. 233 (2018), 29-40 [arXiv:1710.09745 [hep-lat]].
 
 When taking advantage of the Möbius MSPCG solver, please also cite:
 
-Jiqun Tu, M. A. Clark, Chulwoo Jung, Robert Mawhinney, "Solving DWF
+Jiqun Tu, M. A. Clark, Chulwoo Jung, Robert Mawhinney, _"Solving DWF
 Dirac Equation Using Multi-splitting Preconditioned Conjugate Gradient
-with Tensor Cores on NVIDIA GPUs," published in the Platform of
+with Tensor Cores on NVIDIA GPUs_," published in the Platform of
 Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 
 
