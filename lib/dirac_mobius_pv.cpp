@@ -90,7 +90,6 @@ namespace quda
     auto pv = getFieldTmp(out);
 
     // zMobius breaks the following code. Refer to the zMobius check in DiracMobius::DiracMobius(param)
-    double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
     auto tmp = getFieldTmp(out);
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
@@ -148,7 +147,6 @@ namespace quda
     checkFullSpinor(out, in);
 
     // zMobius breaks the following code. Refer to the zMobius check in DiracMobius::DiracMobius(param)
-    double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
     auto tmp = getFieldTmp(out);
 
     ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data, profile);
