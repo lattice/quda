@@ -1,6 +1,6 @@
 local: fix compilation errors with modern GCC due to stricter template resolution and variable scoping
-- Variables, even pointer members in a Class, shall be declared first in the same scope before usage
-- References of type `vector<Complex>&` initialized from `Complex*` will be regarded as invalid
+- Variables, even pointer members in a Class, shall be **declared** first in the same scope before usage
+- References of type `vector<Complex>&` initialized from `Complex*` will be regarded as **invalid**
 - Ambiguous type conversion will NOT be inferred, if there are more than one constructor candidates
 - A singleton `vector<double>` will NOT be converted to `double` implicitly when used as a scalar
 
