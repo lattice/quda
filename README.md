@@ -1,3 +1,19 @@
+local: fix compilation errors with modern GCC due to stricter template resolution and variable scoping
+- Variables, even pointer members in a Class, shall be declared first in the same scope before usage
+- References of type `vector<Complex>&` initialized from `Complex*` will be regarded as invalid
+- Ambiguous type conversion will NOT be inferred, if there are more than one constructor candidates
+- A singleton `vector<double>` will NOT be converted to `double` implicitly when used as a scalar
+
+Committer: WANG Ting-Xiao <wangtx@ihep.ac.cn>
+
+On branch quda-v1.1.0-gcc13x
+Changes to be committed:
+- modified:   <a href=include/invert_quda.h>include/invert_quda.h</a>
+- modified:   <a href=lib/inv_cg_quda.cpp>lib/inv_cg_quda.cpp</a>
+- modified:   <a href=lib/interface_quda.cpp>lib/interface_quda.cpp</a>
+
+See <a href=build/patch.quda-v1.1.0-gcc13x.diff>build/patch.quda-v1.1.0-gcc13x.diff</a>
+
 # QUDA 1.1.0
 
 ## Overview
