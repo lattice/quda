@@ -45,17 +45,14 @@ QUDA includes an implementations of adaptive multigrid for the Wilson,
 clover-improved, twisted-mass and twisted-clover fermion actions.  We
 note however that this is undergoing continued evolution and
 improvement and we highly recommend using adaptive multigrid use the
-latest develop branch.  More details can be found [here]
-(https://github.com/lattice/quda/wiki/Multigrid-Solver).
+latest develop branch.  More details can be found <a href=https://github.com/lattice/quda/wiki/Multigrid-Solver>here</a>.
 
 Support for eigen-vector deflation solvers is also included through
 the Thick Restarted Lanczos Method (TRLM), and we offer an Implicitly
 Restarted Arnoldi for observing non-hermitian operator spectra.
-For more details we refer the user to the wiki:
-[QUDA's eigensolvers]
-(https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers)
-[Deflating coarse grid solves in Multigrid]
-(https://github.com/lattice/quda/wiki/Multigrid-Solver#multigrid-inverter--lanczos)
+For more details we refer the user to the wiki: 
+<a href=https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers>QUDA's eigensolvers</a>
+and <a href=https://github.com/lattice/quda/wiki/Multigrid-Solver#multigrid-inverter--lanczos>Deflating coarse grid solves in Multigrid</a>.
 
 ## Software Compatibility:
 
@@ -72,9 +69,7 @@ See also Known Issues below.
 
 ## Hardware Compatibility:
 
-For a list of supported devices, see
-
-http://developer.nvidia.com/cuda-gpus
+For a list of supported devices, see <a href=http://developer.nvidia.com/cuda-gpus>nvidia/cuda-gpus</a>.
 
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
@@ -92,12 +87,11 @@ See also "Known Issues" below.
 
 It is recommended to build QUDA in a separate directory from the
 source directory.  For instructions on how to build QUDA using cmake
-see this page
-https://github.com/lattice/quda/wiki/QUDA-Build-With-CMake. Note
-that this requires cmake version 3.15 or later. You can obtain cmake
-from https://cmake.org/download/. On Linux the binary tar.gz archives
-unpack into a cmake directory and usually run fine from that
-directory.
+see <a ref=https://github.com/lattice/quda/wiki/QUDA-Build-With-CMake>this page</a>.
+Note that this requires cmake version 3.15 or later. You can obtain cmake
+from <a href=https://cmake.org/download/>cmake/download</a>.
+On Linux the binary `*.tar.gz` archives unpack into a cmake directory
+and usually run fine from that directory.
 
 The basic steps for building with cmake are:
 
@@ -106,54 +100,52 @@ The basic steps for building with cmake are:
 3. It is recommended to set options by calling `ccmake` in
 your build dir. Alternatively you can use the `-DVARIABLE=value`
 syntax in the previous step.
-4. run 'make -j <N>' to build with N
+4. run `make -j <N>` to build with N
 parallel jobs. 
 5. Now is a good time to get a coffee.
 
 You are most likely to want to specify the GPU architecture of the
 machine you are building for. Either configure QUDA_GPU_ARCH in step 3
-or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
+or specify e.g. `-DQUDA_GPU_ARCH=sm_60` for a Pascal GPU in step 2.
 
 ### Multi-GPU support
 
 QUDA supports using multiple GPUs through MPI and QMP, together with
 the optional use of NVSHMEM GPU-initiated communication for improved
 strong scaling of the Dirac operators.  To enable multi-GPU support
-either set `QUDA_MPI` or `QUDA_QMP` to ON when configuring QUDA
+either set `QUDA_MPI` or `QUDA_QMP` to `ON` when configuring QUDA
 through cmake.
 
 Note that in any case cmake will automatically try to detect your MPI
 installation. If you need to specify a particular MPI please set
 `MPI_C_COMPILER` and `MPI_CXX_COMPILER` in cmake.  See also
-https://cmake.org/cmake/help/v3.9/module/FindMPI.html for more help.
+<a href=https://cmake.org/cmake/help/v3.9/module/FindMPI.html>cmake/FindMPI</a> for more help.
 
 For QMP please set `QUDA_QMP_HOME` to the installation directory of QMP.
 
-For more details see https://github.com/lattice/quda/wiki/Multi-GPU-Support
+For more details see <a href=https://github.com/lattice/quda/wiki/Multi-GPU-Support>Multi GPU Support</a>
 
 To enable NVSHMEM support set `QUDA_NVSHMEM` to ON, and set the
 location of the local NVSHMEM installation with `QUDA_NVSHMEM_HOME`.
-For more details see
-https://github.com/lattice/quda/wiki/Multi-GPU-with-NVSHMEM
+For more details see <a href=https://github.com/lattice/quda/wiki/Multi-GPU-with-NVSHMEM>Multi GPU with NVSHMEM</a>.
 
 ### External dependencies
 
 The eigen-vector solvers (eigCG and incremental eigCG) by default will
 use Eigen, however, QUDA can be configured to use MAGMA if available
-(see https://github.com/lattice/quda/wiki/Deflated-Solvers for more
-details).  MAGMA is available from
-http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
-cmake option `QUDA_MAGMA=ON`.
+(see <a href=https://github.com/lattice/quda/wiki/Deflated-Solvers>Deflated Solvers</a> for more
+details).  MAGMA is available from <a href=http://icl.cs.utk.edu/magma/index.html>icl.utk/magma</a>.
+MAGMA is enabled using the cmake option `QUDA_MAGMA=ON`.
 
 Version 1.1.0 of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
-https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
-CMake option `QUDA_ARPACK=ON`. Note that with a multi-GPU option, the
-build system will automatically use PARPACK library.
+<a href=https://github.com/opencollab/arpack-ng>opencollab/arpack</a>.
+(P)ARPACK is enabled using CMake option `QUDA_ARPACK=ON`.
+Note that with a multi-GPU option, the build system will automatically use PARPACK library.
 
 Automatic download and installation of Eigen, (P)ARPACK, QMP and QIO
-is supported in QUDA through the CMake options QUDA_DOWNLOAD_EIGEN,
-QUDA_DOWNLOAD_ARPACK, and QUDA_DOWNLOAD_USQCD.
+is supported in QUDA through the CMake options `QUDA_DOWNLOAD_EIGEN`,
+`QUDA_DOWNLOAD_ARPACK`, and `QUDA_DOWNLOAD_USQCD`.
 
 ### Application Interfaces
 
@@ -199,12 +191,12 @@ communication and exterior update).
 
 ## Using the Library:
 
-Include the header file include/quda.h in your application, link against
-lib/libquda.so, and study tests/invert_test.cpp (for Wilson, clover,
+Include the header file `include/quda.h` in your application, link against
+`lib/libquda.so`, and study <a href=tests/invert_test.cpp>tests/invert_test.cpp</a> (for Wilson, clover,
 twisted-mass, or domain wall fermions) or
-tests/staggered_invert_test.cpp (for asqtad/HISQ fermions) for examples
+<a href=tests/staggered_invert_test.cpp>tests/staggered_invert_test.cpp</a> (for asqtad/HISQ fermions) for examples
 of the solver interface.  The various solver options are enumerated in
-include/enum_quda.h.
+<a href=include/enum_quda.h>include/enum_quda.h</a>.
 
 
 ## Known Issues:
@@ -226,7 +218,7 @@ reports are especially welcome.
 
 ## Acknowledging QUDA:
 
-[![DOI](https://zenodo.org/badge/1300564.svg)](https://zenodo.org/badge/latestdoi/1300564)
+[![DOI](DOI.svg)](https://zenodo.org/badge/latestdoi/1300564)
   
 If you find this software useful in your work, please cite:
 
@@ -315,9 +307,9 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Yi-Bo Yang (ITP, Chinese Academy of Sciences)
 
 
-Portions of this software were developed at the Innovative Systems Lab,
-National Center for Supercomputing Applications
-http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
+Portions of this software were developed at the
+<a href=http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html>Innovative Systems Lab,
+National Center for Supercomputing Applications</a>.
 
 Development was supported in part by the U.S. Department of Energy under
 grants DE-FC02-06ER41440, DE-FC02-06ER41449, and DE-AC05-06OR23177; the
