@@ -1,0 +1,168 @@
+CMake Error at cmake/CPM.cmake:19 (file):
+  file DOWNLOAD cannot compute hash on failed download
+    status: [56;"Failure when receiving data from the peer"]
+Call Stack (most recent call first):
+  CMakeLists.txt:35 (include)
+-- Found Git: /usr/bin/git (found version "2.43.5")
+
+lib/inv_cg_quda.cpp: In member function ‘virtual void quda::CG::blocksolve(quda::ColorSpinorField&, quda::ColorSpinorField&)’:
+lib/inv_cg_quda.cpp:894:7: error: ‘rp’ was not declared in this scope; did you mean ‘r’?
+  894 |       rp = ColorSpinorField::Create(csParam);
+      |       ^~
+      |       r
+lib/inv_cg_quda.cpp:895:7: error: ‘yp’ was not declared in this scope; did you mean ‘y’?
+  895 |       yp = ColorSpinorField::Create(csParam);
+      |       ^~
+      |       y
+lib/inv_cg_quda.cpp:899:7: error: ‘pp’ was not declared in this scope; did you mean ‘p’?
+  899 |       pp = ColorSpinorField::Create(csParam);
+      |       ^~
+      |       p
+lib/inv_cg_quda.cpp:900:7: error: ‘App’ was not declared in this scope; did you mean ‘Ap’?
+  900 |       App = ColorSpinorField::Create(csParam);
+      |       ^~~
+      |       Ap
+lib/inv_cg_quda.cpp:902:9: error: ‘rSloppyp’ was not declared in this scope
+  902 |         rSloppyp = ColorSpinorField::Create(csParam);
+      |         ^~~~~~~~
+lib/inv_cg_quda.cpp:903:9: error: ‘xSloppyp’ was not declared in this scope
+  903 |         xSloppyp = ColorSpinorField::Create(csParam);
+      |         ^~~~~~~~
+lib/inv_cg_quda.cpp:905:9: error: ‘rSloppyp’ was not declared in this scope
+  905 |         rSloppyp = rp;
+      |         ^~~~~~~~
+lib/inv_cg_quda.cpp:910:7: error: ‘tmpp’ was not declared in this scope; did you mean ‘tm’?
+  910 |       tmpp = ColorSpinorField::Create(csParam);
+      |       ^~~~
+      |       tm
+lib/inv_cg_quda.cpp:915:10: error: ‘rnewp’ was not declared in this scope; did you mean ‘rnew’?
+  915 |     if (!rnewp) {
+      |          ^~~~~
+      |          rnew
+------/
+lib/inv_cg_quda.cpp:921:28: error: ‘rp’ was not declared in this scope; did you mean ‘r’?
+  921 |     ColorSpinorField &r = *rp;
+      |                            ^~
+      |                            r
+lib/inv_cg_quda.cpp:922:28: error: ‘yp’ was not declared in this scope; did you mean ‘y’?
+  922 |     ColorSpinorField &y = *yp;
+      |                            ^~
+      |                            y
+lib/inv_cg_quda.cpp:923:28: error: ‘pp’ was not declared in this scope; did you mean ‘p’?
+  923 |     ColorSpinorField &p = *pp;
+      |                            ^~
+      |                            p
+lib/inv_cg_quda.cpp:924:29: error: ‘App’ was not declared in this scope; did you mean ‘Ap’?
+  924 |     ColorSpinorField &Ap = *App;
+      |                             ^~~
+      |                             Ap
+lib/inv_cg_quda.cpp:925:31: error: ‘rnewp’ was not declared in this scope; did you mean ‘rnew’?
+  925 |     ColorSpinorField &rnew = *rnewp;
+      |                               ^~~~~
+      |                               rnew
+lib/inv_cg_quda.cpp:926:34: error: ‘rSloppyp’ was not declared in this scope; did you mean ‘rSloppy’?
+  926 |     ColorSpinorField &rSloppy = *rSloppyp;
+      |                                  ^~~~~~~~
+      |                                  rSloppy
+lib/inv_cg_quda.cpp:927:73: error: ‘xSloppyp’ was not declared in this scope; did you mean ‘xSloppy’?
+  927 |     ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+      |                                                                         ^~~~~~~~
+      |                                                                         xSloppy
+------/
+
+lib/inv_cg_quda.cpp:1028:17: error: invalid initialization of reference of type ‘quda::cvector<std::complex<double> >&’ {aka ‘const quda::vector<std::complex<double> >&’} from expression of type ‘quda::Complex*’ {aka ‘std::complex<double>*’}
+ 1028 |     blas::caxpy(AC, r, p);
+      |                 ^~
+In file included from lib/inv_cg_quda.cpp:10:
+include/blas_quda.h:185:34: note: in passing argument 1 of ‘void quda::blas::caxpy(quda::cvector<std::complex<double> >&, quda::cvector_ref<const quda::ColorSpinorField>&, quda::cvector_ref<quda::ColorSpinorField>&)’
+  185 |     void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      |                ~~~~~~~~~~~~~~~~~~^
+------/
+lib/inv_cg_quda.cpp:1062:19: error: invalid initialization of reference of type ‘quda::cvector<std::complex<double> >&’ {aka ‘const quda::vector<std::complex<double> >&’} from expression of type ‘quda::Complex*’ {aka ‘std::complex<double>*’}
+ 1062 |       blas::caxpy(AC, p, xSloppy);
+      |                   ^~
+include/blas_quda.h:185:34: note: in passing argument 1 of ‘void quda::blas::caxpy(quda::cvector<std::complex<double> >&, quda::cvector_ref<const quda::ColorSpinorField>&, quda::cvector_ref<quda::ColorSpinorField>&)’
+  185 |     void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      |                ~~~~~~~~~~~~~~~~~~^
+------/
+lib/inv_cg_quda.cpp:1070:19: error: invalid initialization of reference of type ‘quda::cvector<std::complex<double> >&’ {aka ‘const quda::vector<std::complex<double> >&’} from expression of type ‘quda::Complex*’ {aka ‘std::complex<double>*’}
+ 1070 |       blas::caxpy(AC, Ap, rSloppy);
+      |                   ^~
+include/blas_quda.h:185:34: note: in passing argument 1 of ‘void quda::blas::caxpy(quda::cvector<std::complex<double> >&, quda::cvector_ref<const quda::ColorSpinorField>&, quda::cvector_ref<quda::ColorSpinorField>&)’
+  185 |     void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      |                ~~~~~~~~~~~~~~~~~~^
+------/
+lib/inv_cg_quda.cpp:1090:19: error: invalid initialization of reference of type ‘quda::cvector<std::complex<double> >&’ {aka ‘const quda::vector<std::complex<double> >&’} from expression of type ‘quda::Complex*’ {aka ‘std::complex<double>*’}
+ 1090 |       blas::caxpy(AC, rnew, rSloppy);
+      |                   ^~
+include/blas_quda.h:185:34: note: in passing argument 1 of ‘void quda::blas::caxpy(quda::cvector<std::complex<double> >&, quda::cvector_ref<const quda::ColorSpinorField>&, quda::cvector_ref<quda::ColorSpinorField>&)’
+  185 |     void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      |                ~~~~~~~~~~~~~~~~~~^
+------/
+lib/inv_cg_quda.cpp:1110:19: error: invalid initialization of reference of type ‘quda::cvector<std::complex<double> >&’ {aka ‘const quda::vector<std::complex<double> >&’} from expression of type ‘quda::Complex*’ {aka ‘std::complex<double>*’}
+ 1110 |       blas::caxpy(AC, p, rnew);
+      |                   ^~
+include/blas_quda.h:185:34: note: in passing argument 1 of ‘void quda::blas::caxpy(quda::cvector<std::complex<double> >&, quda::cvector_ref<const quda::ColorSpinorField>&, quda::cvector_ref<quda::ColorSpinorField>&)’
+  185 |     void caxpy(cvector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+      |                ~~~~~~~~~~~~~~~~~~^
+------/
+
+lib/inv_cg_quda.cpp:1138:53: error: conversion from ‘int’ to ‘quda::cvector<double>’ {aka ‘const quda::vector<double>’} is ambiguous
+ 1138 |         converged[i] = convergence(r2(i, i).real(), 0, stop[i], param.tol_hq);
+      |                                                     ^
+In file included from include/lattice_field.h:9, from include/color_spinor_field.h:6, from lib/inv_cg_quda.cpp:9:
+include/reference_wrapper_helper.h:555:5: note: candidate: ‘quda::vector<T>::vector(const T&) [with T = double]’
+  555 |     vector(const T &t) : std::vector<T>(1, t) { }
+      |     ^~~~~~
+include/reference_wrapper_helper.h:517:5: note: candidate: ‘quda::vector<T>::vector(uint64_t, const T&) [with T = double; uint64_t = long unsigned int]’
+  517 |     vector(uint64_t size, const T &value = {}) : std::vector<T>(size, value) { }
+      |     ^~~~~~
+------/
+
+In file included from lib/inv_cg_quda.cpp:12:
+include/invert_quda.h:548:60: note: initializing argument 2 of ‘bool quda::Solver::convergence(quda::cvector<double>&, quda::cvector<double>&, quda::cvector<double>&, quda::cvector<double>&)’
+  548 |     bool convergence(cvector<double> &r2, cvector<double> &hq2, cvector<double> &r2_tol, cvector<double> &hq_tol);
+      |                                           ~~~~~~~~~~~~~~~~~^~~
+lib/inv_cg_quda.cpp:1159:40: error: cannot convert ‘quda::vector<double>’ to ‘double’ in assignment
+ 1159 |       param.true_res_offset[i] = param.true_res;
+      |                                  ~~~~~~^~~~~~~~
+      |                                        |
+      |                                        quda::vector<double>
+lib/inv_cg_quda.cpp:1160:43: error: cannot convert ‘quda::vector<double>’ to ‘double’ in assignment
+ 1160 |       param.true_res_hq_offset[i] = param.true_res_hq;
+      |                                     ~~~~~~^~~~~~~~~~~
+      |                                           |
+      |                                           quda::vector<double>
+------/
+
+lib/interface_quda.cpp: In function ‘void computeCloverForceQuda(void*, double, void**, void**, double*, double, double, int, double, void*, QudaGaugeParam*, QudaInvertParam*)’:
+lib/interface_quda.cpp:4806:30: error: template argument 1 is invalid
+ 4806 |   std::vector<array<double, 2>> ferm_epsilon(nvector);
+      |                              ^~
+lib/interface_quda.cpp:4806:30: error: template argument 2 is invalid
+lib/interface_quda.cpp:4822:17: error: invalid types ‘int[int]’ for array subscript
+ 4822 |     ferm_epsilon[i] = {2.0 * ck * coeff[i] * dt, -kappa2 * 2.0 * ck * coeff[i] * dt};
+      |                 ^
+lib/interface_quda.cpp:4834:91: error: invalid initialization of reference of type ‘const std::vector<quda::array<double, 2>, std::allocator<quda::array<double, 2> > >&’ from expression of type ‘int’
+ 4834 |   computeCloverForce(cudaMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
+      |                                                                                           ^~~~~~~~~~~~
+In file included from include/dirac_quda.h:8, from lib/interface_quda.cpp:17:
+include/clover_field.h:587:98: note: in passing argument 8 of ‘void quda::computeCloverForce(GaugeField&, const GaugeField&, const GaugeField&, const CloverField&, cvector_ref<ColorSpinorField>&, cvector_ref<ColorSpinorField>&, const std::vector<double, std::allocator<double> >&, const std::vector<array<double, 2>, std::allocator<array<double, 2> > >&, double, bool, QudaInvertParam&)’
+  587 |                           const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+      |                                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+------/
+lib/interface_quda.cpp: In function ‘void computeTMCloverForceQuda(void*, void**, void**, double*, int, QudaGaugeParam*, QudaInvertParam*, int)’:
+lib/interface_quda.cpp:4881:30: error: template argument 1 is invalid
+ 4881 |   std::vector<array<double, 2>> ferm_epsilon(nvector);
+      |                              ^~
+lib/interface_quda.cpp:4881:30: error: template argument 2 is invalid
+lib/interface_quda.cpp:4899:17: error: invalid types ‘int[int]’ for array subscript
+ 4899 |     ferm_epsilon[i] = {k_csw_ov_8 * coeff[i], k_csw_ov_8 * coeff[i] / (kappa * kappa)};
+      |                 ^
+lib/interface_quda.cpp:4908:90: error: invalid initialization of reference of type ‘const std::vector<quda::array<double, 2>, std::allocator<quda::array<double, 2> > >&’ from expression of type ‘int’
+ 4908 |   computeCloverForce(gpuMom, gaugeEx, *gaugePrecise, *cloverPrecise, x, x0, force_coeff, ferm_epsilon,
+      |                                                                                          ^~~~~~~~~~~~
+include/clover_field.h:587:98: note: in passing argument 8 of ‘void quda::computeCloverForce(GaugeField&, const GaugeField&, const GaugeField&, const CloverField&, cvector_ref<ColorSpinorField>&, cvector_ref<ColorSpinorField>&, const std::vector<double, std::allocator<double> >&, const std::vector<array<double, 2>, std::allocator<array<double, 2> > >&, double, bool, QudaInvertParam&)’
+  587 |                           const std::vector<double> &coeff, const std::vector<array<double, 2>> &epsilon,
+      |                                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+------/
