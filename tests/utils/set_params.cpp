@@ -442,6 +442,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.m5 = m5;
     kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
+    for (int k = 0; k < Lsdim; k++) { // for mobius only
+      // b5[k], c[k] values are chosen for arbitrary values,
+      // but the difference of them are same as 1.0
+      inv_param.b_5[k] = b5;
+      inv_param.c_5[k] = c5;
+    }
   }
 
   inv_param.dagger = QUDA_DAG_NO;

@@ -8,7 +8,32 @@
 namespace quda
 {
 
-  DiracMobiusPV::DiracMobiusPV(const DiracParam &param) : DiracMobius(param), mass_pv(1.0) { }
+  DiracMobiusPV::DiracMobiusPV(const DiracParam &param) : DiracMobius(param), mass_pv(1.0) {
+    memcpy(b_5, param.b_5, sizeof(Complex) * param.Ls);
+    memcpy(c_5, param.c_5, sizeof(Complex) * param.Ls);
+
+    double b = b_5[0].real();
+    double c = c_5[0].real();
+    mobius_kappa_b = 0.5 / (b * (m5 + 4.) + 1.);
+    mobius_kappa_c = 0.5 / (c * (m5 + 4.) - 1.);
+
+    mobius_kappa = mobius_kappa_b / mobius_kappa_c;
+
+    // check if doing zMobius
+    for (int i = 0; i < Ls; i++) {
+      if (b_5[i].imag() != 0.0 || c_5[i].imag() != 0.0 || (i < Ls - 1 && (b_5[i] != b_5[i + 1] || c_5[i] != c_5[i + 1]))) {
+        zMobius = true;
+      }
+    }
+
+    if (zMobius) {
+      logQuda(QUDA_VERBOSE, "%s: Detected variable or complex cofficients: using zMobius\n", __func__);
+    } else {
+      logQuda(QUDA_VERBOSE, "%s: Detected fixed real cofficients: using regular Mobius\n", __func__);
+    }
+
+    if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA"); }
+  }
 
   DiracMobiusPV::DiracMobiusPV(const DiracMobiusPV &dirac) : DiracMobius(dirac), mass_pv(1.0) { }
 
@@ -70,6 +95,10 @@ namespace quda
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
     if (dagger == QUDA_DAG_NO) {
+      ApplyMDwf(pv, in);
+      ApplyPVDagger(out, pv);
+
+      /*
       // Apply D_mob
       ApplyDslash5(pv, in, in, mass, m5, b_5, c_5, 0.0, QUDA_DAG_NO, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDomainWall4D(tmp, pv, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim.data, profile);
@@ -81,7 +110,7 @@ namespace quda
       ApplyDomainWall4D(out, pv, *gauge, 0.0, m5, b_5, c_5, pv, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data, profile);
       ApplyDslash5(tmp, out, pv, mass_pv, m5, b_5, c_5, 0.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDslash5(out, pv, pv, mass_pv, m5, b_5, c_5, 0.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_MOBIUS);
-      blas::axpy(-mobius_kappa_b, tmp, out);
+      blas::axpy(-mobius_kappa_b, tmp, out);*/
     } else {
       // Apply D_pv
       ApplyDslash5(pv, in, in, mass_pv, m5, b_5, c_5, 0.0, QUDA_DAG_NO, Dslash5Type::DSLASH5_MOBIUS_PRE);

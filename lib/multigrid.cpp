@@ -1454,8 +1454,8 @@ namespace quda
           if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4DPV_DIRAC) {
             static_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
           } else {
-            errorQuda("  The coarse MobiusPV op has not been implemented yet");
-            //static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
+            //errorQuda("  The coarse MobiusPV op has not been implemented yet");
+            static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
           }
 
           blas::copy(fine_5d_lhs, fine_5d_lhs_inter);
@@ -1779,150 +1779,310 @@ namespace quda
     auto chiral_minus_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
     cvector_ref<ColorSpinorField> chiral_plus(chiral_plus_4d_), chiral_minus(chiral_minus_4d_);
 
-    if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
-      auto kappa5 = 0.5 / (5.0 + m5);
+    // check 5-d dslash
+    {
+      printfQuda("Checking the 5-d Pauli-Villars operator\n");
 
-      // apply the exact DiracDomainWall4D::M
-      reinterpret_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
+      if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
+        auto kappa5 = 0.5 / (5.0 + m5);
 
-      // This bit is equivalent to the DWF call:
-      // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
-      //                   profile);
+        // apply the exact DiracDomainWall4D::ApplyMDwf
+        reinterpret_cast<const DiracDomainWall4DPV *>(diracCoarseSmoother)->ApplyMDwf(dwf_lhs, rhs);
 
-      d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
-      d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
+        // This bit is equivalent to the DWF call:
+        // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
+        //                   profile);
 
-      // This next block is equivalent to the DWF call:
-      // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
+        d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
+        d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
 
-      ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
-      ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
-      for (int s = 0; s < Ls; s++) {
-        // forwards direction
-        blas::axpy((s == Ls - 1) ? -mass : 1, chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
-        // backwards direction
-        blas::axpy((s == 0) ? -mass : 1, chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+        // This next block is equivalent to the DWF call:
+        // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
+
+        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axpy((s == Ls - 1) ? -mass : 1, chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+          // backwards direction
+          blas::axpy((s == 0) ? -mass : 1, chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+        }
+
+        // This last bit is equivalent to the call:
+        // blas::xpay(in, -kappa5, out);
+
+        blas::xpay(rhs_4d, -kappa5, emul_lhs_4d);
+
+      } else if (diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+        auto b_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
+        auto c_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
+        double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
+
+        // from compute_coeff_mobius_pre and compute_coeff_mobius
+        std::array<double, QUDA_MAX_DWF_LS> kappa, alpha, beta;
+
+        // apply the exact DiracMobius::ApplyMDwf
+        reinterpret_cast<const DiracMobiusPV *>(diracCoarseSmoother)->ApplyMDwf(dwf_lhs, rhs);
+
+        // create a temporary
+        auto tmp_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+        vector_ref<ColorSpinorField> tmp_4d(tmp_4d_);
+
+        // This bit is equivalent to the following Mobius call:
+        // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
+
+        // from compute_coeff_mobius_pre
+        for (int s = 0; s < Ls; s++) {
+          beta[s] = b_5[s].real();
+          alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
+        }
+
+        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axy(alpha[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+          // backwards direction
+          blas::axpy(alpha[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+          // diagonal contribution
+          blas::axpy(beta[s], rhs_4d[s], emul_lhs_4d[s]);
+        }
+
+        // This bit is equivalent to the next Mobius call:
+        // ApplyDomainWall4D(tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+
+        // a = 0; xpay false; much simpler than it looks
+        d_wilson->Dslash(tmp_4d.Even(), emul_lhs_4d.Odd(), QUDA_EVEN_PARITY);
+        d_wilson->Dslash(tmp_4d.Odd(), emul_lhs_4d.Even(), QUDA_ODD_PARITY);
+
+        // This bit is equivalent to the last Mobius call:
+        // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
+
+        // from compute_coeff_mobius
+        for (int s = 0; s < Ls; s++) {
+          kappa[s]
+            = 0.5 * (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        }
+
+        // seems to be the same chiral projectors?
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axy(kappa[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
+          // backwards direction
+          blas::axpy(kappa[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+          // diagonal contribution
+          blas::axpy(1.0, rhs_4d[s], emul_lhs_4d[s]);
+        }
+
+        // last, but not least, this call
+        // blas::axpy(-mobius_kappa_b, tmp, out);
+
+        blas::axpy(-mobius_kappa_b, tmp_4d, emul_lhs_4d);
       }
 
-      // This last bit is equivalent to the call:
-      // blas::xpay(in, -kappa5, out);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        // for debugging purposes
+        // std::vector<ColorSpinorField> dwf_lhs_4(Ls);
+        // for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
+        // auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
+        auto dwf_lhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+        vector_ref<ColorSpinorField> dwf_lhs_4d(dwf_lhs_4d_);
 
-      blas::xpay(rhs_4d, -kappa5, emul_lhs_4d);
+        Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
 
-    } else if (diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
-      auto b_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
-      auto c_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
-      double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
-
-      // from compute_coeff_mobius_pre and compute_coeff_mobius
-      std::array<double, QUDA_MAX_DWF_LS> kappa, alpha, beta;
-
-      // apply the exact DiracMobius::M
-      reinterpret_cast<const DiracMobiusPV *>(diracSmoother)->ApplyMDwf(dwf_lhs, rhs);
-
-      // create a temporary
-      auto tmp_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
-      vector_ref<ColorSpinorField> tmp_4d(tmp_4d_);
-
-      // This bit is equivalent to the following Mobius call:
-      // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
-
-      // from compute_coeff_mobius_pre
-      for (int s = 0; s < Ls; s++) {
-        beta[s] = b_5[s].real();
-        alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
+        // in theory emul_lhs contains the same thing as dwf_lhs on a per-component basis
+        for (int s = 0; s < Ls; s++)
+          printfQuda("s %d norm2 source %e norm2 chiral+ %e norm2 chiral- %e norm2 dwf %e norm2 emul %e\n", s,
+                    blas::norm2(rhs_4d[s]), blas::norm2(chiral_plus[s]), blas::norm2(chiral_minus[s]),
+                    blas::norm2(dwf_lhs_4d[s]), blas::norm2(emul_lhs_4d[s]));
       }
 
-      ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
-      ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
-      for (int s = 0; s < Ls; s++) {
-        // forwards direction
-        blas::axy(alpha[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
-        // backwards direction
-        blas::axpy(alpha[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
-        // diagonal contribution
-        blas::axpy(beta[s], rhs_4d[s], emul_lhs_4d[s]);
+      // re-join
+      Join4DTo5DField(emul_lhs, emul_lhs_4d);
+
+      // verify
+      double emul_nrm2 = blas::norm2(emul_lhs);
+      double native_nrm2 = blas::norm2(dwf_lhs);
+      auto max_deviation = blas::max_deviation(dwf_lhs, emul_lhs);
+      auto l2_deviation = sqrt(xmyNorm(dwf_lhs, emul_lhs) / native_nrm2);
+
+      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n", emul_nrm2,
+              native_nrm2, l2_deviation, max_deviation[0]);
+
+      // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+      // these were set while hacking in tests of quarter precision ghosts
+      // moreover, we can improve the precision of block ortho with a tighter max than 1.0
+      QudaPrecision prec
+        = std::min(param.mg_global.precision_null[param.level], param.mg_global.invert_param->cuda_prec_sloppy);
+
+      double tol;
+      switch (prec) {
+      case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+      case QUDA_HALF_PRECISION: tol = 5e-2; break;
+      case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
+      default: tol = 1e-8;
       }
 
-      // This bit is equivalent to the next Mobius call:
-      // ApplyDomainWall4D(tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+      if (check_deviation(l2_deviation, tol))
+        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+      if (check_deviation(max_deviation[0], tol))
+        warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+    } // end of check 5-d Pauli-Villars operator
 
-      // a = 0; xpay false; much simpler than it looks
-      d_wilson->Dslash(tmp_4d.Even(), emul_lhs_4d.Odd(), QUDA_EVEN_PARITY);
-      d_wilson->Dslash(tmp_4d.Odd(), emul_lhs_4d.Even(), QUDA_ODD_PARITY);
+    // check 5-d Pauli-Villars dagger operator
+    {
+      printfQuda("Checking the 5-d Pauli-Villars dagger operator\n");
 
-      // This bit is equivalent to the last Mobius call:
-      // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
+      double mass_pv = 1.0;
 
-      // from compute_coeff_mobius
-      for (int s = 0; s < Ls; s++) {
-        kappa[s]
-          = 0.5 * (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0); // 0.5 from gamma matrices
+      if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4D_DIRAC) {
+        auto kappa5 = 0.5 / (5.0 + m5);
+
+        // apply the exact DiracDomainWall4D::ApplyPVDagger
+        reinterpret_cast<const DiracDomainWall4DPV *>(diracCoarseSmoother)->ApplyPVDagger(dwf_lhs, rhs);
+
+        d_wilson->flipDagger();
+        d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
+        d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
+        d_wilson->flipDagger();
+
+        // This next block is equivalent to the DWF call:
+        // ApplyDslash5(out, in, out, mass_pv, 0.0, nullptr, nullptr, 1.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_DWF);
+        // the dagger version of the projector is the same as the non-dagger version, but with the direction of the projector flipped
+        
+        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axpy((s == Ls - 1) ? -mass_pv : 1, chiral_plus[(s + 1) % Ls], emul_lhs_4d[s]);
+          // backwards direction
+          blas::axpy((s == 0) ? -mass_pv : 1, chiral_minus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+        }
+
+        // This last bit is equivalent to the call:
+        // blas::xpay(in, -kappa5, out);
+
+        blas::xpay(rhs_4d, -kappa5, emul_lhs_4d);
+
+      } else if (diracSmoother->getDiracType() == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+        auto b_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getB5();
+        auto c_5 = reinterpret_cast<const DiracMobius *>(diracSmoother)->getC5();
+        double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
+
+        // from compute_coeff_mobius_pre and compute_coeff_mobius
+        std::array<double, QUDA_MAX_DWF_LS> kappa, alpha, beta;
+
+        // apply the exact DiracMobius::ApplyPVDagger
+        reinterpret_cast<const DiracMobiusPV *>(diracCoarseSmoother)->ApplyPVDagger(dwf_lhs, rhs);
+
+        // create a temporary
+        auto tmp_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+        vector_ref<ColorSpinorField> tmp_4d(tmp_4d_);
+
+        // This bit is equivalent:
+        // ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim.data, profile);
+
+        // a = 0; xpay false; much simpler than it looks
+        d_wilson->flipDagger();
+        d_wilson->Dslash(emul_lhs_4d.Even(), rhs_4d.Odd(), QUDA_EVEN_PARITY);
+        d_wilson->Dslash(emul_lhs_4d.Odd(), rhs_4d.Even(), QUDA_ODD_PARITY);
+        d_wilson->flipDagger();
+
+        
+        // This bit is equivalent to the following Mobius call:
+        // ApplyDslash5(tmp, out, in, mass_pv, m5, b_5, c_5, 0.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_MOBIUS_PRE);
+
+        // from compute_coeff_mobius_pre
+        for (int s = 0; s < Ls; s++) {
+          beta[s] = b_5[s].real();
+          alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
+        }
+
+        ApplyChiralProj(chiral_plus, emul_lhs_4d, +1);  // for the backwards direction
+        ApplyChiralProj(chiral_minus, emul_lhs_4d, -1); // for the forwards direction
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axy(alpha[s] * ((s == Ls - 1) ? -mass_pv : 1), chiral_plus[(s + 1) % Ls], tmp_4d[s]);
+          // backwards direction
+          blas::axpy(alpha[s] * ((s == 0) ? -mass_pv : 1), chiral_minus[(s + Ls - 1) % Ls], tmp_4d[s]);
+          // diagonal contribution
+          blas::axpy(beta[s], emul_lhs_4d[s], tmp_4d[s]);
+        }
+
+        // This bit is equivalent to the last Mobius call:
+        // ApplyDslash5(out, in, in, mass_pv, m5, b_5, c_5, 0.0, QUDA_DAG_YES, Dslash5Type::DSLASH5_MOBIUS);
+
+        // from compute_coeff_mobius
+        for (int s = 0; s < Ls; s++) {
+          kappa[s]
+            = 0.5 * (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        }
+
+        ApplyChiralProj(chiral_plus, rhs_4d, +1);  // for the backwards direction
+        ApplyChiralProj(chiral_minus, rhs_4d, -1); // for the forwards direction
+        for (int s = 0; s < Ls; s++) {
+          // forwards direction
+          blas::axy(kappa[s] * ((s == Ls - 1) ? -mass_pv : 1), chiral_plus[(s + 1) % Ls], emul_lhs_4d[s]);
+          // backwards direction
+          blas::axpy(kappa[s] * ((s == 0) ? -mass_pv : 1), chiral_minus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
+          // diagonal contribution
+          blas::axpy(1.0, rhs_4d[s], emul_lhs_4d[s]);
+        }
+
+        // last, but not least, this call
+        // blas::axpy(-mobius_kappa_b, tmp, out);
+
+        blas::axpy(-mobius_kappa_b, tmp_4d, emul_lhs_4d);
       }
 
-      // seems to be the same chiral projectors?
-      for (int s = 0; s < Ls; s++) {
-        // forwards direction
-        blas::axy(kappa[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], emul_lhs_4d[s]);
-        // backwards direction
-        blas::axpy(kappa[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], emul_lhs_4d[s]);
-        // diagonal contribution
-        blas::axpy(1.0, rhs_4d[s], emul_lhs_4d[s]);
+      if (getVerbosity() >= QUDA_VERBOSE) {
+        // for debugging purposes
+        // std::vector<ColorSpinorField> dwf_lhs_4(Ls);
+        // for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
+        // auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
+        auto dwf_lhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
+        vector_ref<ColorSpinorField> dwf_lhs_4d(dwf_lhs_4d_);
+
+        Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
+
+        // in theory emul_lhs contains the same thing as dwf_lhs on a per-component basis
+        for (int s = 0; s < Ls; s++)
+          printfQuda("s %d norm2 source %e norm2 chiral+ %e norm2 chiral- %e norm2 dwf %e norm2 emul %e\n", s,
+                    blas::norm2(rhs_4d[s]), blas::norm2(chiral_plus[s]), blas::norm2(chiral_minus[s]),
+                    blas::norm2(dwf_lhs_4d[s]), blas::norm2(emul_lhs_4d[s]));
       }
 
-      // last, but not least, this call
-      // blas::axpy(-mobius_kappa_b, tmp, out);
+      // re-join
+      Join4DTo5DField(emul_lhs, emul_lhs_4d);
 
-      blas::axpy(-mobius_kappa_b, tmp_4d, emul_lhs_4d);
-    }
+      // verify
+      double emul_nrm2 = blas::norm2(emul_lhs);
+      double native_nrm2 = blas::norm2(dwf_lhs);
+      auto max_deviation = blas::max_deviation(dwf_lhs, emul_lhs);
+      auto l2_deviation = sqrt(xmyNorm(dwf_lhs, emul_lhs) / native_nrm2);
 
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      // for debugging purposes
-      // std::vector<ColorSpinorField> dwf_lhs_4(Ls);
-      // for (auto &f : dwf_lhs_4) f = ColorSpinorField(csParam);
-      // auto dwf_lhs_4d = vector_ref<ColorSpinorField>(dwf_lhs_4);
-      auto dwf_lhs_4d_ = getFieldTmp<ColorSpinorField>(Ls, csParam);
-      vector_ref<ColorSpinorField> dwf_lhs_4d(dwf_lhs_4d_);
+      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n", emul_nrm2,
+              native_nrm2, l2_deviation, max_deviation[0]);
 
-      Split5DTo4DFields(dwf_lhs_4d, dwf_lhs);
+      // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+      // these were set while hacking in tests of quarter precision ghosts
+      // moreover, we can improve the precision of block ortho with a tighter max than 1.0
+      QudaPrecision prec
+        = std::min(param.mg_global.precision_null[param.level], param.mg_global.invert_param->cuda_prec_sloppy);
 
-      // in theory emul_lhs contains the same thing as dwf_lhs on a per-component basis
-      for (int s = 0; s < Ls; s++)
-        printfQuda("s %d norm2 source %e norm2 chiral+ %e norm2 chiral- %e norm2 dwf %e norm2 emul %e\n", s,
-                   blas::norm2(rhs_4d[s]), blas::norm2(chiral_plus[s]), blas::norm2(chiral_minus[s]),
-                   blas::norm2(dwf_lhs_4d[s]), blas::norm2(emul_lhs_4d[s]));
-    }
+      double tol;
+      switch (prec) {
+      case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+      case QUDA_HALF_PRECISION: tol = 5e-2; break;
+      case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
+      default: tol = 1e-8;
+      }
 
-    // re-join
-    Join4DTo5DField(emul_lhs, emul_lhs_4d);
-
-    // verify
-    double emul_nrm2 = blas::norm2(emul_lhs);
-    double native_nrm2 = blas::norm2(dwf_lhs);
-    auto max_deviation = blas::max_deviation(dwf_lhs, emul_lhs);
-    auto l2_deviation = sqrt(xmyNorm(dwf_lhs, emul_lhs) / native_nrm2);
-
-    logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n", emul_nrm2,
-            native_nrm2, l2_deviation, max_deviation[0]);
-
-    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
-    // these were set while hacking in tests of quarter precision ghosts
-    // moreover, we can improve the precision of block ortho with a tighter max than 1.0
-    QudaPrecision prec
-      = std::min(param.mg_global.precision_null[param.level], param.mg_global.invert_param->cuda_prec_sloppy);
-
-    double tol;
-    switch (prec) {
-    case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
-    case QUDA_HALF_PRECISION: tol = 5e-2; break;
-    case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
-    default: tol = 1e-8;
-    }
-
-    if (check_deviation(l2_deviation, tol))
-      errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-    if (check_deviation(max_deviation[0], tol))
-      warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(l2_deviation, tol))
+        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+      if (check_deviation(max_deviation[0], tol))
+        warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+    } // end of check 5-d Pauli-Villars dagger operator
   }
 
   void MG::operator()(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b)

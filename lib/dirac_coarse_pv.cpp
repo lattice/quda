@@ -96,9 +96,6 @@ namespace quda
     if (out.X(4) != Ls) errorQuda("Unexpected fourth dimension for out = %d, expected %d", out.X(4), Ls);
     if (in.X(4) != Ls) errorQuda("Unexpected fourth dimension for in = %d, expected %d", in.X(4), Ls);
 
-    if (parent_dwf != QUDA_DOMAIN_WALL_4D_DIRAC)
-      errorQuda("Only the coarse DomainWall4DPV operator is supported for now");
-
     ColorSpinorParam csParam(out[0]);
     csParam.nDim = 4;
     csParam.x[4] = 1;
@@ -109,37 +106,101 @@ namespace quda
     auto chiral_plus = getFieldTmp<ColorSpinorField>(Ls, csParam);
     auto chiral_minus = getFieldTmp<ColorSpinorField>(Ls, csParam);
 
-    // split rhs
-    Split5DTo4DFields(in_4d, in[0]);
+    if (parent_dwf == QUDA_DOMAIN_WALL_4D_DIRAC) {
 
-    // This bit is spiritually equivalent to the DWF call:
-    // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
-    //                   profile);
+      // split rhs
+      Split5DTo4DFields(in_4d, in[0]);
 
-    // DiracCoarse::Mdag(out_4d, in_4d); // this ends up calling DiracCoarsePV::Mdag
-    flipDagger();
-    DiracCoarse::M(out_4d, in_4d);
-    flipDagger();
-    blas::axpy(-1.0, in_4d, out_4d);
-    blas::ax(-0.5 / kappa, out_4d); // undo the kappa baked into DiracCoarse
+      // This bit is spiritually equivalent to the DWF call:
+      // ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim.data,
+      //                   profile);
 
-    // This next block is spiritually equivalent to the DWF call:
-    // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
-    // the only difference between dagger and non-dagger is the direction of the projector
+      // DiracCoarse::Mdag(out_4d, in_4d); // this ends up calling DiracCoarsePV::Mdag
+      flipDagger();
+      DiracCoarse::M(out_4d, in_4d);
+      flipDagger();
+      blas::axpy(-1.0, in_4d, out_4d);
+      blas::ax(-0.5 / kappa, out_4d); // undo the kappa baked into DiracCoarse
 
-    ApplyCoarseChiralProj(chiral_plus, in_4d, +1);  // for the forwards direction
-    ApplyCoarseChiralProj(chiral_minus, in_4d, -1); // for the direction direction
-    for (int s = 0; s < Ls; s++) {
-      // forwards direction
-      blas::axpy((s == Ls - 1) ? -mass_pv : 1, chiral_plus[(s + 1) % Ls], out_4d[s]);
-      // backwards direction
-      blas::axpy((s == 0) ? -mass_pv : 1, chiral_minus[(s + Ls - 1) % Ls], out_4d[s]);
+      // This next block is spiritually equivalent to the DWF call:
+      // ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
+      // the only difference between dagger and non-dagger is the direction of the projector
+
+      ApplyCoarseChiralProj(chiral_plus, in_4d, +1);  // for the forwards direction
+      ApplyCoarseChiralProj(chiral_minus, in_4d, -1); // for the direction direction
+      for (int s = 0; s < Ls; s++) {
+        // forwards direction
+        blas::axpy((s == Ls - 1) ? -mass_pv : 1, chiral_plus[(s + 1) % Ls], out_4d[s]);
+        // backwards direction
+        blas::axpy((s == 0) ? -mass_pv : 1, chiral_minus[(s + Ls - 1) % Ls], out_4d[s]);
+      }
+
+      // This last bit is spiritually equivalent to the call:
+      // blas::xpay(in, -kappa5, out);
+
+      blas::xpay(in_4d, -2.0 * kappa5, out_4d);
+    } else if (parent_dwf == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
+
+      auto tmp_4d = getFieldTmp<ColorSpinorField>(Ls, csParam);
+
+      // This bit is spiritually equivalent to the following Mobius call:
+      // ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
+      flipDagger();
+      DiracCoarse::M(out_4d, in_4d);
+      flipDagger();
+      blas::axpy(-1.0, in_4d, out_4d);
+      blas::ax(-0.5 / kappa, out_4d); // undo the kappa baked into DiracCoarse
+
+      // This bit is spiritually equivalent to the following Mobius call:
+      // ApplyDslash5(tmp, out, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
+      // the only difference between dagger and non-dagger is the direction of the projector
+
+      // from compute_coeff_mobius_pre and compute_coeff_mobius
+      std::array<double, QUDA_MAX_DWF_LS> alpha, beta;
+      for (int s = 0; s < Ls; s++) {
+        beta[s] = b_5[s].real();
+        alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
+      }
+
+      ApplyCoarseChiralProj(chiral_plus, out_4d, +1);  // for the backwards direction
+      ApplyCoarseChiralProj(chiral_minus, out_4d, -1); // for the forwards direction
+      for (int s = 0; s < Ls; s++) {
+        // forwards direction
+        blas::axy(alpha[s] * ((s == Ls - 1) ? -mass_pv : 1), chiral_plus[(s + 1) % Ls], tmp_4d[s]);
+        // backwards direction
+        blas::axpy(alpha[s] * ((s == 0) ? -mass_pv : 1), chiral_minus[(s + Ls - 1) % Ls], tmp_4d[s]);
+        // diagonal contribution
+        blas::axpy(beta[s], out_4d[s], tmp_4d[s]);
+      }
+
+      // This bit is equivalent to the last Mobius call:
+      // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
+
+      // from compute_coeff_mobius
+      std::array<double, QUDA_MAX_DWF_LS> kappa;
+      for (int s = 0; s < Ls; s++) {
+        // the coarse kappa doesn't have the 0.5 from gamma matrices
+        kappa[s] = (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0);
+      }
+
+      ApplyCoarseChiralProj(chiral_plus, in_4d, +1);  // for the forwards direction
+      ApplyCoarseChiralProj(chiral_minus, in_4d, -1); // for the direction direction
+      for (int s = 0; s < Ls; s++) {
+        // forwards direction
+        blas::axy(kappa[s] * ((s == Ls - 1) ? -mass_pv : 1), chiral_plus[(s + 1) % Ls], out_4d[s]);
+        // backwards direction
+        blas::axpy(kappa[s] * ((s == 0) ? -mass_pv : 1), chiral_minus[(s + Ls - 1) % Ls], out_4d[s]);
+        // diagonal contribution
+        blas::axpy(1.0, in_4d[s], out_4d[s]);
+      }
+
+      // last, but not least, this call
+      // blas::axpy(-mobius_kappa_b, tmp, out);
+
+      blas::axpy(-mobius_kappa_b, tmp_4d, out_4d);
+    } else {
+      errorQuda("Only the coarse DomainWall4DPV and MobiusPV operators are supported for now");
     }
-
-    // This last bit is spiritually equivalent to the call:
-    // blas::xpay(in, -kappa5, out);
-
-    blas::xpay(in_4d, -2.0 * kappa5, out_4d);
 
     Join4DTo5DField(out[0], out_4d);
   }
@@ -205,6 +266,17 @@ namespace quda
         alpha[s] = 0.5 * c_5[s].real(); // 0.5 from gamma matrices
       }
 
+      {
+        // step 0 norms
+        double accum_4d = 0.;
+        for (int i = 0; i < Ls; i++) {
+          auto in_4d_r2 = blas::norm2(static_cast<const ColorSpinorField&>(in_4d[i]));
+          printfQuda("in_4d constituent %d has norm %e\n", i, in_4d_r2);
+          accum_4d += in_4d_r2;
+        }
+        printfQuda("Step 0 norms: %e\n", accum_4d);
+      }
+
       ApplyCoarseChiralProj(chiral_plus, in_4d, +1);  // for the backwards direction
       ApplyCoarseChiralProj(chiral_minus, in_4d, -1); // for the forwards direction
       for (int s = 0; s < Ls; s++) {
@@ -216,6 +288,17 @@ namespace quda
         blas::axpy(beta[s], in_4d[s], out_4d[s]);
       }
 
+      {
+        // step 1 norms
+        double accum_4d = 0.;
+        for (int i = 0; i < Ls; i++) {
+          auto out_4d_r2 = blas::norm2(static_cast<const ColorSpinorField&>(out_4d[i]));
+          printfQuda("out_4d constituent %d has norm %e\n", i, out_4d_r2);
+          accum_4d += out_4d_r2;
+        }
+        printfQuda("Step 1 norms: %e\n", accum_4d);
+      }
+
       // This bit is equivalent to the next Mobius call:
       // ApplyDomainWall4D(tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
 
@@ -224,24 +307,46 @@ namespace quda
       blas::axpy(-1.0, out_4d, tmp_4d);
       blas::ax(-0.5 / kappa, tmp_4d); // undo the kappa baked into DiracCoarse
 
+      {
+        // step 2 norms
+        double accum_4d = 0.;
+        for (int i = 0; i < Ls; i++) {
+          auto tmp_4d_r2 = blas::norm2(static_cast<const ColorSpinorField&>(tmp_4d[i]));
+          printfQuda("tmp_4d constituent %d has norm %e\n", i, tmp_4d_r2);
+          accum_4d += tmp_4d_r2;
+        }
+        printfQuda("Step 2 norms: %e\n", accum_4d);
+      }
+
       // This bit is equivalent to the last Mobius call:
       // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
 
       // from compute_coeff_mobius
       std::array<double, QUDA_MAX_DWF_LS> kappa;
       for (int s = 0; s < Ls; s++) {
-        kappa[s]
-          = 0.5 * (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        // the coarse kappa doesn't have the 0.5 from gamma matrices
+        kappa[s] = (c_5[s].real() * (m5 + 4.0) - 1.0) / (b_5[s].real() * (m5 + 4.0) + 1.0);
       }
 
       // seems to be the same chiral projectors?
       for (int s = 0; s < Ls; s++) {
         // forwards direction
-        blas::axy(2.0 * kappa[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], out_4d[s]);
+        blas::axy(kappa[s] * ((s == Ls - 1) ? -mass : 1), chiral_minus[(s + 1) % Ls], out_4d[s]);
         // backwards direction
-        blas::axpy(2.0 * kappa[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], out_4d[s]);
+        blas::axpy(kappa[s] * ((s == 0) ? -mass : 1), chiral_plus[(s + Ls - 1) % Ls], out_4d[s]);
         // diagonal contribution
         blas::axpy(1.0, in_4d[s], out_4d[s]);
+      }
+
+      {
+        // step 3 norms
+        double accum_4d = 0.;
+        for (int i = 0; i < Ls; i++) {
+          auto out_4d_r2 = blas::norm2(static_cast<const ColorSpinorField&>(out_4d[i]));
+          printfQuda("out_4d constituent %d has norm %e\n", i, out_4d_r2);
+          accum_4d += out_4d_r2;
+        }
+        printfQuda("Step 3 norms: %e\n", accum_4d);
       }
 
       // last, but not least, this call
@@ -251,6 +356,17 @@ namespace quda
 
     } else {
       errorQuda("Only the coarse DomainWall4DPV and MobiusPV operators are supported for now");
+    }
+
+    {
+      // step 4 norms 
+      double accum_4d = 0.;
+      for (int i = 0; i < Ls; i++) {
+        auto out_4d_r2 = blas::norm2(static_cast<const ColorSpinorField&>(out_4d[i]));
+        printfQuda("final out_4d constituent %d has norm %e\n", i, out_4d_r2);
+        accum_4d += out_4d_r2;
+      }
+      printfQuda("Step 4 norms: %e\n", accum_4d);
     }
 
     Join4DTo5DField(out[0], out_4d);
