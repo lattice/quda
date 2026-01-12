@@ -1,7 +1,7 @@
 #!/bin/bash
-cmake "/ustcfs/LQCD/wangtx/QUDA/src" \
-  -DCMAKE_INSTALL_PREFIX="/ustcfs/LQCD/wangtx/QUDA/quda" \
-  -DCMAKE_PREFIX_PATH="/ustcfs/LQCD/wangtx/QUDA/quda:/ustcfs/LQCD/wangtx/QCDIO/qio:/ustcfs/LQCD/wangtx/QCDMP/qmp" \
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/path/to/your/install/directory \
+  -DCMAKE_PREFIX_PATH=/path/to/eigen3/install/directory:/path/to/qio/install/directory:/path/to/qmp/install/directory \
   -DCMAKE_BUILD_TYPE=RELEASE \
   -DQUDA_TARGET_TYPE=CUDA \
   -DQUDA_GPU_ARCH=sm_80 \
@@ -33,9 +33,9 @@ cmake "/ustcfs/LQCD/wangtx/QUDA/src" \
   -DQUDA_DOWNLOAD_USQCD=OFF \
   -DQUDA_DOWNLOAD_NVSHMEM=OFF \
   -DQUDA_SPACK_BUILD=OFF \
-  -DQMP_DIR="/ustcfs/LQCD/wangtx/QCDMP/qmp/lib/cmake/QMP" \
-  -DQIO_DIR="/ustcfs/LQCD/wangtx/QCDIO/qio/lib/cmake/QIO" \
-  -DEIGEN_INCLUDE_DIRS="/ustcfs/LQCD/wangtx/QUDA/quda/include/eigen3" \
+  -DQMP_DIR=/path/to/qmp/cmake/directory \
+  -DQIO_DIR=/path/to/qio/cmake/directory \
+  -DEIGEN_INCLUDE_DIRS=/path/to/eigen3/include/directory \
   -DQUDA_INTERFACE_QDP=OFF \
   -DQUDA_INTERFACE_MILC=OFF \
   -DQUDA_INTERFACE_CPS=OFF \
@@ -49,9 +49,9 @@ cmake "/ustcfs/LQCD/wangtx/QUDA/src" \
   -DQUDA_MAX_MULTI_BLAS_N=8 \
   -DQUDA_BUILD_SHAREDLIB=ON \
   -DQUDA_BACKWARDS=OFF \
-  -DMPI_C_COMPILER="/ustcfs/LQCD/wangtx/OpenMPI/ompi/bin/mpicc" \
-  -DCMAKE_C_COMPILER="/opt/rh/gcc-toolset-13/root/usr/bin/gcc" \
-  -DCMAKE_CXX_COMPILER="/opt/rh/gcc-toolset-13/root/usr/bin/g++" \
-  -DCMAKE_CUDA_COMPILER="/ustcfs/LQCD/sunwei/software/cuda/cuda-12.4/bin/nvcc" \
+  -DMPI_C_COMPILER=mpicc \
+  -DCMAKE_C_COMPILER=gcc \
+  -DCMAKE_CXX_COMPILER=g++ \
+  -DCMAKE_CUDA_COMPILER=nvcc \
   -DCMAKE_C_FLAGS="-O3 -fPIC" \
   -DCMAKE_CXX_FLAGS="-O3 -fPIC"
