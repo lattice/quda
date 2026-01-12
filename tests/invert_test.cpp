@@ -235,6 +235,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   void *mg_preconditioner = nullptr;
   if (inv_multigrid) {
     if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
+
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
 

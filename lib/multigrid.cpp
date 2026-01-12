@@ -1379,8 +1379,8 @@ namespace quda
           if (diracSmoother->getDiracType() == QUDA_DOMAIN_WALL_4DPV_DIRAC) {
             static_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
           } else {
-            errorQuda("  The coarse MobiusPV op has not been implemented yet");
-            // static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
+            //errorQuda("  The coarse MobiusPV op has not been implemented yet");
+            static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyMDwf(fine_5d_lhs_inter, fine_5d_rhs_inter);
           }
 
           blas::copy(fine_5d_lhs, fine_5d_lhs_inter);
@@ -1455,7 +1455,7 @@ namespace quda
             static_cast<const DiracDomainWall4DPV *>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
           } else {
             errorQuda("  The coarse MobiusPV op has not been implemented yet");
-            // static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
+            //static_cast<const DiracMobiusPV*>(diracSmoother)->ApplyPVDagger(fine_5d_lhs_inter, fine_5d_rhs_inter);
           }
 
           blas::copy(fine_5d_lhs, fine_5d_lhs_inter);
