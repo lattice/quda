@@ -470,13 +470,13 @@ namespace quda {
     void generateNullVectors(std::vector<ColorSpinorField> &B, bool refresh = false);
 
     /**
-       @brief Use Null-space vectors from vec_copy property
+       @brief Use Null-space vectors from vec_copy_in property
        @param B Null-space vectors
     */
     void copyInVectors(std::vector<ColorSpinorField> &B);
 
     /**
-       @brief Store Null-space vectors in vec_store property
+       @brief Store Null-space vectors in vec_copy_out property
        @param B Null-space vectors
     */
     void copyOutVectors(std::vector<ColorSpinorField> &B);

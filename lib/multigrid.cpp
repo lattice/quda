@@ -48,6 +48,8 @@ namespace quda
               loadVectors(param.B);
             } else if (param.mg_global.use_eig_solver[param.level]) {
               generateEigenVectors(); // Run the eigensolver
+            } else if (param.mg_global.vec_copy_in[param.level] != nullptr) { // copy them
+              copyInVectors(param.B);
             } else {
               generateNullVectors(param.B);
             }
@@ -57,6 +59,8 @@ namespace quda
           if (param.mg_global.num_setup_iter[param.level] > 0) generateNullVectors(param.B);
         } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE) { // only conditional load of null vectors
           loadVectors(param.B);
+        } else if (param.mg_global.vec_copy_in[param.level] != nullptr) { // copy them
+          copyInVectors(param.B);
         } else { // generate free field vectors
           buildFreeVectors(param.B);
         }
@@ -1168,7 +1172,6 @@ namespace quda
     if (inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
-
     if (param.level < param.Nlevel - 1) {
       std::vector<ColorSpinorField> out(b.size()), in(b.size());
       diracSmoother->prepare(out, in, x, b, outer_solution_type);
@@ -1477,13 +1480,17 @@ namespace quda
 
   void MG::copyInVectors(std::vector<ColorSpinorField> &B)
   {
-    auto* in = reinterpret_cast<std::vector<ColorSpinorField>*>(param.mg_global.vec_copy_in[param.level]);
+    auto *in = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_in[param.level]);
+    logQuda(QUDA_VERBOSE, "Loading null vectors from vec_copy_in property\n");
     blas::copy(B, *in);
+    delete in;
+    param.mg_global.vec_copy_in[param.level] = nullptr;
   }
 
   void MG::copyOutVectors(std::vector<ColorSpinorField> &B)
   {
-    auto* out = reinterpret_cast<std::vector<ColorSpinorField>*>(param.mg_global.vec_copy_out[param.level]);
+    logQuda(QUDA_VERBOSE, "Storing null vectors from vec_copy_out property\n");
+    auto *out = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_out[param.level]);
     blas::copy(*out, B);
   }
 

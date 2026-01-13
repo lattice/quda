@@ -1942,7 +1942,7 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
 
     if (openQCD_field != nullptr) {
       ColorSpinorField in_h(cpuParam);
-      in_d = in_h; /* transfer the CPU field to GPU */
+      in_d = in_h; /* transfer, reorder and gamma basis change */
     }
 
     return in_d;
@@ -2023,6 +2023,39 @@ void openQCD_qudaMultiSrcMG(int id, double mu, void** sources, void** solutions,
     WITH_COMM(logQuda(QUDA_VERBOSE, "  residual[%d]    = %.2e\n", i, residual[i]));
     WITH_COMM(logQuda(QUDA_VERBOSE, "  status[%d]      = %d\n", i, status[i]));
   }
+}
+
+
+void openQCD_qudaMGSetEvecs(int id, void** evecs)
+{
+  if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
+
+  if (qudaState.layout.h_sw != nullptr) {
+    qudaState.layout.h_sw();
+  } else {
+    WITH_COMM(errorQuda("qudaState.layout.h_sw is not set."));
+  }
+
+  if (qudaState.inv_handles[id] == nullptr) {
+    qudaState.inv_handles[id] = static_cast<QudaInvertParam *>(openQCD_qudaSolverReadIn(id));
+  }
+  QudaInvertParam *param = static_cast<QudaInvertParam *>(qudaState.inv_handles[id]);
+
+  if (param->inv_type_precondition != QUDA_MG_INVERTER) {
+    WITH_COMM(errorQuda("No MG preconditioner defined."));
+  }
+
+  int level = 0;
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
+  QudaMultigridParam *mg_param = additional_prop->mg_param;
+  int nevecs = mg_param->n_vec[level];
+
+  auto *d_evecs = new std::vector<ColorSpinorField>();
+  for (int i = 0; i < nevecs; ++i) {
+    d_evecs->push_back(std::move(CSFactory(evecs[i], QUDA_DOUBLE_PRECISION)));
+  }
+
+  mg_param->vec_copy_in[level] = static_cast<void*>(d_evecs);
 }
 
 
