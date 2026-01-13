@@ -250,7 +250,7 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field);
  *
  * @param      quda_field  Pointer to device pointer
  */
-void openQCD_qudaSpinorFree(void **quda_field);
+void openQCD_qudaSpinorFree(void *quda_field);
 
 /**
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
@@ -389,7 +389,7 @@ void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** soluti
  *
  * @return     Residual
  */
-double openQCD_qudaInvertMG(int id, double mu, void* source, void* solution, int *status);
+double openQCD_qudaMG(int id, double mu, void* source, void* solution, int *status);
 
 /**
  * @brief      Apply the MG preconditioner. All fields passed and returned are
@@ -410,7 +410,7 @@ double openQCD_qudaInvertMG(int id, double mu, void* source, void* solution, int
  *                        that the inversion failed.
  * @param      residual   The num_src residuals
  */
-void openQCD_qudaInvertMultiSrcMG(int id, double mu, void** sources, void** solutions, int *status, double *residual);
+void openQCD_qudaMultiSrcMG(int id, double mu, void** sources, void** solutions, int *status, double *residual);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details

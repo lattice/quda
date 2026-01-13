@@ -262,6 +262,10 @@ namespace quda {
    */
   class MG : public Solver {
 
+  public:
+    /** Storage for the parameter struct for the coarse solver */
+    SolverParam *param_coarse_solver = nullptr;
+
   private:
     /** Local copy of the multigrid metadata */
     MGParam &param;
@@ -297,9 +301,6 @@ namespace quda {
 
     /** Storage for the parameter struct for the post-smoother */
     SolverParam *param_postsmooth = nullptr;
-
-    /** Storage for the parameter struct for the coarse solver */
-    SolverParam *param_coarse_solver = nullptr;
 
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField> B_coarse;
