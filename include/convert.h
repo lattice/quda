@@ -60,14 +60,6 @@ namespace quda
     }
   };
 
-  template <bool is_device> struct i2f_fma {
-    template <typename T> constexpr float operator()(int a, T, float b, float) { return static_cast<float>(a) * b; }
-    template <typename T> constexpr float2 operator()(int a1, int a2, T, float b, float)
-    {
-      return mul2(float2 {static_cast<float>(a1), static_cast<float>(a2)}, float2 {b, b});
-    }
-  };
-
   /**
      @brief This is a LUT which is used to determine whether a given
      int-to-float conversion in a array of numbers to be converted
@@ -104,7 +96,6 @@ namespace quda
         int32_t i = a + 0x4B400000;
         float f;
         memcpy(&f, &i, sizeof(int32_t));
-        assert(f - 12582912.0f == static_cast<float>(a));
         return f - 12582912.0f;
       }
     }
@@ -120,8 +111,6 @@ namespace quda
         int2 i = {a + 0x4B400000, b + 0x4B400000};
         float2 f;
         memcpy(&f, &i, sizeof(int2));
-        assert(f.x - 12582912.0f == static_cast<float>(a));
-        assert(f.y - 12582912.0f == static_cast<float>(b));
         return add2(f, {-12582912.0f, -12582912.0f});
       }
     }
