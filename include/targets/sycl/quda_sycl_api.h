@@ -14,6 +14,7 @@ namespace quda
     void *get_arg_buf(qudaStream_t stream, size_t size);
     void *get_arg_buf_d(qudaStream_t stream, size_t size);
     void free_arg_buf();
+    bool sync_kernels();
   } // namespace device
 
   namespace target
