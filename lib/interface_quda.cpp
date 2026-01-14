@@ -5185,7 +5185,7 @@ void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_p
   }
 
   std::vector<ColorSpinorField> in_h, in, out;
-  for (size_t i = 0; i < nSpinors; i ++) {
+  for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_in[i], *inv_param, precise->X(), false, inv_param->input_location);
     in_h.push_back(ColorSpinorField(cpuParam));
 
@@ -5215,12 +5215,12 @@ void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_p
     // swap pointers rather than deep copying spinor
     if (i) std::swap(in, out);
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, comm_dim, profileWuppertal);
-    for (size_t j = 0; j < nSpinors; j ++)
+    for (size_t j = 0; j < nSpinors; j++)
       logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector %lu norm %e\n", i, j, blas::norm2(out[j]));
   }
 
   // copy out to h_out
-  for (size_t i = 0; i < nSpinors; i ++) {
+  for (size_t i = 0; i < nSpinors; i++) {
     ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
     ColorSpinorField out_h(cpuParam);
     out_h = out[i];
@@ -5233,7 +5233,8 @@ void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_p
   popVerbosity();
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha) {
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
+{
   // call multi-RHS version with only a single right-hand side
   performWuppertalnStepQuda(&h_out, &h_in, inv_param, n_steps, alpha, 1);
 }
