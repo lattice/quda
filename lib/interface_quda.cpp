@@ -5161,7 +5161,8 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
+void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *inv_param, unsigned int n_steps,
+                               double alpha, size_t nSpinors)
 {
   auto profile = pushProfile(profileWuppertal);
   pushVerbosity(inv_param->verbosity);
@@ -5183,17 +5184,20 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
     precise = gaugePrecise;
   }
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField in_h(cpuParam);
+  std::vector<ColorSpinorField> in_h, in, out;
+  for (size_t i = 0; i < nSpinors; i ++) {
+    ColorSpinorParam cpuParam(h_in[i], *inv_param, precise->X(), false, inv_param->input_location);
+    in_h.push_back(ColorSpinorField(cpuParam));
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField in(cudaParam);
-  in = in_h;
+    ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+    in.push_back(ColorSpinorField(cudaParam));
+    in[i] = in_h[i];
 
-  logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+    logQuda(QUDA_DEBUG_VERBOSE, "In CPU %e CUDA %e\n", blas::norm2(in_h[i]), blas::norm2(in[i]));
 
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField out(cudaParam);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    out.push_back(ColorSpinorField(cudaParam));
+  }
   int parity = 0;
 
   // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
@@ -5208,21 +5212,30 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
-    if (i) in = out;
+    // swap pointers rather than deep copying spinor
+    if (i) std::swap(in, out);
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, comm_dim, profileWuppertal);
-    logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector norm %e\n", i, blas::norm2(out));
+    for (size_t j = 0; j < nSpinors; j ++)
+      logQuda(QUDA_DEBUG_VERBOSE, "Step %d, vector %lu norm %e\n", i, j, blas::norm2(out[j]));
   }
 
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField out_h(cpuParam);
-  out_h = out;
+  // copy out to h_out
+  for (size_t i = 0; i < nSpinors; i ++) {
+    ColorSpinorParam cpuParam(h_out[i], *inv_param, gaugePrecise->X(), false, inv_param->output_location);
+    ColorSpinorField out_h(cpuParam);
+    out_h = out[i];
 
-  logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+    logQuda(QUDA_DEBUG_VERBOSE, "Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out[i]));
+  }
 
   if (gaugeSmeared != nullptr) delete precise;
 
   popVerbosity();
+}
+
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha) {
+  // call multi-RHS version with only a single right-hand side
+  performWuppertalnStepQuda(&h_out, &h_in, inv_param, n_steps, alpha, 1);
 }
 
 void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)

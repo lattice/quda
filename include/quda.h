@@ -1667,6 +1667,21 @@ extern "C" {
                                const QudaFermionSmearType smear_type);
 
   /**
+   * Performs Wuppertal smearing on a given set of spinors using the gauge field
+   * gaugeSmeared, if it exists, or gaugePrecise if no smeared field is present.
+   * This smears multiple right-hand sides simultaneously.
+   * @param h_out    Result spinor fields
+   * @param h_in     Input spinor fields
+   * @param param    Contains all metadata regarding host and device
+   *                 storage and operator which will be applied to the spinor
+   * @param n_steps  Number of steps to apply.
+   * @param alpha    Alpha coefficient for Wuppertal smearing.
+   * @param nSpinors Number of spinor fields to smear
+   */
+  void performWuppertalnStepQuda(void **h_out, void **h_in, QudaInvertParam *param, unsigned int n_steps, double alpha,
+                                 size_t nSpinors);
+
+  /**
    * LEGACY
    * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
