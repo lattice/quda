@@ -28,7 +28,6 @@ namespace quda {
     null_precision(null_precision),
     spin_bs(spin_bs),
     spin_map(0),
-    nspin_fine(B[0].Nspin()),
     site_subset(QUDA_FULL_SITE_SUBSET),
     parity(QUDA_INVALID_PARITY),
     transfer_type(transfer_type)
@@ -106,9 +105,12 @@ namespace quda {
     createGeoMap(geo_bs);
 
     // allocate the fine-to-coarse spin map
-    spin_map = static_cast<int**>(safe_malloc(nspin_fine*sizeof(int*)));
+    spin_map = static_cast<int**>(safe_malloc(B[0].Nspin()*sizeof(int*)));
     for (int s = 0; s < B[0].Nspin(); s++) spin_map[s] = static_cast<int *>(safe_malloc(2 * sizeof(int)));
     createSpinMap(spin_bs);
+
+    // create ColorSpinorParam objects for the fine and coarse fields
+    createColorSpinorParams();
 
     reset();
     postTrace();
@@ -166,7 +168,7 @@ namespace quda {
   Transfer::~Transfer() {
     if (spin_map)
     {
-      for (int s = 0; s < nspin_fine; s++) { if (spin_map[s]) host_free(spin_map[s]); } 
+      for (int s = 0; s < fine_param.nSpin; s++) { if (spin_map[s]) host_free(spin_map[s]); }
       host_free(spin_map);
     }
     if (coarse_to_fine_d) pool_device_free(coarse_to_fine_d);
@@ -256,6 +258,70 @@ namespace quda {
     }
   }
 
+  void Transfer::createColorSpinorParams() {
+    // create the ColorSpinorParam objects for the fine and coarse fields
+    // the precision is intentionally unset
+    fine_param = ColorSpinorParam(B[0]);
+    fine_param.create = QUDA_NULL_FIELD_CREATE;
+    fine_param.location = B[0].Location();
+    fine_param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    fine_param.gammaBasis = (B[0].Nspin() == 4) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // copy the fine param and modify in place
+    coarse_param = fine_param;
+    for (int d = 0; d < fine_param.nDim; d++) coarse_param.x[d] = fine_param.x[d] / geo_bs[d];
+
+    // Detect if the "coarse op" is the Kahler-Dirac op or something else that still acts on a fine staggered ColorSpinorField
+    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      coarse_param.nSpin = fine_param.nSpin;
+      coarse_param.nColor = fine_param.nColor;
+      coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // fine staggered fields are always Degrand-Rossi
+    } else if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
+      coarse_param.nSpin = 2;
+      coarse_param.nColor = 24;
+      coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // coarse staggered fields are always Degrand-Rossi
+    } else {
+      coarse_param.nSpin = (fine_param.nSpin == 1) ? 2 : (fine_param.nSpin / spin_bs);
+      coarse_param.nColor = Nvec;
+      coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // coarse fields are always Degrand-Rossi
+    }
+
+    coarse_param.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
+  }
+
+  ColorSpinorParam Transfer::fineColorSpinorParam(QudaPrecision precision, QudaFieldLocation new_location, QudaMemoryType new_mem_type) const {
+    auto fine_param_copy = fine_param;
+
+    // if new location is not set, use this->location
+    fine_param_copy.location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? fine_param.location : new_location;
+
+    fine_param_copy.fieldOrder
+      = (fine_param_copy.location == QUDA_CUDA_FIELD_LOCATION) ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    fine_param_copy.setPrecision(precision);
+
+    // set where we allocate the field
+    fine_param_copy.mem_type = (new_mem_type == QUDA_MEMORY_INVALID) ? fine_param.mem_type : new_mem_type;
+
+    return fine_param_copy;
+  }
+
+  ColorSpinorParam Transfer::coarseColorSpinorParam(QudaPrecision precision, QudaFieldLocation new_location, QudaMemoryType new_mem_type) const {
+    auto coarse_param_copy = coarse_param;
+
+    // if new location is not set, use this->location
+    coarse_param_copy.location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? coarse_param.location : new_location;
+
+    coarse_param_copy.fieldOrder
+      = (coarse_param_copy.location == QUDA_CUDA_FIELD_LOCATION) ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    coarse_param_copy.setPrecision(precision);
+
+    // set where we allocate the field
+    coarse_param_copy.mem_type = (new_mem_type == QUDA_MEMORY_INVALID) ? coarse_param.mem_type : new_mem_type;
+
+    return coarse_param_copy;
+  }
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);

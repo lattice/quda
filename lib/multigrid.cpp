@@ -111,20 +111,19 @@ namespace quda
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
+        auto coarse_param = transfer->coarseColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy,
+          param.mg_global.location[param.level + 1]);
+
         // create coarse residual vector if not already created in verify()
         if (r_coarse.empty()) {
           r_coarse.resize(1);
-          r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                                 param.mg_global.invert_param->cuda_prec_sloppy,
-                                                 param.mg_global.location[param.level + 1]);
+          r_coarse[0] = ColorSpinorField(coarse_param);
         }
 
         // create coarse solution vector if not already created in verify()
         if (x_coarse.empty()) {
           x_coarse.resize(1);
-          x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                                 param.mg_global.invert_param->cuda_prec_sloppy,
-                                                 param.mg_global.location[param.level + 1]);
+          x_coarse[0] = ColorSpinorField(coarse_param);
         }
 
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
@@ -132,9 +131,10 @@ namespace quda
 
         // only have single precision B vectors on the coarse grid
         QudaPrecision B_coarse_precision = std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
-        for (int i=0; i<nVec_coarse; i++)
-          B_coarse[i] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                                 B_coarse_precision, param.mg_global.setup_location[param.level + 1]);
+        coarse_param.setPrecision(B_coarse_precision);
+        coarse_param.location = param.mg_global.setup_location[param.level + 1];
+        for (auto &B_coarse_i : B_coarse)
+          B_coarse_i = ColorSpinorField(coarse_param);
 
         // if we're not generating on all levels then we need to propagate the vectors down
         if ((param.level != 0 || param.Nlevel - 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
@@ -761,15 +761,12 @@ namespace quda
 
     // temporary fields used for verification
     std::vector<ColorSpinorField> fine_tmp(param.Nvec);
-    ColorSpinorParam fine_param(param.B[0]);
-    fine_param.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
-                            fine_param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-    fine_param.gammaBasis
-      = (param.level > 0 || param.B[0].Nspin() == 1) ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
+    auto fine_param = transfer->fineColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy);
+
     for (auto &f : fine_tmp) f = ColorSpinorField(fine_param);
 
     std::vector<ColorSpinorField> coarse_tmp(param.Nvec);
-    ColorSpinorParam coarse_param(r_coarse[0]);
+    auto coarse_param = transfer->coarseColorSpinorParam(r_coarse[0].Precision(), r_coarse[0].Location());
     for (auto &c : coarse_tmp) c = ColorSpinorField(coarse_param);
 
     auto &tmp1 = fine_tmp[0];
@@ -850,17 +847,17 @@ namespace quda
     // create coarse residual vector if not already created in verify()
     if (r_coarse.empty()) {
       r_coarse.resize(1);
-      r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                             param.mg_global.invert_param->cuda_prec_sloppy,
+      auto coarse_param = transfer->coarseColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy,
                                              param.mg_global.location[param.level + 1]);
+      r_coarse[0] = ColorSpinorField(coarse_param);
     }
 
     // create coarse solution vector if not already created in verify()
     if (x_coarse.empty()) {
       x_coarse.resize(1);
-      x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                             param.mg_global.invert_param->cuda_prec_sloppy,
+      auto coarse_param = transfer->coarseColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy,
                                              param.mg_global.location[param.level + 1]);
+      x_coarse[0] = ColorSpinorField(coarse_param);
     }
 
     {
@@ -1308,12 +1305,21 @@ namespace quda
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-    ColorSpinorParam csParam(B[0]);                             // Create spinor field parameters:
-    csParam.setPrecision(solverParam.precision, solverParam.precision, true); // ensure native ordering
-    csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = B[0].Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
-                                             QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
+    // hard code to GPU location for null-space generation for now
+    auto csParam = [&]() -> ColorSpinorParam {
+      if (transfer) {
+        return transfer->fineColorSpinorParam(solverParam.precision, QUDA_CUDA_FIELD_LOCATION);
+      } else {
+        ColorSpinorParam tmp(B[0]);
+        tmp.setPrecision(solverParam.precision, solverParam.precision, true); // ensure native ordering
+        tmp.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
+        tmp.gammaBasis = (B[0].Nspin() == 1) ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
+        return tmp;
+      }
+    }();
+
     csParam.create = QUDA_ZERO_FIELD_CREATE;
+
     std::vector<ColorSpinorField> b, x;
     resize(b, param.n_vec_batch, csParam);
     resize(x, param.n_vec_batch, csParam);
@@ -1497,7 +1503,7 @@ namespace quda
         for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(B[0]);
+        auto csParam = transfer->fineColorSpinorParam(B[0].Precision(), B[0].Location());
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
@@ -1523,7 +1529,7 @@ namespace quda
         for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(B[0]);
+        auto csParam = transfer->fineColorSpinorParam(B[0].Precision(), B[0].Location());
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
@@ -1594,7 +1600,7 @@ namespace quda
         for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(B[0]);
+        auto csParam = transfer->fineColorSpinorParam(B[0].Precision(), B[0].Location());
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
@@ -1615,7 +1621,7 @@ namespace quda
         for (int i = 0; i < Nvec; i++) zero(B[i]);
 
         // Create a temporary vector.
-        ColorSpinorParam csParam(B[0]);
+        auto csParam = transfer->fineColorSpinorParam(B[0].Precision(), B[0].Location());
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         ColorSpinorField tmp(csParam);
 
@@ -1653,8 +1659,7 @@ namespace quda
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
-    ColorSpinorParam csParam(param.B[0]);
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    auto csParam = transfer->fineColorSpinorParam(param.B[0].Precision(), param.B[0].Location());
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
@@ -1664,7 +1669,7 @@ namespace quda
     for (auto &b : B_evecs) b = ColorSpinorField(csParam);
 
     // before entering the eigen solver, let's free the B vectors to save some memory
-    ColorSpinorParam bParam(param.B[0]);
+    auto bParam = transfer->fineColorSpinorParam(param.B[0].Precision(), param.B[0].Location());
     for (auto &b : param.B) b = ColorSpinorField();
 
     EigenSolver *eig_solve;

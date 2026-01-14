@@ -86,9 +86,6 @@ namespace quda {
     /** The mapping onto coarse spin from fine spin (inner) and fine parity (outer), for staggered */
     int **spin_map;
 
-    /** Nspin for the fine level. Required for deallocating spin_map. */
-    const int nspin_fine;
-
     /** Whether the transfer operator is to be applied to full fields or single parity fields */
     QudaSiteSubset site_subset;
 
@@ -101,6 +98,12 @@ namespace quda {
     /** Implies whether or not the fine level is a staggered operator, in which
     case we don't actually need to allocate any memory. */
     mutable QudaTransferType transfer_type;
+
+    /** ColorSpinorParam corresponding to the fine-grid field */
+    ColorSpinorParam fine_param;
+
+    /** ColorSpinorParam corresponding to the coarse-grid field */
+    ColorSpinorParam coarse_param;
 
     /**
      * @brief Allocate V field
@@ -119,6 +122,11 @@ namespace quda {
      * @param spin_bs The spin block size
      */
     void createSpinMap(int spin_bs);
+
+    /**
+     * @brief Creates the ColorSpinorParam objects for the fine and coarse fields
+     */
+    void createColorSpinorParams();
 
   public:
     /**
@@ -217,6 +225,28 @@ namespace quda {
      * applicable)
      */
     void setSiteSubset(QudaSiteSubset site_subset, QudaParity parity);
+
+    /**
+     * @brief Returns the ColorSpinorParam for the fine-grid field
+     * @param precision Optionally sets the precision of the fine-grid field
+     * @param new_location Optionally sets the location of the fine-grid field
+     * @param new_mem_type Optionally sets the memory type of the fine-grid field
+     * @return The ColorSpinorParam for the fine-grid field
+     */
+    ColorSpinorParam fineColorSpinorParam(QudaPrecision precision,
+      QudaFieldLocation new_location = QUDA_INVALID_FIELD_LOCATION,
+      QudaMemoryType new_mem_type = QUDA_MEMORY_INVALID) const;
+
+    /**
+     * @brief Returns the ColorSpinorParam for the coarse-grid field
+     * @param precision Optionally sets the precision of the coarse-grid field
+     * @param new_location Optionally sets the location of the coarse-grid field
+     * @param new_mem_type Optionally sets the memory type of the coarse-grid field
+     * @return The ColorSpinorParam for the coarse-grid field
+     */
+    ColorSpinorParam coarseColorSpinorParam(QudaPrecision precision,
+      QudaFieldLocation new_location = QUDA_INVALID_FIELD_LOCATION,
+      QudaMemoryType new_mem_type = QUDA_MEMORY_INVALID) const;
   };
 
   /**
