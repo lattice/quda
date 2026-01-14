@@ -79,6 +79,18 @@ namespace quda
   template <> struct VectorType<int8_t, 24> {
     using type = array<int8_t, 24>;
   };
+  template <> struct VectorType<double, 12> {
+    using type = array<double, 12>;
+  };
+  template <> struct VectorType<float, 12> {
+    using type = array<float, 12>;
+  };
+  template <> struct VectorType<short, 12> {
+    using type = array<short, 12>;
+  };
+  template <> struct VectorType<int8_t, 12> {
+    using type = array<int8_t, 12>;
+  };
   template <> struct VectorType<double, 6> {
     using type = array<double, 6>;
   };
@@ -331,7 +343,7 @@ namespace quda
     template <> constexpr int n_vector<double, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<double>(24) : colorspinor::get_vector_order<double>(6);
+        return colorspinor::get_vector_order<double>(nSpin * 6);
       else
         return colorspinor::get_vector_order<double>(4);
     }
@@ -339,7 +351,7 @@ namespace quda
     template <> constexpr int n_vector<float, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<float>(24) : colorspinor::get_vector_order<float>(6);
+        return colorspinor::get_vector_order<float>(nSpin * 6);
       else
         return colorspinor::get_vector_order<float>(8);
     }
@@ -347,7 +359,7 @@ namespace quda
     template <> constexpr int n_vector<short, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<short>(24) : colorspinor::get_vector_order<short>(6);
+        return colorspinor::get_vector_order<short>(nSpin * 6);
       else
         return colorspinor::get_vector_order<short>(16);
     }
@@ -355,7 +367,7 @@ namespace quda
     template <> constexpr int n_vector<int8_t, true>(int nSpin, int site_unroll)
     {
       if (site_unroll)
-        return nSpin == 4 ? colorspinor::get_vector_order<int8_t>(24) : colorspinor::get_vector_order<int8_t>(6);
+        return colorspinor::get_vector_order<int8_t>(nSpin * 6);
       else
         return colorspinor::get_vector_order<int8_t>(16);
     }
@@ -385,10 +397,15 @@ namespace quda
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x_, Args &&... args)
     {
       unwrap_t<V> &x(x_);
-      if (x.Nspin() == 4 || x.Nspin() == 2) {
-        if constexpr (is_enabled_spin(2) || is_enabled_spin(4)) {
-          // Nspin-2 takes Nspin-4 path here, and we check for this later
+      if (x.Nspin() == 4) {
+        if constexpr (is_enabled_spin(4)) {
           Blas<Functor, store_t, y_store_t, 4, T>(a, b, c, x, args...);
+        } else {
+          errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+        }
+      } else if (x.Nspin() == 2) {
+        if constexpr (is_enabled_spin(2)) {
+          Blas<Functor, store_t, y_store_t, 2, T>(a, b, c, x, args...);
         } else {
           errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
         }

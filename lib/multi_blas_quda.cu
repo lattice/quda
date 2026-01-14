@@ -99,7 +99,8 @@ namespace quda {
         staticCheck<NXZ, store_t, y_store_t, decltype(f)>(f, x, y);
 
         constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
-        if (site_unroll_check && (x[0].Ncolor() != 3 || x[0].Nspin() == 2))
+        // TODO: Is x[0].Nspin() == 2 check needed here?
+        if (site_unroll_check && (x[0].Ncolor() != 3 && x[0].Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x[0].Nspin(), x[0].Ncolor());
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -115,7 +116,8 @@ namespace quda {
           constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
           constexpr int N = n_vector<device_store_t, true>(nSpin, site_unroll);
           constexpr int Ny = n_vector<device_y_store_t, true>(nSpin, site_unroll);
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          // TODO: Shall we use n_vector<device_store_t, false>(nSpin, true) here?
+          constexpr int M = site_unroll ? (nSpin * 6) : N; // real numbers per thread
           const int length = x[0].Length() / (nParity * M);
 
           if (tp.aux.x > 1 && (length * tp.aux.x) % device::warp_size() != 0) {

@@ -454,6 +454,9 @@ extern "C" {
     /** Whether to use fused kernels for mobius */
     QudaBoolean use_mobius_fused_kernel;
 
+    /** Parameters for overlap fermion */
+    double overlap_invsqrt_tol;
+
     /**
      * Parameters for distance preconditioning algorithm proposed in arXiv:1006.4028,
      * which is useful to solve a precise heavy quark propagator.
@@ -522,6 +525,9 @@ extern "C" {
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
     QudaBoolean use_pc;
+
+    /** Use chiral version of MdagM */
+    QudaChirality chirality;
 
     /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
     QudaBoolean use_eigen_qr;
@@ -1217,6 +1223,9 @@ extern "C" {
    * @param param Contains all metadata regarding the type of solve.
    */
   void eigensolveQuda(void **h_evecs, double_complex *h_evals, QudaEigParam *param);
+
+  void loadOverlapQuda(QudaInvertParam *inv_param, QudaEigParam *eig_param);
+  void freeOverlapQuda();
 
   /**
    * Perform the solve, according to the parameters set in param.  It

@@ -9,6 +9,7 @@
 #include <blas_quda.h>
 #include <field_cache.h>
 #include <memory>
+#include <overlap_kernel.h>
 
 namespace quda {
 
@@ -66,6 +67,8 @@ namespace quda {
     bool allow_truncation; /** whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions */
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
+
+    OverlapKernel *overlap_kernel;
 
     double distance_pc_alpha0; // used by distance preconditioning
     int distance_pc_t0;        // used by distance preconditioning
@@ -149,6 +152,7 @@ namespace quda {
   class DiracMMdag;
   class DiracMdag;
   class DiracG5M;
+  class DiracMdagMChiral;
   //Forward declaration of multigrid Transfer class
   class Transfer;
 
@@ -162,6 +166,7 @@ namespace quda {
     friend class DiracMMdag;
     friend class DiracMdag;
     friend class DiracG5M;
+    friend class DiracMdagMChiral;
 
   protected:
     GaugeField *gauge;
@@ -349,6 +354,14 @@ namespace quda {
        @brief Apply Normal Operator
     */
     virtual void MMdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    /**
+       @brief Apply MdagM on single chirality
+    */
+    virtual void MdagMChiral(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaChirality) const
+    {
+      errorQuda("Not implemented!");
+    }
 
     /**
        @brief Prepare the source and solution vectors for solving given the solution type
@@ -1413,6 +1426,47 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const override;
+  };
+
+  // Full overlap
+  class DiracOverlap : public Dirac
+  {
+
+  protected:
+    OverlapKernel *overlap_kernel;
+
+  public:
+    DiracOverlap(const DiracParam &param);
+    DiracOverlap(const DiracOverlap &dirac);
+    virtual ~DiracOverlap();
+    DiracOverlap &operator=(const DiracOverlap &dirac);
+
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const override;
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const override;
+    virtual void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+    virtual void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+    virtual void MdagMChiral(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                             QudaChirality chirality) const override;
+
+    virtual void prepare(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
+                         cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                         const QudaSolutionType solType) const override;
+    virtual void reconstruct(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b,
+                             const QudaSolutionType solType) const override;
+
+    virtual int getStencilSteps() const override { return 2 * (overlap_kernel->remez_order[0] + 1) + 1; }
+    virtual QudaDiracType getDiracType() const { return QUDA_OVERLAP_DIRAC; }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full staggered
@@ -2508,6 +2562,7 @@ public:
       case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_TWISTED_MASS_DIRAC:
       case QUDA_TWISTED_CLOVER_DIRAC:
+      case QUDA_OVERLAP_DIRAC:
         // while the twisted ops don't have a Hermitian indefinite spectrum, they
         // do have a spectrum of the form (real) + i mu
         gamma5(vec, vec);
@@ -2593,6 +2648,8 @@ public:
           || dirac_type == QUDA_GAUGE_COVDEV_DIRAC)
         return true;
 
+      if (dirac_type == QUDA_WILSON_DIRAC || dirac_type == QUDA_CLOVER_DIRAC) return true;
+
       // subtle: odd operator gets a minus sign
       if ((dirac_type == QUDA_STAGGEREDPC_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
           && (pc_type == QUDA_MATPC_EVEN_EVEN || pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC))
@@ -2600,6 +2657,46 @@ public:
 
       return false;
     }
+  };
+
+  /**
+     Gloms onto a DiracMatrix and provides an operator() for its MdagMChiral method
+  */
+  class DiracMdagMChiral : public DiracMatrix
+  {
+  protected:
+    QudaChirality chirality;
+
+  public:
+    DiracMdagMChiral(const Dirac &d) : DiracMatrix(d) { }
+    DiracMdagMChiral(const Dirac *d) : DiracMatrix(d) { }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override
+    {
+      dirac->MdagMChiral(out, in, chirality);
+      if (shift != 0.0) blas::axpy(shift, in, out);
+    }
+
+    int getStencilSteps() const override
+    {
+      if (dirac->getDiracType() == QUDA_OVERLAP_DIRAC) {
+        return dirac->getStencilSteps(); // P M^dag M P == P M P for overlap chiral fermion
+      } else {
+        return dirac->getStencilSteps() * 2; // 2 for M and M dagger
+      }
+    }
+
+    /**
+       @brief return if the operator is HPD
+    */
+    virtual bool hermitian() const override { return true; }
+
+    void setChirality(QudaChirality chirality_in) { chirality = chirality_in; }
   };
 
   /**

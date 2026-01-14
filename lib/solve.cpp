@@ -33,6 +33,20 @@ namespace quda
       for (auto &b2i : b2) printfQuda("Mass rescale: norm of source in = %g\n", b2i);
     }
 
+    // overlap dslash uses mass normalization internally
+    if (param.dslash_type == QUDA_OVERLAP_DSLASH) {
+      switch (param.solution_type) {
+      case QUDA_MAT_SOLUTION:
+        if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(param.mass, b);
+        break;
+      case QUDA_MATDAG_MAT_SOLUTION:
+        if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) blas::ax(param.mass * param.mass, b);
+        break;
+      default: errorQuda("Not implemented");
+      }
+      return;
+    }
+
     // staggered dslash uses mass normalization internally
     if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
       switch (param.solution_type) {
@@ -125,6 +139,46 @@ namespace quda
     }
   }
 
+  void separateChiral(std::vector<size_t> &idx_left, std::vector<ColorSpinorField> &in_left,
+                      std::vector<size_t> &idx_right, std::vector<ColorSpinorField> &in_right,
+                      cvector_ref<const ColorSpinorField> &in, std::vector<double> &nb)
+  {
+    ColorSpinorParam chiralParam(in[0]);
+    chiralParam.nSpin = 2;
+    chiralParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+    chiralParam.setPrecision(chiralParam.Precision(), chiralParam.Precision(), true);
+    in_left.resize(0);
+    in_right.resize(0);
+    for (size_t i = 0; i < in.size(); i++) {
+      ColorSpinorField tmp_left(chiralParam);
+      ColorSpinorField tmp_right(chiralParam);
+      spinorChiralProject(tmp_left, tmp_right, in[i]);
+      if (blas::norm2(tmp_left) / nb[i] > 1e-6) {
+        idx_left.push_back(i);
+        in_left.push_back(std::move(tmp_left));
+      }
+      if (blas::norm2(tmp_right) / nb[i] > 1e-6) {
+        idx_right.push_back(i);
+        in_right.push_back(std::move(tmp_right));
+      }
+    }
+  }
+
+  void combineChiral(std::vector<size_t> &idx_left, cvector_ref<ColorSpinorField> &out_left,
+                     std::vector<size_t> &idx_right, cvector_ref<ColorSpinorField> &out_right,
+                     cvector_ref<ColorSpinorField> &out)
+  {
+    auto tmp = getFieldTmp(out[0]);
+    for (size_t i = 0; i < out_left.size(); i++) {
+      spinorChiralReconstruct(tmp, out_left[i], QUDA_LEFT_CHIRALITY);
+      blas::xpy(tmp, out[idx_left[i]]);
+    }
+    for (size_t i = 0; i < out_right.size(); i++) {
+      spinorChiralReconstruct(tmp, out_right[i], QUDA_RIGHT_CHIRALITY);
+      blas::xpy(tmp, out[idx_right[i]]);
+    }
+  }
+
   void solve(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, Dirac &dirac, Dirac &diracSloppy,
              Dirac &diracPre, Dirac &diracEig, QudaInvertParam &param)
   {
@@ -132,7 +186,9 @@ namespace quda
 
     bool mat_solution = (param.solution_type == QUDA_MAT_SOLUTION) || (param.solution_type == QUDA_MATPC_SOLUTION);
     bool direct_solve = (param.solve_type == QUDA_DIRECT_SOLVE) || (param.solve_type == QUDA_DIRECT_PC_SOLVE);
-    bool norm_error_solve = (param.solve_type == QUDA_NORMERR_SOLVE) || (param.solve_type == QUDA_NORMERR_PC_SOLVE);
+    bool norm_error_solve = (param.solve_type == QUDA_NORMERR_SOLVE) || (param.solve_type == QUDA_NORMERR_PC_SOLVE)
+      || (param.solve_type == QUDA_NORMERR_CHIRAL_SOLVE);
+    bool chiral_solve = (param.solve_type == QUDA_NORMERR_CHIRAL_SOLVE);
 
     auto nb = blas::norm2(b);
     for (auto &bi : nb) {
@@ -187,6 +243,8 @@ namespace quda
     // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
     // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
     // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
+    // MAT              CHIRAL        Solve (A A^dag) y = b on both chrialities, then x = A^dag y
+    // MATDAG_MAT       CHIRAL        Solve (A A^dag) x = b on both chrialities
     //
     // We generally require that the solution_type and solve_type
     // preconditioning match.  As an exception, the unpreconditioned MAT
@@ -212,7 +270,37 @@ namespace quda
       solverParam.updateInvertParam(param);
     }
 
-    if (direct_solve) {
+    if (chiral_solve) { // (A A^dag) y = b or (A A^dag) x = b on both chiralities
+      DiracMdagMChiral m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
+      SolverParam solverParam(param);
+
+      std::vector<size_t> idx_left, idx_right;
+      std::vector<ColorSpinorField> in_left, in_right;
+      separateChiral(idx_left, in_left, idx_right, in_right, in, nb);
+      auto out_left = getFieldTmp<ColorSpinorField>(in_left);
+      auto out_right = getFieldTmp<ColorSpinorField>(in_right);
+
+      for (QudaChirality chirality : {QUDA_LEFT_CHIRALITY, QUDA_RIGHT_CHIRALITY}) {
+        auto &in_chiral = (chirality == QUDA_LEFT_CHIRALITY) ? in_left : in_right;
+        auto &out_chiral = (chirality == QUDA_LEFT_CHIRALITY) ? out_left : out_right;
+        m.setChirality(chirality);
+        mSloppy.setChirality(chirality);
+        mPre.setChirality(chirality);
+        mEig.setChirality(chirality);
+        if (in_chiral.size() > 0) {
+          Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig);
+          (*solve)(out_chiral, in_chiral);
+          delete solve;
+          solverParam.updateInvertParam(param);
+        }
+      }
+      combineChiral(idx_left, out_left, idx_right, out_right, out);
+      if (mat_solution) { // then x = A^dag y
+        auto tmp = getFieldTmp<ColorSpinorField>(out);
+        blas::copy(tmp, out);
+        dirac.Mdag(out, tmp);
+      }
+    } else if (direct_solve) { // A x = b, or A x = y where A^dag y = b
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
       SolverParam solverParam(param);
 
@@ -227,7 +315,7 @@ namespace quda
       (*solve)(out, in);
       delete solve;
       solverParam.updateInvertParam(param);
-    } else if (!norm_error_solve) {
+    } else if (!norm_error_solve) { // (A^dag A) x = b, or (A^dag A) x = b' where b' = A^dag b
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
       SolverParam solverParam(param);
 
@@ -251,7 +339,7 @@ namespace quda
         delete solve;
         solverParam.updateInvertParam(param);
       }
-    } else { // norm_error_solve
+    } else { // (A A^dag) y = b, then x = A^dag y
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
       auto tmp = getFieldTmp(cvector_ref<ColorSpinorField>(in));
       SolverParam solverParam(param);

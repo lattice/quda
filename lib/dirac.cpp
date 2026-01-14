@@ -48,6 +48,7 @@ namespace quda {
     type(dirac.type),
     halo_precision(dirac.halo_precision),
     commDim(dirac.commDim),
+    use_mobius_fused_kernel(dirac.use_mobius_fused_kernel), // TODO: Shall we copy this?
     distance_pc_alpha0(dirac.distance_pc_alpha0),
     distance_pc_t0(dirac.distance_pc_t0),
     profile("Dirac", false)
@@ -72,6 +73,7 @@ namespace quda {
       symmetric = dirac.symmetric;
       dagger = dirac.dagger;
       commDim = dirac.commDim;
+      use_mobius_fused_kernel = dirac.use_mobius_fused_kernel; // TODO: Shall we copy this?
       distance_pc_alpha0 = dirac.distance_pc_alpha0;
       distance_pc_t0 = dirac.distance_pc_t0;
       profile = dirac.profile;
@@ -186,6 +188,9 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofaPC operator\n");
       return new DiracMobiusEofaPC(param);
+    } else if (param.type == QUDA_OVERLAP_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracOverlap operator\n");
+      return new DiracOverlap(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);

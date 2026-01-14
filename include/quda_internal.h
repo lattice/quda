@@ -22,15 +22,15 @@
 // these are helper macros used to enable spin-1, spin-2 and spin-4 building blocks as needed
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_CLOVER_DIRAC)                           \
   || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_CLOVER_HASENBUSCH_TWIST)      \
-  || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
+  || defined(GPU_LAPLACE) || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
 #define NSPIN4
 #endif
 
-#if defined(GPU_MULTIGRID)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_MULTIGRID)
 #define NSPIN2
 #endif
 
-#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_LAPLACE)
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_LAPLACE) || defined(GPU_COVDEV)
 #define NSPIN1
 #endif
 

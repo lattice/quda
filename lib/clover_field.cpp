@@ -185,7 +185,8 @@ namespace quda {
   {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
-    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor << ",order=" << order;
+    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor << ",memory=" << mem_type
+           << ",order=" << order;
     if (isNative()) aux_ss << ",N=" << clover::get_vector_order(precision, 128);
     aux_string = aux_ss.str();
     if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
