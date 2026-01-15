@@ -136,6 +136,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    if (device::sync_kernels()) qudaStreamSynchronize(stream);
     return err;
   }
 
@@ -186,6 +187,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    if (device::sync_kernels()) qudaStreamSynchronize(stream);
     return err;
   }
 
@@ -241,6 +243,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    if (device::sync_kernels()) qudaStreamSynchronize(stream);
     return err;
   }
 
@@ -271,6 +274,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    if (device::sync_kernels()) qudaStreamSynchronize(stream);
     return err;
   }
 
@@ -309,6 +313,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    if (device::sync_kernels()) qudaStreamSynchronize(stream);
     return err;
   }
 
@@ -350,6 +355,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    if (device::sync_kernels()) qudaStreamSynchronize(stream);
     return err;
   }
 

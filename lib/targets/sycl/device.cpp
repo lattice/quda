@@ -11,6 +11,7 @@ static size_t syncStamp[Nstream];  // eventCount of last sync
 static void *argBufD[Nstream];
 static size_t argBufSizeD[Nstream];
 static bool print = false;
+static bool syncKernels = false;
 
 #ifdef OLDSYCL
 class mySelectorT : public sycl::device_selector
@@ -173,6 +174,22 @@ namespace quda
       // myDevice.get_info<sycl::info::device::max_parameter_size>();
       // myDevice.get_info<sycl::info::device::max_work_group_size>();
       if (err) { errorQuda("Device checks failed"); }
+
+      char *sync_kernels_env = getenv("QUDA_SYNC_KERNELS");
+      if (sync_kernels_env) {
+        int sync_kernels_int = atoi(sync_kernels_env);
+        switch (sync_kernels_int) {
+        case 0:
+	  syncKernels = false;
+          if (getVerbosity() > QUDA_SILENT) warningQuda("Using asynchronous kernels");
+          break;
+        case 1:
+	  syncKernels = true;
+          if (getVerbosity() > QUDA_SILENT) warningQuda("Using synchronous kernels");
+          break;
+        default: errorQuda("Unexpected value QUDA_SYNC_KERNELS=%s\n", sync_kernels_env);
+        }
+      }
     }
 
     void init_thread() { }
@@ -542,6 +559,11 @@ namespace quda
       for (int i = 0; i < Nstream; i++) {
         if (argBufD[i] != nullptr) device_free(argBufD[i]);
       }
+    }
+
+    bool sync_kernels()
+    {
+      return syncKernels;
     }
 
   } // namespace device
