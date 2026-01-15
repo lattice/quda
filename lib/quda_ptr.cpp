@@ -48,7 +48,7 @@ namespace quda
       break;
     case QUDA_MEMORY_MAPPED: // TODO: Is this needed here?
       host = ptr;
-      device = get_mapped_device_pointer(ptr);
+      device = (ptr != nullptr) ? get_mapped_device_pointer(ptr) : nullptr;
       break;
     case QUDA_MEMORY_MANAGED:
       device = ptr;

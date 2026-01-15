@@ -236,6 +236,10 @@ void printQudaEigParam(QudaEigParam *param) {
   P(partfile, QUDA_BOOLEAN_INVALID);
 #endif
 
+#ifndef CHECK_PARAM
+  P(chirality, QUDA_INVALID_CHIRALITY);
+#endif
+
   // only need to enfore block size checking if doing a block eigen solve
 #ifdef CHECK_PARAM
   if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
@@ -374,17 +378,20 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(evmax, INVALID_DOUBLE);
   P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
+  P(overlap_invsqrt_tol, INVALID_DOUBLE);
   P(laplace3D, INVALID_INT);
   P(covdev_mu, INVALID_INT);
 #else
-  // asqtad and domain wall use mass parameterization
+  // staggered, overlap, and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
+      || param->dslash_type == QUDA_OVERLAP_DSLASH
       || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
   }
+  if (param->dslash_type == QUDA_OVERLAP_DSLASH) { P(overlap_invsqrt_tol, INVALID_DOUBLE); }
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
