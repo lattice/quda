@@ -98,32 +98,30 @@ namespace quda
     return *this;
   }
 
-  void DiracOverlap::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            QudaParity parity) const
+  void DiracOverlap::Dslash(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity) const
   {
-    ApplyOverlap(out, in, *gauge, *overlap_kernel, 0.0, in, parity, dagger, commDim.data, profile);
+    errorQuda("The overlap Dirac operator does not have a single parity form");
   }
 
-  // Defined as k * x + (1 - k) * D * in
-  void DiracOverlap::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+  void DiracOverlap::DslashXpay(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &, QudaParity,
+                                cvector_ref<const ColorSpinorField> &, double) const
   {
-    ApplyOverlap(out, in, *gauge, *overlap_kernel, k, x, parity, dagger, commDim.data, profile);
+    errorQuda("The overlap Dirac operator does not have a single parity form");
   }
 
   // Defined as m + (1 - m) D
   void DiracOverlap::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
-    DslashXpay(out, in, QUDA_INVALID_PARITY, in, mass);
+    ApplyOverlap(out, in, *gauge, *overlap_kernel, mass, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
   }
 
   // Defined as m^2 + (1 - m^2) DdagD
   void DiracOverlap::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     auto tmp = getFieldTmp(out);
-    Dslash(tmp, in, QUDA_INVALID_PARITY);
+    ApplyOverlap(out, in, *gauge, *overlap_kernel, 0.0, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
     flipDagger();
-    DslashXpay(out, tmp, QUDA_INVALID_PARITY, in, mass * mass);
+    ApplyOverlap(out, in, *gauge, *overlap_kernel, mass * mass, in, QUDA_INVALID_PARITY, dagger, commDim.data, profile);
     flipDagger();
   }
 
@@ -141,7 +139,8 @@ namespace quda
     auto out_tmp = getFieldTmp<ColorSpinorField>(out.size(), param);
 
     for (size_t i = 0; i < in.size(); i++) { spinorChiralReconstruct(in_tmp[i], in[i], chirality); }
-    DslashXpay(out_tmp, in_tmp, QUDA_INVALID_PARITY, in_tmp, mass * mass);
+    ApplyOverlap(out_tmp, in_tmp, *gauge, *overlap_kernel, mass * mass, in_tmp, QUDA_INVALID_PARITY, dagger,
+                 commDim.data, profile);
     for (size_t i = 0; i < out.size(); i++) { spinorChiralProject(out[i], out_tmp[i], chirality); }
   }
 
