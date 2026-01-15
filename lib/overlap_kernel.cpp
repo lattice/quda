@@ -162,7 +162,7 @@ namespace quda
     param.setPrecision(precision, precision, true);
     evecs.resize(overlap_kernel->evecs.size(), ColorSpinorField(param));
     for (size_t i = 0; i < overlap_kernel->evecs.size(); i++) { evecs[i].copy(overlap_kernel->evecs[i]); }
-    double prec_tol;
+    double prec_tol = 0.0;
     switch (precision) {
     case QUDA_DOUBLE_PRECISION: prec_tol = std::numeric_limits<double>::epsilon() / 2.; break;
     case QUDA_SINGLE_PRECISION: prec_tol = std::numeric_limits<float>::epsilon() / 2.; break;

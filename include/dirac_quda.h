@@ -1457,7 +1457,7 @@ public:
                              const QudaSolutionType solType) const override;
 
     virtual int getStencilSteps() const override { return 2 * (overlap_kernel->remez_order[0] + 1) + 1; }
-    virtual QudaDiracType getDiracType() const { return QUDA_OVERLAP_DIRAC; }
+    virtual QudaDiracType getDiracType() const override { return QUDA_OVERLAP_DIRAC; }
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1466,7 +1466,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const override;
   };
 
   // Full staggered
