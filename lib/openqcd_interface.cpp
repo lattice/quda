@@ -1469,7 +1469,7 @@ static void *openQCD_qudaSolverReadIn(int id)
       *invert_param_mg = *param;
 
       /* these have to be fixed, and cannot be overwritten by the input file */
-      invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+      invert_param_mg->gamma_basis = QUDA_UKQCD_GAMMA_BASIS; /* this is QUDAs internal Gamma basis */
       invert_param_mg->dirac_order = QUDA_DIRAC_ORDER;
 
       multigrid_param->n_level = kv.get<int>(mg_section, "n_level", multigrid_param->n_level, true);
@@ -1902,7 +1902,7 @@ void openQCD_qudaInvertMultiSrc(int id, double mu, void** sources, void** soluti
 double openQCD_qudaMG(int id, double mu, void* source, void* solution, int *status)
 {
   double residual;
-  openQCD_qudaMultiSrcMG(id, mu, &source, &solution, status, &residual);
+  openQCD_qudaMGMultiSrc(id, mu, &source, &solution, status, &residual);
   return residual;
 }
 
@@ -1954,18 +1954,18 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
 
 static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, QudaInvertParam *param, int *status, double *residual)
 {
+  static TimeProfile profileMG("MG");
+  auto profile = pushProfile(profileMG, param); // this will fill param->secs/gflops properly in its deconstructor
+
   auto mg_instance = (multigrid_solver*) param->preconditioner;
   auto mg = (MG*) mg_instance->mg;
   auto cparam = mg->param_coarse_solver;
 
-  /* we want true convergence */
+  // we want true convergence
   cparam->compute_true_res = true;
   cparam->sloppy_converge = false;
   cparam->use_init_guess = param->use_init_guess;
-
-  cparam->iter = 0; /* reset the solver */
-  for (int i = 0; i < param->num_src; ++i)
-    cparam->true_res[i] = 0.0;
+  cparam->iter = 0; // reset the solver
 
   (*mg)(x, b);
 
@@ -1977,7 +1977,7 @@ static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<const C
 }
 
 
-void openQCD_qudaMultiSrcMG(int id, double mu, void** sources, void** solutions, int *status, double *residual)
+void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions, int *status, double *residual)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
@@ -2015,7 +2015,7 @@ void openQCD_qudaMultiSrcMG(int id, double mu, void** sources, void** solutions,
     MPI_Bcast(residual, param->num_src, MPI_DOUBLE, 0, qudaState.layout.world_comm);
   }
 
-  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaMultiSrcMG()\n"));
+  WITH_COMM(logQuda(QUDA_VERBOSE, "openQCD_qudaMGMultiSrc()\n"));
   WITH_COMM(logQuda(QUDA_VERBOSE, "  iter           = %d\n", param->iter));
   WITH_COMM(logQuda(QUDA_VERBOSE, "  gflops         = %.2e\n", param->gflops));
   WITH_COMM(logQuda(QUDA_VERBOSE, "  secs           = %.2e\n", param->secs));
@@ -2026,7 +2026,29 @@ void openQCD_qudaMultiSrcMG(int id, double mu, void** sources, void** solutions,
 }
 
 
-void openQCD_qudaMGSetEvecs(int id, void** evecs)
+ColorSpinorField HostCSFactory(void *openQCD_field)
+{
+  void *in;
+
+  if (openQCD_field == nullptr) {
+    in = nullptr;
+  } else {
+    in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
+    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in);
+  }
+
+  if (in_comm()) {
+    QudaInvertParam param = newOpenQCDParam();
+    ColorSpinorParam cpuParam(in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+    ColorSpinorField in_h(cpuParam);
+    return in_h;
+  }
+
+  return ColorSpinorField();
+}
+
+
+void openQCD_qudaMGSetEvecs(const int id, const int nevecs, void** evecs)
 {
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
@@ -2045,17 +2067,26 @@ void openQCD_qudaMGSetEvecs(int id, void** evecs)
     WITH_COMM(errorQuda("No MG preconditioner defined."));
   }
 
-  int level = 0;
+  int level = 0; /* finest coarse level is enough */
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   QudaMultigridParam *mg_param = additional_prop->mg_param;
-  int nevecs = mg_param->n_vec[level];
+
+  if (nevecs != mg_param->n_vec[level])
+    WITH_COMM(errorQuda("Number of eigenvectors nevecs = %d not equal to n_vec = %d.", nevecs, mg_param->n_vec[level]));
 
   auto *d_evecs = new std::vector<ColorSpinorField>();
   for (int i = 0; i < nevecs; ++i) {
-    d_evecs->push_back(std::move(CSFactory(evecs[i], QUDA_DOUBLE_PRECISION)));
+    d_evecs->push_back(std::move(HostCSFactory(evecs[i])));
   }
 
   mg_param->vec_copy_in[level] = static_cast<void*>(d_evecs);
+  param = static_cast<QudaInvertParam *>(openQCD_qudaSolverGetHandle(id));
+  delete d_evecs;
+  mg_param->vec_copy_in[level] = nullptr;
+
+  if (!openQCD_qudaInvertParamCheck(param)) {
+    WITH_COMM(errorQuda("Solver check failed, parameters/fields between openQxD and QUDA are not in sync."));
+  }
 }
 
 

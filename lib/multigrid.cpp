@@ -1196,6 +1196,11 @@ namespace quda
         // restrict to the coarse grid
         transfer->R(r_coarse, residual);
 
+        if (param.level == 0 && param_coarse_solver->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+          logQuda(QUDA_VERBOSE, "Using inital guess for coarse solver ...\n");
+          transfer->R(x_coarse, x);
+        }
+
         // recurse to the next lower level
         (*coarse_solver)(x_coarse, r_coarse);
 
@@ -1481,15 +1486,19 @@ namespace quda
   void MG::copyInVectors(std::vector<ColorSpinorField> &B)
   {
     auto *in = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_in[param.level]);
-    logQuda(QUDA_VERBOSE, "Loading null vectors from vec_copy_in property\n");
+    logQuda(QUDA_VERBOSE, "Loading %ld null vectors from vec_copy_in property\n", B.size());
+    if (B.size() != (*in).size())
+      errorQuda("Sizes of B (%ld) and vec_copy_in (%ld) are not equal", B.size(), (*in).size());
     blas::copy(B, *in);
-    delete in;
-    param.mg_global.vec_copy_in[param.level] = nullptr;
+
+    // pretend the fields are Degrand Rossi, even though they are UKQCD
+    for (size_t i = 0; i < B.size(); ++i)
+      B[i].GammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS);
   }
 
   void MG::copyOutVectors(std::vector<ColorSpinorField> &B)
   {
-    logQuda(QUDA_VERBOSE, "Storing null vectors from vec_copy_out property\n");
+    logQuda(QUDA_VERBOSE, "Storing %ld null vectors from vec_copy_out property\n", B.size());
     auto *out = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_out[param.level]);
     blas::copy(*out, B);
   }
