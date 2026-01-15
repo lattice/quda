@@ -113,15 +113,14 @@ namespace quda {
 
     /**
      * @brief Creates the map between fine and coarse grids
-     * @param geo_bs An array storing the block size in each geometric dimension
      */
-    void createGeoMap(int *geo_bs);
+    void createGeoMap();
 
     /**
      * @brief Creates the map between fine spin and parity to coarse spin dimensions
-     * @param spin_bs The spin block size
+     * @param n_fine_spin The number of fine spins
      */
-    void createSpinMap(int spin_bs);
+    void createSpinMap(int n_fine_spin);
 
     /**
      * @brief Creates the ColorSpinorParam objects for the fine and coarse fields
@@ -185,6 +184,66 @@ namespace quda {
      * @return Nvec
      */
     int nvec() const {return Nvec;}
+
+    /**
+     * Returns the number of fine spins
+     * @return fine_nspin
+     */
+    int fineNspin() const { return fine_param.nSpin; }
+
+    /**
+     * Returns the number of coarse spins
+     * @return coarse_nspin
+     */
+    int coarseNspin() const { return coarse_param.nSpin; }
+
+    /**
+     * Returns the number of fine colors
+     * @return fine_ncolor
+     */
+    int fineNcolor() const { return fine_param.nColor; }
+
+    /**
+     * Returns the number of coarse colors
+     * @return coarse_ncolor
+     */
+    int coarseNcolor() const { return coarse_param.nColor; }
+
+    /**
+     * Returns the number of fine dimensions
+     * @return fine_gamma_basis
+     */
+    int fineGammaBasis() const { return fine_param.gammaBasis; }
+
+    /**
+     * Returns the number of coarse dimensions
+     * @return coarse_gamma_basis
+     */
+    int coarseGammaBasis() const { return coarse_param.gammaBasis; }
+
+    /**
+     * Returns the site subset of the fine field
+     * @return fine_site_subset
+     */
+    QudaSiteSubset fineSiteSubset() const { return fine_param.siteSubset; }
+
+    /**
+     * Returns the site subset of the coarse field
+     * @return coarse_site_subset
+     */
+    QudaSiteSubset coarseSiteSubset() const { return coarse_param.siteSubset; }
+
+    /**
+     * Verifies the compatibility of the fine field with the transfer operator
+     * @param fine The fine field
+     */
+     void verifyFineCompatibility(const ColorSpinorField &fine) const;
+
+    /**
+     * Verifies the compatibility of the coarse field with the transfer operator
+     * @param coarse The coarse field
+     */
+    void verifyCoarseCompatibility(const ColorSpinorField &coarse) const;
 
     /**
      * Returns the amount of spin blocking. Defined as zero when coarsening staggered.

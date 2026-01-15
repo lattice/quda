@@ -27,12 +27,16 @@ namespace quda {
     blockOrthoTwoPass(block_ortho_two_pass),
     null_precision(null_precision),
     spin_bs(spin_bs),
-    spin_map(0),
+    spin_map(nullptr),
     site_subset(QUDA_FULL_SITE_SUBSET),
     parity(QUDA_INVALID_PARITY),
     transfer_type(transfer_type)
   {
     postTrace();
+
+    // allocate the fine-to-coarse spin map
+    createSpinMap(B[0].Nspin());
+
     int ndim = B[0].Ndim();
 
     // Only loop over four dimensions for now, we don't have
@@ -95,18 +99,11 @@ namespace quda {
 
     createV(); // allocate V field
 
-    // allocate and compute the fine-to-coarse and coarse-to-fine site maps
-    fine_to_coarse_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
-    coarse_to_fine_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
-
-    fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
-    coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
-
-    createGeoMap(geo_bs);
+    // create the fine-to-coarse and coarse-to-fine site maps
+    createGeoMap();
 
     // allocate the fine-to-coarse spin map
-    spin_map = static_cast<int**>(safe_malloc(B[0].Nspin()*sizeof(int*)));
-    for (int s = 0; s < B[0].Nspin(); s++) spin_map[s] = static_cast<int *>(safe_malloc(2 * sizeof(int)));
+
     createSpinMap(spin_bs);
 
     // create ColorSpinorParam objects for the fine and coarse fields
@@ -187,6 +184,7 @@ namespace quda {
 
     if (site_subset == site_subset_) return;
     site_subset = site_subset_;
+    fine_param.siteSubset = site_subset;
   }
 
   struct Int2 {
@@ -200,9 +198,16 @@ namespace quda {
   };
 
   // compute the fine-to-coarse site map
-  void Transfer::createGeoMap(int *geo_bs)
+  void Transfer::createGeoMap()
   {
     int x[QUDA_MAX_DIM];
+
+    // allocate and compute the fine-to-coarse and coarse-to-fine site maps
+    fine_to_coarse_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
+    coarse_to_fine_h = static_cast<int *>(pool_pinned_malloc(B[0].Volume() * sizeof(int)));
+
+    fine_to_coarse_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
+    coarse_to_fine_d = static_cast<int *>(pool_device_malloc(B[0].Volume() * sizeof(int)));
 
     ColorSpinorParam param(B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
@@ -243,17 +248,22 @@ namespace quda {
   }
 
   // compute the fine spin and checkerboard to coarse spin map
-  void Transfer::createSpinMap(int spin_bs) {
-    if (spin_bs == 0) // staggered
-    {
-      spin_map[0][0] = 0; // fine even
-      spin_map[0][1] = 1; // fine odd
-    }
-    else
-    {
-      for (int s = 0; s < B[0].Nspin(); s++) {
-        spin_map[s][0] = s / spin_bs; // not staggered, doesn't care about parity. 
-        spin_map[s][1] = s / spin_bs;
+  void Transfer::createSpinMap(int n_fine_spin) {
+    if (!spin_map) {
+      spin_map = static_cast<int**>(safe_malloc(n_fine_spin*sizeof(int*)));
+      for (int s = 0; s < n_fine_spin; s++) spin_map[s] = static_cast<int *>(safe_malloc(2 * sizeof(int)));
+
+      if (spin_bs == 0) // staggered
+      {
+        spin_map[0][0] = 0; // fine even
+        spin_map[0][1] = 1; // fine odd
+      }
+      else
+      {
+        for (int s = 0; s < n_fine_spin; s++) {
+          spin_map[s][0] = s / spin_bs; // not staggered, doesn't care about parity. 
+          spin_map[s][1] = s / spin_bs;
+        }
       }
     }
   }
@@ -322,10 +332,55 @@ namespace quda {
 
     return coarse_param_copy;
   }
+
+
+  void Transfer::verifyFineCompatibility(const ColorSpinorField &fine) const {
+    if (fineSiteSubset() == QUDA_PARITY_SITE_SUBSET && fine.X(0) * 2 != fine_param.x[0])
+      errorQuda("Mismatched fine dimension %d sizes %d != %d", 0, 2 * fine.X(0), fine_param.x[0]);
+    else if (fineSiteSubset() == QUDA_FULL_SITE_SUBSET && fine.X(0) != fine_param.x[0])
+      errorQuda("Mismatched fine dimension %d sizes %d != %d", 0, fine.X(0), fine_param.x[0]);
+    for (int d = 1; d < 4; d++)
+      if (fine.X(d) != fine_param.x[d]) errorQuda("Mismatched fine dimension %d sizes %d != %d", d, fine.X(d), fine_param.x[d]);
+    if (fine.SiteSubset() != fineSiteSubset()) errorQuda("Mismatched fine site subset %d != %d", fine.SiteSubset(), fineSiteSubset());
+    if (fine.Nspin() != fineNspin()) errorQuda("Mismatched fine spin sizes %d != %d", fine.Nspin(), fineNspin());
+    if (fine.Ncolor() != fineNcolor()) errorQuda("Mismatched fine color sizes %d != %d", fine.Ncolor(), fineNcolor());
+
+    // nSpin = 4 can be either UKQCD or Degrand-Rossi
+    if (fine.Nspin() != 4 && fine.GammaBasis() != fineGammaBasis()) {
+      errorQuda("Mismatched fine gamma basis %d != %d", fine.GammaBasis(), fineGammaBasis());
+    } else if (fine.Nspin() == 4 && fine.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS && fine.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) {
+      errorQuda("Invalid fine gamma basis %d", fine.GammaBasis());
+    }
+  }
+
+  void Transfer::verifyCoarseCompatibility(const ColorSpinorField &coarse) const {
+    if (coarseSiteSubset() == QUDA_PARITY_SITE_SUBSET && coarse.X(0) * 2 != coarse_param.x[0])
+      errorQuda("Mismatched coarse dimension %d sizes %d != %d", 0, 2 * coarse.X(0), coarse_param.x[0]);
+    else if (coarseSiteSubset() == QUDA_FULL_SITE_SUBSET && coarse.X(0) != coarse_param.x[0])
+      errorQuda("Mismatched coarse dimension %d sizes %d != %d", 0, coarse.X(0), coarse_param.x[0]);
+    for (int d = 1; d < 4; d++)
+      if (coarse.X(d) != coarse_param.x[d]) errorQuda("Mismatched coarse dimension %d sizes %d != %d", d, coarse.X(d), coarse_param.x[d]);
+    if (coarse.SiteSubset() != coarseSiteSubset()) errorQuda("Mismatched coarse site subset %d != %d", coarse.SiteSubset(), coarseSiteSubset());
+    if (coarse.Nspin() != coarseNspin()) errorQuda("Mismatched coarse spin sizes %d != %d", coarse.Nspin(), coarseNspin());
+    if (coarse.Ncolor() != coarseNcolor()) errorQuda("Mismatched coarse color sizes %d != %d", coarse.Ncolor(), coarseNcolor());
+    if (coarse.GammaBasis() != coarseGammaBasis()) errorQuda("Mismatched coarse gamma basis %d != %d", coarse.GammaBasis(), coarseGammaBasis());
+
+    // nSpin = 4 can be either UKQCD or Degrand-Rossi... for "copy" transfer ops only, but we'll get there...
+    if (coarse.Nspin() != 4 && coarse.GammaBasis() != coarseGammaBasis()) {
+      errorQuda("Mismatched coarse gamma basis %d != %d", coarse.GammaBasis(), coarseGammaBasis());
+    } else if (coarse.Nspin() == 4 && coarse.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS && coarse.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) {
+      errorQuda("Invalid coarse gamma basis %d", coarse.GammaBasis());
+    }
+  }
+
   // apply the prolongator
   void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+    // verify that "out" is an appropriate fine field and "in" is an appropriate coarse field
+    verifyFineCompatibility(out[0]);
+    verifyCoarseCompatibility(in[0]);
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(out, in, fine_to_coarse_d, spin_map, parity);
@@ -359,6 +414,10 @@ namespace quda {
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+    // verify that "out" is an appropriate coarse field and "in" is an appropriate fine field
+    verifyCoarseCompatibility(out[0]);
+    verifyFineCompatibility(in[0]);
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(out, in, fine_to_coarse_d, spin_map, parity);

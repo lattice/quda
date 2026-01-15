@@ -111,17 +111,18 @@ namespace quda
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
-        auto coarse_param = transfer->coarseColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy,
-          param.mg_global.location[param.level + 1]);
-
         // create coarse residual vector if not already created in verify()
         if (r_coarse.empty()) {
+          auto coarse_param = transfer->coarseColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy,
+            param.mg_global.location[param.level + 1]);
           r_coarse.resize(1);
           r_coarse[0] = ColorSpinorField(coarse_param);
         }
 
         // create coarse solution vector if not already created in verify()
         if (x_coarse.empty()) {
+          auto coarse_param = transfer->coarseColorSpinorParam(param.mg_global.invert_param->cuda_prec_sloppy,
+            param.mg_global.location[param.level + 1]);
           x_coarse.resize(1);
           x_coarse[0] = ColorSpinorField(coarse_param);
         }
@@ -131,8 +132,7 @@ namespace quda
 
         // only have single precision B vectors on the coarse grid
         QudaPrecision B_coarse_precision = std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
-        coarse_param.setPrecision(B_coarse_precision);
-        coarse_param.location = param.mg_global.setup_location[param.level + 1];
+        auto coarse_param = transfer->coarseColorSpinorParam(B_coarse_precision, param.mg_global.location[param.level + 1]);
         for (auto &B_coarse_i : B_coarse)
           B_coarse_i = ColorSpinorField(coarse_param);
 
