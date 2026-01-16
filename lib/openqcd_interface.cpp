@@ -1469,7 +1469,7 @@ static void *openQCD_qudaSolverReadIn(int id)
       *invert_param_mg = *param;
 
       /* these have to be fixed, and cannot be overwritten by the input file */
-      invert_param_mg->gamma_basis = QUDA_UKQCD_GAMMA_BASIS; /* this is QUDAs internal Gamma basis */
+      invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
       invert_param_mg->dirac_order = QUDA_DIRAC_ORDER;
 
       multigrid_param->n_level = kv.get<int>(mg_section, "n_level", multigrid_param->n_level, true);
@@ -1942,7 +1942,7 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
 
     if (openQCD_field != nullptr) {
       ColorSpinorField in_h(cpuParam);
-      in_d = in_h; /* transfer, reorder and gamma basis change */
+      in_d = in_h; /* transfer, convert, reorder and gamma basis change */
     }
 
     return in_d;
@@ -1999,9 +1999,12 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
   }
 
   std::vector<ColorSpinorField> in(param->num_src), out(param->num_src);
+  openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
+  QudaMultigridParam *mg_param = additional_prop->mg_param;
   for (int i = 0; i < param->num_src; ++i) {
-    in[i] = std::move(CSFactory(sources[i], QUDA_SINGLE_PRECISION));
-    out[i] = std::move(CSFactory(param->use_init_guess == QUDA_USE_INIT_GUESS_YES ? solutions[i] : nullptr, QUDA_SINGLE_PRECISION));
+    auto prec =  mg_param->precision_null[0];
+    in[i] = std::move(CSFactory(sources[i], prec));
+    out[i] = std::move(CSFactory(param->use_init_guess == QUDA_USE_INIT_GUESS_YES ? solutions[i] : nullptr, prec));
   }
 
   WITH_COMM(callMultiSrcMg(out, in, param, status, residual));

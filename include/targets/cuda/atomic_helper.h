@@ -107,6 +107,29 @@ namespace quda
       uint32_t *addr_ = reinterpret_cast<uint32_t *>(addr);
       atomicMax(addr_, val_);
     }
+
+    /**
+       @brief Implementation of double-precision atomic max specialized
+       for positive-definite numbers.
+       @param addr Address that stores the atomic variable to be updated
+       @param val Value to be added to the atomic
+    */
+    __device__ inline void operator()(double *addr, double val)
+    {
+      // reinterpret double bits as unsigned 64-bit integer
+      unsigned long long val_ = __double_as_longlong(val);
+      unsigned long long *addr_ =
+        reinterpret_cast<unsigned long long *>(addr);
+
+      unsigned long long old = *addr_;
+      unsigned long long assumed;
+
+      do {
+        assumed = old;
+        if (assumed >= val_) break;
+        old = atomicCAS(addr_, assumed, val_);
+      } while (assumed != old);
+    }
   };
 
   /**

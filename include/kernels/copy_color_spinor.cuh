@@ -274,6 +274,22 @@ namespace quda
     }
   };
 
+  /** Transform from openQCD into relativistic Degrand-Rossi basis
+   *  FIXME: this should be implemented more performant.
+   */
+  template <int Ns, int Nc> struct OpenqcdToDegrandRossi {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
+    {
+      complex<FloatIn> buf[Ns * Nc];
+      OpenqcdToNonRelBasis<Ns, Nc> A;
+      RelBasis<Ns, Nc> B;
+
+      A(buf, in);
+      B(out, buf);
+    }
+  };
+
   template <typename Arg> struct CopyColorSpinor_ {
     const Arg &arg;
     constexpr CopyColorSpinor_(const Arg &arg) : arg(arg) { }

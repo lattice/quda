@@ -141,7 +141,8 @@ namespace quda
                                                  B_coarse_precision, param.mg_global.setup_location[param.level + 1]);
 
         // if we're not generating on all levels then we need to propagate the vectors down
-        if ((param.level != 0 || param.Nlevel - 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
+        bool condition = true; //param.level != 0;
+        if ((condition || param.Nlevel > 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
           logQuda(QUDA_VERBOSE, "Restricting null space vectors\n");
           for (int i = 0; i < param.Nvec; i++) {
             zero(B_coarse[i]);
@@ -1483,17 +1484,107 @@ namespace quda
     popLevel();
   }
 
+  /*void MG::g5(ColorSpinorField &out, const ColorSpinorField &in)
+  {
+    if (param.level == 0) {
+      gamma5(out, in);
+    } else {
+      out = in;
+    }
+  }*/
+
+  void MG::g5D(ColorSpinorField &out, const ColorSpinorField &in, std::vector<ColorSpinorField> &B)
+  {
+    if (param.level == 0) {
+      ColorSpinorParam csParam(B[0]);
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      auto buf = ColorSpinorField(csParam);
+      DiracMatrix *Op = new DiracM(*diracResidual);
+
+      (*Op)(buf, in);
+      gamma5(out, buf);
+
+      delete Op;
+
+      /*DiracMatrix *Op = new DiracG5M(*diracResidual);
+      (*Op)(out, in);
+      delete Op;*/
+    } else {
+      ColorSpinorParam csParam(B[0]);
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      auto buf1 = ColorSpinorField(csParam);
+      auto buf2 = ColorSpinorField(B[0]);
+
+      ColorSpinorParam fine_csParam(param.fine->param.B[0]);
+      fine_csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      auto fine_buf1 = ColorSpinorField(fine_csParam);
+      auto fine_buf2 = ColorSpinorField(fine_csParam);
+      DiracMatrix *Op = new DiracM(*diracResidual);
+
+      (*Op)(buf1, in);
+      buf2 = buf1;
+      param.fine->transfer->P(fine_buf1, buf2);
+      gamma5(fine_buf2, fine_buf1);
+      zero(buf2);
+      param.fine->transfer->R(buf2, fine_buf2);
+      out = buf2;
+
+      delete Op;
+    }
+  }
+
   void MG::copyInVectors(std::vector<ColorSpinorField> &B)
   {
     auto *in = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_in[param.level]);
     logQuda(QUDA_VERBOSE, "Loading %ld null vectors from vec_copy_in property\n", B.size());
     if (B.size() != (*in).size())
       errorQuda("Sizes of B (%ld) and vec_copy_in (%ld) are not equal", B.size(), (*in).size());
+    logQuda(QUDA_VERBOSE, "Loading gamma basis: %d -> %d\n", (*in)[0].GammaBasis(), B[0].GammaBasis());
     blas::copy(B, *in);
 
     // pretend the fields are Degrand Rossi, even though they are UKQCD
-    for (size_t i = 0; i < B.size(); ++i)
-      B[i].GammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS);
+    /*for (size_t i = 0; i < B.size(); ++i)
+      B[i].GammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS);*/
+
+/*    DiracMatrix *Op;
+    if (param.level == 0) {
+      Op = new DiracG5M(*diracResidual);
+    } else {
+      Op = new DiracM(*diracResidual);
+    }
+*/
+    /*logQuda(QUDA_VERBOSE, "init: Type = %s\n", Op->Type().c_str());*/
+
+    /*auto buf1 = ColorSpinorField(B[0]);
+    auto buf2 = ColorSpinorField(B[0]);*/
+
+    // These are only eigenvectors of g5D only if the basis is set to UKQCD ?!?
+    ColorSpinorParam csParam(B[0]);
+    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    auto buf1 = ColorSpinorField(csParam);
+    auto buf2 = ColorSpinorField(csParam);
+
+    /*DiracG5M *Op = new DiracG5M(*diracResidual);*/
+
+    for (size_t i = 0; i < B.size(); ++i) {
+      auto norm2 = sqrt(blas::norm2(B[i]));
+      logQuda(QUDA_VERBOSE, "init: |B[%ld]|^2 = %.6e\n", i, norm2);
+
+      buf2 = B[i];
+      g5D(buf1, buf2, B);
+      Complex lambda = blas::cDotProduct(buf2, buf1);
+      double rnorm2 = sqrt(blas::caxpyNorm(-lambda, buf2, buf1));
+      logQuda(QUDA_VERBOSE, "g5 D: lambda[%ld] = %.6e + %.6ei\n", i, lambda.real(), lambda.imag());
+      logQuda(QUDA_VERBOSE, "g5 D: | g5 D psi - lambda psi|^2                                 = %.6e\n", rnorm2/norm2);
+    }
+
+    // if not on the coarsest level, propagate fields
+    /*if ((param.level < param.Nlevel-1 || param.Nlevel > 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
+      logQuda(QUDA_SILENT, "Setting next level vec_copy_in\n");
+      param.mg_global.vec_copy_in[param.level+1] = static_cast<void*>(&B_coarse);
+    }*/
+
+
   }
 
   void MG::copyOutVectors(std::vector<ColorSpinorField> &B)

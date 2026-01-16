@@ -19,6 +19,8 @@ namespace quda
                    double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                    bool need_bidirectional)
   {
+    using storeType = typename coarse_store_type<Float>::type;
+
     constexpr int fineSpin = 2;
     constexpr int coarseSpin = 2;
     constexpr bool allow_truncation = false;
@@ -108,6 +110,8 @@ namespace quda
                                                    double mass, double mu, double mu_factor, QudaDiracType dirac,
                                                    QudaMatPCType matpc, bool need_bidirectional)
   {
+    using storeType = typename coarse_store_type<Float>::type;
+
     constexpr int fineSpin = 2;
     constexpr int coarseSpin = 2;
     constexpr bool allow_truncation = false;

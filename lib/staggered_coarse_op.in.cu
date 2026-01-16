@@ -110,6 +110,8 @@ namespace quda {
                         const Transfer &T, const GaugeField &g, const GaugeField &l, const GaugeField &XinvKD,
                         double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
+    using storeType = typename coarse_store_type<Float>::type;
+
     // Actually create the temporaries like UV, etc.
     auto location = Y.Location();
 

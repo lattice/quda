@@ -73,6 +73,8 @@ namespace quda
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<OpenqcdToNonRelBasis>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToOpenqcdBasis>(out, in, Out_, In_));
+        } else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS) {
+          launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<OpenqcdToDegrandRossi>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
           launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<DegrandRossiToDiracPaulBasis>(out, in, Out_, In_));
         } else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_DIRAC_PAULI_GAMMA_BASIS) {

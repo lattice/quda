@@ -226,8 +226,7 @@ namespace quda
         // use spin-ignorant accessor to make multiplication simpler
         using gCoarse = typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat>;
         using gPreconditionedCoarse = typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat>;
-        // XXX: This doesn't work for double precision since hard-coded to single precision
-        using gCoarseInv = gauge::FieldOrder<float, N, 1, gOrder_milc, use_native_ghosts, float>;
+        using gCoarseInv = typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat>;
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
 

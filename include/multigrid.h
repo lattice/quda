@@ -12,6 +12,8 @@
 //#define GPU_MULTIGRID_DOUBLE
 #endif
 
+#define GPU_MULTIGRID_DOUBLE
+
 namespace quda {
 
   /**
@@ -386,6 +388,9 @@ namespace quda {
        @param Whether we are refreshing the null-space components or just updating the operators
      */
     void reset(bool refresh=false);
+
+    /** FIXME: remove again */
+    void g5D(ColorSpinorField &out, const ColorSpinorField &in, std::vector<ColorSpinorField> &B);
 
     /**
        @brief This method only resets the KD operators with the updated fine links and rebuilds

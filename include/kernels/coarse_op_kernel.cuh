@@ -17,7 +17,17 @@ namespace quda {
 
   /** This is the storage type used when computing the coarse link
       variables: by using integers we have deterministic atomics */
-  using storeType = int;
+  template <typename Float>
+  struct coarse_store_type {
+    using type = int;  // default: fixed-point
+  };
+
+  /** In case of double precision MG, we fall back to double as
+      storage type */
+  template <>
+  struct coarse_store_type<double> {
+    using type = double;  // no fixed-point for double
+  };
 
   /** This is the arg struct used for all multigrid coarse-grid
       construction.  The same instance is reused for different
@@ -937,7 +947,7 @@ namespace quda {
   template <typename Arg> struct compute_kv {
     using real = typename Arg::Float;
     using Vector = ColorSpinor<real, Arg::fineColor, 1>;
-    using Link = Matrix<complex<float>, Arg::fineColor>;
+    using Link = Matrix<complex<real>, Arg::fineColor>;
 
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -1397,7 +1407,10 @@ namespace quda {
 
   template <> struct storeCoarseSharedAtomic_impl<true> {
     template <typename Arg>
-    using CacheT = complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4]
+    using storeType = typename coarse_store_type<typename Arg::Float>::type;
+
+    template <typename Arg>
+    using CacheT = complex<storeType<Arg>>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4]
                                      [Arg::coarseSpin][Arg::coarseSpin];
     template <typename Arg> using Cache = SharedMemoryCache<CacheT<Arg>, DimsStaticConditional<2, 1, 1>>;
     template <typename Arg> using Ops = KernelOps<Cache<Arg>>;
@@ -1447,7 +1460,7 @@ namespace quda {
             for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
               for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-                atomic_helper<real, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
+                atomic_helper<real, storeType<Arg>>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
                                                arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
               }
             }
@@ -1456,7 +1469,7 @@ namespace quda {
             for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
               for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-                atomic_helper<real, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
+                atomic_helper<real, storeType<Arg>>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
                                                arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
               }
             }

@@ -17,6 +17,8 @@ namespace quda {
                   ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
 		  const GaugeField &g, const CloverField &c, double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
+    using storeType = typename coarse_store_type<Float>::type;
+
     QudaFieldLocation location = Y.Location();
     constexpr int fineSpin = 4;
     constexpr int coarseSpin = 2;

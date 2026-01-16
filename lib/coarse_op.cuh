@@ -30,6 +30,7 @@ namespace quda {
   class CalculateY : public TunableKernel3D {
   public:
     using Float = typename Arg::Float;
+    using storeType = typename coarse_store_type<Float>::type;
     static constexpr bool from_coarse = Arg::from_coarse;
     static constexpr bool from_kd_op = Arg::from_kd_op;
     static constexpr int fineSpin = Arg::fineSpin;
