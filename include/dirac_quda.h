@@ -14,6 +14,9 @@ namespace quda {
 
   // Forward declare: MG Transfer Class
   class Transfer;
+  class TransferAggregate;
+  class TransferCopy;
+  class TransferCoarseKD;
 
   // Forward declare: Dirac Op Base Class
   class Dirac;

@@ -15,151 +15,14 @@
 
 namespace quda {
 
-  /*
-  * for the staggered case, there is no spin blocking, 
-  * however we do even-odd to preserve chirality (that is straightforward)
-  */
-  Transfer::Transfer(const std::vector<ColorSpinorField> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass,
-                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type) :
+  Transfer::Transfer(const std::vector<ColorSpinorField> &B, int Nvec,
+                     int spin_bs, QudaPrecision null_precision) :
     B(B),
     Nvec(Nvec),
-    NblockOrtho(n_block_ortho),
-    blockOrthoTwoPass(block_ortho_two_pass),
     null_precision(null_precision),
-    spin_bs(spin_bs),
-    spin_map(nullptr),
-    site_subset(QUDA_FULL_SITE_SUBSET),
-    parity(QUDA_INVALID_PARITY),
-    transfer_type(transfer_type)
+    spin_bs(spin_bs)
   {
-    postTrace();
-
-    // allocate the fine-to-coarse spin map
-    createSpinMap(B[0].Nspin());
-
-    int ndim = B[0].Ndim();
-
-    // Only loop over four dimensions for now, we don't have
-    // to worry about the fifth dimension until we hit chiral fermions.
-    for (int d = 0; d < 4; d++) {
-      while (geo_bs[d] > 0) {
-        if (d == 0 && B[0].X(0) == geo_bs[0])
-          warningQuda("X-dimension length %d cannot block length %d", B[0].X(0), geo_bs[0]);
-        else if ((B[0].X(d) / geo_bs[d] + 1) % 2 == 0)
-          warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0].X(d) / geo_bs[d]);
-        else if ((B[0].X(d) / geo_bs[d]) * geo_bs[d] != B[0].X(d))
-          warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0].X(d), geo_bs[d]);
-        else
-      	  break; // this is a valid block size so let's use it
-      	geo_bs[d] /= 2;
-      }
-      if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
-    }
-
-    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
-
-    this->geo_bs = new int[ndim];
-    int total_block_size = 1;
-    for (int d = 0; d < ndim; d++) {
-      this->geo_bs[d] = geo_bs[d];
-      total_block_size *= geo_bs[d];
-    }
-
-    // Various consistency checks for optimized KD "transfers"
-    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
-
-      // Aggregation size is "technically" 1 for optimized KD
-      if (total_block_size != 1)
-        errorQuda("Invalid total geometric block size %d for transfer type optimized-kd, must be 1", total_block_size);
-
-      // The number of coarse dof is technically fineColor for optimized KD
-      if (Nvec != B[0].Ncolor())
-        errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0].Ncolor());
-
-    } else {
-      int aggregate_size = total_block_size * B[0].Ncolor();
-      if (spin_bs == 0)
-        aggregate_size /= 2; // effective spin_bs of 0.5 (fine spin / coarse spin)
-      else
-        aggregate_size *= spin_bs;
-      if (Nvec > aggregate_size)
-        errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, aggregate_size);
-    }
-
-    std::string block_str = std::to_string(geo_bs[0]);
-    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
-    logQuda(QUDA_VERBOSE, "Transfer: using block size %s\n", block_str.c_str());
-
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      for (int d = 0; d < 4; d++) {
-        if (geo_bs[d] != 2) errorQuda("Invalid staggered KD block size %d for dimension %d, must be 2", geo_bs[d], d);
-      }
-      if (Nvec != 24) errorQuda("Invalid number of coarse vectors %d for staggered KD multigrid, must be 24", Nvec);
-    }
-
-    createV(); // allocate V field
-
-    // create the fine-to-coarse and coarse-to-fine site maps
-    createGeoMap();
-
-    // allocate the fine-to-coarse spin map
-
-    createSpinMap(spin_bs);
-
-    // create ColorSpinorParam objects for the fine and coarse fields
-    createColorSpinorParams();
-
-    reset();
-    postTrace();
-  }
-
-  void Transfer::createV() const
-  {
-    postTrace();
-
-    // create the storage for the final block orthogonal elements
-    ColorSpinorParam param(B[0]); // takes the geometry from the null-space vectors
-
-    // the ordering of the V vector is defined by these parameters and
-    // the Packed functions in ColorSpinorFieldOrder
-
-    param.nSpin = B[0].Nspin();          // spin has direct mapping
-    param.nColor = B[0].Ncolor() * Nvec; // nColor = number of colors * number of vectors
-    param.nVec = Nvec;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
-    if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      //keep it the same for staggered:
-      param.siteSubset = QUDA_FULL_SITE_SUBSET;
-      param.x[0] *= 2;
-    }
-    param.fieldOrder
-      = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    param.setPrecision(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision());
-
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
-      // Need to create V_d and V_h as metadata containers, but we don't
-      // actually need to allocate the memory.
-      param.create = QUDA_REFERENCE_FIELD_CREATE;
-    }
-
-    V = ColorSpinorField(param);
-    postTrace();
-  }
-
-  void Transfer::reset()
-  {
-    postTrace();
-
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
-        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
-      return;
-    }
-    logQuda(QUDA_VERBOSE, "Transfer: block orthogonalizing\n");
-
-    BlockOrthogonalize(V, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
-    postTrace();
+    
   }
 
   Transfer::~Transfer() {
@@ -268,36 +131,6 @@ namespace quda {
     }
   }
 
-  void Transfer::createColorSpinorParams() {
-    // create the ColorSpinorParam objects for the fine and coarse fields
-    // the precision is intentionally unset
-    fine_param = ColorSpinorParam(B[0]);
-    fine_param.create = QUDA_NULL_FIELD_CREATE;
-    fine_param.location = B[0].Location();
-    fine_param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    fine_param.gammaBasis = (B[0].Nspin() == 4) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
-    // copy the fine param and modify in place
-    coarse_param = fine_param;
-    for (int d = 0; d < fine_param.nDim; d++) coarse_param.x[d] = fine_param.x[d] / geo_bs[d];
-
-    // Detect if the "coarse op" is the Kahler-Dirac op or something else that still acts on a fine staggered ColorSpinorField
-    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
-      coarse_param.nSpin = fine_param.nSpin;
-      coarse_param.nColor = fine_param.nColor;
-      coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // fine staggered fields are always Degrand-Rossi
-    } else if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      coarse_param.nSpin = 2;
-      coarse_param.nColor = 24;
-      coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // coarse staggered fields are always Degrand-Rossi
-    } else {
-      coarse_param.nSpin = (fine_param.nSpin == 1) ? 2 : (fine_param.nSpin / spin_bs);
-      coarse_param.nColor = Nvec;
-      coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // coarse fields are always Degrand-Rossi
-    }
-
-    coarse_param.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
-  }
 
   ColorSpinorParam Transfer::fineColorSpinorParam(QudaPrecision precision, QudaFieldLocation new_location, QudaMemoryType new_mem_type) const {
     auto fine_param_copy = fine_param;
@@ -332,7 +165,6 @@ namespace quda {
 
     return coarse_param_copy;
   }
-
 
   void Transfer::verifyFineCompatibility(const ColorSpinorField &fine) const {
     if (fineSiteSubset() == QUDA_PARITY_SITE_SUBSET && fine.X(0) * 2 != fine_param.x[0])
@@ -373,83 +205,438 @@ namespace quda {
     }
   }
 
-  // apply the prolongator
-  void Transfer::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
-
-    // verify that "out" is an appropriate fine field and "in" is an appropriate coarse field
-    verifyFineCompatibility(out[0]);
-    verifyCoarseCompatibility(in[0]);
-
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      StaggeredProlongate(out, in, fine_to_coarse_d, spin_map, parity);
-    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
-
-      if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
-      if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
-
-      // the optimized KD op acts on fine spinors
-      if (out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
-        for (auto i = 0u; i < out.size(); i++) out[i] = in[i].Even();
-      } else {
-        for (auto i = 0u; i < out.size(); i++) out[i] = in[i];
-      }
-
-    } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
-
-      if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-        errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
-
-      Prolongate(out, in, V, fine_to_coarse_d, spin_map, _use_mma, parity);
-    } else {
-      errorQuda("Invalid transfer type in prolongate");
-    }
-
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-  }
-
-  // apply the restrictor
-  void Transfer::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+  TransferAggregate::TransferAggregate(const std::vector<ColorSpinorField> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass,
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision, bool use_mma) :
+    Transfer(B, Nvec, spin_bs, null_precision),
+    NblockOrtho(n_block_ortho),
+    blockOrthoTwoPass(block_ortho_two_pass),
+    use_mma(use_mma)
   {
-    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
-    if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+    postTrace();
 
-    // verify that "out" is an appropriate coarse field and "in" is an appropriate fine field
-    verifyCoarseCompatibility(out[0]);
-    verifyFineCompatibility(in[0]);
+    // initialize the block sizes
+    initializeBlockSizes(geo_bs);
 
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
-      StaggeredRestrict(out, in, fine_to_coarse_d, spin_map, parity);
-    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+    // allocate the fine-to-coarse spin map
+    createSpinMap(B[0].Nspin());
 
-      if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
-      if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
+    // create ColorSpinorParam objects for the fine and coarse fields
+    createColorSpinorParams();
 
-      // the optimized KD op acts on fine spinors
-      if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
-        for (auto i = 0u; i < out.size(); i++) out[i].Even() = in[i];
-        for (auto i = 0u; i < out.size(); i++) blas::zero(out[i].Odd());
-      } else {
-        for (auto i = 0u; i < out.size(); i++) out[i] = in[i];
+    createV(); // allocate V field
+
+    // create the fine-to-coarse and coarse-to-fine site maps
+    createGeoMap();
+
+    reset();
+    postTrace();
+  }
+
+  void TransferAggregate::initializeBlockSizes(int *geo_bs) {
+    int ndim = B[0].Ndim();
+
+    // Only loop over four dimensions for now, we don't have
+    // to worry about the fifth dimension until we hit chiral fermions.
+    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
+
+    this->geo_bs = new int[ndim];
+    int total_block_size = 1;
+
+    for (int d = 0; d < 4; d++) {
+      while (geo_bs[d] > 0) {
+        if (d == 0 && B[0].X(0) == geo_bs[0])
+          warningQuda("X-dimension length %d cannot block length %d", B[0].X(0), geo_bs[0]);
+        else if ((B[0].X(d) / geo_bs[d] + 1) % 2 == 0)
+          warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0].X(d) / geo_bs[d]);
+        else if ((B[0].X(d) / geo_bs[d]) * geo_bs[d] != B[0].X(d))
+          warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0].X(d), geo_bs[d]);
+        else
+          break; // this is a valid block size so let's use it
+        geo_bs[d] /= 2;
       }
-
-    } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
-
-      if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-        errorQuda("Cannot restrict a full field since only have single parity null-space components");
-
-      Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, _use_mma, parity);
-
-    } else {
-      errorQuda("Invalid transfer type in restrict");
+      if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
+      this->geo_bs[d] = geo_bs[d];
+      total_block_size *= geo_bs[d];
     }
 
-    // only need to synchronize if we're transferring from GPU to CPU
-    if (out[0].Location() == QUDA_CPU_FIELD_LOCATION && in[0].Location() == QUDA_CUDA_FIELD_LOCATION)
-      qudaDeviceSynchronize();
+    int aggregate_size = total_block_size * B[0].Ncolor();
+    if (spin_bs == 0)
+      aggregate_size /= 2; // effective spin_bs of 0.5 (fine spin / coarse spin)
+    else
+      aggregate_size *= spin_bs;
+    if (Nvec > aggregate_size)
+      errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, aggregate_size);
 
-    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    std::string block_str = std::to_string(geo_bs[0]);
+    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
+    logQuda(QUDA_VERBOSE, "Transfer: using block size %s\n", block_str.c_str());
   }
+
+  void TransferAggregate::createV() const
+  {
+    postTrace();
+
+    // create the storage for the final block orthogonal elements
+    // uses the geometry from the null-space vectors
+    auto param = fineColorSpinorParam(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision(), B[0].Location());
+    param.nColor *= Nvec;
+    param.nVec = Nvec;
+
+    // the prolongator/restrictor is always in the Degrand-Rossi gamma basis
+    param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
+    if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      //keep it the same for staggered:
+      param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      param.x[0] *= 2;
+    }
+
+    V = ColorSpinorField(param);
+    postTrace();
+  }
+
+  void TransferAggregate::reset()
+  {
+    postTrace();
+
+    logQuda(QUDA_VERBOSE, "Transfer: block orthogonalizing\n");
+
+    BlockOrthogonalize(V, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
+    postTrace();
+  }
+
+  void TransferAggregate::createColorSpinorParams() {
+    // create the ColorSpinorParam objects for the fine and coarse fields
+    // the precision is intentionally unset
+    fine_param = ColorSpinorParam(B[0]);
+    fine_param.create = QUDA_NULL_FIELD_CREATE;
+    fine_param.location = B[0].Location();
+    fine_param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    fine_param.gammaBasis = (B[0].Nspin() == 4) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // copy the fine param and modify in place
+    coarse_param = fine_param;
+    for (int d = 0; d < fine_param.nDim; d++) coarse_param.x[d] = fine_param.x[d] / geo_bs[d];
+
+    coarse_param.nSpin = (fine_param.nSpin == 1) ? 2 : (fine_param.nSpin / spin_bs);
+    coarse_param.nColor = Nvec;
+    coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // coarse fields are always Degrand-Rossi
+    coarse_param.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
+  }
+
+// apply the prolongator
+void TransferAggregate::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+  // verify that "out" is an appropriate fine field and "in" is an appropriate coarse field
+  verifyFineCompatibility(out[0]);
+  verifyCoarseCompatibility(in[0]);
+
+  if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+    errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
+
+  Prolongate(out, in, V, fine_to_coarse_d, spin_map, use_mma, parity);
+
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+// apply the restrictor
+void TransferAggregate::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+{
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+  // verify that "out" is an appropriate coarse field and "in" is an appropriate fine field
+  verifyCoarseCompatibility(out[0]);
+  verifyFineCompatibility(in[0]);
+
+  if (V.SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+    errorQuda("Cannot restrict a full field since only have single parity null-space components");
+
+  Restrict(out, in, V, fine_to_coarse_d, coarse_to_fine_d, spin_map, use_mma, parity);
+
+  // only need to synchronize if we're transferring from GPU to CPU
+  if (out[0].Location() == QUDA_CPU_FIELD_LOCATION && in[0].Location() == QUDA_CUDA_FIELD_LOCATION)
+    qudaDeviceSynchronize();
+
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+  TransferCopy::TransferCopy(const std::vector<ColorSpinorField> &B, int Nvec,
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type) :
+    Transfer(B, Nvec, spin_bs, null_precision),
+    transfer_type(transfer_type)
+  {
+    postTrace();
+
+    // initialize the block sizes
+    initializeBlockSizes(geo_bs);
+
+    // allocate the fine-to-coarse spin map
+    createSpinMap(B[0].Nspin());
+
+    // create ColorSpinorParam objects for the fine and coarse fields
+    createColorSpinorParams();
+
+    createV(); // allocate V field
+
+    // create the fine-to-coarse and coarse-to-fine site maps
+    createGeoMap();
+
+    reset();
+    postTrace();
+  }
+
+
+  void TransferCopy::initializeBlockSizes(int *geo_bs) {
+    int ndim = B[0].Ndim();
+
+    // Only loop over four dimensions for now, we don't have
+    // to worry about the fifth dimension until we hit chiral fermions.
+    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
+
+    this->geo_bs = new int[ndim];
+
+    // the aggregation size is technically 1
+    for (int d = 0; d < ndim; d++) {
+      if (geo_bs[d] != 1)
+        errorQuda("Invalid geometric block size %d for dimension %d for optimized KD transfer, must be 1", geo_bs[d], d);
+      this->geo_bs[d] = geo_bs[d];
+    }
+
+    // The number of coarse dof is technically fineColor for optimized KD
+    if (Nvec != B[0].Ncolor())
+      errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0].Ncolor());
+
+    std::string block_str = std::to_string(geo_bs[0]);
+    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
+    logQuda(QUDA_VERBOSE, "Transfer: using block size %s\n", block_str.c_str());
+  }
+
+  void TransferCopy::createV() const
+  {
+    postTrace();
+
+    // create the storage for the final block orthogonal elements
+    // uses the geometry from the null-space vectors
+    auto param = fineColorSpinorParam(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision(), B[0].Location());
+    param.nColor *= Nvec;
+    param.nVec = Nvec;
+
+    // the prolongator/restrictor is always in the Degrand-Rossi gamma basis
+    param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
+    if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      //keep it the same for staggered:
+      param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      param.x[0] *= 2;
+    }
+
+    // Need to create V_d and V_h as metadata containers, but we don't actually need to allocate the memory.
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+
+    V = ColorSpinorField(param);
+    postTrace();
+  }
+
+  void TransferCopy::createColorSpinorParams() {
+    // create the ColorSpinorParam objects for the fine and coarse fields
+    // the precision is intentionally unset
+    fine_param = ColorSpinorParam(B[0]);
+    fine_param.create = QUDA_NULL_FIELD_CREATE;
+    fine_param.location = B[0].Location();
+    fine_param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    fine_param.gammaBasis = (B[0].Nspin() == 4) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // for the copy transfer, the coarse param is the same as the fine param
+    coarse_param = fine_param;
+
+    // except maybe for this, but we'll figure it out later
+    coarse_param.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
+  }
+
+// apply the prolongator
+void TransferCopy::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+  // verify that "out" is an appropriate fine field and "in" is an appropriate coarse field
+  verifyFineCompatibility(out[0]);
+  verifyCoarseCompatibility(in[0]);
+
+  if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
+  if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
+
+  // the optimized KD op acts on fine spinors
+  if (out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+    for (auto i = 0u; i < out.size(); i++) out[i] = in[i].Even();
+  } else {
+    for (auto i = 0u; i < out.size(); i++) out[i] = in[i];
+  }
+
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+// apply the restrictor
+void TransferCopy::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+{
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+  // verify that "out" is an appropriate coarse field and "in" is an appropriate fine field
+  verifyCoarseCompatibility(out[0]);
+  verifyFineCompatibility(in[0]);
+
+  if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
+  if (out.VolumeCB() != in.VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
+
+  // the optimized KD op acts on fine spinors
+  if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+    for (auto i = 0u; i < out.size(); i++) out[i].Even() = in[i];
+    for (auto i = 0u; i < out.size(); i++) blas::zero(out[i].Odd());
+  } else {
+    for (auto i = 0u; i < out.size(); i++) out[i] = in[i];
+  }
+
+  // only need to synchronize if we're transferring from GPU to CPU
+  if (out[0].Location() == QUDA_CPU_FIELD_LOCATION && in[0].Location() == QUDA_CUDA_FIELD_LOCATION)
+    qudaDeviceSynchronize();
+
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+
+  TransferCoarseKD::TransferCoarseKD(const std::vector<ColorSpinorField> &B, int Nvec,
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision) :
+    Transfer(B, Nvec, spin_bs, null_precision)
+  {
+    postTrace();
+
+    // initialize the block sizes
+    initializeBlockSizes(geo_bs);
+
+    // allocate the fine-to-coarse spin map
+    createSpinMap(B[0].Nspin());
+
+    // create ColorSpinorParam objects for the fine and coarse fields
+    createColorSpinorParams();
+
+    createV(); // allocate V field
+
+    // create the fine-to-coarse and coarse-to-fine site maps
+    createGeoMap();
+
+    reset();
+    postTrace();
+  }
+
+  void TransferCoarseKD::initializeBlockSizes(int *geo_bs) {
+    int ndim = B[0].Ndim();
+
+    // Only loop over four dimensions for now, we don't have
+    // to worry about the fifth dimension until we hit chiral fermions.
+    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
+
+    this->geo_bs = new int[ndim];
+
+    // the aggregation size needs to be 2^4
+    for (int d = 0; d < ndim; d++) {
+      if (geo_bs[d] != 2)
+        errorQuda("Invalid geometric block size %d for dimension %d for coarse KD transfer, must be 2", geo_bs[d], d);
+      this->geo_bs[d] = geo_bs[d];
+    }
+
+    // The number of coarse dof is 8 * fineColor / 2 for coarse KD
+    if (Nvec != 8 * B[0].Ncolor())
+      errorQuda("Invalid Nvec %d for coarse KD aggregation, must be %d", Nvec, 8 * B[0].Ncolor());
+
+    std::string block_str = std::to_string(geo_bs[0]);
+    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
+    logQuda(QUDA_VERBOSE, "Transfer: using block size %s\n", block_str.c_str());
+  }
+
+  void TransferCoarseKD::createV() const
+  {
+    postTrace();
+
+    // create the storage for the final block orthogonal elements
+    // uses the geometry from the null-space vectors
+    auto param = fineColorSpinorParam(B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0].Precision(), B[0].Location());
+    param.nColor *= Nvec;
+    param.nVec = Nvec;
+
+    // the prolongator/restrictor is always in the Degrand-Rossi gamma basis
+    param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
+    if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      //keep it the same for staggered:
+      param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      param.x[0] *= 2;
+    }
+
+    // Need to create V_d and V_h as metadata containers, but we don't actually need to allocate the memory.
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+
+    V = ColorSpinorField(param);
+    postTrace();
+  }
+
+  void TransferCoarseKD::createColorSpinorParams() {
+    // create the ColorSpinorParam objects for the fine and coarse fields
+    // the precision is intentionally unset
+    fine_param = ColorSpinorParam(B[0]);
+    fine_param.create = QUDA_NULL_FIELD_CREATE;
+    fine_param.location = B[0].Location();
+    fine_param.fieldOrder = B[0].Location() == QUDA_CUDA_FIELD_LOCATION ? QUDA_NATIVE_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    fine_param.gammaBasis = (B[0].Nspin() == 4) ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+    // copy the fine param and modify in place
+    coarse_param = fine_param;
+    for (int d = 0; d < fine_param.nDim; d++) coarse_param.x[d] = fine_param.x[d] / 2;
+
+    coarse_param.nSpin = 2;
+    coarse_param.nColor *= 8; // 16 * fineColor / 2 for coarse KD
+    coarse_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // coarse staggered fields are always Degrand-Rossi
+    coarse_param.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
+  }
+
+// apply the prolongator
+void TransferCoarseKD::P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const {
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+  // verify that "out" is an appropriate fine field and "in" is an appropriate coarse field
+  verifyFineCompatibility(out[0]);
+  verifyCoarseCompatibility(in[0]);
+
+  StaggeredProlongate(out, in, fine_to_coarse_d, spin_map, parity);
+
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+// apply the restrictor
+void TransferCoarseKD::R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+{
+  getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (out.size() != in.size()) errorQuda("Mismatched set sizes %lu != %lu", out.size(), in.size());
+
+  // verify that "out" is an appropriate coarse field and "in" is an appropriate fine field
+  verifyCoarseCompatibility(out[0]);
+  verifyFineCompatibility(in[0]);
+
+  StaggeredRestrict(out, in, fine_to_coarse_d, spin_map, parity);
+
+  // only need to synchronize if we're transferring from GPU to CPU
+  if (out[0].Location() == QUDA_CPU_FIELD_LOCATION && in[0].Location() == QUDA_CUDA_FIELD_LOCATION)
+    qudaDeviceSynchronize();
+
+  getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+}
+
+
 
 } // namespace quda

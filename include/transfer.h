@@ -29,7 +29,7 @@ namespace quda {
    */
   class Transfer {
 
-  private:
+  protected:
 
     /** The raw null space components */
     const std::vector<ColorSpinorField> &B;
@@ -37,23 +37,11 @@ namespace quda {
     /** The number of null space components */
     const int Nvec;
 
-    /** The number of times to Gram-Schmidt within block ortho */
-    const int NblockOrtho;
-
-    /** Whether we are doing the two-pass Block Orthogonalize */
-    const bool blockOrthoTwoPass;
-
     /** Precision to use for the GPU null-space components */
     const QudaPrecision null_precision;
 
     /** Block-normalized null-space components that define the prolongator */
     mutable ColorSpinorField V;
-
-    /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
-    mutable ColorSpinorField fine_tmp_h;
-
-    /** A CPU temporary field with coarse geometry and coarse color */
-    mutable ColorSpinorField coarse_tmp_h;
 
     /** The geometrical coase grid blocking */
     int *geo_bs = nullptr;
@@ -84,32 +72,19 @@ namespace quda {
     int spin_bs;
 
     /** The mapping onto coarse spin from fine spin (inner) and fine parity (outer), for staggered */
-    int **spin_map;
+    int **spin_map = nullptr;
 
     /** Whether the transfer operator is to be applied to full fields or single parity fields */
-    QudaSiteSubset site_subset;
+    QudaSiteSubset site_subset = QUDA_FULL_SITE_SUBSET;
 
     /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
-    QudaParity parity;
-
-    /** Whether to apply the transfer operation with MMA */
-    mutable bool _use_mma;
-
-    /** Implies whether or not the fine level is a staggered operator, in which
-    case we don't actually need to allocate any memory. */
-    mutable QudaTransferType transfer_type;
+    QudaParity parity = QUDA_INVALID_PARITY;
 
     /** ColorSpinorParam corresponding to the fine-grid field */
     ColorSpinorParam fine_param;
 
     /** ColorSpinorParam corresponding to the coarse-grid field */
     ColorSpinorParam coarse_param;
-
-    /**
-     * @brief Allocate V field
-     * @param[in] location Where to allocate the V field
-     */
-    void createV() const;
 
     /**
      * @brief Creates the map between fine and coarse grids
@@ -122,50 +97,37 @@ namespace quda {
      */
     void createSpinMap(int n_fine_spin);
 
-    /**
-     * @brief Creates the ColorSpinorParam objects for the fine and coarse fields
-     */
-    void createColorSpinorParams();
-
   public:
     /**
      * The constructor for Transfer
      * @param B Array of null-space vectors
      * @param Nvec Number of null-space vectors
-     * @param NblockOrtho Number of times to Gram-Schmidt within block ortho
-     * @param blockOrthoTwoPass Whether to do a two pass block orthogonalization
-     * @param d The Dirac operator to which these null-space vectors correspond
-     * @param geo_bs The geometric block sizes to use
      * @param spin_bs The spin block sizes to use
-     * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param null_precision The precision to store the null-space basis vectors in
      */
-    Transfer(const std::vector<ColorSpinorField> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
-             int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type);
+    Transfer(const std::vector<ColorSpinorField> &B, int Nvec, int spin_bs, QudaPrecision null_precision);
 
     /** The destructor for Transfer */
-    virtual ~Transfer();
+    ~Transfer();
 
     /**
      @brief for resetting the Transfer when the null vectors have changed
      */
-    void reset();
-
-    void set_use_mma(bool b) const { _use_mma = b; }
+    virtual void reset() {};
 
     /**
      * Apply the prolongator
      * @param out The resulting field on the fine lattice
      * @param in The input field on the coarse lattice
      */
-    void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    virtual void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const = 0;
 
     /**
      * Apply the restrictor
      * @param out The resulting field on the coarse lattice
      * @param in The input field on the fine lattice
      */
-    void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+    virtual void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const = 0;
 
     /**
      * @brief The precision of the packed null-space vectors
@@ -261,7 +223,7 @@ namespace quda {
      * Returns the transfer type; used to inform staggered-type coarsenings
      * @return transfer_type
      */
-    QudaTransferType getTransferType() const { return transfer_type; }
+    virtual QudaTransferType getTransferType() const = 0;
 
     /**
        @return Pointer to the lookup table to the fine-to-coarse map
@@ -306,6 +268,189 @@ namespace quda {
     ColorSpinorParam coarseColorSpinorParam(QudaPrecision precision,
       QudaFieldLocation new_location = QUDA_INVALID_FIELD_LOCATION,
       QudaMemoryType new_mem_type = QUDA_MEMORY_INVALID) const;
+  };
+
+  class TransferAggregate : public Transfer {
+
+  protected:
+
+    /** The number of times to Gram-Schmidt within block ortho */
+    const int NblockOrtho;
+
+    /** Whether we are doing the two-pass Block Orthogonalize */
+    const bool blockOrthoTwoPass;
+
+    /** Whether to apply the transfer operation with MMA */
+    bool use_mma;
+
+    /**
+      * @brief Initialize the block sizes
+      */
+    void initializeBlockSizes(int *geo_bs);
+
+    /**
+      * @brief Allocate V field
+      * @param[in] location Where to allocate the V field
+      */
+    void createV() const;
+
+    /**
+      * @brief Creates the ColorSpinorParam objects for the fine and coarse fields
+      */
+    void createColorSpinorParams();
+
+  public:
+    /**
+      * The constructor for TransferAggregate
+      * @param B Array of null-space vectors
+      * @param Nvec Number of null-space vectors
+      * @param NblockOrtho Number of times to Gram-Schmidt within block ortho
+      * @param blockOrthoTwoPass Whether to do a two pass block orthogonalization
+      * @param geo_bs The geometric block sizes to use
+      * @param spin_bs The spin block sizes to use
+      * @param null_precision The precision to store the null-space basis vectors in
+      * @param use_mma Whether to apply the transfer operation with MMA
+      */
+    TransferAggregate(const std::vector<ColorSpinorField> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
+              int spin_bs, QudaPrecision null_precision, bool use_mma);
+
+    /**
+      @brief for resetting the Transfer when the null vectors have changed
+      */
+    void reset() override;
+
+    /**
+      * Apply the prolongator
+      * @param out The resulting field on the fine lattice
+      * @param in The input field on the coarse lattice
+      */
+    virtual void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    /**
+      * Apply the restrictor
+      * @param out The resulting field on the coarse lattice
+      * @param in The input field on the fine lattice
+      */
+    virtual void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    /**
+      * Returns the transfer type; used to inform staggered-type coarsenings
+      * @return transfer_type
+      */
+    virtual QudaTransferType getTransferType() const override { return QUDA_TRANSFER_AGGREGATE; }
+
+  };
+
+  class TransferCopy : public Transfer {
+
+  protected:
+
+    /** Implies whether or not the fine level is a staggered operator, in which
+    case we don't actually need to allocate any memory. */
+    mutable QudaTransferType transfer_type;
+
+    /**
+      * @brief Initialize the block sizes
+      */
+    void initializeBlockSizes(int *geo_bs);
+
+    /**
+      * @brief Allocate V field
+      * @param[in] location Where to allocate the V field
+      */
+    void createV() const;
+
+    /**
+      * @brief Creates the ColorSpinorParam objects for the fine and coarse fields
+      */
+    void createColorSpinorParams();
+
+  public:
+    /**
+      * The constructor for Transfer
+      * @param B Array of null-space vectors
+      * @param Nvec Number of null-space vectors
+      * @param geo_bs The geometric block sizes to use
+      * @param spin_bs The spin block sizes to use
+      * @param null_precision The precision to store the null-space basis vectors in
+      * @param transfer_type The type of transfer operator to use
+      */
+    TransferCopy(const std::vector<ColorSpinorField> &B, int Nvec, int *geo_bs,
+              int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type);
+
+    /**
+      * Apply the prolongator
+      * @param out The resulting field on the fine lattice
+      * @param in The input field on the coarse lattice
+      */
+    virtual void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    /**
+      * Apply the restrictor
+      * @param out The resulting field on the coarse lattice
+      * @param in The input field on the fine lattice
+      */
+    virtual void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    /**
+      * Returns the transfer type; used to inform staggered-type coarsenings
+      * @return transfer_type
+      */
+    virtual QudaTransferType getTransferType() const override { return transfer_type; }
+
+  };
+
+  class TransferCoarseKD : public Transfer {
+
+  protected:
+
+    /**
+      * @brief Initialize the block sizes
+      */
+    void initializeBlockSizes(int *geo_bs);
+
+    /**
+      * @brief Allocate V field
+      * @param[in] location Where to allocate the V field
+      */
+    void createV() const;
+
+    /**
+      * @brief Creates the ColorSpinorParam objects for the fine and coarse fields
+      */
+    void createColorSpinorParams();
+
+  public:
+    /**
+      * The constructor for Transfer
+      * @param B Array of null-space vectors
+      * @param Nvec Number of null-space vectors
+      * @param geo_bs The geometric block sizes to use
+      * @param spin_bs The spin block sizes to use
+      * @param null_precision The precision to store the null-space basis vectors in
+      */
+    TransferCoarseKD(const std::vector<ColorSpinorField> &B, int Nvec, int *geo_bs,
+              int spin_bs, QudaPrecision null_precision);
+
+    /**
+      * Apply the prolongator
+      * @param out The resulting field on the fine lattice
+      * @param in The input field on the coarse lattice
+      */
+    virtual void P(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    /**
+      * Apply the restrictor
+      * @param out The resulting field on the coarse lattice
+      * @param in The input field on the fine lattice
+      */
+    virtual void R(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const override;
+
+    /**
+      * Returns the transfer type; used to inform staggered-type coarsenings
+      * @return transfer_type
+      */
+    virtual QudaTransferType getTransferType() const override { return QUDA_TRANSFER_COARSE_KD; }
   };
 
   /**

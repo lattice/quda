@@ -104,10 +104,19 @@ namespace quda
       } else {
         // create transfer operator
         logQuda(QUDA_VERBOSE, "Creating transfer operator %s\n", param.transfer_use_mma ? "with MMA enabled" : "");
-        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
-                                param.spinBlockSize, param.mg_global.precision_null[param.level],
-                                param.mg_global.transfer_type[param.level]);
-        transfer->set_use_mma(param.transfer_use_mma);
+        if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_AGGREGATE) {
+          transfer = new TransferAggregate(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
+                                param.spinBlockSize, param.mg_global.precision_null[param.level], param.transfer_use_mma);
+        } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+          transfer = new TransferCopy(param.B, param.Nvec, param.geoBlockSize,
+                                param.spinBlockSize, param.mg_global.precision_null[param.level], param.mg_global.transfer_type[param.level]);
+        } else if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_COARSE_KD) {
+          transfer = new TransferCoarseKD(param.B, param.Nvec, param.geoBlockSize,
+                                param.spinBlockSize, param.mg_global.precision_null[param.level]);
+        } else {
+          errorQuda("Invalid transfer type %d", param.mg_global.transfer_type[param.level]);
+        }
+
         for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++)
           param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
