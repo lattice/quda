@@ -503,12 +503,16 @@ if (Nsrc > QUDA_MAX_MULTI_SRC)
   // genericSource(pion_source,QUDA_CONSTANT_SOURCE,0,0,0);
   genericSource(pion_source,QUDA_POINT_SOURCE,0,0,0);
   genericSource(one_field,QUDA_CONSTANT_SOURCE,1,0,0);
-  auto dott = quda::blas::cDotProduct(pion_source,one_field);
-  auto dot_real = dott.real();
-  pion_source.PrintVector(0,0,0);
-  one_field.PrintVector(0,0,0);
-  printfQuda("dott %d\n",dot_real);
+  std::complex<double> dott = quda::blas::cDotProduct(pion_source,one_field);
+  double dot_real = dott.real();
+  printfQuda("dott %f\n",dot_real);
   printfQuda("comm_dim first %d\n",comm_dim(3));
+  // pion_source.PrintVector(0,0,0);
+  // pion_source.PrintVector(1,0,0);
+  genericPrintVector(pion_source,0,0);
+    //BAD
+  // genericPrintVector(pion_source,0,0,1);
+  
   int origin[4] = {0, 0, 0, 0};
   auto x_cb_true = linkIndex(origin, pion_source.X() );
   auto which_rank = lex_rank_from_coords_t(origin, (void*)pion_source.X());

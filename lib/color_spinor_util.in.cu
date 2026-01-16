@@ -34,11 +34,13 @@ namespace quda {
   */
   template <class T>
   void point(T &t, int x, int s, int c, const ColorSpinorField &meta) {
-      int origin[4] = {0, 0, 0, 0};
+      int origin[4];
       int X[4] = { meta.X(0), meta.X(1), meta.X(2), meta.X(3) };
+      getCoordsCB(origin, x, X, meta.X(0)>>1, 0);
       int which_rank = origin[0];
       for (int i = 1; i < 4; i++) { which_rank = X[i] * which_rank + origin[i]; }
       if (comm_rank() == which_rank) t(x%2, x/2, s, c) = 1.0;
+      else t(x%2, x/2, s, c) = 0.0;
   }
 
   /**
