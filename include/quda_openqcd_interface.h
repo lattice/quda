@@ -415,13 +415,16 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
 /**
  * @brief      Setup eigenvector fields from the host from an MG instance
  *
- * @param[in]  id      The solver identifier in the input file, i.e. "Solver #".
- *                     The input file is the one given by quda_init
- * @param[in]  nevecs  The number of eigenvectors to load
- * @param      evecs   The eigenvector fields on the host. Have to be as many as
- *                     indicated in member n_vec
+ * @param[in]  id        The solver identifier in the input file, i.e.
+ *                       "Solver #". The input file is the one given by
+ *                       quda_init. The solver has to be a inv_type_precondition
+ *                       = QUDA_MG_INVERTER solver.
+ * @param[in]  nvecs     The number of eigenvectors to load
+ * @param      in_vecs   The Input vector fields on the host. Have to be as many
+ *                       as indicated in member n_vec
+ * @param      out_vecs  The out vector fields
  */
-void openQCD_qudaMGSetEvecs(const int id, const int nevecs, void** evecs);
+void openQCD_qudaMGSetInOutVecs(const int id, const int nvecs, void** in_vecs, void** out_vecs);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
