@@ -21,20 +21,23 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename out_t, typename in_t, typename v_t, int fineSpin_, int fineColor_, int coarseSpin_,
+  template <typename oFloat_, typename iFloat_, typename vFloat_, int fineSpin_, int fineColor_, int coarseSpin_,
             int coarseColor_, bool from_non_rel_>
   struct RestrictArg : kernel_param<> {
-    using real = out_t;
+    using oFloat = oFloat_;
+    using iFloat = iFloat_;
+    using vFloat = vFloat_;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int coarseColor = coarseColor_;
     static constexpr bool from_non_rel = from_non_rel_;
 
+
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<real, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, in_t, in_t, true, isFixed<in_t>::value>;
-    using C = FieldOrderCB<real, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, out_t, out_t, true>;
-    using V = FieldOrderCB<real, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, v_t>;
+    using F = FieldOrderCB<iFloat, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, iFloat, iFloat, true, isFixed<iFloat>::value>;
+    using C = FieldOrderCB<oFloat, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, oFloat, oFloat, true, isFixed<oFloat>::value>;
+    using V = FieldOrderCB<vFloat, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, false, isFixed<vFloat>::value>;
 
     const int_fastdiv n_src;
     C out[MAX_MULTI_RHS];
@@ -105,19 +108,23 @@ namespace quda {
     for (int coarse_color_local = 0; coarse_color_local < coarse_color_per_thread; coarse_color_local++) {
       int i = coarse_color_block + coarse_color_local;
 
-      ColorSpinor<typename Arg::real, Arg::fineColor, Arg::fineSpin> in;
+      ColorSpinor<typename Arg::iFloat, Arg::fineColor, Arg::fineSpin> in;
       arg.in[src_idx].template load<Arg::fineSpin>(in.data, spinor_parity, x_cb);
 
       if constexpr (Arg::fineSpin == 4 && Arg::from_non_rel) {
         in.toRel();
-        in *= rsqrt(static_cast<typename Arg::real>(2.0));
+        in *= static_cast<typename Arg::iFloat>(rsqrt(2.0));
       }
 
 #pragma unroll
       for (int s = 0; s < Arg::fineSpin; s++) {
 	for (int c = 0; c < Arg::fineColor; c++) {
           out[s * coarse_color_per_thread + coarse_color_local] =
-            cmac(conj(arg.v(v_parity, x_cb, s, c, i)), in(s, c), out[s * coarse_color_per_thread + coarse_color_local]);
+            cmac(
+              static_cast<complex<typename Arg::oFloat>>(conj(arg.v(v_parity, x_cb, s, c, i))),
+              static_cast<complex<typename Arg::oFloat>>(in(s, c)),
+              static_cast<complex<typename Arg::oFloat>>(out[s * coarse_color_per_thread + coarse_color_local])
+            );
         }
       }
     }
@@ -125,7 +132,7 @@ namespace quda {
 
   template <typename Arg> struct RestrictorParams {
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
-    using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
+    using vector = array<complex<typename Arg::oFloat>, Arg::coarseSpin*coarse_color_per_thread>;
     static constexpr int block_dim = 1;
     using BlockReduce_t = BlockReduce<vector, block_dim, Arg::n_vector_z>;
   };
@@ -163,7 +170,7 @@ namespace quda {
           const int x_fine = arg.coarse_to_fine[x_fine_site_id];
           const int x_fine_cb = x_fine - parity * arg.in[src_idx].VolumeCB();
 
-          array<complex<typename Arg::real>, Arg::fineSpin * coarse_color_per_thread> tmp {0};
+          array<complex<typename Arg::oFloat>, Arg::fineSpin * coarse_color_per_thread> tmp {0};
 
           rotateCoarseColor(tmp, arg, src_idx, parity, x_fine_cb, coarse_color_block);
 

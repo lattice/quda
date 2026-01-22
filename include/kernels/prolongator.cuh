@@ -15,9 +15,11 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, bool to_non_rel_>
+  template <typename oFloat_, typename iFloat_, typename vFloat_, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, bool to_non_rel_>
   struct ProlongateArg : kernel_param<> {
-    using real = Float;
+    using oFloat = oFloat_;
+    using iFloat = iFloat_;
+    using vFloat = vFloat_;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int fineColor = fineColor_;
@@ -25,9 +27,9 @@ namespace quda {
     static constexpr bool to_non_rel = to_non_rel_;
 
     // disable ghost to reduce arg size
-    using F = FieldOrderCB<Float, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, Float, Float, true>;
-    using C = FieldOrderCB<Float, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, Float, Float, true>;
-    using V = FieldOrderCB<Float, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat>;
+    using F = FieldOrderCB<oFloat, fineSpin, fineColor, 1, QUDA_NATIVE_FIELD_ORDER, oFloat, oFloat, true, isFixed<oFloat>::value>;
+    using C = FieldOrderCB<iFloat, coarseSpin, coarseColor, 1, QUDA_NATIVE_FIELD_ORDER, iFloat, iFloat, true, isFixed<iFloat>::value>;
+    using V = FieldOrderCB<vFloat, fineSpin, fineColor, coarseColor, QUDA_NATIVE_FIELD_ORDER, vFloat, vFloat, false, isFixed<vFloat>::value>;
 
     const int_fastdiv n_src;
     F out[MAX_MULTI_RHS];
@@ -62,7 +64,7 @@ namespace quda {
      Applies the grid prolongation operator (coarse to fine)
   */
   template <typename Arg>
-  __device__ __host__ inline void prolongate(complex<typename Arg::real> out[], const Arg &arg, int src_idx, int parity, int x_cb)
+  __device__ __host__ inline void prolongate(complex<typename Arg::oFloat> out[], const Arg &arg, int src_idx, int parity, int x_cb)
   {
     int x = parity * arg.out[src_idx].VolumeCB() + x_cb;
     int x_coarse = arg.geo_map[x];
@@ -83,7 +85,7 @@ namespace quda {
      is the second step of applying the prolongator.
   */
   template <typename Arg>
-  __device__ __host__ inline void rotateFineColor(const Arg &arg, const complex<typename Arg::real> in[], int src_idx, int parity, int x_cb, int fine_color_block)
+  __device__ __host__ inline void rotateFineColor(const Arg &arg, const complex<typename Arg::oFloat> in[], int src_idx, int parity, int x_cb, int fine_color_block)
   {
     constexpr int fine_color_per_thread = fine_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -91,7 +93,7 @@ namespace quda {
 
     constexpr int color_unroll = 2;
 
-    ColorSpinor<typename Arg::real, fine_color_per_thread, Arg::fineSpin> out;
+    ColorSpinor<typename Arg::oFloat, fine_color_per_thread, Arg::fineSpin> out;
 
 #pragma unroll
     for (int s=0; s<Arg::fineSpin; s++) {
@@ -99,7 +101,7 @@ namespace quda {
       for (int fine_color_local = 0; fine_color_local < fine_color_per_thread; fine_color_local++) {
         int i = fine_color_block + fine_color_local; // global fine color index
 
-        complex<typename Arg::real> partial[color_unroll];
+        complex<typename Arg::oFloat> partial[color_unroll];
 #pragma unroll
         for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
 
@@ -108,7 +110,11 @@ namespace quda {
           // v is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 #pragma unroll
           for (int k=0; k<color_unroll; k++)
-            partial[k] = cmac(arg.v(v_parity, x_cb, s, i, j + k), in[s * Arg::coarseColor + j + k], partial[k]);
+            partial[k] = cmac(
+              static_cast<complex<typename Arg::oFloat>>(arg.v(v_parity, x_cb, s, i, j + k)),
+              static_cast<complex<typename Arg::oFloat>>(in[s * Arg::coarseColor + j + k]),
+              static_cast<complex<typename Arg::oFloat>>(partial[k])
+            );
         }
 
 #pragma unroll
@@ -118,7 +124,7 @@ namespace quda {
 
     if constexpr (Arg::fineSpin == 4 && Arg::to_non_rel) {
       out.toNonRel();
-      out *= rsqrt(static_cast<typename Arg::real>(2.0));
+      out *= rsqrt(static_cast<typename Arg::oFloat>(2.0));
     }
 
 #pragma unroll
@@ -143,7 +149,7 @@ namespace quda {
       int src_idx = src_parity % arg.n_src;
       int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;
       const int fine_color_block = fine_color_thread * fine_color_per_thread;
-      complex<typename Arg::real> tmp[Arg::fineSpin*Arg::coarseColor];
+      complex<typename Arg::oFloat> tmp[Arg::fineSpin*Arg::coarseColor];
 
       prolongate(tmp, arg, src_idx, parity, x_cb);
       rotateFineColor(arg, tmp, src_idx, parity, x_cb, fine_color_block);
