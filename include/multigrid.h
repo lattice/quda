@@ -391,6 +391,7 @@ namespace quda {
 
     /** FIXME: remove again */
     void g5D(ColorSpinorField &out, const ColorSpinorField &in, std::vector<ColorSpinorField> &B);
+    void check_evecs(std::vector<ColorSpinorField> &B);
 
     /**
        @brief This method only resets the KD operators with the updated fine links and rebuilds
