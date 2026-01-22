@@ -275,15 +275,31 @@ namespace quda
   };
 
   /** Transform from openQCD into relativistic Degrand-Rossi basis
-   *  FIXME: this should be implemented more performant.
+   *  FIXME: this should be implemented in one shot.
    */
   template <int Ns, int Nc> struct OpenqcdToDegrandRossi {
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
     {
       complex<FloatIn> buf[Ns * Nc];
-      OpenqcdToNonRelBasis<Ns, Nc> A;
-      RelBasis<Ns, Nc> B;
+      OpenqcdToNonRelBasis<Ns, Nc> A; // Openqcd -> UKQCD
+      RelBasis<Ns, Nc> B;             // UKQCD -> Degrand-Rossi
+
+      A(buf, in);
+      B(out, buf);
+    }
+  };
+
+  /** Transform from relativistic Degrand-Rossi basis into openQCD
+   *  FIXME: this should be implemented in one shot.
+   */
+  template <int Ns, int Nc> struct DegrandRossiToOpenqcd {
+    template <typename FloatOut, typename FloatIn>
+    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
+    {
+      complex<FloatIn> buf[Ns * Nc];
+      NonRelBasis<Ns, Nc> A;          // Degrand-Rossi -> UKQCD
+      NonRelToOpenqcdBasis<Ns, Nc> B; // UKQCD -> Openqcd
 
       A(buf, in);
       B(out, buf);
