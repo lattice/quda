@@ -810,8 +810,14 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
+    /** Whether to load the null-space vectors from array */
+    QudaBoolean copy_in[QUDA_MAX_MG_LEVEL];
+
     /** Pointer to explicit null vectors to copy from */
     void* vec_copy_in[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to store the null-space vectors to array */
+    QudaBoolean copy_out[QUDA_MAX_MG_LEVEL];
 
     /** Pointer to explicit null vectors to copy to */
     void* vec_copy_out[QUDA_MAX_MG_LEVEL];

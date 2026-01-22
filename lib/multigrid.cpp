@@ -48,7 +48,7 @@ namespace quda
               loadVectors(param.B);
             } else if (param.mg_global.use_eig_solver[param.level]) {
               generateEigenVectors(); // Run the eigensolver
-            } else if (param.mg_global.vec_copy_in[param.level] != nullptr) { // copy them
+            } else if (param.mg_global.copy_in[param.level] == QUDA_BOOLEAN_TRUE) { // copy them
               copyInVectors(param.B);
             } else {
               generateNullVectors(param.B);
@@ -56,10 +56,12 @@ namespace quda
           }
         } else if (strcmp(param.mg_global.vec_infile[param.level], "")
                    != 0) { // only load if infile is defined and not computing
-          if (param.mg_global.num_setup_iter[param.level] > 0) generateNullVectors(param.B);
+          if (param.mg_global.num_setup_iter[param.level] > 0) {
+            generateNullVectors(param.B);
+          }
         } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE) { // only conditional load of null vectors
           loadVectors(param.B);
-        } else if (param.mg_global.vec_copy_in[param.level] != nullptr) { // copy them
+        } else if (param.mg_global.copy_in[param.level] == QUDA_BOOLEAN_TRUE) { // copy them
           copyInVectors(param.B);
         } else { // generate free field vectors
           buildFreeVectors(param.B);
@@ -119,34 +121,41 @@ namespace quda
         if (r_coarse.empty()) {
           r_coarse.resize(1);
           r_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                                 param.mg_global.invert_param->cuda_prec_sloppy,
+                                                 param.mg_global.precision_null[param.level],
                                                  param.mg_global.location[param.level + 1]);
+          printfQuda("reset: r_coarse[0].Precision() = %d\n", r_coarse[0].Precision());
         }
 
         // create coarse solution vector if not already created in verify()
         if (x_coarse.empty()) {
           x_coarse.resize(1);
           x_coarse[0] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
-                                                 param.mg_global.invert_param->cuda_prec_sloppy,
+                                                 param.mg_global.precision_null[param.level],
                                                  param.mg_global.location[param.level + 1]);
+          printfQuda("reset: x_coarse[0].Precision() = %d\n", x_coarse[0].Precision());
         }
 
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]);
         B_coarse.resize(nVec_coarse);
 
         // only have single precision B vectors on the coarse grid
-        QudaPrecision B_coarse_precision = std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
+        QudaPrecision B_coarse_precision = param.mg_global.precision_null[param.level+1]; //std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
         for (int i=0; i<nVec_coarse; i++)
           B_coarse[i] = param.B[0].create_coarse(param.geoBlockSize, param.spinBlockSize, param.Nvec,
                                                  B_coarse_precision, param.mg_global.setup_location[param.level + 1]);
 
         // if we're not generating on all levels then we need to propagate the vectors down
-        bool condition = true; //param.level != 0;
+        //bool condition = true; // always restrict
+        bool condition = param.level < param.Nlevel-2; // dont restrict to coarsest level
+        //bool condition = param.level != 0; // original condition
         if ((condition || param.Nlevel > 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
-          logQuda(QUDA_VERBOSE, "Restricting null space vectors\n");
+          logQuda(QUDA_VERBOSE, "Restricting null space vectors, precision %d ->  %d\n",
+            param.B[0].Precision(), B_coarse[0].Precision());
           for (int i = 0; i < param.Nvec; i++) {
             zero(B_coarse[i]);
             transfer->R(B_coarse[i], param.B[i]);
+            printfQuda("norm2: %.2e -> %.2e\n", blas::norm2(param.B[i]), blas::norm2(B_coarse[i]));
+            if (std::isnan(blas::norm2(B_coarse[i]))) errorQuda("Coarse vector is NaN!");
           }
         }
         logQuda(QUDA_VERBOSE, "Transfer operator done\n");
@@ -174,11 +183,13 @@ namespace quda
         coarse->reset(refresh);
       } else {
         // create the next multigrid level
+        logQuda(QUDA_VERBOSE, "Recursing from level %d into level %d\n", param.level, param.level + 1);
         param_coarse
           = new MGParam(param, B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level + 1);
         param_coarse->fine = this;
         param_coarse->delta = 1e-20;
         param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
+        printfQuda("reset: param_coarse->precision = %d\n", param_coarse->precision);
 
         coarse = new MG(*param_coarse);
       }
@@ -293,11 +304,18 @@ namespace quda
     param_presmooth->precision_precondition = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition :
                                                                  param.mg_global.invert_param->cuda_prec_sloppy;
 
+    printfQuda("createSmoother: param_presmooth->precision = %d\n", param_presmooth->precision);
+    printfQuda("createSmoother: param_presmooth->precision_sloppy = %d\n", param_presmooth->precision_sloppy);
+    printfQuda("createSmoother: param_presmooth->precision_precondition = %d\n", param_presmooth->precision_precondition);
+
     param_presmooth->inv_type = param.smoother;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     param_presmooth->residual_type = (param_presmooth->inv_type == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
     param_presmooth->Nsteps = param.mg_global.smoother_schwarz_cycle[param.level];
     param_presmooth->maxiter = (param.level < param.Nlevel-1) ? param.nu_pre : param.nu_pre + param.nu_post;
+    logQuda(QUDA_VERBOSE, "param_presmooth->maxiter = %d\n", param_presmooth->maxiter);
+    logQuda(QUDA_VERBOSE, "param.nu_pre = %d\n", param.nu_pre);
+    logQuda(QUDA_VERBOSE, "param.nu_post = %d\n", param.nu_post);
 
     param_presmooth->Nkrylov = param_presmooth->maxiter;
     param_presmooth->pipeline = param_presmooth->maxiter;
@@ -328,6 +346,7 @@ namespace quda
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
       param_postsmooth->maxiter = param.nu_post;
+      logQuda(QUDA_VERBOSE, "param_postsmooth->maxiter = %d\n", param_postsmooth->maxiter);
       param_postsmooth->Nkrylov = param_postsmooth->maxiter;
       param_postsmooth->pipeline = param_postsmooth->maxiter;
 
@@ -645,6 +664,7 @@ namespace quda
       } else if (param_coarse_solver->inv_type == QUDA_BICGSTABL_INVERTER) {
         param_coarse_solver->Nkrylov = param.mg_global.coarse_solver_ca_basis_size[param.level + 1];
       }
+      printfQuda("param_coarse_solver->Nkrylov = %d\n", param_coarse_solver->Nkrylov);
       param_coarse_solver->inv_type_precondition = (param.level<param.Nlevel-2 || coarse->presmoother) ? QUDA_MG_INVERTER : QUDA_INVALID_INVERTER;
       param_coarse_solver->preconditioner = (param.level<param.Nlevel-2 || coarse->presmoother) ? coarse : nullptr;
       param_coarse_solver->mg_instance = true;
@@ -1137,6 +1157,8 @@ namespace quda
   {
     pushOutputPrefix(prefix);
 
+    printfQuda("Calling MG::operator() on level %d\n", param.level);
+
     QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
     QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ?
       QUDA_EVEN_PARITY :
@@ -1195,10 +1217,14 @@ namespace quda
                                                      r;
 
         // restrict to the coarse grid
+        logQuda(QUDA_VERBOSE, "Restricting residual, r_coarse[0].Precision() = %d, residual[0].Precision() = %d\n",
+            r_coarse[0].Precision(), residual[0].Precision());
         transfer->R(r_coarse, residual);
 
         if (param.level == 0 && param_coarse_solver->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
           logQuda(QUDA_VERBOSE, "Using inital guess for coarse solver ...\n");
+          logQuda(QUDA_VERBOSE, "Restricting init guess, x_coarse[0].Precision() = %d, x[0].Precision() = %d\n",
+            x_coarse[0].Precision(), x[0].Precision());
           transfer->R(x_coarse, x);
         }
 
@@ -1207,10 +1233,14 @@ namespace quda
 
         // prolongate back to this grid
         if (!presmoother) {
+          logQuda(QUDA_VERBOSE, "Prolongate solution back, x[0].Precision() = %d, x_coarse[0].Precision() = %d\n",
+            x[0].Precision(), x_coarse[0].Precision());
           transfer->P(inner_solution_type == outer_solution_type ? x : x(parity), x_coarse);
         } else { // we must sum to the presmoother solution
           auto res = inner_solution_type == outer_solution_type ? cvector_ref<ColorSpinorField>(r) :
                                                                   cvector_ref<ColorSpinorField>(r)(parity);
+          logQuda(QUDA_VERBOSE, "Prolongate solution back, res[0].Precision() = %d, x_coarse[0].Precision() = %d\n",
+              res[0].Precision(), x_coarse[0].Precision());
           transfer->P(res, x_coarse);
           xpy(res, inner_solution_type == outer_solution_type ? x : x(parity));
         }
@@ -1315,6 +1345,10 @@ namespace quda
     } else {
       solverParam.precision_precondition = solverParam.precision;
     }
+
+    printfQuda("generateNullVectors: solverParam.precision = %d\n", solverParam.precision);
+    printfQuda("generateNullVectors: solverParam.precision_sloppy = %d\n", solverParam.precision_sloppy);
+    printfQuda("generateNullVectors: solverParam.precision_precondition = %d\n", solverParam.precision_precondition);
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
@@ -1479,7 +1513,7 @@ namespace quda
       saveVectors(B);
     }
 
-    if (param.mg_global.vec_copy_out[param.level] != nullptr) copyOutVectors(B);
+    if (param.mg_global.copy_out[param.level] == QUDA_BOOLEAN_TRUE) copyOutVectors(B);
 
     popLevel();
   }
@@ -1496,7 +1530,7 @@ namespace quda
   void MG::g5D(ColorSpinorField &out, const ColorSpinorField &in, std::vector<ColorSpinorField> &B)
   {
     if (param.level == 0) {
-      ColorSpinorParam csParam(B[0]);
+      ColorSpinorParam csParam(in);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       auto buf = ColorSpinorField(csParam);
       DiracMatrix *Op = new DiracM(*diracResidual);
@@ -1533,34 +1567,12 @@ namespace quda
     }
   }
 
-  void MG::copyInVectors(std::vector<ColorSpinorField> &B)
+  void MG::check_evecs(std::vector<ColorSpinorField> &B)
   {
-    auto *in = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_in[param.level]);
-    logQuda(QUDA_VERBOSE, "Loading %ld null vectors from vec_copy_in property\n", B.size());
-    if (B.size() != (*in).size())
-      errorQuda("Sizes of B (%ld) and vec_copy_in (%ld) are not equal", B.size(), (*in).size());
-    logQuda(QUDA_VERBOSE, "Loading gamma basis: %d -> %d\n", (*in)[0].GammaBasis(), B[0].GammaBasis());
-    blas::copy(B, *in);
-
-    // pretend the fields are Degrand Rossi, even though they are UKQCD
-    /*for (size_t i = 0; i < B.size(); ++i)
-      B[i].GammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS);*/
-
-/*    DiracMatrix *Op;
-    if (param.level == 0) {
-      Op = new DiracG5M(*diracResidual);
-    } else {
-      Op = new DiracM(*diracResidual);
-    }
-*/
-    /*logQuda(QUDA_VERBOSE, "init: Type = %s\n", Op->Type().c_str());*/
-
-    /*auto buf1 = ColorSpinorField(B[0]);
-    auto buf2 = ColorSpinorField(B[0]);*/
-
-    // These are only eigenvectors of g5D only if the basis is set to UKQCD ?!?
     ColorSpinorParam csParam(B[0]);
+    // These are only eigenvectors of g5D only if the basis is set to UKQCD ?!?
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
     auto buf1 = ColorSpinorField(csParam);
     auto buf2 = ColorSpinorField(csParam);
 
@@ -1577,20 +1589,29 @@ namespace quda
       logQuda(QUDA_VERBOSE, "g5 D: lambda[%ld] = %.6e + %.6ei\n", i, lambda.real(), lambda.imag());
       logQuda(QUDA_VERBOSE, "g5 D: | g5 D psi - lambda psi|^2                                 = %.6e\n", rnorm2/norm2);
     }
+  }
 
-    // if not on the coarsest level, propagate fields
-    /*if ((param.level < param.Nlevel-1 || param.Nlevel > 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
-      logQuda(QUDA_SILENT, "Setting next level vec_copy_in\n");
-      param.mg_global.vec_copy_in[param.level+1] = static_cast<void*>(&B_coarse);
-    }*/
-
-
+  void MG::copyInVectors(std::vector<ColorSpinorField> &B)
+  {
+    if (param.level == 0) {
+      auto *in = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_in[param.level]);
+      if (in == nullptr) errorQuda("vec_copy_in is null");
+      logQuda(QUDA_VERBOSE, "Loading %ld null vectors from vec_copy_in property\n", B.size());
+      if (B.size() != (*in).size())
+        errorQuda("Sizes of B (%ld) and vec_copy_in (%ld) are not equal", B.size(), (*in).size());
+      blas::copy(B, *in);
+      if (param.mg_global.copy_out[param.level] == QUDA_BOOLEAN_TRUE) copyOutVectors(B);
+      check_evecs(B);
+    }
   }
 
   void MG::copyOutVectors(std::vector<ColorSpinorField> &B)
   {
-    logQuda(QUDA_VERBOSE, "Storing %ld null vectors from vec_copy_out property\n", B.size());
     auto *out = static_cast<std::vector<ColorSpinorField> *>(param.mg_global.vec_copy_out[param.level]);
+    if (out == nullptr) errorQuda("vec_copy_out is null");
+    logQuda(QUDA_VERBOSE, "Storing %ld null vectors from vec_copy_out property\n", B.size());
+    if (B.size() != (*out).size())
+      errorQuda("Sizes of B (%ld) and vec_copy_out (%ld) are not equal", B.size(), (*out).size());
     blas::copy(*out, B);
   }
 
@@ -1823,10 +1844,12 @@ namespace quda
       param.B[i] = B_evecs[i];
     }
 
+    check_evecs(param.B);
+
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }
 
-    if (param.mg_global.vec_copy_out[param.level] != nullptr) copyOutVectors(param.B);
+    if (param.mg_global.copy_out[param.level] == QUDA_BOOLEAN_TRUE) copyOutVectors(param.B);
 
     popLevel();
   }
