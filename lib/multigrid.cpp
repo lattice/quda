@@ -1157,8 +1157,6 @@ namespace quda
   {
     pushOutputPrefix(prefix);
 
-    printfQuda("Calling MG::operator() on level %d\n", param.level);
-
     QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
     QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ?
       QUDA_EVEN_PARITY :
@@ -1223,8 +1221,6 @@ namespace quda
 
         if (param.level == 0 && param_coarse_solver->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
           logQuda(QUDA_VERBOSE, "Using inital guess for coarse solver ...\n");
-          logQuda(QUDA_VERBOSE, "Restricting init guess, x_coarse[0].Precision() = %d, x[0].Precision() = %d\n",
-            x_coarse[0].Precision(), x[0].Precision());
           transfer->R(x_coarse, x);
         }
 
@@ -1233,14 +1229,10 @@ namespace quda
 
         // prolongate back to this grid
         if (!presmoother) {
-          logQuda(QUDA_VERBOSE, "Prolongate solution back, x[0].Precision() = %d, x_coarse[0].Precision() = %d\n",
-            x[0].Precision(), x_coarse[0].Precision());
           transfer->P(inner_solution_type == outer_solution_type ? x : x(parity), x_coarse);
         } else { // we must sum to the presmoother solution
           auto res = inner_solution_type == outer_solution_type ? cvector_ref<ColorSpinorField>(r) :
                                                                   cvector_ref<ColorSpinorField>(r)(parity);
-          logQuda(QUDA_VERBOSE, "Prolongate solution back, res[0].Precision() = %d, x_coarse[0].Precision() = %d\n",
-              res[0].Precision(), x_coarse[0].Precision());
           transfer->P(res, x_coarse);
           xpy(res, inner_solution_type == outer_solution_type ? x : x(parity));
         }

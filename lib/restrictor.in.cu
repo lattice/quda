@@ -135,22 +135,13 @@ namespace quda {
     if (out[0].Nspin() != 2) errorQuda("Unsupported nSpin %d", out[0].Nspin());
     constexpr int coarseSpin = 2;
 
-    printfQuda("Restrict: %d -> %d with %d\n", in[0].Precision(), out[0].Precision(), v.Precision());
-
     // first check that the spin_map matches the spin_mapper
     spin_mapper<fineSpin,coarseSpin> mapper;
     for (int s=0; s<fineSpin; s++)
       for (int p=0; p<2; p++)
         if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-    /*if (v.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-        RestrictLaunch<oFloat, iFloat, short, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(
-          out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else {
-        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-      }
-    } else */if (v.Precision() == QUDA_SINGLE_PRECISION) {
+    if (v.Precision() == QUDA_SINGLE_PRECISION) {
       RestrictLaunch<oFloat, iFloat, float, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(
         out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (v.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -192,6 +183,23 @@ namespace quda {
     }
   }
 
+  template <typename oFloat, int fineColor, int coarseColor>
+  void Restrict(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const ColorSpinorField &v,
+                const int *fine_to_coarse, const int *coarse_to_fine, const int *const *spin_map, int parity)
+  {
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled_multigrid_double()) {
+        Restrict<oFloat, double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      } else {
+        errorQuda("Double precision multigrid has not been enabled");
+      }
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+      Restrict<oFloat, float, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
+    } else {
+      errorQuda("Unsupported precision in: %d, out: %d", in.Precision(), out.Precision());
+    }
+  }
+
   constexpr int fineColor = @QUDA_MULTIGRID_NC_NVEC@;
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
 
@@ -211,61 +219,18 @@ namespace quda {
       }
 
       checkLocation(out, in, v);
-      QudaPrecision out_precision = out.Precision();
-      QudaPrecision in_precision = in.Precision();
 
-      if (out_precision == QUDA_DOUBLE_PRECISION) {
+      if (out.Precision() == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double()) {
-          if (in_precision == QUDA_DOUBLE_PRECISION) {
-            Restrict<double, double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-          } else if (in_precision == QUDA_SINGLE_PRECISION) {
-            Restrict<double, float, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-          } /*else if (in_precision == QUDA_HALF_PRECISION) {
-            if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-              Restrict<double, short, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-            } else {
-              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-            }
-          } */else {
-            errorQuda("Unsupported precision in: %d, out: %d", in_precision, out_precision);
-          }
+          Restrict<double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
         } else {
           errorQuda("Double precision multigrid has not been enabled");
         }
-      } else if (out_precision == QUDA_SINGLE_PRECISION) {
-        if (in_precision == QUDA_DOUBLE_PRECISION) {
-          if constexpr (is_enabled_multigrid_double()) {
-            Restrict<float, double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-          } else {
-            errorQuda("Double precision multigrid has not been enabled");
-          }
-        } else if (in_precision == QUDA_SINGLE_PRECISION) {
-          Restrict<float, float, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-        } /*else if (in_precision == QUDA_HALF_PRECISION) {
-          if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
-            Restrict<float, short, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-          } else {
-            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-          }
-        } */else {
-          errorQuda("Unsupported precision in: %d, out: %d", in_precision, out_precision);
-        }
-      } else {
-        errorQuda("Unsupported precision in: %d, out: %d", in_precision, out_precision);
-      }
-
-      /*if (in[0].Nspin() == 2) checkPrecision(in, out);
-      QudaPrecision precision = out.Precision();
-
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if constexpr (is_enabled_multigrid_double())
-          Restrict<double, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
-        else errorQuda("Double precision multigrid has not been enabled");
-      } else if (precision == QUDA_SINGLE_PRECISION) {
+      } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
         Restrict<float, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
       } else {
-        errorQuda("Unsupported precision %d", precision);
-      }*/
+        errorQuda("Unsupported precision in: %d, out: %d", in.Precision(), out.Precision());
+      }
     } else {
       errorQuda("Multigrid has not been built");
     }
