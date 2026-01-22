@@ -41,12 +41,42 @@ namespace quda {
       Xatomic = GaugeField::Create(param);
     }
 
+    GaugeField *G_prec = const_cast<GaugeField*>(&gauge);
+    if (Y.Precision() != gauge.Precision()) {
+      //Create a copy of the gauge field with correct precision
+      GaugeFieldParam param(gauge);
+      param.setPrecision(Y.Precision(), true);
+      G_prec = new GaugeField(param);
+      G_prec->copy(gauge);
+    }
+
+    GaugeField *C_prec = const_cast<GaugeField*>(&clover);
+    if (Y.Precision() != clover.Precision()) {
+      //Create a copy of the clover field with correct precision
+      GaugeFieldParam param(clover);
+      param.setPrecision(Y.Precision(), true);
+      C_prec = new GaugeField(param);
+      C_prec->copy(clover);
+    }
+
+    GaugeField *I_prec = const_cast<GaugeField*>(&cloverInv);
+    if (Y.Precision() != cloverInv.Precision()) {
+      //Create a copy of the cloverInv field with correct precision
+      GaugeFieldParam param(cloverInv);
+      param.setPrecision(Y.Precision(), true);
+      I_prec = new GaugeField(param);
+      I_prec->copy(cloverInv);
+    }
+
     bool constexpr use_mma = false;
-    calculateYcoarse<use_mma, fineColor, coarseColor>(Y, X, *Yatomic, *Xatomic, *uv, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
+    calculateYcoarse<use_mma, fineColor, coarseColor>(Y, X, *Yatomic, *Xatomic, *uv, T, *G_prec, *C_prec, *I_prec, kappa, mass, mu, mu_factor, dirac, matpc,
                               need_bidirectional);
 
     if (Yatomic != &Y) delete Yatomic;
     if (Xatomic != &X) delete Xatomic;
+    if (I_prec != &cloverInv) delete I_prec;
+    if (C_prec != &clover) delete C_prec;
+    if (G_prec != &gauge) delete G_prec;
 
     delete uv;
   }
