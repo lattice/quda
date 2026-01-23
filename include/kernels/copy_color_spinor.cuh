@@ -274,35 +274,37 @@ namespace quda
     }
   };
 
-  /** Transform from openQCD into relativistic Degrand-Rossi basis
-   *  FIXME: this should be implemented in one shot.
-   */
+  /** Transform from openQCD into relativistic Degrand-Rossi basis */
   template <int Ns, int Nc> struct OpenqcdToDegrandRossi {
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
     {
-      complex<FloatIn> buf[Ns * Nc];
-      OpenqcdToNonRelBasis<Ns, Nc> A; // Openqcd -> UKQCD
-      RelBasis<Ns, Nc> B;             // UKQCD -> Degrand-Rossi
+      int s1[4] = {3, 2, 1, 0};
+      FloatOut K1[4] = {static_cast<FloatOut>(-1.0), static_cast<FloatOut>(1.0), static_cast<FloatOut>(1.0),
+                        static_cast<FloatOut>(-1.0)};
 
-      A(buf, in);
-      B(out, buf);
+      for (int s = 0; s < Ns; s++) {
+        for (int c = 0; c < Nc; c++) {
+          out[s * Nc + c] = K1[s] * static_cast<complex<FloatOut>>(in[s1[s] * Nc + c]);
+        }
+      }
     }
   };
 
-  /** Transform from relativistic Degrand-Rossi basis into openQCD
-   *  FIXME: this should be implemented in one shot.
-   */
+  /** Transform from relativistic Degrand-Rossi basis into openQCD */
   template <int Ns, int Nc> struct DegrandRossiToOpenqcd {
     template <typename FloatOut, typename FloatIn>
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns * Nc], const complex<FloatIn> in[Ns * Nc]) const
     {
-      complex<FloatIn> buf[Ns * Nc];
-      NonRelBasis<Ns, Nc> A;          // Degrand-Rossi -> UKQCD
-      NonRelToOpenqcdBasis<Ns, Nc> B; // UKQCD -> Openqcd
+      int s1[4] = {3, 2, 1, 0};
+      FloatOut K1[4] = {static_cast<FloatOut>(-1.0), static_cast<FloatOut>(1.0), static_cast<FloatOut>(1.0),
+                        static_cast<FloatOut>(-1.0)};
 
-      A(buf, in);
-      B(out, buf);
+      for (int s = 0; s < Ns; s++) {
+        for (int c = 0; c < Nc; c++) {
+          out[s * Nc + c] = K1[s] * static_cast<complex<FloatOut>>(in[s1[s] * Nc + c]);
+        }
+      }
     }
   };
 
