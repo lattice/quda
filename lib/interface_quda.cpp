@@ -2005,16 +2005,21 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam *param
 
   GaugeCovDev myCovDev(diracParam); // create the Dirac operator
 
-  if (sym & 1) {
-    myCovDev.MCD(out, in, dir); // apply the operator
+  switch (sym) {
+  case 1: // Forward shift
+    myCovDev.MCD(out, in, dir);
+    break;
+  case 2: // Backward shift
+    myCovDev.MCD(out, in, dir + 4);
+    break;
+  case 3: // Symmetric shift
+    myCovDev.MCD(out, in, dir);
+    myCovDev.MCD(tmp, in, dir + 4);
+    quda::blas::xpy(tmp, out);
+    quda::blas::ax(0.5, out);
+    break;
+  default: errorQuda("Invalid shift type = %d\n", sym);
   }
-  if (sym & 2) {
-    myCovDev.MCD(tmp, in, dir + 4); // apply the operator
-  }
-
-  quda::blas::xpy(tmp, out);
-
-  if (sym == 3) quda::blas::ax(0.5, out);
 
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
