@@ -260,6 +260,16 @@
 #undef QUDA_CLOVER_CHOLESKY_PROMOTE
 #endif
 
+#cmakedefine QUDA_MULTIGRID_DOUBLE
+#ifdef QUDA_MULTIGRID_DOUBLE
+/**
+ * @def   QUDA_MULTIGRID_DOUBLE
+ * @brief This macro is set when we have double precision multigrid
+ * enabled
+ */
+#define GPU_MULTIGRID_DOUBLE
+#endif
+
 /**
  * @def QUDA_ORDER_DOUBLE
  * @brief This macro sets the data ordering for double precision fields

@@ -252,6 +252,7 @@ option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_MULTIGRID_DSLASH_PROMOTE "Whether to promote the internal precision when computing the coarse dslash" OFF)
+option(QUDA_MULTIGRID_DOUBLE "Whether to enable double precision multigrid" OFF)
 
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
@@ -280,6 +281,7 @@ mark_as_advanced(QUDA_FLUSH_DENORMALS)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
+mark_as_advanced(QUDA_MULTIGRID_DOUBLE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 
 mark_as_advanced(QUDA_BACKWARDS)
