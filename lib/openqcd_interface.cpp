@@ -2140,16 +2140,10 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
 }
 
 
-ColorSpinorField HostCSFactory(void *openQCD_field)
+ColorSpinorField HostCSFactory(void *openQCD_field, int idx = 0)
 {
-  void *in;
-
-  if (openQCD_field == nullptr) {
-    in = nullptr;
-  } else {
-    in = qudaState.init.buffer_field(qudaState.layout.world_comm, 0, openQCD_field);
-    qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in);
-  }
+  void* in = qudaState.init.buffer_field(qudaState.layout.world_comm, idx, openQCD_field);
+  qudaState.layout.openqcd2quda(OPENQCD_FIELD_SPINOR, openQCD_field, in);
 
   if (in_comm()) {
     QudaInvertParam param = newOpenQCDParam();
@@ -2162,8 +2156,9 @@ ColorSpinorField HostCSFactory(void *openQCD_field)
 }
 
 
-void openQCD_qudaMGSetInOutVecs(const int id, const int nvecs, void** in_vecs, void** out_vecs)
+QudaMultigridParam* openQCD_qudaMGSetInOutVecs(const int id, void** in_vecs, void** out_vecs)
 {
+  int i=0,j=0;
   if (qudaState.inv_handles[id] == nullptr) {
     qudaState.inv_handles[id] = static_cast<QudaInvertParam *>(openQCD_qudaSolverReadIn(id));
   }
@@ -2173,21 +2168,27 @@ void openQCD_qudaMGSetInOutVecs(const int id, const int nvecs, void** in_vecs, v
   openQCD_QudaSolver *additional_prop = static_cast<openQCD_QudaSolver *>(param->additional_prop);
   QudaMultigridParam *mg_param = additional_prop->mg_param;
 
+  auto n_vec = mg_param->n_vec[0];
+
   if (in_vecs != nullptr) {
     auto *d_vecs = new std::vector<ColorSpinorField>();
-    for (int i = 0; i < nvecs; ++i) {
-      d_vecs->push_back(std::move(HostCSFactory(in_vecs[i])));
+    for (i = 0; i < n_vec; ++i) {
+      d_vecs->push_back(std::move(HostCSFactory(in_vecs[i], i)));
+      WITH_COMM(printfQuda("in_vecs[%d] = %p\n", i, in_vecs[i]));
     }
     mg_param->vec_copy_in[level] = static_cast<void*>(d_vecs);
+    WITH_COMM(printfQuda("(*d_vecs)[0].data() = %p\n", (*d_vecs)[0].data()));
   }
 
   if (out_vecs != nullptr) {
     auto *d_vecs = new std::vector<ColorSpinorField>();
-    for (int i = 0; i < nvecs; ++i) {
-      d_vecs->push_back(std::move(HostCSFactory(out_vecs[i])));
+    for (j = 0; j < n_vec; ++j) {
+      d_vecs->push_back(std::move(HostCSFactory(out_vecs[i], i+j)));
     }
     mg_param->vec_copy_out[level] = static_cast<void*>(d_vecs);
   }
+
+  return mg_param;
 }
 
 
@@ -2270,7 +2271,6 @@ void check_mpi_init(void)
 
 void openQCD_qudaInvertAsyncSetup(int id, double mu)
 {
-  check_mpi_init();
   if (gauge_field_get_unset()) { WITH_COMM(errorQuda("Gauge field not populated in openQxD.")); }
 
   if (qudaState.layout.h_sw != nullptr) {
@@ -2289,8 +2289,6 @@ void openQCD_qudaInvertAsyncSetup(int id, double mu)
 
 void openQCD_qudaInvertAsyncDispatch(void *source, void *solution, int *status)
 {
-  check_mpi_init();
-
   openQCD_qudaInvert_args_t args;
   args.source = source;
   args.solution = solution;

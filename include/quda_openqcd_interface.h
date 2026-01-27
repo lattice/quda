@@ -419,12 +419,14 @@ void openQCD_qudaMGMultiSrc(int id, double mu, void** sources, void** solutions,
  *                       "Solver #". The input file is the one given by
  *                       quda_init. The solver has to be a inv_type_precondition
  *                       = QUDA_MG_INVERTER solver.
- * @param[in]  nvecs     The number of eigenvectors to load
- * @param      in_vecs   The Input vector fields on the host. Have to be as many
- *                       as indicated in member n_vec
- * @param      out_vecs  The out vector fields
+ * @param[in]  in_vecs   The input vector fields on the host. The number of
+ *                       vector set is QudaMultigridParam->n_vec[0].
+ * @param[in]  out_vecs  The output vector fields on the host. The number of
+ *                       vector set is QudaMultigridParam->n_vec[0].
+ *
+ * @return     Pointer to the multigrid parameter struct.
  */
-void openQCD_qudaMGSetInOutVecs(const int id, const int nvecs, void** in_vecs, void** out_vecs);
+QudaMultigridParam* openQCD_qudaMGSetInOutVecs(const int id, void** in_vecs, void** out_vecs);
 
 /**
  * @brief      Set up a async solve. See [[openQCD_qudaInvert]] for details
