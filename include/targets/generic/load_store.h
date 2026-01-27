@@ -101,6 +101,15 @@ namespace quda
     target::dispatch<prefetch_cache_bulk_imp>(p, bytes);
   }
 
+  template <bool is_device> struct prefetch_cache_tensor_2d_imp {
+    constexpr void operator()(const tma_descriptor_t &, int, int) { }
+  };
+
+  __device__ __host__ inline void prefetch_cache_tensor_2d(const tma_descriptor_t &desc, int x, int y)
+  {
+    target::dispatch<prefetch_cache_tensor_2d_imp>(desc, x, y);
+  }
+
   template <bool is_device> struct prefetch_cache_tensor_3d_imp {
     constexpr void operator()(const tma_descriptor_t &, int, int, int) { }
   };

@@ -493,6 +493,12 @@ namespace quda {
 
   using tensor_desc_t = CUtensorMap;
 
+  __device__ __forceinline__ void prefetch_tma_2d(const CUtensorMap &tensor_map, int x, int y)
+  {
+    asm volatile("cp.async.bulk.prefetch.tensor.2d.L2.global.tile [%0, {%1, %2}];" ::"l"(&tensor_map), "r"(x), "r"(y)
+                 : "memory");
+  }
+
   __device__ __forceinline__ void prefetch_tma_3d(const CUtensorMap &tensor_map, int x, int y, int z)
   {
     asm volatile("cp.async.bulk.prefetch.tensor.3d.L2.global.tile [%0, {%1, %2, %3}];" ::"l"(&tensor_map), "r"(x),

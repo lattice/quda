@@ -180,6 +180,7 @@ namespace quda
 
   // pre-declaration of the prefetch_cache that we wish to specialize
   template <bool> struct prefetch_cache_bulk_imp;
+  template <bool> struct prefetch_cache_tensor_2d_imp;
   template <bool> struct prefetch_cache_tensor_3d_imp;
   template <bool> struct prefetch_cache_tensor_4d_imp;
   template <bool> struct prefetch_cache_tensor_5d_imp;
@@ -188,6 +189,11 @@ namespace quda
   // CUDA specialization of the prefetch_cache_bulk that uses TMA (requires Hopper+)
   template <> struct prefetch_cache_bulk_imp<true> {
     __device__ inline void operator()(const void *p, size_t bytes) { prefetch_tma(p, bytes); }
+  };
+
+  // CUDA specialization of the prefetch_cache_tensor_2d that uses TMA (requires Hopper+)
+  template <> struct prefetch_cache_tensor_2d_imp<true> {
+    __device__ inline void operator()(const tma_descriptor_t &desc, int x, int y) { prefetch_tma_2d(desc.map, x, y); }
   };
 
   // CUDA specialization of the prefetch_cache_tensor_3d that uses TMA (requires Hopper+)
