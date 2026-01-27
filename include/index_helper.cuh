@@ -807,7 +807,7 @@ namespace quda {
   // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
   template <int nDim, typename Arg>
-  constexpr int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
+  __host__ __device__ inline int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
     const auto &V4 = arg.dc.volume_4d;   // 4-d volume
@@ -866,7 +866,7 @@ namespace quda {
   }
 
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  constexpr int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  __host__ __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
   {
     return indexFromFaceIndexStaggered<nDim>(dim, face_num, face_idx_in, parity, nLayers, type, arg);
   }
