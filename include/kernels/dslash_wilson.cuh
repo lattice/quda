@@ -172,11 +172,8 @@ namespace quda
       if (arg.dd_in.doHopping(coord, d, -1)) {
         const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-        const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
-#else
-        const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
-#endif
+        const int gauge_idx = dslash_double_store() ? coord.x_cb : back_idx;
+        if constexpr (Arg::nDim == 5) gauge_idx = gauge_idx % arg.dc.volume_4d_cb;
         constexpr int proj_dir = dagger ? -1 : +1;
 
         const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -188,11 +185,8 @@ namespace quda
             idx;
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-          Link U = arg.Uback(d, gauge_idx, gauge_parity);
-#else
-          Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
-#endif
+          Link U = dslash_double_store() ? static_cast<const Link&>(arg.Uback(d, gauge_idx, gauge_parity)) :
+                                           static_cast<const Link &>(arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity));
           HalfVector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx * arg.Ls + coord.s) * arg.dc.ghostFaceCB[d],
                                          their_spinor_parity);
 
@@ -201,11 +195,8 @@ namespace quda
 
         if constexpr (doBulk<kernel_type>()) {
           if (!ghost) {
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-            Link U = arg.Uback(d, gauge_idx, gauge_parity);
-#else
-            Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-#endif
+            Link U = dslash_double_store() ? static_cast<const Link &>(arg.Uback(d, gauge_idx, gauge_parity)) :
+                                             static_cast<const Link &>(arg.U(d, gauge_idx, 1 - gauge_parity));
             Vector in = arg.in[src_idx](back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
             out += bwd_coeff * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
           }
