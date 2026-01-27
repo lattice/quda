@@ -172,7 +172,7 @@ namespace quda
       if (arg.dd_in.doHopping(coord, d, -1)) {
         const real bwd_coeff = (d < 3) ? 1.0 : bwd_coeff_3;
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-        const int gauge_idx = dslash_double_store() ? coord.x_cb : back_idx;
+        int gauge_idx = dslash_double_store() ? coord.x_cb : back_idx;
         if constexpr (Arg::nDim == 5) gauge_idx = gauge_idx % arg.dc.volume_4d_cb;
         constexpr int proj_dir = dagger ? -1 : +1;
 
