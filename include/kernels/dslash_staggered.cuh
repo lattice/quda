@@ -1,12 +1,10 @@
 #pragma once
 
-#include <dslash_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <kernels/dslash_pack.cuh> // forthe packing kernel
+#include <kernels/dslash_pack.cuh> // for the packing kernel
 
 namespace quda
 {
@@ -179,7 +177,7 @@ namespace quda
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
-          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+          const Link U = arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -190,8 +188,7 @@ namespace quda
         if constexpr (doBulk<kernel_type>()) {
           if (!ghost) {
             const int fwd_idx = getNeighborIndexCB<1>(coord1, d, 1, arg.dc);
-            const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) :
-                                          arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+            const Link U = arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
 #pragma unroll
             for (auto s = 0; s < n_src_tile; s++) {
               Vector in = arg.in[src_idx + s](fwd_idx, their_spinor_parity);
@@ -237,13 +234,9 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 3) : ghost_idx2;
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-          const Link U = arg.improved ? arg.Uback(d, coord.x_cb, parity) :
-                                        arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg));
-#else
-          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
-            arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
-#endif
+          const Link U = dslash_double_store() ?
+            static_cast<const Link>(arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg))) :
+            static_cast<const Link>(arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -254,14 +247,9 @@ namespace quda
         if constexpr (doBulk<kernel_type>()) {
           if (!ghost) {
             const int back_idx = getNeighborIndexCB<1>(coord1, d, -1, arg.dc);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-            const Link U = arg.improved ? arg.Uback(d, coord.x_cb, parity) :
-                                          arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg));
-#else
-            const int gauge_idx = back_idx;
-            const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
-                                          arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
-#endif
+            const Link U = dslash_double_store() ?
+              static_cast<const Link>(arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg))) :
+              static_cast<const Link>(arg.U(d, back_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
 #pragma unroll
             for (auto s = 0; s < n_src_tile; s++) {
               Vector in = arg.in[src_idx + s](back_idx, their_spinor_parity);
@@ -277,11 +265,8 @@ namespace quda
         const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-          const Link L = arg.Lback(d, coord.x_cb, parity);
-#else
-          const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
-#endif
+          const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback(d, coord.x_cb, parity)) :
+                                                 static_cast<const Link>(arg.L.Ghost(d, ghost_idx, 1 - parity));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
@@ -293,12 +278,8 @@ namespace quda
         if constexpr (doBulk<kernel_type>()) {
           if (!ghost) {
             const int back3_idx = getNeighborIndexCB<3>(coord, d, -1, arg.dc);
-#ifdef QUDA_DSLASH_DOUBLE_STORE
-            const Link L = arg.Lback(d, coord.x_cb, parity);
-#else
-            const int gauge_idx = back3_idx;
-            const Link L = arg.L(d, gauge_idx, 1 - parity);
-#endif
+            const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback(d, coord.x_cb, parity)) :
+                                                   static_cast<const Link>(arg.L(d, back3_idx, 1 - parity));
 #pragma unroll
             for (auto s = 0; s < n_src_tile; s++) {
               const Vector in = arg.in[src_idx + s](back3_idx, their_spinor_parity);
@@ -308,6 +289,7 @@ namespace quda
           prefetch(d, 1, 1, coord, coord1, parity, arg); // prefetch the gauge link Arg::prefetch_distance ahead
         }
       }
+
     } // nDim
   }
 
