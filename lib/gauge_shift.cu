@@ -62,6 +62,7 @@ namespace quda
     const_cast<double&>(out.LinkMax()) = in.LinkMax();
     instantiate<GaugeShifter>(out, in, shift);
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
+    if (out.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) out.exchangeGhost();
     return out;
   }
 

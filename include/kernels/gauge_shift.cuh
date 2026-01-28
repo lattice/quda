@@ -11,16 +11,17 @@ namespace quda
 
   template <typename store_t, int nColor, QudaReconstructType recon> struct GaugeShiftArg : kernel_param<> {
     using real = typename mapper<store_t>::type;
-    using Link = Matrix<complex<real>, nColor>;
+    using RawLink = array<store_t, recon>;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
 
     int X[4]; // true grid dimensions
     Gauge out;
     const Gauge in;
     int shift;
+    int volume_cb;
 
     GaugeShiftArg(GaugeField &out, const GaugeField &in, int shift) :
-      kernel_param(dim3(in.VolumeCB(), 2, 4)), out(out), in(in), shift(shift)
+      kernel_param(dim3(in.VolumeCB(), 2, 4)), out(out), in(in), shift(shift), volume_cb(in.VolumeCB())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = in.X()[dir];
     }
@@ -33,21 +34,21 @@ namespace quda
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      using Link = typename Arg::Link;
-
       byte_array<int8_t, 4> x = {};
       getCoords(x, x_cb, arg.X, parity);
 
+      typename Arg::RawLink link;
+
       if (x[dir] < arg.shift && arg.comms_dim[dir] > 1) { // on the boundary so we need to fetch from the ghost zone
         const int ghost_idx = ghostFaceIndex<0, 4>(x, arg.X, dir, arg.shift);
-        Link U = arg.in.Ghost(dir, ghost_idx, 1 - parity);
-        arg.out(dir, x_cb, parity) = U;
+        arg.in.raw_load(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
+        arg.out.raw_save(link, x_cb, dir, parity);
       } else { // simple shift
         byte_array<int8_t, 4> dx = {};
         dx[dir] = dx[dir] - arg.shift;
         int x_cb_back = linkIndexShift(x, dx, arg.X);
-        Link U = arg.in(dir, x_cb_back, 1 - parity);
-        arg.out(dir, x_cb, parity) = U;
+        arg.in.raw_load(link, x_cb_back, dir, 1 - parity);
+        arg.out.raw_save(link, x_cb, dir, parity);
       }
     }
   };
