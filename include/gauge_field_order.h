@@ -1655,6 +1655,25 @@ namespace quda {
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
 
+      __device__ __host__ inline void raw_load(array<store_t, reconLen> &v, int x, int dir, int parity) const
+      {
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          // first load from memory
+          auto vecTmp = vector_load<Float, N>(gauge, parity * offset + dir * (M * N + Nrem) * stride, i * stride + x);
+          memcpy(&v[i * N], &vecTmp, sizeof(vecTmp));
+        }
+
+        // now load any remainder
+        if constexpr (Nrem > 0) {
+          auto vecTmp = vector_load<Float, Nrem>(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x);
+          memcpy(&v[M * N], &vecTmp, sizeof(vecTmp));
+        }
+
+        if constexpr (loadPhase)
+          memcpy(&v[M * N + Nrem], &gauge[parity * offset + phaseOffset + stride * dir + x], sizeof(store_t));
+      }
+
       template <int type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
       {
         if constexpr (type == 0) { // use per-thread prefetching
@@ -1730,6 +1749,29 @@ namespace quda {
           real phase = reconstruct.getPhase(v);
           copy(gauge[parity * offset + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
         }
+      }
+
+      __device__ __host__ inline void raw_save(const array<store_t, reconLen> &v, int x, int dir, int parity) const
+      {
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          array<Float, N> vecTmp;
+          // first do copy converting into storage type
+          memcpy(&vecTmp, &v[i * N], sizeof(vecTmp));
+          // second do vectorized copy into memory
+          vector_store(gauge, parity * offset + dir * (M * N + Nrem) * stride, x + i * stride, vecTmp);
+        }
+
+        // now save any remainder
+        if constexpr (Nrem > 0) {
+          array<Float, Nrem> vecTmp;
+          memcpy(&vecTmp, &v[M * N], sizeof(vecTmp));
+          // second do vectorized copy into memory
+          vector_store(gauge, parity * offset + (dir * (M * N + Nrem) + M * N) * stride, x, vecTmp);
+        }
+
+        if constexpr (hasPhase)
+          memcpy(&gauge[parity * offset + phaseOffset + dir * stride + x], &v[M * N + Nrem], sizeof(store_t));
       }
 
       /**
