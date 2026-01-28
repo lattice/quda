@@ -288,6 +288,7 @@ namespace quda
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
+      if (QUDA_DSLASH_PREFETCH_TMA > 0 && tp.block.z > 1) errorQuda("Z-dimension block size must be 1 when using TMA");
       launch_device<dslash_functor>(
         tp, stream, dslash_functor_arg<D, P, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
