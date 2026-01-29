@@ -24,7 +24,6 @@ namespace quda {
     int f[nDim][nDim];
     bool localParity[nDim];
     int faceVolumeCB[nDim];
-    int comm_dim[QUDA_MAX_DIM];
     const int offset;
     ExtractGhostArg(const GaugeField &u, Float **Ghost, int offset, uint64_t size) :
       kernel_param(dim3(size, 1, 1)),
@@ -34,7 +33,6 @@ namespace quda {
     {
       for (int d=0; d<nDim; d++) {
 	X[d] = u.X()[d];
-	comm_dim[d] = comm_dim_partitioned(d);
 	faceVolumeCB[d] = u.SurfaceCB(d)*u.Nface();
       }
 
@@ -79,7 +77,7 @@ namespace quda {
       int dim = parity_dim % Arg::nDim;
 
       // for now we never inject unless we have partitioned in that dimension
-      if (!arg.comm_dim[dim] && !Arg::extract) return;
+      if (!arg.comms_dim_partitioned[dim] && !Arg::extract) return;
 
       // linear index used for writing into ghost buffer
       if (X >= 2*arg.faceVolumeCB[dim]) return;
@@ -128,7 +126,7 @@ namespace quda {
       int dim = parity_dim % Arg::nDim;
 
       // for now we never inject unless we have partitioned in that dimension
-      if (!arg.comm_dim[dim] && !Arg::extract) return;
+      if (!arg.comms_dim_partitioned[dim] && !Arg::extract) return;
 
       // linear index used for writing into ghost buffer
       if (X >= 2*arg.faceVolumeCB[dim]) return;

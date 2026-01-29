@@ -26,6 +26,7 @@ namespace quda
     int comms_rank_global; /** per process value comm_rank_global() */
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
     int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
+    int comms_dim_partitioned[4]; /** array storing {comm_dim_partitioned(0), ..., comm_dim_partiitoned(3)} */
 
     constexpr kernel_param() = default;
 
@@ -34,7 +35,9 @@ namespace quda
       comms_rank(comm_rank()),
       comms_rank_global(comm_rank_global()),
       comms_coord {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)},
-      comms_dim {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)}
+      comms_dim {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)},
+      comms_dim_partitioned {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2),
+                             comm_dim_partitioned(3)}
     {
     }
 
