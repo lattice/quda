@@ -640,7 +640,7 @@ namespace quda {
     output << "localVolume = " << field.localVolume << std::endl;
     output << "localVolumeCB = " << field.localVolumeCB << std::endl;
     output << "stride = " << field.stride << std::endl;
-    output << "pad = " << field.stride << std::endl;
+    output << "pad = " << field.pad << std::endl;
     output << "total_bytes = " << field.total_bytes << std::endl;
     output << "nDim = " << field.nDim << std::endl;
     output << "x = " << field.x << std::endl;
