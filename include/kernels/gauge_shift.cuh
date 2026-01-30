@@ -9,10 +9,13 @@
 namespace quda
 {
 
-  template <typename store_t, int nColor, QudaReconstructType recon> struct GaugeShiftArg : kernel_param<> {
+  template <typename store_t, int nColor, QudaReconstructType recon, bool verify_ = false>
+  struct GaugeShiftArg : kernel_param<> {
     using real = typename mapper<store_t>::type;
+    using Link = Matrix<complex<real>, nColor>;
     using RawLink = array<store_t, recon>;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
+    static constexpr bool verify = verify_;
 
     int X[4]; // true grid dimensions
     Gauge out;
@@ -37,18 +40,49 @@ namespace quda
       byte_array<int8_t, 4> x = {};
       getCoords(x, x_cb, arg.X, parity);
 
-      typename Arg::RawLink link;
+      if constexpr (!Arg::verify) {
+        typename Arg::RawLink link;
+        if (x[dir] < arg.shift
+            && arg.comms_dim_partitioned[dir]) { // on the boundary so we need to fetch from the ghost zone
+          const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, arg.shift);
+          arg.in.raw_load(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
+          arg.out.raw_save(link, x_cb, dir, parity);
+        } else { // simple shift
+          byte_array<int8_t, 4> dx = {};
+          dx[dir] = dx[dir] - arg.shift;
+          int x_cb_back = linkIndexShift(x, dx, arg.X);
+          arg.in.raw_load(link, x_cb_back, dir, 1 - parity);
+          arg.out.raw_save(link, x_cb, dir, parity);
 
-      if (x[dir] < arg.shift && arg.comms_dim[dir] > 1) { // on the boundary so we need to fetch from the ghost zone
-        const int ghost_idx = ghostFaceIndex<0, 4>(x, arg.X, dir, arg.shift);
-        arg.in.raw_load(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
-        arg.out.raw_save(link, x_cb, dir, parity);
-      } else { // simple shift
-        byte_array<int8_t, 4> dx = {};
-        dx[dir] = dx[dir] - arg.shift;
-        int x_cb_back = linkIndexShift(x, dx, arg.X);
-        arg.in.raw_load(link, x_cb_back, dir, 1 - parity);
-        arg.out.raw_save(link, x_cb, dir, parity);
+          if (x[dir] >= arg.X[dir] - arg.shift && arg.comms_dim_partitioned[dir]) { // write the ghost
+            const int ghost_idx = ghostFaceIndexStaggered<1>(x, arg.X, dir, arg.shift);
+            arg.in.raw_load(link, x_cb, dir, parity);
+            arg.out.raw_save(link, arg.volume_cb + ghost_idx, dir, 1 - parity);
+          }
+        }
+      } else {
+        // verify the shifting has worked
+        using Link = typename Arg::Link;
+        if (x[dir] < arg.shift && arg.comms_dim_partitioned[dir]) {
+          const int ghost_idx = ghostFaceIndexStaggered<0>(x, arg.X, dir, arg.shift);
+          Link in = arg.in(dir, arg.volume_cb + ghost_idx, 1 - parity);
+          Link out = arg.out(dir, x_cb, parity);
+          assert(in.L1() == out.L1());
+        } else {
+          byte_array<int8_t, 4> dx = {};
+          dx[dir] = dx[dir] - arg.shift;
+          int x_cb_back = linkIndexShift(x, dx, arg.X);
+          Link in = arg.in(dir, x_cb_back, 1 - parity);
+          Link out = arg.out(dir, x_cb, parity);
+          assert(in.L1() == out.L1());
+
+          if (x[dir] >= arg.X[dir] - arg.shift && arg.comms_dim_partitioned[dir]) {
+            const int ghost_idx = ghostFaceIndexStaggered<1>(x, arg.X, dir, arg.shift);
+            Link in = arg.in(dir, x_cb, parity);
+            Link out = arg.out.Ghost(dir, ghost_idx, 1 - parity);
+            assert(in.L1() == out.L1());
+          }
+        }
       }
     }
   };

@@ -11,39 +11,44 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
     int shift;
+    bool verify;
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    GaugeShifter(GaugeField &out, const GaugeField &in, int shift) :
-      TunableKernel3D(in, 2, 4), out(out), in(in), shift(shift)
+    GaugeShifter(GaugeField &out, const GaugeField &in, int shift, bool verify) :
+      TunableKernel3D(in, 2, 4), out(out), in(in), shift(shift), verify(verify)
     {
       assert(shift == 1 || shift == 3);
       strcat(aux, ",shift=");
       char shift_str[16];
       u32toa(shift_str, shift);
       strcat(aux, shift_str);
+      strcat(aux, verify ? ",verify" : "");
       apply(device::get_default_stream());
+    }
+
+    template <bool verify> void instantiate(TuneParam &tp, const qudaStream_t &stream)
+    {
+      if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+        launch<GaugeShift>(tp, stream, GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_NO, verify>(out, in, shift));
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
+        launch<GaugeShift>(tp, stream, GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_13, verify>(out, in, shift));
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
+        launch<GaugeShift>(tp, stream, GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_12, verify>(out, in, shift));
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
+        launch<GaugeShift>(tp, stream, GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_9, verify>(out, in, shift));
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
+        launch<GaugeShift>(tp, stream, GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_8, verify>(out, in, shift));
+      }
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_NO> arg(out, in, shift);
-        launch<GaugeShift>(tp, stream, arg);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
-        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_13> arg(out, in, shift);
-        launch<GaugeShift>(tp, stream, arg);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_12> arg(out, in, shift);
-        launch<GaugeShift>(tp, stream, arg);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
-        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_9> arg(out, in, shift);
-        launch<GaugeShift>(tp, stream, arg);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-        GaugeShiftArg<Float, nColor, QUDA_RECONSTRUCT_8> arg(out, in, shift);
-        launch<GaugeShift>(tp, stream, arg);
-      }
+      if (verify)
+        instantiate<true>(tp, stream);
+      else
+        instantiate<false>(tp, stream);
     }
 
     long long bytes() const { return out.Bytes() + in.Bytes(); }
@@ -57,12 +62,14 @@ namespace quda
     if (in.GhostExchange() == QUDA_GHOST_EXCHANGE_NO && comm_partitioned())
       errorQuda("comm_dim_partition() == true requires we have GhostExchange = QUDA_GHOST_EXCHANGE_PAD");
     GaugeFieldParam param(in);
-    param.create = QUDA_NULL_FIELD_CREATE;
+    param.create = QUDA_ZERO_FIELD_CREATE;
     GaugeField out(param);
     const_cast<double&>(out.LinkMax()) = in.LinkMax();
-    instantiate<GaugeShifter>(out, in, shift);
+    instantiate<GaugeShifter>(out, in, shift, false);
+#if 0 // set to 1 to run verification
+    instantiate<GaugeShifter>(out, in, shift, true);
+#endif
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
-    if (out.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) out.exchangeGhost();
     return out;
   }
 
