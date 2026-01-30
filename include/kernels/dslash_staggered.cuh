@@ -177,7 +177,10 @@ namespace quda
 
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, 1);
-          const Link U = arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+          const Link U = dslash_double_store() ?
+            static_cast<const Link>(arg.Uback.Ghost(d, ghost_idx, 1 - parity, StaggeredPhase(coord, d, +1, arg))) :
+            static_cast<const Link>(arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg)));
+
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.halo.Ghost(d, 1, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -204,7 +207,8 @@ namespace quda
         const bool ghost = coord.in_boundary[1][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dc.X, d, arg.nFace);
-          const Link L = arg.L(d, coord.x_cb, parity);
+          const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback.Ghost(d, ghost_idx, 1 - parity)) :
+                                                 static_cast<const Link>(arg.L(d, coord.x_cb, parity));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
@@ -234,9 +238,9 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 3) : ghost_idx2;
-          const Link U = dslash_double_store() ?
-            static_cast<const Link>(arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg))) :
-            static_cast<const Link>(arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
+          const Link U
+            = static_cast<const Link>(arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
+
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             Vector in = arg.halo.Ghost(d, 0, ghost_idx + (src_idx + s) * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -250,6 +254,7 @@ namespace quda
             const Link U = dslash_double_store() ?
               static_cast<const Link>(arg.Uback(d, coord.x_cb, parity, StaggeredPhase(coord, d, -1, arg))) :
               static_cast<const Link>(arg.U(d, back_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg)));
+
 #pragma unroll
             for (auto s = 0; s < n_src_tile; s++) {
               Vector in = arg.in[src_idx + s](back_idx, their_spinor_parity);
@@ -265,8 +270,7 @@ namespace quda
         const bool ghost = coord.in_boundary[0][d] & isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dc.X, d, 1);
-          const Link L = dslash_double_store() ? static_cast<const Link>(arg.Lback(d, coord.x_cb, parity)) :
-                                                 static_cast<const Link>(arg.L.Ghost(d, ghost_idx, 1 - parity));
+          const Link L = static_cast<const Link>(arg.L.Ghost(d, ghost_idx, 1 - parity));
 #pragma unroll
           for (auto s = 0; s < n_src_tile; s++) {
             const Vector in
