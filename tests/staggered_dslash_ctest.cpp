@@ -80,6 +80,7 @@ public:
   {
     if (skip()) GTEST_SKIP();
     dslash_test_wrapper.end();
+    commDimPartitionedReset();
   }
 
   static void SetUpTestCase() { initQuda(device_ordinal); }
