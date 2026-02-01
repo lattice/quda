@@ -3970,7 +3970,10 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   // Balint: Isn't there a nice construction pattern we could use here? This is
   // expedient but yucky.
   //  DiracParam diracParam;
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) { param->mass = 0.0; }
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH){
+    param->mass = sqrt(param->offset[0]/4);
+  }
 
   // We solve m / (1 - m) + D in multi-shift solver
   // But we actually use m + (1 - m) D as DiracOverlap::M()
@@ -4139,6 +4142,13 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
         logQuda(QUDA_SUMMARIZE, "Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n", i,
                 param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
 
+        // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
+        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+            param->dslash_type == QUDA_STAGGERED_DSLASH) {
+          dirac.setMass(sqrt(param->offset[i]/4));
+          diracSloppy.setMass(sqrt(param->offset[i]/4));
+        }
+
         DiracMatrix *m, *mSloppy;
 
         if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
@@ -4153,8 +4163,11 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
           mSloppy = new DiracMdagM(diracSloppy);
         }
 
-        m->shift = param->offset[i];
-        mSloppy->shift = param->offset[i];
+        // need to curry in the shift if we are not doing staggered
+        if (param->dslash_type != QUDA_ASQTAD_DSLASH && param->dslash_type != QUDA_STAGGERED_DSLASH) {
+          m->shift = param->offset[i];
+          mSloppy->shift = param->offset[i];
+        }
 
         if (false) { // experimenting with Minimum residual extrapolation
                      // only perform MRE using current and previously refined solutions
@@ -4214,6 +4227,11 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
         solverParam.true_res_offset[i] = static_cast<double>(solverParam.true_res);
         solverParam.true_res_hq_offset[i] = static_cast<double>(solverParam.true_res_hq);
         solverParam.updateInvertParam(*param,i);
+        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+            param->dslash_type == QUDA_STAGGERED_DSLASH) {
+          dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+          diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+        }
 
         delete m;
         delete mSloppy;

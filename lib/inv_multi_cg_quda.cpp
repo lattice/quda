@@ -284,7 +284,11 @@ namespace quda {
       // iteration so that all shifts are updated during the dslash
       shift_update.updateNshift(num_offset_now);
 
-      pAp = blas::axpyReDot(offset[0], p[0], Ap);
+      // at some point we should curry these into the Dirac operator
+      if (r.Nspin() != 1)
+        pAp = blas::axpyReDot(offset[0], p[0], Ap);
+      else
+        pAp = blas::reDotProduct(p[0], Ap);
 
       // compute zeta and alpha
       for (int j=1; j<num_offset_now; j++) r2_old_array[j] = zeta[j] * zeta[j] * r2[0];
@@ -340,7 +344,7 @@ namespace quda {
         }
 
         mat(r, x[0]);
-        blas::axpy(offset[0], x[0], r);
+        if (r.Nspin() != 1) blas::axpy(offset[0], x[0], r);
 
         r2[0] = blas::xmyNorm(b, r);
         for (int j = 1; j < num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
@@ -448,7 +452,11 @@ namespace quda {
         // 2.) For shift 0 if we did not exit early  (we went to the full solution)
         if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
           mat(r, x[i]);
-          blas::axpy(offset[i], x[i], r); // Offset it.
+          if (r.Nspin() != 1) {
+            blas::axpy(offset[i], x[i], r); // Offset it.
+          } else if (i != 0) {
+            blas::axpy(offset[i] - offset[0], x[i], r); // Offset it.
+          }
           double true_res = blas::xmyNorm(b, r);
           param.true_res_offset[i] = sqrt(true_res / b2);
           param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r).z);

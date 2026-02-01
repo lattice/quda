@@ -384,9 +384,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
   // staggered, overlap, and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
-      || param->dslash_type == QUDA_OVERLAP_DSLASH
-      || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+      || param->dslash_type == QUDA_OVERLAP_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH
+      || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
