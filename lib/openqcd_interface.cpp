@@ -2179,7 +2179,7 @@ QudaMultigridParam* openQCD_qudaMGSetInOutVecs(const int id, void** in_vecs, voi
   if (in_vecs != nullptr) {
     auto *d_vecs = new std::vector<ColorSpinorField>();
     for (i = 0; i < n_vec; ++i) {
-      d_vecs->push_back(std::move(HostCSFactory(in_vecs[i], i)));
+      d_vecs->push_back(std::move(HostCSFactory(in_vecs[i], i+2)));
       WITH_COMM(printfQuda("in_vecs[%d] = %p\n", i, in_vecs[i]));
     }
     mg_param->vec_copy_in[level] = static_cast<void*>(d_vecs);
@@ -2189,7 +2189,7 @@ QudaMultigridParam* openQCD_qudaMGSetInOutVecs(const int id, void** in_vecs, voi
   if (out_vecs != nullptr) {
     auto *d_vecs = new std::vector<ColorSpinorField>();
     for (j = 0; j < n_vec; ++j) {
-      d_vecs->push_back(std::move(HostCSFactory(out_vecs[i], i+j)));
+      d_vecs->push_back(std::move(HostCSFactory(out_vecs[i], i+j+2)));
     }
     mg_param->vec_copy_out[level] = static_cast<void*>(d_vecs);
   }
