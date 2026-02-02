@@ -84,6 +84,10 @@ typedef struct openQCD_QudaSolver_s {
 
 static openQCD_QudaState_t qudaState = {false, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, {}, {}, { false, false, 1, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, MPI_COMM_NULL, MPI_COMM_NULL }, {}, {}, nullptr, {}, {}, ""};
 
+namespace quda {
+  void massRescale(cvector_ref<ColorSpinorField> &b, QudaInvertParam &param, bool for_multishift);
+}
+
 using namespace quda;
 
 /**
@@ -2049,6 +2053,7 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
     param.cuda_prec = precision;
     ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
     cudaParam.create = openQCD_field == nullptr ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
+    printfQuda("cudaParam.gammaBasis = %d\n", cudaParam.gammaBasis);
     ColorSpinorField in_d(cudaParam);
 
     if (openQCD_field != nullptr) {
@@ -2062,8 +2067,7 @@ static ColorSpinorField CSFactory(void *openQCD_field, QudaPrecision precision)
   return ColorSpinorField();
 }
 
-
-static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<const ColorSpinorField> &b, QudaInvertParam *param, int *status, double *residual)
+static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<ColorSpinorField> &b, QudaInvertParam *param, int *status, double *residual)
 {
   static TimeProfile profileMG("MG");
   auto profile = pushProfile(profileMG, param); // this will fill param->secs/gflops properly in its deconstructor
@@ -2077,6 +2081,8 @@ static void callMultiSrcMg(cvector_ref<ColorSpinorField> &x, cvector_ref<const C
   cparam->sloppy_converge = false;
   cparam->use_init_guess = param->use_init_guess;
   cparam->iter = 0; // reset the solver
+
+  massRescale(b, *param, false);
 
   (*mg)(x, b);
 
