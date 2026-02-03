@@ -176,6 +176,45 @@ option(QUDA_SHARED_MEMORY_SPILL "enable shared memory spilling?" OFF)
 mark_as_advanced(QUDA_SHARED_MEMORY_SPILL)
 message(STATUS "Shared memory spilling: ${QUDA_SHARED_MEMORY_SPILL}")
 
+# Dslash prefetching
+option(QUDA_DSLASH_DOUBLE_STORE "store a forwards shifted copy of the gauge fields for simplified Dslash indexing" OFF)
+mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
+message(STATUS "QUDA_DSLASH_DOUBLE_STORE: ${QUDA_DSLASH_DOUBLE_STORE}")
+
+set(QUDA_DSLASH_PREFETCH_TYPE "NONE" CACHE STRING "enable Dslash prefetching (NONE, THREAD, BULK, TENSOR)")
+set_property(CACHE QUDA_DSLASH_PREFETCH_TYPE PROPERTY STRINGS NONE THREAD BULK TENSOR)
+set(_valid_prefetch NONE THREAD BULK TENSOR)
+if(NOT QUDA_DSLASH_PREFETCH_TYPE IN_LIST _valid_prefetch)
+  message(FATAL_ERROR
+    "Invalid QUDA_DSLASH_PREFETCH_TYPE='${QUDA_DSLASH_PREFETCH_TYPE}'. "
+    "Allowed: ${_valid_prefetch}")
+endif()
+message(STATUS "QUDA_DSLASH_PREFETCH_TYPE: ${QUDA_DSLASH_PREFETCH_TYPE}")
+mark_as_advanced(QUDA_DSLASH_PREFETCH_TYPE)
+
+if(QUDA_DSLASH_PREFETCH_TYPE GREATER 0 AND NOT QUDA_DSLASH_DOUBLE_STORE)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_TYPE with TMA cannot be enabled without QUDA_DSLASH_DOUBLE_STORE=ON")
+endif()
+
+set(_tma_modes BULK TENSOR)
+if(QUDA_DSLASH_PREFETCH_TYPE IN_LIST _tma_modes AND
+   QUDA_COMPUTE_CAPABILITY LESS 90)
+  message(FATAL_ERROR
+    "QUDA_DSLASH_PREFETCH_TYPE=${QUDA_DSLASH_PREFETCH_TYPE} "
+    "requires QUDA_GPU_ARCH=sm_90 or newer")
+endif()
+
+set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions")
+set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions")
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
+mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
+if(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON GREATER 7)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON is greater than pipeline length")
+endif()
+if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
+  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
+endif()
+
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")

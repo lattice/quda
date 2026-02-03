@@ -153,26 +153,6 @@ option(QUDA_DIRAC_COVDEV "build code for covariant derivative" ${QUDA_DIRAC_DEFA
 option(QUDA_DIRAC_DISTANCE_PRECONDITIONING "build code for distance preconditioned Wilson/clover Dirac operators" OFF)
 set(QUDA_DOMAIN_DECOMPOSITION "0" CACHE STRING "which domain decomposition to instantiate in QUDA (1-bit number - RedBlack)")
 
-option(QUDA_DSLASH_DOUBLE_STORE "store a forwards shifted copy of the gauge fields for simplified Dslash indexing" OFF)
-mark_as_advanced(QUDA_DSLASH_DOUBLE_STORE)
-set(QUDA_DSLASH_PREFETCH_TMA "0" CACHE STRING "enable TMA prefetching (Hopper+, 0 - disable, 1 - bulk, 2 - tensor)")
-set_property(CACHE QUDA_DSLASH_PREFETCH_TMA PROPERTY STRINGS 0 1 2)
-mark_as_advanced(QUDA_DSLASH_PREFETCH_TMA)
-if(QUDA_DSLASH_PREFETCH_TMA GREATER 0 AND NOT QUDA_DSLASH_DOUBLE_STORE)
-  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_TMA cannot be enabled without QUDA_DSLASH_DOUBLE_STORE")
-endif()
-
-set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions")
-set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions")
-mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON)
-mark_as_advanced(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED)
-if(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON GREATER 7)
-  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_WILSON is greater than pipeline length")
-endif()
-if(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED GREATER 15)
-  message(SEND_ERROR "QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED is greater than pipeline length")
-endif()
-
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options

@@ -88,15 +88,15 @@ namespace quda
      @param[in] parity Partiry that we are working on
      @param[in] arg Paramter struct
    */
-  template <int prefetch_type, int distance, class coord_t, class Arg>
+  template <PrefetchType prefetch_type, int distance, class coord_t, class Arg>
   __device__ __host__ void prefetch(int dim, int dir, int hop, const coord_t &coord, const coord_t &coord1, int parity,
                                     const Arg &arg)
   {
     int step = 4 * dim + 2 * dir + hop + distance;
     if (step >= Arg::improved ? 16 : 8) return;
 
-    // if using a bulk prefetch we need to use block's first coordinate
-    auto x_cb = (prefetch_type == 1 || prefetch_type == 2) ? coord.x_cb_0 : coord.x_cb;
+    // if using a TMA prefetch we need to use block's first coordinate
+    auto x_cb = dslash_prefetch_tma() ? coord.x_cb_0 : coord.x_cb;
     x_cb = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
 
     if constexpr (Arg::improved) {
@@ -138,7 +138,7 @@ namespace quda
     if constexpr (Arg::prefetch_distance_l1 > 0) // L1 prefetch
       prefetch<3, Arg::prefetch_distance_l1>(dim, dir, hop, coord, coord1, parity, arg);
     if constexpr (Arg::prefetch_distance > 0) // L2 prefetch
-      prefetch<Arg::prefetch_tma, Arg::prefetch_distance>(dim, dir, hop, coord, coord1, parity, arg);
+      prefetch<Arg::prefetch_type, Arg::prefetch_distance>(dim, dir, hop, coord, coord1, parity, arg);
   };
 
   /**

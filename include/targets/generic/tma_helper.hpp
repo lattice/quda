@@ -3,6 +3,8 @@
 namespace quda
 {
 
+  enum class PrefetchType { NONE, THREAD, BULK, TENSOR };
+
   struct tma_descriptor_t {
   };
 

@@ -12,10 +12,6 @@
 namespace quda
 {
 
-#if defined(NVSHMEM_COMMS) && QUDA_DSLASH_PREFETCH_TMA > 0
-#error NVSHMEM cannot be used in combination with TMA prefetching at present
-#endif
-
   /**
      @brief This is the generic driver for launching Dslash kernels
      (the base kernel of which is defined in dslash_helper.cuh).  This
@@ -79,7 +75,12 @@ namespace quda
         strcat(aux_base, ",prefetch=");
         i32toa(tile_str, Arg::prefetch_distance);
         strcat(aux_base, tile_str);
-        if constexpr (Arg::prefetch_tma) strcat(aux_base, Arg::prefetch_tma == 1 ? ",tma=bulk" : ",tma=tensor");
+        if constexpr (dslash_prefetch_type() == PrefetchType::THREAD)
+          strcat(aux_base, ",prefetch=thread");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::BULK)
+          strcat(aux_base, ",prefetch=bulk");
+        else if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR)
+          strcat(aux_base, ",prefetch=tensor");
       }
     }
 
@@ -233,7 +234,7 @@ namespace quda
     virtual bool advanceBlockDim(TuneParam &param) const override
     {
       // if TMA is enabled we must keep parity separate in the block (2-d tuning)
-      if constexpr (QUDA_DSLASH_PREFETCH_TMA > 0)
+      if constexpr (dslash_prefetch_tma())
         return TunableKernel2D_base<false>::advanceBlockDim(param);
       else
         return TunableKernel3D::advanceBlockDim(param);
@@ -288,7 +289,7 @@ namespace quda
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
-      if (QUDA_DSLASH_PREFETCH_TMA > 0 && tp.block.z > 1) errorQuda("Z-dimension block size must be 1 when using TMA");
+      if (dslash_prefetch_tma() && tp.block.z > 1) errorQuda("Z-dimension block size must be 1 when using TMA");
       launch_device<dslash_functor>(
         tp, stream, dslash_functor_arg<D, P, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }

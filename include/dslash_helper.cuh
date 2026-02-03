@@ -13,6 +13,7 @@
 #include <tune_quda.h>
 #include <domain_decomposition_helper.cuh>
 #include <kernel_ops.h>
+#include <tma_helper.hpp>
 
 constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 
@@ -26,6 +27,33 @@ namespace quda
 #else
   constexpr bool dslash_double_store() { return false; }
 #endif
+
+  constexpr PrefetchType dslash_prefetch_type()
+  {
+#if defined(QUDA_DSLASH_PREFETCH_TYPE_NONE)
+    return PrefetchType::NONE;
+#elif defined(QUDA_DSLASH_PREFETCH_TYPE_THREAD)
+    return PrefetchType::THREAD;
+#elif defined(QUDA_DSLASH_PREFETCH_TYPE_BULK)
+    return PrefetchType::BULK;
+#elif defined(QUDA_DSLASH_PREFETCH_TYPE_TENSOR)
+    return PrefetchType::TENSOR;
+#else
+#error "Invalid or missing QUDA_DSLASH_PREFETCH_TYPE"
+#endif
+  }
+
+#if defined(NVSHMEM_COMMS) && (defined(QUDA_DSLASH_PREFETCH_TYPE_BULK) || defined(QUDA_DSLASH_PREFETCH_TYPE_TENSOR))
+#error NVSHMEM cannot be used in combination with TMA prefetching at present
+#endif
+
+  constexpr bool dslash_prefetch_tma()
+  {
+    return (dslash_prefetch_type() == PrefetchType::BULK || dslash_prefetch_type() == PrefetchType::TENSOR);
+  }
+
+  static_assert(!dslash_prefetch_tma() || dslash_double_store(),
+                "Cannot use TMA prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
 
   /**
      @brief Helper function to determine if we should do halo
@@ -307,9 +335,7 @@ namespace quda
     static constexpr int max_regs = 0;             // by default we don't limit register count
     static constexpr bool spill_shared = false;    // whether a given kernel should use shared memory spilling
     static constexpr int prefetch_distance = 0;    // whether we are using prefetching in the dslash
-    static constexpr int prefetch_tma = QUDA_DSLASH_PREFETCH_TMA;
-    static_assert(!prefetch_tma || dslash_double_store(),
-                  "Cannot use TMA prefetching unless QUDA_DSLASH_DOUBLE_STORE is enabled");
+    static constexpr PrefetchType prefetch_type = dslash_prefetch_type();
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const QudaReconstructType reconstruct;
@@ -754,7 +780,7 @@ namespace quda
     {
       typename Arg::D dslash(*this);
 
-      if constexpr (QUDA_DSLASH_PREFETCH_TMA > 0) {
+      if constexpr (dslash_prefetch_tma()) {
         // FIXME need warp uniform parity which is not composable with
         // NVSHMEM since the latter requires blockDim.y and blockDim.z to
         // cover the entire extent

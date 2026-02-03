@@ -24,6 +24,8 @@ using barrier_t = cuda::barrier<cuda::thread_scope_block>;
 namespace quda
 {
 
+  enum class PrefetchType { NONE, THREAD, BULK, TENSOR };
+
   struct tma_descriptor_t {
     CUtensorMap map;
   };

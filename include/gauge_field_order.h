@@ -1674,9 +1674,9 @@ namespace quda {
           memcpy(&v[M * N + Nrem], &gauge[parity * offset + phaseOffset + stride * dir + x], sizeof(store_t));
       }
 
-      template <int type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
+      template <PrefetchType type> __device__ inline void prefetch(int x, int dir, int parity, int block_size = 0) const
       {
-        if constexpr (type == 0) { // use per-thread prefetching
+        if constexpr (type == PrefetchType::THREAD) { // use per-thread prefetching
 #pragma unroll
           for (int i = 0; i < M; i++)
             prefetch_cache_line(gauge + (parity * offset + dir * (M * N + Nrem) * stride + (i * stride + x) * N));
@@ -1686,7 +1686,7 @@ namespace quda {
             prefetch_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
 
           if constexpr (loadPhase) prefetch_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
-        } else if constexpr (type == 1) { // bulk prefetch
+        } else if constexpr (type == PrefetchType::BULK) { // bulk prefetch
           if (block_size == 0) block_size = blockDim.x;
           if (target::is_thread_zero()) {
 #pragma unroll
@@ -1702,12 +1702,13 @@ namespace quda {
             if constexpr (loadPhase)
               prefetch_cache_bulk(gauge + (parity * offset + phaseOffset + stride * dir + x), block_size * sizeof(Float));
           }
-        } else if constexpr (type == 2) { // n-d tensor prefetch
+        } else if constexpr (type == PrefetchType::TENSOR) { // n-d tensor prefetch
           if (target::is_thread_zero()) {
             prefetch_cache_tensor_5d(tensor_desc.N, x, x / 16, 0, dir, parity);
             if constexpr (Nrem > 0) prefetch_cache_tensor_4d(tensor_desc.Nrem, x, x / 16, dir, parity);
             if constexpr (loadPhase) prefetch_cache_tensor_4d(tensor_desc.phase, x, x / 16, dir, parity);
           }
+#if 0 // L1 prefetching is a disabled experiment
         } else { // L1 prefetching
 #pragma unroll
           for (int i = 0; i < M; i++)
@@ -1718,6 +1719,7 @@ namespace quda {
             prefetch_L1_cache_line(gauge + (parity * offset + (dir * (M * N + Nrem) + M * N) * stride + x * Nrem));
 
           if constexpr (loadPhase) prefetch_L1_cache_line(gauge + (parity * offset + phaseOffset + stride * dir + x));
+#endif
         }
       }
 
