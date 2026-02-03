@@ -41,6 +41,7 @@ namespace quda
 #else
 #error "Invalid or missing QUDA_DSLASH_PREFETCH_TYPE"
 #endif
+    return PrefetchType::NONE;
   }
 
 #if defined(NVSHMEM_COMMS) && (defined(QUDA_DSLASH_PREFETCH_TYPE_BULK) || defined(QUDA_DSLASH_PREFETCH_TYPE_TENSOR))

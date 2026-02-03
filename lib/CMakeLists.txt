@@ -519,6 +519,13 @@ if(NOT DEFINED QUDA_MAX_MULTI_RHS)
   message(STATUS "Max number of rhs per kernel: ${QUDA_MAX_MULTI_RHS}")
 endif()
 
+# Disable dslash prefetching if not already set
+if(NOT QUDA_DSLASH_PREFETCH_TYPE)
+  set(QUDA_DSLASH_PREFETCH_TYPE "NONE" CACHE STRING "enable Dslash prefetching" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_WILSON "0" CACHE STRING "set prefetch distance for Wilson-like fermions" FORCE)
+  set(QUDA_DSLASH_PREFETCH_DISTANCE_STAGGERED "0" CACHE STRING "set prefetch distance for staggered-like fermions" FORCE)
+endif()
+
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
