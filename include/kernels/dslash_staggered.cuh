@@ -70,6 +70,9 @@ namespace quda
     is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
     dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
+      if (!improved && prefetch_distance > 7)
+        warningQuda("dslash prefetch distance %d is greater than pipeline length for naive staggered", prefetch_distance);
+
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
         this->in[i] = in[i];
