@@ -30,10 +30,7 @@ namespace quda
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
-      const_cast<quda::gauge::tensor_desc_t &>(Dslash::arg.U.tensor_desc) = get_tensor_descriptor(U, tp.block.x);
-      if constexpr (dslash_double_store())
-        const_cast<quda::gauge::tensor_desc_t &>(Dslash::arg.Uback.tensor_desc) = get_tensor_descriptor(U.shift(1), tp.block.x);
+      Dslash::setParam(tp, U);
       Dslash::template instantiate<packShmem>(tp, stream);
     }
   };

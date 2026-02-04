@@ -39,8 +39,8 @@ namespace quda
     F x[MAX_MULTI_RHS];   /** input vector set when doing xpay */
     Ghost halo_pack;
     Ghost halo;
-    const G<false> U;    /** the gauge field */
-    const G<true> Uback; /** the backwards gauge field */
+    mutable G<false> U;    /** the gauge field */
+    mutable G<true> Uback; /** the backwards gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     /** parameters for distance preconditioning */
     const real alpha0;

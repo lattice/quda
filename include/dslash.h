@@ -8,6 +8,7 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <instantiate_dslash.h>
+#include <tma_helper.hpp>
 
 namespace quda
 {
@@ -142,7 +143,7 @@ namespace quda
       }
     }
 
-    inline void setParam(TuneParam &tp)
+    template <bool improved = false> inline void setParam(TuneParam &tp, const GaugeField &U, const GaugeField &L = {})
     {
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
@@ -184,6 +185,16 @@ namespace quda
           (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
           0;
         tp.grid.x += arg.exterior_blocks;
+      }
+
+      if constexpr (dslash_prefetch_type() == PrefetchType::TENSOR && Arg::prefetch_distance > 0) {
+        Dslash::arg.U.tensor_desc = get_tensor_descriptor(U, tp.block.x);
+        Dslash::arg.Uback.tensor_desc = get_tensor_descriptor(U.shift(), tp.block.x);
+        if constexpr (improved) {
+          assert(!U.empty());
+          Dslash::arg.L.tensor_desc = get_tensor_descriptor(L, tp.block.x);
+          Dslash::arg.Lback.tensor_desc = get_tensor_descriptor(L.shift(), tp.block.x);
+        }
       }
     }
 

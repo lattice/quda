@@ -1443,6 +1443,7 @@ namespace quda {
 
   GaugeField& GaugeField::shift(int shift_offset) const
   {
+    if (shift_offset == -1) shift_offset = nFace;
     // If we don't yet have a cached shifted copy or the shift value changed
     if (!shifted) shifted = std::make_unique<GaugeField>(::quda::shift(*this, shift_offset));
     return *shifted;

@@ -652,10 +652,11 @@ namespace quda {
     /**
        @brief Return the shifted gauge field by shift in each
        dimension.  Shifted field is cached for subsequent reuse.
-       @param[in] shift value (1 or 3 supported)
+       @param[in] shift value (1 or 3 supported).  If no argument
+       passed the shift is set to Nface.
        @return Reference to shifted field
     */
-    GaugeField &shift(int shift) const;
+    GaugeField &shift(int shift = -1) const;
 
     /**
      * @brief Print the site data

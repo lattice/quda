@@ -36,7 +36,7 @@ namespace quda
     const Ghost halo_pack; /** accessor used for writing the halo field */
     const Ghost halo;      /** accessor used for reading the halo field */
     F x[MAX_MULTI_RHS];    /** input vector field for xpay*/
-    const G U;    /** the gauge field */
+    mutable G U;           /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
     const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */

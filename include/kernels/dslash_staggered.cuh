@@ -43,10 +43,10 @@ namespace quda
     const Ghost halo_pack; /** accessor for writing the halo */
     const Ghost halo;      /** accessor for reading the halo */
     F x[MAX_MULTI_RHS];    /** input vector when doing xpay */
-    const GU<false> U;     /** the gauge field */
-    const GU<true> Uback;  /** the gauge field */
-    const GL<false> L;     /** the long gauge field */
-    const GL<true> Lback;  /** the long gauge field */
+    mutable GU<false> U;     /** the gauge field */
+    mutable GU<true> Uback;  /** the gauge field */
+    mutable GL<false> L;     /** the long gauge field */
+    mutable GL<true> Lback;  /** the long gauge field */
 
     const real a; /** xpay scale factor */
     const real tboundary; /** temporal boundary condition */
