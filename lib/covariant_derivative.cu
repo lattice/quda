@@ -25,18 +25,19 @@ namespace quda
     using Dslash::arg;
     using Dslash::halo;
     using Dslash::in;
+    const GaugeField &U;
 
   public:
     CovDev(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-           const ColorSpinorField &halo) :
-      Dslash(arg, out, in, halo)
+           const ColorSpinorField &halo, const GaugeField &U) :
+      Dslash(arg, out, in, halo), U(U)
     {
     }
 
     void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash::setParam(tp);
+      Dslash::setParam(tp, U);
       if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
       if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
 
@@ -143,11 +144,11 @@ namespace quda
       auto halo = ColorSpinorField::create_comms_batch(in, 1, false);
       if (in.Nspin() == 4) {
         CovDevArg<Float, 4, nColor, DDArg, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-        CovDev<decltype(arg)> covDev(arg, out, in, halo);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
         dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
       } else if (in.Nspin() == 1) {
         CovDevArg<Float, 1, nColor, DDArg, recon, nDim> arg(out, in, halo, U, mu, parity, dagger, comm_override);
-        CovDev<decltype(arg)> covDev(arg, out, in, halo);
+        CovDev<decltype(arg)> covDev(arg, out, in, halo, U);
         dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, out, in, halo, profile);
       } else {
         errorQuda("Spin not supported");
