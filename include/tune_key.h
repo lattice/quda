@@ -9,7 +9,7 @@ namespace quda {
 
     static constexpr int volume_n = 32;
     static constexpr int name_n = 512;
-    static constexpr int aux_n = 256;
+    static constexpr int aux_n = 384;
     char volume[volume_n];
     char name[name_n];
     char aux[aux_n];
