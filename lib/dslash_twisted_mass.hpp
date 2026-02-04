@@ -22,7 +22,7 @@ namespace quda
 
   public:
     TwistedMass(Arg &arg, cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                const ColorSpinorField &halo, const GaugeField(U)) :
+                const ColorSpinorField &halo, const GaugeField U) :
       Dslash(arg, out, in, halo), U(U)
     {
     }
