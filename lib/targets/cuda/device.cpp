@@ -160,7 +160,16 @@ namespace quda
     auto get_temperature()
     {
       unsigned int temp = 0;
+#if defined(NVML_API_VERSION) && NVML_API_VERSION >= 12
+      nvmlTemperature_t temperature;
+      temperature.version = nvmlTemperature_v1;
+      temperature.sensorType = NVML_TEMPERATURE_GPU;
+      temperature.temperature = 0;
+      NVML_CHECK(nvmlDeviceGetTemperatureV(monitor_device_id, &temperature));
+      temp = static_cast<unsigned int>(temperature.temperature);
+#else
       NVML_CHECK(nvmlDeviceGetTemperature(monitor_device_id, NVML_TEMPERATURE_GPU, &temp));
+#endif
       return temp;
     }
 
