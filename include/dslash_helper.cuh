@@ -777,7 +777,7 @@ namespace quda
     }
 
     template <bool allthreads = false> // true if all threads in block will enter, even if out of range
-    __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true)
+    __forceinline__ __device__ void operator()(int, int s, int parity, bool alive = true) const
     {
       typename Arg::D dslash(*this);
 
