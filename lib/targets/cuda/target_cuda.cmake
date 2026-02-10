@@ -505,7 +505,7 @@ endif()
 CPMAddPackage(
     NAME CCCL
     GITHUB_REPOSITORY nvidia/cccl
-    GIT_TAG v3.1.4 # Fetches this tagged commit
+    GIT_TAG v3.2.0 # Fetches this tagged commit
 )
 target_link_libraries(quda PRIVATE CCCL::CCCL)
 
